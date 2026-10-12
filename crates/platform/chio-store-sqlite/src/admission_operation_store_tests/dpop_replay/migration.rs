@@ -8,7 +8,7 @@ fn v23_upgrade_adds_only_empty_dpop_history_and_rejects_unqualified_namespaces(
         Some("CREATE TABLE dpop_replay_unqualified(value TEXT)"),
         Some("DROP TRIGGER admission_operation_commits_immutable"),
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let Fixture {
             _temp,
             database,

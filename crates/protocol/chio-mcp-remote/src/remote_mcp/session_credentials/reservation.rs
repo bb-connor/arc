@@ -122,6 +122,7 @@ mod tests {
                 reaper_interval_millis: DEFAULT_SESSION_REAPER_INTERVAL_MILLIS,
                 tombstone_retention_millis: DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS,
                 request_response_timeout_millis: DEFAULT_REQUEST_RESPONSE_TIMEOUT_MILLIS,
+                resume_envelope_floor: RemoteSessionEnvelope::V3,
             },
             protocol_version: None,
             peer_capabilities: None,

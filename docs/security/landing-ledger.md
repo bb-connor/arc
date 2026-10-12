@@ -8,6 +8,25 @@ say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
 
+## MINISW source-pinned native acceptance (October 12 UTC)
+
+`MINISW-NATIVE-DENY` now records three local Linux/x86 runs at
+`66f976ab27f2bae9136e84ae013b0184fd4f5237` (tree
+`43a4905da92dbbda2efc2a5b7e0e1a9555314402`). Both native and operator
+qualifiers exited zero in every run, with the 10,000 ms fence unchanged.
+Baseline completed in one attempt with eight verified receipts; known-outcome
+recovery used three attempts with eight verified receipts; unknown-outcome
+recovery stopped after two attempts with zero command effects. Each operator
+control retained its 10-second timeout and eight verified receipts.
+
+The [canonical current row](landing-ledger.json) pins the binary, worker image
+and evidence checksum list; all 148 entries were verified locally. The earlier
+RemoveIPC-invalid fixture capture and both labelled failed-run directories are
+retained, as is the prior hosted observation. Acceptance is limited to this
+captured source and local OCI host. Exact-current, hosted, latency, cold-state
+and whole-qualification acceptance remain separate; concurrent builds in runs
+two and three do not establish a load or percentile guarantee.
+
 ## Federation reputation uses admitted verification keys (October 12 UTC)
 
 `FEDERATION-RAW-SIGNER` is repaired on `fix/federation-reputation-trust`.

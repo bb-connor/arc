@@ -1,0 +1,27 @@
+[package]
+name = "chio-recovery-lab"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.94"
+publish = false
+description = "Local recovery-offer prototype over the real Chio flow engine"
+
+[workspace]
+
+[dependencies]
+chio-flow = { path = "../../crates/security/chio-flow", features = ["std"] }
+chio-core-types = { path = "../../crates/core/chio-core-types" }
+chio-security-types = { path = "../../crates/security/chio-security-types", features = ["std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+sha2 = "0.10"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+
+[profile.dev]
+debug = 0
+
+[profile.test]
+debug = 0

@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn lost_claim_acknowledgement_recovers_the_exact_new_version_without_reacquisition(
 ) -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let authority = activate(&fixture, &source)?;
     let (initial, lease, credential) = setup(
@@ -43,7 +43,7 @@ fn lost_claim_acknowledgement_recovers_the_exact_new_version_without_reacquisiti
 
 #[test]
 fn claim_history_is_immutable_even_without_recursive_triggers() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let authority = activate(&fixture, &source)?;
     let (operation, lease, credential) = setup(
@@ -105,7 +105,7 @@ fn claim_cutpoints_roll_back_the_operation_history_and_global_commit() -> Anchor
         ("dpop_replay_claim_episodes", ""),
         ("dpop_replay_claim_resources", ""),
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, true)?;
         let authority = activate(&fixture, &source)?;
         let (operation, lease, credential) = setup(
@@ -156,7 +156,7 @@ fn malformed_or_missing_physical_claim_history_denies_readback() -> AnchoredTest
         "DROP TRIGGER dpop_replay_claim_resources_no_delete; DELETE FROM dpop_replay_claim_resources",
         "DROP TRIGGER dpop_replay_claim_episodes_no_update; PRAGMA ignore_check_constraints = ON; UPDATE dpop_replay_claim_episodes SET claim_json = zeroblob(65537)",
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, true)?;
         let authority = activate(&fixture, &source)?;
         let (operation, lease, credential) = setup(&fixture, &authority, "dpop-corrupt", "nonce", DpopReplayClaimPhase::Dispatch)?;
@@ -171,7 +171,7 @@ fn malformed_or_missing_physical_claim_history_denies_readback() -> AnchoredTest
 
 #[test]
 fn release_failure_retains_exact_custody_until_a_successful_retry() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let authority = activate(&fixture, &source)?;
     let (operation, lease, credential) = setup(

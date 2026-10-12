@@ -1,0 +1,25 @@
+{
+  "experiment": "file-ledger-recreation",
+  "interpretation": "A fresh FileStore forgets the recorded label and adopts configured initial classification. This confirms a documented experimental limitation.",
+  "label_after": {
+    "audience": [],
+    "trust": 255
+  },
+  "label_before": {
+    "audience": [
+      {
+        "readers": [
+          "hr@company.test"
+        ]
+      }
+    ],
+    "trust": 1
+  },
+  "passed": true,
+  "scope": "FileStore API; recreation of the in-memory ledger, not a full runtime restart",
+  "unchanged_digest": "55160bc96eff99b1bbced30a5470bfca1389cb36e74841739dfcea9caac78ea0"
+}
+     Locking 50 packages to latest Rust 1.93.0 compatible versions
+   Compiling chio-appa-research-probe v0.1.0 (/var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T/chio-appa-probe-16crokne)
+    Finished `dev` profile [unoptimized] target(s) in 2.17s
+     Running `/private/tmp/chio-openappa-research-20261001/target/debug/chio-appa-research-probe /var/folders/jy/95wms_mn265f0bpj_v6wc4zh0000gn/T/chio-appa-probe-16crokne/workspace`

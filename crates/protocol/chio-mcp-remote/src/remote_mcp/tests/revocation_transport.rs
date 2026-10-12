@@ -47,6 +47,7 @@ async fn state(directory: &FsPath, remote: Option<String>) -> TestResult<RemoteA
             protocol_version: None,
             ownership: Default::default(),
             terminal_at: now,
+            terminal_reason: None,
         }),
     );
     Ok(RemoteAppState {

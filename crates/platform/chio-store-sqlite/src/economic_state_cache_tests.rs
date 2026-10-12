@@ -1,5 +1,4 @@
 use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::{sha256_hex, Keypair};
@@ -32,9 +31,11 @@ struct Fixture {
     _authority: SqliteAuthorityStore,
     cache: SqliteEconomicStateCache,
     fence: chio_core::StoreMutationFence,
+    _clock: chio_test_support::clock::ClockScope,
 }
 
 fn fixture() -> Fixture {
+    let clock = chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
     let temp = tempfile::tempdir().expect("tempdir");
     secure_temp_directory(temp.path());
     let database = temp.path().join("authority.db");
@@ -56,6 +57,7 @@ fn fixture() -> Fixture {
         _authority: authority,
         cache,
         fence,
+        _clock: clock,
     }
 }
 
@@ -316,13 +318,7 @@ fn admission_digest(field: &'static str, byte: char) -> AdmissionDigest {
 }
 
 fn now_ms() -> u64 {
-    u64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time")
-            .as_millis(),
-    )
-    .expect("system time fits u64")
+    chio_test_support::clock::unix_millis()
 }
 
 fn prepared_economic_operation(
@@ -983,6 +979,8 @@ fn operation_bound_stage_requires_the_exact_current_recovery_claim() -> TestResu
 
 #[test]
 fn operation_bound_stage_expiry_is_durable_and_ijson_bounded() -> TestResult {
+    let _clock =
+        chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
     let temp = tempfile::tempdir()?;
     secure_temp_directory(temp.path());
     let database = temp.path().join("authority.db");

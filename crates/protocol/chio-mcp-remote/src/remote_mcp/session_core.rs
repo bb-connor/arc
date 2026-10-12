@@ -135,6 +135,7 @@ const SESSION_DRAIN_GRACE_ENV: &str = "CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS";
 const SESSION_REAPER_INTERVAL_ENV: &str = "CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS";
 const SESSION_TOMBSTONE_RETENTION_ENV: &str = "CHIO_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS";
 const REQUEST_RESPONSE_TIMEOUT_ENV: &str = "CHIO_MCP_REQUEST_RESPONSE_TIMEOUT_MILLIS";
+const RESUME_RECORD_ENVELOPE_FLOOR_ENV: &str = "CHIO_MCP_RESUME_RECORD_ENVELOPE_FLOOR";
 const SESSION_TOUCH_PERSIST_INTERVAL_MILLIS: u64 = 5_000;
 
 type NotificationTapQueue = Arc<StdMutex<VecDeque<Value>>>;
@@ -251,6 +252,8 @@ struct SessionLifecyclePolicy {
     tombstone_retention_millis: u64,
     /// Bound on a dispatched request's wait for its terminal response.
     request_response_timeout_millis: u64,
+    /// Lowest integrity envelope a session signs its resume record with.
+    resume_envelope_floor: RemoteSessionEnvelope,
 }
 
 impl SessionLifecyclePolicy {
@@ -269,6 +272,43 @@ struct RemoteSessionDiagnosticRecord {
     #[serde(default)]
     ownership: RemoteSessionOwnershipSnapshot,
     terminal_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    terminal_reason: Option<TerminalReason>,
+}
+
+/// Why a session became terminal. A `v3` terminal record carries it, so the
+/// two subscription failures stay distinct from an ordinary close.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum TerminalReason {
+    Deleted,
+    Expired,
+    Closed,
+    /// A standard subscription failed re-authorization before activation.
+    SubscriptionNotRestored,
+    /// A standard subscription lost its authority after activation.
+    SubscriptionAuthorityLost,
+}
+
+impl TerminalReason {
+    fn state(self) -> RemoteSessionState {
+        match self {
+            Self::Deleted => RemoteSessionState::Deleted,
+            Self::Expired => RemoteSessionState::Expired,
+            Self::Closed | Self::SubscriptionNotRestored | Self::SubscriptionAuthorityLost => {
+                RemoteSessionState::Closed
+            }
+        }
+    }
+
+    /// A `v2` record has no reason field, so only the `v3` envelope can say
+    /// which subscription failure ended the session.
+    fn requires_v3(self) -> bool {
+        matches!(
+            self,
+            Self::SubscriptionNotRestored | Self::SubscriptionAuthorityLost
+        )
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -287,8 +327,34 @@ struct RemoteSessionResumeRecord {
     peer_capabilities: PeerCapabilities,
     initialize_params: Value,
     issued_capabilities: Vec<CapabilityToken>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    subscriptions: Vec<PersistedSubscription>,
     resume_generation: u64,
     resume_integrity: RemoteSessionIntegrityTag,
+}
+
+/// A client subscription the resume record carries across restore.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum PersistedSubscription {
+    /// A standard MCP `resources/subscribe`, keyed by URI within the session.
+    Standard { uri: String, capability_id: String },
+}
+
+/// Integrity envelope a signed session record names. An absent value is `v2`,
+/// so records written before the discriminator keep their exact bytes.
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum RemoteSessionEnvelope {
+    #[default]
+    V2,
+    V3,
+}
+
+impl RemoteSessionEnvelope {
+    fn is_v2(&self) -> bool {
+        *self == Self::V2
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -296,6 +362,8 @@ struct RemoteSessionIntegrityTag {
     key_id: String,
     key_version: u64,
     tag: String,
+    #[serde(default, skip_serializing_if = "RemoteSessionEnvelope::is_v2")]
+    envelope: RemoteSessionEnvelope,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -311,6 +379,8 @@ struct RemoteSessionTerminalFence {
     session_id: String,
     terminal_at: u64,
     terminal_state: RemoteSessionState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    terminal_reason: Option<TerminalReason>,
     resume_generation: u64,
     terminal_epoch: u64,
     resume_integrity: RemoteSessionIntegrityTag,
@@ -656,6 +726,7 @@ struct RemoteSession {
     session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
     resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
     resume_generation: AtomicU64,
+    resume_envelope: ResumeEnvelopeRatchet,
     terminalization: Mutex<()>,
     upstream_transport: RemoteSessionUpstreamTransport,
 }

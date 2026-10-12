@@ -84,7 +84,7 @@ fn child_process_crash() -> AnchoredTestResult {
 fn process_abort_never_exposes_partial_import_and_new_owner_recovers_exact_pin(
 ) -> AnchoredTestResult {
     for stage in 1..=10 {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         drop(source(&fixture)?);
         let Fixture {
             _temp,
@@ -93,6 +93,7 @@ fn process_abort_never_exposes_partial_import_and_new_owner_recovers_exact_pin(
             authority,
             store,
             fence,
+            _clock,
         } = fixture;
         drop(store);
         drop(authority);
@@ -117,6 +118,7 @@ fn process_abort_never_exposes_partial_import_and_new_owner_recovers_exact_pin(
             _temp,
             database,
             lock_root,
+            _clock,
         };
         assert!(fixture
             .store

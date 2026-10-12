@@ -203,6 +203,8 @@ fn rows(store: &SqliteAdmissionOperationStore) -> TestResult<(i64, i64, i64)> {
 
 #[test]
 fn reserved_threshold_witness_binds_its_original_and_checks_only_signed_time() -> TestResult {
+    let _clock =
+        chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
     let (_temp, database, locks) = provision()?;
     let authority = open(&database, &locks)?;
     let store = authority.admission_operation_store();

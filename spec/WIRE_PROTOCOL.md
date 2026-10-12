@@ -271,6 +271,9 @@ Established-session rules:
 - Notification replay uses the `Last-Event-ID` request header.
 - Event identifiers are encoded as `{session_id}-{sequence}`.
 - Replay requests outside the retained event window fail with `409 Conflict`.
+- Event sequences are monotonic across a session restore. A restored session
+  starts above every sequence an earlier incarnation issued, so a cursor from
+  before the restore fails with `409 Conflict` instead of naming a new event.
 - Hosted deployments that reuse one upstream owner across multiple sessions
   **MUST** keep late notifications and task handles scoped to the originating
   session. They **MUST NOT** fan out unattributed notifications or allow a

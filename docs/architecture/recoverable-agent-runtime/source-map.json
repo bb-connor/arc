@@ -1,0 +1,546 @@
+{
+  "schema": "chio.recovery-architecture-source-map.v1",
+  "date": "2026-10-01",
+  "source_kind": "Internal source/provenance record, not public checkout or release instructions",
+  "development_base": "f25cd61f49fbf9a15a70396da82d9808ba4e1da2",
+  "research_branch": "research/openappa-recovery-20261001",
+  "files": [
+    {
+      "path": "Cargo.lock",
+      "sha256": "d9bda38a6c395cd6419760c0edd4473654d011ff1b483d02f36a1667f95a57c8",
+      "bytes": 375947
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "ac74f90336f1f2f40021b78a86c4ed64cafb5127aaae247b9a31be653e017a40",
+      "bytes": 28021
+    },
+    {
+      "path": "crates/core/chio-core-types/src/canonical/signed_json.rs",
+      "sha256": "35485d09d5e3afc533c19db2e6a02faaf7cc66b3891814369009b111d970aa3f",
+      "bytes": 5099
+    },
+    {
+      "path": "crates/core/chio-core-types/src/declassification.rs",
+      "sha256": "0b3e89235ae1374ef60bcd789a89d4a11709fd4f1ca7c09f851919f3aff00c82",
+      "bytes": 7449
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/admission_operation.rs",
+      "sha256": "cdba318f1c4f0195109db9d7b0066bdac0b184719d8d08a91b82faf2bd3520b4",
+      "bytes": 55613
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/admission_operation/projection/outcome_unknown.rs",
+      "sha256": "ad093d7a6d2dfc572f90f4c3ef76055a40c7ffc652ecd6b6a36bdeb3a1a7d11f",
+      "bytes": 2340
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/active_response_simulation.rs",
+      "sha256": "38b551da16a27547af2de95067e5daf9fb17ffcc261cb2181cca6cc191c2afac",
+      "bytes": 6879
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/response_simulation_report.rs",
+      "sha256": "1a0bb7fa505eded04197fe0f3cd7066200055cbec40ce28ed9506afeba936ec1",
+      "bytes": 7717
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/tool_outcome/release.rs",
+      "sha256": "905e1bdd1deb5ee8fddb04497ae404d82ae843c8c57dbc2367255c988bc3330f",
+      "bytes": 74921
+    },
+    {
+      "path": "crates/kernel/chio-process/src/lib.rs",
+      "sha256": "ec6dc924f363b7bdc1ef381005951c0aaf1ba9a9bfedd7b896a5fdc712581624",
+      "bytes": 26431
+    },
+    {
+      "path": "crates/kernel/chio-process/src/security.rs",
+      "sha256": "5b53ad63e237da529ba7018e81fd1af380e5219c51c9c6bc8778810791c5f234",
+      "bytes": 1764
+    },
+    {
+      "path": "crates/kernel/chio-process/src/state_reader.rs",
+      "sha256": "8c81c9c465b10268f9c8cea8e71ad0a876eb461aa8153484f4d78d1c787c80b0",
+      "bytes": 4682
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store.rs",
+      "sha256": "b1f08866f54ca067a6e873fb3ba2a28585a9a67c3f91ccabc760ed922d482933",
+      "bytes": 16099
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store.sql",
+      "sha256": "53d92e2c34fe956cca18fc7db14ed3f52aaf9505f02267d91ec3e38acc74dad2",
+      "bytes": 2909
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store/blobs.rs",
+      "sha256": "726a28d19bc6597172404527c4ed9c732fdbb66a919dc7f2642f4cdd2790eac4",
+      "bytes": 3999
+    },
+    {
+      "path": "crates/kernel/chio-process/src/types.rs",
+      "sha256": "26ba7f6468167f743f7ab33ed10217583da7ee9457e69cc67415a896d4d6f3fc",
+      "bytes": 4343
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
+      "sha256": "119a5be1a42d98ebd76e810c00035a0bbfa620693f5a8dea779703b12c3bcf68",
+      "bytes": 20453
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/native_flow/declassification.rs",
+      "sha256": "81f42b57b006b5a9e4f7e2d4b9013d6c2d43d6f89fa13d34c346a65007263ce3",
+      "bytes": 3987
+    },
+    {
+      "path": "crates/platform/chio-manifest/src/admission.rs",
+      "sha256": "0c2607017443ff4a724fd2f910974724001165b2f7a5c6a277846b709d6ffb85",
+      "bytes": 34603
+    },
+    {
+      "path": "crates/platform/chio-manifest/src/lib_parts/part_01.inc",
+      "sha256": "c8067ecb1e831ab4ea7b7da7a47248a23a7396b28473c9be35689ad2d93a8e6f",
+      "bytes": 43275
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner.rs",
+      "sha256": "df6e9a2e76c94ba1710e28d3caeadbe97c5bbdd8839a43c40b7e4643153836b0",
+      "bytes": 69689
+    },
+    {
+      "path": "crates/platform/chio-workflow/src/authority.rs",
+      "sha256": "621152a24eb08794394fb6b913a26f37c7003adb7c80143eb5f47760e3f4757b",
+      "bytes": 52564
+    },
+    {
+      "path": "crates/platform/chio-workflow/src/lib.rs",
+      "sha256": "cfa5682b3514ec663bf0260bb8c7a857d50abf63e058396e5a97f44039321bf0",
+      "bytes": 1785
+    },
+    {
+      "path": "crates/platform/chio-workflow/src/manifest.rs",
+      "sha256": "21458f0b2145e6f27c95bee05978a24a558763516ce55caf0920bb82f841198d",
+      "bytes": 9088
+    },
+    {
+      "path": "crates/protocol/chio-egress-contract/src/lib.rs",
+      "sha256": "d37658206f08f53baefaab841b7b9d24e0ca86a278c8611a09c6297981186fc1",
+      "bytes": 26205
+    },
+    {
+      "path": "crates/security/chio-flow/src/declassification.rs",
+      "sha256": "0e121749b4bc7f6811cea537840bfdbe1cd7fac5183384cffa2ff3f89503b5bc",
+      "bytes": 32130
+    },
+    {
+      "path": "crates/security/chio-flow/src/engine.rs",
+      "sha256": "dc9e7701adb2465b43e12b3ca183e7e4e2001d3ef02f091d6b3019300050ecb4",
+      "bytes": 57803
+    },
+    {
+      "path": "crates/security/chio-flow/src/lattice.rs",
+      "sha256": "239d84fc48a654fb3e5f8679fa6ff873f7d0bfdf55e4c72138955a4291b35701",
+      "bytes": 9429
+    },
+    {
+      "path": "crates/security/chio-security-kernel/src/pre_invocation.rs",
+      "sha256": "77d7ae78883677842972b8cf3f4bb01342552139e7c32263eb6b5a6f3a037f1c",
+      "bytes": 3594
+    },
+    {
+      "path": "crates/security/chio-security-types/src/declassification.rs",
+      "sha256": "8b30ac70802e7864976e5b12be9ffee3073f71fef13fefc0cfc0697212c8a392",
+      "bytes": 11180
+    },
+    {
+      "path": "crates/security/chio-security-types/src/flow.rs",
+      "sha256": "724c50b89a36c0bcf0cb554ae56c494ac408b2fbcba17dcd181b50bd1e580304",
+      "bytes": 40356
+    },
+    {
+      "path": "crates/trust/chio-disclosure-lineage/src/lib.rs",
+      "sha256": "f6bcceae68f96f9e3696f755317f6f9f801f7cb854d6052934f66d28a55a18b4",
+      "bytes": 1145
+    },
+    {
+      "path": "docs/architecture/SWARM_EXECUTION_CONTRACT.md",
+      "sha256": "5c877303baf93cbf7f62c0882db5dde123ff1acef355495eb0aa4e39b6b7e467",
+      "bytes": 64122
+    },
+    {
+      "path": "docs/reviews/2026-09-27-production-response-simulation.md",
+      "sha256": "6d8fb4b3db3825fe5100e95d115737a3f87a2c59f44aeda1d1bd935d6301472f",
+      "bytes": 7204
+    },
+    {
+      "path": "labs/openappa-recovery/evidence/source-manifest.json",
+      "sha256": "c06c1193fd9f680f8ccecf415b562a5e1bee17eb0225e15b46a374b090bd4696",
+      "bytes": 8356
+    },
+    {
+      "path": "labs/openappa-recovery/evidence/test-results.json",
+      "sha256": "0312b861d4dce3d3b4d8cbbca12091cfa8fa89325074427647960285d2b61567",
+      "bytes": 6736
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "sha256": "d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0",
+      "bytes": 86
+    },
+    {
+      "path": "crates/security/chio-flow/Cargo.toml",
+      "sha256": "6ea3655a7a99a16472891d887bd0b8c2e5a28c55f40ac2a19712a2723f5ea440",
+      "bytes": 853
+    },
+    {
+      "path": "crates/security/chio-security-types/Cargo.toml",
+      "sha256": "d869f83e7738cc9edbefbab059368582d4e2446bcff183e26efd4384a1a8b2e0",
+      "bytes": 694
+    },
+    {
+      "path": "crates/core/chio-core-types/Cargo.toml",
+      "sha256": "39c0e7d7dd15f72230bf47ed6d8a983f1385f608544315ca7a031bc224418f38",
+      "bytes": 4475
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/Cargo.toml",
+      "sha256": "7a061ed985cdc619897e26cac24389167487745a1d94093764d00068d3dfcda8",
+      "bytes": 3631
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/flow_state/input_join.rs",
+      "sha256": "12f7ccd4fb24225ddf74ca8714f5438f4f385407da33c470a06785d8c6f35944",
+      "bytes": 1831
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/flow_state/mutations.rs",
+      "sha256": "1b2b190168ed31fc2fe214dac28ee846f3b0d85cf4aafaec4d088b0c01b3a1fa",
+      "bytes": 4284
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/flow_state/egress.rs",
+      "sha256": "1fe869f97fb83f2f4c4abdd6dc6017f2ca7a645484047008205939b9f14c1c0e",
+      "bytes": 5109
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/flow_state/tests/native_scope/fences.rs",
+      "sha256": "e093ff3a624feb9db7f9b66e49c0ab8da3e06d9469418fff797a758386473c2a",
+      "bytes": 3738
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs",
+      "sha256": "a03baca3a3ed40a6908ef3f1b7cff72b37f0ce19e162fb40e707cc082c3b98de",
+      "bytes": 13179
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/runtime.rs",
+      "sha256": "eef363dcffe4864dc82b6870f5d2f44b07b552073c7177f980f33f32d24e2acb",
+      "bytes": 17073
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs",
+      "sha256": "052130a5aa2e335c7438ad137cc7b68979386717eef9652bca357d36be8d08c0",
+      "bytes": 19622
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",
+      "sha256": "ec64cf0470d12b151272e11216bc66688200fc6f5776db5e1aba645a5c542729",
+      "bytes": 88068
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/execution_nonce.rs",
+      "sha256": "5507ab9f47bcfee5e6ebdbc2de8372a52cb2acc6c7f7a7f90c2d632003c8160c",
+      "bytes": 25074
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition/nonce_preflight.rs",
+      "sha256": "b224a7715b60df674a1bd74c919d2241e1fc1cc404016036966028b91de82442",
+      "bytes": 7806
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs",
+      "sha256": "b56e6cf335f3a2c02c9a8a64f5ead286ba6b32bbc84c6502ba985f1dd8748fd3",
+      "bytes": 21677
+    },
+    {
+      "path": "crates/kernel/chio-process/src/store/nonces.rs",
+      "sha256": "06b82549daacfaceeb2fa27e488219654658d381455fdd2fabfed73a0fd02863",
+      "bytes": 2999
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/security/adapters/flow_policy.rs",
+      "sha256": "6b2c10c4a1401a7a3a2d63332541939b0a75014792116d92f910c7c1dbf5cc1b",
+      "bytes": 9425
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/nonce_recovery.rs",
+      "sha256": "46fd81995e441421a64dd3b9b098f218733273b66de843dd63161e6b2cb690db",
+      "bytes": 8621
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/support/mod.rs",
+      "sha256": "723d3c7fb53dcd07c1eff7fcd89e22c2bef69d6366c99ba43528afbee7198640",
+      "bytes": 7597
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/support/supplemental.rs",
+      "sha256": "d0c3e5c6fe86d1461880e5819735be552f23cf2a9a313301ec780e981cbb03c5",
+      "bytes": 3487
+    }
+  ],
+  "findings": [
+    {
+      "id": "SRC-01",
+      "observed": "Complete tool requests are frozen under logical operation identity.",
+      "paths": [
+        "crates/kernel/chio-process/src/lib.rs",
+        "crates/kernel/chio-process/src/store.rs",
+        "crates/kernel/chio-process/src/store.sql"
+      ],
+      "design_consequence": "Separate workflow/step/continuation identity; reserve before approval and finalize once."
+    },
+    {
+      "id": "SRC-02",
+      "observed": "Native flow uses borrowed preparation and an existing capture authority.",
+      "paths": [
+        "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",
+        "crates/platform/chio-control-plane/src/security/adapters/native_flow/declassification.rs"
+      ],
+      "design_consequence": "Join the existing native capture protocol; historical custody is not a live owner."
+    },
+    {
+      "id": "SRC-03",
+      "observed": "Grant v1 lacks workflow/step/continuation binding.",
+      "paths": [
+        "crates/security/chio-security-types/src/declassification.rs",
+        "crates/core/chio-core-types/src/declassification.rs",
+        "crates/security/chio-flow/src/declassification.rs"
+      ],
+      "design_consequence": "Add explicitly versioned recovery binding and scoped owner coverage at native verification."
+    },
+    {
+      "id": "SRC-04",
+      "observed": "Source joins retain payload, input floor, principal, lineage and session restrictions.",
+      "paths": [
+        "crates/security/chio-flow/src/engine.rs",
+        "crates/security/chio-flow/src/lattice.rs",
+        "crates/security/chio-security-types/src/flow.rs",
+        "crates/security/chio-security-kernel/src/pre_invocation.rs"
+      ],
+      "design_consequence": "Preserve the current label algebra and monotone observation path."
+    },
+    {
+      "id": "SRC-05",
+      "observed": "Terminal evaluation/denial does not establish a resource had no effect.",
+      "paths": [
+        "crates/kernel/chio-kernel/src/admission_operation.rs",
+        "crates/kernel/chio-kernel/src/admission_operation/projection/outcome_unknown.rs",
+        "docs/architecture/SWARM_EXECUTION_CONTRACT.md"
+      ],
+      "design_consequence": "Use owning effect projections; do not infer replacement authority from a receipt verdict."
+    },
+    {
+      "id": "SRC-06",
+      "observed": "Verified pre-dispatch no-effect evidence exists with participant and fence binding.",
+      "paths": [
+        "crates/kernel/chio-kernel/src/tool_outcome/release.rs"
+      ],
+      "design_consequence": "Build sealed recovery closure over native proof and irreversible attempt closure."
+    },
+    {
+      "id": "SRC-07",
+      "observed": "Process security context is host-selected; ordinary lineage derives from existing ancestry.",
+      "paths": [
+        "crates/kernel/chio-process/src/security.rs",
+        "crates/kernel/chio-process/src/lib.rs"
+      ],
+      "design_consequence": "Confined observation domains require an explicit authorized lineage boundary."
+    },
+    {
+      "id": "SRC-08",
+      "observed": "Process blobs/checkpoints provide bounded integrity and persistence, with separate read APIs.",
+      "paths": [
+        "crates/kernel/chio-process/src/store/blobs.rs",
+        "crates/kernel/chio-process/src/state_reader.rs",
+        "crates/kernel/chio-process/src/types.rs"
+      ],
+      "design_consequence": "Add provenance, mediated read/restore and legacy-state quarantine; checksums alone do not grant audience."
+    },
+    {
+      "id": "SRC-09",
+      "observed": "Skill workflow execution tracks composition and receipts using in-memory execution state.",
+      "paths": [
+        "crates/platform/chio-workflow/src/lib.rs",
+        "crates/platform/chio-workflow/src/authority.rs",
+        "crates/platform/chio-workflow/src/manifest.rs"
+      ],
+      "design_consequence": "Do not give this layer ownership of durable native recovery."
+    },
+    {
+      "id": "SRC-10",
+      "observed": "Verified manifest policy and typed HTTP egress contracts already own important boundaries.",
+      "paths": [
+        "crates/platform/chio-manifest/src/admission.rs",
+        "crates/platform/chio-manifest/src/lib_parts/part_01.inc",
+        "crates/protocol/chio-egress-contract/src/lib.rs"
+      ],
+      "design_consequence": "Resolve semantic packs into existing policy/topology and actual route checks."
+    },
+    {
+      "id": "SRC-11",
+      "observed": "Current response simulation has explicit execution modes and signed reproducible reports.",
+      "paths": [
+        "crates/kernel/chio-kernel/src/kernel/active_response_simulation.rs",
+        "crates/kernel/chio-kernel/src/response_simulation_report.rs",
+        "docs/reviews/2026-09-27-production-response-simulation.md"
+      ],
+      "design_consequence": "Borrow its advisory/live separation, not its domain-specific effect model."
+    },
+    {
+      "id": "SRC-12",
+      "observed": "Serving authority supplies fenced native store adapters.",
+      "paths": [
+        "crates/platform/chio-store-sqlite/src/serving_owner.rs"
+      ],
+      "design_consequence": "Place recovery ownership and protected native linkage here; bridge the process journal explicitly."
+    },
+    {
+      "id": "SRC-13",
+      "observed": "Disclosure lineage verification and signed JSON parsing are existing primitives.",
+      "paths": [
+        "crates/trust/chio-disclosure-lineage/src/lib.rs",
+        "crates/core/chio-core-types/src/canonical/signed_json.rs"
+      ],
+      "design_consequence": "Reuse verified primitives only through exact semantic conversions; retain strict numeric/duplicate handling."
+    },
+    {
+      "id": "SRC-14",
+      "observed": "Earlier research has 104 selected passing tests with explicitly bounded scope.",
+      "paths": [
+        "labs/openappa-recovery/evidence/test-results.json",
+        "labs/openappa-recovery/evidence/source-manifest.json"
+      ],
+      "design_consequence": "Treat as foundation/prototype evidence, not validation of the newly specified architecture."
+    },
+    {
+      "id": "SRC-15",
+      "observed": "Portable substrate crates retain Rust 1.93 and alloc-only contracts; chio-flow has no default features.",
+      "paths": [
+        "crates/security/chio-flow/Cargo.toml",
+        "crates/security/chio-security-types/Cargo.toml",
+        "crates/core/chio-core-types/Cargo.toml",
+        "crates/platform/chio-store-sqlite/Cargo.toml"
+      ],
+      "design_consequence": "Preserve MSRV/proof targets and qualify pure crates under isolated and unified Cargo features."
+    },
+    {
+      "id": "SRC-16",
+      "observed": "Process-call binding includes normalized request identity, known-outcome-only mode, host route and security profile; first admission charges the tree call quota.",
+      "paths": [
+        "crates/kernel/chio-process/src/lib.rs",
+        "crates/kernel/chio-process/src/store.rs"
+      ],
+      "design_consequence": "Reuse the complete binding derivation and transfer the reserved logical-call charge exactly once."
+    },
+    {
+      "id": "SRC-17",
+      "observed": "Native input joins share the authority writer transaction and scoped flow joins invalidate the corresponding egress fence.",
+      "paths": [
+        "crates/platform/chio-store-sqlite/src/security_state/flow_state/input_join.rs",
+        "crates/platform/chio-store-sqlite/src/security_state/flow_state/mutations.rs",
+        "crates/platform/chio-store-sqlite/src/security_state/flow_state/egress.rs",
+        "crates/platform/chio-store-sqlite/src/security_state/flow_state/tests/native_scope/fences.rs"
+      ],
+      "design_consequence": "Artifact and return mediation must join those same native flow rows before release and respect capture ordering."
+    },
+    {
+      "id": "SRC-18",
+      "observed": "Native capture borrows actual invocation reservations, attempts capture once and retains credentials before an ambiguous result.",
+      "paths": [
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/capture.rs"
+      ],
+      "design_consequence": "Keep borrowed preparation synchronous, preserve native ownership across the owned dispatch task, and never infer refunds from Drop."
+    },
+    {
+      "id": "SRC-19",
+      "observed": "Flow grant request_hash covers canonical arguments; process hashing covers the caller envelope; native retained material has a separate derivation and explicitly strips one-shot credentials.",
+      "paths": [
+        "crates/platform/chio-control-plane/src/security/adapters/flow_policy.rs",
+        "crates/security/chio-flow/src/declassification.rs",
+        "crates/kernel/chio-process/src/lib.rs",
+        "crates/kernel/chio-kernel/src/runtime.rs",
+        "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs"
+      ],
+      "design_consequence": "Use distinct digest types, exhaustive semantic projection and protected exact process-envelope custody; preserve native credential-free history."
+    },
+    {
+      "id": "SRC-20",
+      "observed": "Strict nonce issuance precedes attachment to a derived execution request; the native operation retains the original issuance, and preflight has its own knowledge-join authority.",
+      "paths": [
+        "crates/kernel/chio-process/src/lib.rs",
+        "crates/kernel/chio-process/src/store/nonces.rs",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/execution_nonce.rs",
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_acquisition/nonce_preflight.rs",
+        "crates/kernel/chio-process/tests/nonce_recovery.rs"
+      ],
+      "design_consequence": "Persist recovery admission intent before preflight; repair missing nonce acknowledgements by exact original-operation readback without rewriting the initial process envelope."
+    },
+    {
+      "id": "SRC-21",
+      "observed": "Native startup reconciliation owns retained operations through serving fences and recovery leases; ordinary process invocation requires a running process and performs live ancestry checks.",
+      "paths": [
+        "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs",
+        "crates/kernel/chio-process/src/lib.rs",
+        "crates/kernel/chio-process/src/store.rs"
+      ],
+      "design_consequence": "Extend the existing narrow historical settlement owner independently of new execution authority, while retaining current external lookup and result-release checks."
+    },
+    {
+      "id": "SRC-22",
+      "observed": "The existing declassification verifier checks exact source/target and one trusted authority key; the native adapter consumes one verified grant through retained evidence.",
+      "paths": [
+        "crates/security/chio-flow/src/declassification.rs",
+        "crates/platform/chio-control-plane/src/security/adapters/native_flow/declassification.rs"
+      ],
+      "design_consequence": "Specify multi-owner recovery coverage as independently checked conjunction for one reviewed restriction change and one grant, not implicit sequential v1 grant composition."
+    }
+  ],
+  "openappa": {
+    "repository": "https://github.com/archestra-ai/OpenAPPA",
+    "commit": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+    "files": [
+      {
+        "path": "appa-runtime/src/engine.rs",
+        "sha256": "e33d7c09d025e3379c36d2175a1356a5ea8d6588865384ce763f9bd4b58c6be3"
+      },
+      {
+        "path": "appa-engine/src/plan.rs",
+        "sha256": "dd9e881c884f91ed7c1e42621b40d91724ae600874f41704d89eb6932957f76b"
+      },
+      {
+        "path": "website/content/docs/batteries.md",
+        "sha256": "9f2ea29e42245cf60099edd52df0a2ee9a5d787e1c24344f59b0202e76ecf16e"
+      },
+      {
+        "path": "website/content/docs/coding-agents.md",
+        "sha256": "b00f55a7dff1c52dcd97801fe553faf86e9f96553094fad0fa75066ed644c31f"
+      },
+      {
+        "path": "website/content/docs/self-improving-policies.md",
+        "sha256": "366f558e98de0617bf3cd03eb423a22f815a55c5bd88e7b98be3ef70035fc5e3"
+      },
+      {
+        "path": "website/content/docs/evaluation.md",
+        "sha256": "03363bc26329481ad91e128629c011f4d4c8be354bbf65278abe8b4aa816a650"
+      }
+    ]
+  },
+  "production_code_changed_by_spec_work": false,
+  "public_availability_claimed": false,
+  "architecture_review_date": "2026-10-02",
+  "architecture_revision": 3
+}

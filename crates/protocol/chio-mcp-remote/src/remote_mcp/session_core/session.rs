@@ -33,6 +33,7 @@ impl RemoteSession {
                 reading,
             )?);
         }
+        let resume_envelope = ResumeEnvelopeRatchet::new(init.lifecycle_policy.resume_envelope_floor);
         Ok(Self {
             clock: init.clock,
             session_id: init.session_id,
@@ -62,6 +63,7 @@ impl RemoteSession {
             session_store_lease: init.session_store_lease,
             resume_hmac_keyring: init.resume_hmac_keyring,
             resume_generation: AtomicU64::new(init.resume_generation),
+            resume_envelope,
             upstream_transport: RemoteSessionUpstreamTransport {
                 inner: init.upstream_transport,
             },
@@ -280,6 +282,24 @@ impl RemoteSession {
         self.resume_record_for_lifecycle(lifecycle).map(Some)
     }
 
+    /// Signs and persists the restored record at the generation its event
+    /// seed was derived from, before the session serves.
+    pub(super) fn persist_restored_generation(&self) -> Result<(), CliError> {
+        let path = self.session_db_path.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(format!(
+                "restored MCP session {} has no session database",
+                self.session_id
+            ))
+        })?;
+        let record = self.resume_record()?.ok_or_else(|| {
+            CliError::cli_other_error(format!(
+                "restored MCP session {} is not ready",
+                self.session_id
+            ))
+        })?;
+        self.persist_record(path, &record, self.clock.millis()?)
+    }
+
     fn resume_record_for_lifecycle(
         &self,
         lifecycle: RemoteSessionLifecycleSnapshot,
@@ -347,6 +367,8 @@ impl RemoteSession {
                 self.session_id
             ))
         })?;
+        let subscriptions = Vec::new();
+        let envelope = self.resume_envelope.select(&subscriptions);
         let resume_generation = crate::clock::next_counter(&self.resume_generation)?;
         let mut record = RemoteSessionResumeRecord {
             session_id: self.session_id.clone(),
@@ -361,9 +383,11 @@ impl RemoteSession {
             peer_capabilities,
             initialize_params,
             issued_capabilities: self.issued_capabilities.clone(),
+            subscriptions,
             resume_generation,
             resume_integrity: keyring.empty_tag_for_current(),
         };
+        record.resume_integrity.envelope = envelope;
         record.resume_integrity.tag =
             compute_resume_record_integrity_tag(&keyring.current, &record)?;
         Ok(record)
@@ -555,6 +579,7 @@ impl RemoteSession {
             protocol_version: self.protocol_version(),
             ownership: self.ownership_snapshot(),
             terminal_at: self.lifecycle_snapshot().last_seen_at,
+            terminal_reason: None,
         }
     }
 

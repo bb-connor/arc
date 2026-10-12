@@ -1042,6 +1042,7 @@ fn obligation_head_accepts_same_millisecond_serving_owner_rotation() -> Anchored
         authority,
         store,
         fence: first_fence,
+        _clock,
     } = fixture;
     drop(store);
     drop(authority);
@@ -1056,6 +1057,7 @@ fn obligation_head_accepts_same_millisecond_serving_owner_rotation() -> Anchored
         authority,
         store,
         fence,
+        _clock,
     };
     assert!(fixture.fence.owner_epoch > first_fence.owner_epoch);
 

@@ -532,6 +532,16 @@ impl RemoteSessionFactory {
         )?;
         // Validate the session window before creating the upstream or edge worker.
         resume_deadline(record, self.config.clock.read()?)?;
+        if !record.subscriptions.is_empty() {
+            warn!(session_id = %record.session_id,
+                "retaining MCP session whose subscriptions cannot be restored");
+            return Ok(None);
+        }
+        let Some(event_seed) = restored_event_seed(record.resume_generation) else {
+            warn!(session_id = %record.session_id,
+                "retaining MCP session whose resume generation exhausts the event-id space");
+            return Ok(None);
+        };
         if record.runtime_contract_fingerprint != self.runtime_contract_fingerprint {
             return Ok(None);
         }
@@ -686,7 +696,7 @@ impl RemoteSessionFactory {
         let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(256);
         let retained_notification_events =
             Arc::new(StdMutex::new(VecDeque::<RetainedRemoteSessionEvent>::new()));
-        let next_event_id = Arc::new(AtomicU64::new(0));
+        let next_event_id = Arc::new(AtomicU64::new(event_seed));
         let session = Arc::new(RemoteSession::new(RemoteSessionInit {
             clock: self.config.clock.clone(),
             session_id: record.session_id.clone(),
@@ -714,6 +724,7 @@ impl RemoteSessionFactory {
             resume_generation: record.resume_generation,
             upstream_transport: upstream_notification_source,
         })?);
+        session.resume_envelope.raise(record.resume_integrity.envelope);
         let writer = BroadcastJsonRpcWriter::new(
             session.event_tx.clone(),
             session.retained_notification_events.clone(),

@@ -1,0 +1,26 @@
+{
+  "captured_at": "2026-10-01T18:36:55.938807+00:00",
+  "scope": "Read-only source research and local experiments; no product changes or deployment",
+  "repositories": [
+    {
+      "name": "OpenAPPA",
+      "url": "https://github.com/archestra-ai/OpenAPPA",
+      "path": "/private/tmp/chio-openappa-research-20261001/OpenAPPA",
+      "head": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "tree": "3820544fb5cefcf84a04ff4fec5f61815775ab65",
+      "commit": "2026-10-01T18:06:23+02:00 fix: restrict runtime ingress, fail closed on agent frontmatter, bind kagent delegations (#573)",
+      "tracked_files": 1114,
+      "clean": true
+    },
+    {
+      "name": "chio-public",
+      "url": "https://github.com/backbay-labs/chio",
+      "path": "/private/tmp/chio-openappa-research-20261001/chio-public",
+      "head": "5b8bec41d32f3838b880576fe6123c983ecebf8d",
+      "tree": "1c25197f345db77ab8c12cec9a639514006a09d5",
+      "commit": "2026-09-02T14:32:05-04:00 Merge pull request #1090 from bb-connor/bb-connor/chio-repo-description-tagline",
+      "tracked_files": 16466,
+      "clean": true
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+[
+  {
+    "command": [
+      "cargo",
+      "+1.94.1",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "labs/openappa-recovery/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "log": "prototype-tests.log"
+  },
+  {
+    "command": [
+      "cargo",
+      "+1.94.1",
+      "clippy",
+      "--locked",
+      "--manifest-path",
+      "labs/openappa-recovery/Cargo.toml",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "log": "prototype-clippy.log"
+  },
+  {
+    "command": [
+      "cargo",
+      "+1.94.1",
+      "fmt",
+      "--manifest-path",
+      "labs/openappa-recovery/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "log": "prototype-fmt.log"
+  },
+  {
+    "command": [
+      "rustfmt",
+      "+1.94.1",
+      "--edition",
+      "2021",
+      "--check",
+      "crates/kernel/chio-process/tests/recovery_offer_binding_lab.rs"
+    ],
+    "exit_code": 0,
+    "log": "process-lab-fmt.log"
+  },
+  {
+    "command": [
+      "cargo",
+      "+1.94.1",
+      "run",
+      "--quiet",
+      "--locked",
+      "--manifest-path",
+      "labs/openappa-recovery/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "log": "demo.json"
+  },
+  {
+    "command": [
+      "cargo",
+      "+1.94.1",
+      "test",
+      "--locked",
+      "-p",
+      "chio-control-plane",
+      "--test",
+      "response_dry_run"
+    ],
+    "exit_code": 0,
+    "log": "response-simulation-tests.log"
+  }
+]

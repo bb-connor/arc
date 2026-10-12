@@ -13,7 +13,7 @@ fn local_rows_and_global_references_are_verified_without_external_write_detectio
         ("authority_global_commits_no_delete", "DELETE FROM authority_global_commits WHERE projection_kind = 'dpop_replay_migration'"),
         ("authority_global_commits_immutable", "UPDATE authority_global_commits SET projection_reference_digest = printf('%064d', 0) WHERE projection_kind = 'dpop_replay_migration'"),
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         let expected = pin(&fixture, &source)?;
         import(&fixture, &source, &expected)?;
@@ -36,7 +36,7 @@ fn local_rows_and_global_references_are_verified_without_external_write_detectio
 
 #[test]
 fn immutable_guards_reject_replace_update_and_delete() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     import(&fixture, &source, &pin(&fixture, &source)?)?;
     let connection = fixture.store.connection()?;
@@ -78,7 +78,7 @@ fn oversized_and_wrong_storage_types_refuse_before_canonical_decode() -> Anchore
             "CAST(zeroblob(4097) AS TEXT)",
         ),
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         import(&fixture, &source, &pin(&fixture, &source)?)?;
         let connection = fixture.store.connection()?;
@@ -110,7 +110,7 @@ fn current_schema_damage_is_not_repaired_on_reopen() -> AnchoredTestResult {
         "DROP TABLE dpop_replay_legacy_tombstones",
         "CREATE TABLE dpop_replay_unqualified(value TEXT)",
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let Fixture {
             _temp,
             database,

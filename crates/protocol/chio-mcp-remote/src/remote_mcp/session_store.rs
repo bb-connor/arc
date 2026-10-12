@@ -808,6 +808,7 @@ pub(super) fn load_terminal_session_records(
             || tombstone.terminal_epoch != fence.terminal_epoch
             || tombstone.record.terminal_at != fence.terminal_at
             || tombstone.record.lifecycle.state != fence.terminal_state
+            || tombstone.record.terminal_reason != fence.terminal_reason
         {
             warn!(
                 session_id = %session_id,
@@ -1000,6 +1001,7 @@ pub(super) fn prepare_terminal_session_transition(
             || existing.resume_generation != fence.resume_generation
             || existing.terminal_at != fence.terminal_at
             || existing.terminal_state != fence.terminal_state
+            || existing.terminal_reason != fence.terminal_reason
             || existing.resume_integrity != fence.resume_integrity
         {
             return Err(CliError::cli_other_error(format!(
@@ -1083,6 +1085,7 @@ pub(super) fn finalize_terminal_session_transition(
         || tombstone.terminal_epoch != fence.terminal_epoch
         || tombstone.record.terminal_at != fence.terminal_at
         || tombstone.record.lifecycle.state != fence.terminal_state
+        || tombstone.record.terminal_reason != fence.terminal_reason
     {
         return Err(CliError::cli_other_error(format!(
             "terminal MCP session {} tombstone does not match its prepared terminal intent",

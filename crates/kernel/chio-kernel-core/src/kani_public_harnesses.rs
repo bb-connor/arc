@@ -1,5 +1,9 @@
 extern crate alloc;
 
+#[cfg(feature = "revocation-view")]
+#[path = "kani_public_harnesses/revocation.rs"]
+mod revocation;
+
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -1605,6 +1609,18 @@ pub fn verify_revocation_view_freshness() {
 
     let retry = revocation_snapshot_denies(token_revoked, ancestor_revoked);
     assert_eq!(retry, denied);
+}
+
+/// The child module checks all u64 inputs and calls the production boundaries.
+#[cfg(feature = "revocation-view")]
+#[kani::proof]
+pub fn verify_revocation_snapshot_timestamp_freshness() {
+    let boundary_witness = revocation::verify_revocation_snapshot_timestamp_freshness();
+    assert!(boundary_witness);
+    kani::cover!(
+        boundary_witness,
+        "verify_revocation_snapshot_timestamp_freshness"
+    );
 }
 
 #[kani::proof]

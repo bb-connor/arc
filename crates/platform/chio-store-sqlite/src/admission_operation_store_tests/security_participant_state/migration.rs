@@ -27,6 +27,7 @@ fn v28_initialization_and_anchor_survive_v29_without_rewriting_history() -> Anch
         lock_root,
         authority,
         store,
+        _clock,
         ..
     } = fixture;
     drop(store);
@@ -61,6 +62,7 @@ fn v28_initialization_and_anchor_survive_v29_without_rewriting_history() -> Anch
         store: authority.admission_operation_store(),
         fence: authority.mutation_fence(),
         authority,
+        _clock,
     };
     let (context, request) = super::mutations::request("post-migration-join")?;
     let (operation, lease) =

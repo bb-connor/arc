@@ -462,6 +462,8 @@ fn authenticated_sender_key(auth_context: &SessionAuthContext) -> Option<&Public
 #[derive(Serialize)]
 struct RemoteSessionResumeIntegrityEnvelope<'a> {
     schema: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    subscriptions: Option<&'a [PersistedSubscription]>,
     session_id: &'a str,
     agent_id: &'a str,
     auth_context: &'a SessionAuthContext,
@@ -495,6 +497,8 @@ struct RemoteSessionTerminalFenceIntegrityEnvelope<'a> {
     session_id: &'a str,
     terminal_at: u64,
     terminal_state: RemoteSessionState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    terminal_reason: Option<TerminalReason>,
     resume_generation: u64,
     terminal_epoch: u64,
     key_id: &'a str,
@@ -821,8 +825,16 @@ fn compute_resume_record_integrity_tag(
     key: &RemoteSessionHmacKey,
     record: &RemoteSessionResumeRecord,
 ) -> Result<String, CliError> {
+    let (schema, subscriptions) = match record.resume_integrity.envelope {
+        RemoteSessionEnvelope::V2 => ("chio.remote-mcp.resume-record-integrity.v2", None),
+        RemoteSessionEnvelope::V3 => (
+            "chio.remote-mcp.resume-record-integrity.v3",
+            Some(record.subscriptions.as_slice()),
+        ),
+    };
     let envelope = RemoteSessionResumeIntegrityEnvelope {
-        schema: "chio.remote-mcp.resume-record-integrity.v2",
+        schema,
+        subscriptions,
         session_id: &record.session_id,
         agent_id: &record.agent_id,
         auth_context: &record.auth_context,
@@ -855,6 +867,12 @@ fn validate_resume_record_integrity_with_keyring(
     if record.resume_generation == 0 {
         return Err(CliError::cli_other_error(format!(
             "stored MCP session {} has an invalid zero resume generation",
+            record.session_id
+        )));
+    }
+    if record.resume_integrity.envelope.is_v2() && !record.subscriptions.is_empty() {
+        return Err(CliError::cli_other_error(format!(
+            "stored MCP session {} carries subscriptions its v2 envelope does not authenticate",
             record.session_id
         )));
     }
@@ -899,6 +917,39 @@ impl RemoteSessionHmacKeyring {
             key_id: self.current.key_id.clone(),
             key_version: self.current.version,
             tag: String::new(),
+            envelope: RemoteSessionEnvelope::V2,
+        }
+    }
+}
+
+/// The resume-record envelope a session signs with. It only ever rises: a
+/// session that has signed or loaded `v3` never signs `v2` again.
+#[derive(Debug)]
+struct ResumeEnvelopeRatchet(AtomicBool);
+
+impl ResumeEnvelopeRatchet {
+    fn new(floor: RemoteSessionEnvelope) -> Self {
+        Self(AtomicBool::new(floor == RemoteSessionEnvelope::V3))
+    }
+
+    fn raise(&self, envelope: RemoteSessionEnvelope) {
+        if envelope == RemoteSessionEnvelope::V3 {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    fn select(&self, subscriptions: &[PersistedSubscription]) -> RemoteSessionEnvelope {
+        if !subscriptions.is_empty() {
+            self.raise(RemoteSessionEnvelope::V3);
+        }
+        self.current()
+    }
+
+    fn current(&self) -> RemoteSessionEnvelope {
+        if self.0.load(Ordering::SeqCst) {
+            RemoteSessionEnvelope::V3
+        } else {
+            RemoteSessionEnvelope::V2
         }
     }
 }
@@ -950,9 +1001,13 @@ fn verify_remote_session_hmac(
     Ok(())
 }
 
+/// Signs the terminal pair under `envelope`, raised to `v3` when only `v3`
+/// can carry `reason`. A `v2` pair records no reason.
 fn sign_terminal_session_records(
     keyring: &RemoteSessionHmacKeyring,
-    record: RemoteSessionDiagnosticRecord,
+    mut record: RemoteSessionDiagnosticRecord,
+    reason: TerminalReason,
+    envelope: RemoteSessionEnvelope,
     resume_generation: u64,
     terminal_epoch: u64,
 ) -> Result<(RemoteSessionTombstoneRecord, RemoteSessionTerminalFence), CliError> {
@@ -962,11 +1017,26 @@ fn sign_terminal_session_records(
                 .to_string(),
         ));
     }
+    if reason.state() != record.lifecycle.state {
+        return Err(CliError::cli_other_error(format!(
+            "terminal MCP session {} reason {reason:?} does not match state {}",
+            record.session_id,
+            record.lifecycle.state.as_str()
+        )));
+    }
+    let envelope = if reason.requires_v3() {
+        RemoteSessionEnvelope::V3
+    } else {
+        envelope
+    };
+    record.terminal_reason = (envelope == RemoteSessionEnvelope::V3).then_some(reason);
+    let mut integrity = keyring.empty_tag_for_current();
+    integrity.envelope = envelope;
     let mut tombstone = RemoteSessionTombstoneRecord {
         record,
         resume_generation,
         terminal_epoch,
-        resume_integrity: keyring.empty_tag_for_current(),
+        resume_integrity: integrity.clone(),
     };
     tombstone.resume_integrity.tag =
         compute_terminal_tombstone_integrity_tag(&keyring.current, &tombstone)?;
@@ -974,9 +1044,10 @@ fn sign_terminal_session_records(
         session_id: tombstone.record.session_id.clone(),
         terminal_at: tombstone.record.terminal_at,
         terminal_state: tombstone.record.lifecycle.state,
+        terminal_reason: tombstone.record.terminal_reason,
         resume_generation,
         terminal_epoch,
-        resume_integrity: keyring.empty_tag_for_current(),
+        resume_integrity: integrity,
     };
     fence.resume_integrity.tag = compute_terminal_fence_integrity_tag(&keyring.current, &fence)?;
     Ok((tombstone, fence))
@@ -987,7 +1058,10 @@ fn compute_terminal_tombstone_integrity_tag(
     tombstone: &RemoteSessionTombstoneRecord,
 ) -> Result<String, CliError> {
     let envelope = RemoteSessionTombstoneIntegrityEnvelope {
-        schema: "chio.remote-mcp.terminal-tombstone-integrity.v2",
+        schema: match tombstone.resume_integrity.envelope {
+            RemoteSessionEnvelope::V2 => "chio.remote-mcp.terminal-tombstone-integrity.v2",
+            RemoteSessionEnvelope::V3 => "chio.remote-mcp.terminal-tombstone-integrity.v3",
+        },
         record: &tombstone.record,
         resume_generation: tombstone.resume_generation,
         terminal_epoch: tombstone.terminal_epoch,
@@ -1007,10 +1081,14 @@ fn compute_terminal_fence_integrity_tag(
     fence: &RemoteSessionTerminalFence,
 ) -> Result<String, CliError> {
     let envelope = RemoteSessionTerminalFenceIntegrityEnvelope {
-        schema: "chio.remote-mcp.terminal-fence-integrity.v2",
+        schema: match fence.resume_integrity.envelope {
+            RemoteSessionEnvelope::V2 => "chio.remote-mcp.terminal-fence-integrity.v2",
+            RemoteSessionEnvelope::V3 => "chio.remote-mcp.terminal-fence-integrity.v3",
+        },
         session_id: &fence.session_id,
         terminal_at: fence.terminal_at,
         terminal_state: fence.terminal_state,
+        terminal_reason: fence.terminal_reason,
         resume_generation: fence.resume_generation,
         terminal_epoch: fence.terminal_epoch,
         key_id: &fence.resume_integrity.key_id,
@@ -1024,6 +1102,20 @@ fn compute_terminal_fence_integrity_tag(
     )
 }
 
+/// A `v2` terminal record carries no reason; a `v3` one carries exactly the
+/// reason its terminal state permits.
+fn terminal_reason_fits(
+    envelope: RemoteSessionEnvelope,
+    reason: Option<TerminalReason>,
+    state: RemoteSessionState,
+) -> bool {
+    match (envelope, reason) {
+        (RemoteSessionEnvelope::V2, None) => true,
+        (RemoteSessionEnvelope::V3, Some(reason)) => reason.state() == state,
+        _ => false,
+    }
+}
+
 fn validate_terminal_tombstone_integrity(
     keyring: &RemoteSessionHmacKeyring,
     tombstone: &RemoteSessionTombstoneRecord,
@@ -1035,6 +1127,11 @@ fn validate_terminal_tombstone_integrity(
         || !matches!(
             tombstone.record.lifecycle.state,
             RemoteSessionState::Deleted | RemoteSessionState::Expired | RemoteSessionState::Closed
+        )
+        || !terminal_reason_fits(
+            tombstone.resume_integrity.envelope,
+            tombstone.record.terminal_reason,
+            tombstone.record.lifecycle.state,
         )
     {
         return Err(CliError::cli_other_error(format!(
@@ -1070,6 +1167,11 @@ fn validate_terminal_fence_integrity(
         || !matches!(
             fence.terminal_state,
             RemoteSessionState::Deleted | RemoteSessionState::Expired | RemoteSessionState::Closed
+        )
+        || !terminal_reason_fits(
+            fence.resume_integrity.envelope,
+            fence.terminal_reason,
+            fence.terminal_state,
         )
     {
         return Err(CliError::cli_other_error(format!(

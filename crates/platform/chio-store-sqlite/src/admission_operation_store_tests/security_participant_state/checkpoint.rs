@@ -124,6 +124,7 @@ fn reopen(fixture: Fixture) -> AnchoredTestResult<Fixture> {
         lock_root,
         authority,
         store,
+        _clock,
         ..
     } = fixture;
     drop(store);
@@ -136,6 +137,7 @@ fn reopen(fixture: Fixture) -> AnchoredTestResult<Fixture> {
         store: authority.admission_operation_store(),
         fence: authority.mutation_fence(),
         authority,
+        _clock,
     })
 }
 
@@ -433,7 +435,7 @@ fn checkpoint_abort_child() -> AnchoredTestResult {
 fn native_journal_checkpoint_abort_reopens_complete_old_or_new_state() -> AnchoredTestResult {
     use std::os::unix::process::ExitStatusExt as _;
     for stage in 70..=74 {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
         let Fixture {
             _temp,
@@ -441,6 +443,7 @@ fn native_journal_checkpoint_abort_reopens_complete_old_or_new_state() -> Anchor
             lock_root,
             authority,
             store,
+            _clock,
             ..
         } = fixture;
         drop(store);
@@ -464,6 +467,7 @@ fn native_journal_checkpoint_abort_reopens_complete_old_or_new_state() -> Anchor
             store: authority.admission_operation_store(),
             fence: authority.mutation_fence(),
             authority,
+            _clock,
         };
         assert_eq!(events(&fixture)?, i64::from(stage >= 73));
         assert_eq!(

@@ -32,7 +32,7 @@ fn source(
 
 #[test]
 fn fresh_v2_domain_is_separate_from_preserved_full_legacy_inventory() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = source(&fixture, 1, 1, 16 * 1024 * 1024, true)?;
     let domain = activate(&fixture, &source)?;
     let (operation, lease, credential) = setup(
@@ -89,7 +89,7 @@ fn fresh_v2_domain_is_separate_from_preserved_full_legacy_inventory() -> Anchore
 #[test]
 fn per_capability_and_identity_byte_limits_deny_without_new_history() -> AnchoredTestResult {
     for bytes in [1, 16 * 1024 * 1024] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = source(&fixture, 8, 1, bytes, false)?;
         let domain = activate(&fixture, &source)?;
         let (operation, lease, credential) = setup(
@@ -132,7 +132,7 @@ fn per_capability_and_identity_byte_limits_deny_without_new_history() -> Anchore
 #[test]
 fn maximum_utf8_and_control_nonces_fit_bounded_canonical_history_without_normalization(
 ) -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let domain = activate(&fixture, &source)?;
     for (index, nonce) in ["\0".repeat(4096), "é".repeat(2048)]

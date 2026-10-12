@@ -4,7 +4,7 @@ use chio_kernel::admission_operation::dpop_claim::DpopReplayClaimDisposition;
 
 #[test]
 fn native_dpop_ledger_snapshot_retains_exact_claim_after_release() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let authority = activate(&fixture, &source)?;
     let (initial, lease, credential) = setup(

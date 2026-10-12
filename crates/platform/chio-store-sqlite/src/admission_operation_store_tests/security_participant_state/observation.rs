@@ -294,6 +294,7 @@ fn fresh_observation_requires_current_owner_but_preserves_original_initializatio
         authority,
         store,
         fence,
+        _clock,
     } = fixture;
     drop(store);
     drop(authority);

@@ -16,6 +16,7 @@ fn child_process_crash() -> AnchoredTestResult {
         store: authority.admission_operation_store(),
         fence: authority.mutation_fence(),
         authority,
+        _clock: None,
     };
     let (operation, retained) = fixture
         .store
@@ -98,7 +99,7 @@ fn independent_process_abort_recovers_acquire_and_commit_without_partial_custody
     use std::os::unix::process::ExitStatusExt as _;
     for commit_phase in [false, true] {
         for stage in 12..=16 {
-            let fixture = fixture();
+            let fixture = fixture_real_time();
             hydrate(&fixture, &imported(&fixture, "source")?)?;
             let mut pending = pending(&fixture, "egress-crash", None)?;
             let planned_commitment = if commit_phase {
@@ -113,6 +114,7 @@ fn independent_process_abort_recovers_acquire_and_commit_without_partial_custody
                 lock_root,
                 authority,
                 store,
+                _clock,
                 ..
             } = fixture;
             drop(store);
@@ -139,6 +141,7 @@ fn independent_process_abort_recovers_acquire_and_commit_without_partial_custody
                 store: authority.admission_operation_store(),
                 fence: authority.mutation_fence(),
                 authority,
+                _clock,
             };
             assert_eq!(counts(&fixture)?.0, before.0 + i64::from(stage >= 15));
             pending.operation = fixture

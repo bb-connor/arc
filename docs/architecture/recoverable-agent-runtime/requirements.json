@@ -1,0 +1,1656 @@
+{
+  "schema": "chio.recovery-architecture-requirements.v1",
+  "status": "architecture_only",
+  "date": "2026-10-02",
+  "requirement_count": 111,
+  "phases": [
+    "P0",
+    "P1",
+    "P2",
+    "P3",
+    "P4",
+    "P5",
+    "P6"
+  ],
+  "functionality_coverage": {
+    "exact_recovery_offers": [
+      "REC-01",
+      "REC-02",
+      "REC-03",
+      "REC-05",
+      "REC-08",
+      "REC-14",
+      "REC-19",
+      "REC-21",
+      "REC-23",
+      "REC-24"
+    ],
+    "unknown_outcome_and_restart": [
+      "SEC-04",
+      "REC-09",
+      "REC-10",
+      "REC-11",
+      "OPS-10",
+      "REC-19",
+      "REC-20",
+      "CON-12",
+      "OPS-11",
+      "OPS-12",
+      "REC-23",
+      "REC-24",
+      "OPS-13"
+    ],
+    "exact_owner_approval": [
+      "REC-06",
+      "REC-07",
+      "REC-16",
+      "REC-18",
+      "REC-22"
+    ],
+    "counterfactual_explanations": [
+      "SIM-01",
+      "SIM-02",
+      "SIM-03",
+      "SIM-04",
+      "SIM-05",
+      "SIM-06",
+      "SIM-07",
+      "SIM-08"
+    ],
+    "semantic_connector_packages": [
+      "CON-01",
+      "CON-02",
+      "CON-03",
+      "CON-04",
+      "CON-05",
+      "CON-11",
+      "CON-12"
+    ],
+    "integrity_and_dynamic_annotations": [
+      "CON-06",
+      "CON-07",
+      "SEC-05"
+    ],
+    "compatible_destinations": [
+      "CON-04",
+      "CON-05",
+      "SIM-05",
+      "REC-14"
+    ],
+    "input_and_output_transforms": [
+      "CON-08",
+      "CON-09",
+      "CON-10",
+      "ART-06",
+      "REC-17"
+    ],
+    "prerequisites_and_narrowing": [
+      "REC-12",
+      "REC-13",
+      "CON-10",
+      "REC-17",
+      "CON-13"
+    ],
+    "durable_artifacts_and_memory": [
+      "ART-01",
+      "ART-02",
+      "ART-03",
+      "ART-04",
+      "ART-05",
+      "ART-06",
+      "ART-07",
+      "ART-08",
+      "ART-09",
+      "ART-10",
+      "ART-11",
+      "ART-12"
+    ],
+    "confined_readers_and_returns": [
+      "ISO-01",
+      "ISO-02",
+      "ISO-03",
+      "ISO-04",
+      "ISO-05",
+      "ISO-06",
+      "ISO-07",
+      "ISO-08",
+      "ISO-09",
+      "ISO-10",
+      "ART-12"
+    ],
+    "policy_examples_and_trajectory_tests": [
+      "TEST-01",
+      "TEST-02",
+      "TEST-03",
+      "TEST-04"
+    ],
+    "policy_feedback_and_maintenance": [
+      "OPS-07",
+      "OPS-08",
+      "CON-11"
+    ],
+    "protected_setup_and_adapters": [
+      "OPS-01",
+      "OPS-02",
+      "OPS-03",
+      "OPS-04",
+      "RUST-08",
+      "RUST-09",
+      "RUST-10",
+      "OPS-11",
+      "OPS-12",
+      "RUST-11",
+      "REC-24",
+      "OPS-13"
+    ],
+    "matched_security_utility_evaluation": [
+      "TEST-05",
+      "TEST-06",
+      "TEST-07",
+      "TEST-08"
+    ]
+  },
+  "requirements": [
+    {
+      "id": "SEC-01",
+      "obligation": "Every external effect MUST enter the existing kernel/native dispatch ownership path.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "security::no_alternate_dispatch_path",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SEC-02",
+      "obligation": "Serialized or reconstructed evidence MUST NOT manufacture live ownership.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "types::evidence_cannot_construct_dispatch_owner",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SEC-03",
+      "obligation": "A workflow MUST have at most one unresolved effectful continuation.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "recovery::concurrent_continuation_selection",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SEC-04",
+      "obligation": "An unknown, delivered-but-denied or awaiting-report operation MUST NOT authorize a replacement effect.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "recovery::deny_receipt_with_unknown_effect",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SEC-05",
+      "obligation": "Disclosure/endorsement MUST NOT reduce retained confidentiality or influence history.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "flow::exceptions_preserve_knowledge",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SEC-06",
+      "obligation": "All authorization checks MUST bind tenant, authority domain, process and exact action; mismatches refuse.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "authority::cross_context_substitution",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SEC-07",
+      "obligation": "Stale serving/coordinator epochs MUST be rejected at every authoritative mutation and capture.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "recovery::stale_owner_after_takeover",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SEC-08",
+      "obligation": "Missing/corrupt evidence, unknown variants, dependency failure and bounded-resource exhaustion MUST fail closed.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "wire::unknown_and_exhausted_inputs",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SEC-09",
+      "obligation": "Every data-bearing release MUST be audience-governed for every enabled profile channel, including explanations, errors and retained outputs.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "channels::complete_release_inventory",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SEC-10",
+      "obligation": "Cancellation, expiry and Drop MUST NOT imply rollback of an accepted or uncertain external effect.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "recovery::cancel_after_dispatch_cutpoints",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SEC-11",
+      "obligation": "Policy and semantic packages MUST NOT widen the caller's capability authority.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "contracts::approval_without_capability",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SEC-12",
+      "obligation": "Safety claims MUST identify coverage, assumptions and source/evidence versions.",
+      "document": "01-security-model.md",
+      "owners": [
+        "chio-kernel",
+        "chio-flow",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "conformance::profile_claims_match_coverage",
+      "phase": "P6",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "RUST-01",
+      "obligation": "Pure planner/contracts crates MUST have no effectful platform dependencies or ambient state reads.",
+      "document": "02-rust-design.md",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "proposed_acceptance_test": "architecture::pure_dependency_graph",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "RUST-02",
+      "obligation": "Live preparation/ownership types MUST be unconstructible from public wire data.",
+      "document": "02-rust-design.md",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "proposed_acceptance_test": "compile_fail::wire_to_live_owner",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "RUST-03",
+      "obligation": "Security variants and identifiers MUST be bounded, closed and non-interchangeable.",
+      "document": "02-rust-design.md",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "proposed_acceptance_test": "wire::bounds_and_identifier_domains",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "RUST-04",
+      "obligation": "Cancellation and unwinding MUST preserve durable ownership and consumed authority.",
+      "document": "02-rust-design.md",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "proposed_acceptance_test": "runtime::abort_at_every_await",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "RUST-05",
+      "obligation": "Async orchestration MUST NOT hold a store transaction across provider awaits.",
+      "document": "02-rust-design.md",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "proposed_acceptance_test": "storage::blocked_provider_does_not_hold_writer",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "RUST-06",
+      "obligation": "New code MUST pass owning Clippy, formatting, feature-matrix and dependency-direction checks without relaxed baselines.",
+      "document": "02-rust-design.md",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "proposed_acceptance_test": "architecture::owning_quality_gates",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "RUST-07",
+      "obligation": "Debug, tracing and public errors MUST exclude protected payloads and secret material.",
+      "document": "02-rust-design.md",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery (proposed)",
+        "owning crate maintainers"
+      ],
+      "proposed_acceptance_test": "observability::secret_and_payload_canaries",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "RUST-08",
+      "obligation": "Pure/substrate changes MUST preserve declared MSRV, no_std/alloc builds and deterministic behavior under isolated and unified features.",
+      "document": "02-rust-design.md",
+      "owners": [
+        "chio-core-types",
+        "chio-security-types",
+        "chio-recovery",
+        "chio-semantic-contracts"
+      ],
+      "proposed_acceptance_test": "architecture::portable_feature_and_determinism_matrix",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "RUST-09",
+      "obligation": "Live handle auto traits, consuming APIs and supervised task lifetimes MUST preserve exclusive dispatch without relying on Drop or must_use.",
+      "document": "02-rust-design.md",
+      "owners": [
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "compile_fail::owner_autotraits_and_consumption",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "RUST-10",
+      "obligation": "Decoding and evidence expansion MUST enforce aggregate limits before allocation or unbounded verification work.",
+      "document": "02-rust-design.md",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-recovery"
+      ],
+      "proposed_acceptance_test": "wire::nested_allocation_and_verification_budget",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "RUST-11",
+      "obligation": "Planner results and workflow directives MUST remain non-authorizing, and request projections MUST account explicitly for every field and digest meaning.",
+      "document": "02-rust-design.md",
+      "owners": [
+        "chio-recovery",
+        "chio-kernel",
+        "chio-process",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "architecture::planner_driver_types_and_exhaustive_projection",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-01",
+      "obligation": "Workflow creation/commands MUST be idempotent and conflict on changed canonical content.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::command_replay_and_substitution",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-02",
+      "obligation": "Continuation selection MUST atomically enforce one unresolved effectful continuation.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::two_coordinators_select",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-03",
+      "obligation": "Approval MUST bind an identity reserved before immutable request admission.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::reserve_approve_finalize_restart",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-04",
+      "obligation": "Existing frozen requests MUST never be rewritten to add grants or refreshed authority.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "process::frozen_request_authorization_conflict",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-05",
+      "obligation": "Recovery grants MUST use v2 and refuse downgraded, stripped or cross-workflow bindings.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "grants::v2_binding_and_downgrade_vectors",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-06",
+      "obligation": "Owner/compartment approval coverage MUST be verified against operator authority scope.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "grants::multiple_owners_require_coverage",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-07",
+      "obligation": "Approval presentation MUST bind the exact canonical action and authorized preview.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "approval::display_digest_and_recipient_substitution",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-08",
+      "obligation": "Native capture MUST own the recovery participant, grant consumption and budget join.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "native::recovery_capture_participant_atomicity",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-09",
+      "obligation": "Cross-store attachment MUST recover idempotently without assuming a distributed transaction.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::process_authority_bridge_cutpoints",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-10",
+      "obligation": "Active ownership MUST close only from authoritative final effect/no-effect evidence.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::closure_requires_all_participants",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-11",
+      "obligation": "Reconciliation MUST never reset consumed grants or create a fresh identity for an uncertain effect.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::unknown_does_not_reset_authority",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-12",
+      "obligation": "A bounded plan's prerequisite edges MUST reference verified effects under exact scope and provenance.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::prerequisite_substitution_and_cycles",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-13",
+      "obligation": "Withheld output MUST preserve completed-effect identity and prevent replacement dispatch.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::withheld_output_is_not_no_effect",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-14",
+      "obligation": "Offer use MUST revalidate scoped versions, fresh revocation, budget and time.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::basis_change_between_review_and_capture",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-15",
+      "obligation": "Existing pending native approval operations MUST retain their owning resume protocol.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::native_pending_approval_adapter",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-16",
+      "obligation": "Capture MUST distinguish the proven same-call input observation from unrelated source-generation changes.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-process",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::self_observation_and_concurrent_knowledge",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-17",
+      "obligation": "Exact offers and approvals MUST bind materialized step inputs; accepting a plan MUST NOT authorize unknown future output or bypass per-step authority.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-recovery",
+        "chio-control-plane",
+        "chio-kernel"
+      ],
+      "proposed_acceptance_test": "recovery::prerequisite_result_materialization",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-18",
+      "obligation": "Approval/grant issuance MUST retain one exact challenge-bound body across signing, lost acknowledgements, expiry and restart.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-store-sqlite",
+        "chio-core-types"
+      ],
+      "proposed_acceptance_test": "approval::issuer_sign_attach_publish_cutpoints",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-19",
+      "obligation": "Admission intent MUST be durable before entering the kernel, and closure MUST fence late admission using authoritative state even when projections are absent.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::admit_before_link_and_late_submission",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-20",
+      "obligation": "Partial or failed-after-effect settlement MUST spend the step identity independently of result availability and cancellation.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-kernel",
+        "chio-recovery",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "recovery::partial_effect_and_delayed_release",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-21",
+      "obligation": "Reservation finalization MUST reuse the existing complete process binding and charge the logical-call slot exactly once.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-process"
+      ],
+      "proposed_acceptance_test": "process::finalization_binding_and_quota_equivalence",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-22",
+      "obligation": "Approval and coverage MUST bind the exact unsigned authorization requirements and satisfy every required authority class for the same action without cycles or duplicated approvers.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-security-types",
+        "chio-core-types",
+        "chio-flow",
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "grants::coverage_conjunction_target_and_binding_graph",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-23",
+      "obligation": "Finalization MUST retain recoverable exact request and fixed authorization custody separately from credential-free native history.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "recovery::signed_envelope_custody_after_restart",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "REC-24",
+      "obligation": "Recovery MUST preserve operation-owned nonce preflight, exact issuance attachment and phase-specific closure without rewriting the frozen process envelope.",
+      "document": "03-recovery-protocol.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "recovery::nonce_preflight_lost_ack_and_expiry",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SIM-01",
+      "obligation": "Counterfactual evaluation MUST operate only on explicit bounded facts and have no effect ports.",
+      "document": "04-counterfactuals.md",
+      "owners": [
+        "chio-recovery (proposed)",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "simulation::no_effect_dependencies_or_writes",
+      "phase": "P2",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SIM-02",
+      "obligation": "Cross-store observations MUST retain versions and uncertainty without claiming global atomicity.",
+      "document": "04-counterfactuals.md",
+      "owners": [
+        "chio-recovery (proposed)",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "simulation::mixed_snapshot_versions",
+      "phase": "P2",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SIM-03",
+      "obligation": "Advice/report objects MUST be rejected by every live authority/capture API.",
+      "document": "04-counterfactuals.md",
+      "owners": [
+        "chio-recovery (proposed)",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "simulation::report_cannot_authorize",
+      "phase": "P2",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SIM-04",
+      "obligation": "Explanations and candidate existence MUST be projected to the authorized audience.",
+      "document": "04-counterfactuals.md",
+      "owners": [
+        "chio-recovery (proposed)",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "simulation::hidden_membership_and_resource_probes",
+      "phase": "P2",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SIM-05",
+      "obligation": "Search MUST be deterministic, bounded and explicit about incompleteness.",
+      "document": "04-counterfactuals.md",
+      "owners": [
+        "chio-recovery (proposed)",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "planner::permutation_bounds_and_partial_order",
+      "phase": "P2",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SIM-06",
+      "obligation": "Signed reports MUST bind expected signer, deployment, snapshot, intent and recomputed result.",
+      "document": "04-counterfactuals.md",
+      "owners": [
+        "chio-recovery (proposed)",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "simulation::resigned_semantic_tampering",
+      "phase": "P2",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SIM-07",
+      "obligation": "Live use MUST freshly validate relevant observations rather than trust a prior feasible result.",
+      "document": "04-counterfactuals.md",
+      "owners": [
+        "chio-recovery (proposed)",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "simulation::policy_acl_change_after_report",
+      "phase": "P2",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "SIM-08",
+      "obligation": "Projected reports and authorization references MUST NOT expose unauthorized transitive commitments or low-entropy secret digests.",
+      "document": "04-counterfactuals.md",
+      "owners": [
+        "chio-recovery",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "simulation::commitment_dictionary_and_cross_audience_probe",
+      "phase": "P2",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-01",
+      "obligation": "Package publisher identity MUST remain distinct from tenant deployment authority.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-semantic-contracts (proposed)",
+        "chio-manifest",
+        "chio-flow",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "contracts::package_cannot_bind_operator_authority",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-02",
+      "obligation": "Every exposed tool/channel MUST have complete authenticated coverage or refuse.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-semantic-contracts (proposed)",
+        "chio-manifest",
+        "chio-flow",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "contracts::uncovered_nested_stream_and_error_paths",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-03",
+      "obligation": "Policy composition MUST expose resolved precedence and preserve kernel/operator ceilings.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-semantic-contracts (proposed)",
+        "chio-manifest",
+        "chio-flow",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "contracts::override_and_ceiling_matrix",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-04",
+      "obligation": "Recipient resolution MUST bind the actual provider/account/resource and enforced transport.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-semantic-contracts (proposed)",
+        "chio-manifest",
+        "chio-flow",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "contracts::recipient_redirect_and_account_substitution",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-05",
+      "obligation": "ACL observations MUST be scoped, fresh, complete and fail closed on uncertainty.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-semantic-contracts (proposed)",
+        "chio-manifest",
+        "chio-flow",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "contracts::acl_cache_outage_and_pagination",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-06",
+      "obligation": "Dynamic annotators MUST have explicit bounded powers; confidence MUST NOT grant authority.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-semantic-contracts (proposed)",
+        "chio-manifest",
+        "chio-flow",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "contracts::annotator_power_escalation",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-07",
+      "obligation": "Influence/endorsement MUST be independent of confidentiality and transport authentication.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-semantic-contracts (proposed)",
+        "chio-manifest",
+        "chio-flow",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "integrity::trusted_transport_untrusted_ticket",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-08",
+      "obligation": "Transformation release MUST bind exact inputs, code, output, authority and purpose.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-semantic-contracts (proposed)",
+        "chio-manifest",
+        "chio-flow",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "transforms::input_output_code_and_scope_substitution",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-09",
+      "obligation": "A one-shot crossing MUST NOT create reusable public artifact authority.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-semantic-contracts (proposed)",
+        "chio-manifest",
+        "chio-flow",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "transforms::one_shot_cannot_mint_projection_certificate",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-10",
+      "obligation": "Bound output disposition MUST cover success, failure, stream and alternate channels without raw fallback.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-semantic-contracts (proposed)",
+        "chio-manifest",
+        "chio-flow",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "transforms::failure_and_withhold_channels",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-11",
+      "obligation": "Reload MUST activate a complete verified generation while preserving captured historical operations.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-semantic-contracts (proposed)",
+        "chio-manifest",
+        "chio-flow",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "contracts::reload_during_offer_and_unknown_effect",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-12",
+      "obligation": "Provider submission and any retry MUST obey the qualified native effect contract, including deduplication scope, lifetime and complete effect cardinality.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-kernel",
+        "chio-control-plane",
+        "chio-semantic-contracts"
+      ],
+      "proposed_acceptance_test": "contracts::hidden_transport_retry_and_partial_batch",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "CON-13",
+      "obligation": "Prerequisites MUST distinguish historical facts, current predicates and held reservations at the dependent effect boundary.",
+      "document": "05-semantic-contracts.md",
+      "owners": [
+        "chio-recovery",
+        "chio-semantic-contracts",
+        "chio-kernel"
+      ],
+      "proposed_acceptance_test": "recovery::expired_lock_and_changed_reviewed_version",
+      "phase": "P3",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-01",
+      "obligation": "Artifact identity MUST bind content version and provenance without treating hashes as bearer authority.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "artifact backend adapter"
+      ],
+      "proposed_acceptance_test": "artifacts::equal_bytes_different_provenance",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-02",
+      "obligation": "Publication MUST recover safely across every byte-store/metadata-store cutpoint.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "artifact backend adapter"
+      ],
+      "proposed_acceptance_test": "artifacts::publication_commit_cutpoints",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-03",
+      "obligation": "Missing or corrupt metadata/bytes MUST quarantine the version without public fallback.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "artifact backend adapter"
+      ],
+      "proposed_acceptance_test": "artifacts::restart_with_missing_label_or_blob",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-04",
+      "obligation": "Reads MUST commit required knowledge and validate exact bytes before model/agent release.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "artifact backend adapter"
+      ],
+      "proposed_acceptance_test": "artifacts::taint_commit_before_first_chunk",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-05",
+      "obligation": "Copy/move/export/import MUST preserve governed provenance across aliases and tenants.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "artifact backend adapter"
+      ],
+      "proposed_acceptance_test": "artifacts::copy_restore_archive_and_aliases",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-06",
+      "obligation": "Derivation MUST join all inputs unless exact scoped projection authority is verified.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "artifact backend adapter"
+      ],
+      "proposed_acceptance_test": "artifacts::summary_and_dependency_overflow",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-07",
+      "obligation": "Checkpoint/model restore MUST join retained knowledge and preserve provider context identity.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "artifact backend adapter"
+      ],
+      "proposed_acceptance_test": "memory::old_checkpoint_cannot_reset_context",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-08",
+      "obligation": "Legacy unlabeled state MUST require quarantine and explicit adoption.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "artifact backend adapter"
+      ],
+      "proposed_acceptance_test": "memory::legacy_state_activation",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-09",
+      "obligation": "GC and deletion MUST retain ownership/replay tombstones and live version pins.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "artifact backend adapter"
+      ],
+      "proposed_acceptance_test": "artifacts::gc_races_with_unknown_operation",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-10",
+      "obligation": "Existence, error, digest and deduplication channels MUST obey audience policy.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "artifact backend adapter"
+      ],
+      "proposed_acceptance_test": "artifacts::cross_tenant_existence_oracle",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-11",
+      "obligation": "Filesystem enforcement MUST mediate mutation rather than rely on observation after writes.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-store-sqlite",
+        "artifact backend adapter"
+      ],
+      "proposed_acceptance_test": "artifacts::concurrent_writer_symlink_and_rename",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ART-12",
+      "obligation": "Artifact/return releases MUST join native scoped knowledge and retain release identity before delivery, including concurrent dispatch and uncertain acknowledgement.",
+      "document": "06-artifacts-memory.md",
+      "owners": [
+        "chio-kernel",
+        "chio-store-sqlite",
+        "chio-process"
+      ],
+      "proposed_acceptance_test": "artifacts::join_egress_race_and_release_readback",
+      "phase": "P4",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ISO-01",
+      "obligation": "Ordinary child creation MUST preserve inherited knowledge and authority attenuation.",
+      "document": "07-confined-returns.md",
+      "owners": [
+        "chio-process",
+        "chio-cage",
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "isolation::ordinary_fork_cannot_clear_taint",
+      "phase": "P5",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ISO-02",
+      "obligation": "A confined lineage/epoch MUST require host-issued boundary authority and admitted seed provenance.",
+      "document": "07-confined-returns.md",
+      "owners": [
+        "chio-process",
+        "chio-cage",
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "isolation::forged_boundary_and_seed_substitution",
+      "phase": "P5",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ISO-03",
+      "obligation": "Sensitive observation MUST wait for verified enforcement and provider-context identity.",
+      "document": "07-confined-returns.md",
+      "owners": [
+        "chio-process",
+        "chio-cage",
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "isolation::unconfined_or_reused_provider_context",
+      "phase": "P5",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ISO-04",
+      "obligation": "Return release MUST bind exact artifact, child, parent, boundary, policy and scoped authority.",
+      "document": "07-confined-returns.md",
+      "owners": [
+        "chio-process",
+        "chio-cage",
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "returns::cross_parent_and_cross_epoch_substitution",
+      "phase": "P5",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ISO-05",
+      "obligation": "Parent knowledge MUST be committed before return bytes are delivered.",
+      "document": "07-confined-returns.md",
+      "owners": [
+        "chio-process",
+        "chio-cage",
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "returns::crash_before_and_after_parent_join",
+      "phase": "P5",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ISO-06",
+      "obligation": "Success, failure, logs, progress, files and streams MUST share the declared release boundary.",
+      "document": "07-confined-returns.md",
+      "owners": [
+        "chio-process",
+        "chio-cage",
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "returns::alternate_channel_canary_campaign",
+      "phase": "P5",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ISO-07",
+      "obligation": "Schema compliance MUST NOT substitute for disclosure or integrity authority.",
+      "document": "07-confined-returns.md",
+      "owners": [
+        "chio-process",
+        "chio-cage",
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "returns::well_typed_unauthorized_predicate",
+      "phase": "P5",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ISO-08",
+      "obligation": "Restart, cancellation and duplicate spawn/return MUST preserve logical identity and consumed resources.",
+      "document": "07-confined-returns.md",
+      "owners": [
+        "chio-process",
+        "chio-cage",
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "isolation::restart_duplicate_and_cancel_cutpoints",
+      "phase": "P5",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ISO-09",
+      "obligation": "The parent tree's budgets and limits MUST include confined work and its recovery.",
+      "document": "07-confined-returns.md",
+      "owners": [
+        "chio-process",
+        "chio-cage",
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "isolation::epoch_churn_cannot_escape_limits",
+      "phase": "P5",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "ISO-10",
+      "obligation": "Confined launch MUST mediate every parent-influenced seed, control and metadata channel using the parent's current knowledge.",
+      "document": "07-confined-returns.md",
+      "owners": [
+        "chio-process",
+        "chio-kernel",
+        "chio-control-plane"
+      ],
+      "proposed_acceptance_test": "isolation::tainted_parent_control_channel_laundering",
+      "phase": "P5",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-01",
+      "obligation": "All SDK/CLI paths MUST share Rust-owned recovery semantics and stable command identity.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "protocol::cross_sdk_replay_and_conflict",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-02",
+      "obligation": "Required enforcement features MUST be bound to the deployment/admission profile and resist downgrade.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "protocol::old_host_and_stripped_extension",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-03",
+      "obligation": "Shared generated wire vectors MUST reject malformed or unknown signed bindings.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "wire::shared_negative_recovery_vectors",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-04",
+      "obligation": "Protected setup MUST prove required mediation/self-test coverage before accepting protected work.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "deployment::missing_broker_or_uncovered_path",
+      "phase": "P6",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-05",
+      "obligation": "Time and key changes MUST refuse stale authority without corrupting historical recovery.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "operations::clock_rollback_rotation_and_revocation",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-06",
+      "obligation": "Store upgrades/rollbacks MUST preserve original identities and reject incompatible serving binaries.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "migration::interrupted_upgrade_and_old_binary",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-07",
+      "obligation": "Policy feedback MUST remain a classified proposal with separate deployment authority.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "policy::report_cannot_relax_or_approve",
+      "phase": "P6",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-08",
+      "obligation": "Telemetry MUST be audience-safe and never substitute for durable ownership/audit state.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "observability::telemetry_loss_and_secret_canaries",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-09",
+      "obligation": "Reconciliation MUST retain bounded reserved capacity under overload.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "operations::planner_flood_does_not_starve_recovery",
+      "phase": "P6",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-10",
+      "obligation": "Cancellation and notification failures MUST not create new effect attempts.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-cli",
+        "SDK/codegen",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "operations::cancel_and_delivery_replay",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-11",
+      "obligation": "Command replay MUST resolve committed identity before stale-revision rejection and freshly authorize every returned projection without reapplying mutations.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-control-plane",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "protocol::lost_ack_stale_revision_and_revoked_replay",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-12",
+      "obligation": "New recovery intake MUST obey durable per-tenant/authority quotas while preserving headroom and ownership for existing unresolved work.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-store-sqlite",
+        "chio-control-plane",
+        "chio-process"
+      ],
+      "proposed_acceptance_test": "operations::workflow_flood_and_disk_headroom",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "OPS-13",
+      "obligation": "Historical settlement MUST use scoped current recovery authority independently of expired initiating authority, without creating execution rights or bypassing current release checks.",
+      "document": "08-protocol-operations.md",
+      "owners": [
+        "chio-kernel",
+        "chio-control-plane",
+        "chio-store-sqlite"
+      ],
+      "proposed_acceptance_test": "operations::revoked_caller_settlement_and_lookup_authority",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "TEST-01",
+      "obligation": "Trajectories MUST assert effects, authority and retained knowledge alongside decisions.",
+      "document": "09-conformance.md",
+      "owners": [
+        "chio-conformance",
+        "chio-trace-validate",
+        "owning integration suites"
+      ],
+      "proposed_acceptance_test": "conformance::trajectory_effect_assertions",
+      "phase": "P0",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "TEST-02",
+      "obligation": "Every security negative MUST have a successful relevant benign counterpart.",
+      "document": "09-conformance.md",
+      "owners": [
+        "chio-conformance",
+        "chio-trace-validate",
+        "owning integration suites"
+      ],
+      "proposed_acceptance_test": "conformance::paired_case_inventory",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "TEST-03",
+      "obligation": "Crash campaigns MUST use fresh processes and independent effect/evidence checks.",
+      "document": "09-conformance.md",
+      "owners": [
+        "chio-conformance",
+        "chio-trace-validate",
+        "owning integration suites"
+      ],
+      "proposed_acceptance_test": "conformance::native_os_death_cutpoints",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "TEST-04",
+      "obligation": "Mutation tests MUST reject the intended broken invariant rather than incidental fixture failure.",
+      "document": "09-conformance.md",
+      "owners": [
+        "chio-conformance",
+        "chio-trace-validate",
+        "owning integration suites"
+      ],
+      "proposed_acceptance_test": "conformance::mutation_reason_coverage",
+      "phase": "P1",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "TEST-05",
+      "obligation": "Concurrency/parser/model tests MUST map to actual owning components before qualification.",
+      "document": "09-conformance.md",
+      "owners": [
+        "chio-conformance",
+        "chio-trace-validate",
+        "owning integration suites"
+      ],
+      "proposed_acceptance_test": "conformance::source_bound_assurance_map",
+      "phase": "P6",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "TEST-06",
+      "obligation": "Comparative trials MUST match tasks, actors, authority and competent recovery baselines.",
+      "document": "09-conformance.md",
+      "owners": [
+        "chio-conformance",
+        "chio-trace-validate",
+        "owning integration suites"
+      ],
+      "proposed_acceptance_test": "evaluation::matched_trial_manifest",
+      "phase": "P6",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "TEST-07",
+      "obligation": "Published metrics MUST preserve denominators, uncertainty, unsupported cases and source/profile identity.",
+      "document": "09-conformance.md",
+      "owners": [
+        "chio-conformance",
+        "chio-trace-validate",
+        "owning integration suites"
+      ],
+      "proposed_acceptance_test": "evaluation::report_provenance_and_denominators",
+      "phase": "P6",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    },
+    {
+      "id": "TEST-08",
+      "obligation": "Feature acceptance MUST include bounded-resource overload and declared performance budgets.",
+      "document": "09-conformance.md",
+      "owners": [
+        "chio-conformance",
+        "chio-trace-validate",
+        "owning integration suites"
+      ],
+      "proposed_acceptance_test": "conformance::resource_and_latency_budget",
+      "phase": "P6",
+      "implementation_status": "specified_not_implemented_by_this_package"
+    }
+  ],
+  "architecture_revision": 3
+}

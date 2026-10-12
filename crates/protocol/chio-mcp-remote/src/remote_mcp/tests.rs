@@ -23,10 +23,14 @@ mod clock_custody;
 mod dpop_replay;
 #[path = "tests/protocol_refusal.rs"]
 mod protocol_refusal;
+#[path = "tests/resume_envelope.rs"]
+mod resume_envelope;
 #[path = "tests/session_recovery.rs"]
 mod session_recovery;
 #[path = "tests/session_runtime.rs"]
 mod session_runtime;
+#[path = "tests/terminal_reason.rs"]
+mod terminal_reason;
 
 #[derive(Clone)]
 pub(crate) struct TestNativeLaunchFactory;
@@ -525,6 +529,7 @@ fn sample_resume_record_with_keyring(
             peer_capabilities: PeerCapabilities::default(),
             initialize_params: json!({}),
             issued_capabilities: Vec::new(),
+            subscriptions: Vec::new(),
             resume_generation: 1,
             resume_integrity: keyring.empty_tag_for_current(),
         },
@@ -994,9 +999,17 @@ fn terminal_transition_deletes_active_state_and_retains_replay_fence() {
         protocol_version: active_record.protocol_version.clone(),
         ownership: RemoteSessionOwnershipSnapshot::default(),
         terminal_at: 13,
+        terminal_reason: None,
     };
-    let (tombstone, fence) = sign_terminal_session_records(&keyring, terminal_record, 2, 2)
-        .expect("sign terminal transition");
+    let (tombstone, fence) = sign_terminal_session_records(
+        &keyring,
+        terminal_record,
+        TerminalReason::Deleted,
+        RemoteSessionEnvelope::V2,
+        2,
+        2,
+    )
+    .expect("sign terminal transition");
     persist_terminal_session_transition(&path, &tombstone, &fence, &keyring, session_now_millis())
         .expect("persist terminal transition");
 
@@ -1068,6 +1081,7 @@ fn restored_ready_session_preserves_lifecycle_and_requires_store_lease() {
         reaper_interval_millis: 100,
         tombstone_retention_millis: 10_000,
         request_response_timeout_millis: 10_000,
+        resume_envelope_floor: RemoteSessionEnvelope::V3,
     };
     let session = RemoteSession::new(RemoteSessionInit {
         clock: RemoteClock::new(Arc::new(

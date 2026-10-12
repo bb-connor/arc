@@ -1001,6 +1001,7 @@ fn anchored_reservation_finalizes_after_expiry_under_a_new_serving_owner() -> Te
         lock_root,
         authority,
         store,
+        _clock,
         ..
     } = fixture;
     drop(store);
@@ -1018,6 +1019,7 @@ fn anchored_reservation_finalizes_after_expiry_under_a_new_serving_owner() -> Te
         authority,
         store,
         fence,
+        _clock,
     };
     let operation = fixture
         .authority

@@ -1,0 +1,46 @@
+{
+  "captured_at": "2026-10-01T18:52:52.741239+00:00",
+  "source": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+  "platform": "macOS-26.4-arm64-arm-64bit-Mach-O",
+  "rustc": "rustc 1.93.0 (254b59607 2026-01-19)",
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/chio-openappa-research-20261001/target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "runtime_run_CARGO_INCREMENTAL": "0"
+  },
+  "runs": [
+    {
+      "name": "core-tests",
+      "command": "cargo test --locked -p appa-engine -p appa-policy -p appa-eventlog -p appa-adapter-claude-code -p appa-adapter-kagent",
+      "exit_code": 0,
+      "test_groups": 14,
+      "passed": 683,
+      "failed": 0,
+      "ignored": 0,
+      "log": "core-tests.log"
+    },
+    {
+      "name": "runtime-tests",
+      "command": "cargo test --locked -p appa --lib --test replay --test crash_recovery --test claude_code_subagent --test input_substitution --test hook_client --test config_reload --test session_principal --test audience --test embedded_host --test audit_read --test docs_examples --test api_shape",
+      "exit_code": 0,
+      "test_groups": 13,
+      "passed": 819,
+      "failed": 0,
+      "ignored": 2,
+      "log": "runtime-tests.log"
+    }
+  ],
+  "totals": {
+    "passed": 1502,
+    "failed": 0,
+    "ignored": 2
+  },
+  "ignored": "Two upstream live TypeSafe API tests; credentials/provider calls were not exercised.",
+  "limits": [
+    "Selected packages and integration suites, not the whole workspace.",
+    "No live model evaluation, installed coding-agent run, external provider ACL test, PostgreSQL deployment, or Linux confinement qualification.",
+    "No Chio runtime tests were run in this research pass."
+  ]
+}

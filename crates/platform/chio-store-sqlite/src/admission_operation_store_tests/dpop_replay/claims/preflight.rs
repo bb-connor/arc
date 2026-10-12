@@ -9,7 +9,7 @@ use chio_kernel::BudgetStore;
 fn real_nonce_preflight_requires_fresh_claim_but_recovers_and_cleans_expired_history(
 ) -> AnchoredTestResult {
     for already_authorized in [false, true] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, true)?;
         let domain = activate(&fixture, &source)?;
         let (operation, lease, credential) = setup(
@@ -129,7 +129,7 @@ fn real_nonce_preflight_requires_fresh_claim_but_recovers_and_cleans_expired_his
 
 #[test]
 fn generic_command_cannot_create_dpop_custody_from_an_attachment() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let domain = activate(&fixture, &source)?;
     let (operation, lease, _) = setup(
