@@ -13,12 +13,24 @@ pub(super) struct DischargeBinding {
     pub request_id: String,
     pub operation_id: Option<String>,
     pub capability_id: String,
+    pub server_id: String,
+    pub tool_name: String,
+    pub policy_hash: String,
     pub parameter_hash: String,
     pub grant_index: usize,
 }
 
 impl DischargeBinding {
     pub(super) fn validate_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
+        if !receipt
+            .action
+            .verify_hash()
+            .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?
+        {
+            return Err(KernelError::Internal(
+                "terminal action does not match its parameter hash".into(),
+            ));
+        }
         let metadata = receipt.metadata.as_ref();
         let text = |pointer| {
             metadata
@@ -40,7 +52,12 @@ impl DischargeBinding {
         if self.operation_id.is_some()
             || text("/receipt_context/request_id") != Some(self.request_id.as_str())
             || text("/receipt_context/request_namespace_digest") != Some(self.namespace.as_str())
+            || text("/receipt_context/evaluation_id") != Some(self.evaluation_id.as_str())
             || receipt.capability_id != self.capability_id
+            || receipt.tool_server != self.server_id
+            || receipt.tool_name != self.tool_name
+            || receipt.policy_hash != self.policy_hash
+            || receipt.receipt_kind != chio_core::receipt::kinds::ReceiptKind::MediatedDecision
             || receipt.action.parameter_hash != self.parameter_hash
             || grant != u64::try_from(self.grant_index).ok()
             || !terminal
@@ -101,6 +118,9 @@ impl ChioKernel {
                 .admission
                 .map(|admission| admission.operation_id().to_owned()),
             capability_id: input.request.capability.id.clone(),
+            server_id: input.request.server_id.clone(),
+            tool_name: input.request.tool_name.clone(),
+            policy_hash: self.config.policy_hash.clone(),
             parameter_hash: action.parameter_hash.clone(),
             grant_index: input.matched_grant_index,
         };
@@ -123,7 +143,7 @@ impl ChioKernel {
         let metadata = merge_metadata_objects(
             metadata,
             Some(serde_json::json!({
-                "receipt_context": { "request_namespace_digest": binding.namespace },
+                "receipt_context": { "request_namespace_digest": binding.namespace, "evaluation_id": binding.evaluation_id },
                 "chio_runtime": {
                     "identity_disposition": "terminal",
                     "evaluation_started_at": input.evaluation_started_at,
@@ -226,7 +246,7 @@ impl PreparedFaultReceipt {
             "payment_reference": result.transaction_id,
             "settlement_status": result.settlement_status.to_receipt_status(),
             "rail_status": result.settlement_status,
-            "cost_charged": amount,
+            "cost_charged": if released { 0 } else { amount },
             "payment_authorization_retained": !final_state,
             "payment_release_confirmed": released && final_state,
             "release_outcome": if released { "acknowledged" } else { "not_released" }
@@ -242,12 +262,21 @@ impl PreparedFaultReceipt {
         let mut observed = serde_json::Map::new();
         if let Some(authority) = metadata.get("budget_authority") {
             let mut authority = authority.clone();
-            if let Some(terminal) = authority
-                .get_mut("terminal")
-                .and_then(serde_json::Value::as_object_mut)
-            {
-                if let Some(event) = terminal.get("event_id").cloned() {
-                    retain_bounded_reference(terminal, "event_id", &event);
+            if let Some(fields) = authority.as_object_mut() {
+                for key in ["hold_id", "budget_term", "execution_nonce_id"] {
+                    if let Some(value) = fields.get(key).cloned() {
+                        retain_bounded_reference(fields, key, &value);
+                    }
+                }
+                for key in ["terminal", "authorize", "invocation_capture", "authority"] {
+                    if let Some(object) = fields
+                        .get_mut(key)
+                        .and_then(serde_json::Value::as_object_mut)
+                    {
+                        for (field, value) in object.clone() {
+                            retain_bounded_reference(object, &field, &value);
+                        }
+                    }
                 }
             }
             observed.insert("budget_authority".into(), authority);
@@ -308,6 +337,23 @@ fn retain_bounded_reference(
     key: &str,
     value: &serde_json::Value,
 ) {
+    if let serde_json::Value::Number(number) = value {
+        if number
+            .as_u64()
+            .is_some_and(|value| value > 9_007_199_254_740_991)
+            || number.as_i64().is_some_and(|value| {
+                !(-9_007_199_254_740_991..=9_007_199_254_740_991).contains(&value)
+            })
+        {
+            map.insert(key.into(), serde_json::Value::Null);
+            map.insert(
+                format!("{key}_decimal"),
+                serde_json::Value::String(number.to_string()),
+            );
+            map.insert(format!("{key}_omitted"), serde_json::Value::Bool(true));
+            return;
+        }
+    }
     if let Some(text) = value.as_str().filter(|text| text.len() > 512) {
         // A new rail/reference value is not predictable before execution. Keep
         // its exact digest and explicitly omit raw bytes rather than retaining
@@ -322,3 +368,6 @@ fn retain_bounded_reference(
         map.insert(key.into(), value.clone());
     }
 }
+
+#[cfg(test)]
+mod tests;

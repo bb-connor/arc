@@ -225,7 +225,7 @@ fn prepare_ordinary(
     let metadata = merge_metadata_objects(
         inputs.metadata.clone(),
         Some(serde_json::json!({
-            "receipt_context": { "request_namespace_digest": inputs.prepared.binding.namespace },
+        "receipt_context": { "request_namespace_digest": inputs.prepared.binding.namespace, "evaluation_id": inputs.prepared.binding.evaluation_id },
             "chio_runtime": { "identity_disposition": "terminal" }
         })),
     );
