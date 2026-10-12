@@ -254,6 +254,32 @@ impl Fixture {
                     vec![self.request.capability.clone()],
                 )?;
                 self.kernel.activate_session(&session)?;
+                if metadata.is_some() {
+                    let context = make_operation_context(
+                        &session,
+                        &self.request.request_id,
+                        &self.request.agent_id,
+                    );
+                    let mut operation: ToolCallOperation =
+                        serde_json::from_value(serde_json::json!({
+                            "capability": self.request.capability,
+                            "server_id": self.request.server_id,
+                            "tool_name": self.request.tool_name,
+                            "arguments": self.request.arguments,
+                            "governed_intent": self.request.governed_intent,
+                            "approval_token": self.request.approval_token,
+                        }))
+                        .map_err(|error| KernelError::Internal(error.to_string()))?;
+                    operation.extra_metadata = metadata;
+                    return self
+                        .kernel
+                        .evaluate_tool_call_operation_with_nested_flow_client_async(
+                            &context,
+                            &operation,
+                            &mut NoopNestedFlowClient,
+                        )
+                        .await;
+                }
                 let context =
                     make_operation_context(&session, "outcome-parent", &self.request.agent_id);
                 self.kernel
