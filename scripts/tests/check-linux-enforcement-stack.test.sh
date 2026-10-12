@@ -21,6 +21,7 @@ make_fixture() {
   cp "$REPO_ROOT/.github/workflows/release-binaries.yml" "$root/.github/workflows/"
   cp "$REPO_ROOT/third_party/provenance/linux-enforcement-stack.toml" \
     "$root/third_party/provenance/"
+  cp -R "$REPO_ROOT/third_party/provenance/archives" "$root/third_party/provenance/"
   cp \
     "$REPO_ROOT/third_party/nono-chio/Cargo.toml" \
     "$REPO_ROOT/third_party/nono-chio/README.md" \
@@ -99,9 +100,43 @@ grep -F 'nono-chio wrapper source digest does not match provenance' "$work/abi.e
 
 tampered_seccompiler="$work/tampered-seccompiler"
 cp -R "$valid" "$tampered_seccompiler"
-printf '\n// provenance tamper\n' >>"$tampered_seccompiler/third_party/seccompiler-chio/src/lib.rs"
+python3 - "$tampered_seccompiler/third_party/seccompiler-chio/src/backend/bpf.rs" <<'PYTEST'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+data = bytearray(p.read_bytes())
+data[-2] ^= 1
+p.write_bytes(bytes(data))
+PYTEST
 test "$(run_checker "$tampered_seccompiler" "$work/tampered-seccompiler.out" "$work/tampered-seccompiler.err")" = 1
-grep -F 'seccompiler fork source digest does not match provenance' "$work/tampered-seccompiler.err" >/dev/null
+grep -F 'seccompiler fork differs from the registry release plus recorded patch: src/backend/bpf.rs' "$work/tampered-seccompiler.err" >/dev/null
+
+unrecorded_seccompiler_file="$work/unrecorded-seccompiler-file"
+cp -R "$valid" "$unrecorded_seccompiler_file"
+printf 'fn main() {}\n' >"$unrecorded_seccompiler_file/third_party/seccompiler-chio/build.rs"
+test "$(run_checker "$unrecorded_seccompiler_file" "$work/unrecorded-file.out" "$work/unrecorded-file.err")" = 1
+grep -F 'seccompiler fork differs from the registry release plus recorded patch: build.rs' "$work/unrecorded-file.err" >/dev/null
+
+stale_seccompiler_patch="$work/stale-seccompiler-patch"
+cp -R "$valid" "$stale_seccompiler_patch"
+python3 - "$stale_seccompiler_patch/third_party/seccompiler-chio/CHIO-PATCH.patch.json" <<'PYTEST'
+import json
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+lines = json.loads(p.read_text())
+index = next(i for i, line in enumerate(lines) if line.startswith("-") and not line.startswith("---"))
+lines[index] = lines[index][:-1] + "X\n"
+p.write_text(json.dumps(lines))
+PYTEST
+test "$(run_checker "$stale_seccompiler_patch" "$work/stale-patch.out" "$work/stale-patch.err")" = 1
+grep -F 'cannot reconstruct seccompiler fork: patch hunk does not apply to' "$work/stale-patch.err" >/dev/null
+
+substituted_seccompiler_archive="$work/substituted-seccompiler-archive"
+cp -R "$valid" "$substituted_seccompiler_archive"
+printf '\0' >>"$substituted_seccompiler_archive/third_party/provenance/archives/seccompiler-0.5.0.crate"
+test "$(run_checker "$substituted_seccompiler_archive" "$work/archive.out" "$work/archive.err")" = 1
+grep -F 'cannot reconstruct seccompiler fork: seccompiler registry archive does not match the reviewed checksum' "$work/archive.err" >/dev/null
 
 tampered_nono="$work/tampered-nono-source"
 cp -R "$valid" "$tampered_nono"

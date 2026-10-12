@@ -21,6 +21,11 @@ checks the exact rejected length, and proves the invalid input leaves seccomp
 mode unchanged. All upstream tests are retained. The manifest makes the fork
 unpublished and independently testable.
 
+`CHIO-PATCH.patch.json` records every change against the registry archive
+vendored at `third_party/provenance/archives/seccompiler-0.5.0.crate`.
+`scripts/check-linux-enforcement-stack.py` verifies the archive checksum,
+applies the recorded patch and rejects any difference from this directory.
+
 One documentation-list indentation is normalized so the retained upstream
 documentation passes current strict Clippy. It has no runtime effect.
 Whitespace in retained platform and syscall-table generator metadata is also
