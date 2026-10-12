@@ -116,7 +116,8 @@ fn recover(
     )
     .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
     let mut admission = kernel
-        .begin_durable_tool_admission(request, &matching, current_unix_timestamp_ms())?
+        .begin_durable_tool_admission(request, &matching, current_unix_timestamp_ms())
+        .map_err(|failure| *failure.error)?
         .ok_or_else(|| KernelError::DurableAdmission("missing test admission".into()))?;
     kernel
         .recover_durable_tool_admission(&mut admission, request)?

@@ -127,7 +127,8 @@ fn pending_admission(
     .map_err(|error| KernelError::Internal(error.to_string()))?;
     let now = current_unix_timestamp_ms();
     let mut admission = kernel
-        .begin_durable_tool_admission(request, &matching, now)?
+        .begin_durable_tool_admission(request, &matching, now)
+        .map_err(|failure| *failure.error)?
         .ok_or_else(|| KernelError::Internal("test requires durable admission".into()))?;
     let (_, mutation) = kernel
         .check_and_increment_budget(

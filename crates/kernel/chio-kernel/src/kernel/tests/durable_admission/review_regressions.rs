@@ -705,6 +705,7 @@ fn an_unrelated_cumulative_grant_does_not_withdraw_an_exempt_admission() {
         kernel
             .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
             .map(|admission| admission.is_none())
+            .map_err(|failure| *failure.error)
     };
 
     // Neither exempt tool matches a cumulative grant, so the cumulative grants

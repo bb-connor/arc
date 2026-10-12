@@ -67,7 +67,8 @@ fn historical_native_response(
             Some(security_context),
             now,
             DispatchTransport::KernelToolServer,
-        )?
+        )
+        .map_err(|failure| *failure.error)?
         .ok_or_else(|| KernelError::Internal("historical native admission missing".into()))?;
     kernel.run_native_admission_preparation(
         request,
