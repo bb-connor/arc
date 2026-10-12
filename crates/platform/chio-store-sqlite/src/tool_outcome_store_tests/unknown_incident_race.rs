@@ -3,7 +3,7 @@ use chio_kernel::admission_operation::{
     verified_outcome_unknown_after_dispatch_projection, AdmissionProjectionContext,
     AdmissionTerminalReplay,
 };
-use chio_kernel::receipt_store::QualifiedAdmissionProjectionStore;
+use chio_kernel::ReceiptStore;
 
 #[test]
 fn original_dispatch_incident_and_tool_return_mutually_refuse_the_losing_write() {
