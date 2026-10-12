@@ -205,6 +205,36 @@ mod tests {
     }
 
     #[test]
+    fn consultation_accepts_500_ms_and_denies_501_ms() {
+        let token = build_token("cap-leaf", &["cap-root"]);
+        let view = install_view_at(1, &[], NOW_MS - 500);
+
+        assert!(consult_revocation_view(&token, Some(&view), UnixMillis::new(NOW_MS)).is_ok());
+        assert!(matches!(
+            consult_revocation_view(&token, Some(&view), UnixMillis::new(NOW_MS + 1)),
+            Err(KernelError::RevocationSnapshotStale)
+        ));
+    }
+
+    #[test]
+    fn snapshot_freshness_maps_full_width_boundary_errors() {
+        let mut snapshot = RevocationSnapshot::empty();
+        snapshot.issued_at_unix_ms = u64::MAX;
+
+        assert!(verify_snapshot_freshness(&snapshot, u64::MAX, 0).is_ok());
+        assert!(matches!(
+            verify_snapshot_freshness(&snapshot, u64::MAX - 1, u64::MAX),
+            Err(KernelError::RevocationSnapshotFuture)
+        ));
+        snapshot.issued_at_unix_ms = 0;
+        assert!(verify_snapshot_freshness(&snapshot, u64::MAX, u64::MAX).is_ok());
+        assert!(matches!(
+            verify_snapshot_freshness(&snapshot, u64::MAX, u64::MAX - 1),
+            Err(KernelError::RevocationSnapshotStale)
+        ));
+    }
+
+    #[test]
     fn empty_view_denies_as_stale() {
         let token = build_token("cap-leaf", &["cap-root"]);
         let view = Arc::new(RevocationView::new());
