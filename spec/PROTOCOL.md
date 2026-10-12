@@ -2943,6 +2943,164 @@ endpoint re-verifies a submitted bundle against pinned trusted signer keys
 and the schema set above before reporting a verdict; verification failures
 deny.
 
+### 8.6 Local Process Worker Protocol (`chio.process.v1`)
+
+`chio.process.v1` is the local protocol between a process host (the
+`chio-process` crate's `WorkerService`) and the worker processes it
+supervises. It exposes a process-scoped subset of the host API: a worker can
+inspect itself, invoke tools through the kernel, compare-and-set its
+checkpoint, store and read immutable private blobs, cancel its own subtree,
+and request host-prepared invocations. It has no process selector, capability
+replacement, mint, revocation or administrative operation. Host setup,
+credential delivery and OS isolation are specified in
+`crates/kernel/chio-process/WORKER_PROTOCOL.md`.
+
+Machine-readable contract:
+
+- `spec/schemas/chio-process/v1/request.schema.json`: the request frame and
+  every operation.
+- `spec/schemas/chio-process/v1/response.schema.json`: the response envelope,
+  the error code set, and one `$defs` entry per operation result
+  (`InspectResult`, `InvokeResult`, `CheckpointResult`, `BlobPutResult`,
+  `BlobReadResult`, `CancelResult`, `PrepareInvocationResult`).
+- `spec/fixtures/chio-process-v1.json`: the shared conformance corpus. Its
+  `server` cases run in order against one reference host and pin the Rust
+  worker; its `client` cases pin the Python and Node clients' encoders and
+  decoders, byte for byte where a request is given.
+
+#### Transport and framing
+
+A host serves the protocol on a Unix domain socket in a private directory
+(mode 0700, socket mode 0600). It is not a network service. Each connection
+carries exactly one request and one response:
+
+- A request is UTF-8 JSON followed by one newline (`0x0A`). The request,
+  including that newline, MUST NOT exceed 2097152 bytes (2 MiB). JSON
+  whitespace inside the frame is permitted; content after the JSON value and
+  before the newline is not. Bytes after the first newline are ignored.
+- A response is UTF-8 JSON followed by one newline, at most 8388608 bytes
+  (8 MiB) including that newline. It contains no byte order mark, no `NaN` or
+  `Infinity`, and no raw newline before its terminator.
+- The host closes the connection after its response. A client MUST NOT send a
+  second request on the same connection.
+
+The reference host admits at most 32 concurrent connections and closes
+excess connections without a response. It allows five seconds to receive a
+complete request and five seconds to write the response.
+
+#### Requests
+
+```json
+{"protocol":"chio.process.v1","credential":"<64 lowercase hex>","operation":{"op":"inspect"}}
+```
+
+The request object has exactly the members `protocol`, `credential` and
+`operation`. `operation` is an object discriminated by `op`:
+
+| `op` | Members beyond `op` | Result (`response.schema.json#/$defs/...`) |
+| --- | --- | --- |
+| `inspect` | none | `InspectResult`: own process id, parent and root ids, state, depth, limits, tree call count, optional `storage` (`chio.process.blobs.v1`) and checkpoint. Never a capability token. |
+| `invoke` | `operation_key`, `server_id`, `tool_name`, `arguments` (any JSON); optional `governed_intent` (object or null); optional boolean `known_outcome_only` | `InvokeResult`: `request_id`, `verdict`, `output`, `reason`, `terminal_state`, `receipt_json`, `execution_nonce_json`, and `output_withheld` when the output was dropped. |
+| `prepare_invocation` | `operation_key`, `server_id`, `tool_name`, `arguments` | `PrepareInvocationResult`: the host-prepared envelope, a JSON object. |
+| `checkpoint` | `expected_revision` (canonical decimal string), `value` (any JSON) | `CheckpointResult`: `revision` (decimal string) and `value`. |
+| `blob_put` | `sha256` (64 lowercase hex), `data_base64` (canonical padded standard base64) | `BlobPutResult`: `sha256` and `bytes`. |
+| `blob_read` | `sha256` (64 lowercase hex) | `BlobReadResult`: `sha256`, `bytes` and `data_base64`. |
+| `cancel` | none | `CancelResult`: `cancelled_processes`. |
+
+Field rules a host MUST enforce, each refused with `invalid_request`:
+
+- No unknown members and no duplicate member names in the request object or
+  in `operation`. `arguments`, `value` and the context of a governed intent
+  are application JSON and are not subject to this rule.
+- `operation_key` is 1 to 256 UTF-8 bytes, contains no control character
+  (Unicode category Cc), and has no leading or trailing Unicode whitespace.
+  The schema's `maxLength` bounds characters, so a host checks bytes.
+- `expected_revision` is the canonical decimal form of an unsigned 64-bit
+  integer: no sign, no leading zero, no JSON number.
+- The canonical JSON encoding of a checkpoint `value` is at most 1048576
+  bytes.
+- `data_base64` decodes to at most 1048576 bytes, re-encodes to exactly the
+  same text, and its SHA-256 equals `sha256`.
+- `governed_intent`, when not null, is a `GovernedTransactionIntent`
+  (`spec/schemas/chio-wire/v1/agent/governed-transaction-intent.schema.json`).
+  Null and absence are equivalent. `known_outcome_only` is a JSON boolean;
+  false and absence are equivalent.
+
+A host evaluates a request in this order, and the first failure decides the
+response: frame size and termination, then JSON syntax and the member rules
+above (`invalid_request`), then the `protocol` value (`invalid_request` for
+any other value, including future versions), then the credential
+(`unauthenticated`), then the operation. A credential that is not 64
+lowercase hex digits is refused as `unauthenticated`, the same as an unknown,
+expired or revoked one. The host authenticates again before returning a
+result, and withholds it with `unauthenticated` if the credential was revoked
+or expired meanwhile.
+
+#### Responses
+
+Success: `{"protocol":"chio.process.v1","ok":true,"result":{...}}`, where
+`result` is always a JSON object. A kernel denial is a success: its `verdict`
+is `deny` and it carries the signed receipt. Failure:
+`{"protocol":"chio.process.v1","ok":false,"error":{"code":"..."}}`. A failure
+carries no message, path, SQL text or credential, and no tool receipt.
+
+`receipt_json` is the signed receipt as canonical JSON text; consumers MUST
+keep it byte-exact for verification rather than re-serialize a parsed copy.
+`expected_revision` and `revision` are decimal strings for the same reason.
+`execution_nonce_json`, when not null, is the signed execution nonce as JSON
+text. When an invoke result does not fit the response frame, the host returns
+it with `output: null` and `output_withheld: "too_large"`; a retry replays the
+same outcome, so that output is not recoverable through this protocol.
+
+Host error codes:
+
+| Code | Meaning |
+| --- | --- |
+| `unauthenticated` | Malformed, unknown, expired or revoked credential. |
+| `invalid_request` | Malformed JSON, member or field rule violation, or unsupported `protocol`. |
+| `cancelled` | The process or an ancestor is cancelled. |
+| `conflict` | The operation key is already bound to different input: arguments, intent, recovery policy or preparation input. |
+| `checkpoint_conflict` | `expected_revision` is not the current revision. |
+| `limit_reached` | A process-tree ceiling (logical calls, dispatch attempts, prepared invocations, state quota) is exhausted. |
+| `runtime_error` | Any other host failure, including a host without a preparation service. |
+| `blob_missing` | No blob with that digest belongs to this process. |
+| `blob_corrupt` | Stored blob bytes failed their integrity check. |
+| `response_too_large` | The response cannot fit the frame and has no output to withhold. |
+| `invalid_frame` | The request exceeded the frame limit or ended without a newline. |
+| `frame_timeout` | No complete request arrived within the receive deadline. |
+
+#### Client conformance
+
+A conforming client:
+
+- emits compact JSON with members in the order `protocol`, `credential`,
+  `operation`, and within `operation` in the order `op`, `operation_key`,
+  `server_id`, `tool_name`, `arguments`, `known_outcome_only`,
+  `governed_intent` (the remaining operations list their members in the
+  table's order);
+- omits `known_outcome_only` unless it is true and omits an absent
+  `governed_intent`;
+- refuses to send a request over 2097152 bytes, reporting
+  `request_too_large`, and refuses arguments it cannot encode exactly
+  (non-finite numbers; in JavaScript, integers outside the safe range) before
+  connecting;
+- reads at most 8388608 bytes up to the first newline and reports
+  `response_too_large` beyond that, `truncated_response` when the connection
+  ends first, `transport_error` for a socket failure or its deadline, and
+  `invalid_response` for anything that is not strict UTF-8 JSON matching the
+  envelope, including a byte order mark and `NaN` or `Infinity`;
+- reports a failure's `code` unchanged, including codes not listed above;
+- verifies `blob_put` and `blob_read` results against the digest and length it
+  holds and reports `invalid_response` on any mismatch or non-canonical
+  base64;
+- never retries automatically. A transport failure can follow a committed
+  effect; recovery reuses the original operation key with identical
+  arguments, intent and `known_outcome_only`.
+
+Client-side codes (`request_too_large`, `transport_error`,
+`truncated_response`, `response_too_large`, `invalid_response`) never appear
+on the wire from a host, except `response_too_large`, which both sides use.
+
 ## 9. Trust-Control Contract
 
 `chio trust serve` is the shipped trust-control HTTP service.

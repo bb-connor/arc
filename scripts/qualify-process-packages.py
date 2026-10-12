@@ -43,6 +43,18 @@ def write(path, value):
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
+def protocol_test_environment(env):
+    """Bind installed SDK tests to this checkout's exact shared corpus."""
+    relative = "spec/fixtures/chio-process-v1.json"
+    corpus = ROOT / relative
+    identity = {
+        "path": relative,
+        "sha256": digest(corpus),
+        "git_blob": command(["git", "hash-object", "--", corpus], ROOT, env).strip(),
+    }
+    return {**env, "CHIO_PROCESS_PROTOCOL_CORPUS": str(corpus)}, identity
+
+
 def qualify(kit, work, env):
     state = work / "state"
     started = time.monotonic()
@@ -126,9 +138,14 @@ def qualify(kit, work, env):
     tests = work / "python-tests"
     shutil.copytree(ROOT / "sdks/python/chio-process/tests", tests)
     python = state / "venv/bin/python"
-    command([python, "-I", "-m", "unittest", "discover", "-s", tests], work, env)
+    sdk_env, corpus_identity = protocol_test_environment(env)
+    command([python, "-I", "-m", "unittest", "discover", "-s", tests], work, sdk_env)
     shutil.copytree(ROOT / "sdks/typescript/packages/process/test", installed_node / "test")
-    command(["node", "--test", *sorted((installed_node / "test").glob("*.test.mjs"))], work, env)
+    command(
+        ["node", "--test", *sorted((installed_node / "test").glob("*.test.mjs"))],
+        work,
+        sdk_env,
+    )
 
     # Rebuild only from the sdist, install that wheel into a second external
     # environment and run the same behavioral protocol tests there.
@@ -155,7 +172,9 @@ def qualify(kit, work, env):
         work,
         env,
     )
-    command([sdist_python, "-I", "-m", "unittest", "discover", "-s", tests], work, env)
+    command([sdist_python, "-I", "-m", "unittest", "discover", "-s", tests], work, sdk_env)
+    _, observed_corpus = protocol_test_environment(env)
+    assert observed_corpus == corpus_identity, "shared protocol corpus changed during qualification"
 
     source = kit / "producer.py"
     saved = source.read_bytes()
@@ -176,6 +195,7 @@ def qualify(kit, work, env):
             "python": platform.python_version(),
             "node": command(["node", "--version"], work, env).strip(),
             "elapsed_seconds": round(time.monotonic() - started, 2),
+            "protocol_corpus": corpus_identity,
             "checks": [
                 "offline_local_artifact_install",
                 "external_python_and_node_imports",
@@ -187,6 +207,7 @@ def qualify(kit, work, env):
                 "native_operator_status_and_attempt_logs",
                 "installed_wheel_and_tarball_protocol_tests",
                 "rebuilt_sdist_protocol_tests",
+                "installed_protocol_tests_bound_to_shared_corpus",
                 "artifact_drift_rejected",
             ],
         },

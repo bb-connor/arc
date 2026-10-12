@@ -1,0 +1,1709 @@
+{
+  "description": "Shared conformance corpus for the chio.process.v1 worker protocol. Normative text: spec/PROTOCOL.md section 8.6. server cases run in order, one connection each, against one fresh reference host; client cases drive each SDK client against a stub host that returns the given response bytes.",
+  "protocol": "chio.process.v1",
+  "schemas": {
+    "request": "spec/schemas/chio-process/v1/request.schema.json",
+    "response": "spec/schemas/chio-process/v1/response.schema.json"
+  },
+  "limits": {
+    "max_request_bytes": 2097152,
+    "max_response_bytes": 8388608,
+    "max_state_blob_bytes": 1048576,
+    "max_checkpoint_bytes": 1048576,
+    "max_operation_key_bytes": 256
+  },
+  "server_error_codes": [
+    "unauthenticated",
+    "invalid_request",
+    "cancelled",
+    "conflict",
+    "checkpoint_conflict",
+    "limit_reached",
+    "runtime_error",
+    "blob_missing",
+    "blob_corrupt",
+    "response_too_large",
+    "invalid_frame",
+    "frame_timeout"
+  ],
+  "client_error_codes": [
+    "request_too_large",
+    "transport_error",
+    "truncated_response",
+    "response_too_large",
+    "invalid_response"
+  ],
+  "fill_marker": "@FILL@",
+  "fixture_credential": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "server": {
+    "reference_host": {
+      "description": "One root process with id root and no preparation service. Tool server tools exposes append and read, both granted; each echoes its arguments, and arguments {\"large\": true} return a string of max_response_bytes characters. The host issues one credential for root and substitutes it for fixture_credential in every frame.",
+      "process_id": "root",
+      "max_calls": 5
+    },
+    "cases": [
+      {
+        "name": "inspect-fresh-process",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result_keys": [
+            "checkpoint",
+            "depth",
+            "limits",
+            "parent_id",
+            "process_id",
+            "root_id",
+            "state",
+            "storage",
+            "tree_calls"
+          ],
+          "result_subset": {
+            "process_id": "root",
+            "parent_id": null,
+            "root_id": "root",
+            "state": "running",
+            "depth": 0,
+            "tree_calls": 0,
+            "checkpoint": {
+              "revision": "0",
+              "value": null
+            }
+          },
+          "result_schema": "InspectResult"
+        }
+      },
+      {
+        "name": "invoke-allowed",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result_keys": [
+            "execution_nonce_json",
+            "output",
+            "reason",
+            "receipt_json",
+            "request_id",
+            "terminal_state",
+            "verdict"
+          ],
+          "result_subset": {
+            "verdict": "allow",
+            "reason": null,
+            "terminal_state": {
+              "state": "completed"
+            },
+            "execution_nonce_json": null,
+            "output": {
+              "kind": "value",
+              "value": {
+                "text": "hi"
+              }
+            }
+          },
+          "result_schema": "InvokeResult"
+        }
+      },
+      {
+        "name": "invoke-replays-the-same-logical-operation",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "same_result_as": "invoke-allowed",
+          "result_schema": "InvokeResult"
+        }
+      },
+      {
+        "name": "invoke-changed-arguments-under-the-same-key",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"changed\"}}}",
+        "schema_valid": true,
+        "expect": {
+          "error": "conflict"
+        }
+      },
+      {
+        "name": "invoke-known-outcome-only",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"infer-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"},\"known_outcome_only\":true}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result_keys": [
+            "execution_nonce_json",
+            "output",
+            "reason",
+            "receipt_json",
+            "request_id",
+            "terminal_state",
+            "verdict"
+          ],
+          "result_subset": {
+            "verdict": "allow"
+          },
+          "result_schema": "InvokeResult"
+        }
+      },
+      {
+        "name": "invoke-known-outcome-only-dropped-on-retry",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"infer-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "schema_valid": true,
+        "expect": {
+          "error": "conflict"
+        }
+      },
+      {
+        "name": "invoke-explicit-false-recovery-flag-equals-absent",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"},\"known_outcome_only\":false}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "same_result_as": "invoke-allowed",
+          "result_schema": "InvokeResult"
+        }
+      },
+      {
+        "name": "invoke-null-governed-intent-equals-absent",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"},\"governed_intent\":null}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "same_result_as": "invoke-allowed",
+          "result_schema": "InvokeResult"
+        }
+      },
+      {
+        "name": "invoke-ungranted-tool-is-a-signed-denial",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"delete-1\",\"server_id\":\"tools\",\"tool_name\":\"delete\",\"arguments\":{\"text\":\"hi\"}}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result_keys": [
+            "execution_nonce_json",
+            "output",
+            "reason",
+            "receipt_json",
+            "request_id",
+            "terminal_state",
+            "verdict"
+          ],
+          "result_subset": {
+            "verdict": "deny",
+            "output": null
+          },
+          "result_schema": "InvokeResult"
+        }
+      },
+      {
+        "name": "invoke-operation-key-at-byte-limit",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result_keys": [
+            "execution_nonce_json",
+            "output",
+            "reason",
+            "receipt_json",
+            "request_id",
+            "terminal_state",
+            "verdict"
+          ],
+          "result_subset": {
+            "verdict": "allow"
+          },
+          "result_schema": "InvokeResult"
+        }
+      },
+      {
+        "name": "invoke-output-withheld-over-response-limit",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"large-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"large\":true}}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result_keys": [
+            "execution_nonce_json",
+            "output",
+            "output_withheld",
+            "reason",
+            "receipt_json",
+            "request_id",
+            "terminal_state",
+            "verdict"
+          ],
+          "result_subset": {
+            "verdict": "allow",
+            "output": null,
+            "output_withheld": "too_large"
+          },
+          "result_schema": "InvokeResult"
+        }
+      },
+      {
+        "name": "invoke-operation-key-empty",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "invoke-operation-key-leading-space",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\" read-2\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "invoke-operation-key-trailing-no-break-space",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-2 \",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "invoke-operation-key-control-character",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read\\u0007-2\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "invoke-operation-key-over-byte-limit",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "invoke-operation-key-multibyte-over-byte-limit",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "note": "129 characters pass maxLength, but 258 UTF-8 bytes exceed the 256-byte limit.",
+        "schema_valid": true,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "invoke-recovery-flag-not-boolean",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-2\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"},\"known_outcome_only\":\"true\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "invoke-governed-intent-not-object",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-2\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"},\"governed_intent\":[]}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "invoke-governed-intent-unknown-member",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-2\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"},\"governed_intent\":{\"id\":\"intent-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"purpose\":\"fixture\",\"process_id\":\"other\"}}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "invoke-missing-arguments",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-2\",\"server_id\":\"tools\",\"tool_name\":\"read\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "prepare-invocation-without-host-preparer",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"prepare_invocation\",\"operation_key\":\"prepare-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "note": "The reference host installs no preparation service.",
+        "schema_valid": true,
+        "expect": {
+          "error": "runtime_error"
+        }
+      },
+      {
+        "name": "checkpoint-first-revision",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"checkpoint\",\"expected_revision\":\"0\",\"value\":{\"step\":1}}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result": {
+            "revision": "1",
+            "value": {
+              "step": 1
+            }
+          },
+          "result_schema": "CheckpointResult"
+        }
+      },
+      {
+        "name": "checkpoint-stale-revision",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"checkpoint\",\"expected_revision\":\"0\",\"value\":{\"step\":2}}}",
+        "schema_valid": true,
+        "expect": {
+          "error": "checkpoint_conflict"
+        }
+      },
+      {
+        "name": "checkpoint-revision-leading-zero",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"checkpoint\",\"expected_revision\":\"01\",\"value\":{\"step\":2}}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "checkpoint-revision-signed",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"checkpoint\",\"expected_revision\":\"+1\",\"value\":{\"step\":2}}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "checkpoint-revision-number",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"checkpoint\",\"expected_revision\":1,\"value\":{\"step\":2}}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "checkpoint-revision-over-u64",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"checkpoint\",\"expected_revision\":\"18446744073709551616\",\"value\":2}}",
+        "note": "Matches the decimal pattern and length bound but exceeds an unsigned 64-bit integer.",
+        "schema_valid": true,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "checkpoint-value-at-canonical-limit",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"checkpoint\",\"expected_revision\":\"1\",\"value\":\"@FILL@\"}}",
+        "fill": {
+          "char": "x",
+          "count": 1048574
+        },
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result_keys": [
+            "revision",
+            "value"
+          ],
+          "result_subset": {
+            "revision": "2"
+          },
+          "result_schema": "CheckpointResult"
+        }
+      },
+      {
+        "name": "checkpoint-value-over-canonical-limit",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"checkpoint\",\"expected_revision\":\"2\",\"value\":\"@FILL@\"}}",
+        "fill": {
+          "char": "x",
+          "count": 1048575
+        },
+        "schema_valid": true,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "blob-put",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"data_base64\":\"AP+A\"}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result": {
+            "sha256": "f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211",
+            "bytes": 3
+          },
+          "result_schema": "BlobPutResult"
+        }
+      },
+      {
+        "name": "blob-put-repeated-is-idempotent",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"data_base64\":\"AP+A\"}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result": {
+            "sha256": "f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211",
+            "bytes": 3
+          },
+          "result_schema": "BlobPutResult"
+        }
+      },
+      {
+        "name": "blob-put-non-canonical-base64",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"data_base64\":\"AP+B\"}}",
+        "note": "Well-formed base64 whose unused bits are set does not re-encode to the same text.",
+        "schema_valid": true,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "blob-put-unpadded-base64",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89\",\"data_base64\":\"/w\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "blob-put-digest-mismatch",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"5ad38304b535c2987dbd24657c1a11b884984ff600d9f389deb0d4e634fee792\",\"data_base64\":\"AP+A\"}}",
+        "schema_valid": true,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "blob-put-uppercase-digest",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"F742B965F156C10374BC23AEA96E3A8AFF8FACD6FC079DEFEAA30219AD86F211\",\"data_base64\":\"AP+A\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "blob-read",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_read\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\"}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result": {
+            "sha256": "f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211",
+            "bytes": 3,
+            "data_base64": "AP+A"
+          },
+          "result_schema": "BlobReadResult"
+        }
+      },
+      {
+        "name": "blob-read-absent",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_read\",\"sha256\":\"5ad38304b535c2987dbd24657c1a11b884984ff600d9f389deb0d4e634fee792\"}}",
+        "schema_valid": true,
+        "expect": {
+          "error": "blob_missing"
+        }
+      },
+      {
+        "name": "blob-read-uppercase-digest",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_read\",\"sha256\":\"F742B965F156C10374BC23AEA96E3A8AFF8FACD6FC079DEFEAA30219AD86F211\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "blob-read-process-selector",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_read\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"process_id\":\"root\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "unknown-request-field",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"},\"trace\":1}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "unknown-operation-field",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\",\"process_id\":\"root\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "unknown-operation-spawn",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"spawn\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "unknown-operation-issue-credential",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"issue_credential\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "invoke-with-capability-selector",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-2\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"},\"capability\":{}}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "missing-operation",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "missing-op-tag",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"operation_key\":\"read-2\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "unsupported-protocol-version",
+        "frame": "{\"protocol\":\"chio.process.v2\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "unsupported-protocol-checked-before-credential",
+        "frame": "{\"protocol\":\"chio.process.v2\",\"credential\":\"not-a-credential\",\"operation\":{\"op\":\"inspect\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "duplicate-request-field",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}",
+        "schema_valid": null,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "duplicate-operation-field",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"checkpoint\",\"expected_revision\":\"2\",\"expected_revision\":\"2\",\"value\":null}}",
+        "schema_valid": null,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "trailing-content-after-request",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}{}",
+        "schema_valid": null,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "request-not-an-object",
+        "frame": "[]",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "empty-frame",
+        "frame": "",
+        "schema_valid": null,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "request-invalid-utf8",
+        "frame_base64": "eyJwcm90b2NvbCI6ImNoaW8ucHJvY2Vzcy52MSIsImNyZWRlbnRpYWwiOiIwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmIiwib3BlcmF0aW9uIjp7Im9wIjoiaW52b2tlIiwib3BlcmF0aW9uX2tleSI6InJlYWQtMiIsInNlcnZlcl9pZCI6InRvb2xzIiwidG9vbF9uYW1lIjoicmVhZCIsImFyZ3VtZW50cyI6eyJ0ZXh0IjoiaP9pIn19fQ==",
+        "schema_valid": null,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "credential-not-a-string",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":7,\"operation\":{\"op\":\"inspect\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "invalid_request"
+        }
+      },
+      {
+        "name": "credential-uppercase-hex",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF\",\"operation\":{\"op\":\"inspect\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "unauthenticated"
+        }
+      },
+      {
+        "name": "credential-short",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde\",\"operation\":{\"op\":\"inspect\"}}",
+        "schema_valid": false,
+        "expect": {
+          "error": "unauthenticated"
+        }
+      },
+      {
+        "name": "credential-unknown",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210\",\"operation\":{\"op\":\"inspect\"}}",
+        "schema_valid": true,
+        "expect": {
+          "error": "unauthenticated"
+        }
+      },
+      {
+        "name": "whitespace-padded-frame-at-limit",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}@FILL@",
+        "fill": {
+          "char": " ",
+          "count": 2097012
+        },
+        "note": "Exactly 2097152 bytes including the newline.",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result_keys": [
+            "checkpoint",
+            "depth",
+            "limits",
+            "parent_id",
+            "process_id",
+            "root_id",
+            "state",
+            "storage",
+            "tree_calls"
+          ],
+          "result_schema": "InspectResult"
+        }
+      },
+      {
+        "name": "frame-over-limit",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}@FILL@",
+        "fill": {
+          "char": " ",
+          "count": 2097013
+        },
+        "note": "2097153 bytes including the newline.",
+        "schema_valid": null,
+        "expect": {
+          "error": "invalid_frame"
+        }
+      },
+      {
+        "name": "unterminated-frame",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}",
+        "terminated": false,
+        "note": "The client half-closes its connection without sending a newline.",
+        "schema_valid": null,
+        "expect": {
+          "error": "invalid_frame"
+        }
+      },
+      {
+        "name": "invoke-over-tree-call-limit",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-over-limit\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"text\":\"hi\"}}}",
+        "schema_valid": true,
+        "expect": {
+          "error": "limit_reached"
+        }
+      },
+      {
+        "name": "cancel",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"cancel\"}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result": {
+            "cancelled_processes": 1
+          },
+          "result_schema": "CancelResult"
+        }
+      },
+      {
+        "name": "inspect-after-cancel",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}",
+        "schema_valid": true,
+        "expect": {
+          "ok": true,
+          "result_keys": [
+            "checkpoint",
+            "depth",
+            "limits",
+            "parent_id",
+            "process_id",
+            "root_id",
+            "state",
+            "storage",
+            "tree_calls"
+          ],
+          "result_subset": {
+            "state": "cancelled"
+          },
+          "result_schema": "InspectResult"
+        }
+      },
+      {
+        "name": "checkpoint-after-cancel",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"checkpoint\",\"expected_revision\":\"2\",\"value\":{\"step\":3}}}",
+        "schema_valid": true,
+        "expect": {
+          "error": "cancelled"
+        }
+      },
+      {
+        "name": "blob-put-after-cancel",
+        "frame": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"data_base64\":\"AP+A\"}}",
+        "schema_valid": true,
+        "expect": {
+          "error": "cancelled"
+        }
+      }
+    ]
+  },
+  "client": {
+    "cases": [
+      {
+        "name": "inspect",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"process_id\":\"reader\",\"parent_id\":\"root\",\"root_id\":\"root\",\"state\":\"running\",\"depth\":1,\"limits\":{\"max_processes\":4,\"max_depth\":2,\"max_calls\":8},\"tree_calls\":3,\"storage\":{\"protocol\":\"chio.process.blobs.v1\",\"max_blob_bytes\":1048576,\"limits\":{\"max_bytes\":67108864,\"max_blobs\":4096},\"process_bytes\":3,\"process_blobs\":1,\"tree_bytes\":3,\"tree_blobs\":1},\"checkpoint\":{\"revision\":\"9007199254740993\",\"value\":{\"step\":1}}}}\n",
+        "result": {
+          "process_id": "reader",
+          "parent_id": "root",
+          "root_id": "root",
+          "state": "running",
+          "depth": 1,
+          "limits": {
+            "max_processes": 4,
+            "max_depth": 2,
+            "max_calls": 8
+          },
+          "tree_calls": 3,
+          "storage": {
+            "protocol": "chio.process.blobs.v1",
+            "max_blob_bytes": 1048576,
+            "limits": {
+              "max_bytes": 67108864,
+              "max_blobs": 4096
+            },
+            "process_bytes": 3,
+            "process_blobs": 1,
+            "tree_bytes": 3,
+            "tree_blobs": 1
+          },
+          "checkpoint": {
+            "revision": "9007199254740993",
+            "value": {
+              "step": 1
+            }
+          }
+        },
+        "server_response": true,
+        "result_schema": "InspectResult"
+      },
+      {
+        "name": "invoke-escapes-and-unicode",
+        "call": {
+          "op": "invoke",
+          "operation_key": "publish-report",
+          "server_id": "reports",
+          "tool_name": "publish",
+          "arguments": {
+            "text": "λ  ",
+            "escapes": "\u0000\t\"\\/",
+            "n": [
+              0,
+              -1,
+              9007199254740991,
+              1.5
+            ],
+            "e": {}
+          }
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"publish-report\",\"server_id\":\"reports\",\"tool_name\":\"publish\",\"arguments\":{\"text\":\"λ  \",\"escapes\":\"\\u0000\\t\\\"\\\\/\",\"n\":[0,-1,9007199254740991,1.5],\"e\":{}}}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"request_id\":\"process:6c2e\",\"verdict\":\"allow\",\"output\":{\"kind\":\"value\",\"value\":{\"text\":\"λ\"}},\"reason\":null,\"terminal_state\":{\"state\":\"completed\"},\"receipt_json\":\"{\\\"counter\\\":18446744073709551615,\\\"text\\\":\\\"λ\\\"}\",\"execution_nonce_json\":null}}\n",
+        "result": {
+          "request_id": "process:6c2e",
+          "verdict": "allow",
+          "output": {
+            "kind": "value",
+            "value": {
+              "text": "λ"
+            }
+          },
+          "reason": null,
+          "terminal_state": {
+            "state": "completed"
+          },
+          "receipt_json": "{\"counter\":18446744073709551615,\"text\":\"λ\"}",
+          "execution_nonce_json": null
+        },
+        "server_response": true,
+        "result_schema": "InvokeResult"
+      },
+      {
+        "name": "invoke-known-outcome-only",
+        "call": {
+          "op": "invoke",
+          "operation_key": "infer-1",
+          "server_id": "model",
+          "tool_name": "infer",
+          "arguments": {},
+          "known_outcome_only": true
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"infer-1\",\"server_id\":\"model\",\"tool_name\":\"infer\",\"arguments\":{},\"known_outcome_only\":true}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"request_id\":\"process:6c2e\",\"verdict\":\"allow\",\"output\":{\"kind\":\"value\",\"value\":{\"text\":\"λ\"}},\"reason\":null,\"terminal_state\":{\"state\":\"completed\"},\"receipt_json\":\"{\\\"counter\\\":18446744073709551615,\\\"text\\\":\\\"λ\\\"}\",\"execution_nonce_json\":null}}\n",
+        "result": {
+          "request_id": "process:6c2e",
+          "verdict": "allow",
+          "output": {
+            "kind": "value",
+            "value": {
+              "text": "λ"
+            }
+          },
+          "reason": null,
+          "terminal_state": {
+            "state": "completed"
+          },
+          "receipt_json": "{\"counter\":18446744073709551615,\"text\":\"λ\"}",
+          "execution_nonce_json": null
+        }
+      },
+      {
+        "name": "invoke-recovery-flag-false-is-omitted",
+        "call": {
+          "op": "invoke",
+          "operation_key": "read-1",
+          "server_id": "tools",
+          "tool_name": "read",
+          "arguments": {},
+          "known_outcome_only": false
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{}}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"request_id\":\"process:6c2e\",\"verdict\":\"allow\",\"output\":{\"kind\":\"value\",\"value\":{\"text\":\"λ\"}},\"reason\":null,\"terminal_state\":{\"state\":\"completed\"},\"receipt_json\":\"{\\\"counter\\\":18446744073709551615,\\\"text\\\":\\\"λ\\\"}\",\"execution_nonce_json\":null}}\n",
+        "result": {
+          "request_id": "process:6c2e",
+          "verdict": "allow",
+          "output": {
+            "kind": "value",
+            "value": {
+              "text": "λ"
+            }
+          },
+          "reason": null,
+          "terminal_state": {
+            "state": "completed"
+          },
+          "receipt_json": "{\"counter\":18446744073709551615,\"text\":\"λ\"}",
+          "execution_nonce_json": null
+        }
+      },
+      {
+        "name": "invoke-governed-intent-after-recovery-flag",
+        "call": {
+          "op": "invoke",
+          "operation_key": "read-1",
+          "server_id": "tools",
+          "tool_name": "read",
+          "arguments": {},
+          "governed_intent": {
+            "id": "task-read",
+            "server_id": "tools",
+            "tool_name": "read",
+            "purpose": "read task λ",
+            "context": {
+              "chioSwarm": {
+                "taskId": "task-1"
+              }
+            }
+          },
+          "known_outcome_only": true
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"read-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{},\"known_outcome_only\":true,\"governed_intent\":{\"id\":\"task-read\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"purpose\":\"read task λ\",\"context\":{\"chioSwarm\":{\"taskId\":\"task-1\"}}}}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"request_id\":\"process:6c2e\",\"verdict\":\"allow\",\"output\":{\"kind\":\"value\",\"value\":{\"text\":\"λ\"}},\"reason\":null,\"terminal_state\":{\"state\":\"completed\"},\"receipt_json\":\"{\\\"counter\\\":18446744073709551615,\\\"text\\\":\\\"λ\\\"}\",\"execution_nonce_json\":null}}\n",
+        "result": {
+          "request_id": "process:6c2e",
+          "verdict": "allow",
+          "output": {
+            "kind": "value",
+            "value": {
+              "text": "λ"
+            }
+          },
+          "reason": null,
+          "terminal_state": {
+            "state": "completed"
+          },
+          "receipt_json": "{\"counter\":18446744073709551615,\"text\":\"λ\"}",
+          "execution_nonce_json": null
+        }
+      },
+      {
+        "name": "invoke-kernel-denial-is-a-result",
+        "call": {
+          "op": "invoke",
+          "operation_key": "delete-1",
+          "server_id": "tools",
+          "tool_name": "delete",
+          "arguments": {}
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"delete-1\",\"server_id\":\"tools\",\"tool_name\":\"delete\",\"arguments\":{}}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"request_id\":\"process:6c2e\",\"verdict\":\"deny\",\"output\":null,\"reason\":\"tool is not in scope\",\"terminal_state\":{\"state\":\"completed\"},\"receipt_json\":\"{\\\"counter\\\":18446744073709551615,\\\"text\\\":\\\"λ\\\"}\",\"execution_nonce_json\":null}}\n",
+        "result": {
+          "request_id": "process:6c2e",
+          "verdict": "deny",
+          "output": null,
+          "reason": "tool is not in scope",
+          "terminal_state": {
+            "state": "completed"
+          },
+          "receipt_json": "{\"counter\":18446744073709551615,\"text\":\"λ\"}",
+          "execution_nonce_json": null
+        },
+        "server_response": true,
+        "result_schema": "InvokeResult"
+      },
+      {
+        "name": "invoke-output-withheld",
+        "call": {
+          "op": "invoke",
+          "operation_key": "large-1",
+          "server_id": "tools",
+          "tool_name": "read",
+          "arguments": {}
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"large-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{}}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"request_id\":\"process:6c2e\",\"verdict\":\"allow\",\"output\":null,\"reason\":null,\"terminal_state\":{\"state\":\"completed\"},\"receipt_json\":\"{\\\"counter\\\":18446744073709551615,\\\"text\\\":\\\"λ\\\"}\",\"execution_nonce_json\":null,\"output_withheld\":\"too_large\"}}\n",
+        "result": {
+          "request_id": "process:6c2e",
+          "verdict": "allow",
+          "output": null,
+          "reason": null,
+          "terminal_state": {
+            "state": "completed"
+          },
+          "receipt_json": "{\"counter\":18446744073709551615,\"text\":\"λ\"}",
+          "execution_nonce_json": null,
+          "output_withheld": "too_large"
+        },
+        "server_response": true,
+        "result_schema": "InvokeResult"
+      },
+      {
+        "name": "invoke-stream-output",
+        "call": {
+          "op": "invoke",
+          "operation_key": "stream-1",
+          "server_id": "tools",
+          "tool_name": "read",
+          "arguments": {}
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"stream-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{}}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"request_id\":\"process:6c2e\",\"verdict\":\"allow\",\"output\":{\"kind\":\"stream\",\"chunks\":[{\"n\":1},\"two\"]},\"reason\":null,\"terminal_state\":{\"state\":\"incomplete\",\"reason\":\"stream ended early\"},\"receipt_json\":\"{\\\"counter\\\":18446744073709551615,\\\"text\\\":\\\"λ\\\"}\",\"execution_nonce_json\":null}}\n",
+        "result": {
+          "request_id": "process:6c2e",
+          "verdict": "allow",
+          "output": {
+            "kind": "stream",
+            "chunks": [
+              {
+                "n": 1
+              },
+              "two"
+            ]
+          },
+          "reason": null,
+          "terminal_state": {
+            "state": "incomplete",
+            "reason": "stream ended early"
+          },
+          "receipt_json": "{\"counter\":18446744073709551615,\"text\":\"λ\"}",
+          "execution_nonce_json": null
+        },
+        "server_response": true,
+        "result_schema": "InvokeResult"
+      },
+      {
+        "name": "prepare-invocation",
+        "call": {
+          "op": "prepare_invocation",
+          "operation_key": "prepare-1",
+          "server_id": "tools",
+          "tool_name": "fetch",
+          "arguments": {
+            "url": "https://example.test"
+          }
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"prepare_invocation\",\"operation_key\":\"prepare-1\",\"server_id\":\"tools\",\"tool_name\":\"fetch\",\"arguments\":{\"url\":\"https://example.test\"}}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"schema\":\"chio.broker-execute.v1\",\"envelope\":\"sealed\"}}\n",
+        "result": {
+          "schema": "chio.broker-execute.v1",
+          "envelope": "sealed"
+        },
+        "server_response": true,
+        "result_schema": "PrepareInvocationResult"
+      },
+      {
+        "name": "checkpoint-decimal-revisions",
+        "call": {
+          "op": "checkpoint",
+          "expected_revision": "9007199254740993",
+          "value": {
+            "step": 1
+          }
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"checkpoint\",\"expected_revision\":\"9007199254740993\",\"value\":{\"step\":1}}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"revision\":\"9007199254740994\",\"value\":{\"step\":1}}}\n",
+        "result": {
+          "revision": "9007199254740994",
+          "value": {
+            "step": 1
+          }
+        },
+        "server_response": true,
+        "result_schema": "CheckpointResult"
+      },
+      {
+        "name": "blob-put",
+        "call": {
+          "op": "blob_put",
+          "data_hex": "00ff80"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"data_base64\":\"AP+A\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"bytes\":3}}\n",
+        "result": {
+          "sha256": "f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211",
+          "bytes": 3
+        },
+        "server_response": true,
+        "result_schema": "BlobPutResult"
+      },
+      {
+        "name": "blob-put-empty",
+        "call": {
+          "op": "blob_put",
+          "data_hex": ""
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"data_base64\":\"\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"bytes\":0}}\n",
+        "result": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "server_response": true,
+        "result_schema": "BlobPutResult"
+      },
+      {
+        "name": "blob-put-response-wrong-length",
+        "call": {
+          "op": "blob_put",
+          "data_hex": "00ff80"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"data_base64\":\"AP+A\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"bytes\":4}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "blob-put-response-wrong-digest",
+        "call": {
+          "op": "blob_put",
+          "data_hex": "00ff80"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"data_base64\":\"AP+A\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"sha256\":\"5ad38304b535c2987dbd24657c1a11b884984ff600d9f389deb0d4e634fee792\",\"bytes\":3}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "blob-put-response-length-not-integer",
+        "call": {
+          "op": "blob_put",
+          "data_hex": "00ff80"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_put\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"data_base64\":\"AP+A\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"bytes\":\"3\"}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "blob-read",
+        "call": {
+          "op": "blob_read",
+          "sha256": "f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_read\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"bytes\":3,\"data_base64\":\"AP+A\"}}\n",
+        "result": {
+          "data_hex": "00ff80"
+        },
+        "server_response": true,
+        "result_schema": "BlobReadResult"
+      },
+      {
+        "name": "blob-read-non-canonical-base64",
+        "call": {
+          "op": "blob_read",
+          "sha256": "f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_read\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"bytes\":3,\"data_base64\":\"AP+B\"}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "blob-read-extra-padding",
+        "call": {
+          "op": "blob_read",
+          "sha256": "f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_read\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"bytes\":3,\"data_base64\":\"AP+A=\"}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "blob-read-embedded-newline",
+        "call": {
+          "op": "blob_read",
+          "sha256": "f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_read\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"bytes\":3,\"data_base64\":\"AP+A\\n\"}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "blob-read-response-wrong-digest",
+        "call": {
+          "op": "blob_read",
+          "sha256": "f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_read\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"sha256\":\"5ad38304b535c2987dbd24657c1a11b884984ff600d9f389deb0d4e634fee792\",\"bytes\":3,\"data_base64\":\"AP+A\"}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "blob-read-response-wrong-length",
+        "call": {
+          "op": "blob_read",
+          "sha256": "f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"blob_read\",\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"sha256\":\"f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f211\",\"bytes\":2,\"data_base64\":\"AP+A\"}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "cancel",
+        "call": {
+          "op": "cancel"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"cancel\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"cancelled_processes\":2}}\n",
+        "result": {
+          "cancelled_processes": 2
+        },
+        "server_response": true,
+        "result_schema": "CancelResult"
+      },
+      {
+        "name": "server-error-unauthenticated",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"unauthenticated\"}}\n",
+        "error": "unauthenticated",
+        "server_response": true
+      },
+      {
+        "name": "server-error-invalid-request",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"invalid_request\"}}\n",
+        "error": "invalid_request",
+        "server_response": true
+      },
+      {
+        "name": "server-error-cancelled",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"cancelled\"}}\n",
+        "error": "cancelled",
+        "server_response": true
+      },
+      {
+        "name": "server-error-conflict",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"conflict\"}}\n",
+        "error": "conflict",
+        "server_response": true
+      },
+      {
+        "name": "server-error-checkpoint-conflict",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"checkpoint_conflict\"}}\n",
+        "error": "checkpoint_conflict",
+        "server_response": true
+      },
+      {
+        "name": "server-error-limit-reached",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"limit_reached\"}}\n",
+        "error": "limit_reached",
+        "server_response": true
+      },
+      {
+        "name": "server-error-runtime-error",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"runtime_error\"}}\n",
+        "error": "runtime_error",
+        "server_response": true
+      },
+      {
+        "name": "server-error-blob-missing",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"blob_missing\"}}\n",
+        "error": "blob_missing",
+        "server_response": true
+      },
+      {
+        "name": "server-error-blob-corrupt",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"blob_corrupt\"}}\n",
+        "error": "blob_corrupt",
+        "server_response": true
+      },
+      {
+        "name": "server-error-response-too-large",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"response_too_large\"}}\n",
+        "error": "response_too_large",
+        "server_response": true
+      },
+      {
+        "name": "server-error-invalid-frame",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"invalid_frame\"}}\n",
+        "error": "invalid_frame",
+        "server_response": true
+      },
+      {
+        "name": "server-error-frame-timeout",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"frame_timeout\"}}\n",
+        "error": "frame_timeout",
+        "server_response": true
+      },
+      {
+        "name": "unrecognized-error-code-passes-through",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":\"future_code\"}}\n",
+        "error": "future_code"
+      },
+      {
+        "name": "invalid-response-other-protocol",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"other\",\"ok\":true,\"result\":{}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-missing-protocol",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"ok\":true,\"result\":{}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-success-without-result",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-success-result-array",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":[]}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-success-result-null",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":null}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-ok-not-boolean",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":\"true\",\"result\":{}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-failure-without-error",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-failure-code-not-string",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":{\"code\":7}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-failure-error-not-object",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":false,\"error\":\"conflict\"}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-response-not-object",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "[\"chio.process.v1\"]\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-response-empty-line",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-response-nonfinite-number",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"n\":NaN}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-response-infinity",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"n\":-Infinity}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-response-byte-order-mark",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "﻿{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{}}\n",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-invalid-utf8",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response_base64": "eyJwcm90b2NvbCI6ImNoaW8ucHJvY2Vzcy52MSIsIm9rIjp0cnVlLCJyZXN1bHQiOnsidCI6Iv8ifX0K",
+        "error": "invalid_response"
+      },
+      {
+        "name": "invalid-response-encoded-surrogate",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response_base64": "eyJwcm90b2NvbCI6ImNoaW8ucHJvY2Vzcy52MSIsIm9rIjp0cnVlLCJyZXN1bHQiOnsidCI6Iu2ggCJ9fQo=",
+        "error": "invalid_response"
+      },
+      {
+        "name": "connection-closed-without-response",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "",
+        "error": "truncated_response"
+      },
+      {
+        "name": "response-without-newline",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{}}",
+        "error": "truncated_response"
+      },
+      {
+        "name": "bytes-after-the-response-newline-are-ignored",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"a\":1}}\n{\"protocol\":\"other\"}\n",
+        "result": {
+          "a": 1
+        }
+      },
+      {
+        "name": "response-at-frame-limit",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"pad\":\"@FILL@\"}}\n",
+        "fill": {
+          "char": "x",
+          "count": 8388547
+        },
+        "accepted": true,
+        "note": "Exactly 8388608 bytes including the newline."
+      },
+      {
+        "name": "response-over-frame-limit",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"pad\":\"@FILL@\"}}\n",
+        "fill": {
+          "char": "x",
+          "count": 8388548
+        },
+        "error": "response_too_large",
+        "note": "8388609 bytes including the newline."
+      },
+      {
+        "name": "response-over-frame-limit-without-newline",
+        "call": {
+          "op": "inspect"
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"inspect\"}}\n",
+        "response": "@FILL@",
+        "fill": {
+          "char": "x",
+          "count": 8388609
+        },
+        "error": "response_too_large"
+      },
+      {
+        "name": "request-at-frame-limit",
+        "call": {
+          "op": "invoke",
+          "operation_key": "pad-1",
+          "server_id": "tools",
+          "tool_name": "read",
+          "arguments": {
+            "pad": "@FILL@"
+          }
+        },
+        "request": "{\"protocol\":\"chio.process.v1\",\"credential\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operation\":{\"op\":\"invoke\",\"operation_key\":\"pad-1\",\"server_id\":\"tools\",\"tool_name\":\"read\",\"arguments\":{\"pad\":\"@FILL@\"}}}\n",
+        "response": "{\"protocol\":\"chio.process.v1\",\"ok\":true,\"result\":{\"done\":true}}\n",
+        "fill": {
+          "char": "x",
+          "count": 2096927
+        },
+        "result": {
+          "done": true
+        },
+        "note": "Exactly 2097152 bytes including the newline."
+      },
+      {
+        "name": "request-over-frame-limit-is-not-sent",
+        "call": {
+          "op": "invoke",
+          "operation_key": "pad-1",
+          "server_id": "tools",
+          "tool_name": "read",
+          "arguments": {
+            "pad": "@FILL@"
+          }
+        },
+        "fill": {
+          "char": "x",
+          "count": 2096928
+        },
+        "error": "request_too_large",
+        "sent": false
+      },
+      {
+        "name": "invalid-argument-recovery-flag-not-boolean",
+        "call": {
+          "op": "invoke",
+          "operation_key": "one",
+          "server_id": "tools",
+          "tool_name": "read",
+          "arguments": {},
+          "known_outcome_only": "yes"
+        },
+        "error": "invalid_argument",
+        "sent": false
+      },
+      {
+        "name": "invalid-argument-recovery-flag-number",
+        "call": {
+          "op": "invoke",
+          "operation_key": "one",
+          "server_id": "tools",
+          "tool_name": "read",
+          "arguments": {},
+          "known_outcome_only": 1
+        },
+        "error": "invalid_argument",
+        "sent": false
+      },
+      {
+        "name": "invalid-argument-governed-intent-array",
+        "call": {
+          "op": "invoke",
+          "operation_key": "one",
+          "server_id": "tools",
+          "tool_name": "read",
+          "arguments": {},
+          "governed_intent": []
+        },
+        "error": "invalid_argument",
+        "sent": false
+      },
+      {
+        "name": "invalid-argument-governed-intent-string",
+        "call": {
+          "op": "invoke",
+          "operation_key": "one",
+          "server_id": "tools",
+          "tool_name": "read",
+          "arguments": {},
+          "governed_intent": "intent"
+        },
+        "error": "invalid_argument",
+        "sent": false
+      },
+      {
+        "name": "invalid-argument-blob-read-uppercase-digest",
+        "call": {
+          "op": "blob_read",
+          "sha256": "F742B965F156C10374BC23AEA96E3A8AFF8FACD6FC079DEFEAA30219AD86F211"
+        },
+        "error": "invalid_argument",
+        "sent": false
+      },
+      {
+        "name": "invalid-argument-blob-read-short-digest",
+        "call": {
+          "op": "blob_read",
+          "sha256": "f742b965f156c10374bc23aea96e3a8aff8facd6fc079defeaa30219ad86f21"
+        },
+        "error": "invalid_argument",
+        "sent": false
+      },
+      {
+        "name": "invalid-argument-blob-over-limit",
+        "call": {
+          "op": "blob_put",
+          "data_hex": "@FILL@"
+        },
+        "fill": {
+          "char": "00",
+          "count": 1048577
+        },
+        "error": "invalid_argument",
+        "sent": false
+      },
+      {
+        "name": "governed-intent-over-frame-limit-is-not-sent",
+        "call": {
+          "op": "invoke",
+          "operation_key": "one",
+          "server_id": "tools",
+          "tool_name": "read",
+          "arguments": {},
+          "governed_intent": {
+            "context": "@FILL@"
+          }
+        },
+        "fill": {
+          "char": "x",
+          "count": 2097152
+        },
+        "error": "request_too_large",
+        "sent": false
+      }
+    ]
+  }
+}

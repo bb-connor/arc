@@ -1,4 +1,4 @@
-a6aa1a26d80a87a712c519711552aac4432d9da432c1c845ad93e5f56ca2af93  spec/schemas/MANIFEST.sha256
+8cd7a15d4a0b7cb0202de065f343334160d750b68c5df527ab8c5f67ecf25844  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -280,6 +280,8 @@ a51968c27a6bbee059e1fbb624d84cd46be4004d36778541d19d9190197bf9ed  spec/schemas/c
 914dd1b72e0d7200c6fdb5e01d16720bd1c4301b384cffcc5760e9b15733e11c  spec/schemas/chio-pheromone/v1/scarcity-window-id.schema.json
 1327a5537d86c79b708281a0b8367728445240e8a8673458bfdb156bb925f64e  spec/schemas/chio-pheromone/v1/transit-policy.schema.json
 85f8f7752075ef138f7485630e6bbd8e5b8794a17fb42af9d88e0543525538a7  spec/schemas/chio-pheromone/v1/workflow-context.schema.json
+b754fbec776f9d0810de19159f8d9b67a3f5f729e031a23c71c8c4a4a857e3b1  spec/schemas/chio-process/v1/request.schema.json
+22c2724016d151444a007ab2e7617d6f8b7feabfb7b24bf8308a8915d6f0c284  spec/schemas/chio-process/v1/response.schema.json
 c963f63a2ce007fe9d480958b8cb35436af23f847e66bf0472d7201f07a43185  spec/schemas/chio-proof-room/v1/bundle.schema.json
 f23f59daa2bcdaf6dc29a4bd26b179642f16f91a146b1a50bd8295abd2a5f9cc  spec/schemas/chio-proof-room/v1/docker-quickstart-evidence.schema.json
 7b5c5574348ea55ff01d176ec48671fd4081879d5ed57e349706e6a9ae6f4897  spec/schemas/chio-proof-room/v1/first-run-capability-proof.schema.json

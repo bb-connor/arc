@@ -1,0 +1,97 @@
+{
+  "schema": "chio.process-sdk-corpus.qualification.v1",
+  "base": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+  "rust_candidate": "6c357bf64cb162e6b9ead6093a4e84f453b9379d",
+  "status": "private-local-qualification-and-independent-source-review-complete",
+  "producer_integration": [
+    {
+      "producer": "78326bfd3c461d87905b578840cf55b0f6f10e1d",
+      "integration": "28e20403389259fd39b01b7d7187be43c45894ee",
+      "scope": "protocol schemas, corpus and spec"
+    },
+    {
+      "producer": "e3a84d7978dbf181c8a8bbc60351b8669a995251",
+      "integration": "153765074d70ef389efd4e5a920f4bc796368b91",
+      "scope": "F086 recovery flags and prepareInvocation"
+    },
+    {
+      "producer": "4b5d52273d1eb8965a9573a0425e4132449331cc",
+      "integration": "ae3f0e8ce8ed5c722c5ba626d00fa74c9baa22ad",
+      "scope": "Python strict response decoder and corpus"
+    },
+    {
+      "producer": "267a80f7d0df9d48cfdd8e000966abc79b823ed7",
+      "integration": "0795c210de80314daecd2897ec7359e5197e16ce",
+      "scope": "Node BOM refusal and corpus"
+    },
+    {
+      "producer": "9faa43e5c0e488ce320a8337a819c33e690c9f45",
+      "integration": "f9930b1b15891298a2ddd23f5cb6a7749d3f3421",
+      "scope": "real Rust worker socket corpus"
+    },
+    {
+      "producer": "068e27de2677173d2f65311c920cae4a0afaa671",
+      "integration": "6c357bf64cb162e6b9ead6093a4e84f453b9379d",
+      "scope": "deny undeclared intent fields; oracle committed first as d5a2ae76ad"
+    }
+  ],
+  "qualification_delta_sha256": {
+    ".github/workflows/process-workers.yml": "d5b2c92f7f0ec9c8a32b1ef807dc8755b77214ad412e4904e3eda5e9d8deac9e",
+    "scripts/qualify-process-packages.py": "caeff4a384fb166018e097a64ff092f7645d2a4d9a7e10de31aa2972e4348066",
+    "scripts/tests/check-process-ci-inventory.test.py": "fb3e2a97157697646d5a8fcfff92ea80aeb9db8c2e604f63b98464a0dacf7401",
+    "scripts/tests/check-process-corpus-qualification.test.py": "728cef186ddecdc0ee909bc5c5f0d40d0a218d673124480d64c862211c287020",
+    "sdks/python/chio-process/tests/test_protocol_corpus.py": "92bca2f5f12159942af09d5b6654bef009ef7eef5911ad3ec601b2943a2cd8fd",
+    "sdks/typescript/packages/process/test/protocol-corpus.test.mjs": "48ae57e6fda904326dd13fc7967b58dab21e1afbbd54ce99d7b45c8eeecde957"
+  },
+  "archive": "/home/connor/lanes/pr1160-root-evidence/process-sdk-corpus-20261012",
+  "archive_manifest_sha256": "0177dcd5169bf3006dbf113c0881ee1ef23068c3b9b7bab47a4884b32239bb65",
+  "originals": {
+    "F086": "7 passed, 2 failed on current main",
+    "SDK corpus": "Node BOM accepted; Python nonfinite constants, BOM and encoded surrogate accepted, nesting leaked RecursionError",
+    "intent": "0 passed, 1 failed: undeclared member accepted; test-only oracle ran before source fix",
+    "qualification": "3 failing assertions: both clients silently skipped missing corpus; required schema mode skipped without validators",
+    "CI inventory": "failed: missing core-types corpus trigger"
+  },
+  "verified": {
+    "core_types": "615 passing invocations, 0 failed, 0 ignored",
+    "process_all_features": "112 passing invocations, 0 failed, 0 ignored, including subprocess cases and socket corpus",
+    "strict_clippy": "owning crates, all targets, worker-server and mailboxes features: pass",
+    "no_std": "renewal pass after artifact-preserving disk recovery",
+    "source_python": "54 passed including all 5 schema tests with mandatory validators",
+    "source_node": "77 passed, 0 skipped",
+    "installed_wheel": "49 passed, 5 optional schema-tool skips; all behavioral corpus cases executed",
+    "rebuilt_sdist_wheel": "49 passed, 5 optional schema-tool skips; all behavioral corpus cases executed",
+    "installed_node_tarball": "77 passed, 0 skipped",
+    "qualification_regressions": "5 passed, including missing corpus and required validator refusals",
+    "public_types": "strict public package exports, positive and negative type controls pass",
+    "structural": "schema registry, wire schemas, Rust hygiene, public surface, CI inventory, native protocol contract, actionlint, formatting and scoped Ruff pass"
+  },
+  "retained_invalid_attempts": [
+    "First intent Original never compiled: disk floor refusal.",
+    "Owning Rust campaign status remains failed because final no_std was refused before execution by disk floor. Separate unchanged-source renewal passed.",
+    "Direct absolute .mjs TypeScript fixture did not use package exports; replaced by public-export fixture.",
+    "First Node pack failed because output directory did not exist; separate offline renewal passed."
+  ],
+  "review": {
+    "initial": "Claude/C7 2026-10-12T03:41:40Z: no P0/P1; P2 mandatory source schema validation addressed with installed-corpus fix",
+    "remaining_P3": [
+      "Document host nesting limit.",
+      "Extreme numeric exponents and escaped lone-surrogate response parity.",
+      "Document invalid_argument fixture mapping to client exceptions.",
+      "Narrow prepareInvocation return declaration.",
+      "Convert Python request-side RecursionError."
+    ],
+    "qualification_delta": "Claude APPROVE 6c357..9ba85d9be4; P2-1 and CORPUS-SKIP closed. No additional P0/P1/P2. Mailbox records exact source and scoped evidence."
+  },
+  "remaining_acceptance": [
+    "Rebase onto actual main after current two-PR landing queue advances; no third PR created.",
+    "Exact future-head hosted qualification.",
+    "Full native installed starter/recovery qualification on this future candidate; installed behavioral checks alone are not that evidence."
+  ],
+  "boundaries": [
+    "No production Rust changes after qualified 6c357 inputs.",
+    "No manual formal engines, authority rotation, repository-variable changes or ratchet waiver.",
+    "Not published, merged, or operationally accepted."
+  ],
+  "qualification_candidate": "9ba85d9be4f8b6fbb9ca3f0df2c75f8e341d9e1d"
+}

@@ -15,6 +15,16 @@ ROOT = Path(__file__).resolve().parents[2]
 workflow = yaml.safe_load((ROOT / ".github/workflows/process-workers.yml").read_text())
 triggers = workflow.get("on", workflow.get(True))
 for event in ("push", "pull_request"):
+    for source in (
+        "crates/core/chio-core-types/**",
+        "spec/fixtures/chio-process-v1.json",
+        "spec/schemas/chio-process/v1/**",
+        "spec/schemas/chio-wire/v1/agent/**",
+        "scripts/tests/check-process-corpus-qualification.test.py",
+    ):
+        assert source in triggers[event]["paths"], (
+            f"{source} must trigger corpus qualification"
+        )
     for owner in (
         "chio-secret-broker",
         "chio-cage",
@@ -25,6 +35,28 @@ for event in ("push", "pull_request"):
             f"{owner} changes must trigger native consumer qualification"
         )
 host_steps = workflow["jobs"]["host-tests"]["steps"]
+client_step = next(
+    step
+    for step in workflow["jobs"]["workers"]["steps"]
+    if step.get("name") == "Client framing and lossless receipts"
+)
+assert (
+    client_step.get("env", {}).get("CHIO_PROCESS_REQUIRE_SCHEMA_VALIDATION") == "1"
+), "source corpus/schema agreement must not silently skip"
+client_commands = [shlex.split(line) for line in client_step["run"].splitlines()]
+assert [
+    "python3",
+    "-m",
+    "pip",
+    "install",
+    "--disable-pip-version-check",
+    "jsonschema==4.26.0",
+    "referencing==0.37.0",
+] in client_commands, "source corpus validation requires pinned schema validators"
+assert [
+    "python3",
+    "scripts/tests/check-process-corpus-qualification.test.py",
+] in client_commands
 steps = host_steps + workflow["jobs"]["installed-consumers"]["steps"]
 commands = [
     shlex.split(line) for step in steps for line in step.get("run", "").splitlines()

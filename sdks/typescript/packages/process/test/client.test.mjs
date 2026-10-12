@@ -149,3 +149,37 @@ test("state blobs snapshot input and verify canonical bytes and digest on read",
   await assert.rejects(disconnected.putBlob(new Uint8Array(1_048_577)), TypeError);
   await assert.rejects(disconnected.readBlob("A".repeat(64)), TypeError);
 });
+
+test("known_outcome_only is sent only when requested and must be a boolean", async () => {
+  const seen = [];
+  await fixture((socket, request) => {
+    seen.push(request.operation);
+    socket.end(JSON.stringify({ protocol: PROTOCOL, ok: true, result: { receipt_json: "{}" } }) + "\n");
+  }, async client => {
+    await client.invoke("model", "tools", "infer", {}, { knownOutcomeOnly: true });
+  });
+  await fixture((socket, request) => {
+    seen.push(request.operation);
+    socket.end(JSON.stringify({ protocol: PROTOCOL, ok: true, result: { receipt_json: "{}" } }) + "\n");
+  }, async client => {
+    await client.invoke("read", "tools", "read", {}, { knownOutcomeOnly: false });
+  });
+  assert.equal(seen[0].known_outcome_only, true);
+  assert.equal("known_outcome_only" in seen[1], false);
+  const client = new ProcessClient("/absent", "test-secret");
+  await assert.rejects(client.invoke("one", "tools", "read", {}, { knownOutcomeOnly: "yes" }), TypeError);
+});
+
+test("prepareInvocation retains a host-prepared envelope without dispatching", async () => {
+  const calls = await fixture((socket, request) => {
+    assert.deepEqual(request.operation, {
+      op: "prepare_invocation", operation_key: "prepare-1", server_id: "tools",
+      tool_name: "fetch", arguments: { url: "https://example.test" },
+    });
+    socket.end(JSON.stringify({ protocol: PROTOCOL, ok: true, result: { envelope: "sealed" } }) + "\n");
+  }, async client => {
+    const prepared = await client.prepareInvocation("prepare-1", "tools", "fetch", { url: "https://example.test" });
+    assert.deepEqual(prepared, { envelope: "sealed" });
+  });
+  assert.equal(calls, 1);
+});

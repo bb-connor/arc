@@ -23,6 +23,11 @@ on:
       - "examples/shared-resource-swarm/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
+      - "crates/core/chio-core-types/**"
+      - "spec/fixtures/chio-process-v1.json"
+      - "spec/schemas/chio-process/v1/**"
+      - "spec/schemas/chio-wire/v1/agent/**"
+      - "scripts/tests/check-process-corpus-qualification.test.py"
       - "scripts/check-process-dependencies.py"
       - "scripts/tests/check-process-dependencies.test.py"
       - "scripts/tests/check-process-ci-inventory.test.py"
@@ -65,6 +70,11 @@ on:
       - "examples/shared-resource-swarm/**"
       - "examples/process-starter/**"
       - "scripts/qualify-process-packages.py"
+      - "crates/core/chio-core-types/**"
+      - "spec/fixtures/chio-process-v1.json"
+      - "spec/schemas/chio-process/v1/**"
+      - "spec/schemas/chio-wire/v1/agent/**"
+      - "scripts/tests/check-process-corpus-qualification.test.py"
       - "scripts/check-process-dependencies.py"
       - "scripts/tests/check-process-dependencies.test.py"
       - "scripts/tests/check-process-ci-inventory.test.py"
@@ -512,7 +522,11 @@ jobs:
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
       - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39
       - name: Client framing and lossless receipts
+        env:
+          CHIO_PROCESS_REQUIRE_SCHEMA_VALIDATION: "1"
         run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0 referencing==0.37.0
+          python3 scripts/tests/check-process-corpus-qualification.test.py
           PYTHONPATH=sdks/python/chio-process/src python3 -m unittest discover -s sdks/python/chio-process/tests
           node --test sdks/typescript/packages/process/test/*.test.mjs
       - name: Process protocol and host crash recovery
