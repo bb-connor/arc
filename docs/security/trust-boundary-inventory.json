@@ -3963,17 +3963,6 @@
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs",
       "owner": "backfill_tool_receipt_attribution_columns",
-      "sha256": "70c8cc09b03aa9ec62532f6e9cb4d6a4027894082e7a8943d6a81e7986604ea4",
-      "tables": [
-        "chio_tool_receipts"
-      ],
-      "sql": "UPDATE chio_tool_receipts SET tenant_id = CAST(json_extract(raw_json, '$.tenant_id') AS TEXT) WHERE tenant_id IS NULL AND json_extract(raw_json, '$.tenant_id') IS NOT NULL",
-      "principal": "receipt-integrity",
-      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs",
-      "owner": "backfill_tool_receipt_attribution_columns",
       "sha256": "8c6b6788289e422aaf9f58d985cae1dcef182e19eb23de16edc7d4e651ef7075",
       "tables": [
         "chio_tool_receipts"
@@ -16521,7 +16510,7 @@
     "crates/economy/chio-settle/src/config.rs::from_path::from_wire#1::decode_signed",
     "crates/economy/chio-settle/src/input.rs::canonical::from_wire#1::decode_canonical",
     "crates/economy/chio-settle/src/input.rs::external_canonical::from_wire#1::canonicalize+decode_signed",
-    "crates/guards/chio-data-guards/src/structured_classification.rs::from_payload::from_wire#1::decode_signed",
+    "crates/guards/chio-data-guards/src/structured_classification.rs::from_payload::from_wire#1::decode_document",
     "crates/guards/chio-external-guards/src/external/input.rs::arguments::from_wire#1::decode_signed",
     "crates/guards/chio-external-guards/src/external/input.rs::response::from_wire#1::decode_external",
     "crates/guards/chio-guard-registry/src/input.rs::external::from_wire#1::decode_external",
