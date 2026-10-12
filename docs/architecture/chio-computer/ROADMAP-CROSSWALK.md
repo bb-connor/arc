@@ -31,7 +31,7 @@ examples retain the approved product vocabulary.
 
 | PR | Inspected head | Role |
 | --- | --- | --- |
-| [#1200](https://github.com/bb-connor/arc/pull/1200) | `cdc858edefccbb400aae329becbba5b2eb2bdce5` | Revision-5 closure exits, Computer-0 profiles, COMP gates and the roadmap docs gate |
+| [#1200](https://github.com/bb-connor/arc/pull/1200) | `d9ecdfe2d9f7253a6b3bcdadfc78e165a97a1ea3` | Revision-5 closure exits, Computer-0 profiles, COMP gates and the roadmap docs gate |
 | [#1196](https://github.com/bb-connor/arc/pull/1196) | `c32c460fae67c6f21386ab3cffa425cd06f0433b` | Unified contracts, lane owners, gates and superseding decisions |
 | [#1174](https://github.com/bb-connor/arc/pull/1174) | `7419d56e98e84ee57212e293e5f2658f7fef7642` | FTL lessons and all eleven kernel specifications |
 | [#1173](https://github.com/bb-connor/arc/pull/1173) | `cafdc970e4f89bddf810647e4228a605ed9f498a` | Delegation/graph code and W1-W4 work architecture |
@@ -68,7 +68,7 @@ Preserve the constituent contract's canonical transactions, migration inventory,
 sealed-outstanding semantics and conformance obligations. This changes landing
 order, not fence ownership. Computer adds no closure store or mutable balance.
 
-Pinned amendment: [Computer roadmap revision 5](https://github.com/bb-connor/arc/blob/cdc858edefccbb400aae329becbba5b2eb2bdce5/docs/operations/UNIFIED_ROADMAP.md).
+Pinned amendment: [Computer roadmap revision 5](https://github.com/bb-connor/arc/blob/d9ecdfe2d9f7253a6b3bcdadfc78e165a97a1ea3/docs/operations/UNIFIED_ROADMAP.md).
 
 Apply acceptance remains distinct from action authority in every profile.
 Computer-0 can accept a revision and still refuse its apply when the source

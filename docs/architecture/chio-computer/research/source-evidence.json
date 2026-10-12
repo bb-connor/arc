@@ -2061,8 +2061,8 @@
       ]
     },
     "computer_roadmap_revision_5": {
-      "head": "cdc858edefccbb400aae329becbba5b2eb2bdce5",
-      "hosted_source_commit": "cdc858edefccbb400aae329becbba5b2eb2bdce5",
+      "head": "d9ecdfe2d9f7253a6b3bcdadfc78e165a97a1ea3",
+      "hosted_source_commit": "d9ecdfe2d9f7253a6b3bcdadfc78e165a97a1ea3",
       "hosted_source_commit_matches_recorded_files": true,
       "inspection": "Computer-0 closure exits, full-hero COMP-5 completion with a first preview pass, COMP-6 branch/work prerequisites and non-blocking COMP-7 reuse",
       "sources": [
