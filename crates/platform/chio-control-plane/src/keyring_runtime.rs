@@ -1627,10 +1627,9 @@ fn load_private_seed_backend(path: &Path) -> Result<chio_core::crypto::Ed25519Ba
             "signing seed must contain exactly 32 bytes".to_string(),
         ));
     }
-    let mut seed = [0_u8; 32];
+    let mut seed = Zeroizing::new([0_u8; 32]);
     seed.copy_from_slice(&bytes);
     let keypair = Keypair::from_seed(&seed);
-    seed.fill(0);
     Ok(chio_core::crypto::Ed25519Backend::new(keypair))
 }
 
