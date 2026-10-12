@@ -27,6 +27,35 @@ fn sqlite_budget_store_persists_across_reopen() {
 }
 
 #[test]
+fn capability_usage_listing_searches_the_primary_key() {
+    let path = unique_db_path("chio-budget-usage-plan");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let connection = store.connection().unwrap();
+    let mut plan = connection
+        .prepare(&format!("EXPLAIN QUERY PLAN {LIST_CAPABILITY_USAGES_SQL}"))
+        .unwrap();
+    let details = plan
+        .query_map(params!["cap-plan"], |row| row.get::<_, String>(3))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    drop(plan);
+    drop(connection);
+
+    assert!(
+        details.iter().all(|detail| !detail.starts_with("SCAN")),
+        "{details:?}"
+    );
+    assert!(
+        details.iter().any(|detail| detail.starts_with("SEARCH")
+            && detail.contains("sqlite_autoindex_capability_grant_budgets_1")),
+        "{details:?}"
+    );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn budget_usage_query_rejects_negative_persisted_counter() {
     let path = unique_db_path("chio-budget-negative-usage");
     let store = SqliteBudgetStore::open(&path).unwrap();

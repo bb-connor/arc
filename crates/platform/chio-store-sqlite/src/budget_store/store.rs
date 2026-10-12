@@ -16,6 +16,33 @@ const BUDGET_INVOCATION_CAPTURE_SCHEMA_VERSION: i32 = 2;
 const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
 /// Tables shipped before schema stamping existed, used to adopt a pre-stamping
 /// budget database rather than reject it as foreign.
+pub(super) const LIST_ALL_USAGES_SQL: &str = r#"
+    SELECT
+        capability_id,
+        grant_index,
+        invocation_count,
+        updated_at,
+        seq,
+        total_cost_exposed,
+        total_cost_realized_spend
+    FROM capability_grant_budgets
+    ORDER BY updated_at DESC, capability_id ASC, grant_index ASC
+"#;
+
+pub(super) const LIST_CAPABILITY_USAGES_SQL: &str = r#"
+    SELECT
+        capability_id,
+        grant_index,
+        invocation_count,
+        updated_at,
+        seq,
+        total_cost_exposed,
+        total_cost_realized_spend
+    FROM capability_grant_budgets
+    WHERE capability_id = ?1
+    ORDER BY updated_at DESC, capability_id ASC, grant_index ASC
+"#;
+
 const BUDGET_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
 
 impl SqliteBudgetStore {
@@ -1103,22 +1130,12 @@ impl SqliteBudgetStore {
     ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
-        let mut statement = transaction.prepare(
-            r#"
-            SELECT
-                capability_id,
-                grant_index,
-                invocation_count,
-                updated_at,
-                seq,
-                total_cost_exposed,
-                total_cost_realized_spend
-            FROM capability_grant_budgets
-            WHERE (?1 IS NULL OR capability_id = ?1)
-            ORDER BY updated_at DESC, capability_id ASC, grant_index ASC
-            "#,
-        )?;
-        let rows = statement.query_map(params![capability_id], record_from_row)?;
+        let (sql, filter) = match capability_id {
+            Some(capability_id) => (LIST_CAPABILITY_USAGES_SQL, Some(capability_id)),
+            None => (LIST_ALL_USAGES_SQL, None),
+        };
+        let mut statement = transaction.prepare(sql)?;
+        let rows = statement.query_map(rusqlite::params_from_iter(filter), record_from_row)?;
         let rows = rows.collect::<Result<Vec<_>, _>>()?;
         drop(statement);
         transaction.rollback()?;
