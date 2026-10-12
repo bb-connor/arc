@@ -2,8 +2,7 @@
 //!
 //! Emits a JSON report on stdout per the verdict-matrix driver contract.
 //! When neither `CHIO_VERDICT_MATRIX_SIDECAR_URL` nor `CHIO_SIDECAR_URL`
-//! is set, every scenario is reported as `unsupported`; the local-invoke
-//! shim against `sdks/lambda/chio-lambda-extension` is operator-tactical.
+//! is set, every scenario is reported as `unsupported`.
 
 #![forbid(clippy::unwrap_used)]
 #![forbid(clippy::expect_used)]

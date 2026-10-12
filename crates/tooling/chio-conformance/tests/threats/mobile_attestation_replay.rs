@@ -3,12 +3,6 @@
 // Coverage strategy: present a production-shaped App Attest assertion whose
 // counter does not advance beyond the previously accepted value. The
 // production verifier must reject the replay before certificate processing.
-//
-// Revert-to-prove-it-fails recipe: replace `enforce_counter` in
-// `crates/trust/chio-custody-hw/src/attestation/app_attest.rs` with `Ok(())`.
-// The replay assertion then advances to the intentionally incomplete
-// certificate-chain fixture instead of returning `CounterRollback`, and the
-// typed deny-arm assertion below fails.
 
 use std::error::Error;
 use std::sync::Arc;

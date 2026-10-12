@@ -11,13 +11,6 @@
 //
 // Production call site:
 //   `crates/kernel/chio-kernel/src/transport.rs:79` (`read_frame`).
-//
-// Revert-to-prove-it-fails recipe:
-// In `crates/kernel/chio-kernel/src/transport.rs`, invert the
-// `len > MAX_MESSAGE_SIZE` predicate in `read_frame`. Re-run
-// `cargo test -p chio-conformance --test threats -- resource_exhaustion_dos`.
-// The oversized-frame assertion MUST fail because the transport no longer
-// returns `TransportError::MessageTooLarge` before reading the body.
 
 use std::io::Cursor;
 

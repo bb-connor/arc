@@ -18,22 +18,6 @@
 //     (`verify_capability_with_trusted_and_floor`).
 //   `crates/kernel/chio-kernel-core/src/budget_split.rs`
 //     (`InMemoryBudgetRegistry::verify_child_admission`).
-//
-// Revert-to-prove-it-fails recipes:
-//   (a) swallow the `?` on `verify_child_admission` inside
-//       `admit_delegated_budget` in
-//       `crates/kernel/chio-kernel-core/src/capability_verify.rs` (so the
-//       sibling-sum / unknown-parent deny branches no longer
-//       propagate). The sibling-budget / unknown-parent deny-arm
-//       assertions below fail.
-//   (b) delete the trusted-issuer guard inside
-//       `verify_capability_with_trusted_and_floor`. The
-//       untrusted-issuer deny-arm assertion below fails.
-//
-// Targeted mutation recipe: replace `admit_delegated_budget` with `Ok(())`.
-// The unknown-parent token then bypasses the verifier-owned registry, and its
-// deny-arm assertion MUST fail. The registered-parent positive control MUST
-// continue to pass and commit the child share.
 
 use chio_core::capability::{
     attenuation::{DelegationLink, DelegationLinkBody},

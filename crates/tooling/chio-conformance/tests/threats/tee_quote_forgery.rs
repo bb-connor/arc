@@ -34,8 +34,8 @@
 //
 // This row directly proves the TEE-frame tenant-signature boundary. The
 // platform quote verifiers for TDX, SEV-SNP, and Nitro are separate
-// production controls whose test files are pinned below but whose bypass
-// mutations remain follow-up work.
+// production controls whose test files are pinned below; their bypass
+// mutations are not covered by this row.
 //
 // Production call sites:
 //   `crates/trust/chio-tee-frame/src/schema.rs:95` (`validate_signed`).
@@ -224,13 +224,6 @@ fn threat_tee_quote_forgery_cross_tee_misbinding_rejected() {
     // its name as a distinct deny path from #2 (request_blob_sha256
     // tampering, which is a generic body-tamper case rather than a
     // cross-TEE binding violation).
-    //
-    // Revert-to-prove-it-fails recipe: replace the signature
-    // verification in `chio_tee_frame::schema::verify_tenant_sig`
-    // with `Ok(())` (or short-circuit before
-    // `public_key.verify(&payload, &signature)` returns false), and
-    // this assertion will flip from a pass to a panic because the
-    // misbound frame would be admitted.
     let (mut frame, public_key) = signed_frame();
     assert_eq!(
         frame.tee_id, "tee-prod-1",

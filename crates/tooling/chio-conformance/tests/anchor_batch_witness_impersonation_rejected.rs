@@ -214,8 +214,8 @@ fn rekor_verify_inclusion_rejects_lane_that_returns_a_substituted_entry() {
     let batch = sample_batch();
     let real_body_hash = batch_body_hash(&batch).unwrap();
 
-    // The verifier already holds an honest receipt (we pre-populated
-    // it from a previous successful publish). At verify_inclusion
+    // The verifier already holds an honest receipt (pre-populated
+    // from a previous successful publish). At verify_inclusion
     // time, the mirror has been compromised: GET /entries/<uuid>
     // returns a Rekor body whose hash.value points at a different
     // batch.

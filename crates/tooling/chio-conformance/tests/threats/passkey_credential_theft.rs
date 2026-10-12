@@ -34,14 +34,6 @@
 // Production call sites:
 //   `crates/trust/chio-custody-hw/src/nonce_store.rs`
 //     (`InMemoryPasskeyNonceStore::record_if_fresh`).
-//
-// Revert-to-prove-it-fails recipe:
-// In `crates/trust/chio-custody-hw/src/nonce_store.rs`, make
-// `retained_replay_outcome` return `None` for retained keys. Re-run
-// `cargo test -p chio-conformance --test threats -- passkey_credential_theft`
-// and the `assert_eq!(second, RecordOutcome::Replayed)` arm in
-// `replay_attack_rejected` MUST then fail because production now
-// admits the second presentation.
 
 use std::{fs, path::PathBuf};
 
