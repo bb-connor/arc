@@ -300,31 +300,13 @@ function normalizeEvaluation(value: unknown): ChioEvaluation {
       ? receipt as Record<string, unknown>
       : undefined;
     const verdict = record["verdict"];
-    if (verdict === "allow" || verdict === "deny") {
-      return {
-        verdict,
-        reason: typeof record["reason"] === "string" ? record["reason"] : undefined,
-        ...evaluationFields(record, receiptRecord),
-      };
-    }
     if (verdict != null && typeof verdict === "object") {
       const nested = verdict as Record<string, unknown>;
       if (nested["verdict"] === "allow" || nested["verdict"] === "deny") {
         return {
           verdict: nested["verdict"],
           reason: typeof nested["reason"] === "string" ? nested["reason"] : undefined,
-          ...evaluationFields(record, receiptRecord),
-        };
-      }
-    }
-    const decision = record["decision"];
-    if (decision != null && typeof decision === "object") {
-      const nested = decision as Record<string, unknown>;
-      if (nested["verdict"] === "allow" || nested["verdict"] === "deny") {
-        return {
-          verdict: nested["verdict"],
-          reason: typeof nested["reason"] === "string" ? nested["reason"] : undefined,
-          ...evaluationFields(record, receiptRecord),
+          ...evaluationFields(receiptRecord),
         };
       }
     }
@@ -334,80 +316,25 @@ function normalizeEvaluation(value: unknown): ChioEvaluation {
 
 /**
  * Pull out the non-authority fields the evaluation response itself carries
- * (receipt id, decision verdict, observation_outcome, ...). Authority
- * fields (signer / signature / receipt-id / parameter-hash) are
- * deliberately NOT read here: they are the output of a downstream
- * verification step and are layered on top via `applyReceiptAuthority`.
- * Receipt body is preserved so the verification step can inspect it.
+ * (receipt id, decision verdict, observation_outcome). Authority fields
+ * (signer / signature / receipt-id / parameter-hash) are deliberately NOT
+ * read here: they are the output of a downstream verification step and are
+ * layered on top via `applyReceiptAuthority`. The receipt body is preserved
+ * so the verification step can inspect it.
  */
 function evaluationFields(
-  record: Record<string, unknown>,
   receipt: Record<string, unknown> | undefined,
 ): Omit<ChioEvaluation, "verdict" | "reason"> {
-  const receiptId =
-    stringField(record, "receipt_id")
-    ?? stringField(record, "receiptId")
-    ?? stringField(receipt, "id");
-  const decision = liftDecisionVerdict(record, receipt);
-  const observation =
-    stringField(record, "observation_outcome")
-    ?? stringField(receipt, "observation_outcome");
   return {
-    receiptId,
-    decision: decisionValue(decision),
-    observation_outcome: observationOutcomeValue(observation),
+    receiptId: stringField(receipt, "id"),
+    decision: decisionValue(readVerdictTag(receipt?.["verdict"])),
+    observation_outcome: observationOutcomeValue(stringField(receipt, "observation_outcome")),
     receipt,
   };
 }
 
-/**
- * Normalize the verdict string used by `isAuthorizedEvaluation`. The wire
- * formats we have to accept, in priority order:
- *
- *   1. `record.decision` as a string ("allow"/"deny"/...).
- *   2. `record.decision` as a tagged-enum object `{ verdict: "allow" }`.
- *   3. `receipt.decision` as a string. Some SDK fixtures inline a string
- *      here instead of the tagged-enum object.
- *   4. `receipt.decision` as a tagged-enum object `{ verdict: "..." }`.
- *      Used by some non-Rust receipt shims.
- *   5. `receipt.verdict` as a tagged-enum object `{ verdict: "..." }`.
- *      This is the SHAPE produced by the real Rust `HttpReceipt`: the
- *      `Verdict` enum is `#[serde(tag = "verdict")]` so an Allow variant
- *      becomes `{ "verdict": "allow" }` and there is no `decision`
- *      sibling at all.
- *   6. `receipt.verdict` as a plain string. A defensive fallback for
- *      hand-rolled fixtures.
- *   7. `record.verdict` (top-level EvaluateResponse verdict) as a tagged
- *      object or string. Last-resort fallback before failing.
- */
-function liftDecisionVerdict(
-  record: Record<string, unknown>,
-  receipt: Record<string, unknown> | undefined,
-): string | undefined {
-  const candidates: Array<unknown> = [
-    record["decision"],
-    receipt?.["decision"],
-    receipt?.["verdict"],
-    record["verdict"],
-  ];
-  for (const candidate of candidates) {
-    const verdict = readVerdictTag(candidate);
-    if (verdict != null) {
-      return verdict;
-    }
-  }
-  return undefined;
-}
-
-/**
- * Accept the verdict in any of the shapes the protocol or older shims
- * have published: a plain string, or a Rust-style tagged enum object
- * `{ verdict: "allow", ... }`.
- */
+/** Read the tag of a Rust-style tagged verdict object `{ verdict: "allow", ... }`. */
 function readVerdictTag(value: unknown): string | undefined {
-  if (typeof value === "string") {
-    return value;
-  }
   if (value != null && typeof value === "object") {
     const nested = (value as Record<string, unknown>)["verdict"];
     if (typeof nested === "string") {

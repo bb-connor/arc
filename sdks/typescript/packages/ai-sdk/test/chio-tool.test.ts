@@ -1155,14 +1155,13 @@ describe("chioTool: verdict lifting across wire shapes", () => {
     expect(result).toEqual({ doubled: 42 });
   });
 
-  it("accepts a plain-string receipt.decision", async () => {
-    // Some evaluator shims write the decision as a plain string rather than
-    // the tagged-enum object. Both shapes must lift identically.
+  it("rejects a plain-string receipt.decision", async () => {
+    // Only the tagged-enum object is a valid decision; a bare string must
+    // not authorize execution.
     const plainStringShape: Record<string, unknown> = {
       verdict: "allow",
       receipt: {
         id: "r-string-decision",
-        // Alternate shim shape: receipt.decision is a plain string, not an object.
         decision: "allow",
         receipt_kind: "mediated_decision",
         boundary_class: "prevent",
@@ -1186,7 +1185,8 @@ describe("chioTool: verdict lifting across wire shapes", () => {
       clientOptions: { fetch },
     });
 
-    const result = await wrapped.execute!({ n: 21 });
-    expect(result).toEqual({ doubled: 42 });
+    await expect(wrapped.execute!({ n: 21 })).rejects.toMatchObject({
+      name: "ChioToolError",
+    });
   });
 });
