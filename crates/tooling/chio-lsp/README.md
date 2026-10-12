@@ -1,61 +1,65 @@
 # chio-lsp
 
-`chio-lsp` is the Chio language server. It runs a `tower-lsp` server over
-stdio, classifies each opened document as `chio.yaml`, a tool/capability
-manifest (`*.chio-manifest.yaml`), or a guard DSL file (`*.chio-guard.yaml`),
-and serves diagnostics, completion, hover, and go-to-definition from a shared
-document cache. It stops at the document boundary: it does not run the
-kernel, evaluate policy, or read arbitrary project files.
+`chio-lsp` provides editor diagnostics, completion, hover, and definition
+navigation for Chio configuration documents. Its binary speaks LSP over
+stdio; its library exposes the same providers for embedding and testing.
+The shared document cache supplies text to each request handler.
 
-## Responsibilities
+## Usage
 
-- Cache opened documents keyed by URI and classify each by language id or URI
-  suffix (`document`).
-- Validate documents on `didOpen` / `didChange` and publish `urn:chio:error:*`
-  diagnostics, one hand-rolled structural provider per language: required-key
-  and shape checks over parsed YAML, not schema-file validation
-  (`diagnostics`).
-- Offer static, catalog-backed completion for capability scopes, guard
-  identifiers, and top-level keys, for `chio.yaml` documents only; manifest
-  and guard DSL documents currently return no completions (`completion`).
-- Render hover help for capability scope, guard, and error-code URNs across
-  all three document languages, sourced from the completion catalogs and the
-  `chio-errors` registry (`hover`).
-- Resolve `urn:chio:scope:*` / `urn:chio:guard:*` references to a definition
-  site: a linked, path-scoped manifest file first, then the first occurrence
-  in the open document (`definition`).
-- Convert LSP UTF-16 column positions to UTF-8 byte offsets, and back, before
-  every string slice so multibyte content cannot panic a request handler
-  (`position`).
+Run the configuration diagnostic provider without starting an editor or server:
 
-## Public API
+```rust
+use chio_lsp::diagnostics::chio_yaml::validate;
 
-- `ChioLanguageServer` - the `tower_lsp::LanguageServer` implementation; owns
-  the document cache and the lifecycle / completion / hover / definition
-  handlers.
-- `ServerCapabilitiesSnapshot` - plain-data snapshot of the capabilities
-  `ChioLanguageServer::capabilities()` advertises (full sync, completion,
-  hover, definition).
-- `DocumentCache`, `DocumentEntry`, `DocumentLanguage` - the open / replace /
-  close document store and its language classification.
-- `server::run_stdio()` - runs the server on stdin/stdout; called by the
-  `chio-lsp` binary.
-- `diagnostics::validate(language, uri, text) -> Vec<Diagnostic>`
-- `completion::complete(language, text, position) -> Vec<CompletionItem>`
-- `hover::hover(language, text, position) -> Option<Hover>`
-- `definition::definition(language, uri, text, position) -> Option<Location>`
-- `position::{utf16_to_byte_offset, byte_to_utf16_column}`
+let valid = "version: 1\npolicy: ./policy.yaml\n";
+assert!(validate(valid).is_empty());
 
-## Testing
+let missing_policy = validate("version: 1\n");
+assert_eq!(missing_policy.len(), 1);
+assert!(missing_policy[0].message.contains("policy"));
+```
 
-`cargo test -p chio-lsp`
+The `chio-lsp` executable takes LSP messages on stdin and sends responses on
+stdout. Clients should use full document synchronization, which
+`ChioLanguageServer::capabilities()` advertises alongside completion,
+hover, and definition support.
 
-`cargo bench -p chio-lsp` runs the cold-start / steady-state diagnostic
-latency benchmarks against a synthesized 1k-line `chio.yaml`.
+## Guarantees
 
-## See also
+- `DocumentLanguage::detect` recognizes Chio language IDs before checking
+  filename suffixes. Unrecognized documents receive no diagnostics.
+- `diagnostics::chio_yaml::validate` requires a YAML mapping with `version`
+  and `policy` keys. Values and referenced policy files are outside this check.
+- `diagnostics::manifest::validate` checks a `tools` sequence of mappings
+  with an `id` key. The runtime manifest loader enforces the v2 contract.
+- `diagnostics::guard_dsl::validate` requires a `guards` sequence whose
+  entries contain string IDs beginning with `urn:chio:guard:`.
+- `definition` restricts linked manifest reads to recognized filenames
+  within the document directory after canonicalization.
 
-- `chio-errors` - registry-generated `lookup_error_code`; backs hover text for
-  `urn:chio:error:*` codes.
-- `integrations/editors/` - VSCode and Zed extensions that spawn this binary
-  as an LSP client over stdio.
+## Status
+
+This workspace package has a library and a stdio binary and is marked
+`publish = false`. Diagnostics are structural YAML checks. Completion uses
+static catalogs and is implemented for `chio.yaml`; hover recognizes scope,
+guard, and registered error URNs across the three supported document languages.
+Definition navigation follows scope and guard URNs. Kernel admission, policy
+evaluation, signature verification, and manifest authorization belong to
+runtime components.
+
+Lifecycle and provider integration tests run with `cargo test -p chio-lsp`.
+The `diagnostic_latency` benchmark measures cold-start and repeated diagnostic
+calls against a synthesized configuration document.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Manifest contract](../../../spec/PROTOCOL.md#7-manifest-contract)
+- [Schema validator](../chio-spec-validate/README.md)
+- [Error registry](../../core/chio-errors/README.md)
+- [Editor integrations](../../../integrations/editors/)
+
+## License
+
+[Apache-2.0](../../../LICENSE)

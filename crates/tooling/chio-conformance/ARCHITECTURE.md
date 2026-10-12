@@ -1,121 +1,98 @@
 # chio-conformance architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-conformance` is a test-support crate: it holds no runtime state and
-enforces nothing at the protocol boundary. Its job is to prove that other
-Chio crates (the kernel, the MCP edge, the SIEM exporters, the federation
-transport, ...) hold their fail-closed and wire-compatibility contracts. It
-has three layers: a small library that loads scenarios and orchestrates live
-runs (`src/`), a cross-SDK verdict-tuple corpus and diff oracle compiled
-directly into its test binaries (`verdict_matrix/`), and a large
-negative-conformance and threat-model test suite that links production
-crates as dev-dependencies and drives them directly (`tests/`).
+The public surface combines fixture loading, compatibility rendering, peer
+lockfile handling, native fixtures, and cross-language orchestration.
+`ScenarioDescriptor` describes expected coverage; `ScenarioResult` records
+one peer, deployment mode, transport, and outcome. `CompatibilityReport`
+collects both lists for Markdown rendering.
 
-## Module map
+The crate owns test inputs and test artifacts. Kernel authorization,
+cryptographic verification, persistence, and tool isolation come from the
+Chio implementations exercised by a particular suite. A recorded pass alone
+carries no authenticated proof of the process that produced it.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Re-exports the loader, model, native-suite, peers, and runner surfaces. |
-| `src/model.rs` | Scenario/result data model: `ScenarioDescriptor`, `ScenarioResult`, `CompatibilityReport`, and their enums. |
-| `src/load.rs` | Fail-closed JSON scenario/result loading: rejects missing, non-directory, symlinked, or empty fixture roots. |
-| `src/runner.rs` | Live cross-language runner: locates/builds `chio`, spawns `chio mcp serve-http`, drives peer client processes over remote HTTP, collects results. |
-| `src/native_suite.rs` | Native (non-MCP) conformance: builds signed capability/delegation/receipt/DPoP/governed-transaction fixtures and drives them via `artifact` (in-process), `stdio`, or `http` executors. |
-| `src/peers.rs` | `peers.lock.toml` parsing and validation (schema, https urls, sha256 pins, safe binary paths) and default lockfile path resolution. |
-| `src/report.rs` | Markdown compatibility-matrix rendering. |
-| `src/bin/*.rs` | Thin CLI wrappers over the library (cross-language runner, report generator, native runner, native fixture server). |
+## Structure
 
-## Conformance run lifecycle
+- `load.rs` recursively collects JSON files and deserializes scenarios/results.
+- `model.rs` defines categories, transport/deployment labels, and result states.
+- `report.rs` groups results into compatibility columns and failure sections.
+- `peers.rs` parses, validates, selects, and partitions peer lock entries.
+- `runner.rs` provisions native MCP security, starts an HTTP edge, and runs peers.
+- `runner/native_launch.rs` reads explicit cage paths, grants, and execution IDs.
+- `native_suite.rs` dispatches artifact, stdio, and HTTP fixture drivers and
+  captures signed runtime revocation traces.
+- `econsim.rs` validates and signs typed economic simulation matrices.
+- `fuzz.rs` exposes a lockfile parser/query target behind the `fuzz` feature.
+- `src/bin/` contains report, cross-language, native runner, native fixture,
+  and economic simulation entrypoints.
+- `verdict_matrix/` carries a separate tuple corpus, oracle, and driver registry.
 
-1. `run_conformance_harness` clears and recreates the results directory,
-   reserves a loopback port, and locates or builds the `chio` binary.
-2. It spawns `chio mcp serve-http` against a policy fixture and a mock
-   upstream MCP server, held by a `ChildGuard` that kills the process on
-   drop, and polls the port until the server accepts connections.
-3. For each requested `PeerTarget`, it spawns the peer's client process (or a
-   caller-supplied override binary from `peer_binaries`) against the live
-   server and writes its JSON results.
-4. It loads every collected result and the scenario descriptors and renders
-   `generate_markdown_report`. A failure in any peer process aborts the run
-   before a report is written.
+## Data and control flow
 
-The native suite (`run_native_conformance_suite`) does not spawn a Chio
-server. Each scenario names an `artifact`, `stdio`, or `http` driver;
-`execute_native_scenario` builds the matching fixture in-process, signed with
-fixed test keypairs for determinism, and drives it directly against kernel
-types, a subprocess speaking the kernel's stdio frame protocol, or a
-`chio-native-conformance-fixture` HTTP endpoint.
+The offline loaders walk a directory tree in sorted file order.
+Scenario loading requires at least one JSON descriptor and sorts by ID.
+Result loading first tries an array, then a single record, and sorts by
+scenario ID, peer, deployment mode, and transport.
+The renderer derives columns from results and places them under scenario
+categories. Duplicate records for the same displayed column resolve through
+a map insertion; callers must curate their input corpus.
 
-## Verdict matrix
+`run_conformance_harness` validates credentials and cage configuration,
+replaces its results directory, locates or builds the Chio executable,
+provisions the wrapped mock upstream, and starts the remote edge.
+It runs selected peer processes sequentially, reloads their result files,
+requires nonempty results, and writes the Markdown report.
 
-`verdict_matrix/` is a separate crate (`chio-conformance-verdict-matrix`)
-deliberately excluded from the root workspace (it declares its own
-`[workspace]` table) so it can be checked standalone. `chio-conformance`'s
-five `[[test]]` targets compile its sources directly via
-`#[path = "../src/lib.rs"]` rather than depending on it as a library. It
-holds:
+The native suite selects a driver for each descriptor and compares fixture
+responses or artifacts against assertion specifications. Its runtime trace
+capture uses a real kernel and SQLite revocation state; artifact fixtures
+also contain deterministic keys and synthetic messages.
 
-- A 48-scenario JSON corpus (`scenarios/`) across four categories
-  (`capability_subset`, `revocation_propagation`, `replay_verdict`,
-  `redaction_determinism`), indexed and hash-pinned by `manifest.toml`.
-- `RustKernelDriver`, which runs each scenario through a real in-process
-  `chio_kernel::ChioKernel`. It is the only required driver.
-- A diff oracle (`diff_oracle.rs`, `cross_language.rs`) that asserts
-  `(verdict, reason_code, scope_set)` tuple equality between `rust-kernel`
-  and every other driver that reports a scenario as supported.
-- External drivers under `drivers/` (Python, Go, TypeScript, JVM, .NET,
-  WASM-browser, Kubernetes, Lambda) that replay the same corpus through their
-  own SDK or deployment shape, most gated on an operator-supplied
-  `CHIO_VERDICT_MATRIX_SIDECAR_URL` and reporting `unsupported` without one.
-  Only `drivers/lambda` (`chio-verdict-matrix-driver-lambda`) is a root
-  workspace member; the rest build in their native toolchains outside
-  `cargo`.
+## Trust and invariants
 
-## Invariants and failure modes
+Directory walkers reject symlinked roots and encountered symlinks.
+They use ordinary filesystem reads after traversal and have no input byte
+ceiling or atomic snapshot guarantee. Typed deserialization checks the JSON
+shape; imported results remain caller-supplied evidence.
 
-- Fixture and scenario loading fails closed: a missing directory, a
-  non-directory path, a symlinked escape, or an empty scenario set is an
-  error before any scenario runs (`load.rs`, `native_suite.rs`).
-- `peers.lock.toml` entries must carry an https url, a 64-character
-  lowercase hex sha256, a language in `SUPPORTED_LANGUAGES`, and a binary
-  path with no `..` or absolute components. The shipped lockfile's
-  placeholder pins are asserted `published = false` in tests so
-  `fetch-peers` cannot download an unverified artifact.
-- The bundled MCP-core policy fixture must pair
-  `allow_ephemeral_receipt_log` with `allow_ephemeral_revocation_store`,
-  checked by a runner unit test, or the kernel's revocation durability gate
-  denies every mediated call before the harness produces evidence.
-- `run_conformance_harness` aborts on the first peer process failure; it does
-  not write a partial report.
-- The `tests/` suite constructs real `HttpEgressContract`, DSSE, anchor-batch
-  witness, and threat-model code paths from forged or adversarial inputs and
-  asserts they are rejected, so a failure there is a regression in the crate
-  under test, not in this harness.
+`PeersLock::load` and `parse_str` only parse. `validate` separately enforces
+schema and entry constraints. The HTTPS check is a string-prefix check;
+artifact digest verification belongs to the consuming download path.
+Checkout discovery validates an absolute root, workspace membership,
+package identity, and repository fixture layout. An invalid explicit
+`CHIO_CHECKOUT_ROOT` prevents fallback discovery of another checkout.
+
+The `in-repo-fixtures` feature is declared but currently has no source gate.
+Runtime checkout discovery and packaged-fixture fallback determine defaults.
+`econsim` validators check case consistency, coverage, and provenance fields;
+signing rejects missing targets and unresolved high or critical findings.
+Provenance fields must be nonempty; library validation does not prove their truth.
 
 ## Dependencies
 
-`chio-core` is aliased to `chio-core-types`
-(`chio-core = { package = "chio-core-types", ... }`); `native_suite.rs` and
-`peers.rs` reach it as `chio_core::{canonical, capability, crypto, message,
-receipt, sha256_hex}`. `chio-kernel` (not aliased) supplies
-`dpop::verify_dpop_proof`/`DpopConfig`/`DpopNonceStore` and the
-`transport::{read_frame, write_frame}` frame codec the native suite's
-`stdio` driver speaks. `reqwest::blocking` drives the native suite's `http`
-executor, `toml` parses `peers.lock.toml`, and `tiny_http` backs the native
-fixture binary's HTTP mode. The dev-dependency list is unusually large
-because `tests/` links directly against the production crates it
-conformance-tests (`chio-siem`, `chio-link`, `chio-openapi-mcp-bridge`,
-`chio-a2a-adapter`, `chio-anchor`, `chio-federation-transport-iroh`,
-`chio-tee-frame`, `chio-adversarial-suite`, `chio-custody-hw`, ...) instead
-of mocking them, so evidence comes from real code paths.
+`chio-core-types` supplies native wire and signed artifact types.
+`chio-kernel` and `chio-store-sqlite` support real runtime trace capture;
+`chio-trace-validate` projects trace artifacts into validator inputs.
+`serde_json` and `toml` decode fixtures and peer locks.
+`reqwest` and `tiny_http` support local HTTP fixture traffic.
+`tempfile` holds temporary runtime state.
+Optional `chio-selective-disclosure` and `chio-workflow` support BBS tests.
+The larger dev-dependency graph exposes production crates to regression tests.
 
-## Extension points
+## Verification
 
-- `ConformanceRunOptions` / `NativeConformanceRunOptions` are the caller
-  surface: external consumers point every path (scenarios, results, report,
-  policy) at their own layout, and `peer_binaries` lets a caller override any
-  `PeerTarget` with a custom binary without editing this crate.
-- `peers::PeersLock` is the pinned peer-release contract `chio conformance
-  fetch-peers` validates before downloading; adding a peer language means
-  extending `SUPPORTED_LANGUAGES` and the runner's peer-dispatch match arms
-  together.
+Loader tests cover empty/missing directories, JSON records, and symlink refusal.
+Report tests cover category grouping and expected-failure rendering.
+Peer tests cover validation, filtering, partitioning, and checkout discovery.
+Native tests exercise signed nonvacuous traces, dropped admission callbacks,
+revocation retention, trace mutations, and fixture metadata.
+The deployment-shape smoke target checks registry metadata and source presence;
+it does not invoke a Lambda deployment.
+
+Run `cargo test -p chio-conformance --lib` for library checks and
+`cargo test -p chio-conformance --test deployment_shape_smoke` for registration.
+Set `CHIO_CHECKOUT_ROOT` to this checkout when using an external target directory.
+Live cross-language execution additionally requires peer SDKs and reviewed cage
+configuration; its result artifacts identify the peers and surfaces exercised.

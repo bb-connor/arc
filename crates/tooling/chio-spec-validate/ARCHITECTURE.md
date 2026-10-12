@@ -1,72 +1,86 @@
 # chio-spec-validate architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-spec-validate` is a pure validation library: no async runtime, no
-network I/O, no internal `chio-*` dependencies. It gates untrusted JSON
-documents (capability tokens, receipts, wire artifacts, conformance
-scenarios) against trusted, Chio-controlled JSON Schemas committed under
-`spec/schemas/`. The `schema` argument to every entry point must be
-Chio-controlled; the `doc` argument is the untrusted half and never drives
-`$ref` resolution.
+The public surface consists of `load_json`, `validate`, `validate_value`,
+and `ValidateError`. The library checks JSON document shape against a
+caller-supplied schema. xtask uses this check for conformance scenarios and
+fixture gates; the standalone binary exposes the file-based entrypoint.
 
-## Module map
+Schemas are trusted inputs. Instance validation does not establish signer
+identity, receipt integrity, capability freshness, or authorization.
+Those properties require the corresponding runtime validators. Ordinary JSON
+parsing here also does not enforce the canonical signed-artifact input rules.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Public API (`validate`, `validate_value`, `load_json`, `ValidateError`), compile-option assembly, schema-registry-root detection, and `LocalSchemaRetriever`. |
-| `src/main.rs` | CLI: parses two path arguments, calls `validate`, maps the result to stdout/stderr and a process exit code. |
-| `tests/scenarios.rs` | Integration test against the real `spec/schemas/chio-wire/v1/capability/token.schema.json`; exercises both `validate` and `validate_value` with a valid token and one mutated to drop `signature`. |
+## Structure
 
-## Validation flow
+All library logic lives in `src/lib.rs`: JSON loading, option construction,
+reference retrieval, Chio schema identifier lookup, and error reporting.
+`src/main.rs` handles the two positional CLI arguments and exit status.
+There is no persistent compiled-schema cache or daemon state.
 
-1. `validate` loads the schema and document from disk with `load_json`;
-   `validate_value` skips this and takes both as `Value`s already.
-2. `validate_value` derives a `file://` base URI from the schema path's parent
-   directory (`schema_base_uri`) and, when that parent sits under a
-   `spec/schemas/` root (`schema_registry_root`), installs a
-   `LocalSchemaRetriever` scoped to that root.
-3. `jsonschema::options().build(schema)` compiles the schema, invoking the
-   retriever for every `$ref`. Compile failure, including any rejected `$ref`,
-   returns `ValidateError::SchemaCompile`.
-4. The compiled validator runs `is_valid` against the document; on failure,
-   `iter_errors` collects every violation into one
-   `ValidateError::SchemaViolation(schema_path, doc_path, messages)`.
+`ValidateError` separates I/O, JSON parsing, schema compilation, and schema
+violation failures. A violation retains the schema path, document path, and
+vector of messages from the validator. The display implementation joins
+these messages for CLI diagnostics.
 
-## `$ref` resolution
+## Data and control flow
 
-`LocalSchemaRetriever::retrieve` dispatches on URI scheme:
+`validate` reads and parses the schema, then reads and parses the document.
+It passes both values and paths to `validate_value`. That entrypoint builds
+a fresh `jsonschema` validator on each call. A successful `is_valid` returns
+immediately; otherwise `iter_errors` supplies the violation messages.
 
-| Scheme | Behavior |
-|--------|----------|
-| `https` | Resolved only when the URI starts with a registered Chio schema host (`https://chio.world/schemas/`, `https://chio-protocol.dev/schemas/`). The path is joined onto the schema root; if no file exists there, a directory walk matches the URI against every schema's `$id` instead, which is what lets an id like `.../token/v1` resolve to a file named `token.schema.json`. |
-| `file` | Read directly by path. |
-| `http` | Always rejected. |
-| anything else | Rejected as `Unknown scheme {scheme}`. |
+The schema path has operational meaning even for in-memory inputs.
+`schema_base_uri` derives a file URI from a nonempty parent directory.
+`schema_registry_root` searches that path's ancestors for `spec/schemas`;
+when absent it uses the immediate parent as the retrieval root.
+A synthetic path without a parent selects the library's default retrieval
+behavior, suitable for a self-contained inline schema.
 
-Every resolved file path is canonicalized and must fall under the
-canonicalized schema root; a `file://` or `$id` resolution that would land
-outside it is rejected rather than read.
+Chio HTTPS references map into that root using the URI path. When the
+mapped file is absent, the retriever scans local JSON files for a matching
+`$id`, accepting equality after trimming trailing slashes. Relative file
+references use the derived base URI.
 
-## Invariants and failure modes
+## Trust and invariants
 
-- No entry point panics on malformed input; I/O, parse, compile, and
-  violation errors all return through `ValidateError`.
-- `$ref` resolution never reaches the network: the workspace `jsonschema`
-  dependency is built with `default-features = false` and only the
-  `resolve-file` feature, so an `http://`/`https://` URI outside the two
-  registered Chio hosts fails at schema-compile time rather than fetching
-  anything (`http_ref_in_schema_does_not_fetch_network`,
-  `unknown_scheme_in_schema_ref_is_rejected`).
-- A schema-URI path segment of `..` is rejected while the local path is being
-  built (`join_schema_path`); a `file://` `$ref` that canonicalizes outside
-  the schema root is rejected after resolution
-  (`file_ref_outside_schema_root_is_rejected`). Both fail closed rather than
-  silently widening scope.
-- `#![forbid(unsafe_code)]`.
+With a nonempty schema parent, `LocalSchemaRetriever` accepts local `file`
+references and the two Chio HTTPS namespaces, `chio.world/schemas/` and
+`chio-protocol.dev/schemas/`. HTTP and unregistered HTTPS references return
+errors. Other URI schemes are rejected.
+
+`join_schema_path` rejects parent traversal in Chio URI paths.
+`read_local_schema_file` canonicalizes the requested file and retrieval root,
+then requires the file to remain beneath the canonical root. This checks
+symlink escapes before reading the referenced schema. The initial schema
+and instance paths themselves are read directly by `load_json`.
+
+`load_json` reads the complete file before parsing; there is no byte budget
+at this layer. `serde_json::Value` parsing supplies instance values without
+a duplicate-field or canonical-number rejection pass. A document's own
+`$ref` field is data unless its schema assigns it special constraints.
 
 ## Dependencies
 
-No internal `chio-*` crates. External: `jsonschema` (0.46, `default-features
-= false`, `resolve-file` only) for schema compilation, and `serde_json` for
-parsing and error formatting.
+`serde_json` supplies the parsed values and file decoding. `jsonschema`
+compiles schemas and evaluates instances. The workspace dependency disables
+default features and enables file resolution, so the default configuration
+also lacks HTTP retrieval. The custom retriever maps published Chio identifiers
+to repository-local schemas.
+
+## Verification
+
+`cargo test -p chio-spec-validate` runs unit tests for network refusal,
+sibling-file references, absolute Chio `$id` resolution, and references outside
+the root. Artifact tests check nested anchor payloads, supported signature
+envelope shapes, checkpoint version rules, hashes, and log-ID spelling.
+
+The `scenarios`, `fiscal`, `bound_tool_invocation`, and `ws2_protocol_ladder`
+integration suites exercise repository schemas and document mutations.
+Their schema assertions describe accepted shapes; signature-shaped strings
+in those fixtures receive no cryptographic verification here.
+
+See the [README](README.md) for the inline API example and the
+[serialization contract](../../../spec/PROTOCOL.md#4-serialization-and-identity)
+for signed-artifact requirements.

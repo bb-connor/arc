@@ -1,82 +1,90 @@
-# chio-verdict-matrix-driver-lambda architecture
+# Lambda verdict-matrix driver architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-verdict-matrix-driver-lambda` is a conformance tool, not a production
-Chio component. `chio-conformance` owns the verdict-matrix scenario corpus
-and manifest under `crates/tooling/chio-conformance/verdict_matrix/`, and
-registers this crate there as the `lambda-deployment-shape` driver,
-representing the `sdks/lambda/chio-lambda-extension` package in the registry.
-The crate holds no kernel, guard, or policy logic of its own: it loads the
-shared scenario corpus, hand-builds a `chio-http-core::ChioHttpRequest`-shaped
-JSON body per scenario, and POSTs it to an operator-supplied Chio sidecar's
-`/chio/evaluate` endpoint, then diffs the parsed verdict tuple against the
-scenario's expected tuple. Its trust position is that of an external caller
-exercising the sidecar's public wire contract: it has no path dependency on
-any `chio-*` crate and cannot produce a verdict on its own.
+This deployment-shape driver exercises a remote evaluator through the
+`POST /chio/evaluate` surface. Its public types are `Scenario`,
+`ScenarioScript`, `VerdictTuple`, `ScenarioOutcome`, and `DriverReport`.
+Its entrypoints cover scenario discovery/loading, request translation,
+response projection, expected-tuple indexing, and a complete driver run.
 
-## Module map
+The sidecar owns policy, guard, and capability evaluation.
+The driver owns fixture translation and comparison.
+The Lambda extension association comes from the matrix registry;
+this binary does not invoke AWS Lambda or package an extension.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Scenario loading and validation, HTTP relay to the sidecar, verdict-tuple parsing, and the `DriverReport`/`ScenarioOutcome` data model. |
-| `src/main.rs` | CLI entry point: resolves the scenario root, reads the sidecar env vars, runs the driver, prints the JSON report, and sets the process exit code. |
+## Structure
 
-## Evaluation flow
+`src/lib.rs` contains the scenario models, directory walker, HTTP client,
+request builder, tuple extraction, report aggregation, and unit tests.
+`src/main.rs` resolves the corpus, reads sidecar environment variables,
+prints pretty JSON, and selects a process exit code.
+There are no internal Chio dependencies or separate kernel modules.
 
-1. `resolve_scenario_root` walks upward from the working directory for a
-   directory containing both `Cargo.toml` and
-   `crates/tooling/chio-conformance/verdict_matrix`, and returns
-   `<that>/scenarios`.
-2. `load_scenarios` walks the scenario tree, rejecting a symlinked root or
-   any symlinked file under it, sorts paths for determinism, and parses each
-   `.json` file into a `Scenario`, rejecting any `schema` other than
-   `chio.verdict-matrix.scenario.v1`.
-3. `run_driver` branches on whether a sidecar URL is configured. Unset or
-   empty: every scenario is reported `unsupported` with a diagnostic naming
-   `CHIO_VERDICT_MATRIX_SIDECAR_URL`. Set: `capability` and `revocation`
-   scenarios gate to `unsupported` up front (`sidecar_unsupported_reason`);
-   every other scenario goes through `evaluate_scenario`.
-4. `evaluate_scenario` builds a `chio-http-core::ChioHttpRequest`-shaped JSON
-   body (`scenario_to_http_request`) with a synthetic `x-chio-capability`
-   header, POSTs it to `<sidecar_url>/chio/evaluate`, and on a successful
-   response derives the verdict tuple (`tuple_from_evaluate_response`) from
-   `verdict.verdict` and the `receipt.metadata.verdict_matrix` block, falling
-   back to the deny reason when matrix metadata is absent.
-5. The derived tuple and the scenario's expected tuple are both normalized
-   (`VerdictTuple::normalized` sorts `scope_set`) and compared; any transport
-   error, non-success status, unparseable body, or tuple mismatch yields
-   `fail`.
-6. `run_driver` aggregates the per-scenario `ScenarioOutcome`s into a
-   `DriverReport`; `main.rs` prints it as pretty JSON on stdout and exits 2 on
-   a setup error, 1 if any scenario failed, 0 otherwise.
+## Data and control flow
 
-## Invariants and failure modes
+`resolve_scenario_root` walks upward from the current directory until it
+finds a Cargo manifest and the matrix directory. It returns the scenarios
+child path. `load_scenarios` validates the root, walks JSON files recursively,
+sorts paths, and deserializes each fixture. An empty tree yields an empty list.
 
-- Fails closed on any symlinked scenario root or symlinked file within the
-  scenario tree, before parsing.
-- Every scenario must declare `schema = "chio.verdict-matrix.scenario.v1"`;
-  any other value is a hard load error, not a skipped scenario.
-- "No sidecar configured" (`unsupported`) and "sidecar configured but
-  unreachable" (`fail`) are kept distinct outcomes; a misconfigured sidecar
-  can never read as a pass.
-- `capability` and `revocation` scenarios always gate to `unsupported`, even
-  against a reachable sidecar, because this relay has no signed
-  `CapabilityToken` builder and cannot produce a faithful verdict for
-  issuer/signature/time-validity checks.
-- `VerdictTuple` equality depends on `scope_set` order; both the actual and
-  expected tuples must go through `normalized()` before comparison.
-- `#![forbid(clippy::unwrap_used)]` and `#![forbid(clippy::expect_used)]`
-  apply to both `lib.rs` and `main.rs`; every fallible path returns a
-  `Result` or degrades to a reported outcome.
+`run_driver` trims the optional URL. An absent or empty URL creates only
+unsupported outcomes. With a URL, it creates a blocking client and gates
+capability/revocation categories before sending other cases sequentially.
+
+`scenario_to_http_request` assigns a fixed timestamp, synthetic IDs,
+an anonymous caller marked verified, and a tool path with percent-encoded
+segments. Read/get tool suffixes and `metrics.query` select GET; other tools
+select POST. The envelope itself always travels as a POST to the evaluator.
+Invalid `input_json` becomes null arguments. Nonempty non-GET bodies receive
+a synthetic all-zero hash. The capability header carries an unsigned ID
+and scope list.
+
+Successful HTTP responses pass through `tuple_from_evaluate_response`.
+It reads the verdict tag and matrix receipt metadata, with a deny-reason
+fallback and an empty scope list when metadata is absent.
+Actual and expected tuples have sorted scope vectors before equality.
+The report counts pass, fail, and unsupported outcomes separately.
+
+## Trust and invariants
+
+`load_scenarios` rejects symlinked roots and every encountered symlink,
+and checks the scenario schema string. Reads have no byte ceiling;
+traversal and later file opening are separate operations.
+`Scenario.requires` and `script.operation` are stored but do not select behavior.
+
+The HTTP client has a five-second timeout and targets the configured URL.
+This test URL bypasses the production egress-contract abstraction through
+explicit lint markers. Operators control its destination.
+Transport failures, non-success statuses, JSON parse errors, and tuple
+mismatches become failed outcomes. Capability and revocation scenarios
+always remain unsupported because signed token construction is unavailable.
+
+Response projection trusts the received JSON fields. It does not verify
+receipt signatures, enforce a response schema, or validate scope members;
+non-string scope array entries are filtered out.
+`normalized` sorts scope vectors without removing duplicate entries.
+A matching malformed response can only be assessed through its projected
+values, so tuple equality has a bounded wire-comparison meaning.
 
 ## Dependencies
 
-No internal `chio-*` crate dependencies: the driver cannot link kernel or
-guard code and can only reach a Chio evaluator over HTTP. External:
-`reqwest` (`blocking`, `json`, `rustls`) for the sidecar relay,
-`serde`/`serde_json` for the scenario and report models, `url` for
-percent-encoding tool-name path segments in the request path. Both `reqwest`
-call sites carry a `CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST` marker, the house
-convention for exempting an operator-supplied test URL from the
-`chio-egress-contract` production egress policy.
+`serde` and `serde_json` deserialize fixtures and serialize reports.
+`reqwest` supplies blocking JSON requests with rustls TLS support.
+`url::form_urlencoded::byte_serialize` encodes tool path segments.
+No Cargo features are declared by this package.
+
+## Verification
+
+Unit tests cover missing sidecar outcomes, unreachable loopback failures,
+symlink refusal, unsupported signed-token categories, request fields,
+path encoding, scope sorting, and response metadata/fallback projection.
+These tests use local fixtures and a refused loopback port.
+The conformance crate's `deployment_shape_smoke` target checks registry
+labels, sidecar gates, and source/README presence.
+
+Run `cargo test -p chio-verdict-matrix-driver-lambda --lib` from a repository
+checkout so corpus discovery can find the shared scenarios.
+A configured live sidecar changes the execution boundary; retained driver
+reports describe its attempted cases. Hosted Lambda behavior requires a
+separate invocation and environment qualification.

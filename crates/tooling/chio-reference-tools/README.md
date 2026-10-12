@@ -1,49 +1,74 @@
 # chio-reference-tools
 
-Three MCP servers over standard input and output, built to run inside the
-Chio cage as the wrapped servers of the reference runtime. Each one is
-single-threaded, reads one JSON-RPC object per line, never touches the
-environment or the network, and bounds every message. The
-`native_minimal_v1` syscall profile supports startup and the reference swarm's
-file reads. The reader's `list_directory` additionally needs `getdents64`,
-which is available in `native_standard_v1`; the reference provisioner currently
-selects the minimal profile and does not support directory enumeration.
+Three MCP stdio servers for the Chio cage reference runtime, plus a small
+library for implementing the same line-delimited JSON-RPC tool interface.
+The tools apply local path and byte limits; the cage and kernel supply process
+isolation, capability evaluation, guards, and signed receipts.
 
-| Binary | Arguments | Tools | Grants the launch policy needs |
-|--------|-----------|-------|--------------------------------|
-| `chio-tool-repo-reader` | `--root <directory>` | `list_directory`, `read_file`, `stat` | read access to the root |
-| `chio-tool-artifact-writer` | `--artifact <file>` | `write_file`, `read_file`, `stat`, each with `path` naming the artifact | read and write access to the one pre-created file |
-| `chio-tool-digest` | none | `sha256`, `canonical_json` | none |
+| Binary | Arguments | Tool surface |
+| --- | --- | --- |
+| `chio-tool-repo-reader` | `--root <absolute directory>` | `list_directory`, `read_file`, `stat` |
+| `chio-tool-artifact-writer` | `--artifact <absolute file>` | `write_file`, `read_file`, `stat` |
+| `chio-tool-digest` | None | `sha256`, `canonical_json` |
 
-The reader resolves every path inside its root and refuses `..`, absolute
-paths and symlinks that leave the root; a session reads at most 64 distinct
-files, 4 MiB in total and 256 KiB per call. The writer replaces the content
-of a file that exists before it starts, never creating, renaming or removing
-anything, and refuses any `path` other than that file. The digest tool needs
-no grant at all and is the control for the other two: if it cannot start,
-the host is the problem. The tool names and arguments follow the vocabulary
-the kernel's guards read (`read_file`, `write_file` and `stat` with `path`,
-writes with `content`), so the forbidden-path and secret-leak guards of an
-edge policy apply to them.
+## Usage
 
-## Building for the cage
+Serve a tool set over in-memory streams. `serve` also accepts locked stdin and
+stdout for a real stdio server. This example performs no file or network I/O.
 
-The cage admits a target executable either statically linked or with its
-interpreter and shared objects declared as runtime files. Build the tools
-static-PIE, the same way the cage helper is built, so the launch policy
-carries no runtime files:
+```rust
+use chio_reference_tools::{serve, ToolDescriptor, ToolError, ToolOutput, ToolServer};
+use serde_json::Value;
 
-```bash
-RUSTFLAGS="-C target-feature=+crt-static -C relocation-model=pie" \
-  cargo build --release --target x86_64-unknown-linux-gnu -p chio-reference-tools
+struct EmptyTools;
+impl ToolServer for EmptyTools {
+    fn name(&self) -> &str { "example" }
+    fn version(&self) -> &str { "1" }
+    fn tools(&self) -> Vec<ToolDescriptor> { Vec::new() }
+    fn call(&mut self, name: &str, _: &Value) -> Result<ToolOutput, ToolError> {
+        Err(ToolError::InvalidArguments(format!("unknown tool {name}")))
+    }
+}
+let input = br#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#;
+let mut output = Vec::new();
+serve(EmptyTools, &input[..], &mut output)?;
+let response: Value = serde_json::from_slice(&output)?;
+assert_eq!(response["result"], serde_json::json!({}));
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-Name the target explicitly: with it, the flags apply to the tools alone and
-the build's own procedural macros stay dynamically linked. The x86_64 GNU
-toolchain produces static position-independent images; the aarch64 GNU
-toolchain produces static fixed-address images, which the cage also admits
-as targets.
+This package declares no Cargo features. A caged launch needs read grants for
+the repository root or read/write grants for the artifact, as appropriate.
+Static targets need no declared runtime files; dynamic targets need their
+interpreter and shared objects included in the launch policy.
 
-`chio security provision-reference-runtime` checks the linkage of the target
-it binds and refuses a dynamically linked target whose runtime files are not
-declared.
+## Guarantees
+
+`serve` bounds request lines to `MAX_LINE_BYTES` (4 MiB), drains oversized
+frames, and resumes at the next line. `handle` dispatches initialize, ping,
+tool listing, and calls; notifications produce no reply. Argument errors use
+JSON-RPC invalid params, while refused/failed operations use `isError` results.
+
+`RepoReader::resolve` checks plain relative paths and canonical containment.
+Reads allow 64 distinct files, 4 MiB per session, and 256 KiB per call.
+`ArtifactWriter::require_artifact_path` requires the configured spelling;
+startup requires an existing regular file, and writes replace its content.
+The digest server caps text/canonical output at 1 MiB and canonicalizes JSON
+through `chio_core_types::canonical_json_string` before hashing.
+
+## Status
+
+Implemented reference tools with publication disabled. Local tests spawn the
+binaries directly and check protocol behavior and path/size refusal.
+Filesystem checks precede separate opens; host enforcement and runtime
+qualification establish the surrounding cage boundary. Directory enumeration
+also needs a syscall profile permitting `getdents64`.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol MCP surface](../../../spec/PROTOCOL.md#82-mcp-compatibility)
+- [Process runtime](../../kernel/chio-process/README.md)
+- [Conformance tooling](../chio-conformance/README.md)
+
+Licensed under [Apache-2.0](../../../LICENSE).

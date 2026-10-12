@@ -1,67 +1,72 @@
 # chio-spec-validate
 
-JSON Schema validator for Chio protocol artifacts. Compiles a schema from
-`spec/schemas/` and checks that a target document conforms, collecting every
-violation instead of stopping at the first. Ships as both a library
-(`chio_spec_validate`) and a CLI binary (`chio-spec-validate`).
-
-`cargo xtask validate-scenarios` uses this crate to gate the conformance
-scenarios under `tests/conformance/scenarios/` against their declared
-`$schema`. `chio-spec-codegen` is the sibling tool that turns the same
-`spec/schemas/` tree into generated Rust types; this crate only validates
-documents, it does not generate code.
-
-## Responsibilities
-
-- Load and parse a JSON file from disk (`load_json`), reporting I/O and parse
-  errors with the offending path attached.
-- Compile a JSON Schema and validate a document against it, returning every
-  violation message instead of failing on the first.
-- Resolve `$ref` only within the local `spec/schemas/` tree: sibling-file
-  references via a derived `file://` base URI, and absolute Chio schema-host
-  URIs (`chio.world`, `chio-protocol.dev`) via a retriever that falls back to
-  matching a schema's `$id` on disk when the URI does not map 1:1 to a file
-  path.
-- Fail closed on any `$ref` that would reach the network, escape the schema
-  root after canonicalization, or use an unrecognized URI scheme.
-
-## Public API
-
-- `validate(schema_path: &Path, doc_path: &Path) -> Result<(), ValidateError>`
-  - load both files from disk and validate.
-- `validate_value(schema_path: &Path, schema: &Value, doc_path: &Path, doc: &Value) -> Result<(), ValidateError>`
-  - validate in-memory `serde_json::Value`s; `schema_path` still drives
-    base-URI and schema-registry-root detection.
-- `load_json(path: &Path) -> Result<Value, ValidateError>`.
-- `ValidateError` - `Io`, `Json`, `SchemaCompile`, `SchemaViolation` variants;
-  implements `Display` and `std::error::Error`.
+`chio-spec-validate` checks JSON instances against JSON Schema definitions.
+It supplies the library used by xtask scenario and fixture gates and a binary
+that accepts a schema path and a document path. Schema paths also determine
+where local references may resolve.
 
 ## Usage
 
-```text
-chio-spec-validate <schema.json> <document.json>
-```
-
-Exit code `0` on success, `1` on I/O, parse, compile, or schema-violation
-failure, `2` on incorrect usage. Success prints `OK <document> -> <schema>` to
-stdout; failures print to stderr.
+Validate an in-memory instance using a self-contained schema:
 
 ```rust
 use std::path::Path;
-use chio_spec_validate::{validate, ValidateError};
+use chio_spec_validate::{validate_value, ValidateError};
+use serde_json::json;
 
-fn check(schema: &Path, doc: &Path) -> Result<(), ValidateError> {
-    validate(schema, doc)
-}
+let schema = json!({
+    "type": "object",
+    "required": ["id"],
+    "properties": {"id": {"type": "string", "minLength": 1}},
+    "additionalProperties": false
+});
+validate_value(
+    Path::new("<schema>"), &schema,
+    Path::new("<document>"), &json!({"id": "tool-1"}),
+)?;
+assert!(matches!(
+    validate_value(
+        Path::new("<schema>"), &schema,
+        Path::new("<document>"), &json!({"id": ""}),
+    ),
+    Err(ValidateError::SchemaViolation(_, _, _))
+));
+# Ok::<(), ValidateError>(())
 ```
 
-## Testing
+The CLI accepts exactly two positional paths. It prints
+`OK <document> -> <schema>` on success. Exit codes are 0 for success,
+1 for validation or loading failure, and 2 for incorrect arguments.
 
-`cargo test -p chio-spec-validate`
+## Guarantees
 
-## See also
+- `validate` loads both JSON files and delegates to `validate_value`.
+- `validate_value` distinguishes schema compilation failure from instance
+  violations and collects every message returned by `iter_errors`.
+- For schemas with a nonempty parent path, `LocalSchemaRetriever` resolves
+  Chio HTTPS identifiers from local files and rejects unregistered network
+  references. Canonical referenced paths must stay within the schema root.
+- `ValidateError` preserves the relevant file paths for I/O, JSON parse,
+  compilation, and validation errors.
 
-- `chio-spec-codegen` - generates Rust types from the same `spec/schemas/`
-  tree; this crate validates documents against it instead.
-- `xtask` - `validate-scenarios` and the fixture-generation path both drive
-  this crate.
+## Status
+
+This workspace package ships a library and binary and is marked
+`publish = false`. Callers provide trusted schemas. Validation checks the
+schema's assertions; runtime cryptographic verification, authorization, and
+canonical signed-payload parsing remain separate responsibilities.
+`load_json` uses ordinary `serde_json` parsing and reads the whole file.
+
+`cargo test -p chio-spec-validate` exercises local references, network
+refusal, protocol artifacts, and positive and negative scenario fixtures.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Serialization contract](../../../spec/PROTOCOL.md#4-serialization-and-identity)
+- [Schema generator](../chio-spec-codegen/README.md)
+- [Workspace task runner](../../../xtask/README.md)
+
+## License
+
+[Apache-2.0](../../../LICENSE)
