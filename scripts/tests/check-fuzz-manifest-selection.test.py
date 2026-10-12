@@ -81,6 +81,32 @@ with tempfile.TemporaryDirectory() as temporary:
         text=True,
     )
     assert (directory / "fired.txt").read_text() == ""
+
+    gate_start = workflow.index("        run: |\n", workflow.index(
+        "- name: Fail if no targets fired (changed-target mode)"
+    )) + len("        run: |\n")
+    gate_end = workflow.index("\n\n", gate_start)
+    no_target_gate = "\n".join(
+        line[10:] for line in workflow[gate_start:gate_end].splitlines()
+    )
+    for changed, passes in [
+        ("crates/store/chio-store-sqlite/tests/receipt_query_snapshot.rs\n", True),
+        ("crates/core/chio-core/src/receipt/tests/fixtures.rs\n", True),
+        ("crates/core/chio-core/src/receipt_tests.rs\ndocs/fuzzing/README.md\n", True),
+        ("crates/core/chio-core/README.md\nspec/schemas/x.json\n", True),
+        ("crates/core/chio-core/src/lib.rs\n", False),
+        ("crates/core/chio-core/tests/a.rs\ncrates/core/chio-core/build.rs\n", False),
+        ('"crates/core/chio-core/src/\\303\\251.rs"\n', False),
+        ("", False),
+    ]:
+        (directory / "changed.txt").write_text(changed)
+        result = subprocess.run(
+            ["bash", "-euc", no_target_gate],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+        )
+        assert (result.returncode == 0) == passes, (changed, result.stderr)
 print(
     f"fuzz manifest selection passed ({len(paths)} tracked manifests plus future-member controls)"
 )
