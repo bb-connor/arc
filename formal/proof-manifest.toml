@@ -237,15 +237,16 @@ excluded_surfaces = [
 notes = [
   "The implementation-linked protocol core is the pure security decision surface plus bounded models for adjacent state transitions. Concrete platform effects are tracked as audited assumptions.",
   "The budget-admission and revocation-projection public Kani harnesses verify shared scalar projection functions called by both production backends or callers; they do not verify storage IO, mutation journals, snapshot freshness, or reservation-ledger transitions. The separate budget checked-add harness remains model-level.",
-  "Reservation conservation has four independent enforcement surfaces: bounded Apalache interleavings, the pure ledger_apply transition with Kani, Creusot, and Lean witnesses, a debug-only concrete monetary-journal replay plus runtime-metadata check, and a stateful InMemoryBudgetStore property test. A separate public Kani harness pins ledger_is_terminal to no outstanding reservation plus at least one non-zero terminal disposition. The store test does not drive kernel lifecycle or receipts; the in-kernel drop_guard_disposition_table separately exercises the production hook and guard. The pure classifier and scalar admission are linked; production ledger linkage is not established.",
+  "Reservation conservation retains four separately scoped evidence surfaces: historical bounded Apalache interleavings, pure ledger_apply witnesses, a debug-only monetary-journal replay, and a stateful InMemoryBudgetStore test. The public ledger_is_terminal harness checks its scalar classifier. The store test does not drive kernel lifecycle or receipts; the prior drop_guard_disposition_table is historical guard-fixture evidence. Current PostEffectObligation, preparation failure and retained recovery transitions are not refined by that model or fixture. The pure classifier and scalar admission remain linked; production ledger linkage is not established.",
   "Lean assets are release evidence only when root-imported, sorry-free, and mapped to property_matrix entries.",
   "Creusot and Kani are required strict-CI lanes for production implementation linkage; public Kani harnesses target verify_capability, NormalizedScope::is_subset_of, resolve_matching_grants, evaluate, sign_receipt, and the shared budget and revocation admission projections.",
   "Aeneas production extraction pairs every registered decision-core, reservation-ledger, Merkle-walk, and economy-conversion function with a generated Lean equivalence theorem. Economy evidence proves scalar ceil and floor rounding only; collection conservation, production netting absorption, and P11 remain outside that theorem. The ledger theorem reaches the bounded transition model, while concrete runtime store linkage remains outside it.",
-  "The post-admission drop lifecycle is model-checked at two invocations and one buffered child per invocation. Its evidence requires both a positive NoError result and every paired negative mutation producing a registered ITF counterexample.",
+  "PostAdmissionDropGuard is the retained historical two-invocation, one-child lifecycle model. Its existing positive runs and paired negative ITF witnesses apply to those unchanged transitions. Current post-effect ownership, retained child barriers, authenticated append readback, idle recovery, preparation failures and evidence capacity are source-review anchors only; current lifecycle refinement and recovery liveness remain unproved.",
   "RevocationPropagation is checked nightly against callback-complete, canonical, signed traces captured at real kernel revocation commit, revocation admission, and receipt append boundaries. The full-state ITF is the sole state input, Apalache evaluates four non-vacuous invariant witnesses, every invariant has a registered real-runtime negative calibration, and ASSUME-TRACE-OBSERVER remains the explicit callback-completeness boundary.",
   "The cognition-market challenge slash allocator is covered by its registered public Kani harness in the multi-crate PR lane.",
   "Release-facing formal claims must name this manifest, the theorem inventory, and the audited assumptions.",
-  "ReceiptBeforeAllow proves the abstract persist-before-publish ordering and its production replay exercises the native happy path. It does not discharge concrete cross-row crash recovery, which remains excluded until implementation trace validation and crash-reopen conservation gates establish refinement.",
+  "ReceiptBeforeAllow retains abstract persist-before-publish ordering. Current anchors separate PreparedResponse construction, the obligation-owned append and Discharged delivery. Buffered evidence and durable-saga custody do not establish a persisted allow receipt. Earlier production replay is bounded historical evidence; current recovery, exact identity/readback and cross-row crash refinement remain unproved.",
+  "KERN2 anchor remaps record source review, not a renewal of model proofs. New or remapped zero digests are explicit pending final-source records and keep formal-mirrors failing until reviewed hash renewal. MonotoneLogApalache remains a bounded model-clock example; deferred or prebuilt receipts and ASSUME-OS-CLOCK do not establish strict production timestamp order.",
   "Manual Rust-to-model hashes are enforced by cargo xtask check formal-mirrors; transliteration and abstraction-anchor records require review, but matching hashes do not prove semantic equivalence or modeled properties.",
   "The Rust relying-party inclusion walk is bound to the symbolic Lean walk by paired manual-mirror hashes, an authenticated generated-output Aeneas theorem for the scalar step, bounded Kani parity with unwinding assertions over runtime-cross-checked fixtures for every size from 1 through 8, and required Rust-TypeScript tamper differentials. Hash collision resistance remains ASSUME-SHA256.",
   "The treaty PredicateLang is a bounded post-validation abstraction over production-shaped federation inputs. Its Lean abstraction anchors are drift tripwires, not a Rust refinement proof.",
@@ -941,12 +942,16 @@ model_file = "formal/apalache/MonotoneLogApalache.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs"
-rust_symbols = ["ChioKernel::record_chio_receipt"]
-normalized_sha256 = "d0c18f06b977020e1fa0a885eb5a0cf6caaf319c35ad698803c5b73e5ddcb5a8"
-symbol_sha256 = [
-  { symbol = "ChioKernel::record_chio_receipt", sha256 = "c6f43e5b2cf0e7c02874d39c93f67b1bbb94039aaef2d3b9133e3611776c01b5" },
+rust_symbols = [
+  "ChioKernel::record_chio_receipt",
+  "ChioKernel::append_terminal_receipt_during_trace_transition",
 ]
-
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "ChioKernel::record_chio_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::append_terminal_receipt_during_trace_transition", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
 [[mirror]]
 model_file = "formal/apalache/MonotoneLogApalache.tla"
 model_kind = "tla"
@@ -1011,27 +1016,34 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/responses/allow_responses.rs"
 rust_symbols = [
-  "ChioKernel::build_allow_response_with_metadata_and_payee_binding",
+  "ChioKernel::prepare_allow_response_with_metadata_and_payee_binding",
   "ChioKernel::build_execution_nonce_preflight_allow_response_with_metadata",
 ]
-normalized_sha256 = "287ab331affe8e66c05c7de8f45a70ac4d400bf4224088e0ccad29e2a859ddb5"
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 symbol_sha256 = [
-  { symbol = "ChioKernel::build_allow_response_with_metadata_and_payee_binding", sha256 = "a12987fd07f60468784fbe581bb9113323b917411d672a70594972bc2afe1783" },
-  { symbol = "ChioKernel::build_execution_nonce_preflight_allow_response_with_metadata", sha256 = "a4eac7d9ee6e4b4b4a1926a055d912e131b252bb0134aee20783974104a833c2" },
+  { symbol = "ChioKernel::prepare_allow_response_with_metadata_and_payee_binding", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::build_execution_nonce_preflight_allow_response_with_metadata", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
 ]
-
 [[mirror]]
 model_file = "formal/apalache/ReceiptBeforeAllow.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs"
-rust_symbols = ["ChioKernel::record_chio_receipt_with_federation", "ChioKernel::record_chio_receipt"]
-normalized_sha256 = "3b1dab5be0eb28f751d9d7db8dd05022e4b795a1af07a5c2e051a485a9f41e30"
-symbol_sha256 = [
-  { symbol = "ChioKernel::record_chio_receipt_with_federation", sha256 = "46f119d784a14e3bd7ff476d1b28125f8001dfca6dff90650ee3155da6154323" },
-  { symbol = "ChioKernel::record_chio_receipt", sha256 = "c6f43e5b2cf0e7c02874d39c93f67b1bbb94039aaef2d3b9133e3611776c01b5" },
+rust_symbols = [
+  "ChioKernel::record_chio_receipt_with_federation",
+  "ChioKernel::record_chio_receipt",
+  "ChioKernel::append_terminal_receipt_during_trace_transition",
+  "ChioKernel::project_acknowledged_receipt_during_trace_transition",
 ]
-
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "ChioKernel::record_chio_receipt_with_federation", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::record_chio_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::append_terminal_receipt_during_trace_transition", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::project_acknowledged_receipt_during_trace_transition", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
 [[mirror]]
 model_file = "formal/apalache/KernelTransitionCancelSafe.tla"
 model_kind = "tla"
@@ -1078,31 +1090,23 @@ rust_symbols = [
   "PostAdmissionDropGuard",
   "PostAdmissionDropGuard::new",
   "PostAdmissionDropGuard::with_durable_operation",
-  "PostAdmissionDropGuard::child_receipts_mut",
-  "PostAdmissionDropGuard::record_buffered_child_receipts",
-  "PostAdmissionDropGuard::mark_dispatch_started",
   "PostAdmissionDropGuard::disarm",
   "PostAdmissionDropGuard::handle_pre_dispatch_drop",
-  "PostAdmissionDropGuard::flush_buffered_child_receipts_from_drop",
   "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
   "PostAdmissionDropGuard::drop",
 ]
-normalized_sha256 = "ff9c45b35423f415e0d8b640f39a89aa21f68ef18510121db295ae8d1d3eda90"
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 symbol_sha256 = [
-  { symbol = "PostAdmissionReceiptContext", sha256 = "84155728c35fa1783115e17afdf15eed7941dec248d0f059a62f4cdfe5523c5f" },
-  { symbol = "PostAdmissionDropGuard", sha256 = "40f01e0464d243c87700e9751b8bd44283c3b58ff886d5a1a323fd5037c5bc80" },
-  { symbol = "PostAdmissionDropGuard::new", sha256 = "85e078915fc85ba889499526e3998adf7ed687a9212d7fc42f0fb8e9846e54f4" },
-  { symbol = "PostAdmissionDropGuard::with_durable_operation", sha256 = "075ee346bdcb7602fd9396c62e115ac78fb0ada7fbac6731d6a5ff4086c37ce3" },
-  { symbol = "PostAdmissionDropGuard::child_receipts_mut", sha256 = "67a778416d3f4ada4845c394f3b3d5ae25e54d2c1a7665c25d5deb622aba4518" },
-  { symbol = "PostAdmissionDropGuard::record_buffered_child_receipts", sha256 = "17c58730b5aae4613dcc0c5c7f7a77f74859a40a78caee8ebd72f402191aab99" },
-  { symbol = "PostAdmissionDropGuard::mark_dispatch_started", sha256 = "ddf846b1fd9df7b56e38061cef9c9513b037d75bd9635a2a7004ac2c00940b93" },
-  { symbol = "PostAdmissionDropGuard::disarm", sha256 = "133f33f226e614fc6cd6565ac33e34a806f13b4c105d2ab4c2ce605a170f70e0" },
-  { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "1ee920b401ffec48a1aaa329050f265ada92298a4c3321cc2f55a9d2a5a347e5" },
-  { symbol = "PostAdmissionDropGuard::flush_buffered_child_receipts_from_drop", sha256 = "aa8f87860c57de6d2c77bf22d85e8537b77a983c4b8774f8b0db74ca53a6378b" },
-  { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "ed39a4785d10067d698766bd199665597354e85efa45151e1feb0b3cae8b2c32" },
-  { symbol = "PostAdmissionDropGuard::drop", sha256 = "2f97e0416af6170dcf8dc9be9451c430cc8e243973c7c9279b25946bb99f696d" },
+  { symbol = "PostAdmissionReceiptContext", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostAdmissionDropGuard", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostAdmissionDropGuard::new", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostAdmissionDropGuard::with_durable_operation", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostAdmissionDropGuard::disarm", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostAdmissionDropGuard::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
 ]
-
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
@@ -1139,29 +1143,13 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/mod.rs"
 rust_symbols = [
-  "SessionNestedFlowBridge",
-  "SessionNestedFlowBridge::complete_child_request_with_receipt",
-  "SessionNestedFlowBridge::list_roots",
-  "SessionNestedFlowBridge::create_message",
-  "SessionNestedFlowBridge::create_elicitation",
-  "SessionNestedFlowBridge::notify_elicitation_completed",
-  "SessionNestedFlowBridge::notify_resource_updated",
-  "SessionNestedFlowBridge::notify_resources_list_changed",
   "SecurityPreDispatchHook",
 ]
-normalized_sha256 = "9b53111c9525fe63e342c6c2e6bad5a7637a1b43394b342c2ee7915b4e6eb03c"
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 symbol_sha256 = [
-  { symbol = "SessionNestedFlowBridge", sha256 = "35e67ea181db7209ed0606da2095bec3820a73f68fcf8c8aedb416bfea3c5bd7" },
-  { symbol = "SessionNestedFlowBridge::complete_child_request_with_receipt", sha256 = "e8e5637b30e7752ff14f1ecd6bbf888b8b6aef00b144dbdb57326d2612739b5e" },
-  { symbol = "SessionNestedFlowBridge::list_roots", sha256 = "04ac0df00e30b56fbcc29d12be991ac6b96abd3c9e603105e4b7874f96d34e39" },
-  { symbol = "SessionNestedFlowBridge::create_message", sha256 = "92f5b6995cb8c446148dc563a5752607737861617b67054e25b98e23e44a8d4e" },
-  { symbol = "SessionNestedFlowBridge::create_elicitation", sha256 = "4a3ef4900f76881ab5622c8f4875c6fd9dc85d8ba9993edcebe3d835f996dae5" },
-  { symbol = "SessionNestedFlowBridge::notify_elicitation_completed", sha256 = "1928b74be1a09f8de7636bc0ff2eaa25e55b69b3c68e3db7217865073610a05f" },
-  { symbol = "SessionNestedFlowBridge::notify_resource_updated", sha256 = "e4c4bf3de4a2e70c0d6b505cd3b8efdedbe048a1bdfb8b3c19b63a1c0f51e632" },
-  { symbol = "SessionNestedFlowBridge::notify_resources_list_changed", sha256 = "2e5619de0749629c1ef39aa3f119694a31fd81f80877ce1b0e5a7d455bd63d93" },
-  { symbol = "SecurityPreDispatchHook", sha256 = "32b36922d126b7536812fd523eba08d4f3bd45634cec7ef2ea4ad008fcebb500" },
+  { symbol = "SecurityPreDispatchHook", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
 ]
-
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
@@ -1209,20 +1197,18 @@ relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/dispatch.rs"
 rust_symbols = [
   "ChioKernel::revalidate_immediately_before_dispatch",
-  "ChioKernel::record_child_receipt",
   "ChioKernel::release_runtime_admission_reservations",
   "ChioKernel::mark_runtime_admission_reservations_retained_fail_closed",
   "ChioKernel::wait_for_runtime_admission_dispatch_readiness",
 ]
-normalized_sha256 = "29dabbe1e6535dfbc2255dec206df8e751516f0572f73302f213aaa2ede7924f"
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 symbol_sha256 = [
-  { symbol = "ChioKernel::revalidate_immediately_before_dispatch", sha256 = "bac2f9f7f000beedf795c3af5379712918242d1ef2154a091a48e671826fe046" },
-  { symbol = "ChioKernel::record_child_receipt", sha256 = "bc3d82e5b1d2e5b433524757e62be0d7cc20a1534746b967dc8a8f8519cbde7a" },
-  { symbol = "ChioKernel::release_runtime_admission_reservations", sha256 = "8bd9f0694609edd241bb6b970bc6b74a9d00b01471f7e487772a78acbc30e757" },
-  { symbol = "ChioKernel::mark_runtime_admission_reservations_retained_fail_closed", sha256 = "e9097e16d978d4faf00ab5d131a60be98f0ac5079e80201385e33c51d1db0ff1" },
-  { symbol = "ChioKernel::wait_for_runtime_admission_dispatch_readiness", sha256 = "e8d294dbcf7a17f8bebd651898723bc3ea799562b29cc39f6e6752b364d7b843" },
+  { symbol = "ChioKernel::revalidate_immediately_before_dispatch", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::release_runtime_admission_reservations", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::mark_runtime_admission_reservations_retained_fail_closed", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::wait_for_runtime_admission_dispatch_readiness", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
 ]
-
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
@@ -1309,10 +1295,11 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/responses/finalization.rs"
-rust_symbols = ["ChioKernel::finalize_tool_output_with_metadata_and_payee_binding"]
-normalized_sha256 = "ce356f229204fe0312eaacd895786591a9d78e41e573d31e8a60325bdda37f10"
+rust_symbols = ["ChioKernel::prepare_tool_output_with_metadata_and_payee_binding"]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 symbol_sha256 = [
-  { symbol = "ChioKernel::finalize_tool_output_with_metadata_and_payee_binding", sha256 = "53f46e52f29196251107a24462bd5bb316eb7527ada320e9570c4a195e2da47b" },
+  { symbol = "ChioKernel::prepare_tool_output_with_metadata_and_payee_binding", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
 ]
 
 [[mirror]]
@@ -2078,33 +2065,31 @@ rust_symbols = [
   "SecurityDispatchOutcomeHandle::validate_context",
   "SecurityRequestLifecycleHandle",
   "SecurityRequestLifecycleHandle::new",
-  "SecurityRequestLifecycleHandle::finish_response",
   "SecurityRequestLifecycleHandle::ensure_final_release",
-  "SecurityRequestLifecycleHandle::ensure_final_release_for", "SecurityRequestLifecycleHandle::validate_release_context",
+  "SecurityRequestLifecycleHandle::ensure_final_release_for",
+  "SecurityRequestLifecycleHandle::validate_release_context",
   "SecurityRequestLifecycleHandle::drop",
 ]
-normalized_sha256 = "8bb347614bb150e20189dab5d543eddb9e23dee6018e64f6ce0f77f0ffa131f9"
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 symbol_sha256 = [
-  { symbol = "callback", sha256 = "1ce4cd889d8893c5191026667fc496edef1a994b06e236567a294aba14b8a3f2" },
-  { symbol = "record_outcome", sha256 = "44072ca6d22fb3e8e9bf83dddc82bcf31c809aef8b62026cef343b1425103128" },
-  { symbol = "SecurityDispatchOutcomeHandle::new", sha256 = "e86490cf57e036257c929713c131048c3bf9dd35b5c0eeaf46abcb5a44600d59" },
-  { symbol = "SecurityDispatchOutcomeHandle::mark_dispatch_started", sha256 = "097b6b9e36822fdeb106cde85a671bea06e3f63cc147233a5dc614cbf229a0d0" },
-  { symbol = "SecurityDispatchOutcomeHandle::record", sha256 = "ef35dae7673e49f7a1ef159a8d6966a19512ecd9a3a43f6d84d6bfb6dff8c2eb" },
-  { symbol = "SecurityDispatchOutcomeHandle::record_released", sha256 = "41163ad88ebb5a425a1957e3192bc8cf06c6d442cbd8781c3de310f10ca4f41e" },
-  { symbol = "SecurityDispatchOutcomeHandle::record_dispatch_failed", sha256 = "aa33e59071364465aa2efbd74d08db3b7099bfa605496e3b18ff95a614b5ceba" },
-  { symbol = "SecurityDispatchOutcomeHandle::record_outcome_unknown_after_dispatch", sha256 = "00fd2a40406e65394c21490484f3b57eb3f3a27918cb903824827593bfba9e89" },
-  { symbol = "SecurityDispatchOutcomeHandle::drop", sha256 = "7d8a9f556555d8823266d90f1df4eddf1a1dc3904d77edd99ea47c4e92f2be29" },
-  { symbol = "SecurityDispatchOutcomeHandle::validate_context", sha256 = "a189ed6484b0a5d6f04265114433b1cfc50e884017eb9623b5efe0746c01e116" },
-  { symbol = "SecurityRequestLifecycleHandle", sha256 = "fc0107049e7ee5a7229d2f9babd8789c4bd2e716ad05e87fd1ebdedf2659253b" },
-  { symbol = "SecurityRequestLifecycleHandle::new", sha256 = "4916868babe3adc3b09b452480950321e1caa0b60909027e9f2591b840a17fde" },
-  { symbol = "SecurityRequestLifecycleHandle::finish_response", sha256 = "4ebafb65a75ec166e50afa47efb92e0f25722588b07f3fe4ca635104d720ed6f" },
-  { symbol = "SecurityRequestLifecycleHandle::ensure_final_release", sha256 = "ce0e2d05ef075dcc6cbc95195a9b83c7cfa8c797b03d00aa0ab3001b0b0822c5" },
-  { symbol = "SecurityRequestLifecycleHandle::ensure_final_release_for", sha256 = "181c2bf411a49bb998fce2f7621fe76c6d5d3c946ee6d8384e83a930867ccaef" },
-  { symbol = "SecurityRequestLifecycleHandle::validate_release_context", sha256 = "7f1d33e9e1b046e2bc2ae2baab4173683bc8970655c86cfe028f54ef25fa6ca3" },
-  { symbol = "SecurityRequestLifecycleHandle::drop", sha256 = "6062fa97976082932f327c157e9173750857adea9e0d3d7a8df919077654f8f3" },
+  { symbol = "callback", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "record_outcome", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityDispatchOutcomeHandle::new", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityDispatchOutcomeHandle::mark_dispatch_started", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityDispatchOutcomeHandle::record", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityDispatchOutcomeHandle::record_released", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityDispatchOutcomeHandle::record_dispatch_failed", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityDispatchOutcomeHandle::record_outcome_unknown_after_dispatch", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityDispatchOutcomeHandle::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityDispatchOutcomeHandle::validate_context", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityRequestLifecycleHandle", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityRequestLifecycleHandle::new", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityRequestLifecycleHandle::ensure_final_release", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityRequestLifecycleHandle::ensure_final_release_for", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityRequestLifecycleHandle::validate_release_context", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SecurityRequestLifecycleHandle::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
 ]
-
-
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
@@ -3583,13 +3568,16 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_helpers.rs"
-rust_symbols = ["ChioKernel::deny_changed_ordinary_recovery_status", "ChioKernel::build_execution_nonce_authorization_reserving_response"]
-normalized_sha256 = "940143b5b06431ba7ca851ef370a8ccdd938a538035a43c009922c8f122f3b6b"
-symbol_sha256 = [
-  { symbol = "ChioKernel::deny_changed_ordinary_recovery_status", sha256 = "b885fa039d6a8df006cb2b54247ace1cf9b64ef37faeffbd487adf60496f4b44" },
-  { symbol = "ChioKernel::build_execution_nonce_authorization_reserving_response", sha256 = "503335637f275fe531ab5934f4a6359034ca00c75420a1d744cce3d8264b7aa4" },
+rust_symbols = [
+  "ChioKernel::prepare_changed_ordinary_recovery_status",
+  "ChioKernel::build_execution_nonce_authorization_reserving_response",
 ]
-
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "ChioKernel::prepare_changed_ordinary_recovery_status", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::build_execution_nonce_authorization_reserving_response", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
@@ -4176,12 +4164,13 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/return_recording.rs"
-rust_symbols = ["EvaluationReturnRecording", "ChioKernel::record_evaluation_return", "ChioKernel::timed_dispatch"]
-normalized_sha256 = "6fed4be626723e3fca44bab9fc07309f9e290f8045f0a7ef6d50f27d11ca4faa"
+rust_symbols = [
+  "ChioKernel::timed_dispatch",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 symbol_sha256 = [
-  { symbol = "EvaluationReturnRecording", sha256 = "bd9d64559dd447c8edbf518c18111b036ee716398ffa24463a8c67c5433fa325" },
-  { symbol = "ChioKernel::record_evaluation_return", sha256 = "cbd2eabf2593cfa2d93f5c566fbb72904ce9b114b78da71f3e2d7aa85e89eddb" },
-  { symbol = "ChioKernel::timed_dispatch", sha256 = "b01aae3f4d4ca873112ca187b84b4401add6c3d7110cbc12e9d9c8906c1fc006" },
+  { symbol = "ChioKernel::timed_dispatch", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
@@ -4564,4 +4553,266 @@ normalized_sha256 = "ddc28eea1a908f12eb250e033de9467c8d9542cb3ca518b6aaf1a1dda62
 symbol_sha256 = [
   { symbol = "transition_occupied", sha256 = "28c6249ba674038fe761a608c871de4f0565a1294dd56c17ad16f9e086aabf2c" },
   { symbol = "fence_occupied", sha256 = "b5bd8b301c0b207f724f66cce0955f13c303da217fb83d09b7c32e7fc0924f94" },
+]
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/nested_flow_bridge.rs"
+rust_symbols = [
+  "SessionNestedFlowBridge",
+  "SessionNestedFlowBridge::complete_child_request_with_receipt",
+  "SessionNestedFlowBridge::list_roots",
+  "SessionNestedFlowBridge::create_message",
+  "SessionNestedFlowBridge::create_elicitation",
+  "SessionNestedFlowBridge::notify_elicitation_completed",
+  "SessionNestedFlowBridge::notify_resource_updated",
+  "SessionNestedFlowBridge::notify_resources_list_changed",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "SessionNestedFlowBridge", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SessionNestedFlowBridge::complete_child_request_with_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SessionNestedFlowBridge::list_roots", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SessionNestedFlowBridge::create_message", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SessionNestedFlowBridge::create_elicitation", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SessionNestedFlowBridge::notify_elicitation_completed", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SessionNestedFlowBridge::notify_resource_updated", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "SessionNestedFlowBridge::notify_resources_list_changed", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation.rs"
+rust_symbols = [
+  "PostEffectInputs",
+  "PostEffectObligation",
+  "Discharged",
+  "Delivery",
+  "PostEffectObligation::enter",
+  "PostEffectObligation::nested_receipt_sinks",
+  "PostEffectObligation::commit_terminal_receipt",
+  "PostEffectObligation::fail",
+  "PostEffectObligation::buffer",
+  "PostEffectObligation::drop",
+  "Discharged::deliver",
+  "Discharged::drop",
+  "run_post_effect",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "PostEffectInputs", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostEffectObligation", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "Discharged", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "Delivery", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostEffectObligation::enter", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostEffectObligation::nested_receipt_sinks", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostEffectObligation::commit_terminal_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostEffectObligation::fail", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostEffectObligation::buffer", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostEffectObligation::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "Discharged::deliver", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "Discharged::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "run_post_effect", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation/post_effect.rs"
+rust_symbols = [
+  "run",
+  "flush_children",
+  "record_durable_return",
+  "prepare_ordinary",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "run", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "flush_children", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "record_durable_return", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "prepare_ordinary", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation/preparation.rs"
+rust_symbols = [
+  "DischargeBinding",
+  "DischargeBinding::validate_receipt",
+  "PreparedPostEffect",
+  "PostEffectPreparation",
+  "ChioKernel::prepare_post_effect",
+  "fault_response",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "DischargeBinding", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "DischargeBinding::validate_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PreparedPostEffect", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PostEffectPreparation", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::prepare_post_effect", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "fault_response", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation/publication.rs"
+rust_symbols = [
+  "ReceiptAppendFailure",
+  "ReceiptCommit",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "ReceiptAppendFailure", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ReceiptCommit", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation/recovery.rs"
+rust_symbols = [
+  "PendingPostEffectEvidence",
+  "PendingChildReceipt",
+  "UnknownChildAppend",
+  "PendingPostEffectRecord",
+  "EvidenceQueue::buffer",
+  "EvidenceRecovery::ensure_clear",
+  "EvidenceRecovery::matches_resources",
+  "EvidenceRecovery::drop",
+  "recover",
+  "EvidenceRecoveryResources::flush",
+  "EvidenceRecoveryResources::flush_locked",
+  "EvidenceRecoveryResources::resolve_submitted",
+  "EvidenceRecoveryResources::flush_children",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "PendingPostEffectEvidence", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PendingChildReceipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "UnknownChildAppend", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PendingPostEffectRecord", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "EvidenceQueue::buffer", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "EvidenceRecovery::ensure_clear", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "EvidenceRecovery::matches_resources", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "EvidenceRecovery::drop", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "recover", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "EvidenceRecoveryResources::flush", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "EvidenceRecoveryResources::flush_locked", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "EvidenceRecoveryResources::resolve_submitted", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "EvidenceRecoveryResources::flush_children", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation/runtime.rs"
+rust_symbols = [
+  "ChioKernel::acquire_post_effect_evidence_slot",
+  "ChioKernel::buffer_post_effect_evidence",
+  "ChioKernel::ensure_post_effect_evidence_latch_clear",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "ChioKernel::acquire_post_effect_evidence_slot", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::buffer_post_effect_evidence", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::ensure_post_effect_evidence_latch_clear", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/responses/prepared_response.rs"
+rust_symbols = [
+  "PreparedResponse",
+  "PreparedResponse::terminal",
+  "PreparedResponse::allow",
+  "PreparedResponse::finish_delivery",
+  "ChioKernel::publish_prepared_response",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "PreparedResponse", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PreparedResponse::terminal", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PreparedResponse::allow", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PreparedResponse::finish_delivery", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::publish_prepared_response", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/validation/tool_output.rs"
+rust_symbols = [
+  "ChioKernel::prepare_budgeted_tool_output_with_cost_and_metadata",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "ChioKernel::prepare_budgeted_tool_output_with_cost_and_metadata", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
+[[mirror]]
+model_file = "formal/apalache/ReceiptBeforeAllow.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation.rs"
+rust_symbols = [
+  "PostEffectObligation::commit_terminal_receipt",
+  "Discharged::deliver",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "PostEffectObligation::commit_terminal_receipt", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "Discharged::deliver", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
+[[mirror]]
+model_file = "formal/apalache/ReceiptBeforeAllow.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/responses/prepared_response.rs"
+rust_symbols = [
+  "PreparedResponse",
+  "PreparedResponse::terminal",
+  "PreparedResponse::allow",
+  "PreparedResponse::finish_delivery",
+  "ChioKernel::publish_prepared_response",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "PreparedResponse", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PreparedResponse::terminal", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PreparedResponse::allow", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "PreparedResponse::finish_delivery", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "ChioKernel::publish_prepared_response", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+]
+[[mirror]]
+model_file = "formal/apalache/MonotoneLogApalache.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/effect_obligation/recovery.rs"
+rust_symbols = [
+  "EvidenceRecoveryResources::flush_locked",
+  "EvidenceRecoveryResources::resolve_submitted",
+  "EvidenceRecoveryResources::project",
+]
+# Pending final-source digest review; zero hashes keep the drift gate failing.
+normalized_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+symbol_sha256 = [
+  { symbol = "EvidenceRecoveryResources::flush_locked", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "EvidenceRecoveryResources::resolve_submitted", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
+  { symbol = "EvidenceRecoveryResources::project", sha256 = "0000000000000000000000000000000000000000000000000000000000000000" },
 ]

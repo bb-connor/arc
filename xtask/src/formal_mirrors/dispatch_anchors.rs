@@ -525,11 +525,16 @@ const CALLER_SHARE_SOURCES: &[RequiredSource] = &[
 
 const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
     RequiredSource {
-        path: "crates/kernel/chio-kernel/src/kernel/evaluation/return_recording.rs",
+        path: "crates/kernel/chio-kernel/src/kernel/effect_obligation.rs",
         symbols: &[
-            "EvaluationReturnRecording",
-            "ChioKernel::record_evaluation_return",
+            "PostEffectInputs",
+            "PostEffectObligation::commit_terminal_receipt",
+            "Discharged::deliver",
         ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/effect_obligation/post_effect.rs",
+        symbols: &["record_durable_return"],
     },
     RequiredSource {
         path: "crates/platform/chio-control-plane/src/security/adapters/flow_dispatch.rs",
@@ -701,7 +706,6 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "SecurityDispatchOutcomeHandle::validate_context",
             "SecurityRequestLifecycleHandle",
             "SecurityRequestLifecycleHandle::new",
-            "SecurityRequestLifecycleHandle::finish_response",
             "SecurityRequestLifecycleHandle::ensure_final_release",
             "SecurityRequestLifecycleHandle::ensure_final_release_for", "SecurityRequestLifecycleHandle::validate_release_context",
             "SecurityRequestLifecycleHandle::drop",
@@ -1315,7 +1319,7 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_helpers.rs",
-        symbols: &["ChioKernel::deny_changed_ordinary_recovery_status"],
+        symbols: &["ChioKernel::prepare_changed_ordinary_recovery_status"],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/authority_profile.rs",
