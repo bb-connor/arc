@@ -260,12 +260,10 @@ describe("wrapWithChio", () => {
 /// response does not produce them; they are the output of verification.
 function evaluateResponseBody(receiptId = "r-1") {
   return {
-    verdict: "allow",
-    receipt_id: receiptId,
-    decision: "allow",
+    verdict: { verdict: "allow" },
     receipt: {
       id: receiptId,
-      decision: { verdict: "allow" },
+      verdict: { verdict: "allow" },
       signed_body: "stub",
     },
   };
@@ -404,7 +402,7 @@ describe("receipt authority verification", () => {
     const parsed = JSON.parse(verifyBodies[0]!);
     expect(parsed).toEqual({
       id: "r-verify",
-      decision: { verdict: "allow" },
+      verdict: { verdict: "allow" },
       signed_body: "stub",
     });
     expect(parsed.receipt).toBeUndefined();
@@ -603,8 +601,8 @@ describe("receipt authority verification", () => {
     // was provided and the fetch fallback is disabled on edge.
     mock.module("@chio-protocol/edge", () => ({
       evaluate: () => ({
-        verdict: "allow",
-        receipt: { id: "r-edge-no-verifier" },
+        verdict: { verdict: "allow" },
+        receipt: { id: "r-edge-no-verifier", verdict: { verdict: "allow" } },
       }),
     }));
 
@@ -641,8 +639,8 @@ describe("receipt authority verification", () => {
     // directly). The middleware must not require fetch in that case.
     mock.module("@chio-protocol/edge", () => ({
       evaluate: () => ({
-        verdict: "allow",
-        receipt: { id: "r-edge-with-verifier" },
+        verdict: { verdict: "allow" },
+        receipt: { id: "r-edge-with-verifier", verdict: { verdict: "allow" } },
       }),
     }));
 
@@ -748,7 +746,6 @@ describe("receipt verdict lifting", () => {
     // `evaluation.decision` stays undefined and every otherwise-authorized
     // tool use is denied because `isAuthorizedEvaluation` requires
     // `decision === "allow"`. This test deliberately omits the
-    // `record.decision` shim and the `receipt.decision` field so it
     // exercises the nested `receipt.verdict.verdict` lifting path.
     let modelCalls = 0;
     const fetchMock = async (input: RequestInfo | URL) => {
@@ -778,11 +775,7 @@ describe("receipt verdict lifting", () => {
     expect(modelCalls).toBe(1);
   });
 
-  it("falls back to top-level record.verdict when receipt verdict is malformed", async () => {
-    // Defensive fallback: even if a receipt body somehow lands without
-    // a parseable verdict, the already-parsed top-level EvaluateResponse
-    // `verdict` still authorizes the call. Without this fallback an
-    // otherwise-allowed tool use is silently denied.
+  it("denies when the receipt carries no parseable verdict tag", async () => {
     let modelCalls = 0;
     const fetchMock = async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -791,17 +784,12 @@ describe("receipt verdict lifting", () => {
           body: {
             verdict: { verdict: "allow" },
             receipt: {
-              id: "r-toplevel-fallback",
-              // Receipt body intentionally omits both `decision` and a
-              // parseable `verdict` so the normalizer has to consult the
-              // enveloping top-level verdict instead.
+              id: "r-no-tag",
               receipt_kind: "mediated_decision",
               boundary_class: "prevent",
               tool_origin: "caller_executed",
               redaction_mode: "none",
               trust_level: "mediated",
-              route_pattern: "/chio/tools/search/run",
-              method: "POST",
               signed_body: "stub",
             },
             evidence: [],
@@ -811,13 +799,13 @@ describe("receipt verdict lifting", () => {
       if (url.endsWith("/chio/verify")) {
         return jsonResponse({ body: sidecarVerifyAllow() });
       }
-      throw new Error(`unexpected fetch in top-level-fallback test: ${url}`);
+      throw new Error(`unexpected fetch in missing-tag test: ${url}`);
     };
 
     const wrapped = wrapWithChio({
       async doGenerate() {
         modelCalls += 1;
-        return { text: "ok" };
+        return { text: "should not run" };
       },
     }, {
       runtime: "node",
@@ -825,15 +813,11 @@ describe("receipt verdict lifting", () => {
       fetch: fetchMock as typeof fetch,
     });
 
-    const result = await wrapped.doGenerate({ tools: { search: {} } });
-    expect(result).toEqual({ text: "ok" });
-    expect(modelCalls).toBe(1);
+    await expect(wrapped.doGenerate({ tools: { search: {} } })).rejects.toThrow();
+    expect(modelCalls).toBe(0);
   });
 
-  it("lifts a plain string receipt.verdict into decision", async () => {
-    // Hand-rolled fixtures sometimes carry a plain-string `verdict` on
-    // the receipt body rather than the Rust tagged-enum object. Both
-    // shapes must resolve to the same `decision` value.
+  it("rejects a plain-string verdict", async () => {
     let modelCalls = 0;
     const fetchMock = async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -844,19 +828,11 @@ describe("receipt verdict lifting", () => {
             receipt: {
               id: "r-plain-verdict",
               verdict: "allow",
-              receipt_kind: "mediated_decision",
-              boundary_class: "prevent",
-              tool_origin: "caller_executed",
-              redaction_mode: "none",
-              trust_level: "mediated",
               signed_body: "stub",
             },
             evidence: [],
           },
         });
-      }
-      if (url.endsWith("/chio/verify")) {
-        return jsonResponse({ body: sidecarVerifyAllow() });
       }
       throw new Error(`unexpected fetch in plain-string-verdict test: ${url}`);
     };
@@ -864,7 +840,7 @@ describe("receipt verdict lifting", () => {
     const wrapped = wrapWithChio({
       async doGenerate() {
         modelCalls += 1;
-        return { text: "ok" };
+        return { text: "should not run" };
       },
     }, {
       runtime: "node",
@@ -872,9 +848,10 @@ describe("receipt verdict lifting", () => {
       fetch: fetchMock as typeof fetch,
     });
 
-    const result = await wrapped.doGenerate({ tools: { search: {} } });
-    expect(result).toEqual({ text: "ok" });
-    expect(modelCalls).toBe(1);
+    await expect(wrapped.doGenerate({ tools: { search: {} } })).rejects.toThrow(
+      "did not include an allow or deny verdict",
+    );
+    expect(modelCalls).toBe(0);
   });
 
   it("surfaces a tagged deny verdict on the receipt as a deny evaluation", async () => {

@@ -110,13 +110,17 @@ impl RemoteSessionLedger {
     }
 
     pub(super) async fn cleanup_due_sessions(&self) -> Result<(), CliError> {
-        let now = self.clock.millis()?;
         let sessions = {
             let guard = self.active.lock().await;
             guard.values().cloned().collect::<Vec<_>>()
         };
 
         for session in sessions {
+            if session.lifecycle_snapshot().state == RemoteSessionState::Ready
+                && session.subscription_authority_expired()
+            {
+                session.latch_subscription_authority_lost();
+            }
             let serving_closed = *session.worker_serving_closed.borrow();
             if serving_closed {
                 self.mark_closed(&session).await?;
@@ -157,6 +161,7 @@ impl RemoteSessionLedger {
             }
         }
 
+        let now = self.clock.millis()?;
         self.purge_old_terminal_records(now).await;
         Ok(())
     }
@@ -191,6 +196,7 @@ impl RemoteSessionLedger {
         session: &Arc<RemoteSession>,
         reason: TerminalReason,
     ) -> Result<(), CliError> {
+        let reason = session.latched_terminal_reason().unwrap_or(reason);
         let state = reason.state();
         // Every await precedes the first state change, so cancelling this
         // future leaves the session untouched. Map guards are always taken

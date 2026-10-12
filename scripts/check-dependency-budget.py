@@ -62,7 +62,7 @@ HELPER_DENY: dict[str, str] = {
     "ring": "a second crypto backend beside aws-lc-rs",
 }
 
-# Retired pending entries are now unconditional denials. JSON is required by
+# Retired pending entries are unconditional denials. JSON is required by
 # the reviewed plan/status wire format; no other exception remains.
 HELPER_DENY.update({
     name: "the confinement helper has no runtime, network, regex, or tracing role"

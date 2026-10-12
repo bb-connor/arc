@@ -96,22 +96,6 @@ def _operation_set(operations: list[Operation]) -> set[str]:
     return {getattr(operation, "value", str(operation)) for operation in operations}
 
 
-def _operation_missing(cls: type[Operation], value: object) -> Operation | None:
-    legacy_names = {
-        "Invoke": "invoke",
-        "ReadResult": "read_result",
-        "Read": "read",
-        "Subscribe": "subscribe",
-        "Get": "get",
-        "Delegate": "delegate",
-    }
-    if isinstance(value, str):
-        member_name = legacy_names.get(value, value)
-        if hasattr(cls, member_name):
-            return getattr(cls, member_name)
-    return None
-
-
 def _constraint_key(constraint: Constraint) -> str:
     return constraint.model_dump_json(exclude_none=True)
 
@@ -210,11 +194,10 @@ def _prompt_grant_is_subset_of(self: PromptGrant, parent: PromptGrant) -> bool:
     return _operation_set(self.operations).issubset(_operation_set(parent.operations))
 
 
-def scope_is_subset_of(scope: ChioScope, parent: ChioScope) -> bool:
+def _scope_is_subset_of(scope: ChioScope, parent: ChioScope) -> bool:
     """Check conservative attenuation using the SDK's existing grant rules.
 
-    This typed entry point also backs the legacy ``ChioScope.is_subset_of``
-    convenience method. Neither path replaces kernel authorization.
+    Backs ``ChioScope.is_subset_of``. It does not replace kernel authorization.
     """
     parent_tool_grants = parent.grants or []
     for grant in scope.grants or []:
@@ -283,11 +266,10 @@ ChioReceipt.is_denied = property(_receipt_is_denied)  # type: ignore[attr-define
 ToolGrant.is_subset_of = _tool_grant_is_subset_of  # type: ignore[attr-defined]
 ResourceGrant.is_subset_of = _resource_grant_is_subset_of  # type: ignore[attr-defined]
 PromptGrant.is_subset_of = _prompt_grant_is_subset_of  # type: ignore[attr-defined]
-ChioScope.is_subset_of = scope_is_subset_of  # type: ignore[attr-defined]
+ChioScope.is_subset_of = _scope_is_subset_of  # type: ignore[attr-defined]
 CapabilityToken.is_valid_at = _token_is_valid_at  # type: ignore[attr-defined]
 CapabilityToken.is_expired_at = _token_is_expired_at  # type: ignore[attr-defined]
 CapabilityToken.body = _token_body  # type: ignore[attr-defined]
-Operation._missing_ = classmethod(_operation_missing)  # type: ignore[attr-defined]
 Constraint.path_prefix = classmethod(  # type: ignore[attr-defined]
     _constraint_path_prefix
 )
@@ -334,7 +316,6 @@ __all__ = [
     "RuntimeAssuranceTier",
     "ToolCallAction",
     "ToolGrant",
-    "scope_is_subset_of",
     # Sourced from models_supplemental (no generated equivalent).
     "AuthMethod",
     "CallerIdentity",

@@ -32,7 +32,7 @@ hover, and definition support.
 - `diagnostics::chio_yaml::validate` requires a YAML mapping with `version`
   and `policy` keys. Values and referenced policy files are outside this check.
 - `diagnostics::manifest::validate` checks a `tools` sequence of mappings
-  with an `id` key. The runtime manifest loader enforces the v2 contract.
+  with an `id` key. The runtime manifest loader enforces the full manifest contract.
 - `diagnostics::guard_dsl::validate` requires a `guards` sequence whose
   entries contain string IDs beginning with `urn:chio:guard:`.
 - `definition` restricts linked manifest reads to recognized filenames

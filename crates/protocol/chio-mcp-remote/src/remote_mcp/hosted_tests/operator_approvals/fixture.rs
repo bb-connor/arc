@@ -115,9 +115,10 @@ pub(super) async fn open(
         factory.resume_hmac_keyring.clone(),
     )?);
     let session = match resume {
-        Some(record) => factory
-            .restore_session(record)?
-            .ok_or("session was not restorable")?,
+        Some(record) => match factory.restore_session(record)? {
+            Some(RestoredSession::Serve(session)) => session,
+            _ => return Err("session was not restorable".into()),
+        },
         None => factory.spawn_session(SessionAuthContext::streamable_http_static_bearer(
             "static-bearer:ap23-agent",
             sha256_hex(b"ap23-test-agent"),

@@ -3,17 +3,6 @@
 //! Coverage strategy: seed the session journal with cumulative read/write
 //! totals and assert `DataFlowGuard` denies once the configured total ceiling
 //! has been reached.
-//!
-//! Revert-to-prove-it-fails recipe: flip the `max_bytes_total`
-//! `Ok(Verdict::Deny)` branch in `crates/guards/chio-guards/src/data_flow.rs`
-//! to `Ok(Verdict::Allow)`. The deny-arm assertion below fails when
-//! the production guard stops denying once the cumulative ceiling is
-//! reached.
-//!
-//! Targeted mutation recipe: replace the `>=` comparison for
-//! `max_bytes_total` with `<`. The over-limit request is then admitted and the
-//! deny assertion MUST fail. The below-limit positive control MUST remain
-//! admitted.
 
 use std::sync::Arc;
 

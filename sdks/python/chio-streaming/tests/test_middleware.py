@@ -293,7 +293,7 @@ async def test_allow_path_runs_handler_publishes_receipt_and_commits() -> None:
 
     assert outcome is not None
     assert outcome.allowed is True
-    assert outcome.committed is True
+    assert outcome.acked is True
     assert outcome.handler_error is None
     assert handled == [("orders", 7)]
     # request_id is derived from (topic, partition, offset) so non-transactional
@@ -328,7 +328,7 @@ async def test_allow_path_sync_handler_is_awaited() -> None:
 
     outcome = await mw.poll_and_process(handler)
     assert outcome is not None
-    assert outcome.committed is True
+    assert outcome.acked is True
     assert called == [11]
 
 
@@ -344,7 +344,7 @@ async def test_allow_path_handler_error_aborts_transaction() -> None:
 
     assert outcome is not None
     assert outcome.allowed is True
-    assert outcome.committed is False
+    assert outcome.acked is False
     assert isinstance(outcome.handler_error, RuntimeError)
     # Nothing made it through the transaction.
     assert producer.produced == []
@@ -405,7 +405,7 @@ async def test_deny_path_routes_to_dlq_and_commits_atomically() -> None:
 
     assert outcome is not None
     assert outcome.allowed is False
-    assert outcome.committed is True
+    assert outcome.acked is True
     assert outcome.dlq_record is not None
     assert outcome.dlq_record.topic == "chio-dlq"
 
@@ -439,7 +439,7 @@ async def test_deny_path_handles_chio_sidecar_403() -> None:
     outcome = await mw.poll_and_process(handler)
     assert outcome is not None
     assert outcome.allowed is False
-    assert outcome.committed is True
+    assert outcome.acked is True
     assert outcome.receipt.is_denied
     assert outcome.dlq_record is not None
     assert outcome.dlq_record.topic == "chio-dlq"
@@ -561,7 +561,7 @@ async def test_non_transactional_commit_uses_consumer_commit() -> None:
 
     assert outcome is not None
     assert outcome.allowed is True
-    assert outcome.committed is True
+    assert outcome.acked is True
     assert called == [5]
     # No transactions used in this mode.
     assert producer.transactions_begun == 0
@@ -591,7 +591,7 @@ async def test_non_transactional_undelivered_flush_does_not_commit_offset() -> N
     assert outcome is not None
     # acked=False because the source offset must not advance when the
     # receipt envelope did not durably land.
-    assert outcome.committed is False
+    assert outcome.acked is False
     assert consumer.commits == []
     assert isinstance(outcome.handler_error, ChioStreamingError)
     assert "undelivered" in str(outcome.handler_error)
@@ -877,7 +877,7 @@ async def test_receipt_publish_failure_aborts_transaction_and_does_not_ack() -> 
     assert outcome is not None
     assert ran == [1]
     assert outcome.allowed is True
-    assert outcome.committed is False
+    assert outcome.acked is False
     assert isinstance(outcome.handler_error, RuntimeError)
     assert producer.produced == []
     assert producer.committed_offsets == []

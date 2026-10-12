@@ -43,8 +43,8 @@ fn pyth_pair() -> PairConfig {
 #[tokio::test]
 async fn pyth_contract_rejects_ipv6_ula_target_through_read() {
     let contract = strict_contract_excluding_ula();
-    // Direct contract probe: the URL we expect a real PythHermesClient
-    // would attempt is `http://[fc00::1]/api/latest_price_feeds?ids[]=...`.
+    // Direct contract probe: a real PythHermesClient would attempt
+    // the URL `http://[fc00::1]/api/latest_price_feeds?ids[]=...`.
     let probe = "http://[fc00::1]/api/latest_price_feeds";
     let err = contract
         .enforce_url(probe, 0)

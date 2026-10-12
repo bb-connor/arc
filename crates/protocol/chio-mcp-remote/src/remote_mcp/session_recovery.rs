@@ -27,11 +27,27 @@ pub(super) fn restored_event_seed(resume_generation: u64) -> Option<u64> {
     (generation <= u64::from(u32::MAX)).then_some(generation << 32)
 }
 
+/// A restored candidate session, built but not yet served.
+pub(super) enum RestoredSession {
+    Serve(Arc<RemoteSession>),
+    /// A persisted subscription failed re-authorization, so the session is
+    /// terminalized unserved rather than served without it.
+    SubscriptionNotRestored(Arc<RemoteSession>),
+}
+
+impl RestoredSession {
+    fn session(&self) -> &Arc<RemoteSession> {
+        match self {
+            Self::Serve(session) | Self::SubscriptionNotRestored(session) => session,
+        }
+    }
+}
+
 pub(super) async fn restore_persisted_sessions(
     path: &FsPath,
     keyring: &RemoteSessionHmacKeyring,
     sessions: &RemoteSessionLedger,
-    mut restore: impl FnMut(&RemoteSessionResumeRecord) -> Result<Option<Arc<RemoteSession>>, CliError>,
+    mut restore: impl FnMut(&RemoteSessionResumeRecord) -> Result<Option<RestoredSession>, CliError>,
 ) -> Result<(), CliError> {
     let loaded = load_active_session_records(path, keyring, sessions.clock.millis()?)?;
     for session_id in loaded.invalid_session_ids {
@@ -45,7 +61,15 @@ pub(super) async fn restore_persisted_sessions(
         let mut deadline = match resume_deadline(&record, reading) {
             Ok(deadline) => deadline,
             Err(ClockError::Expired) => {
-                expire_record(path, keyring, sessions, &record, reading).await?;
+                terminate_unserved(
+                    path,
+                    keyring,
+                    sessions,
+                    &record,
+                    reading,
+                    TerminalReason::Expired,
+                )
+                .await?;
                 continue;
             }
             Err(error) => return Err(error.into()),
@@ -64,7 +88,15 @@ pub(super) async fn restore_persisted_sessions(
             match deadline.remaining(reading) {
                 Ok(_) => {}
                 Err(ClockError::Expired) => {
-                    let persisted = expire_record(path, keyring, sessions, &record, reading).await;
+                    let persisted = terminate_unserved(
+                        path,
+                        keyring,
+                        sessions,
+                        &record,
+                        reading,
+                        TerminalReason::Expired,
+                    )
+                    .await;
                     let stopped = stop_restored(&restored);
                     persisted?;
                     stopped?;
@@ -77,7 +109,23 @@ pub(super) async fn restore_persisted_sessions(
             }
         }
         match restored {
-            Ok(Some(session)) => {
+            Ok(Some(RestoredSession::SubscriptionNotRestored(session))) => {
+                warn!(session_id = %record.session_id,
+                    "terminating MCP session whose subscription failed re-authorization");
+                let stopped = session.shutdown_upstream_transport();
+                let reading = sessions.clock.read()?;
+                terminate_unserved(
+                    path,
+                    keyring,
+                    sessions,
+                    &record,
+                    reading,
+                    TerminalReason::SubscriptionNotRestored,
+                )
+                .await?;
+                stopped?;
+            }
+            Ok(Some(RestoredSession::Serve(session))) => {
                 if let Some(deadline) = deadline {
                     session
                         .lifecycle
@@ -95,6 +143,15 @@ pub(super) async fn restore_persisted_sessions(
                     }
                     continue;
                 }
+                // Authority may lapse while the restored generation persists.
+                if session.subscription_authority_expired() {
+                    warn!(session_id = %record.session_id,
+                        "terminating restored MCP session whose subscription authority lapsed");
+                    sessions
+                        .transition_to_terminal(&session, TerminalReason::SubscriptionNotRestored)
+                        .await?;
+                    continue;
+                }
                 sessions.insert_active(session).await;
             }
             Ok(None) => warn!(session_id = %record.session_id,
@@ -109,19 +166,22 @@ pub(super) async fn restore_persisted_sessions(
     Ok(())
 }
 
-fn stop_restored(result: &Result<Option<Arc<RemoteSession>>, CliError>) -> Result<(), CliError> {
-    if let Ok(Some(session)) = result {
-        session.shutdown_upstream_transport()?;
+fn stop_restored(result: &Result<Option<RestoredSession>, CliError>) -> Result<(), CliError> {
+    if let Ok(Some(restored)) = result {
+        restored.session().shutdown_upstream_transport()?;
     }
     Ok(())
 }
 
-async fn expire_record(
+/// Terminalizes a loaded record that was never served, at the epoch one past
+/// its stored generation, which the store accepts over that generation.
+async fn terminate_unserved(
     path: &FsPath,
     keyring: &RemoteSessionHmacKeyring,
     sessions: &RemoteSessionLedger,
     record: &RemoteSessionResumeRecord,
     reading: ClockReading,
+    reason: TerminalReason,
 ) -> Result<(), CliError> {
     let epoch = record
         .resume_generation
@@ -129,7 +189,7 @@ async fn expire_record(
         .ok_or(ClockError::Overflow)?;
     let terminal_at = reading.unix_millis().get();
     let mut lifecycle = record.lifecycle.clone();
-    lifecycle.state = RemoteSessionState::Expired;
+    lifecycle.state = reason.state();
     lifecycle.last_seen_at = terminal_at;
     lifecycle.deadline = None;
     lifecycle.drain_deadline_at = None;
@@ -155,14 +215,8 @@ async fn expire_record(
         .resume_integrity
         .envelope
         .max(sessions.lifecycle_policy.resume_envelope_floor);
-    let (tombstone, fence) = sign_terminal_session_records(
-        keyring,
-        diagnostic,
-        TerminalReason::Expired,
-        envelope,
-        epoch,
-        epoch,
-    )?;
+    let (tombstone, fence) =
+        sign_terminal_session_records(keyring, diagnostic, reason, envelope, epoch, epoch)?;
     prepare_terminal_session_transition(path, &fence, &tombstone, keyring, terminal_at)?;
     finalize_terminal_session_transition(path, &tombstone, keyring, terminal_at)?;
     sessions

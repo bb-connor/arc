@@ -156,10 +156,7 @@ Prefer explicit forms:
 - `prompt:<prompt_name>:<operation>`
 
 Supported operations are `invoke`, `read`, `read_result`, `subscribe`, `get`,
-and `delegate`, plus operator-friendly aliases such as `call`, `exec`,
-`execute`, and `watch`. The controller also accepts a legacy shorthand
-`<tool_name>:<verb>` for tool-oriented policy, mapping `read`/`write` style
-verbs onto tool invocation.
+and `delegate`. Any other operation, and any two-part scope, is rejected.
 
 ### Trust Anchor Configuration
 
@@ -226,7 +223,6 @@ In `application.properties` or `application.yml`:
 ```properties
 chio.sidecar-url=http://127.0.0.1:9090
 chio.timeout-seconds=5
-chio.on-sidecar-error=deny
 chio.enabled=true
 chio.url-patterns=/*
 chio.filter-order=1
@@ -238,7 +234,6 @@ Or via `application.yml`:
 chio:
   sidecar-url: http://127.0.0.1:9090
   timeout-seconds: 5
-  on-sidecar-error: deny
   enabled: true
   url-patterns:
     - "/*"
@@ -252,7 +247,6 @@ The `ChioProperties` class maps the `chio.*` prefix:
 |----------|------|---------|-------------|
 | `chio.sidecar-url` | String | `CHIO_SIDECAR_URL` env or `http://127.0.0.1:9090` | Sidecar kernel URL |
 | `chio.timeout-seconds` | Long | 5 | HTTP timeout for sidecar calls |
-| `chio.on-sidecar-error` | String | `deny` | `deny` (fail-closed) or `allow` (fail-open passthrough without Chio receipt) |
 | `chio.enabled` | Boolean | true | Enable/disable Chio protection |
 | `chio.url-patterns` | List | `["/*"]` | URL patterns to protect |
 | `chio.filter-order` | Int | 1 | Servlet filter ordering |
@@ -309,7 +303,6 @@ builder.Services.AddChioProtection(options =>
 {
     options.SidecarUrl = "http://127.0.0.1:9090";
     options.TimeoutSeconds = 5;
-    options.OnSidecarError = "deny"; // fail-closed
 });
 
 var app = builder.Build();
@@ -327,7 +320,6 @@ app.Run();
 |----------|------|---------|-------------|
 | `SidecarUrl` | string | `CHIO_SIDECAR_URL` env or `http://127.0.0.1:9090` | Sidecar kernel URL |
 | `TimeoutSeconds` | int | 5 | HTTP timeout for sidecar calls |
-| `OnSidecarError` | string | `deny` | `deny` (fail-closed) or `allow` (fail-open passthrough without Chio receipt) |
 | `IdentityExtractor` | delegate | Header-based extraction | Custom identity extraction function |
 | `RouteResolver` | delegate | Raw path passthrough | Custom route pattern resolver |
 

@@ -9,19 +9,19 @@ Usage::
     from chio_fastapi import chio_requires, chio_approval, chio_budget
 
     @app.post("/tools/deploy")
-    @chio_requires("deploy-server", "deploy", ["Invoke"])
+    @chio_requires("deploy-server", "deploy", ["invoke"])
     async def deploy(request: Request):
         ...
 
     @app.post("/tools/transfer")
     @chio_approval(threshold_cents=10000)
-    @chio_requires("payments", "transfer", ["Invoke"])
+    @chio_requires("payments", "transfer", ["invoke"])
     async def transfer(request: Request):
         ...
 
     @app.post("/tools/query")
     @chio_budget(max_cost_cents=500, currency="USD")
-    @chio_requires("ai", "query", ["Invoke"])
+    @chio_requires("ai", "query", ["invoke"])
     async def query(request: Request):
         ...
 """
@@ -62,9 +62,9 @@ def chio_requires(
     tool_name:
         The tool name required.
     operations:
-        List of required operations (default ``["Invoke"]``).
+        List of required operations (default ``["invoke"]``).
     """
-    ops = operations or ["Invoke"]
+    ops = operations or ["invoke"]
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)

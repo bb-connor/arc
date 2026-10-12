@@ -220,9 +220,6 @@ export interface ChioConfig {
    */
   routePatternResolver?: RoutePatternResolver | undefined;
 
-  /** Reserved no-op option. The middleware always denies sidecar errors. */
-  onSidecarError?: "deny" | "allow" | undefined;
-
   /**
    * Timeout in milliseconds for sidecar HTTP calls. Default: 5000.
    */

@@ -588,7 +588,6 @@ class TestEvaluateToolCall:
             )
         )
         governed_intent = {"kind": "eip3009_transfer", "amount": {"units": 5}}
-        approval_token = {"request_id": "req-7", "signature": "a" * 128}
         dpop_proof = {"jkt": "thumb", "proof": "p" * 32}
         async with ChioClient(BASE) as client:
             await client.evaluate_tool_call_mediated(
@@ -598,13 +597,11 @@ class TestEvaluateToolCall:
                 parameters={"path": "/tmp"},
                 request_id="req-7",
                 governed_intent=governed_intent,
-                approval_token=approval_token,
                 dpop_proof=dpop_proof,
             )
         body = json.loads(route.calls.last.request.content)
         assert body["request_id"] == "req-7"
         assert body["governed_intent"] == governed_intent
-        assert body["approval_token"] == approval_token
         assert body["dpop_proof"] == dpop_proof
         assert "execution_nonce" not in body
 

@@ -64,6 +64,9 @@ impl RemoteSession {
             resume_hmac_keyring: init.resume_hmac_keyring,
             resume_generation: AtomicU64::new(init.resume_generation),
             resume_envelope,
+            subscriptions: StdMutex::new(BTreeMap::new()),
+            subscription_deadline: StdMutex::new(SubscriptionDeadline::Unbounded),
+            terminal_reason_latch: std::sync::OnceLock::new(),
             upstream_transport: RemoteSessionUpstreamTransport {
                 inner: init.upstream_transport,
             },
@@ -279,7 +282,8 @@ impl RemoteSession {
         if lifecycle.state != RemoteSessionState::Ready {
             return Ok(None);
         }
-        self.resume_record_for_lifecycle(lifecycle).map(Some)
+        self.resume_record_for_lifecycle(lifecycle, self.persisted_subscriptions()?)
+            .map(Some)
     }
 
     /// Signs and persists the restored record at the generation its event
@@ -300,9 +304,138 @@ impl RemoteSession {
         self.persist_record(path, &record, self.clock.millis()?)
     }
 
+    /// Installs the subscriptions a restored record carried. Persisting them is
+    /// left to the restored-generation write.
+    pub(super) fn restore_subscriptions(
+        &self,
+        subscriptions: &[PersistedSubscription],
+    ) -> Result<(), CliError> {
+        let mut current = self
+            .subscriptions
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        *current = subscriptions
+            .iter()
+            .map(|subscription| {
+                let PersistedSubscription::Standard { uri, capability_id } = subscription;
+                (uri.clone(), capability_id.clone())
+            })
+            .collect();
+        self.arm_subscription_deadline(&current);
+        Ok(())
+    }
+
+    /// Arms the deadline at the earliest expiry among the capabilities bound
+    /// to `subscriptions`. A capability that is not held, or a clock that
+    /// cannot be read, leaves the deadline lapsed.
+    fn arm_subscription_deadline(&self, subscriptions: &BTreeMap<String, String>) {
+        let earliest = subscriptions
+            .values()
+            .map(|capability_id| {
+                self.issued_capabilities
+                    .iter()
+                    .find(|capability| &capability.id == capability_id)
+                    .map_or(0, |capability| capability.expires_at)
+            })
+            .min();
+        let deadline = match earliest {
+            None => SubscriptionDeadline::Unbounded,
+            Some(expires_at) => self
+                .clock
+                .read()
+                .and_then(|reading| {
+                    let expires_at = expires_at.checked_mul(1_000).ok_or(ClockError::Overflow)?;
+                    AuthorityDeadline::new(reading.unix_millis(), UnixMillis::new(expires_at), reading)
+                })
+                .map_or(SubscriptionDeadline::Lapsed, SubscriptionDeadline::Armed),
+        };
+        *self
+            .subscription_deadline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = deadline;
+    }
+
+    /// Whether a subscribed capability's authority window has closed. A clock
+    /// that cannot be read or that moved backwards counts as closed.
+    pub(super) fn subscription_authority_expired(&self) -> bool {
+        let mut deadline = self
+            .subscription_deadline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        match &mut *deadline {
+            SubscriptionDeadline::Unbounded => false,
+            SubscriptionDeadline::Lapsed => true,
+            SubscriptionDeadline::Armed(armed) => self
+                .clock
+                .read()
+                .and_then(|reading| armed.remaining(reading))
+                .is_err(),
+        }
+    }
+
+    /// Latches `subscription_authority_lost`, drops retained resource updates
+    /// and wakes every HTTP wait. The next terminal transition uses the reason.
+    pub(super) fn latch_subscription_authority_lost(&self) {
+        self.terminal_reason_latch
+            .get_or_init(|| TerminalReason::SubscriptionAuthorityLost);
+        self.retained_notification_events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .retain(|event| {
+                event.message.get("method").and_then(Value::as_str)
+                    != Some("notifications/resources/updated")
+            });
+        self.worker_serving_closed.send_replace(true);
+    }
+
+    pub(super) fn latched_terminal_reason(&self) -> Option<TerminalReason> {
+        self.terminal_reason_latch.get().copied()
+    }
+
+    pub(super) fn persisted_subscriptions(&self) -> Result<Vec<PersistedSubscription>, CliError> {
+        let subscriptions = self
+            .subscriptions
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        Ok(standard_subscriptions(&subscriptions))
+    }
+
+    /// Applies `change` to the subscription set. A durable session signs and
+    /// persists the changed record first, and keeps the old set if that fails.
+    fn change_subscriptions(
+        &self,
+        change: impl FnOnce(&mut BTreeMap<String, String>),
+    ) -> Result<(), CliError> {
+        let lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+        let mut current = self
+            .subscriptions
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        let mut candidate = current.clone();
+        change(&mut candidate);
+        if candidate == *current {
+            return Ok(());
+        }
+        if let Some(path) = self.session_db_path.as_deref() {
+            if lifecycle.state != RemoteSessionState::Ready {
+                return Err(CliError::cli_other_error(format!(
+                    "MCP session {} persists subscriptions only while ready",
+                    self.session_id
+                )));
+            }
+            let record = self
+                .resume_record_for_lifecycle(lifecycle.clone(), standard_subscriptions(&candidate))?;
+            self.persist_record(path, &record, self.clock.millis()?)?;
+        }
+        self.arm_subscription_deadline(&candidate);
+        *current = candidate;
+        Ok(())
+    }
+
     fn resume_record_for_lifecycle(
         &self,
         lifecycle: RemoteSessionLifecycleSnapshot,
+        subscriptions: Vec<PersistedSubscription>,
     ) -> Result<RemoteSessionResumeRecord, CliError> {
         let protocol_version = self
             .protocol_version
@@ -351,6 +484,7 @@ impl RemoteSession {
             protocol_version,
             peer_capabilities,
             initialize_params,
+            subscriptions,
         )
     }
 
@@ -360,6 +494,7 @@ impl RemoteSession {
         protocol_version: Option<String>,
         peer_capabilities: PeerCapabilities,
         initialize_params: Value,
+        subscriptions: Vec<PersistedSubscription>,
     ) -> Result<RemoteSessionResumeRecord, CliError> {
         let keyring = self.resume_hmac_keyring.as_ref().ok_or_else(|| {
             CliError::cli_other_error(format!(
@@ -367,7 +502,6 @@ impl RemoteSession {
                 self.session_id
             ))
         })?;
-        let subscriptions = Vec::new();
         let envelope = self.resume_envelope.select(&subscriptions);
         let resume_generation = crate::clock::next_counter(&self.resume_generation)?;
         let mut record = RemoteSessionResumeRecord {
@@ -480,6 +614,7 @@ impl RemoteSession {
                 protocol_version.clone(),
                 peer_capabilities.clone(),
                 initialize_params.clone(),
+                self.persisted_subscriptions()?,
             )?;
             self.persist_record(path, &record, now.get())?;
         }
@@ -513,7 +648,8 @@ impl RemoteSession {
         proposed.deadline = Some(deadline);
         if persist {
             if let Some(path) = self.session_db_path.as_deref() {
-                let record = self.resume_record_for_lifecycle(proposed.clone())?;
+                let record = self
+                    .resume_record_for_lifecycle(proposed.clone(), self.persisted_subscriptions()?)?;
                 self.persist_record(path, &record, now.get())?;
             }
         }
@@ -596,6 +732,60 @@ impl RemoteSession {
             request_stream_active: self.has_active_request_stream(),
             notification_stream_attached,
             ..RemoteSessionOwnershipSnapshot::default()
+        }
+    }
+}
+
+fn standard_subscriptions(subscriptions: &BTreeMap<String, String>) -> Vec<PersistedSubscription> {
+    subscriptions
+        .iter()
+        .map(|(uri, capability_id)| PersistedSubscription::Standard {
+            uri: uri.clone(),
+            capability_id: capability_id.clone(),
+        })
+        .collect()
+}
+
+/// Persists the edge's standard resource subscriptions with the session's
+/// resume record before the client is answered.
+pub(super) struct SubscriptionPersistence(pub(super) Weak<RemoteSession>);
+
+impl SubscriptionPersistence {
+    fn change(&self, change: impl FnOnce(&mut BTreeMap<String, String>)) -> Result<(), AdapterError> {
+        let session = self.0.upgrade().ok_or_else(|| {
+            AdapterError::ConnectionFailed("MCP session ended before its subscription change".into())
+        })?;
+        session
+            .change_subscriptions(change)
+            .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))
+    }
+}
+
+/// When the authority of a session's subscriptions runs out.
+#[derive(Debug)]
+pub(super) enum SubscriptionDeadline {
+    /// The session holds no subscription.
+    Unbounded,
+    Armed(AuthorityDeadline),
+    Lapsed,
+}
+
+impl chio_mcp_adapter::edge::ResourceSubscriptionObserver for SubscriptionPersistence {
+    fn subscribed(&self, uri: &str, capability_id: &str) -> Result<(), AdapterError> {
+        self.change(|subscriptions| {
+            subscriptions.insert(uri.to_owned(), capability_id.to_owned());
+        })
+    }
+
+    fn unsubscribed(&self, uri: &str) -> Result<(), AdapterError> {
+        self.change(|subscriptions| {
+            subscriptions.remove(uri);
+        })
+    }
+
+    fn authority_lost(&self, _uri: &str) {
+        if let Some(session) = self.0.upgrade() {
+            session.latch_subscription_authority_lost();
         }
     }
 }

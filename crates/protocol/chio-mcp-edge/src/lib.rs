@@ -208,6 +208,21 @@ pub enum AdapterError {
     },
 }
 
+/// Observes a standard resource subscription change before the client is
+/// answered. An error leaves the session's subscriptions unchanged and fails
+/// the request.
+pub trait ResourceSubscriptionObserver: Send + Sync {
+    /// A subscription to `uri`, authorized by `capability_id`, was added.
+    fn subscribed(&self, uri: &str, capability_id: &str) -> Result<(), AdapterError>;
+
+    /// The subscription to `uri` is about to be removed.
+    fn unsubscribed(&self, uri: &str) -> Result<(), AdapterError>;
+
+    /// A subscription failed its authority check at emission. The edge has
+    /// already stopped emitting resource updates for this session.
+    fn authority_lost(&self, uri: &str);
+}
+
 /// Trait for communicating with an MCP server.
 ///
 /// The default MCP transport is stdio (the adapter spawns the MCP server as

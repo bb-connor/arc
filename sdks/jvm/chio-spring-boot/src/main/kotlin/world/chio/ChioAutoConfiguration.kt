@@ -8,7 +8,6 @@
  * Usage in application.properties:
  *   chio.sidecar-url=http://127.0.0.1:9090
  *   chio.timeout-seconds=5
- *   chio.on-sidecar-error=deny
  */
 package world.chio
 
@@ -27,8 +26,6 @@ data class ChioProperties(
     val sidecarUrl: String = System.getenv("CHIO_SIDECAR_URL") ?: "http://127.0.0.1:9090",
     /** HTTP timeout for sidecar calls in seconds. */
     val timeoutSeconds: Long = 5,
-    /** Behavior when sidecar is unreachable: "deny" (fail-closed) or "allow" (fail-open). */
-    val onSidecarError: String = "deny",
     /** Whether Chio protection is enabled. Defaults to true. */
     val enabled: Boolean = true,
     /** URL patterns to protect. Defaults to all routes. */
@@ -49,7 +46,6 @@ open class ChioAutoConfiguration {
             ChioFilterConfig(
                 sidecarUrl = properties.sidecarUrl,
                 timeoutSeconds = properties.timeoutSeconds,
-                onSidecarError = properties.onSidecarError,
             )
 
         val filter = ChioFilter(config)

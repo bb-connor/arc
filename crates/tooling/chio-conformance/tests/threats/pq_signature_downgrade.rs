@@ -42,20 +42,6 @@
 //     (`verify_capability_with_floor`).
 //   `crates/core/chio-core-types/src/capability/token.rs:936`
 //     (`CapabilityToken::verify_signature_with_floor`).
-//
-// Revert-to-prove-it-fails recipe:
-// In `crates/kernel/chio-kernel-core/src/capability_verify.rs`, locate the
-// `match token.verify_signature_with_floor(crypto_floor) { ... }`
-// block inside `verify_capability_with_floor` (around line 162).
-// Replace the
-// `Err(error) => return Err(CapabilityError::CryptoFloorRejected(...))`
-// arm with a no-op (e.g. `Err(_) => {}`). Re-run
-// `cargo test -p chio-conformance --test threats -- pq_signature_downgrade`
-// and the
-// `assert!(matches!(err, CapabilityError::CryptoFloorRejected(_)))`
-// arm in `classical_token_under_pq_required_rejected` MUST then
-// fail because production now accepts classical-only tokens on a
-// pq_required kernel.
 
 use chio_core::capability::{
     crypto_floor::CapabilityCryptoFloor,

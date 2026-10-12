@@ -147,33 +147,10 @@ describe("chio fastify plugin", () => {
       url: "/test",
     });
 
-    // When the sidecar is unreachable and onSidecarError is "deny" (default),
-    // the plugin should return 502.
+    // When the sidecar is unreachable the plugin should return 502.
     expect(response.statusCode).toBe(502);
     const body = JSON.parse(response.body);
     expect(body.error).toBe("chio_sidecar_unreachable");
-    await fastify.close();
-  });
-
-  it("fails closed when reserved onSidecarError is allow", async () => {
-    const fastify = Fastify();
-    await fastify.register(chio, {
-      sidecarUrl: "http://127.0.0.1:1", // Unreachable
-      onSidecarError: "allow",
-      timeoutMs: 500,
-    });
-
-    fastify.get("/test", async () => {
-      return { data: "reached handler" };
-    });
-
-    const response = await fastify.inject({
-      method: "GET",
-      url: "/test",
-    });
-
-    expect(response.statusCode).toBe(502);
-    expect(JSON.parse(response.body).error).toBe("chio_sidecar_unreachable");
     await fastify.close();
   });
 

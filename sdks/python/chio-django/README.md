@@ -26,7 +26,6 @@ MIDDLEWARE = [
 ]
 
 CHIO_SIDECAR_URL = "http://127.0.0.1:9090"
-CHIO_FAIL_OPEN = False
 CHIO_EXCLUDE_PATHS = ["/health", "/ready"]
 CHIO_EXCLUDE_METHODS = ["OPTIONS"]
 CHIO_RECEIPT_HEADER = "X-Chio-Receipt"
@@ -35,8 +34,6 @@ CHIO_RECEIPT_HEADER = "X-Chio-Receipt"
 ## Settings
 
 - `CHIO_SIDECAR_URL` -- sidecar base URL (default `http://127.0.0.1:9090`).
-- `CHIO_FAIL_OPEN` -- if `True`, allow when the sidecar is down (default
-  `False`, i.e. fail closed).
 - `CHIO_EXCLUDE_PATHS` -- list of paths that bypass evaluation (default
   `[]`).
 - `CHIO_EXCLUDE_METHODS` -- HTTP methods that bypass evaluation (default
@@ -53,9 +50,8 @@ CHIO_RECEIPT_HEADER = "X-Chio-Receipt"
 
 ## Behaviour
 
-The middleware defaults to fail-closed: a deny verdict or an unreachable
-sidecar rejects the request unless you explicitly set
-`CHIO_FAIL_OPEN = True`.
+The middleware fails closed: a deny verdict or an unreachable sidecar rejects
+the request.
 
 ## License
 

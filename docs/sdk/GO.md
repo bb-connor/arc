@@ -38,7 +38,7 @@ The Go SDK communicates with the Chio Rust kernel through localhost HTTP. The ke
 - **Default URL**: `http://127.0.0.1:9090`
 - **Configurable via**: `CHIO_SIDECAR_URL` environment variable or `WithSidecarURL()` option
 - **No native compilation or FFI**: pure Go over HTTP using `net/http`
-- **Fail-closed by default**: when the sidecar is unreachable, requests are denied with a 502 response. Use `WithOnSidecarError("allow")` to change this.
+- **Fail-closed by default**: when the sidecar is unreachable, requests are denied with a 502 response.
 
 ---
 
@@ -75,7 +75,6 @@ protected := chio.Protect(handler,
 	chio.ConfigFile("chio.yaml"),
 	chio.WithSidecarURL("http://127.0.0.1:9090"),
 	chio.WithTimeout(10),
-	chio.WithOnSidecarError("deny"),
 	chio.WithIdentityExtractor(myExtractor),
 	chio.WithRouteResolver(myResolver),
 )
@@ -105,29 +104,6 @@ Set the HTTP timeout for sidecar calls in seconds. Default: 5.
 
 ```go
 chio.WithTimeout(10)
-```
-
-**`WithOnSidecarError(behavior string)`**
-
-Control behavior when the sidecar is unreachable.
-
-| Value | Behavior |
-|-------|----------|
-| `"deny"` | Fail-closed (default). Return 502 error. |
-| `"allow"` | Fail-open. Forward request to inner handler without attaching a Chio receipt header. |
-
-```go
-chio.WithOnSidecarError("allow")  // fail-open
-```
-
-Retrieve the explicit degraded-state marker inside a handler:
-
-```go
-func handler(w http.ResponseWriter, r *http.Request) {
-	if passthrough, ok := chio.GetChioPassthrough(r); ok {
-		log.Printf("Chio passthrough: %s (%s)", passthrough.Mode, passthrough.Error)
-	}
-}
 ```
 
 **`WithIdentityExtractor(fn IdentityExtractorFunc)`**

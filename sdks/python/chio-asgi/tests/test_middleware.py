@@ -7,6 +7,8 @@ import hashlib
 from typing import Any, Awaitable, Callable
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from chio_asgi.config import ChioASGIConfig
 from chio_asgi.middleware import (
     ChioASGIMiddleware,
@@ -597,7 +599,6 @@ class TestConfig:
         assert config.sidecar_url == "http://127.0.0.1:9090"
         assert "OPTIONS" in config.exclude_methods
         assert config.receipt_header == "X-Chio-Receipt"
-        assert config.fail_open is False
         assert config.max_body_bytes == 8 * 1024 * 1024
 
     def test_custom(self) -> None:
@@ -607,16 +608,6 @@ class TestConfig:
         )
         assert "/healthz" in config.exclude_paths
 
-    def test_positional_fail_open_precedes_max_body_bytes(self) -> None:
-        config = ChioASGIConfig(
-            "http://mock:9090",
-            2.5,
-            frozenset({"/health"}),
-            frozenset({"OPTIONS"}),
-            "X-Test-Receipt",
-            True,
-            10 * 1024 * 1024,
-        )
-
-        assert config.fail_open is True
-        assert config.max_body_bytes == 10 * 1024 * 1024
+    def test_fail_open_option_is_rejected(self) -> None:
+        with pytest.raises(TypeError):
+            ChioASGIConfig(fail_open=True)  # type: ignore[call-arg]

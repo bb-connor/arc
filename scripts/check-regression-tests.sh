@@ -3,7 +3,7 @@
 #
 # Regression-test deletion guard. Detects deletion of regression tests under
 # tests/regression_*.rs, crates/<group>/chio-<crate>/tests/regression_*.rs, and
-# formal/diff-tests/tests/regression_*.rs. The grouped and legacy flat crate
+# formal/diff-tests/tests/regression_*.rs. The grouped and flat crate
 # layouts both match. Fails CI when any such file disappears between BASE..HEAD
 # without a paired issue link in the PR body or commit-message range.
 #

@@ -31,17 +31,6 @@
 //     (`WasmtimeBackend::load_module`).
 //   `crates/guards/chio-wasm-guards/src/runtime/wasmtime_backend.rs:595`
 //     (`WasmtimeBackend::evaluate`).
-//
-// Revert-to-prove-it-fails recipe:
-// In `crates/chio-wasm-guards/src/runtime.rs`, locate the
-// `if wasm_bytes.len() > self.max_module_size { return
-// Err(WasmGuardError::ModuleTooLarge { ... }); }` guard inside
-// `WasmtimeBackend::load_module`. Replace the `return` with a
-// no-op. Re-run
-// `cargo test -p chio-conformance --test threats -- wasm_guard_resource_exhaustion`
-// and the `assert!(matches!(err, WasmGuardError::ModuleTooLarge { .. }))`
-// arm in `oversize_module_rejected_at_load` MUST then fail because
-// production now admits arbitrarily large modules.
 
 use std::{fs, path::PathBuf};
 
@@ -125,7 +114,7 @@ fn threat_wasm_guard_resource_exhaustion_oversize_module_rejected_at_load() {
         Err(err) => panic!("wat compile failed: {err}"),
     };
 
-    // Tighten the per-backend module-size cap so we do not have to
+    // Tighten the per-backend module-size cap so the test does not need to
     // synthesise a multi-megabyte blob just to cross the default.
     // Anything strictly less than the valid bytes' length is enough
     // to trip the cap; ESCAPE_TINY_CAP is one byte below.

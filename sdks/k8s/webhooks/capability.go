@@ -316,9 +316,8 @@ type requiredScope struct {
 	operation string
 }
 
-// parseRequiredScope accepts three forms:
+// parseRequiredScope accepts two forms:
 //
-//	"<name>:<op>"                        shorthand for tool:*:<name>:<op>
 //	"<kind>:<name>:<op>"                 resource or prompt scope
 //	"tool:<server>:<name>:<op>"          fully-qualified tool scope
 func parseRequiredScope(raw string) (requiredScope, error) {
@@ -331,20 +330,9 @@ func parseRequiredScope(raw string) (requiredScope, error) {
 	}
 
 	switch len(parts) {
-	case 2:
-		operation, err := normalizeScopeOperation(parts[1], true)
-		if err != nil {
-			return requiredScope{}, fmt.Errorf("invalid scope %q: %w", raw, err)
-		}
-		return requiredScope{
-			kind:      requiredScopeTool,
-			serverID:  "*",
-			name:      parts[0],
-			operation: operation,
-		}, nil
 	case 3:
 		kind := requiredScopeKind(parts[0])
-		operation, err := normalizeScopeOperation(parts[2], false)
+		operation, err := normalizeScopeOperation(parts[2])
 		if err != nil {
 			return requiredScope{}, fmt.Errorf("invalid scope %q: %w", raw, err)
 		}
@@ -360,7 +348,7 @@ func parseRequiredScope(raw string) (requiredScope, error) {
 		if parts[0] != string(requiredScopeTool) {
 			return requiredScope{}, fmt.Errorf("invalid scope %q", raw)
 		}
-		operation, err := normalizeScopeOperation(parts[3], false)
+		operation, err := normalizeScopeOperation(parts[3])
 		if err != nil {
 			return requiredScope{}, fmt.Errorf("invalid scope %q: %w", raw, err)
 		}
@@ -375,27 +363,10 @@ func parseRequiredScope(raw string) (requiredScope, error) {
 	}
 }
 
-func normalizeScopeOperation(raw string, shorthand bool) (string, error) {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "invoke", "call", "exec", "execute":
-		return "invoke", nil
-	case "write":
-		if shorthand {
-			return "invoke", nil
-		}
-	case "read_result", "result":
-		return "read_result", nil
-	case "read":
-		if shorthand {
-			return "invoke", nil
-		}
-		return "read", nil
-	case "subscribe", "watch":
-		return "subscribe", nil
-	case "get":
-		return "get", nil
-	case "delegate":
-		return "delegate", nil
+func normalizeScopeOperation(raw string) (string, error) {
+	switch raw {
+	case "invoke", "read_result", "read", "subscribe", "get", "delegate":
+		return raw, nil
 	}
 	return "", fmt.Errorf("unsupported operation %q", raw)
 }

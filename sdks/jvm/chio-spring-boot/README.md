@@ -70,7 +70,6 @@ Configure the filter through `application.yaml` under the `chio` prefix:
 chio:
   sidecar-url: http://127.0.0.1:9090
   timeout-seconds: 5
-  on-sidecar-error: deny   # or "allow" for fail-open
   enabled: true
   url-patterns:
     - "/*"

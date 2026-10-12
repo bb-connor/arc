@@ -201,7 +201,7 @@ class ProcessingOutcome(BaseProcessingOutcome):
         Populated on deny with the DLQ record that was published.
     acked:
         ``True`` if the offset was committed; ``False`` if the
-        transaction aborted. Alias: :attr:`committed`.
+        transaction aborted.
     handler_error:
         Populated when the handler raised; the transaction was aborted
         and the offset is uncommitted.
@@ -209,12 +209,6 @@ class ProcessingOutcome(BaseProcessingOutcome):
 
     # dataclass field-order rule: base fields have defaults, so this must too.
     message: KafkaMessageLike | None = None
-
-    @property
-    def committed(self) -> bool:
-        """Backward-compat alias for :attr:`acked` (old Kafka-only name)."""
-        return self.acked
-
 
 MessageHandler = Callable[[KafkaMessageLike, ChioReceipt], Awaitable[None] | None]
 """Application callback invoked on allow. Sync or async."""

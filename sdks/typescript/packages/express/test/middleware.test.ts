@@ -231,36 +231,6 @@ describe("chio() middleware", () => {
     }
   });
 
-  it("fails closed when reserved onSidecarError is allow", async () => {
-    const app = express();
-    app.use(
-      chio({
-        sidecarUrl: "http://127.0.0.1:1", // Unreachable
-        onSidecarError: "allow",
-        timeoutMs: 500,
-      }),
-    );
-    app.get("/test", (req, res) => {
-      const chioReq = req as import("../src/index.js").ChioRequest;
-      res.json({
-        hasChioResult: chioReq.chioResult != null,
-        chioPassthrough: chioReq.chioPassthrough,
-      });
-    });
-
-    const server = http.createServer(app);
-    await new Promise<void>((resolve) => server.listen(0, resolve));
-
-    try {
-      const resp = await request(server, "GET", "/test");
-      expect(resp.status).toBe(502);
-      expect(resp.headers["x-chio-receipt-id"]).toBeUndefined();
-      expect(JSON.parse(resp.body).error).toBe("chio_sidecar_unreachable");
-    } finally {
-      server.close();
-    }
-  });
-
   it("preserves request bodies for downstream Express parsers", async () => {
     const sidecar = await startMockSidecar();
     const app = express();

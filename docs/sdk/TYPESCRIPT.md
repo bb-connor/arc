@@ -47,7 +47,7 @@ All Chio TypeScript SDKs communicate with the Chio Rust kernel through localhost
 - **Default URL**: `http://127.0.0.1:9090`
 - **Configurable via**: `CHIO_SIDECAR_URL` environment variable or the `sidecarUrl` config option
 - **No native compilation or FFI**: pure TypeScript/JavaScript over HTTP (uses `fetch`)
-- **Fail-closed by default**: when the sidecar is unreachable, requests receive a 502 response. Set `onSidecarError: "allow"` to forward the request without synthesizing a Chio receipt.
+- **Fail-closed by default**: when the sidecar is unreachable, requests receive a 502 response.
 
 Use the terms precisely:
 
@@ -185,7 +185,6 @@ interface ChioConfig {
   config?: string;                 // Path to chio.yaml config file
   identityExtractor?: IdentityExtractor;
   routePatternResolver?: RoutePatternResolver;
-  onSidecarError?: "deny" | "allow";  // Default: "deny" (fail-closed)
   timeoutMs?: number;              // Default: 5000
   forwardHeaders?: string[];       // Default: ["content-type", "content-length"]
 }
@@ -371,7 +370,6 @@ app.listen(3000);
 app.use(chio({
   config: "chio.yaml",
   sidecarUrl: "http://127.0.0.1:9090",
-  onSidecarError: "deny",
   timeoutMs: 5000,
   skip: ["/health", "/ready", /^\/public\//],
 }));
@@ -448,7 +446,6 @@ await fastify.listen({ port: 3000 });
 await fastify.register(chio, {
   config: "chio.yaml",
   sidecarUrl: "http://127.0.0.1:9090",
-  onSidecarError: "deny",
   timeoutMs: 5000,
   skip: ["/health", /^\/public\//],
 });
@@ -514,7 +511,6 @@ const app = new Elysia()
   .use(chio({
     config: "chio.yaml",
     sidecarUrl: "http://127.0.0.1:9090",
-    onSidecarError: "deny",
     skip: ["/health"],
   }))
   .get("/pets", () => [{ name: "Fido" }]);
