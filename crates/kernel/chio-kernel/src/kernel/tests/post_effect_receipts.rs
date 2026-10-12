@@ -118,3 +118,38 @@ fn caller_cannot_supply_receipt_namespace_or_disposition() {
         assert!(kernel.receipt_log().is_empty());
     }
 }
+
+struct UnresolvedReceiptStore;
+
+impl ReceiptStore for UnresolvedReceiptStore {
+    fn append_chio_receipt(&self, _: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Timeout {
+            operation: "unresolved append".into(),
+            timeout_ms: 1,
+        })
+    }
+
+    fn append_child_receipt(&self, _: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
+        unreachable!("no child operation in this fixture")
+    }
+}
+
+#[test]
+fn unresolved_receipt_append_latches_new_dispatch() {
+    let (mut kernel, request, invocations) = fixture();
+    kernel
+        .set_receipt_store(Box::new(UnresolvedReceiptStore))
+        .unwrap();
+    assert!(kernel.evaluate_tool_call_blocking(&request).is_err());
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let mut next_request = request.clone();
+    next_request.request_id = "after-unresolved-append".into();
+    let next = kernel.evaluate_tool_call_blocking(&next_request);
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        1,
+        "an unresolved append must latch subsequent dispatch: {next:?}"
+    );
+    assert!(next.is_err() || next.is_ok_and(|response| response.verdict == Verdict::Deny));
+}
