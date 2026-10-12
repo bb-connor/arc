@@ -270,7 +270,7 @@ Items were verified on the M:/V: heads, or in W:'s working tree where marked. Ea
 | N1 | V:'s `chio-process/src/worker.rs` reverts M's authority-clock fix (`dcae5d7ba`) | Open (merge) | M:/V: `worker.rs` | Merge owners |
 | N2 | The security recorder records `Released` before finalization | Open | M: `async_evaluation_core.rs:1727` | Spec 3 |
 | N3 | Caged long-lived `AdaptedMcpServer` receipts carry no `native_launch` | Open | M: `chio-mcp-adapter/src/server.rs:141` | Spec 7 section 5.1 |
-| N4 | The Mechanism D escape-hatch gate was never built | Open | M: `unrepresentable-defects-design.md:503-518` | Spec 3 builds it |
+| N4 | The Mechanism D escape-hatch gate was never built | Gate built, pending merge (#1262) | M: `unrepresentable-defects-design.md:503-518`; gate `scripts/check-escape-hatches.py` over `scripts/escape-hatch-inventory.json` | Spec 3 builds it |
 | N5 | GT1: at the M baseline the hardening gates did not run in hosted CI. At #1160 head `89e4641f6`, hosted job `111748798722` passed the structural, formal-traceability and temporal-security gate steps and then failed at workspace tests | Open (qualification) | M: `hardening-toolchain-spec.md:506-521`; GitHub Actions job `111748798722` | Rollout blocker until a whole hosted run passes |
 | N6 | The default sidecar threshold collector lacks its production request-context source | Open | M: `threshold-approval-collection.md:282-283` | Approval owners |
 | N9 | Container launch evidence is unsigned | Open | Spec 7 section 5.3 | Spec 7 |
