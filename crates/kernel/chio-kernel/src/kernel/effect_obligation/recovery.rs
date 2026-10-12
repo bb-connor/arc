@@ -102,6 +102,11 @@ impl Drop for EvidenceProducer {
 }
 
 impl EvidenceQueue {
+    fn request_stop(&self) {
+        self.stopping.store(true, Ordering::Release);
+        self.wake.notify_all();
+    }
+
     pub(super) fn register_producer(self: Arc<Self>) -> EvidenceProducer {
         self.producers.fetch_add(1, Ordering::AcqRel);
         EvidenceProducer { queue: self }
@@ -262,8 +267,7 @@ impl EvidenceRecovery {
 
 impl Drop for EvidenceRecovery {
     fn drop(&mut self) {
-        self.queue.stopping.store(true, Ordering::Release);
-        self.queue.wake.notify_all();
+        self.queue.request_stop();
         // Pending evidence outlives kernel teardown. The worker owns its
         // resources and exits only after the retained queue drains. A failed
         // store therefore keeps its bounded host permits charged.
@@ -612,5 +616,37 @@ impl EvidenceRecoveryResources {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod shutdown_tests {
+    use super::*;
+    use std::sync::mpsc;
+
+    #[test]
+    fn shutdown_cannot_notify_before_the_worker_releases_its_wait_guard() {
+        let queue = EvidenceQueue::empty_for_test();
+        let records = queue.records.lock().unwrap();
+        let (started_tx, started_rx) = mpsc::channel();
+        let (stopped_tx, stopped_rx) = mpsc::channel();
+        let stopping_queue = Arc::clone(&queue);
+        let stopper = std::thread::spawn(move || {
+            started_tx.send(()).unwrap();
+            stopping_queue.request_stop();
+            stopped_tx.send(()).unwrap();
+        });
+        started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let early_stop = stopped_rx.recv_timeout(Duration::from_millis(100)).is_ok();
+        drop(records);
+        if !early_stop {
+            stopped_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        }
+        stopper.join().unwrap();
+        assert!(
+            !early_stop,
+            "shutdown notified before the worker could atomically enter its wait"
+        );
+        assert!(queue.stopping.load(Ordering::Acquire));
     }
 }
