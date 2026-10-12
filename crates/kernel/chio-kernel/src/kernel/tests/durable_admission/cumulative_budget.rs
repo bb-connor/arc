@@ -533,7 +533,8 @@ fn nested_cumulative_approval_resumes_and_dispatches_once() -> Result<(), Box<dy
 }
 
 #[test]
-fn aggregate_invocation_budget_exhausts_across_grants_atomically() {
+fn aggregate_invocation_budget_exhausts_across_grants_atomically(
+) -> Result<(), Box<dyn std::error::Error>> {
     use chio_core::capability::aggregate_invocation::{
         AggregateInvocationBudget, AggregateInvocationScope,
     };
@@ -542,8 +543,53 @@ fn aggregate_invocation_budget_exhausts_across_grants_atomically() {
     first_grant.max_invocations = Some(1);
     let mut second_grant = make_grant("durable-server", "mutate-alt");
     second_grant.max_invocations = Some(1);
-    let (kernel, mut first, store, invocations) =
-        durable_admission_fixture_with_grants("aggregate-first", vec![first_grant, second_grant]);
+    let temp = tempfile::tempdir()?;
+    let database = temp.path().join("authority.db");
+    let lock_root = temp.path().join("locks");
+    let mut directories = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        directories.mode(0o700);
+    }
+    directories.create(&lock_root)?;
+    chio_store_sqlite::SqliteAuthorityStore::provision(&database, &lock_root)?;
+    let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
+    let operations = std::sync::Arc::new(authority.admission_operation_store());
+    let budget = std::sync::Arc::new(authority.budget_store());
+    let mut config = make_config();
+    config.policy_hash = sha256_hex(b"aggregate-invocation-policy");
+    let mut kernel = make_kernel(config);
+    kernel.set_durable_admission_store(
+        operations.clone(),
+        std::sync::Arc::new(authority.tool_outcome_store()),
+        authority.mutation_fence(),
+    )?;
+    kernel.set_budget_store_handle(budget.clone());
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer {
+        id: "durable-server".into(),
+        tools: vec!["mutate".into(), "mutate-alt".into()],
+        invocations: invocations.clone(),
+    }));
+    let agent = make_keypair();
+    let capability = make_capability(
+        &kernel,
+        &agent,
+        make_scope(vec![first_grant, second_grant]),
+        300,
+    );
+    let mut first = make_request_with_arguments(
+        "aggregate-first",
+        &capability,
+        "mutate",
+        "durable-server",
+        serde_json::json!({"value": "first"}),
+    );
     let mut body = first.capability.body();
     body.aggregate_invocation_budget = Some(AggregateInvocationBudget {
         scope: AggregateInvocationScope::Capability,
@@ -572,12 +618,40 @@ fn aggregate_invocation_budget_exhausts_across_grants_atomically() {
     assert_eq!(second_response.verdict, Verdict::Deny);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 
-    let second_grant_usage = store
-        .budget_store()
+    let second_grant_usage = budget
         .get_invocation_quota_usage(&crate::budget_store::BudgetQuotaKey::grant(
             first.capability.id.clone(),
             1,
         ))
         .expect("second grant quota lookup");
     assert!(second_grant_usage.is_none());
+    assert!(second_response.receipt.verify_signature()?);
+    assert_eq!(
+        second_response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| {
+                metadata
+                    .pointer("/chio_runtime/identity_disposition")
+                    .and_then(serde_json::Value::as_str)
+            }),
+        Some("terminal")
+    );
+    let second_operation =
+        operations.load_by_replay_key(&crate::admission_operation::AdmissionReplayKey {
+            request_namespace_digest: kernel
+                .authenticated_receipt_namespace(&second.request_id)?
+                .digest()
+                .clone(),
+            request_id: crate::admission_operation::AdmissionIdentifier::try_new(
+                "request_id",
+                second.request_id.clone(),
+            )?,
+        })?;
+    assert_eq!(
+        second_operation.map(|operation| operation.state()),
+        Some(AdmissionOperationState::Compensated)
+    );
+    Ok(())
 }

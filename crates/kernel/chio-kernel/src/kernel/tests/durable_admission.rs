@@ -292,8 +292,18 @@ impl ReceiptStore for TestAdmissionOperationStore {
             .terminal_replay()
             .cloned()
             .ok_or_else(|| ReceiptStoreError::Conflict("terminal replay is absent".to_owned()))?;
-        if let AdmissionTerminalProjection::Completed(completed) = projection {
-            state.receipt = Some(completed.receipt.receipt().clone());
+        match projection {
+            AdmissionTerminalProjection::Completed(completed) => {
+                state.receipt = Some(completed.receipt.receipt().clone());
+            }
+            AdmissionTerminalProjection::DeniedAfterDelivery { evidence, .. } => {
+                if let crate::admission_operation::AdmissionReceiptOrIncident::Receipt(receipt) =
+                    evidence.as_ref()
+                {
+                    state.receipt = Some(receipt.receipt().clone());
+                }
+            }
+            _ => {}
         }
         state.operation = Some(updated.clone());
         state.claim = None;
