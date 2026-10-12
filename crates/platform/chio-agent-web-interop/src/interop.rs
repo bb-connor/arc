@@ -28,6 +28,12 @@ mod evidence;
 mod policy;
 mod protocols;
 
+/// Ids of every source protocol registered in the projection manifest, in
+/// registration order.
+pub fn registered_source_protocol_ids() -> Vec<&'static str> {
+    protocols::registered_source_protocol_ids().collect()
+}
+
 use artifacts::{
     validate_envelope, validate_external_subject, validate_projection_manifest,
     AgentWebProofEnvelope, ProjectionManifest,
