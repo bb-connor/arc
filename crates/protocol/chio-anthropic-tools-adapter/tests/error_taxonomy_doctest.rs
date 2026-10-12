@@ -97,7 +97,8 @@ fn readme_taxonomy_envelopes_are_class_specific() -> Result<(), String> {
                 require_error_type(&row, "rate_limit_error")?;
             }
             "ContentPolicy" => {
-                require_body_string(&row, "/body/stop_reason", "refusal")?;
+                require_status(&row, 403)?;
+                require_error_type(&row, "permission_error")?;
             }
             "BadToolArgs" => {
                 require_body_string(&row, "/type", "tool_use")?;
@@ -364,5 +365,27 @@ fn require_provider_error<T>(
         ));
     }
 
+    Ok(())
+}
+
+#[tokio::test]
+async fn documented_forbidden_status_and_successful_refusal_take_distinct_paths(
+) -> Result<(), String> {
+    let row = taxonomy_rows()?
+        .into_iter()
+        .find(|row| row.class == "ContentPolicy")
+        .ok_or_else(|| "missing ContentPolicy row".to_string())?;
+    let code = u16::try_from(status(&row).ok_or_else(|| "missing status".to_string())?)
+        .map_err(|error| error.to_string())?;
+    let mock = Arc::new(MockTransport::new());
+    mock.push_error(chio_provider_adapter_core::http::HttpTransportError::Status { code });
+    let adapter = support::adapter(mock);
+    require_provider_error(adapter.send_messages(b"{}").await, "ContentPolicy")?;
+    require_provider_error(
+        adapter.lift_batch(raw(json!({
+            "stop_reason": "refusal", "content": [{"type": "text", "text": "refused"}]
+        }))?),
+        "Malformed",
+    )?;
     Ok(())
 }

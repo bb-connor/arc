@@ -128,7 +128,6 @@ fn readme_taxonomy_table_covers_adapter_visible_classes() -> Result<(), String> 
     let classes = classes(&rows);
     for required in [
         "RateLimited",
-        "ContentPolicy",
         "BadToolArgs",
         "Upstream5xx",
         "TransportTimeout",
@@ -140,6 +139,10 @@ fn readme_taxonomy_table_covers_adapter_visible_classes() -> Result<(), String> 
                 "README taxonomy did not cover ProviderError::{required}"
             ));
         }
+    }
+
+    if classes.contains("ContentPolicy") {
+        return Err("Bedrock has no native ContentPolicy classifier".into());
     }
 
     if classes.contains("Other") {
@@ -154,16 +157,12 @@ fn readme_taxonomy_envelopes_are_bedrock_specific() -> Result<(), String> {
     for row in taxonomy_rows()? {
         match row.class.as_str() {
             "RateLimited" => {
-                require_body_string(&row, "/event", "throttlingException")?;
-                require_body_string(&row, "/operation", "ConverseStream")?;
-                require_positive_u64(&row, "/retry_after_ms")?;
-                require_bedrock_source(&row)?;
-            }
-            "ContentPolicy" => {
-                require_status(&row, 200)?;
+                require_status(&row, 429)?;
+                require_body_string(&row, "/headers/x-amzn-errortype", "ThrottlingException")?;
                 require_body_string(&row, "/operation", "Converse")?;
-                require_body_string(&row, "/body/stopReason", "guardrail_intervened")?;
-                require_body_string(&row, "/body/trace/guardrail/action", "INTERVENED")?;
+                if number_at(&row, "/retry_after_ms")? != 1000 {
+                    return Err("Bedrock SDK throttling retry must be 1000 ms".into());
+                }
                 require_bedrock_source(&row)?;
             }
             "BadToolArgs" => {
@@ -178,7 +177,8 @@ fn readme_taxonomy_envelopes_are_bedrock_specific() -> Result<(), String> {
                 }
             }
             "Upstream5xx" => {
-                require_body_string(&row, "/event", "internalServerException")?;
+                require_body_string(&row, "/operation", "Converse")?;
+                require_body_string(&row, "/headers/x-amzn-errortype", "InternalServerException")?;
                 let status = status(&row)
                     .ok_or_else(|| "Upstream5xx envelope did not include status".to_string())?;
                 if !(500..600).contains(&status) {
@@ -202,8 +202,7 @@ fn readme_taxonomy_envelopes_are_bedrock_specific() -> Result<(), String> {
                 }
             }
             "Malformed" => {
-                require_body_string(&row, "/event", "contentBlockDelta")?;
-                require_body_string(&row, "/data/delta/toolUse/input", "{}")?;
+                require_body_string(&row, "/contentBlockDelta/delta/toolUse/input", "{}")?;
             }
             other => {
                 return Err(format!(
@@ -427,5 +426,110 @@ fn require_provider_error<T>(
         ));
     }
 
+    Ok(())
+}
+
+#[test]
+fn guardrail_only_response_and_captured_stream_exceptions_are_malformed() -> Result<(), String> {
+    let adapter = adapter()?;
+    require_provider_error(
+        adapter.lift_batch(raw(json!({
+            "stopReason": "guardrail_intervened",
+            "output": {"message": {"role": "assistant", "content": [{"text": "blocked"}]}},
+            "trace": {"guardrail": {"action": "INTERVENED"}}
+        }))?),
+        "Malformed",
+    )?;
+    for kind in ["throttlingException", "internalServerException"] {
+        let event = json!([
+            {"messageStart": {"role": "assistant"}},
+            {(kind): {"message": "captured failure"}}
+        ]);
+        let bytes = serde_json::to_vec(&event).map_err(|error| error.to_string())?;
+        let evaluated = std::cell::Cell::new(false);
+        let result = adapter.gate_converse_stream(&bytes, |_| {
+            evaluated.set(true);
+            Ok(allow_verdict())
+        });
+        require_provider_error(result, "Malformed")?;
+        assert!(!evaluated.get());
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn documented_converse_sdk_errors_preserve_exception_mapping(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use aws_sdk_bedrockruntime::config::retry::RetryConfig;
+    use aws_sdk_bedrockruntime::config::{
+        BehaviorVersion, Credentials, Region, SharedCredentialsProvider,
+    };
+    use aws_smithy_http_client::test_util::{ReplayEvent, StaticReplayClient};
+    use aws_smithy_types::body::SdkBody;
+    use chio_bedrock_converse_adapter::{AwsSdkTransport, ConverseRequest};
+
+    let mut rows = taxonomy_rows()?;
+    rows.push(TaxonomyRow {
+        class: "Upstream5xx".into(),
+        envelope: json!({"status":503,"headers":{"x-amzn-errortype":"ServiceUnavailableException"},"body":{"message":"unavailable"}}),
+        source: "Bedrock SDK Converse".into(),
+    });
+    for row in rows
+        .into_iter()
+        .filter(|row| matches!(row.class.as_str(), "RateLimited" | "Upstream5xx"))
+    {
+        let status = u16::try_from(status(&row).ok_or("missing status")?)?;
+        let exception = row
+            .envelope
+            .pointer("/headers/x-amzn-errortype")
+            .and_then(Value::as_str)
+            .ok_or("missing SDK exception header")?;
+        let request = http::Request::builder()
+            .method("POST")
+            .uri("https://bedrock-runtime.us-east-1.amazonaws.com/placeholder")
+            .body(SdkBody::empty())?;
+        let response = http::Response::builder()
+            .status(status)
+            .header("content-type", "application/json")
+            .header("x-amzn-errortype", exception)
+            .body(SdkBody::from(serde_json::to_vec(&row.envelope["body"])?))?;
+        let replay = StaticReplayClient::new(vec![ReplayEvent::new(request, response)]);
+        let sdk = aws_sdk_bedrockruntime::Config::builder()
+            .behavior_version(BehaviorVersion::v2026_01_12())
+            .retry_config(RetryConfig::disabled())
+            .region(Region::new("us-east-1"))
+            .credentials_provider(SharedCredentialsProvider::new(Credentials::new(
+                "AKIDEXAMPLE",
+                "secret",
+                None,
+                None,
+                "chio-taxonomy",
+            )))
+            .http_client(replay)
+            .build();
+        let transport =
+            AwsSdkTransport::from_client(aws_sdk_bedrockruntime::Client::from_conf(sdk));
+        let config = BedrockAdapterConfig::new(
+            "sdk-taxonomy",
+            "Example",
+            "1",
+            "00",
+            "arn:aws:iam::123456789012:user/example",
+            "123456789012",
+        );
+        let adapter = BedrockAdapter::new(config, Arc::new(transport))?;
+        let request = ConverseRequest::new(
+            "anthropic.claude-3-sonnet-20240229-v1:0",
+            vec![json!({"role":"user","content":[{"text":"test"}]})],
+        );
+        let result = adapter.converse(request).await;
+        if let Err(ProviderError::RateLimited { retry_after_ms, .. }) = &result {
+            assert_eq!(*retry_after_ms, 1000);
+        }
+        if let Err(ProviderError::Upstream5xx { status: actual, .. }) = &result {
+            assert_eq!(*actual, status);
+        }
+        require_provider_error(result, &row.class)?;
+    }
     Ok(())
 }

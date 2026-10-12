@@ -1,139 +1,100 @@
-# chio-mcp-remote architecture
+# Architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-mcp-remote` is the network edge for Chio's hosted MCP surface. It runs
-an Axum HTTP service that authenticates every inbound request, then drives a
-per-session `chio-kernel` instance that evaluates guards and signs receipts
-for each tool call. The crate itself enforces no policy: it is the admission
-and session-lifecycle layer in front of the kernel, which is the actual trust
-boundary. Every fallible path (store, policy, egress, or kernel construction)
-fails closed.
+`serve_http(RemoteServeHttpConfig)` runs the hosted MCP service synchronously.
+The runtime owns HTTP admission, authenticated sessions, subprocess workers,
+SSE response ownership, replay, administrative routes, and session recovery.
+The configuration supplies policy, publisher admission, native launch authority,
+listener transport, credentials, egress contracts, and persistence paths.
+`RemoteClock`, `TrustedProxyConfig`, and `RemoteApprovalConfig` expose supporting
+configuration boundaries; OAuth error types preserve structured rejection codes.
 
-## Module map
+Operators own credential custody, upstream command authorization, policy choice,
+and deployment acceptance. Native launch uses an explicit factory supplied by
+the host. Ordinary session construction rejects flow-required manifests because
+it constructs an ordinary kernel without an active-defense flow host.
 
-`lib.rs` composes the crate unconventionally. `admin.rs` and
-`session_store.rs` are declared as real modules via `#[path]`
-(`remote_mcp_admin`, `remote_mcp_session_store`); every other
-`remote_mcp/*.rs` file is spliced into the crate root with `include!`, so
-their items share `lib.rs`'s namespace without `super::` qualification. Two
-of the spliced files declare their own nested real modules the same way:
-`session_core.rs` for `session_core/{session,factory,ledger}.rs`, and
-`oauth.rs` for
-`oauth/{local_server,request_validation,helpers,bearer_auth,jwt_support}.rs`;
-those nested modules pull the crate-root namespace back in with
-`use super::*`.
+## Structure
 
-| Path | Responsibility |
-|------|----------------|
-| `src/input.rs` | Bounded original-byte JSON readers, administrative extractor and typed local error custody. |
-| `src/lib.rs` | Crate root: `include!`/`mod` wiring, `pub use chio_control_plane::{CliError, JwtProviderProfile}`. |
-| `src/remote_mcp/http_service.rs` | `serve_http`/`serve_http_async`, Axum router assembly, MCP POST/GET/DELETE handlers, SSE streaming, per-IP rate limiter, peer-capability parsing. |
-| `src/remote_mcp/http_service_auth.rs` | Request admission: session-id header typing, auth-mode construction, discovery-metadata building, request-time authorization-detail/transaction-context parsing and validation, DPoP sender-constraint verification. |
-| `src/remote_mcp/admin.rs` (real module `remote_mcp_admin`) | `/admin/*` routes: health, authority status/rotation, tool/child receipts, revocations, budgets, session trust/drain/shutdown, Prometheus metrics. |
-| `src/remote_mcp/oauth.rs` (+ `oauth/`) | Bearer/JWT/introspection authentication (`bearer_auth.rs`); JWT decode and RSA/EC/Ed25519 signature verification (`jwt_support.rs`); the self-issued `LocalAuthorizationServer` (`local_server.rs`); OAuth request validation (`request_validation.rs`); shared signing/error helpers (`helpers.rs`). |
-| `src/remote_mcp/session_core.rs` (+ `session_core/`) | `RemoteServeHttpConfig` and session/auth-mode types; `RemoteSessionFactory` spawn/restore (`factory.rs`); `RemoteSession` per-session state machine (`session.rs`); `RemoteSessionLedger` active/terminal bookkeeping (`ledger.rs`). |
-| `src/remote_mcp/session_identity.rs` | OIDC discovery, JWKS resolution, JWK-to-public-key parsing, enterprise-provider matching, federated principal and agent-keypair derivation. |
-| `src/remote_mcp/session_resume.rs` | Auth-contract and policy fingerprinting; resumable-session integrity-tag computation and validation. |
-| `src/remote_mcp/session_shared_upstream.rs` | `SharedUpstreamOwner`/`SharedUpstreamToolServer` for `shared_hosted_owner` mode: one upstream MCP subprocess fanned out to many sessions. |
-| `src/remote_mcp/session_forms.rs` | Admin query structs and OAuth authorization/token request forms (serde types only). |
-| `src/remote_mcp/session_store.rs` (real module `remote_mcp_session_store`) | SQLite persistence for active-session resume records and terminal tombstones (`remote_active_sessions`, `remote_session_tombstones`). |
+`lib.rs` combines private modules and included session/service fragments.
+`remote_mcp/session_core` splits factory, session, ledger, writer, and authority
+mode logic. Identity, forms, credentials, resume, recovery, and shared-upstream
+files implement the associated lifecycle boundaries.
+`http_service` and `http_service_auth` install routes and authentication state.
+`http_body` owns bounded POST reads; `session_worker` runs edge workers.
+`oauth` splits bearer/JWT support, request validation, and local server code.
+`approvals` separates records, validation, and redemption.
+`admin` exposes authenticated operator operations and revocation batches.
+`input`, `sender_constraint`, and `transport_identity` preserve ingress provenance.
+`clock` and `rate_limit` share authority time and bounded rate windows.
 
-## Session lifecycle
+## Data and control flow
 
-1. `serve_http` blocks on a fresh Tokio runtime and calls `serve_http_async`,
-   which resolves the auth mode, OAuth discovery metadata, and the optional
-   local authorization server, then restores any sessions persisted at
-   `session_db_path` before the listener accepts connections.
-2. Every `/mcp` request passes `validate_origin` (no `Origin`, or localhost
-   only) and `authenticate_session_request`, which dispatches to the
-   configured `RemoteAuthMode` and returns a `SessionAuthContext`.
-3. An `initialize` request spawns a session:
-   `RemoteSessionFactory::spawn_session` loads policy, builds or reuses the
-   upstream `AdaptedMcpServer`, constructs a `chio-kernel` wired to the
-   receipt/revocation/authority/budget stores, issues default capabilities,
-   and starts a `ChioMcpEdge` worker thread reachable only through an `mpsc`
-   channel.
-4. Established requests re-validate `MCP-Session-Id`, protocol version, and
-   that the request's `SessionAuthContext` matches the session's; the
-   message is sent to the worker and responses/notifications stream back
-   over SSE through a `broadcast` channel, with `Last-Event-ID` replay from a
-   bounded retained window.
-5. `mark_ready` persists a resumable record after a successful initialize; a
-   background `session_reaper_loop` polls
-   `RemoteSessionLedger::cleanup_due_sessions` to expire idle sessions,
-   finish draining sessions past their grace deadline, and purge old
-   tombstones.
-6. On restart, `restore_session` re-derives the auth and policy fingerprints,
-   checks the stored resume-integrity tag, and re-validates peer
-   capabilities before resuming a session without a new `initialize`.
+`serve_http` creates a Tokio runtime and enters private async serving.
+Startup prepares TLS or explicit plaintext transport, authenticates configured
+proxy separation, binds the listener, resolves identity-provider metadata,
+and validates auth/discovery configuration.
+`RemoteSessionFactory::new` loads policy and a publisher-signed manifest using
+an independently registered key, validates store participation and launch
+binding, and opens configured durable admission and resume custody.
+Persisted sessions are restored before routes begin serving.
 
-## Invariants and failure modes
+POST `/mcp` initializes sessions and accepts subsequent JSON-RPC messages.
+Initialize returns SSE with `MCP-Session-Id`; clients acknowledge initialization
+before using ready-state methods. GET provides session notifications/replay,
+while DELETE closes a session. `Last-Event-ID` identifies the replay cursor.
+Request-correlated replies remain attached to their POST response owner.
+Session-owned events can enter GET replay; the default retained window is 64.
+Shared-owner mode serializes upstream work while retaining per-session tasks.
 
-- A session never reaches `Ready` without capabilities, a kernel, and a
-  running edge worker: any store, policy, or kernel-construction error
-  during spawn or restore aborts the session instead of returning a partial
-  one.
-- `--auth-token` and `--admin-token` are validated when the auth mode and
-  admin token are built (non-empty, unpadded, control-character-free) before
-  they can seed `RemoteAuthMode::StaticBearer` or admin authorization.
-- `--auth-introspection-url` and OIDC discovery/JWKS fetches require an
-  `HttpEgressContract`; without one, the verifier or discovery path returns
-  an error instead of dispatching the request.
-- Resumable session records carry a SHA-256 integrity tag over a canonical
-  envelope, keyed by authority/seed/control-token material
-  (`derive_resume_record_integrity_seed`); `restore_session` rejects a record
-  with a missing, mismatched, or unkeyable tag.
-- `transition_to_terminal` is idempotent: a session already in a terminal
-  state short-circuits, so a racing reaper expiry and admin shutdown cannot
-  overwrite each other's tombstone.
-- Admin routes require a same-origin/localhost `Origin` and a constant-time
-  bearer comparison (`subtle::ConstantTimeEq`); an unset admin token rejects
-  every admin request.
-- `MCP-Session-Id` admission is typed (`Missing`/`Invalid`/`Valid`):
-  established-session requests require a valid header, `initialize` rejects
-  any header at all.
+A session worker wraps an admitted MCP server in a kernel-backed edge.
+Shutdown terminalizes sessions, commits replay fences, closes transport evidence
+custody, and finalizes diagnostic tombstones before closing a shared owner.
+
+## Trust and invariants
+
+Authentication supports static bearer, configured JWT keys, discovered keys,
+introspection, and local signing-key verification. Conflicting modes reject
+startup. Missing authentication also rejects startup.
+Introspection requires an egress contract and validates its URL/DNS binding.
+Local authorization routes exist in code; the protocol describes a separate
+acceptance boundary for the hosted authorization-server product.
+
+`read_limited_mcp_post_body` rejects invalid lengths and bounds reads at 8 MiB.
+MCP middleware allows 600 requests per 60-second socket-derived IP bucket.
+IPv4-mapped addresses normalize and IPv6 buckets use their /64 prefix.
+The limiter retains at most 4,096 keys and evicts the earliest deadline at capacity.
+`RemoteClock` shares high-water fences across cloned service owners.
+
+Trusted proxy configuration requires explicit socket peer IPs and a private
+32-512 byte ASCII token separate from service credentials.
+Proxy middleware strips identity headers and attaches authenticated provenance.
+Caller-supplied forwarding headers do not authenticate that provenance.
+Durable resume uses a dedicated HMAC keyring and runtime binding fingerprints.
+Default lifecycle settings expire idle sessions after 15 minutes, allow five
+seconds for draining, reap every 250 ms, and retain tombstones for 30 minutes.
+Environment settings can change those lifecycle defaults.
+SSE routes have no blanket request timeout; connection hygiene and drain
+limits remain active. Operators must account for idle streaming connections.
 
 ## Dependencies
 
-- `chio-mcp-adapter` supplies `AdaptedMcpServer`, `McpAdapter`,
-  `StdioMcpTransport`, and the re-exported `edge::*` (`ChioMcpEdge`,
-  `McpEdgeConfig`, `McpTransport`) this crate builds sessions on.
-- `chio-kernel` supplies `ChioKernel`, guard/session/DPoP types, and the
-  receipt/budget/revocation traits; one kernel instance runs per session.
-- `chio-control-plane` supplies policy loading, authority keypair
-  management, store configuration (`configure_receipt_store`,
-  `configure_revocation_store`, `configure_capability_authority`,
-  `configure_budget_store`), and the `CliError`/`JwtProviderProfile` types
-  re-exported at the crate root.
-- `chio-core` is aliased: the `chio-core` dependency in `Cargo.toml` points
-  at the `chio-core-types` package, so `chio_core::` in this crate's source
-  is `chio-core-types`.
-- `chio-egress-contract` (`reqwest-egress` feature) gates every outbound
-  HTTP call: OIDC discovery, JWKS, and token introspection.
-- `chio-store-sqlite` backs the receipt, revocation, budget, and
-  capability-authority stores; `rusqlite` directly backs this crate's own
-  session/tombstone tables.
-- `chio-http-serve` supplies connection capping, server hygiene (timeouts,
-  drain), and graceful shutdown for the Axum server.
-- `chio-metrics-spec` renders the alert-pack families composed into
-  `/admin/metrics` alongside `chio_kernel::render_guard_metrics_prometheus`.
-- External: `axum` (HTTP/SSE), `async-stream` (SSE generators), `reqwest`
-  with `rustls` (egress-contracted HTTP client), `rsa`/`p256`/`p384`/`sha2`/
-  `subtle` (JWT signature verification and constant-time comparison), `url`,
-  `base64`.
+`chio-control-plane` builds kernels, policy, authority, and trust-control clients.
+`chio-mcp-adapter` supplies subprocess wrapping and shared edge contracts.
+`chio-store-sqlite` and Rusqlite supply configured persistence.
+`chio-http-serve` supplies listener transport, connection hygiene, and shutdown.
+`chio-egress-contract` gates identity-provider HTTP; Reqwest performs requests.
+Axum/Tokio host routes and workers; cryptographic crates support JWT and HMAC.
+`chio-secure-ipc` and security types carry custody and authority primitives.
 
-## Original-byte and launch boundaries
+## Verification
 
-MCP envelopes and retained session records have an 8 MiB parsing bound;
-administrative, approval and embedded authorization JSON use 64 KiB bounds,
-and credential exchange retains its tighter 16 KiB body limit. JWT/DPoP encoded
-input is bounded before base64 allocation. Duplicate keys are rejected before
-conversion to `Value`. HTTP responses carry typed parser/encoding errors in
-local extensions and expose redacted codes on the wire. The HMAC keyring keeps
-strict typed deserialization, a bounded nofollow read and zeroizing secret owners.
-
-Native runtime factories require `CageRequiredLaunch`. Test transport injection
-and explicit lifecycle configuration exist only under `cfg(test)`; hosted HTTP
-scenarios live in `remote_mcp/hosted_tests`. Remote ambient OAuth/session/rate
-clocks remain queued and are now included in the clock inventory.
+Run `cargo test -p chio-mcp-remote` for controlled runtime tests.
+`remote_mcp/tests` covers bearer verification, DPoP replay, durable bounds,
+clock custody, transport ownership, worker lifecycle, and session recovery.
+`hosted_tests` exercises HTTP auth, isolation, admin, protocol refusals,
+operator approvals, and cross-crate kernel dispatch using configured fixtures.
+Transport identity and rate-limit tests cover provenance and availability bounds.
+These fixtures establish exercised service behavior; deployment custody,
+identity-provider operation, and external client interoperability need host evidence.

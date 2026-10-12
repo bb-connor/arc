@@ -1,60 +1,85 @@
 # chio-mistral-tools-adapter architecture
 
-## Overview
+## Responsibility and boundary
 
-The crate is an edge component: it faces the untrusted Mistral `chat/completions` API on one side and the `chio_tool_call_fabric` contract on the other. It does not evaluate policy itself; callers supply a verdict-evaluator closure (`FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>`), and every send, lift, gate, and lower path re-checks the pinned API version before that closure or the network is touched. Mistral is OpenAI-compatible, so wire decoding and SSE gating are shared primitives from `chio-provider-adapter-core`; this crate supplies only the Mistral-specific transport, config, and version pin.
+`MistralAdapter` converts Mistral native traffic to the shared
+`ToolInvocation` representation. `MistralAdapterConfig` holds server metadata,
+the API identifier, and the configured project_id provenance label.
+The adapter owns parsing and projection. The host owns kernel evaluation,
+tool execution, credentials, and the lifecycle of authoritative receipts.
+Provider labels and captured verdicts do not independently establish authority.
 
-## Module map
+`send_chat_completion` connects the configured transport to batch lifting.
+`lower_function_response` converts an evaluator result into native output.
+The synchronous lift and lower APIs support recorded inputs without services.
 
-| Path | Responsibility |
-|---|---|
-| `src/lib.rs` | `MistralAdapter`, `MistralAdapterConfig`, `MistralChatRequest`; send/lift/lower entry points; the API-version guard (`ensure_supported_api_version`); the `Provider` impl. |
-| `src/transport.rs` | `Transport` trait; `MistralHttpTransport` (real HTTPS client, bearer auth); `MockTransport` (scripted, hermetic); pinned endpoint/version/env-var constants. |
-| `src/native.rs` | `FunctionCallPart` / `FunctionResponsePart` - normalized decoded-call and lowered-response shapes. |
-| `src/response.rs` | Response-envelope unwrapping, `content_filter` classification, `tool_calls[]` extraction. Crate-private. |
-| `src/streaming.rs` | `gate_sse_stream` - SSE gating for `chat.completion.chunk` frames via the shared `gate_openai_sse_tool_calls` primitive. |
-| `src/loaded_weights.rs` | `LoadedWeights` impl reporting Mistral runtime weights as unavailable. |
-| `src/tests.rs` | Adapter-level unit tests (`#[cfg(test)]`). |
+## Structure
 
-## Request lifecycle
+lib.rs owns MistralChatRequest, admission, lifting, and lowering.
+response.rs extracts native calls and classifies content-filter finishes.
+streaming.rs delegates chunk assembly to the shared OpenAI-compatible gate.
+transport.rs owns outbound provider request wiring and mock transport support.
+loaded_weights.rs implements the explicit unavailable-model-bytes contract.
+Native wire types live in native.rs and are serialized with serde.
 
-Non-streaming (`send_chat_completion`):
+The adapter retains its configuration and an Arc-owned transport.
+Registry construction adds admitted bridge-security metadata for exposed tools.
+Cloned handles retain the configured transport and admission snapshot.
 
-1. Caller builds a `MistralChatRequest` and calls `send_chat_completion`.
-2. `ensure_supported_api_version` requires `config.api_version` and `transport.api_version()` to both equal `MISTRAL_API_VERSION`; either drifting fails closed before serialization.
-3. `MistralChatRequest::to_json_bytes` rejects an empty `model` or empty `messages`, then serializes.
-4. `Transport::chat_completion` POSTs the body (`MistralHttpTransport` hits `POST /v1/chat/completions` with `Authorization: Bearer <key>`; `MockTransport` returns a scripted response and records the call).
-5. `lift_batch` unwraps the response envelope, classifies `finish_reason: content_filter` as `ContentPolicy`, and extracts every `choices[].message.tool_calls[]` entry; no `tool_calls` at all is itself a `Malformed` error, not an empty success.
-6. Each entry becomes a `ToolInvocation`: `id`/`name` must be non-empty and untrimmed, `args` must be a JSON object, and the arguments are re-encoded to canonical JSON (RFC 8785) with a `Principal::MistralProject` provenance stamp.
-7. The caller evaluates each invocation and calls `lower_function_response`; allow applies JSON-Pointer redactions, deny renders a `{"error": ...}` payload naming the deny reason.
+## Data and control flow
 
-Streaming (`send_chat_completion_stream`):
+choices[].message.tool_calls entries carry ids and function arguments. Results use tool-role responses with the matching call id.
 
-1. The request is cloned with `stream = true`; the API-version pin is re-checked before the POST.
-2. `Transport::chat_completion_stream` reads chunks under the shared response cap and total deadline, then supplies the bounded complete body to the gate.
-3. `gate_sse_stream` strictly parses original SSE JSON, assembles bounded argument fragments under stable call identities, and requires each choice to finish successfully before `[DONE]`. Every invocation is prepared before any evaluator runs. Provider errors and malformed or incomplete tails deny the whole stream.
-4. An allow verdict carrying redactions, or any deny verdict, fails the whole stream closed rather than partially forwarding a gated chunk.
-5. The result is a `GatedSseStream` (`GatedStream` alias): forwardable bytes plus the invocations and verdicts observed in stream order.
+Original provider bytes pass through bounded JSON ingress before projection.
+Batch extraction constructs native tool-call values, validates required fields,
+canonicalizes object arguments, and stamps provider provenance.
+The resulting invocation carries registry metadata when admission is installed.
+A caller then routes it to evaluation and execution using the fabric contract.
 
-## Invariants and failure modes
+Buffered streaming assembles tool-call content before returning forwardable bytes.
+The evaluator receives a complete invocation rather than a partial argument delta.
+An error or denied verdict terminates the gate with no successful output value.
+Allow verdicts requesting stream redactions are rejected because original
+forwarded bytes cannot represent those requested modifications safely.
+Batch lowering can apply supported redactions to structured results.
 
-- The `2025-04` pin is checked on every public entry point against both `config.api_version` and `transport.api_version()`; a deserialized config or a custom `Transport` claiming a stale contract cannot stamp `2025-04` provenance against a drifted snapshot.
-- Transport failures fail closed: a timeout, non-2xx status, or `MockTransport` exhaustion becomes a `ProviderError`, never an empty success.
-- `validate_function_call` rejects empty or whitespace-padded `id`/`name` and non-object `arguments` before a `ToolInvocation` is built.
-- Streaming gating never forwards a `tool_calls` frame ahead of its verdict, and fails closed on an allow-with-redactions or a deny rather than partially applying it.
-- `MistralHttpTransport::from_env` fails closed (`HttpTransportError::MissingEnvVar`) when `MISTRAL_API_KEY` is unset or empty rather than authenticating with an empty bearer token.
-- `MockTransport` responses are FIFO-scripted; an unscripted call fails closed (`TransportError::MockExhausted`) rather than blocking or returning empty bytes.
+## Trust and invariants
+
+The basic constructor produces projections without manifest authority.
+new_with_registry binds the admitted manifest and tool security sidecars.
+Streaming evaluation requires these registry coordinates before invoking the evaluator.
+
+Registry construction matches configured name, version, and public key to the
+admitted server. Native names and arguments remain untrusted provider input.
+Canonical JSON stabilizes argument bytes; it does not sign the invocation.
+The provider principal in provenance is distinct from Chio capability authority.
+
+MistralChatRequest::to_json_bytes rejects a blank model or empty messages.
+The transport targets /v1/chat/completions using bearer authentication.
+Batch content-filter responses reject before extraction. Stream assembly
+uses the shared tool-call gate and requires admitted security sidecars.
 
 ## Dependencies
 
-Internal: `chio-tool-call-fabric` supplies the provider-agnostic contract (`ToolInvocation`, `VerdictResult`, `ProviderError`, `ProviderId`, `Principal`, `ProvenanceStamp`, `DenyReason`, `Redaction`, `ToolResult`, `ProviderRequest`). `chio-provider-adapter-core` supplies the shared HTTP transport (`HttpTransport`, `AuthScheme`, `map_transport_error`), SSE parsing and gating (`gate_openai_sse_tool_calls`), the OpenAI-compatible `tool_calls[]` decoder (`openai_tool_call_to_function_call`, `response_body`), the `Provider` trait, and `impl_unavailable_loaded_weights!`. `chio-core` is aliased to `chio-core-types` in `Cargo.toml`; used directly for `canonical::canonical_json_bytes` and indirectly for the `LoadedWeights` impl the `impl_unavailable_loaded_weights!` macro expands into `loaded_weights.rs`.
+chio-tool-call-fabric defines invocation, provenance, verdict, and error types.
+chio-provider-adapter-core supplies bounded ingress and shared transport or
+stream helpers. chio-core-types supplies canonical encoding and loaded-weight
+contracts. chio-manifest supplies admitted tool security and manifest validation.
+serde and serde_json handle native projection; thiserror defines local errors.
 
-External: `async-trait` for the `Transport` trait; `serde`/`serde_json` for wire and config types; `thiserror` for `TransportError` and `MistralAdapterError`; `tokio` for the async runtime. Dev-only: `wiremock` backs `tests/live_transport.rs`.
+## Verification
 
-## Extension points
+Run `cargo test -p chio-mistral-tools-adapter` for the package's default test surface.
+The source includes live_transport.rs, registry_security.rs, and src/tests.rs.
+`tests/error_taxonomy_doctest.rs` reads README markers and native JSON examples.
+Preserve that table's four columns when editing error documentation.
 
-- `transport::Transport` - implement to point the adapter at a different HTTP client or test double; the crate ships `MistralHttpTransport` for production and `MockTransport` for hermetic tests.
+Local transport tests and captured streams exercise parser and conversion behavior.
+They do not establish hosted-provider reliability or production acceptance.
+Use the provider-conformance fixture feature for deterministic corpus replay.
 
-## Public surface
+## Navigation
 
-The adapter owns the Mistral wire boundary and provenance stamp. The kernel owns policy evaluation. Provider responses must pass the shared bounded decoder before a caller receives a tool invocation.
+- [Usage and status](README.md)
+- [Shared provider primitives](../chio-provider-adapter-core/ARCHITECTURE.md)
+- [Protocol authority boundary](../../../spec/PROTOCOL.md#3-components-and-trust-boundaries)

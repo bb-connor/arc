@@ -1,80 +1,85 @@
-# chio-mcp-adapter architecture
+# Architecture
 
-## Overview
+## Responsibility and boundary
 
-The adapter is an untrusted edge component. It speaks MCP to an upstream server
-on one side and the Chio `ToolServerConnection` contract to the kernel on the
-other, so the kernel mediates every wrapped call. Module boundaries stay
-distinct at the crate root (`lib.rs` does not flatten them) to keep the edge,
-native, transport, framing, and manifest surfaces separable. Hosting behavior is
-deliberately absent; it belongs to `chio-mcp-edge`.
+`McpAdapter` owns an MCP transport and the server identity assigned by its host.
+It translates tool discovery into a Chio manifest and maps invocation results.
+`AdaptedMcpServer` implements the kernel's `ToolServerConnection` contract.
+Resource and prompt providers connect the corresponding MCP operations to Chio.
+The adapter also reexports shared edge APIs through its `edge` module.
 
-## Module map
+Calling `McpAdapter::invoke` directly delegates to the transport.
+Capability validation, guard evaluation, and receipt signing require the host
+kernel's dispatch path. `McpAdapter::new` accepts custom transports without
+establishing native launch evidence or authenticating discovered metadata.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Declares the public modules and re-exports MCP edge contracts under `edge`. |
-| `src/adapter.rs` | `McpAdapterConfig`, `McpAdapter`, and `SerializedMcpTransport` (shared upstream transport). |
-| `src/server.rs` | `AdaptedMcpServer` and its kernel `ToolServerConnection` implementation. |
-| `src/transport.rs` (+ `transport/`) | Stdio JSON-RPC routing, bounded frame reads, initialization, notification buffering, nested-flow handling, cancellation. |
-| `src/framing.rs` | MCP stdio frame decoding (newline delimiter, size, UTF-8, JSON), shared by the transport and the fuzz entry point. |
-| `src/manifest.rs` | Projection from `McpToolInfo` into Chio `ToolDefinition`, schema validation, annotation-to-side-effect translation. |
-| `src/result_mapping.rs` | Wrapped MCP tool-result normalization. |
-| `src/resources.rs` / `src/prompts.rs` | Resource and prompt provider forwarding, including completion. |
-| `src/url_elicitation.rs` | URL-required elicitation admission and validation. |
-| `src/errors.rs` | Adapter-error to kernel-error mapping. |
-| `src/native.rs` | `NativeChioServiceBuilder` and in-process tool/resource/prompt handlers. |
-| `src/loaded_weights.rs` | Explicit "unavailable" model-weights implementation for MCP surfaces. |
-| `src/fuzz.rs` | Feature-gated MCP envelope parse entry point for the fuzz workspace. |
+## Structure
 
-## Framing and routing
+- `adapter` implements adapter configuration and shared transport serialization.
+- `server` implements kernel registration, invocation, and cost metadata lookup.
+- `manifest` projects tools and compares discovery with admitted manifests.
+- `transport` implements stdio, writer ownership, deadlines, and nested flows.
+- `native` builds in-process tools, resources, and prompts with handlers.
+- `resources` and `prompts` implement kernel-facing provider adapters.
+- `loaded_weights` reports that native loaded model bytes are unavailable.
+- `result_mapping`, `errors`, and `url_elicitation` translate protocol outcomes.
+- `framing` supplies test/fuzz decoding; `fuzz` is feature gated.
 
-MCP stdio is newline-delimited JSON-RPC. `framing.rs` decodes one frame at a
-time and enforces the delimiter, a maximum frame size, UTF-8, and JSON parse in
-one place. The production transport and the fuzz entry point both route through
-it, so fuzz coverage matches the production parse boundary. `SerializedMcpTransport`
-shares a single upstream transport across Chio sessions; every call that touches
-the shared transport (including `drain_notifications`) passes through
-`with_request_gate`, while immutable `capabilities()` reads stay ungated to avoid
-deadlock on cached reads.
+## Data and control flow
 
-## Trust invariants and failure modes
+A subprocess host supplies `CageRequiredLaunch` to `McpAdapter::from_command`.
+The timeout-aware constructor checks the launch server ID, spawns the transport,
+and requires fully enforced evidence and a persisted enforcement receipt.
+Transport startup performs the MCP initialize handshake.
+A caller-provided transport can instead be passed to `McpAdapter::new`.
 
-- The stdio reader rejects EOF before the newline delimiter for a non-empty
-  frame: a delimiterless final object is not a complete frame. `read_bounded_line`
-  also enforces the maximum frame size.
-- Manifest projection preserves MCP annotation semantics: missing or malformed
-  safety hints imply side effects, and `destructiveHint=true` overrides
-  `readOnlyHint=true`.
-- Result normalization inserts `isError: false` only when an MCP-shaped success
-  omits it, matching `chio-mcp-edge`'s `value_to_tool_result`. Explicit upstream
-  `isError` values and both `content` and `structuredContent` bytes are preserved.
-- `url_elicitation.rs` maps upstream `-32042` errors to
-  `KernelError::UrlElicitationsRequired`, validates each operation's `message`,
-  `url`, and `elicitationId`, and rejects empty or padded identifiers and
-  non-HTTP(S) or userinfo-bearing URLs. Form-mode and mixed-mode elicitations are
-  rejected on the wrapped-tool path.
-- The crate fails closed on malformed upstream metadata, JSON-RPC parse errors,
-  transport failures, nested-flow denials, and cancellation.
+`generate_manifest` lists upstream tools, projects schemas and safety hints,
+and calls `chio_manifest::validate_manifest`.
+`AdaptedMcpServer::new` retains this discovery-derived manifest.
+`new_with_manifest_registry` matches that surface against an admitted manifest
+and retains the publisher's security sidecars for kernel use.
+Construction failures shut down the adapter and retain shutdown failures.
+
+Kernel invocation enters `AdaptedMcpServer`, which forwards dispatch identity
+through `invoke_in_context` and maps MCP content and structured content.
+The default `McpTransport::call_tool_in_context` falls back to plain invocation;
+custom transports must implement contextual delivery when it is required.
+`SerializedMcpTransport` gates upstream calls for shared owners.
+Shutdown bypasses that gate so the underlying transport can cancel active work.
+
+## Trust and invariants
+
+Projection requires input and optional output schemas to be JSON objects.
+Missing read-only hints, malformed booleans, and destructive hints produce
+side-effecting tools requiring approval in the generated manifest.
+Discovery matching checks schema, server identity, display metadata, key,
+tool count, descriptions, schemas, and projected safety annotations.
+The matcher requires admitted `server_tools` to be empty.
+It does not verify a signature itself; registry admission owns that check.
+
+Native constructors require cage authorization and terminal evidence custody.
+Stdio transport owns bounded frames, buffered-message accounting, request
+deadlines, cancellation, and removal of Chio credential environment variables.
+Those guarantees apply to the supplied stdio implementation.
+The public transport trait permits other implementations with different I/O.
+Notification-drain gate failures are logged and return an empty list.
 
 ## Dependencies
 
-`chio-kernel` supplies the `ToolServerConnection` contract and kernel error
-types. `chio-mcp-edge` supplies the MCP protocol runtime and the contracts
-re-exported under `edge`. `chio-manifest` supplies `ToolDefinition`. The
-`chio-core` dependency is aliased to `chio-core-types`. `tokio`, `async-trait`,
-and `tracing` support the async transport.
+`chio-mcp-edge` supplies transport types and edge contracts.
+`chio-manifest` validates surfaces and retains admitted security metadata.
+`chio-kernel` supplies invocation and provider interfaces.
+`chio-cage` supplies native launch enforcement; core and security types carry
+identities, receipts, and clocks. Tokio supports transport execution, while
+Serde, JSON, URL, Chrono, and tracing support protocol data and diagnostics.
 
-## Extension points
+## Verification
 
-`NativeChioServiceBuilder` is the authoring surface for an in-process tool
-server: register tool, resource, and prompt handlers and emit a manifest without
-adapting an external MCP process.
-
-`transport/stdio_writer.rs` owns bounded write admission and supervisor dispatch.
-A queued command carries its original monotonic deadline, checked before both
-queue admission and physical write initiation. This does not make an already
-started blocking OS write cancellable. Task TTLs are checked independently in
-`transport/nested_flow.rs`; its 128-entry registry refuses excess pending work.
-These modules preserve request ownership on clock faults and retain terminal
-outcomes even when result encoding fails after the bridge effect.
+Run `cargo test -p chio-mcp-adapter` for unit and integration tests.
+`src/tests.rs` checks safety hints, schema shape, manifest projection, and results.
+`src/manifest.rs` tests discovery matching and admitted-sidecar handling.
+Transport tests cover frame bounds, nested callbacks, deadlines, and writer races.
+`tests/integration_smoke.rs` uses an in-memory edge as an MCP peer and exercises
+manifest discovery plus a tool call through real JSON-RPC envelopes.
+These tests establish the exercised adapter paths and controlled peer behavior.
+The deployment host must validate its cage, policy, stores, and upstream peer.

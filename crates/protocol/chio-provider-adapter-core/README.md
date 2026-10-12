@@ -1,95 +1,48 @@
 # chio-provider-adapter-core
 
-Shared primitives for Chio's native provider-tool adapters (OpenAI, Anthropic,
-Bedrock, Gemini, Groq, Mistral, Cohere, Ollama). It owns the mechanics that are
-identical across providers - HTTP transport, SSE/NDJSON framing, verdict-gated
-stream forwarding, and HTTP error classification - so each adapter crate only
-encodes its provider's request shape, auth scheme, and response fields.
+Shared provider-adapter primitives for HTTP transport, bounded original JSON,
+SSE framing, response envelopes, and OpenAI-compatible tool-call assembly.
+Provider-specific adapters supply endpoint details, identity projection,
+manifest admission, and evaluator callbacks.
 
-The crate is a pure library: it forbids `unsafe`, holds no kernel state, and
-does not implement `ProviderAdapter` itself. That trait and the canonical
-`ToolInvocation` shape live in `chio-tool-call-fabric`; this crate supplies the
-transport, framing, and gating primitives a `lift`/`lower` implementation is
-built from.
+## Usage
 
-## Responsibilities
+Parse one SSE frame offline and preserve its original bytes for forwarding.
+The parser validates framing and JSON; it does not evaluate a tool call.
 
-- Own the async HTTP transport (`ProviderHttpTransport`) that HTTP-backed
-  adapters post through: client construction, auth header/query injection,
-  timeout, and a hermetic scripted mock for tests.
-- Parse upstream SSE and NDJSON streams into structured frames, retaining
-  original bytes for exact forwarding.
-- Classify upstream HTTP failures (status codes, connect/timeout/decode
-  errors) into the shared `chio-tool-call-fabric::ProviderError` taxonomy.
-- Gate the OpenAI-compatible `chat/completions` streaming tool-call shape on a
-  kernel verdict before any bytes are forwarded downstream.
-- Normalize batch-response transport envelopes (`body`/`response`/`payload`
-  wrapping) and decode OpenAI-shaped `tool_calls[]` entries.
-- Supply the `LoadedWeights` "unavailable" boilerplate for hosted providers
-  that cannot expose loaded model bytes.
+```rust
+use chio_provider_adapter_core::{parse_sse_frames, SseParseOptions};
 
-## Public API
+let raw = b"event: message\ndata: {\"ok\":true}\n\n";
+let frames = parse_sse_frames(raw, SseParseOptions::rejecting_unknown("Example"))?;
+assert_eq!(frames.len(), 1);
+assert_eq!(frames[0].event.as_deref(), Some("message"));
+assert_eq!(frames[0].raw, raw);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-- `http::{HttpTransportConfig, HttpTransport, ProviderHttpTransport, HttpResponse, HttpTransportError, AuthScheme}` -
-  reqwest-backed transport: batch JSON POST and buffered SSE/NDJSON POST
-  behind one auth-agnostic config.
-- `http::{MockHttpTransport, RecordedCall, CallKind}` - FIFO-scripted
-  transport double that records calls and fails closed (`MockExhausted`) once
-  exhausted.
-- `http::{map_http_status, map_transport_error, parse_ndjson_lines, DEFAULT_TIMEOUT}` -
-  status/error classification into `ProviderError`, and Ollama-style NDJSON
-  line parsing.
-- `parse_sse_frames`, `SseFrame`, `SseParseOptions`, `UnknownSseFieldPolicy` -
-  fail-closed SSE frame parser shared by every streaming adapter.
-- `gate_openai_sse_tool_calls`, `DecodedToolCall` - verdict-gated decode loop
-  for the OpenAI-compatible `chat/completions` SSE shape (used by Groq and
-  Mistral).
-- `response_body`, `nested_response_body`, `openai_tool_call_to_function_call` -
-  transport-envelope unwrapping and OpenAI-shaped `tool_calls[]` decoding for
-  batch responses.
-- `Provider` - identity trait (`provider_id`, `api_version`) an adapter type
-  implements to identify itself.
-- `GatedStream` - `{bytes, invocations, verdicts}` result of a gated stream
-  pass.
-- `ensure_streaming_allow_no_redactions`, `deny_reason_text` - fail-closed
-  verdict enforcement and `DenyReason` rendering shared by the streaming and
-  batch paths.
-- `loaded_weights_unavailable`, `impl_unavailable_loaded_weights!` -
-  boilerplate `chio_core::LoadedWeights` impl for hosted APIs that cannot
-  expose model bytes.
+No optional Cargo features are declared. The example uses existing dependencies
+and makes no network request.
 
-## Testing
+## Guarantees
 
-`cargo test -p chio-provider-adapter-core`
+`input::json_bounded` validates original bytes before typed decoding.
+`input::arguments` requires an object and enforces a 1 MiB argument bound.
+`parse_sse_frames` preserves original frame bytes and applies stream quotas.
+`SseParseOptions` selects unknown-field handling, terminators, and event/type checks.
+`ensure_streaming_allow_no_redactions` rejects denial and stream redactions.
 
-## See also
+## Status
 
-- `chio-tool-call-fabric` - defines `ProviderAdapter`, `ToolInvocation`,
-  `VerdictResult`, `DenyReason`, and `ProviderError`, consumed here.
-- `chio-core-types` (depended on as `chio-core`) - defines `LoadedWeights` and
-  `LoadedWeightsUnavailable`.
-- `chio-anthropic-tools-adapter`, `chio-bedrock-converse-adapter`,
-  `chio-cohere-tools-adapter`, `chio-gemini-tools-adapter`,
-  `chio-groq-tools-adapter`, `chio-mistral-tools-adapter`,
-  `chio-ollama-tools-adapter`, `chio-openai-adapter` - per-provider adapters
-  built on these primitives.
+Implemented shared support for native provider adapters, with unit tests and
+local HTTP mock coverage. `GatedStream::new` stores caller-supplied vectors;
+its constructor does not independently verify their correspondence.
+Provider authentication, kernel admission, and tool execution belong to callers.
 
-## Input boundaries
+## Related
 
-External JSON is limited to 16 MiB and validated before projection, including
-repeated keys and I-JSON numeric constraints. Tool arguments must be objects,
-with at most 1 MiB per assembled call; streams admit at most 1,024 tool calls
-and 16,384 frames. Provider-specific tighter frame limits still apply.
-
-The HTTP transport checks actual response chunks against its configured limit,
-rejects redirects, and retains a total request deadline. Errors expose redacted
-public text and native local sources. Authentication headers are marked sensitive.
-HTTP status, timeout and rate-limit classifications remain available without
-retaining remote failure bodies.
-
-The shared OpenAI-compatible gate validates every frame and complete invocation
-before the first evaluator callback. Argument fragments must retain stable
-identities, each choice must finish successfully, and configured transport
-terminators remain mandatory. Byte forwarding requires every verdict to allow
-without redactions. Provider captures and decoded values grant no authority;
-admission still requires the owning adapter's verified registry metadata.
+- [Architecture](ARCHITECTURE.md)
+- [Protocol serialization](../../../spec/PROTOCOL.md#4-serialization-and-identity)
+- [Tool-call fabric](../chio-tool-call-fabric/README.md)
+- [Provider replay harness](../chio-provider-conformance/README.md)
+- [License](../../../LICENSE)

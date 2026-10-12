@@ -1,64 +1,72 @@
 # chio-mcp-adapter
 
-Wraps an existing MCP (Model Context Protocol) server as a Chio tool server. The
-underlying MCP tools, resources, and prompts keep working unchanged while every
-call gains Chio capability tokens, guard evaluation, and signed receipts. The
-crate also carries a native authoring surface for building a Chio tool server
-in-process rather than adapting an external one.
+Wraps an MCP server as a Chio `ToolServerConnection`. The adapter translates
+MCP discovery and results; the kernel owns capability checks, guards, and
+receipt signing when the connection is registered and dispatched through it.
 
-Use it to bring an existing MCP surface under Chio's capability, guard, and
-receipt model without rewriting the server. MCP hosting itself lives in
-`chio-mcp-edge`; this crate adapts and governs, it does not host.
+## Usage
 
-## Responsibilities
+Construct an adapter with a caller-provided transport. This example stays in
+memory and exercises the same invocation mapping as a wrapped server.
 
-- Present an adapted MCP server to the kernel as a `ToolServerConnection`
-  (`AdaptedMcpServer`), forwarding tool calls, resources, and prompts.
-- Project MCP tool metadata into Chio `ToolDefinition`s, preserving MCP
-  annotation semantics (safety hints, `destructiveHint`).
-- Frame and route stdio JSON-RPC to the upstream server with bounded reads,
-  notification buffering, nested-flow handling, and cancellation.
-- Admit and validate URL-required elicitations before the kernel stores pending
-  session state.
-- Provide `NativeChioServiceBuilder` for authoring an in-process tool server
-  with the same manifest and result contracts.
+```rust
+use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig};
+use chio_mcp_adapter::edge::{AdapterError, McpTransport, McpToolInfo, McpToolResult};
+use serde_json::{json, Value};
 
-## Public API
+struct Echo;
+impl McpTransport for Echo {
+    fn list_tools(&self) -> Result<Vec<McpToolInfo>, AdapterError> {
+        Ok(vec![])
+    }
+    fn call_tool(&self, _: &str, arguments: Value) -> Result<McpToolResult, AdapterError> {
+        Ok(McpToolResult {
+            content: vec![], structured_content: Some(arguments), is_error: Some(false),
+        })
+    }
+}
+let adapter = McpAdapter::new(McpAdapterConfig {
+    server_id: "echo".into(), server_name: "Echo".into(),
+    server_version: "1".into(), public_key: "00".repeat(32),
+}, Box::new(Echo));
+let result = adapter.invoke("echo", json!({"message": "hello"}))?;
+assert_eq!(result["structuredContent"]["message"], "hello");
+# Ok::<(), AdapterError>(())
+```
 
-- `adapter::{McpAdapter, McpAdapterConfig, SerializedMcpTransport}` - configure
-  and share an upstream MCP transport.
-- `server::AdaptedMcpServer` - the kernel-facing tool server.
-- `transport::StdioMcpTransport` - stdio JSON-RPC transport to a child MCP process.
-- `native::NativeChioServiceBuilder` - in-process native authoring surface.
-- `resources::AdaptedMcpResourceProvider`, `prompts::AdaptedMcpPromptProvider`.
-- `edge::*` - re-exported MCP edge contracts (`McpToolInfo`, `McpTransport`, ...).
+Use `server::AdaptedMcpServer::new_with_manifest_registry` to retain admitted
+publisher metadata after matching fresh discovery. Native subprocess creation
+requires `transport::CageRequiredLaunch` and performs initialization immediately.
 
-Native subprocess APIs require a sealed `CageRequiredLaunch`. The launch factory
-must validate an enforced migration binding, and transport startup rechecks it
-before release, retaining enforcement evidence and a persisted signed receipt.
-There is no direct native runtime fallback. Test subprocess helpers are compiled
-only for unit tests; remote HTTP tests inject in-process transports.
+## Features
 
-The transport API performs synchronous I/O. On a Tokio multithread runtime,
-`AdaptedMcpServer` marks delivery preparation and invocation as blocking work so
-other servers and worker connections can progress during an upstream wait.
-The call stays on its original stack, including any borrowed nested-flow bridge;
-it is not detached or given another cancellation owner. Direct synchronous and
-Tokio current-thread callers retain synchronous behavior. Transport request
-deadlines and kernel dispatch deadlines remain responsible for their own bounds.
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `fuzz` | Off | Exposes fuzz entrypoints and enables `arbitrary`. |
 
-## Feature flags
+There is no declared default feature set.
 
-| Flag | Effect |
-|------|--------|
-| `fuzz` | Exposes `fuzz`, the libFuzzer entry point for the MCP envelope parse path. Off by default; pulls in `arbitrary`. Enabled only by the standalone `fuzz` workspace. |
+## Guarantees
 
-## Testing
+- `generate_manifest` requires object schemas and validates the generated manifest.
+  Missing, malformed, or conflicting safety hints classify tools as side-effecting.
+- `verify_discovered_manifest_surface` checks discovery-visible fields against
+  admitted metadata. Signature admission belongs to `VerifiedManifestRegistry`.
+- `McpAdapter::from_command_with_timeouts` rejects mismatched launch server IDs
+  and requires fully enforced native evidence plus a persisted enforcement receipt.
+- `McpAdapter::invoke` delegates to the transport; authorization requires kernel
+  dispatch through `AdaptedMcpServer`. Custom transports own their I/O guarantees.
 
-`cargo test -p chio-mcp-adapter`
+## Status
 
-## See also
+Implements stdio transport, discovery, resources, prompts, completions, nested
+callbacks, result mapping, and kernel connection adapters. Unit and loopback
+integration tests exercise these paths. Deployment custody and transport setup
+remain the host's responsibility; this crate is unpublished in the workspace.
 
-- `chio-mcp-edge` - the MCP hosting runtime; this adapter wraps and governs it.
-- `chio-kernel` - consumes `AdaptedMcpServer` as a governed tool server.
-- `chio-mcp-remote`, `chio-hosted-mcp` - remote and hosted MCP surfaces built on this adapter.
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [MCP compatibility](../../../spec/PROTOCOL.md#82-mcp-compatibility)
+- [MCP edge](../chio-mcp-edge/README.md)
+- [License](../../../LICENSE)

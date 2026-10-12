@@ -1,100 +1,59 @@
 # chio-egress-contract
 
-Typed HTTP egress policy for Chio substrate adapters. Kernel, guard, and
-adapter code paths that open outbound HTTP must declare an
-`HttpEgressContract` and pass every target through it before dispatch; a
-missing or invalid contract fails closed. The crate has no internal `chio-*`
-dependencies and, without the `reqwest-egress` feature, no I/O dependencies
-at all - it is the workspace's SSRF boundary for outbound HTTP.
+Defines tenant-scoped HTTP egress policy and reusable URL, DNS, redirect, and
+response-size checks for Chio adapters.
 
-## Responsibilities
+## Usage
 
-- Define `HttpEgressContract`: scheme allowlist, exact authority allowlist,
-  independent loopback/link-local/IPv6-ULA denial flags, redirect-depth cap,
-  and response-byte ceiling.
-- Enforce that contract against a target URL's userinfo, scheme, host, and
-  normalized authority, denying on the first violation.
-- Deny RFC 1918 and other private/special-use IPv4 and IPv6 ranges
-  unconditionally, even when the authority is allow-listed.
-- Resolve domain-name hosts and re-check every returned address against the
-  same policy before a caller opens a socket (`enforce_url_with_dns`).
-- Behind `reqwest-egress`, dispatch a `reqwest::Client` request through the
-  contract on the initial URL, every redirect hop, and the streamed response
-  size.
+```rust
+use chio_egress_contract::HttpEgressContract;
+use std::collections::BTreeSet;
 
-## Public API
-
-- `HttpEgressContract` - the raw policy. `validate()` checks shape;
-  `prepare()` returns an immutable `PreparedHttpEgressContract`.
-- `HttpEgressContract::enforce_required` - fail-closed entry point over an
-  `Option<&HttpEgressContract>`.
-- `enforce_url` (userinfo, scheme, address-class, authority),
-  `enforce_url_with_dns` (adds DNS resolution and a per-IP class check),
-  `enforce_response_bytes`, `enforce_attempt` (`enforce_url` plus an optional
-  byte check) - each available on `HttpEgressContract` (re-validates shape
-  through `prepare()` every call) and `PreparedHttpEgressContract` (already
-  validated).
-- `validate_dispatchable_with_pinned_dns` - confirms every allowed authority
-  is usable by the pinned-DNS resolver the `reqwest-egress` dispatch path
-  uses.
-- `ValidatedHttpEgressTarget` - tenant namespace, scheme, and authority
-  returned once enforcement passes.
-- `HttpEgressError` - fail-closed reason enum (`thiserror`), one variant per
-  denial class.
-- `HttpEgressContract::permissive_for_tests` - wildcard-loopback contract for
-  tests driving a local server. Not `#[cfg(test)]`-gated; its doc comment
-  states production code must not call it.
-
-Behind `reqwest-egress` (re-exported at the crate root from `reqwest_helper`):
-
-- `send_with_contract` - drives a `reqwest::Request` through per-hop contract
-  enforcement and a capped, streamed response read.
-- `client_builder_with_contract` / `ContractClientBuilder` - builds a
-  `reqwest::Client` with redirects and proxying disabled and DNS pinned to
-  the contract; the builder exposes only `.timeout()`.
-- `ContractResponse` - status/url/headers/body accessors plus async `text()`
-  and `json()`.
-
-### Operator readiness, not tenant tool egress
-
-`OperatorReadinessProbe::prepare(url, bearer)` binds an operator-selected GET
-target before a supervised service starts. This separate host-management API
-permits local and private service addresses. It must not be used to authorize
-agent-selected destinations or replace `HttpEgressContract` in tool adapters.
-
-The handle retains its client and request privately, accepts no per-probe target,
-method, body or client override, and returns only a readiness boolean. URLs must
-use HTTP(S) with a host and nonzero port, without userinfo or fragments. Invalid
-URLs and bearer headers fail preparation. Proxies and redirects are disabled;
-the asynchronous request, including DNS and streamed body reads, has a
-two-second timeout. Only complete success responses of at most 64 KiB qualify.
-Transport, redirect, timeout and body-limit failures all deny readiness.
-
-This helper is available only with `reqwest-egress`. It adds no serialized
-policy option and does not change tenant address-class restrictions.
-
-## Feature flags
-
-| Flag | Effect |
-|------|--------|
-| `reqwest-egress` | Adds `reqwest` (`rustls`, no default features), `serde_json`, and `tokio` (`net`). Exposes `reqwest_helper` and re-exports `send_with_contract`, `client_builder_with_contract`, `ContractClientBuilder`, `ContractResponse` at the crate root. |
-
-## Testing
-
-```bash
-cargo test -p chio-egress-contract
-cargo test -p chio-egress-contract --features reqwest-egress
+let contract = HttpEgressContract {
+    tenant_egress_namespace: "tenant-a".into(),
+    allowed_schemes: BTreeSet::from(["https".into()]),
+    allowed_authority_set: BTreeSet::from(["api.example".into()]),
+    deny_loopback: true,
+    deny_link_local: true,
+    deny_ipv6_ula: true,
+    max_redirect_chain: 2,
+    max_response_bytes: 4096,
+};
+let target = contract.enforce_url("https://api.example/items", 0)?;
+assert_eq!(target.authority, "api.example");
+# Ok::<(), chio_egress_contract::HttpEgressError>(())
 ```
 
-## See also
+This example validates a URL without DNS or network access. DNS checks require
+`enforce_url_with_dns`; a dispatcher must also enforce observed response bytes.
 
-- `chio-http-core` - re-exports `reqwest-egress` as its own feature so
-  kernel-adjacent HTTP callers reach this contract via
-  `chio_http_core::send_with_contract`.
-- `chio-mcp-remote`, `chio-a2a-adapter`, `chio-openapi-mcp-bridge` - protocol
-  adapters that dispatch outbound HTTP through this contract directly.
-- `chio-guard-registry`, `chio-external-guards` - guard-layer consumers of
-  the `reqwest-egress` dispatch path.
-- Also depended on directly by `chio-anchor`, `chio-link`, `chio-settle`
-  (economy), `chio-siem` (observability), `chio-cli`, `chio-proof-room`
-  (products), and `chio-conformance` (tooling).
+## Features
+
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `default` | On | Empty feature set; contract checks are available. |
+| `reqwest-egress` | Off | Adds contract client, dispatch, and operator readiness helpers. |
+
+## Guarantees
+
+- `HttpEgressContract::prepare` validates shape and captures an immutable snapshot.
+- `enforce_url` checks schemes, normalized authorities, address literals, userinfo,
+  and redirect count. It does not resolve domain names.
+- `enforce_url_with_dns` checks every resolved address. Response-size enforcement
+  requires an observed byte count or the feature-gated dispatch helper.
+
+## Status
+
+Implemented contract validation with optional reqwest transport enforcement.
+Callers own tenant policy selection and must use the enforcing APIs on their
+actual dispatch path. `permissive_for_tests` is intended for test fixtures.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol trust boundaries](../../../spec/PROTOCOL.md#3-components-and-trust-boundaries)
+- [chio-a2a-adapter](../chio-a2a-adapter/README.md)
+
+## License
+
+[Workspace license](../../../LICENSE).

@@ -1,85 +1,74 @@
 # chio-openapi architecture
 
-## Overview
+## Responsibility and boundary
 
-chio-openapi is a pure parsing and transformation library: no I/O, no async
-runtime, `#![forbid(unsafe_code)]`. It is the ingest trust boundary for
-operator-authored OpenAPI documents - `OpenApiSpec::parse` validates
-structure and fails closed on missing fields, unresolved or non-local `$ref`,
-and malformed parameters before any `ToolDefinition` is generated. The crate
-stops at `ToolDefinition` values; assembling a signed `ToolManifest`, hosting
-tools over MCP, and dispatching HTTP calls are out of scope and live in
-`chio-openapi-mcp-bridge`.
+Parses OpenAPI documents and generates Chio tool definitions with HTTP schemas
+and typed `x-chio-*` policy metadata for downstream manifest assembly.
 
-## Module map
+Implemented document parser and tool generator. Generated definitions are
+unsigned data. Callers assemble, sign, admit, and enforce manifests through
+the relevant manifest and HTTP runtime components.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Public API surface: `OpenApiError`, the `Result` alias, and the `tools_from_spec` convenience function (parse + generate in one call). |
-| `src/parser.rs` | OpenAPI 3.x JSON/YAML ingestion into `OpenApiSpec`: format auto-detection, required-field checks, local `$ref` resolution, parameter/request-body/response extraction. |
-| `src/generator.rs` | `ManifestGenerator`: converts an `OpenApiSpec` into `Vec<ToolDefinition>`, merging parameters and building input/output JSON schemas and annotations. |
-| `src/extensions.rs` | `ChioExtensions`: parses `x-chio-*` operation fields (`sensitivity`, `side_effects`, `approval_required`, `budget_limit`, `publish`) from the raw operation JSON. |
-| `src/policy.rs` | `DefaultPolicy`: session-allow / deny-by-default decision per HTTP method, overridable by `ChioExtensions`. |
+## Structure
 
-## Spec-to-tool pipeline
+`input` decodes original JSON or YAML with size and expansion limits.
 
-1. `OpenApiSpec::parse` (or `from_value`) ingests JSON or YAML, requires a
-   `3.x` `openapi` version plus `info` and `paths`, and resolves `$ref`
-   pointers that start with `#/` against the document itself. A missing
-   field, unresolved ref, or malformed parameter (`name`/`in` absent, empty,
-   or non-string; `in` outside `path`/`query`/`header`/`cookie`) fails the
-   parse.
-2. Paths are sorted lexicographically and each path's operations are visited
-   in a fixed method order (`get`, `post`, `put`, `patch`, `delete`, `head`,
-   `options`), so generation is deterministic regardless of source key order.
-3. `ManifestGenerator::generate_tools` merges path-level and operation-level
-   parameters (operation-level wins on a name+location collision) and skips
-   an operation when `ChioExtensions::should_publish` is false and
-   `respect_publish_flag` is set.
-4. For each remaining operation, `build_tool_definition` builds an input
-   schema from path/query parameters (header and cookie parameters are
-   excluded) and the request body, an output schema from the first `200`,
-   then `201`, then any other 2xx response, and annotations from the HTTP
-   method and extensions.
-5. The result is a `Vec<ToolDefinition>`. No manifest assembly, signing, or
-   transport happens in this crate.
+`parser` builds `OpenApiSpec`, paths, operations, and parameters.
 
-## Invariants and failure modes
+`extensions` decodes typed Chio extension metadata.
 
-- Parsing fails closed: an unrecognized parameter `in` value is rejected as
-  `OpenApiError::InvalidSpec`, not silently coerced to a default location.
-- `resolve_ref` only follows pointers beginning with `#/`; external refs
-  (URLs, other files) are rejected as `UnresolvedRef`.
-- Path parameters default to required when the document omits `required`;
-  other locations default to not required.
-- Present Chio security extensions require their declared types and recognized
-  enum values. Sensitive and Restricted operations require the generated approval
-  annotation and a deny-by-default policy; an explicit false approval hint cannot
-  weaken that default. Admission still requires the owning capability and policy
-  checks.
-- `publish`, `side_effects`, and approval annotations affect generated tools.
-  `budget_limit` is rejected until budget semantics are implemented; it never
-  supplies currency enforcement or a price.
-- `GeneratorConfig.server_id` is stored but not read by `generate_tools`; it
-  has no effect on this crate's output.
-- `ToolDefinition.pricing` is always `None`; this crate does not compute
-  pricing from security extensions or elsewhere.
+`generator` creates tool input/output schemas and annotations.
+
+`policy` provides HTTP-method policy defaults.
+
+`diagnostics` formats explicit operator-local error details.
+
+## Data and control flow
+
+`tools_from_spec` parses original text and runs a default generator.
+`OpenApiSpec::parse` accepts bytes and rejects malformed or oversized input
+before constructing the simplified document representation.
+
+The parser extracts path and operation parameters and resolves supported
+local references. Generation merges shared and operation parameters,
+derives schemas and annotations, and filters unpublished operations.
+
+Definitions use operation IDs when available, with method/path fallback.
+Output schemas are included by default. A downstream component packages
+definitions into an authoritative signed manifest and installs policy.
+
+## Trust and invariants
+
+Original input is limited to 8 MiB. JSON decoding rejects duplicate keys.
+YAML decoding rejects duplicate keys and multiple documents and bounds
+expanded nodes, depth, and string bytes. `from_value` receives an already
+decoded value, so original duplicate and byte checks occur only in `parse`.
+
+Version validation accepts strings beginning with `3.`. Parsing is a
+simplified OpenAPI projection with supported local reference handling.
+Generated policy annotations describe defaults and require runtime enforcement.
+
+The generator emits `ToolDefinition` values and does not sign them.
+Extensions carry structured policy hints; their presence alone does not
+authorize calls. HTTP transport, capability admission, and receipt signing
+belong to downstream integrations.
 
 ## Dependencies
 
-`chio-core-types` supplies `ToolDefinition` and `ToolAnnotations`, the types
-this crate produces. `chio-http-core` supplies `HttpMethod`, parsed from the
-OpenAPI method string and consulted by `DefaultPolicy`. `serde`/`serde_json`
-back the JSON model; `serde_yaml` backs YAML parsing; `thiserror` derives
-`OpenApiError`. No dependency aliasing.
+Core types supply tool definitions and untrusted JSON decoding. `chio-http-core`
+supplies method semantics. Serde JSON and YAML handle document values;
+`chio-log-redact` supports safe operator diagnostics.
 
-## Verification focus
+## Verification
 
-The parser tests cover JSON and YAML input, local reference resolution, required
-path parameters, unsupported parameter locations and external-reference rejection.
-Extension tests reject unknown sensitivity values and retain strict Chio flow
-declarations. Generator tests cover deterministic tool construction, merged
-parameters, request and response schemas, publish exclusion, approval annotations
-and flow preservation. Run `cargo test --locked -p chio-openapi --lib` to check
-these owning boundaries. The crate does not establish runtime admission or
-transport enforcement; those remain the kernel and protocol-edge owners' tests.
+Parser, generator, input, extension, and policy unit tests cover projection
+and rejection behavior. `tests/extension_contract.rs` checks extension
+contracts across generated definitions. No live API is required.
+
+Run the focused crate suite from the workspace root:
+
+```bash
+cargo test -p chio-openapi
+```
+
+See the [README](README.md) for a minimal public API example and requirements.

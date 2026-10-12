@@ -1,106 +1,71 @@
 # chio-gemini-tools-adapter
 
-Provider-native adapter that mediates Google Gemini `generateContent` tool-use
-traffic through the Chio kernel. Lifts `functionCall` parts out of a Gemini
-response into `chio_tool_call_fabric::ToolInvocation`s for kernel evaluation,
-and lowers a kernel verdict back into a `functionResponse` part for the next
-turn. Pinned to upstream API version `v1beta` (`transport::GEMINI_API_VERSION`,
-mirrored in `Cargo.toml`'s `[package.metadata.chio]`).
+Converts Gemini generateContent function calls into Chio tool invocations and
+converts evaluator verdicts and tool results back to provider-native messages.
+It sits between provider traffic and the tool-call fabric; the host supplies
+kernel evaluation and actual tool dispatch. The API identifier is `v1beta`.
 
-The crate owns lift/lower and transport only; it has no dependency on
-`chio-kernel`. A caller drives evaluation itself: for batch calls, run each
-`ToolInvocation` from `lift_batch` through the kernel and pass the verdict to
-`lower_function_response`; for streaming calls, pass an `evaluate` closure to
-`generate_content_stream` / `gate_sse_stream` that the adapter invokes per
-`functionCall` frame.
+## Usage
 
-## Responsibilities
+Project a captured tool call offline. The example uses default dependencies
+and a mock transport; it makes no network request.
 
-- Forward a native `generateContent` / `streamGenerateContent` request to the
-  Generative Language API and buffer the response (`GeminiTransport`, built on
-  the shared `chio_provider_adapter_core::http` transport).
-- Lift every `functionCall` part in a batch response into a
-  canonically-encoded `ToolInvocation` stamped with `Principal::GeminiProject`
-  provenance (`lift_batch`).
-- Gate a `streamGenerateContent` SSE body frame by frame: evaluate each
-  buffered `functionCall` against a caller-supplied verdict closure before any
-  bytes are forwarded, and fail closed (return no bytes at all) if any call is
-  denied or carries redactions (`gate_sse_stream`).
-- Lower a kernel verdict and tool result into a `functionResponse` part:
-  apply redactions on allow, emit a structured `{"error": ...}` payload on
-  deny (`lower_function_response`).
-- Classify Gemini safety blocks (`promptFeedback.blockReason`,
-  `candidates[].finishReason=SAFETY`) as `ProviderError::ContentPolicy` on the
-  batch response path.
-- Reject any configured or transport-advertised API version other than
-  `v1beta` before touching the network, stamping provenance, or lowering.
+```rust
+use chio_gemini_tools_adapter::{GeminiAdapter, GeminiAdapterConfig, transport::MockTransport};
+use chio_tool_call_fabric::ProviderRequest;
+use std::sync::Arc;
 
-## Public API
+let config = GeminiAdapterConfig::new("local", "Example", "1", "00", "example");
+let adapter = GeminiAdapter::new(config, Arc::new(MockTransport::new()));
+let response = br#"{"candidates":[{"content":{"parts":[{"functionCall":{"name":"weather","args":{}}}]}}]}"#;
+let calls = adapter.lift_batch(ProviderRequest(response.to_vec()))?;
+assert_eq!(calls[0].tool_name, "weather");
+assert_eq!(calls[0].arguments, b"{}");
+assert!(calls[0].bridge_security.is_none());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-- `GeminiAdapter` - adapter handle (`new`, `provider`, `api_version`,
-  `config`, `transport`).
-- `GeminiAdapter::generate_content` / `generate_content_stream` - proxy a
-  request through the configured transport, then lift or gate the response.
-- `GeminiAdapter::lift_batch` / `gate_sse_stream` - lift or gate an
-  already-fetched response payload without going through the transport.
-- `GeminiAdapter::lower_function_response` - lower a verdict and tool result
-  into a `FunctionResponsePart`.
-- `GeminiAdapter::lower_function_call_response` - the same, echoing the
-  call's `id` so parallel calls to one function stay matched.
-- `GeminiAdapterConfig::new` - builds a config with `api_version` pinned to
-  `GEMINI_API_VERSION`; also carries `server_id`, `server_name`,
-  `server_version`, `public_key`, and `project_id`.
-- `native::{FunctionCallPart, FunctionResponsePart}` - Gemini's wire-level
-  content-part shapes (re-exported at the crate root).
-- `transport::{Transport, GeminiTransport, MockTransport}` - outbound
-  transport trait, the real `reqwest`-backed client, and a hermetic test
-  double. `Transport`, `GeminiTransport`, `GEMINI_API_VERSION`,
-  `GEMINI_API_KEY_ENV`, and `GEMINI_GENERATE_CONTENT_HOST` are also
-  re-exported at the crate root; `MockTransport` is reachable only via
-  `transport::`.
-- `GeminiAdapterError` - `Transport` / `Provider` error wrapper (`thiserror`).
-- Implements `chio_provider_adapter_core::Provider` and, via
-  `impl_unavailable_loaded_weights!`, `chio_core::LoadedWeights` (the Gemini
-  API exposes no runtime model bytes).
+## Guarantees
 
-## Adapter-visible error taxonomy
+`lift_batch` validates native tool-call fields and canonicalizes argument
+objects before returning invocations. Shared original JSON readers reject
+duplicate keys and enforce byte bounds before typed projection.
+`lower_function_response` applies allow-verdict redactions or emits a denial result.
 
-Gemini failures reach this crate two ways: as an HTTP status from the
-Generative Language API (classified by the shared
-`chio_provider_adapter_core::http::map_transport_error`, "HTTP transport
-boundary" below) or as a shape the adapter itself rejects while lifting or
-gating a 2xx body ("current adapter path"). `ProviderError::Other` never
-appears; an unrecognized shape falls back to `Malformed`.
+The basic constructor produces projections without manifest authority.
+new_with_registry binds the admitted manifest and tool security sidecars.
+Streaming evaluation requires these registry coordinates before invoking the evaluator.
 
-The table is parsed by `tests/error_taxonomy_doctest.rs`; keep each envelope
-one valid inline JSON object.
+## Error taxonomy
+
+Batch conversion validates selected tool calls; transport classification uses
+status or typed transport errors. Stream gates validate framing and lifecycle
+and propagate evaluator failures. SSE wrappers below describe event/data pairs.
 
 <!-- error-taxonomy:start -->
 | ProviderError class | Native or boundary envelope | Source | Trigger |
 | -------------------- | ---------------------------- | ------- | ------- |
-| `ProviderError::RateLimited` | `{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}` | HTTP transport boundary | Status 429. `retry_after_ms` is currently hardcoded to `0`; no `Retry-After` header is read. |
-| `ProviderError::ContentPolicy` | `{"promptFeedback":{"blockReason":"SAFETY","safetyRatings":[]}}` | current adapter path (batch only) | `promptFeedback.blockReason` is set, or any `candidates[].finishReason="SAFETY"`; also status 403. |
-| `ProviderError::BadToolArgs` | `{"candidates":[{"content":{"parts":[{"functionCall":{"name":"get_weather","args":"not-an-object"}}]}}]}` | current adapter path | `functionCall.args` is not a JSON object; also 4xx statuses other than 429/403. |
-| `ProviderError::Upstream5xx` | `{"error":{"code":503,"message":"The service is currently unavailable.","status":"UNAVAILABLE"}}` | HTTP transport boundary | Any 5xx status from the Generative Language API. |
-| `ProviderError::TransportTimeout` | `{"transport":"timeout","endpoint":"https://generativelanguage.googleapis.com","timeout_ms":60000}` | HTTP transport boundary | The request exceeds the transport's configured timeout (60s default). |
-| `ProviderError::VerdictBudgetExceeded` | `{"provider":"gemini","event":"functionCall","observed_ms":300,"budget_ms":250}` | current adapter path | The caller's verdict evaluator returns this error; `gate_sse_stream` propagates it unchanged. |
-| `ProviderError::Malformed` | `{"candidates":[{"content":{"parts":[{"text":"no tool call here"}]}}]}` | current adapter path | `lift_batch` requires at least one `functionCall` part; also non-stream JSON bytes, an unparseable envelope, or a malformed `functionCall` / `functionResponse` shape. |
-| `ProviderError::UntrustedInput` | `{"event":"message","data":"not-json"}` | shared SSE reader | Invalid, ambiguous or oversized original SSE JSON; local parser source retained and public error text redacted. |
+| `ProviderError::RateLimited` | `{"status":429,"body":{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}}` | `GeminiAdapter::generate_content` / `http::map_http_status` | HTTP 429; retry_after_ms is 0 and Retry-After is not parsed. |
+| `ProviderError::ContentPolicy` | `{"promptFeedback":{"blockReason":"SAFETY","safetyRatings":[]}}` | `response::classify_content_policy` | Batch candidate finishReason=SAFETY or nonempty promptFeedback.blockReason rejects before extraction; HTTP 403 also maps here. |
+| `ProviderError::BadToolArgs` | `{"candidates":[{"content":{"parts":[{"functionCall":{"name":"get_weather","args":"not-an-object"}}]}}]}` | `GeminiAdapter::lift_batch` / `validate_function_call` | A selected native tool call has nonobject arguments; rejected requests can also map here through HTTP status. |
+| `ProviderError::Upstream5xx` | `{"status":503,"body":{"error":{"code":503,"message":"The service is currently unavailable.","status":"UNAVAILABLE"}}}` | `GeminiAdapter::generate_content` / `http::map_http_status` | HTTP 5xx maps to Upstream5xx with the observed status. |
+| `ProviderError::TransportTimeout` | `{"transport":"timeout","endpoint":"https://generativelanguage.googleapis.com","timeout_ms":60000}` | `http::map_transport_error` | HttpTransportError::Timeout becomes TransportTimeout with the configured timeout in ms. |
+| `ProviderError::VerdictBudgetExceeded` | `{"provider":"gemini","event":"functionCall","observed_ms":300,"budget_ms":250}` | `GeminiAdapter::gate_sse_stream` evaluator callback | The evaluator returns VerdictBudgetExceeded; the gate propagates it. No gate-owned 250 ms timer is installed. |
+| `ProviderError::Malformed` | `{"candidates":[{"content":{"parts":[{"text":"no tool call here"}]}}]}` | `GeminiAdapter::lift_batch` and `gate_sse_stream` | Batch lift_batch finds no functionCall, or the SSE candidate lifecycle is invalid. |
+| `ProviderError::UntrustedInput` | `{"event":"message","data":"not-json"}` | `parse_sse_frames` / `input::json_bounded` | Representative SSE event/data contains non-JSON data; original ambiguous or oversized JSON also rejects. |
 <!-- error-taxonomy:end -->
 
-## Testing
+## Status
 
-`cargo test -p chio-gemini-tools-adapter`
+Implemented native conversion and buffered stream gating, with local unit,
+fixture, and mock-transport coverage. These checks cover adapter behavior;
+external provider availability and deployment acceptance require operator evidence.
+`LoadedWeights` reports unavailable model bytes.
 
-This includes `benches/verdict_latency.rs`, a `#[test]` (not a Criterion
-benchmark) asserting the cold-init gate-and-verdict path stays under a 500ms
-p99 across 128 samples.
+## Related
 
-## See also
-
-- `chio-tool-call-fabric` - `ToolInvocation`, `VerdictResult`, `ProviderError`,
-  and the fabric contract this adapter targets.
-- `chio-provider-adapter-core` - the shared HTTP transport, SSE framing, and
-  response-envelope helpers this crate wires to Gemini's host and auth.
-- `chio-provider-conformance` - replays the `fixtures/gemini/*.ndjson` corpus
-  against this adapter (`tests/replay_gemini.rs`, feature `fixtures-gemini`).
+- [Architecture](ARCHITECTURE.md)
+- [Protocol trust boundaries](../../../spec/PROTOCOL.md#3-components-and-trust-boundaries)
+- [Provider adapter core](../chio-provider-adapter-core/README.md)
+- [Provider replay tests](../chio-provider-conformance/README.md)
+- [License](../../../LICENSE)
