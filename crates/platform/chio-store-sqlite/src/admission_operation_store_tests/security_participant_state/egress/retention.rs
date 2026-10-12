@@ -227,7 +227,7 @@ fn live_pending_fences_beyond_current_row_budget_remain_refused() -> AnchoredTes
 
 #[test]
 fn expired_pending_fence_compacts_and_cannot_be_committed() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
     let mut pending = pending(&fixture, "expiring", None)?;
     pending.plan.expires_at_unix_ms = now_ms() + 1_500;

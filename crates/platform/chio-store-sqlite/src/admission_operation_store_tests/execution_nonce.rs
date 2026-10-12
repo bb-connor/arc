@@ -317,6 +317,7 @@ fn durable_nonce_reservation_is_atomic_fenced_and_replays_after_restart() -> Tes
         authority,
         store,
         fence,
+        _clock,
     } = fixture.fixture;
     drop(store);
     drop(authority);
@@ -590,6 +591,7 @@ fn durable_nonce_v11_migration_preserves_original_commits_without_inventing_rese
         authority,
         store,
         fence,
+        _clock,
     } = fixture();
     let (operation, original) = retained_request::original(&fence)?;
     store.begin_with_retained_tool_request(&operation, &original, &fence, now_ms())?;

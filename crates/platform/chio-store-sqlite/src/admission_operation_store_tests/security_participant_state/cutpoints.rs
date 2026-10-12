@@ -49,7 +49,7 @@ fn child_process_crash() -> AnchoredTestResult {
 fn independent_process_abort_and_owner_rotation_never_expose_partial_native_state(
 ) -> AnchoredTestResult {
     for stage in 1..=6 {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = imported(&fixture, "source")?;
         let Fixture {
             _temp,
@@ -58,6 +58,7 @@ fn independent_process_abort_and_owner_rotation_never_expose_partial_native_stat
             authority,
             store,
             fence,
+            _clock,
         } = fixture;
         drop(store);
         drop(authority);

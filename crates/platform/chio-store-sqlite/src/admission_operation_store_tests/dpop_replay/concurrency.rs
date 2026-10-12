@@ -49,7 +49,7 @@ impl DpopReplaySourcePort for Reentrant<'_> {
 #[test]
 fn callbacks_can_read_destination_but_cannot_reenter_import_through_another_adapter(
 ) -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let expected = pin(&fixture, &source)?;
     let reentrant = Reentrant {
@@ -95,7 +95,7 @@ impl DpopReplaySourcePort for BlockingSource<'_> {
 #[test]
 fn blocked_source_keeps_destination_readable_and_concurrent_import_nonblocking(
 ) -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let expected = pin(&fixture, &source)?;
     let (entered_tx, entered_rx) = std::sync::mpsc::sync_channel(1);

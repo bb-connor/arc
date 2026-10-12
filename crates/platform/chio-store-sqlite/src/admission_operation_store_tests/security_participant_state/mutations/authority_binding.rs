@@ -104,6 +104,7 @@ fn original_native_binding_remains_stable_across_serving_owner_rotation() -> Tes
         authority,
         store,
         fence,
+        _clock,
     } = fixture;
     drop(store);
     drop(authority);

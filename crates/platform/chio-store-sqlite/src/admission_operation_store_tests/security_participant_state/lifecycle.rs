@@ -149,6 +149,7 @@ fn retry_and_new_owner_readback_need_no_remaining_source_file() -> AnchoredTestR
         authority,
         store,
         fence,
+        _clock,
     } = fixture;
     drop(store);
     drop(authority);

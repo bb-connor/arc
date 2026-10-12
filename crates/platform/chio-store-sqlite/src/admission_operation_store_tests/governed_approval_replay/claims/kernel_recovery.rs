@@ -80,6 +80,7 @@ fn kernel_restart_releases_expired_approval_custody_from_original_history() -> A
             _temp,
             database,
             lock_root,
+            _clock: Some(_clock),
         };
         let kernel = kernel(&fixture)?;
         assert_eq!(kernel.reconcile_durable_admission_startup()?, 1);

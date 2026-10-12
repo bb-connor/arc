@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn exact_pin_import_and_retry_preserve_every_marker_without_activation() -> AnchoredTestResult {
     for empty in [false, true] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, empty)?;
         let before = global_count(&fixture);
         let expected = pin(&fixture, &source)?;
@@ -56,7 +56,7 @@ fn exact_pin_import_and_retry_preserve_every_marker_without_activation() -> Anch
 #[test]
 fn destination_reopen_preserves_pending_and_imported_history_but_requires_the_live_source(
 ) -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let expected = pin(&fixture, &source)?;
     let raw = Arc::clone(&source.raw);
@@ -94,6 +94,7 @@ fn reopen(fixture: Fixture) -> AnchoredTestResult<(Fixture, StoreMutationFence)>
         authority,
         store,
         fence,
+        _clock,
     } = fixture;
     drop(store);
     drop(authority);
@@ -106,6 +107,7 @@ fn reopen(fixture: Fixture) -> AnchoredTestResult<(Fixture, StoreMutationFence)>
             _temp,
             database,
             lock_root,
+            _clock,
         },
         fence,
     ))
@@ -113,7 +115,7 @@ fn reopen(fixture: Fixture) -> AnchoredTestResult<(Fixture, StoreMutationFence)>
 
 #[test]
 fn source_replacement_before_seal_cannot_complete_the_pinned_generation() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let expected = pin(&fixture, &source)?;
     drop(source);
@@ -130,7 +132,7 @@ fn source_replacement_before_seal_cannot_complete_the_pinned_generation() -> Anc
 
 #[test]
 fn source_instance_cannot_be_pinned_under_a_second_authority() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let expected = pin(&fixture, &source)?;
     assert!(fixture
@@ -150,7 +152,7 @@ fn source_instance_cannot_be_pinned_under_a_second_authority() -> AnchoredTestRe
 
 #[test]
 fn stale_fences_wrong_instances_and_generations_deny_before_callbacks() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let mut stale = fixture.fence.clone();
     stale.owner_epoch += 1;
@@ -203,7 +205,7 @@ fn stale_fences_wrong_instances_and_generations_deny_before_callbacks() -> Ancho
 
 #[test]
 fn mutation_after_pin_refuses_seal_without_repinning_or_source_repair() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let expected = pin(&fixture, &source)?;
     assert!(source.raw.check_and_insert("changed", "capability")?);
@@ -218,7 +220,7 @@ fn mutation_after_pin_refuses_seal_without_repinning_or_source_repair() -> Ancho
 
 #[test]
 fn authority_clock_regression_denies_before_source_access() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let now = now_ms() / 1000 + 5;
     let expected = {

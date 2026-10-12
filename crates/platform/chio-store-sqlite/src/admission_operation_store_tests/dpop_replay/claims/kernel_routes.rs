@@ -86,7 +86,7 @@ struct Route {
 }
 impl Route {
     fn new() -> AnchoredTestResult<Self> {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         let domain = activate(&fixture, &source)?;
         drop(source);

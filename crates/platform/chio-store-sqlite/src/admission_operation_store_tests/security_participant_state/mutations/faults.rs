@@ -295,7 +295,7 @@ fn child_process_native_join_crash() -> TestResult {
 fn independent_process_abort_and_takeover_preserve_exact_mutation_custody() -> TestResult {
     for family in ["raw", "input"] {
         for stage in 7..=11 {
-            let fixture = fixture();
+            let fixture = fixture_real_time();
             let source = imported(&fixture, "source")?;
             let initialized = hydrate(&fixture, &source)?;
             let (context, request) = request("native-join")?;

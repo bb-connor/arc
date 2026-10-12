@@ -28,7 +28,7 @@ fn activate(
 
 #[test]
 fn explicit_activation_is_atomic_immutable_and_never_a_legacy_cache_reset() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let pinned = pin(&fixture, &source)?;
     let authority = domain(&pinned)?;
@@ -66,7 +66,7 @@ fn explicit_activation_is_atomic_immutable_and_never_a_legacy_cache_reset() -> A
 fn committed_activation_survives_source_loss_but_inactive_import_does_not_activate_itself(
 ) -> AnchoredTestResult {
     for committed in [false, true] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
         let domain = domain(&imported)?;
@@ -81,6 +81,7 @@ fn committed_activation_survives_source_loss_but_inactive_import_does_not_activa
             authority,
             store,
             fence,
+            _clock,
         } = fixture;
         drop(store);
         drop(authority);
@@ -92,6 +93,7 @@ fn committed_activation_survives_source_loss_but_inactive_import_does_not_activa
             _temp,
             database,
             lock_root,
+            _clock,
         };
         let replacement = Source::new(&fixture, true)?;
         assert!(fixture
@@ -117,7 +119,7 @@ fn committed_activation_survives_source_loss_but_inactive_import_does_not_activa
 
 #[test]
 fn activation_rejects_wrong_generation_stale_owner_and_policy_replacement() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
     let domain = domain(&imported)?;
@@ -158,7 +160,7 @@ fn activation_cutpoints_never_leave_a_domain_without_its_event_and_global_commit
             "NEW.mutation_kind = 'activate_dpop_replay_source'",
         ),
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
         let domain = domain(&imported)?;
@@ -190,7 +192,7 @@ fn activation_policy_tampering_is_covered_by_the_existing_global_chain() -> Anch
         "UPDATE dpop_replay_authority_activations SET canonical_authority = CAST('{}' AS BLOB)",
         "UPDATE dpop_replay_authority_activations SET canonical_authority = CAST(replace(CAST(canonical_authority AS TEXT), '\"proof_ttl_secs\":300', '\"proof_ttl_secs\":301') AS BLOB)",
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
         let domain = domain(&imported)?;
@@ -213,7 +215,7 @@ fn activation_policy_tampering_is_covered_by_the_existing_global_chain() -> Anch
 #[test]
 fn activation_guards_reject_replace_update_and_delete_without_recursive_triggers(
 ) -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
     let domain = domain(&imported)?;
@@ -232,7 +234,7 @@ fn activation_guards_reject_replace_update_and_delete_without_recursive_triggers
 #[test]
 fn active_authority_lookup_reuses_verified_records_without_skipping_global_coverage(
 ) -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
     let domain = domain(&imported)?;
@@ -266,7 +268,7 @@ fn active_authority_lookup_reuses_verified_records_without_skipping_global_cover
 fn failed_or_panicking_source_verification_leaves_activation_inactive_and_retryable(
 ) -> AnchoredTestResult {
     for panic in [false, true] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
         let domain = domain(&imported)?;
@@ -297,7 +299,7 @@ fn v24_upgrade_preserves_import_events_and_bytes_without_inventing_activation() 
         Some("CREATE TABLE dpop_replay_authority_unknown(value TEXT)"),
         Some("DROP TRIGGER dpop_replay_migration_events_immutable"),
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
         let domain = domain(&imported)?;

@@ -454,6 +454,7 @@ fn native_join_errors_rollback_or_recover_exactly_one_committed_record() -> Test
             lock_root,
             authority,
             store,
+            _clock,
             ..
         } = fixture;
         drop(store);
@@ -466,6 +467,7 @@ fn native_join_errors_rollback_or_recover_exactly_one_committed_record() -> Test
             store: authority.admission_operation_store(),
             fence: authority.mutation_fence(),
             authority,
+            _clock,
         };
         let operation = fixture
             .store

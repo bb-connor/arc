@@ -42,6 +42,7 @@ fn reopened_history_recovers_exact_claim_and_retains_dispatch_disposition() -> T
             authority,
             store,
             fence,
+            _clock,
         } = fixture;
         drop(store);
         drop(authority);

@@ -3,7 +3,7 @@ use std::sync::Barrier;
 
 #[test]
 fn two_operations_racing_for_one_replay_key_leave_one_physical_owner() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let domain = activate(&fixture, &source)?;
     let mut contenders = Vec::new();

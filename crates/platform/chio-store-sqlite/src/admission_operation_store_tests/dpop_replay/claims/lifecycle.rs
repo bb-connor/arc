@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn released_dpop_identity_remains_spent_for_a_different_operation() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let authority = activate(&fixture, &source)?;
     let (original, lease, credential) = setup(
@@ -72,7 +72,7 @@ fn released_dpop_identity_remains_spent_for_a_different_operation() -> AnchoredT
 
 #[test]
 fn exact_claim_retry_release_and_successor_preserve_ownership() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let authority = activate(&fixture, &source)?;
     let (initial, old_lease, credential) = setup(
@@ -154,7 +154,7 @@ fn exact_claim_retry_release_and_successor_preserve_ownership() -> AnchoredTestR
 
 #[test]
 fn substituted_invocation_generation_grant_or_phase_cannot_claim() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let authority = activate(&fixture, &source)?;
     let (operation, lease, credential) = setup(
@@ -200,7 +200,7 @@ fn substituted_invocation_generation_grant_or_phase_cannot_claim() -> AnchoredTe
 #[test]
 fn expiry_and_release_cannot_cross_dispatch_commit() -> AnchoredTestResult {
     for released in [false, true] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, true)?;
         let authority = activate(&fixture, &source)?;
         let (operation, lease, credential) = setup(
@@ -263,7 +263,7 @@ fn expiry_and_release_cannot_cross_dispatch_commit() -> AnchoredTestResult {
 
 #[test]
 fn committed_claim_survives_source_loss_expiry_and_restart_without_release() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let authority = activate(&fixture, &source)?;
     let (operation, lease, credential) = setup(
@@ -306,6 +306,7 @@ fn committed_claim_survives_source_loss_expiry_and_restart_without_release() -> 
         authority: owner,
         store,
         fence: stale,
+        _clock,
     } = fixture;
     drop(store);
     drop(owner);
@@ -318,6 +319,7 @@ fn committed_claim_survives_source_loss_expiry_and_restart_without_release() -> 
         _temp,
         database,
         lock_root,
+        _clock: Some(_clock),
     };
     let now = expires * 1000;
     assert!(fixture
@@ -356,7 +358,7 @@ fn committed_claim_survives_source_loss_expiry_and_restart_without_release() -> 
 
 #[test]
 fn expired_pre_dispatch_claim_can_be_released_from_recovered_exact_history() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, true)?;
     let authority = activate(&fixture, &source)?;
     let (operation, lease, credential) = setup(

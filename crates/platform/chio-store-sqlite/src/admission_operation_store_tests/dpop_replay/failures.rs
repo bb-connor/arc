@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn lost_seal_acknowledgement_leaves_pending_history_and_retries_exactly_once() -> AnchoredTestResult
 {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let expected = pin(&fixture, &source)?;
     source.state.lock().expect("state").lose_seal_ack_once = true;
@@ -27,7 +27,7 @@ fn lost_seal_acknowledgement_leaves_pending_history_and_retries_exactly_once() -
 fn panicking_callbacks_release_the_import_guard_and_never_grant_partial_history(
 ) -> AnchoredTestResult {
     for call in ["preview", "seal", "verify"] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         let expected = (call != "preview")
             .then(|| pin(&fixture, &source))
@@ -60,7 +60,7 @@ fn panicking_callbacks_release_the_import_guard_and_never_grant_partial_history(
 #[test]
 fn unavailable_sources_never_complete_or_reseal_imported_history() -> AnchoredTestResult {
     for already_imported in [false, true] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         let expected = pin(&fixture, &source)?;
         if already_imported {
@@ -109,7 +109,7 @@ fn destination_write_cutpoints_rollback_rows_events_and_global_commits() -> Anch
             true,
         ),
     ] {
-        let fixture = fixture();
+        let fixture = fixture_real_time();
         let source = Source::new(&fixture, false)?;
         let expected = importing.then(|| pin(&fixture, &source)).transpose()?;
         let before = global_count(&fixture);
@@ -139,7 +139,7 @@ fn destination_write_cutpoints_rollback_rows_events_and_global_commits() -> Anch
 #[test]
 fn owner_wide_migration_guard_rejects_concurrent_import_without_source_access() -> AnchoredTestResult
 {
-    let fixture = fixture();
+    let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let expected = pin(&fixture, &source)?;
     let guard = fixture

@@ -46,6 +46,7 @@ fn injected_fixture() -> AnchoredTestResult<(Fixture, Arc<TestClock>)> {
             authority,
             store,
             fence,
+            _clock: None,
         },
         clock,
     ))

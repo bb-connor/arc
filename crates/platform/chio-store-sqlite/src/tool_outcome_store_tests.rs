@@ -17,6 +17,7 @@ use chio_kernel::tool_outcome::{
     CanonicalResolvedOutputBlobV1, SettlementDispositionV1, ToolOutcomeInsertResultV1,
     ToolOutcomeStore, ToolOutcomeStoreError,
 };
+use chio_test_support::clock::ClockScope;
 use tempfile::TempDir;
 
 use super::*;
@@ -46,9 +47,11 @@ struct Fixture {
     operations: SqliteAdmissionOperationStore,
     outcomes: SqliteToolOutcomeStore,
     fence: StoreMutationFence,
+    _clock: ClockScope,
 }
 
 fn fixture() -> Fixture {
+    let clock = chio_test_support::clock::scope_unix_secs(chio_test_support::clock::unix_seconds());
     let temp = tempfile::tempdir().expect("tempdir");
     secure_temp_directory(temp.path());
     let database = temp.path().join("authority.db");
@@ -74,6 +77,7 @@ fn fixture() -> Fixture {
         operations,
         outcomes,
         fence,
+        _clock: clock,
     }
 }
 

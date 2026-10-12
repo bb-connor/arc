@@ -46,6 +46,7 @@ pub(in crate::admission_operation_store::tests::execution_nonce) fn reopen(
                 lock_root,
                 authority,
                 store,
+                _clock,
                 ..
             },
         operation,
@@ -69,6 +70,7 @@ pub(in crate::admission_operation_store::tests::execution_nonce) fn reopen(
             authority,
             store,
             fence,
+            _clock,
         },
         operation,
         original,

@@ -153,6 +153,7 @@ fn committed_approval_survives_expiry_and_restart_without_release_authority() ->
         authority,
         store,
         fence,
+        _clock,
     } = fixture;
     drop(store);
     drop(authority);
