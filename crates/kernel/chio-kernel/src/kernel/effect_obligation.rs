@@ -198,31 +198,40 @@ impl<'a> PostEffectObligation<'a> {
                 })
             }
         };
-        if receipt.is_allowed() {
-            if let Err(error) = kernel.check_revocation(
-                &self
-                    .parts
-                    .as_ref()
-                    .unwrap_or_else(|| unreachable!("live obligation parts"))
-                    .inputs
-                    .request
-                    .capability,
-            ) {
-                drop(transition);
-                return Err(Undischarged {
-                    obligation: self,
-                    error: PostEffectError::at("append", &error),
-                    original: None,
-                });
+        let appended = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if receipt.is_allowed() {
+                kernel
+                    .check_revocation(
+                        &self
+                            .parts
+                            .as_ref()
+                            .unwrap_or_else(|| unreachable!("live obligation parts"))
+                            .inputs
+                            .request
+                            .capability,
+                    )
+                    .map_err(ReceiptAppendFailure::Refused)?;
             }
-        }
-        self.submitted = Some(original);
-        let committed = match kernel.append_terminal_receipt_during_trace_transition(
-            receipt,
-            &transition,
-            true,
-            false,
-        ) {
+            self.submitted = Some(original);
+            kernel.append_terminal_receipt_during_trace_transition(
+                receipt,
+                &transition,
+                true,
+                false,
+            )
+        }));
+        let appended = match appended {
+            Ok(result) => result,
+            Err(_) => {
+                let error = KernelError::Internal("terminal publication callback panicked".into());
+                Err(if self.submitted.is_some() {
+                    ReceiptAppendFailure::unknown(&receipt.id, error)
+                } else {
+                    ReceiptAppendFailure::Refused(error)
+                })
+            }
+        };
+        let committed = match appended {
             Ok(committed) => committed,
             Err(failure) => {
                 drop(transition);

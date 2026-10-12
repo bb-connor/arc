@@ -97,12 +97,22 @@ fn flush_children(obligation: &mut PostEffectObligation<'_>) -> Result<(), PostE
             // Once entered, the writer can still commit after a timeout or
             // callback panic. Preserve this exact child at the vector front.
             parts.unknown_child = Some(unknown);
-            store
-                .append_child_receipt_with_timeout(
+            let appended = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                store.append_child_receipt_with_timeout(
                     receipt,
                     obligation.kernel.config.deadlines.receipt_append_budget(),
                 )
-                .map_err(|error| failure("child_receipt_flush", KernelError::from(error)))?;
+            }));
+            match appended {
+                Ok(result) => result
+                    .map_err(|error| failure("child_receipt_flush", KernelError::from(error)))?,
+                Err(_) => {
+                    return Err(failure(
+                        "child_receipt_flush",
+                        KernelError::Internal("child receipt append callback panicked".into()),
+                    ))
+                }
+            };
             parts.unknown_child = None;
         }
         let PendingChildReceipt::Signed(receipt) = parts.children.remove(0) else {
