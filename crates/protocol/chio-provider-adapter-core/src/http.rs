@@ -107,6 +107,7 @@ pub struct HttpTransportConfig {
     /// How requests authenticate.
     pub auth: AuthScheme,
     /// Headers applied to every request (for example `anthropic-version`).
+    /// Custom headers may contain credentials, so they require HTTPS or loopback.
     pub extra_headers: Vec<(String, String)>,
     /// Per-request timeout.
     pub timeout: Duration,
@@ -468,9 +469,9 @@ fn validate_base_url(base_url: &str) -> Result<(), HttpTransportError> {
     Ok(())
 }
 
-/// A credential crosses plaintext HTTP only to a loopback host.
+/// Credentials or arbitrary caller headers cross plaintext HTTP only to loopback.
 fn validate_credential_transport(config: &HttpTransportConfig) -> Result<(), HttpTransportError> {
-    if matches!(config.auth, AuthScheme::None) {
+    if matches!(config.auth, AuthScheme::None) && config.extra_headers.is_empty() {
         return Ok(());
     }
     let parsed =
@@ -484,7 +485,7 @@ fn validate_credential_transport(config: &HttpTransportConfig) -> Result<(), Htt
     }
     Err(invalid_base_url(
         &config.base_url,
-        "a base URL that carries credentials must use https unless its host is loopback"
+        "a base URL that carries credentials or custom headers must use https unless its host is loopback"
             .to_string(),
     ))
 }
