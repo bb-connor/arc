@@ -35,7 +35,10 @@ impl ChioKernel {
             &reason,
             now,
             None,
-            error.rejection_metadata(metadata),
+            RefusalReceiptMetadata::new(
+                error.rejection_metadata(metadata),
+                IdentityDisposition::Reusable,
+            ),
         )
     }
 }

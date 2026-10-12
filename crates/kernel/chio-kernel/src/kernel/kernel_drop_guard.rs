@@ -327,7 +327,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
                     PRE_DISPATCH_CLEANUP_FAULT_REASON,
                     now.as_secs(),
                     self.matched_grant_index,
-                    metadata,
+                    RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
                     self.receipt_context.verified_payee_binding.as_ref(),
                 )
         }) {

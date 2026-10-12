@@ -40,6 +40,7 @@ mod kernel_struct;
 mod nonce_admission;
 mod output_guard;
 mod receipt_identity;
+use receipt_identity::{IdentityDisposition, RefusalReceiptMetadata};
 mod rejection_metadata;
 mod security_dispatch;
 mod security_runtime;

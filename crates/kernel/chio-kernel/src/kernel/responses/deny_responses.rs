@@ -9,7 +9,7 @@ impl ChioKernel {
         timestamp: u64,
         matching_grants: &[MatchingGrant<'_>],
         cap: &CapabilityToken,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
     ) -> Result<ToolCallResponse, KernelError> {
         // Look for a monetary grant among the matching candidates to populate metadata.
         let monetary_grant = matching_grants.iter().find(|m| {
@@ -17,6 +17,7 @@ impl ChioKernel {
         });
 
         if let Some(mg) = monetary_grant {
+            let extra_metadata = extra_metadata.into_signed_metadata();
             let grant = mg.grant;
             let currency = grant
                 .max_cost_per_invocation
@@ -132,7 +133,7 @@ impl ChioKernel {
         charge: &BudgetChargeResult,
         committed_cost_after_release: u64,
         cap: &CapabilityToken,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_pre_execution_monetary_deny_response_with_recording(
@@ -197,10 +198,11 @@ impl ChioKernel {
         charge: &BudgetChargeResult,
         committed_cost_after_release: u64,
         cap: &CapabilityToken,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         record_mode: ReceiptRecordMode,
     ) -> Result<ToolCallResponse, KernelError> {
+        let extra_metadata = extra_metadata.into_signed_metadata();
         let financial_metadata =
             Self::pre_execution_financial_metadata(charge, committed_cost_after_release, cap)?;
         let deny_extra_metadata =
@@ -255,23 +257,6 @@ impl ChioKernel {
         })
     }
 
-    /// Build a denial response with a signed receipt.
-    pub(crate) fn build_deny_response(
-        &self,
-        request: &ToolCallRequest,
-        reason: &str,
-        timestamp: u64,
-        matched_grant_index: Option<usize>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        self.build_deny_response_with_metadata(
-            request,
-            reason,
-            timestamp,
-            matched_grant_index,
-            None,
-        )
-    }
-
     fn build_local_v1_failclosed_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
@@ -281,6 +266,8 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         guard: &str,
     ) -> Result<ToolCallResponse, KernelError> {
+        let extra_metadata =
+            with_identity_disposition(extra_metadata, IdentityDisposition::Reusable);
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -380,7 +367,7 @@ impl ChioKernel {
             reason,
             timestamp,
             matched_grant_index,
-            with_identity_disposition(extra_metadata, IdentityDisposition::Reusable),
+            extra_metadata,
             "kernel",
         )
     }
@@ -445,7 +432,7 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_deny_response_with_recording(
             request,
@@ -468,7 +455,7 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_deny_response_with_recording(
@@ -488,7 +475,7 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_deny_response_with_recording(
             request,
@@ -511,7 +498,7 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         record_mode: ReceiptRecordMode,
     ) -> Result<ToolCallResponse, KernelError> {
@@ -533,7 +520,7 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
     ) -> Result<PreparedResponse, KernelError> {
         self.prepare_deny_response_with_recording(
             request,
@@ -556,7 +543,7 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<PreparedResponse, KernelError> {
         self.prepare_deny_response_with_recording(
@@ -580,10 +567,11 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         record_mode: ReceiptRecordMode,
     ) -> Result<PreparedResponse, KernelError> {
+        let extra_metadata = extra_metadata.into_signed_metadata();
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 

@@ -11,7 +11,7 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
         let prepared = self.prepare_cancelled_response_with_metadata_and_payee_binding(
@@ -35,9 +35,10 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<PreparedResponse, KernelError> {
+        let extra_metadata = extra_metadata.into_signed_metadata();
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -102,7 +103,7 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<PreparedResponse, KernelError> {
         let cap = &request.capability;

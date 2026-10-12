@@ -116,7 +116,7 @@ fn fixture() -> (ChioKernel, ChioReceipt, Arc<StoreState>) {
             "post-effect fixture",
             current_unix_timestamp(),
             None,
-            None,
+            RefusalReceiptMetadata::new(None, IdentityDisposition::Terminal),
         )
         .unwrap()
         .receipt()

@@ -198,7 +198,7 @@ impl ChioKernel {
                 &msg,
                 now,
                 None,
-                extra_metadata.clone(),
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
             );
         }
 
@@ -210,7 +210,7 @@ impl ChioKernel {
                 &msg,
                 now,
                 None,
-                extra_metadata.clone(),
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
             );
         }
 
@@ -234,7 +234,7 @@ impl ChioKernel {
                 &msg,
                 now,
                 None,
-                extra_metadata.clone(),
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
             );
         }
 
@@ -246,7 +246,7 @@ impl ChioKernel {
                 &msg,
                 now,
                 None,
-                extra_metadata.clone(),
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
             );
         }
 
@@ -258,7 +258,7 @@ impl ChioKernel {
                 &msg,
                 now,
                 None,
-                extra_metadata.clone(),
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
             );
         }
 
@@ -274,7 +274,7 @@ impl ChioKernel {
                 &msg,
                 now,
                 None,
-                extra_metadata.clone(),
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
             );
         }
 
@@ -294,7 +294,10 @@ impl ChioKernel {
                     &msg,
                     now,
                     None,
-                    extra_metadata.clone(),
+                    RefusalReceiptMetadata::new(
+                        extra_metadata.clone(),
+                        IdentityDisposition::Reusable,
+                    ),
                 );
             }
         };
@@ -308,7 +311,10 @@ impl ChioKernel {
                         reason,
                         now,
                         None,
-                        extra_metadata.clone(),
+                        RefusalReceiptMetadata::new(
+                            extra_metadata.clone(),
+                            IdentityDisposition::Reusable,
+                        ),
                     );
                 }
             };
@@ -325,7 +331,10 @@ impl ChioKernel {
                     reason,
                     now,
                     None,
-                    extra_metadata.clone(),
+                    RefusalReceiptMetadata::new(
+                        extra_metadata.clone(),
+                        IdentityDisposition::Reusable,
+                    ),
                 );
             }
         }
@@ -349,7 +358,10 @@ impl ChioKernel {
                     &msg,
                     now,
                     None,
-                    extra_metadata.clone(),
+                    RefusalReceiptMetadata::new(
+                        extra_metadata.clone(),
+                        IdentityDisposition::Reusable,
+                    ),
                 );
             }
         }
@@ -371,7 +383,10 @@ impl ChioKernel {
                     &reason,
                     now,
                     None,
-                    error.denied_metadata(&extra_metadata),
+                    RefusalReceiptMetadata::new(
+                        error.error.denied_metadata(&extra_metadata),
+                        error.disposition,
+                    ),
                 );
             }
         };
@@ -409,7 +424,14 @@ impl ChioKernel {
                 &msg,
                 now,
                 None,
-                extra_metadata.clone(),
+                RefusalReceiptMetadata::new(
+                    extra_metadata.clone(),
+                    if durable_admission.is_some() {
+                        IdentityDisposition::Terminal
+                    } else {
+                        IdentityDisposition::Reusable
+                    },
+                ),
             );
         }
 
@@ -548,7 +570,14 @@ impl ChioKernel {
                             &msg,
                             now,
                             Some(matching.index),
-                            runtime_metadata,
+                            RefusalReceiptMetadata::new(
+                                runtime_metadata,
+                                if durable_admission.is_some() || !runtime_release_confirmed {
+                                    IdentityDisposition::Terminal
+                                } else {
+                                    IdentityDisposition::Reusable
+                                },
+                            ),
                         )
                     },
                 );
@@ -696,7 +725,14 @@ impl ChioKernel {
                                 now,
                                 &matching_grants,
                                 cap,
-                                receipt_metadata,
+                                RefusalReceiptMetadata::new(
+                                    receipt_metadata,
+                                    if durable_admission.is_some() || !runtime_release_confirmed {
+                                        IdentityDisposition::Terminal
+                                    } else {
+                                        IdentityDisposition::Reusable
+                                    },
+                                ),
                             )
                         },
                     );
@@ -738,7 +774,14 @@ impl ChioKernel {
                             now,
                             &matching_grants,
                             cap,
-                            receipt_metadata,
+                            RefusalReceiptMetadata::new(
+                                receipt_metadata,
+                                if durable_admission.is_some() {
+                                    IdentityDisposition::Terminal
+                                } else {
+                                    IdentityDisposition::Reusable
+                                },
+                            ),
                         )
                     });
                 }
@@ -771,12 +814,19 @@ impl ChioKernel {
                 now,
                 &matching_grants,
                 cap,
-                self.merge_budget_receipt_metadata(
-                    error.rejection_metadata(merge_metadata_objects(
-                        extra_metadata.clone(),
-                        budget_error_metadata,
-                    )),
-                    self.budget_backend_receipt_metadata()?,
+                RefusalReceiptMetadata::new(
+                    self.merge_budget_receipt_metadata(
+                        error.rejection_metadata(merge_metadata_objects(
+                            extra_metadata.clone(),
+                            budget_error_metadata,
+                        )),
+                        self.budget_backend_receipt_metadata()?,
+                    ),
+                    if durable_admission.is_some() || runtime_release_retained {
+                        IdentityDisposition::Terminal
+                    } else {
+                        IdentityDisposition::Reusable
+                    },
                 ),
             );
         };
@@ -1245,9 +1295,12 @@ impl ChioKernel {
                     &reason,
                     now,
                     Some(matched_grant_index),
-                    self.retained_admission_receipt_metadata(
-                        &budget_mutation,
-                        extra_metadata.clone(),
+                    RefusalReceiptMetadata::new(
+                        self.retained_admission_receipt_metadata(
+                            &budget_mutation,
+                            extra_metadata.clone(),
+                        ),
+                        IdentityDisposition::Retained,
                     ),
                 );
             }
@@ -1426,7 +1479,7 @@ impl ChioKernel {
                             &denial_reason,
                             now,
                             Some(matched_grant_index),
-                            metadata,
+                            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Retained),
                             verified_governed_payee_binding.as_ref(),
                         )
                     },

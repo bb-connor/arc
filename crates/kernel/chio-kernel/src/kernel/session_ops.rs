@@ -310,13 +310,16 @@ impl ChioKernel {
             action,
             content_hash: receipt_content.content_hash,
             canonical_content: receipt_content.canonical_content,
-            metadata: merge_metadata_objects(
-                Some(serde_json::json!({
-                    "resource": {
-                        "uri": &operation.uri,
-                    }
-                })),
-                receipt_attribution_metadata(&operation.capability, None)?,
+            metadata: crate::kernel::receipt_identity::with_identity_disposition(
+                merge_metadata_objects(
+                    Some(serde_json::json!({
+                        "resource": {
+                            "uri": &operation.uri,
+                        }
+                    })),
+                    receipt_attribution_metadata(&operation.capability, None)?,
+                ),
+                IdentityDisposition::Reusable,
             ),
             timestamp: self.read_authority_time()?.as_secs(),
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),

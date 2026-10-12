@@ -35,7 +35,10 @@ impl ChioKernel {
                 &reason,
                 self.read_authority_time()?.get() / 1_000,
                 Some(matched_grant_index),
-                crate::finding_denial::denied_metadata(metadata, denial),
+                RefusalReceiptMetadata::new(
+                    crate::finding_denial::denied_metadata(metadata, denial),
+                    IdentityDisposition::Terminal,
+                ),
                 payee,
             )
         })
@@ -90,8 +93,14 @@ impl ChioKernel {
             None,
             None,
         )?;
-        self.build_deny_response_with_metadata(request, reason, now, None, metadata.cloned())
-            .map(Some)
+        self.build_deny_response_with_metadata(
+            request,
+            reason,
+            now,
+            None,
+            RefusalReceiptMetadata::new(metadata.cloned(), IdentityDisposition::Terminal),
+        )
+        .map(Some)
     }
 }
 
@@ -404,7 +413,7 @@ impl ChioKernel {
             reason,
             timestamp,
             Some(matched_grant_index),
-            metadata,
+            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
             verified_payee_binding,
         )
     }
@@ -452,7 +461,10 @@ impl ChioKernel {
                     "captured budget cancellation could not be confirmed",
                     timestamp,
                     Some(charge.grant_index),
-                    self.ambiguous_cancellation_receipt_metadata(charge, runtime_metadata),
+                    RefusalReceiptMetadata::new(
+                        self.ambiguous_cancellation_receipt_metadata(charge, runtime_metadata),
+                        IdentityDisposition::Retained,
+                    ),
                     verified_payee_binding,
                 );
             }
@@ -471,13 +483,16 @@ impl ChioKernel {
             charge,
             cancellation.committed_cost_units_after,
             cap,
-            self.merge_budget_receipt_metadata(
-                runtime_metadata,
-                self.budget_execution_receipt_metadata(
-                    charge,
-                    Some(("cancelled_before_dispatch", &cancellation)),
-                    None,
+            RefusalReceiptMetadata::new(
+                self.merge_budget_receipt_metadata(
+                    runtime_metadata,
+                    self.budget_execution_receipt_metadata(
+                        charge,
+                        Some(("cancelled_before_dispatch", &cancellation)),
+                        None,
+                    ),
                 ),
+                IdentityDisposition::Terminal,
             ),
             verified_payee_binding,
         )
@@ -689,7 +704,7 @@ impl ChioKernel {
                     ),
                     denial.timestamp,
                     Some(denial.matched_grant_index),
-                    metadata,
+                    RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
                     denial.verified_payee_binding,
                 );
             }
@@ -713,13 +728,16 @@ impl ChioKernel {
                 unwind_evidence.as_ref(),
             )?;
         }
-        let runtime_admission_metadata = if saga_compensated {
-            crate::kernel::receipt_identity::with_identity_disposition(
-                runtime_admission_metadata,
-                crate::kernel::receipt_identity::IdentityDisposition::Terminal,
-            )
+        let identity_disposition = if denial.durable_operation.is_some()
+            || denial.budget_mutation.durable_hold_result().is_some()
+            || denial.payment_authorization.is_some()
+            || credential_disposition != PaymentCredentialDisposition::NonePresent
+            || !runtime_release_confirmed
+            || !lease_release.confirmed
+        {
+            IdentityDisposition::Terminal
         } else {
-            runtime_admission_metadata
+            IdentityDisposition::Reusable
         };
 
         if let (Some(charge), Some(reverse)) =
@@ -738,7 +756,7 @@ impl ChioKernel {
                         charge,
                         reverse.committed_cost_units_after,
                         denial.cap,
-                        metadata,
+                        RefusalReceiptMetadata::new(metadata, identity_disposition),
                         denial.verified_payee_binding,
                     ),
                 PreDispatchCleanupOutcome::Cancelled => self
@@ -747,13 +765,16 @@ impl ChioKernel {
                         denial.reason,
                         denial.timestamp,
                         Some(charge.grant_index),
-                        merge_metadata_objects(
-                            Self::pre_execution_financial_metadata(
-                                charge,
-                                reverse.committed_cost_units_after,
-                                denial.cap,
-                            )?,
-                            metadata,
+                        RefusalReceiptMetadata::new(
+                            merge_metadata_objects(
+                                Self::pre_execution_financial_metadata(
+                                    charge,
+                                    reverse.committed_cost_units_after,
+                                    denial.cap,
+                                )?,
+                                metadata,
+                            ),
+                            identity_disposition,
                         ),
                         denial.verified_payee_binding,
                     ),
@@ -766,192 +787,11 @@ impl ChioKernel {
             denial.reason,
             denial.timestamp,
             Some(denial.matched_grant_index),
-            runtime_admission_metadata,
+            RefusalReceiptMetadata::new(runtime_admission_metadata, identity_disposition),
             denial.verified_payee_binding,
         )
     }
 
-    #[allow(dead_code)]
-    pub(super) fn build_nonce_denial_after_monetary_cleanup(
-        &self,
-        denial: PreDispatchCleanupDeny<'_>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        let (runtime_metadata, _) = self
-            .release_runtime_admission_reservations_for_pre_dispatch_denial(
-                denial.durable_operation,
-                denial.runtime_admission_metadata,
-            );
-        let runtime_metadata = self
-            .release_budget_lease_with_evidence(
-                denial.cap,
-                denial.budget_lease_acquired,
-                runtime_metadata,
-            )
-            .metadata;
-        let charge = denial.budget_mutation.charge_result().ok_or_else(|| {
-            KernelError::Internal("monetary nonce cleanup is missing its budget hold".to_string())
-        })?;
-
-        let payment_release_metadata = match denial.payment_authorization {
-            Some(authorization) => {
-                let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
-                    KernelError::Internal(
-                        "payment authorization present without configured adapter".to_string(),
-                    )
-                })?;
-                let (release, expected_status) = if authorization.state.is_final() {
-                    (
-                        adapter.refund(
-                            &authorization.authorization_id,
-                            charge.cost_charged,
-                            &charge.currency,
-                            &denial.request.request_id,
-                        ),
-                        RailSettlementStatus::Refunded,
-                    )
-                } else {
-                    (
-                        adapter
-                            .release(&authorization.authorization_id, &denial.request.request_id),
-                        RailSettlementStatus::Released,
-                    )
-                };
-                match release {
-                    Ok(result) if result.settlement_status == expected_status => {
-                        Some(serde_json::json!({
-                            "financial": {
-                                "payment_reference": authorization.authorization_id,
-                                "payment_release_reference": result.transaction_id,
-                                "payment_release_confirmed": true,
-                                "payment_release_attempt_reference": denial.request.request_id
-                            }
-                        }))
-                    }
-                    Ok(result) => {
-                        let status = match result.settlement_status {
-                            RailSettlementStatus::Authorized => "authorized",
-                            RailSettlementStatus::Captured => "captured",
-                            RailSettlementStatus::Settled => "settled",
-                            RailSettlementStatus::Pending => "pending",
-                            RailSettlementStatus::Failed => "failed",
-                            RailSettlementStatus::Released => "released",
-                            RailSettlementStatus::Refunded => "refunded",
-                        };
-                        warn!(
-                            request_id = %denial.request.request_id,
-                            payment_status = status,
-                            "payment release returned an unexpected result after nonce denial"
-                        );
-                        let metadata = merge_metadata_objects(
-                            self.captured_admission_retained_receipt_metadata(
-                                charge,
-                                runtime_metadata,
-                            ),
-                            Some(serde_json::json!({
-                                "financial": {
-                                    "payment_reference": authorization.authorization_id,
-                                    "payment_authorization_retained": true,
-                                    "payment_release_reference": result.transaction_id,
-                                    "payment_release_status": status,
-                                    "payment_release_unconfirmed": true,
-                                    "payment_release_attempt_reference": denial.request.request_id
-                                }
-                            })),
-                        );
-                        return self.build_deny_response_with_metadata_and_payee_binding(
-                            denial.request,
-                            "payment release could not be confirmed after execution nonce denial",
-                            denial.timestamp,
-                            Some(denial.matched_grant_index),
-                            metadata,
-                            denial.verified_payee_binding,
-                        );
-                    }
-                    Err(error) => {
-                        warn!(
-                            request_id = %denial.request.request_id,
-                            reason = %redacted!(&error),
-                            "payment release could not be confirmed after nonce denial"
-                        );
-                        let metadata = merge_metadata_objects(
-                            self.captured_admission_retained_receipt_metadata(
-                                charge,
-                                runtime_metadata,
-                            ),
-                            Some(serde_json::json!({
-                                "financial": {
-                                    "payment_reference": authorization.authorization_id,
-                                    "payment_authorization_retained": true,
-                                    "payment_release_unconfirmed": true,
-                                    "payment_release_attempt_reference": denial.request.request_id
-                                }
-                            })),
-                        );
-                        return self.build_deny_response_with_metadata_and_payee_binding(
-                            denial.request,
-                            "payment release could not be confirmed after execution nonce denial",
-                            denial.timestamp,
-                            Some(denial.matched_grant_index),
-                            metadata,
-                            denial.verified_payee_binding,
-                        );
-                    }
-                }
-            }
-            None => None,
-        };
-
-        let cancellation = match self
-            .cancel_captured_monetary_before_dispatch(&denial.cap.id, charge)
-        {
-            Ok(cancellation) => cancellation,
-            Err(error) => {
-                warn!(
-                    request_id = %denial.request.request_id,
-                    reason = %redacted!(&error),
-                    "captured budget cancellation could not be confirmed after nonce denial"
-                );
-                let metadata = merge_metadata_objects(
-                    self.ambiguous_cancellation_receipt_metadata(charge, runtime_metadata),
-                    payment_release_metadata,
-                );
-                return self.build_deny_response_with_metadata_and_payee_binding(
-                    denial.request,
-                    "captured budget cancellation could not be confirmed after execution nonce denial",
-                    denial.timestamp,
-                    Some(charge.grant_index),
-                    metadata,
-                    denial.verified_payee_binding,
-                );
-            }
-        };
-
-        self.build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
-            denial.request,
-            denial.reason,
-            denial.timestamp,
-            charge,
-            cancellation.committed_cost_units_after,
-            denial.cap,
-            merge_metadata_objects(
-                self.merge_budget_receipt_metadata(
-                    runtime_metadata,
-                    self.budget_execution_receipt_metadata(
-                        charge,
-                        Some(("cancelled_before_dispatch", &cancellation)),
-                        None,
-                    ),
-                ),
-                payment_release_metadata,
-            ),
-            denial.verified_payee_binding,
-        )
-    }
-
-    // The preflight-allow cleanup legitimately threads the full pre-dispatch
-    // state (request, grant, capability, budget mutation, admission metadata,
-    // and the budget-lease gate) needed to reverse it; grouping them into
-    // a params struct would only rename the same inputs.
     #[allow(
         clippy::too_many_arguments,
         reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
@@ -1027,7 +867,7 @@ impl ChioKernel {
                     "execution nonce preflight cleanup could not be confirmed",
                     timestamp,
                     Some(matched_grant_index),
-                    metadata,
+                    RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
                 );
             }
         };
@@ -1056,7 +896,7 @@ impl ChioKernel {
                 "execution nonce preflight cleanup could not be confirmed",
                 timestamp,
                 Some(matched_grant_index),
-                metadata,
+                RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
             );
         }
 
@@ -1081,7 +921,7 @@ impl ChioKernel {
                             &reason,
                             timestamp,
                             Some(matched_grant_index),
-                            metadata,
+                            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Retained),
                         );
                     }
                 }
@@ -1154,7 +994,10 @@ impl ChioKernel {
                 "execution nonce authorization cleanup could not be confirmed",
                 timestamp,
                 Some(matched_grant_index),
-                runtime_admission_metadata,
+                RefusalReceiptMetadata::new(
+                    runtime_admission_metadata,
+                    IdentityDisposition::Terminal,
+                ),
             );
         }
 

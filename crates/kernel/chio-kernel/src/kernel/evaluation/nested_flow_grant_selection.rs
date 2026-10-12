@@ -188,7 +188,14 @@ impl ChioKernel {
                             &msg,
                             now,
                             Some(matching.index),
-                            runtime_admission_metadata,
+                            RefusalReceiptMetadata::new(
+                                runtime_admission_metadata,
+                                if durable_admission.is_some() || !runtime_release_confirmed {
+                                    IdentityDisposition::Terminal
+                                } else {
+                                    IdentityDisposition::Reusable
+                                },
+                            ),
                         )
                     })
                     .map(ControlFlow::Break);
@@ -325,9 +332,16 @@ impl ChioKernel {
                                 now,
                                 matching_grants,
                                 cap,
-                                self.merge_budget_receipt_metadata(
-                                    runtime_admission_metadata,
-                                    self.budget_backend_receipt_metadata()?,
+                                RefusalReceiptMetadata::new(
+                                    self.merge_budget_receipt_metadata(
+                                        runtime_admission_metadata,
+                                        self.budget_backend_receipt_metadata()?,
+                                    ),
+                                    if durable_admission.is_some() || !runtime_release_confirmed {
+                                        IdentityDisposition::Terminal
+                                    } else {
+                                        IdentityDisposition::Reusable
+                                    },
                                 ),
                             )
                         })
@@ -368,7 +382,14 @@ impl ChioKernel {
                                 now,
                                 matching_grants,
                                 cap,
-                                receipt_metadata,
+                                RefusalReceiptMetadata::new(
+                                    receipt_metadata,
+                                    if durable_admission.is_some() {
+                                        IdentityDisposition::Terminal
+                                    } else {
+                                        IdentityDisposition::Reusable
+                                    },
+                                ),
                             )
                         })
                         .map(ControlFlow::Break);
@@ -403,12 +424,19 @@ impl ChioKernel {
                     now,
                     matching_grants,
                     cap,
-                    self.merge_budget_receipt_metadata(
-                        error.rejection_metadata(merge_metadata_objects(
-                            extra_metadata.clone(),
-                            budget_error_metadata,
-                        )),
-                        self.budget_backend_receipt_metadata()?,
+                    RefusalReceiptMetadata::new(
+                        self.merge_budget_receipt_metadata(
+                            error.rejection_metadata(merge_metadata_objects(
+                                extra_metadata.clone(),
+                                budget_error_metadata,
+                            )),
+                            self.budget_backend_receipt_metadata()?,
+                        ),
+                        if durable_admission.is_some() || runtime_release_retained {
+                            IdentityDisposition::Terminal
+                        } else {
+                            IdentityDisposition::Reusable
+                        },
                     ),
                 )
                 .map(ControlFlow::Break);

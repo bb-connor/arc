@@ -58,7 +58,7 @@ impl ChioKernel {
                 &reason,
                 timestamp,
                 matched_grant_index,
-                extra_metadata,
+                RefusalReceiptMetadata::new(extra_metadata, IdentityDisposition::Terminal),
                 verified_payee_binding,
             );
         }

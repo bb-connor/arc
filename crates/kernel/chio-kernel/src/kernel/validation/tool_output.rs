@@ -188,9 +188,9 @@ impl ChioKernel {
                                 ),
                                 timestamp,
                                 Some(matched_grant_index),
-                                self.mark_runtime_admission_reservations_retained_fail_closed(
+                                RefusalReceiptMetadata::new(self.mark_runtime_admission_reservations_retained_fail_closed(
                                     metadata,
-                                ),
+                                ), IdentityDisposition::Terminal),
                             );
                         }
                     };
@@ -219,7 +219,7 @@ impl ChioKernel {
                         "MustPrepay authorization could not be settled after execution",
                         timestamp,
                         Some(matched_grant_index),
-                        extra_metadata,
+                        RefusalReceiptMetadata::new(extra_metadata, IdentityDisposition::Terminal),
                     );
                 }
                 let (payment_reference, settlement_status) = settlement.into_receipt_parts();

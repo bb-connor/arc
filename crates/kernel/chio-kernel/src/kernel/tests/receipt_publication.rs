@@ -74,11 +74,12 @@ fn signed_receipt() -> ChioReceipt {
     );
     let request = make_request("publication-test", &capability, "read_file", "srv-a");
     kernel
-        .build_deny_response(
+        .build_deny_response_with_metadata(
             &request,
             "publication fixture",
             current_unix_timestamp(),
             None,
+            RefusalReceiptMetadata::new(None, IdentityDisposition::Reusable),
         )
         .unwrap()
         .receipt

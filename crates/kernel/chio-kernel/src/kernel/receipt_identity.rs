@@ -3,7 +3,7 @@
 use serde_json::{Map, Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum IdentityDisposition {
+pub(crate) enum IdentityDisposition {
     /// No persisted operation, retained custody or executed effect binds the id.
     Reusable,
     /// A submitted durable commit has not yielded an authoritative outcome.
@@ -35,4 +35,27 @@ pub(super) fn with_identity_disposition(
     );
     metadata.insert("chio_runtime".into(), Value::Object(runtime));
     Some(Value::Object(metadata))
+}
+
+/// A refusal's metadata and the identity state selected by its producing row.
+#[derive(Debug, Clone)]
+pub(crate) struct RefusalReceiptMetadata {
+    metadata: Option<Value>,
+    disposition: IdentityDisposition,
+}
+
+impl RefusalReceiptMetadata {
+    pub(in crate::kernel) fn new(
+        metadata: Option<Value>,
+        disposition: IdentityDisposition,
+    ) -> Self {
+        Self {
+            metadata,
+            disposition,
+        }
+    }
+
+    pub(in crate::kernel) fn into_signed_metadata(self) -> Option<Value> {
+        with_identity_disposition(self.metadata, self.disposition)
+    }
 }

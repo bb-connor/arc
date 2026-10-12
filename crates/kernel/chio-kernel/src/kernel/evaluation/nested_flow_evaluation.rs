@@ -211,13 +211,25 @@ impl ChioKernel {
         if let Err(error) = request.validate_authorization_extensions() {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "authorization extension rejected");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
+            );
         }
 
         if let Err(error) = self.validate_finding_memory_write_admission(request) {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "Finding memory write rejected pre-dispatch (nested flow)");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
+            );
         }
 
         let cap = &request.capability;
@@ -232,19 +244,37 @@ impl ChioKernel {
         ) {
             let msg = format!("capability verification failed: {reason}");
             warn!(request_id = %request.request_id, msg = %redacted!(&msg), "capability rejected");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
+            );
         }
 
         if let Err(e) = check_time_bounds(cap, now) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
+            );
         }
 
         if let Err(e) = self.check_tool_call_revocation_admission(request) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
+            );
         }
 
         if let Err(e) = self.validate_delegation_admission(cap) {
@@ -254,7 +284,13 @@ impl ChioKernel {
         if let Err(e) = check_subject_binding(cap, &request.agent_id) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
+            );
         }
 
         let matching_grants = match resolve_required_matching_grants(
@@ -268,7 +304,16 @@ impl ChioKernel {
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-                return self.build_deny_response(request, &msg, now, None);
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    None,
+                    RefusalReceiptMetadata::new(
+                        extra_metadata.clone(),
+                        IdentityDisposition::Reusable,
+                    ),
+                );
             }
         };
         let required_delivery_grant_index =
@@ -276,7 +321,16 @@ impl ChioKernel {
                 Ok(index) => index,
                 Err(reason) => {
                     warn!(request_id = %request.request_id, reason, "delivery contract denied");
-                    return self.build_deny_response(request, reason, now, None);
+                    return self.build_deny_response_with_metadata(
+                        request,
+                        reason,
+                        now,
+                        None,
+                        RefusalReceiptMetadata::new(
+                            extra_metadata.clone(),
+                            IdentityDisposition::Reusable,
+                        ),
+                    );
                 }
             };
 
@@ -307,7 +361,13 @@ impl ChioKernel {
         if let Err(e) = self.ensure_registered_tool_target(request) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool target not registered");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
+            );
         }
 
         // Confirm durable persistence is healthy BEFORE the first writer-backed
@@ -380,7 +440,10 @@ impl ChioKernel {
                     &reason,
                     now,
                     None,
-                    error.denied_metadata(&extra_metadata),
+                    RefusalReceiptMetadata::new(
+                        error.error.denied_metadata(&extra_metadata),
+                        error.disposition,
+                    ),
                 );
             }
         };
@@ -403,7 +466,20 @@ impl ChioKernel {
                 None,
                 None,
             )?;
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                RefusalReceiptMetadata::new(
+                    extra_metadata.clone(),
+                    if durable_admission.is_some() {
+                        IdentityDisposition::Terminal
+                    } else {
+                        IdentityDisposition::Reusable
+                    },
+                ),
+            );
         }
 
         let session_roots = match self
@@ -420,7 +496,20 @@ impl ChioKernel {
                     None,
                     None,
                 )?;
-                return self.build_deny_response(request, &msg, now, None);
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    None,
+                    RefusalReceiptMetadata::new(
+                        extra_metadata.clone(),
+                        if durable_admission.is_some() {
+                            IdentityDisposition::Terminal
+                        } else {
+                            IdentityDisposition::Reusable
+                        },
+                    ),
+                );
             }
         };
 
@@ -910,9 +999,12 @@ impl ChioKernel {
                     &reason,
                     now,
                     Some(matched_grant_index),
-                    self.retained_admission_receipt_metadata(
-                        &budget_mutation,
-                        runtime_admission_metadata.clone(),
+                    RefusalReceiptMetadata::new(
+                        self.retained_admission_receipt_metadata(
+                            &budget_mutation,
+                            runtime_admission_metadata.clone(),
+                        ),
+                        IdentityDisposition::Retained,
                     ),
                 );
             }
@@ -956,9 +1048,12 @@ impl ChioKernel {
                                 reason,
                                 now,
                                 Some(matched_grant_index),
-                                self.ambiguous_invocation_capture_receipt_metadata(
-                                    &budget_mutation,
-                                    runtime_admission_metadata,
+                                RefusalReceiptMetadata::new(
+                                    self.ambiguous_invocation_capture_receipt_metadata(
+                                        &budget_mutation,
+                                        runtime_admission_metadata,
+                                    ),
+                                    IdentityDisposition::Retained,
                                 ),
                             )
                         },
@@ -1128,7 +1223,7 @@ impl ChioKernel {
                             &denial_reason,
                             now,
                             Some(matched_grant_index),
-                            metadata,
+                            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Retained),
                             verified_governed_payee_binding.as_ref(),
                         )
                     },

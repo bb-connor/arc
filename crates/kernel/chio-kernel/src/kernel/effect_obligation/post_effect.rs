@@ -258,7 +258,7 @@ fn prepare_ordinary(
                     error @ KernelError::UrlElicitationsRequired { .. } => kernel
                         .prepare_cancelled_response_with_metadata_and_payee_binding(inputs.request,
                             "tool server returned URL elicitation after dispatch; outcome is unknown", now,
-                            Some(inputs.matched_grant_index), metadata, inputs.payee.as_ref())
+                            Some(inputs.matched_grant_index), RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal), inputs.payee.as_ref())
                         .map(|response| (response, Some(error))),
                     KernelError::RequestCancelled { request_id, reason } => {
                         if let Some(parent) = inputs.parent_context.filter(|parent| parent.request_id == request_id) {
@@ -269,20 +269,20 @@ fn prepare_ordinary(
                         }
                         kernel
                         .prepare_cancelled_response_with_metadata_and_payee_binding(inputs.request, &reason, now,
-                            Some(inputs.matched_grant_index), metadata, inputs.payee.as_ref())
+                            Some(inputs.matched_grant_index), RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal), inputs.payee.as_ref())
                         .map(|response| (response, None))
                     },
                     KernelError::HotPathDeadlineExceeded { stage, budget_ms } => kernel
                         .prepare_cancelled_response_with_metadata_and_payee_binding(inputs.request,
                             &format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms"), now,
-                            Some(inputs.matched_grant_index), metadata, inputs.payee.as_ref())
+                            Some(inputs.matched_grant_index), RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal), inputs.payee.as_ref())
                         .map(|response| (response, None)),
                     KernelError::RequestIncomplete(reason) => kernel
                         .prepare_incomplete_response_with_output_metadata_and_payee_binding(inputs.request, None, &reason, now,
                             Some(inputs.matched_grant_index), metadata, inputs.payee.as_ref())
                         .map(|response| (response, None)),
                     error => kernel.prepare_deny_response_with_metadata_and_payee_binding(inputs.request,
-                        &error.to_string(), now, Some(inputs.matched_grant_index), metadata, inputs.payee.as_ref())
+                        &error.to_string(), now, Some(inputs.matched_grant_index), RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal), inputs.payee.as_ref())
                         .map(|response| (response, None)),
                 }
             }

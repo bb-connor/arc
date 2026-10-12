@@ -348,7 +348,10 @@ impl ChioKernel {
                     &reason,
                     now,
                     Some(matched_grant_index),
-                    self.retained_admission_receipt_metadata(budget_mutation, extra_metadata),
+                    RefusalReceiptMetadata::new(
+                        self.retained_admission_receipt_metadata(budget_mutation, extra_metadata),
+                        IdentityDisposition::Retained,
+                    ),
                 );
             }
         };
