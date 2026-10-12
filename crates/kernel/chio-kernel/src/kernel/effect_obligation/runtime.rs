@@ -47,6 +47,7 @@ impl ChioKernel {
         let resources = EvidenceRecoveryResources {
             clock: self.authority_clock(),
             signer: Arc::clone(&self.signing_authority.backend),
+            child_keypair: Arc::new(self.config.keypair.clone()),
             signing_identity: self.freeze_receipt_signing_identity()?,
             store: self.receipt_store.clone(),
             log: Arc::clone(&self.receipt_log),

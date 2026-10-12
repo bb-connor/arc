@@ -303,7 +303,9 @@ fn unknown_child_acknowledgement_recovers_its_mirror_without_a_parent_terminal()
         .unwrap();
     slot.buffer(PendingPostEffectRecord {
         evidence: PendingPostEffectEvidence::ChildrenOnly,
-        child_receipts: vec![child.clone()],
+        child_receipts: vec![
+            crate::kernel::effect_obligation::recovery::PendingChildReceipt::Signed(child.clone()),
+        ],
         unknown_child: None,
     });
     wait_until(|| state.child_append_calls.load(Ordering::SeqCst) == 1);

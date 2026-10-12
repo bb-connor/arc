@@ -14,7 +14,10 @@ use tokio::sync::OwnedSemaphorePermit;
 use super::evidence::{EvidencePool, EvidenceSlot};
 use crate::kernel::{ChildReceiptLog, ReceiptLog, RuntimeTraceEvent, RuntimeTraceObserver};
 use crate::receipt_store::{PendingSettlementObservation, ReceiptStore};
-use crate::{ChildRequestReceipt, ChioReceipt, ChioReceiptBody, KernelError, PublicKey};
+use crate::{
+    ChildRequestReceipt, ChildRequestReceiptBody, ChioReceipt, ChioReceiptBody, KernelError,
+    PublicKey,
+};
 
 const RETRY_MIN: Duration = Duration::from_millis(20);
 const RETRY_MAX: Duration = Duration::from_secs(5);
@@ -46,9 +49,14 @@ pub(in crate::kernel) struct UnknownChildAppend {
     pub kernel_key: PublicKey,
 }
 
+pub(in crate::kernel) enum PendingChildReceipt {
+    Unsigned(ChildRequestReceiptBody),
+    Signed(ChildRequestReceipt),
+}
+
 pub(in crate::kernel) struct PendingPostEffectRecord {
     pub evidence: PendingPostEffectEvidence,
-    pub child_receipts: Vec<ChildRequestReceipt>,
+    pub child_receipts: Vec<PendingChildReceipt>,
     pub unknown_child: Option<UnknownChildAppend>,
 }
 
@@ -60,7 +68,7 @@ struct ReceiptIdentity {
 
 struct BufferedRecord {
     evidence: PendingPostEffectEvidence,
-    children: VecDeque<ChildRequestReceipt>,
+    children: VecDeque<PendingChildReceipt>,
     unknown_child: Option<UnknownChildAppend>,
     submitted: Option<ReceiptIdentity>,
     _kernel: OwnedSemaphorePermit,
@@ -146,6 +154,7 @@ impl EvidenceQueue {
 pub(super) struct EvidenceRecoveryResources {
     pub clock: Arc<dyn Clock>,
     pub signer: Arc<dyn SigningBackend>,
+    pub child_keypair: Arc<chio_core::Keypair>,
     pub signing_identity: crate::tool_outcome::FrozenReceiptSigningIdentityV1,
     pub store: Option<Arc<dyn ReceiptStore>>,
     pub log: Arc<Mutex<ReceiptLog>>,
@@ -208,6 +217,7 @@ impl EvidenceRecovery {
             }
         }
         Arc::ptr_eq(&self.resources.signer, &next.signer)
+            && self.resources.child_keypair.public_key() == next.child_keypair.public_key()
             && self.resources.signing_identity == next.signing_identity
             && Arc::ptr_eq(&self.resources.trace_sequence, &next.trace_sequence)
             && same(&self.resources.store, &next.store)
@@ -467,7 +477,24 @@ impl EvidenceRecoveryResources {
     }
 
     fn flush_children(&self, record: &mut BufferedRecord) -> Result<(), KernelError> {
-        while let Some(child) = record.children.front() {
+        while let Some(pending) = record.children.front_mut() {
+            if let PendingChildReceipt::Unsigned(body) = pending {
+                if record.unknown_child.is_some() {
+                    return Err(KernelError::Internal(
+                        "unknown child append lacks its signed evidence".into(),
+                    ));
+                }
+                let mut body = body.clone();
+                body.timestamp = self.clock.read()?.unix_millis().as_secs();
+                let receipt = ChildRequestReceipt::sign(body, &self.child_keypair)
+                    .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?;
+                *pending = PendingChildReceipt::Signed(receipt);
+            }
+            let PendingChildReceipt::Signed(child) = pending else {
+                return Err(KernelError::Internal(
+                    "child evidence remains unsigned".into(),
+                ));
+            };
             if let Some(unknown) = record.unknown_child.as_ref() {
                 if unknown.receipt_id != child.id {
                     return Err(KernelError::Internal(
