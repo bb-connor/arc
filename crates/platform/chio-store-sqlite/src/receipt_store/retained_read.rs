@@ -93,6 +93,87 @@ where
 }
 
 impl RetainedSnapshot<'_> {
+    pub(crate) fn child_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ChildRequestReceipt>, ReceiptStoreError> {
+        for (connection, upper) in [
+            (Some(self.live), i64::MAX.unsigned_abs()),
+            (self.archive, self.watermark),
+        ] {
+            let Some(connection) = connection else {
+                continue;
+            };
+            // Start from the committed identity so a missing or rebound point
+            // projection cannot turn a retained claim into an absent receipt.
+            let row = connection
+                .query_row(
+                    "SELECT e.entry_seq, e.source_seq, e.raw_json, r.receipt_id, r.raw_json
+                     FROM claim_receipt_log_entries e
+                     LEFT JOIN chio_child_receipts r ON r.seq = e.source_seq
+                     WHERE e.receipt_id = ?1 AND e.receipt_kind = 'child_receipt'
+                       AND e.entry_seq <= ?2",
+                    params![receipt_id, sqlite_i64(upper, "retained claim upper bound")?],
+                    |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, i64>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, Option<String>>(3)?,
+                            row.get::<_, Option<String>>(4)?,
+                        ))
+                    },
+                )
+                .optional()?;
+            let Some((entry_seq, source_seq, committed_json, projected_id, projected_json)) = row
+            else {
+                let orphaned: bool = connection.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM chio_child_receipts WHERE receipt_id = ?1)",
+                    params![receipt_id],
+                    |row| row.get(0),
+                )?;
+                if orphaned {
+                    return Err(ReceiptStoreError::Conflict(
+                        "retained child projection has no matching authenticated claim".into(),
+                    ));
+                }
+                continue;
+            };
+            let (Some(projected_id), Some(projected_json)) = (projected_id, projected_json) else {
+                return Err(ReceiptStoreError::Conflict(
+                    "retained child claim has no matching receipt projection".into(),
+                ));
+            };
+            let receipt = decode_verified_child_receipt(
+                &projected_json,
+                "retained child receipt lookup",
+                Some(sqlite_positive_u64(source_seq, "child receipt seq")?),
+            )?;
+            let committed = decode_verified_child_receipt(
+                &committed_json,
+                "retained child claim commitment",
+                Some(sqlite_positive_u64(entry_seq, "child claim seq")?),
+            )?;
+            if projected_id != receipt_id || receipt.id != receipt_id || committed.id != receipt_id
+            {
+                return Err(ReceiptStoreError::Conflict(
+                    "retained child identity differs from the requested ID".into(),
+                ));
+            }
+            let canonical = chio_core::canonical::canonical_json_bytes(&receipt)
+                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+            let committed_canonical = chio_core::canonical::canonical_json_bytes(&committed)
+                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+            if canonical != committed_canonical {
+                return Err(ReceiptStoreError::Conflict(
+                    "retained child payload differs from its authenticated claim".into(),
+                ));
+            }
+            return Ok(Some(receipt));
+        }
+        Ok(None)
+    }
+
     pub(crate) fn receipt(
         &self,
         receipt_id: &str,
