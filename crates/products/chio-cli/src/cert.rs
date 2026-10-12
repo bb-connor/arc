@@ -235,13 +235,13 @@ pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<()
         println!("Schema:         {}", cert.body.schema);
         println!("Issued at:      {}", cert.body.issued_at);
         println!("Receipt count:  {}", cert.body.receipt_count);
-        if let Some(count) = cert.body.invocation_count {
-            println!("Allowed mediated receipts: {count} (not dispatch or spend proof)");
-        }
-        match cert.body.coverage.as_ref() {
-            Some(chio_acp_proxy::ComplianceCoverage::SuppliedReceiptSet) => println!("Coverage: supplied receipt set"),
-            Some(chio_acp_proxy::ComplianceCoverage::RetainedSnapshotReference { snapshot_end_entry_seq, .. }) => println!("Coverage: signed snapshot reference through claim entry {snapshot_end_entry_seq}; full verification requires the authenticated store"),
-            None => println!("Coverage: legacy signed assertion"),
+        println!(
+            "Allowed mediated receipts: {} (not dispatch or spend proof)",
+            cert.body.invocation_count
+        );
+        match &cert.body.coverage {
+            chio_acp_proxy::ComplianceCoverage::SuppliedReceiptSet => println!("Coverage: supplied receipt set"),
+            chio_acp_proxy::ComplianceCoverage::RetainedSnapshotReference { snapshot_end_entry_seq, .. } => println!("Coverage: signed snapshot reference through claim entry {snapshot_end_entry_seq}; full verification requires the authenticated store"),
         }
         println!("First receipt:  {}", cert.body.first_receipt_at);
         println!("Last receipt:   {}", cert.body.last_receipt_at);
@@ -263,30 +263,15 @@ pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<()
         );
         println!(
             "Tool targets:   {}",
-            check_label(
-                cert.body.checks.as_ref().map(|checks| checks.tool_targets),
-                cert.body.scope_compliant
-            )
+            check_label(cert.body.checks.tool_targets)
         );
         println!(
             "Allowed receipts: {}",
-            check_label(
-                cert.body
-                    .checks
-                    .as_ref()
-                    .map(|checks| checks.allowed_mediated_receipt_limit),
-                cert.body.budget_compliant
-            )
+            check_label(cert.body.checks.allowed_mediated_receipt_limit)
         );
         println!(
             "Guards:         {}",
-            check_label(
-                cert.body
-                    .checks
-                    .as_ref()
-                    .map(|checks| checks.required_guards),
-                cert.body.guards_compliant
-            )
+            check_label(cert.body.checks.required_guards)
         );
         if !cert.body.anomalies.is_empty() {
             println!("Anomalies:");
@@ -301,16 +286,11 @@ pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<()
     Ok(())
 }
 
-fn check_label(
-    status: Option<chio_acp_proxy::ComplianceCheckStatus>,
-    legacy_passed: bool,
-) -> &'static str {
+fn check_label(status: chio_acp_proxy::ComplianceCheckStatus) -> &'static str {
     match status {
-        Some(chio_acp_proxy::ComplianceCheckStatus::Passed) => "checked and passed",
-        Some(chio_acp_proxy::ComplianceCheckStatus::NotEvaluated) => "not evaluated",
-        Some(chio_acp_proxy::ComplianceCheckStatus::NotApplicable) => "not applicable",
-        None if legacy_passed => "legacy signed assertion (not reverified)",
-        None => "legacy check did not pass",
+        chio_acp_proxy::ComplianceCheckStatus::Passed => "checked and passed",
+        chio_acp_proxy::ComplianceCheckStatus::NotEvaluated => "not evaluated",
+        chio_acp_proxy::ComplianceCheckStatus::NotApplicable => "not applicable",
     }
 }
 
@@ -357,22 +337,16 @@ mod tests {
     #[test]
     fn certificate_inspection_labels_unconfigured_checks_honestly() {
         assert_eq!(
-            check_label(
-                Some(chio_acp_proxy::ComplianceCheckStatus::NotEvaluated),
-                false
-            ),
+            check_label(chio_acp_proxy::ComplianceCheckStatus::NotEvaluated),
             "not evaluated"
         );
         assert_eq!(
-            check_label(
-                Some(chio_acp_proxy::ComplianceCheckStatus::NotApplicable),
-                false
-            ),
+            check_label(chio_acp_proxy::ComplianceCheckStatus::NotApplicable),
             "not applicable"
         );
         assert_eq!(
-            check_label(None, true),
-            "legacy signed assertion (not reverified)"
+            check_label(chio_acp_proxy::ComplianceCheckStatus::Passed),
+            "checked and passed"
         );
     }
 }
