@@ -180,6 +180,11 @@ fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option
 fn reject_reserved_receipt_metadata(
     metadata: Option<&serde_json::Value>,
 ) -> Result<(), KernelError> {
+    if metadata.is_some_and(|value| !value.is_object()) {
+        return Err(KernelError::InvalidReceiptMetadata(
+            "receipt metadata must be a JSON object".into(),
+        ));
+    }
     let Some(key) = reserved_receipt_metadata_key(metadata) else {
         return Ok(());
     };
