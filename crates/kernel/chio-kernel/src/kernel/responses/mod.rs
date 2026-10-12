@@ -15,8 +15,6 @@ mod receipt_persistence;
 mod terminal_responses;
 
 pub(crate) use allow_responses::{AllowResponseNonce, PreflightNonceSource, ReservedHoldStamp};
-#[cfg(test)]
-pub(crate) use finalization::FinalizeToolOutputCostContext;
 pub(in crate::kernel) use finalization::PrepareToolOutputCostContext;
 pub(in crate::kernel) use prepared_response::PreparedResponse;
 

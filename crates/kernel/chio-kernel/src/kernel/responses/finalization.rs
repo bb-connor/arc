@@ -1,13 +1,5 @@
 use super::*;
 
-#[cfg(test)]
-pub(crate) struct FinalizeToolOutputCostContext<'a> {
-    pub(crate) charge_result: Option<BudgetChargeResult>,
-    pub(crate) reported_cost: Option<ToolInvocationCost>,
-    pub(crate) payment_authorization: Option<PaymentAuthorization>,
-    pub(crate) cap: &'a CapabilityToken,
-}
-
 pub(in crate::kernel) struct PrepareToolOutputCostContext<'a> {
     pub charge_result: Option<&'a BudgetChargeResult>,
     pub reported_cost: Option<&'a ToolInvocationCost>,
