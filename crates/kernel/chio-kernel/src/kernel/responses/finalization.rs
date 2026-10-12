@@ -19,35 +19,6 @@ pub(crate) struct PostInvocationHandling {
 impl ChioKernel {
     #[allow(
         clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    #[cfg(test)]
-    pub(crate) fn finalize_tool_output_with_metadata_and_payee_binding(
-        &self,
-        request: &ToolCallRequest,
-        output: ToolServerOutput,
-        elapsed: Duration,
-        timestamp: u64,
-        matched_grant_index: usize,
-        extra_metadata: Option<serde_json::Value>,
-        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
-        security_context: Option<&SecurityInvocationContext>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        let prepared = self.prepare_tool_output_with_metadata_and_payee_binding(
-            request,
-            output,
-            elapsed,
-            timestamp,
-            matched_grant_index,
-            extra_metadata,
-            verified_payee_binding,
-            security_context,
-        )?;
-        self.publish_prepared_response(request, prepared)
-    }
-
-    #[allow(
-        clippy::too_many_arguments,
         reason = "Preparation preserves the existing finalization input contract."
     )]
     pub(in crate::kernel) fn prepare_tool_output_with_metadata_and_payee_binding(
