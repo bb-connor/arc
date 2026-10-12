@@ -257,6 +257,9 @@ fn payment_dispatch_failure(
         .as_ref()
         .ok_or("missing denial metadata")?;
     let runtime = &metadata["chio_runtime"];
+    if matches!(boundary, FailureBoundary::CommitFence) {
+        assert_eq!(runtime["identity_disposition"], "retained");
+    }
 
     match boundary {
         FailureBoundary::Freeze | FailureBoundary::Security => {

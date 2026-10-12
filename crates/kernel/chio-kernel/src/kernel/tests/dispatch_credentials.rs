@@ -1373,6 +1373,14 @@ async fn hosted_post_dispatch_approval_commit_failure_records_terminal_receipt(
         .get(0)
         .ok_or_else(|| std::io::Error::other("terminal commit-failure receipt missing"))?;
     assert!(receipt.is_cancelled());
+    assert_eq!(
+        receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/identity_disposition"))
+            .and_then(serde_json::Value::as_str),
+        Some("terminal")
+    );
     assert!(receipt.decision.as_ref().is_some_and(|decision| matches!(
         decision,
         Decision::Cancelled { reason }

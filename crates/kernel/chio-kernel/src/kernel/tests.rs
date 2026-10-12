@@ -272,6 +272,8 @@ mod federation_cosign;
 mod memory_provenance;
 #[path = "tests/receipt_scope_isolation.rs"]
 mod receipt_scope_isolation;
+#[path = "tests/receipt_identity.rs"]
+mod receipt_identity;
 use federation_cosign::{handshake_and_pin, CountingRejectingCosigner, FailingAppendReceiptStore};
 #[path = "tests/durable_admission.rs"]
 mod durable_admission;

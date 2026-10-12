@@ -33,6 +33,15 @@ fn emergency_stop_forces_deny_on_next_evaluate() {
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
     assert_eq!(reason, EMERGENCY_STOP_DENY_REASON);
+    assert_eq!(
+        response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/identity_disposition"))
+            .and_then(serde_json::Value::as_str),
+        Some("reusable")
+    );
 }
 
 #[test]
