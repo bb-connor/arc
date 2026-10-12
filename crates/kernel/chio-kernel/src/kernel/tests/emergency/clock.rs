@@ -73,3 +73,47 @@ fn clock_failure_during_emergency_stop_cannot_resume_execution() {
         );
     }
 }
+
+/// A clock that records whether the stop was already published when it was read.
+struct ObservingClock {
+    heads: std::sync::OnceLock<Arc<crate::stop::StopHeads>>,
+    stopped_at_read: std::sync::Mutex<Vec<bool>>,
+}
+
+impl Clock for ObservingClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        if let Some(heads) = self.heads.get() {
+            self.stopped_at_read
+                .lock()
+                .map_err(|_| ClockError::Unavailable)?
+                .push(heads.is_stopped());
+        }
+        Ok(ClockReading::new(
+            UnixMillis::new(1_800_000_000_000),
+            MonotonicInstant::from_nanos(1),
+        ))
+    }
+}
+
+#[test]
+fn emergency_stop_is_published_before_authority_time_is_read() {
+    let clock = Arc::new(ObservingClock {
+        heads: std::sync::OnceLock::new(),
+        stopped_at_read: std::sync::Mutex::new(Vec::new()),
+    });
+    let kernel = ChioKernel::new_with_clock(make_config(), clock.clone());
+    assert!(clock
+        .heads
+        .set(kernel.stop_control().heads().clone())
+        .is_ok());
+
+    kernel.emergency_stop("ordering").unwrap();
+
+    let observed = clock.stopped_at_read.lock().unwrap().clone();
+    assert!(!observed.is_empty(), "the stop must read authority time");
+    assert!(
+        observed.iter().all(|stopped| *stopped),
+        "every authority-time read must observe the published stop"
+    );
+    assert_eq!(kernel.emergency_stopped_since(), Some(1_800_000_000));
+}

@@ -146,6 +146,8 @@ pub mod session;
 #[cfg(not(loom))]
 mod settlement_routing;
 #[cfg(not(loom))]
+pub mod stop;
+#[cfg(not(loom))]
 pub mod supplemental_admission;
 #[cfg(not(loom))]
 pub mod supplemental_quota;

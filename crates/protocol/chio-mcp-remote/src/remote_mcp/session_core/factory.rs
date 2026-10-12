@@ -106,6 +106,10 @@ impl RemoteSessionFactory {
             }
         };
         let lifecycle_policy = config.lifecycle_policy()?;
+        let stop = durable_admission.as_ref().map_or_else(
+            chio_kernel::stop::StopControl::process_local,
+            DurableAdmissionRuntime::stop_control,
+        );
         let factory = Self {
             config,
             manifest_registry,
@@ -115,6 +119,7 @@ impl RemoteSessionFactory {
             resume_hmac_keyring,
             shared_upstream_owner: Arc::new(StdMutex::new(None)),
             lifecycle_policy,
+            stop,
         };
         if let Some(approval) = &factory.config.approval {
             let keypair = factory.kernel_keypair(loaded_policy.kernel.durable_admission_mode)?;
@@ -179,6 +184,7 @@ impl RemoteSessionFactory {
     }
 
     fn attach_durable_admission(&self, kernel: &mut ChioKernel) -> Result<(), CliError> {
+        kernel.set_stop_control(self.stop.clone());
         if kernel.durable_admission_mode()
             == chio_kernel::admission_operation::DurableAdmissionMode::Off
         {

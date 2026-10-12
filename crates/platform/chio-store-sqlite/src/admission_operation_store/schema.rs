@@ -21,6 +21,7 @@ mod migration_v34;
 mod migration_v35;
 mod migration_v36;
 mod migration_v37;
+mod migration_v38;
 
 #[cfg(test)]
 pub(crate) fn pre_caller_wait_schema_fixture() -> String {
@@ -144,7 +145,10 @@ fn migrate_schema(
     if on_disk < 36 {
         migration_v36::verify_pre_migration_schema(&transaction, on_disk)?;
     }
-    migration_v37::verify_pre_migration_schema(&transaction, on_disk)?;
+    if on_disk < 37 {
+        migration_v37::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    migration_v38::verify_pre_migration_schema(&transaction, on_disk)?;
     if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
         // The legacy report-after-effect contract could refund an executed
         // caller as pre-dispatch compensation. A refunded terminal is not
@@ -250,7 +254,10 @@ fn migrate_schema(
     transaction
         .execute_batch(super::security_participant_state::checkpoint::sql())
         .map_err(sqlite_error)?;
-    migration_v37::migrate(&transaction)?;
+    if on_disk < 37 {
+        migration_v37::migrate(&transaction)?;
+    }
+    migration_v38::migrate(&transaction)?;
     crate::stamp_schema_version(
         &transaction,
         ADMISSION_OPERATION_SCHEMA_KEY,
@@ -735,6 +742,11 @@ fn expected_admission_operation_schema(
     if version >= 37 {
         expected
             .execute_batch(super::caller_budget::SCHEMA)
+            .map_err(sqlite_error)?;
+    }
+    if version >= 38 {
+        expected
+            .execute_batch(super::stop_epoch::SCHEMA)
             .map_err(sqlite_error)?;
     }
     Ok(expected)

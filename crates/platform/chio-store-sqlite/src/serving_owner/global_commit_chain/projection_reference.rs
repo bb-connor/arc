@@ -9,6 +9,9 @@ pub(super) fn projection_reference_digest(
     sequence: u64,
 ) -> Result<String, SqliteServingOwnerError> {
     match kind {
+        "stop_epoch" => {
+            crate::admission_operation_store::stop_epoch_projection_reference(connection, key, sequence)
+        }
         "security_participant_checkpoint" => {
             crate::admission_operation_store::security_participant_checkpoint_projection_reference(connection,key,sequence)
         }

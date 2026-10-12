@@ -4,6 +4,8 @@ use subtle::ConstantTimeEq;
 
 #[path = "admin/revocation_batch.rs"]
 mod revocation_batch;
+#[path = "admin/stop.rs"]
+mod stop;
 
 pub(super) fn install_admin_routes(router: Router<RemoteAppState>) -> Router<RemoteAppState> {
     let router = remote_mcp_session_credentials::install_routes(router);
@@ -25,6 +27,9 @@ pub(super) fn install_admin_routes(router: Router<RemoteAppState>) -> Router<Rem
             get(handle_admin_session_trust).post(handle_admin_revoke_session_trust),
         )
         .route(ADMIN_SESSIONS_PATH, get(handle_admin_sessions))
+        .route(ADMIN_EMERGENCY_STOP_PATH, post(stop::handle_stop))
+        .route(ADMIN_EMERGENCY_RESUME_PATH, post(stop::handle_resume))
+        .route(ADMIN_EMERGENCY_STATUS_PATH, get(stop::handle_status))
         .route(
             "/admin/approvals",
             post(super::remote_mcp_approvals::submit),

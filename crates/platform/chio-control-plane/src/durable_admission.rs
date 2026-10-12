@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::admission_operation::{DurableAdmissionMode, StoreMutationFence};
+use chio_kernel::stop::StopControl;
 use chio_kernel::tool_outcome::QualifiedToolOutcomeStore;
 use chio_kernel::{BudgetStore, ChioKernel, QualifiedAdmissionProjectionStore, RevocationStore};
 use chio_store_sqlite::{
@@ -45,6 +46,7 @@ pub struct DurableAdmissionRuntime {
     local_revocations: Option<SqliteRevocationStore>,
     fence: StoreMutationFence,
     kernel_keypair: Keypair,
+    stop: StopControl,
 }
 
 impl DurableAdmissionRuntime {
@@ -79,6 +81,10 @@ impl DurableAdmissionRuntime {
         let kernel_keypair =
             load_or_create_authority_keypair(&durable_admission_kernel_seed_path(path)?)?;
         bind_durable_admission_kernel_identity(path, &kernel_keypair.public_key())?;
+        let stop = StopControl::durable(
+            Arc::new(authority.admission_operation_store()),
+            authority.mutation_fence(),
+        );
 
         Ok(Self {
             payload_maintenance: Arc::new(payload_maintenance::PayloadMaintenanceOwner::default()),
@@ -92,6 +98,7 @@ impl DurableAdmissionRuntime {
             local_revocations: Some(revocations),
             fence: authority.mutation_fence(),
             kernel_keypair,
+            stop,
         })
     }
 
@@ -224,7 +231,16 @@ impl DurableAdmissionRuntime {
             local_revocations: None,
             fence: stores.fence,
             kernel_keypair,
+            stop: StopControl::process_local(),
         })
+    }
+
+    /// Stop control shared by every kernel this runtime attaches. A local
+    /// authority loads its durable stop chain at open; a remote profile
+    /// holds a process-local stop.
+    #[must_use]
+    pub fn stop_control(&self) -> StopControl {
+        self.stop.clone()
     }
 
     #[must_use]
@@ -270,6 +286,7 @@ impl DurableAdmissionRuntime {
                 "kernel signing key does not match the durable admission authority".to_string(),
             ));
         }
+        kernel.set_stop_control(self.stop.clone());
         kernel.set_durable_admission_store(
             self.operations.clone(),
             self.outcomes.clone(),

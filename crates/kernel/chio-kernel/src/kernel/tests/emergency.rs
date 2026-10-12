@@ -190,3 +190,63 @@ fn emergency_stop_receipt_records_deny_decision() {
 
 #[path = "emergency/clock.rs"]
 mod clock;
+
+fn operator_stop(reason: &str) -> crate::stop::StopCommand {
+    crate::stop::StopCommand {
+        reason: reason.to_owned(),
+        authorizer: crate::stop::StopAuthorizer::shared_credential("test"),
+        requested_via: crate::stop::StopRequestPath::ControlSocket,
+        allow_containment: true,
+    }
+}
+
+#[test]
+fn operator_stop_denies_admission_until_resume() {
+    let (kernel, agent_kp, scope) = kernel_with_echo();
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    kernel
+        .stop_control()
+        .stop(operator_stop("incident"))
+        .unwrap();
+    let denied = kernel
+        .evaluate_tool_call_blocking(&make_request("op-deny", &cap, "read_file", "srv-a"))
+        .unwrap();
+    assert_eq!(denied.verdict, Verdict::Deny);
+    assert_eq!(denied.reason.as_deref(), Some(EMERGENCY_STOP_DENY_REASON));
+    kernel
+        .stop_control()
+        .resume(crate::stop::ResumeCommand {
+            expected_epoch: None,
+            authorizer: crate::stop::StopAuthorizer::shared_credential("test"),
+            requested_via: crate::stop::StopRequestPath::ControlSocket,
+        })
+        .unwrap();
+    let allowed = kernel
+        .evaluate_tool_call_blocking(&make_request("op-allow", &cap, "read_file", "srv-a"))
+        .unwrap();
+    assert_eq!(allowed.verdict, Verdict::Allow);
+}
+
+#[test]
+fn kernels_bound_to_one_stop_control_stop_together() {
+    let (first, agent_kp, scope) = kernel_with_echo();
+    let (mut second, _, _) = kernel_with_echo();
+    second.set_stop_control(first.stop_control().clone());
+    let cap = make_capability(&second, &agent_kp, scope, 300);
+
+    first
+        .stop_control()
+        .stop(operator_stop("incident"))
+        .unwrap();
+    let denied = second
+        .evaluate_tool_call_blocking(&make_request("shared-deny", &cap, "read_file", "srv-a"))
+        .unwrap();
+    assert_eq!(denied.verdict, Verdict::Deny);
+
+    second.emergency_stop("component failed").unwrap();
+    assert!(first.is_emergency_stopped());
+    assert_eq!(
+        first.emergency_stop_reason().as_deref(),
+        Some("component failed")
+    );
+}

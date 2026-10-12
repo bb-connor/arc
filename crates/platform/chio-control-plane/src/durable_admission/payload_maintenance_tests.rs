@@ -6,6 +6,8 @@ use super::*;
 
 #[path = "payload_maintenance_tests/migration.rs"]
 mod migration;
+#[path = "payload_maintenance_tests/stop.rs"]
+mod stop;
 use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
