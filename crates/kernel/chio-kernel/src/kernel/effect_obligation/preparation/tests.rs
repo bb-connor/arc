@@ -139,6 +139,55 @@ fn released_payment_truth_survives_fault_preparation() {
 }
 
 #[test]
+fn release_replaces_an_omitted_capture_reference_without_stale_companions() {
+    let (_, mut fault, keypair) = fixture();
+    let authorization = PaymentAuthorization {
+        authorization_id: "authorization-a".into(),
+        state: crate::payment::PaymentAuthorizationState::Held,
+        metadata: serde_json::Value::Null,
+    };
+    fault.observe_payment_result(
+        &authorization,
+        &crate::payment::PaymentResult {
+            transaction_id: "capture".repeat(100),
+            settlement_status: crate::payment::RailSettlementStatus::Pending,
+            metadata: serde_json::Value::Null,
+        },
+        100,
+        false,
+    );
+    assert_eq!(
+        fault
+            .body
+            .metadata
+            .as_ref()
+            .unwrap()
+            .pointer("/financial/payment_reference_omitted"),
+        Some(&serde_json::json!(true)),
+    );
+    fault.observe_payment_result(
+        &authorization,
+        &crate::payment::PaymentResult {
+            transaction_id: "release-a".into(),
+            settlement_status: crate::payment::RailSettlementStatus::Released,
+            metadata: serde_json::Value::Null,
+        },
+        100,
+        true,
+    );
+    let receipt = ChioReceipt::sign(fault.body, &keypair).unwrap();
+    let financial = receipt.metadata.as_ref().unwrap().get("financial").unwrap();
+    assert_eq!(financial["payment_reference"], "release-a");
+    assert_eq!(financial["cost_charged"], 0);
+    assert_eq!(financial["payment_release_confirmed"], true);
+    for suffix in ["sha256", "decimal", "omitted"] {
+        assert!(financial
+            .get(format!("payment_reference_{suffix}"))
+            .is_none());
+    }
+}
+
+#[test]
 fn unpredictable_payment_references_are_bounded_and_exactly_hashed() {
     let (_, mut fault, keypair) = fixture();
     let reference = "é".repeat(257);
