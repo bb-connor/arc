@@ -26,8 +26,7 @@ use crate::receipt_metadata::{
 use crate::validation::ensure_non_empty;
 
 pub const MERCURY_PUBLICATION_PROFILE_SCHEMA: &str = "chio.mercury.publication_profile.v1";
-pub const MERCURY_PROOF_PACKAGE_SCHEMA_V1: &str = "chio.mercury.proof_package.v1";
-pub const MERCURY_PROOF_PACKAGE_SCHEMA: &str = "chio.mercury.proof_package.v2";
+pub const MERCURY_PROOF_PACKAGE_SCHEMA: &str = "chio.mercury.proof_package.v1";
 pub const MERCURY_INQUIRY_PACKAGE_SCHEMA: &str = "chio.mercury.inquiry_package.v1";
 const CHECKPOINT_CONTINUITY_AUDIT_ONLY: &str = "audit_only";
 const CHECKPOINT_CONTINUITY_TRANSPARENCY_PREVIEW: &str = "transparency_preview";
@@ -138,7 +137,7 @@ pub struct MercuryProofReceiptRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MercuryProofPackage {
     pub schema: String,
     pub package_id: String,
@@ -269,15 +268,12 @@ impl MercuryProofPackage {
     }
 
     pub fn refresh_package_id(&mut self) -> Result<(), MercuryContractError> {
-        self.package_id = derive_proof_package_id_for_schema(self)?;
+        self.package_id = derive_proof_package_id(self)?;
         Ok(())
     }
 
     pub fn validate(&self) -> Result<(), MercuryContractError> {
-        if !matches!(
-            self.schema.as_str(),
-            MERCURY_PROOF_PACKAGE_SCHEMA_V1 | MERCURY_PROOF_PACKAGE_SCHEMA
-        ) {
+        if self.schema != MERCURY_PROOF_PACKAGE_SCHEMA {
             return Err(MercuryContractError::InvalidSchema {
                 expected: MERCURY_PROOF_PACKAGE_SCHEMA,
                 actual: self.schema.clone(),
@@ -772,33 +768,6 @@ fn derive_proof_package_id(
             "chioBundleSha256": chio_bundle_sha256,
         }),
     )
-}
-
-fn derive_legacy_v1_proof_package_id(
-    proof_package: &MercuryProofPackage,
-) -> Result<String, MercuryContractError> {
-    build_hash_id(
-        "proof",
-        &serde_json::json!({
-            "createdAt": proof_package.created_at,
-            "evidenceExportManifestHash": proof_package.evidence_export_manifest_hash,
-            "workflowId": proof_package.workflow_id,
-            "receiptIds": ordered_receipt_ids(proof_package),
-        }),
-    )
-}
-
-fn derive_proof_package_id_for_schema(
-    proof_package: &MercuryProofPackage,
-) -> Result<String, MercuryContractError> {
-    match proof_package.schema.as_str() {
-        MERCURY_PROOF_PACKAGE_SCHEMA_V1 => derive_legacy_v1_proof_package_id(proof_package),
-        MERCURY_PROOF_PACKAGE_SCHEMA => derive_proof_package_id(proof_package),
-        _ => Err(MercuryContractError::InvalidSchema {
-            expected: MERCURY_PROOF_PACKAGE_SCHEMA,
-            actual: proof_package.schema.clone(),
-        }),
-    }
 }
 
 struct InquiryProjection<'a> {
