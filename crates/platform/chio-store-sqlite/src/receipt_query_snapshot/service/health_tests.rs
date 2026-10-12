@@ -15,17 +15,24 @@ fn ready_service() -> (tempfile::TempDir, ReceiptQuerySnapshots) {
         assert!(Instant::now() < deadline, "snapshot did not become ready");
         std::thread::sleep(Duration::from_millis(5));
     }
+    service.pause_extension_for_test(true);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !service.inner.extension_parked.load(Ordering::SeqCst) {
+        assert!(Instant::now() < deadline, "snapshot walker did not park");
+        std::thread::sleep(Duration::from_millis(5));
+    }
     (directory, service)
 }
 
 #[test]
 fn health_uses_a_coherent_sample_while_the_database_is_held() {
     let (_directory, service) = ready_service();
-    service.pause_extension_for_test(true);
     let Phase::Ready(published) = service.inner.phase() else {
         panic!("service was not ready");
     };
-    let held = published.owned.lock().unwrap();
+    let mut held = published.owned.lock().unwrap();
+    // Model the legal gap between advancing metadata and sampling telemetry.
+    held.meta.observed_at_ms = held.meta.observed_at_ms.checked_add(1).unwrap();
     let expected = published.watermark_of(&held.meta);
     let (sent, received) = std::sync::mpsc::channel();
     let status = std::thread::scope(|scope| {
