@@ -32,6 +32,12 @@ mod pending_approval;
 #[path = "wire_protocol_schema/operation_nonce.rs"]
 mod operation_nonce;
 
+#[path = "wire_protocol_schema/active_response_plan.rs"]
+mod active_response_plan;
+
+#[path = "wire_protocol_schema/security_binding.rs"]
+mod security_binding;
+
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")

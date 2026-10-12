@@ -56,12 +56,19 @@ impl CapabilitySecurityBinding {
                 reason: "capability security binding context generation is zero".to_string(),
             });
         }
-        crate::crypto::PublicKey::from_hex(&self.workload_signer_public_key).map_err(|_| {
-            Error::AttenuationViolation {
+        let workload_signer = crate::crypto::PublicKey::from_hex(&self.workload_signer_public_key)
+            .map_err(|_| Error::AttenuationViolation {
                 reason: "capability security binding workload signer public key is invalid"
                     .to_string(),
-            }
-        })?;
+            })?;
+        // Dispatch compares this field with the pinned key's `to_hex()` text,
+        // so only that canonical spelling is a valid binding.
+        if workload_signer.to_hex() != self.workload_signer_public_key {
+            return Err(Error::AttenuationViolation {
+                reason: "capability security binding workload signer public key is not canonical"
+                    .to_string(),
+            });
+        }
         Ok(())
     }
 }

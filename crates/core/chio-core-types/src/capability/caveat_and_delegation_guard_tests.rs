@@ -74,6 +74,24 @@ fn security_binding_is_canonical_signed_and_strict() {
 }
 
 #[test]
+fn security_binding_requires_canonical_workload_key_spelling() {
+    let issuer = Keypair::from_seed(&[0x0c; 32]);
+    let canonical = issuer.public_key().to_hex();
+    const REASON: &str = "capability security binding workload signer public key is not canonical";
+    for spelling in [canonical.to_uppercase(), format!("0x{canonical}")] {
+        let mut binding = security_binding(&issuer);
+        binding.workload_signer_public_key = spelling.clone();
+        assert!(
+            matches!(binding.validate(), Err(Error::AttenuationViolation { reason }) if reason == REASON),
+            "accepted workload key spelling {spelling}"
+        );
+        assert!(
+            matches!(Caveat::bind_security_context(&binding), Err(Error::AttenuationViolation { reason }) if reason == REASON)
+        );
+    }
+}
+
+#[test]
 fn security_binding_mutation_invalidates_capability_signature() {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();

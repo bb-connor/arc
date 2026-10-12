@@ -28,14 +28,15 @@ canonical `chio_spec_codegen::GENERATED_HEADER`; it is not exported from
 
 ## Wire schemas: `chio-wire/v1/`
 
-The native Chio message families defined in `spec/WIRE_PROTOCOL.md`. Fifty-five
-schema files across eleven subtrees.
+The native Chio message families defined in `spec/WIRE_PROTOCOL.md` comprise
+147 schema files across 12 subtrees. The tables below describe selected
+families; `MANIFEST.sha256` contains the complete schema inventory.
 
 ### agent (5)
 
 | File                                                 | Lines |
 |------------------------------------------------------|-------|
-| `agent/active-response-governed-intent.schema.json`  |    51 |
+| `agent/active-response-governed-intent.schema.json`  |    81 |
 | `agent/governed-transaction-intent.schema.json`      |    48 |
 | `agent/heartbeat.schema.json`                        |    12 |
 | `agent/list_capabilities.schema.json`                |    12 |
@@ -74,7 +75,7 @@ schema files across eleven subtrees.
 | `error/policy_denied.schema.json`     |    27 |
 | `error/tool_server_error.schema.json` |    16 |
 
-### capability (11)
+### capability (12)
 
 Capability tokens, grants, revocation envelopes, and the capability list
 projection. See `capability/README.md`.
@@ -88,9 +89,10 @@ projection. See `capability/README.md`.
 | `capability/governed-approval-token.schema.json`       |    41 |
 | `capability/grant.schema.json`                         |   140 |
 | `capability/revocation.schema.json`                    |    20 |
+| `capability/security-binding.schema.json`              |    47 |
 | `capability/supplemental-authorization.schema.json`    |    17 |
 | `capability/threshold-approval-proposal.schema.json`   |    48 |
-| `capability/token.schema.json`                         |   604 |
+| `capability/token.schema.json`                         |   627 |
 | `capability/verified-approval-set.schema.json`         |    44 |
 
 ### receipt (6)

@@ -882,6 +882,87 @@
       }
     },
     {
+      "name": "active-response-rejects-overlong-plan-id",
+      "schema_file": "agent/active-response-governed-intent.schema.json",
+      "valid": false,
+      "instance": {
+        "plan_schema": "chio.response-plan.v1",
+        "plan_id": "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
+        "operator_capability_id": "operator-cap-1",
+        "operator_capability_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operator_capability_expires_at": 300,
+        "executor_subject": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "canonical_plan_body": {
+          "action": "throttle"
+        },
+        "plan_body_hash": "abc03336b75d0f0b396fc101c9ab500e5f1b5b5298998b777e859b7dcfac8eac",
+        "target_binding": {
+          "session_id": "session-1"
+        },
+        "ordered_effects": [
+          "throttle_session"
+        ],
+        "expires_at": 250,
+        "rollback_binding": {
+          "mode": "automatic"
+        }
+      }
+    },
+    {
+      "name": "active-response-rejects-padded-plan-id",
+      "schema_file": "agent/active-response-governed-intent.schema.json",
+      "valid": false,
+      "instance": {
+        "plan_schema": "chio.response-plan.v1",
+        "plan_id": "plan-1 ",
+        "operator_capability_id": "operator-cap-1",
+        "operator_capability_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operator_capability_expires_at": 300,
+        "executor_subject": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "canonical_plan_body": {
+          "action": "throttle"
+        },
+        "plan_body_hash": "abc03336b75d0f0b396fc101c9ab500e5f1b5b5298998b777e859b7dcfac8eac",
+        "target_binding": {
+          "session_id": "session-1"
+        },
+        "ordered_effects": [
+          "throttle_session"
+        ],
+        "expires_at": 250,
+        "rollback_binding": {
+          "mode": "automatic"
+        }
+      }
+    },
+    {
+      "name": "active-response-rejects-control-character-capability-id",
+      "schema_file": "agent/active-response-governed-intent.schema.json",
+      "valid": false,
+      "instance": {
+        "plan_schema": "chio.response-plan.v1",
+        "plan_id": "plan-1",
+        "operator_capability_id": "operator\u0007cap-1",
+        "operator_capability_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operator_capability_expires_at": 300,
+        "executor_subject": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "canonical_plan_body": {
+          "action": "throttle"
+        },
+        "plan_body_hash": "abc03336b75d0f0b396fc101c9ab500e5f1b5b5298998b777e859b7dcfac8eac",
+        "target_binding": {
+          "session_id": "session-1"
+        },
+        "ordered_effects": [
+          "throttle_session"
+        ],
+        "expires_at": 250,
+        "rollback_binding": {
+          "mode": "automatic"
+        }
+      }
+    },
+    {
       "name": "combined-capture-rejects-numeric-boolean",
       "schema_file": "kernel/combined-capture-metadata.schema.json",
       "valid": false,

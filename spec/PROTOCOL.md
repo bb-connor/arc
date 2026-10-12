@@ -503,7 +503,8 @@ capability-keyed recovery aliases, are rejected as downgrade attempts.
 `chio.capability.v1` includes delegation and attenuation in the signed token
 body:
 
-- typed first-party `caveats` with `{ kind, predicate, sig? }`
+- typed first-party `caveats` with `{ kind, predicate, sig? }`, restricted as
+  described in Security-Context Binding Caveat below
 - `scope_attenuations` carrying the narrowing operations
 - `attenuation_proof` with `parentScopeHash`, `childScopeHash`, and a
   `normalizedSubsetProof`
@@ -520,6 +521,43 @@ Minting and verification both check that the child scope hash in the proof
 matches the token scope, that the witness hashes match the normalized scopes,
 and that every recorded grant relation is a subset. Budget shares above 10000
 bps fail closed because they re-amplify parent authority.
+
+#### Security-Context Binding Caveat
+
+A verifier accepts at most one caveat, and its `kind` MUST be
+`bind_security_context`. A token carrying more than one caveat, or a caveat of
+any other kind (`restrict_tool`, `bind_session`, `restrict_audience`,
+`restrict_geo`, `restrict_time_window`), is rejected. Attenuated issuance mints
+no caveats.
+
+A `bind_security_context` caveat seals one workload, tenant and session
+identity into the capability signature:
+
+- `predicate` is the RFC 8785 canonical JSON text of a
+  `chio.capability-security-binding.v1` object, described by
+  `capability/security-binding.schema.json`. The verifier canonicalizes the
+  predicate with the strict I-JSON canonicalizer and rejects it unless the
+  result is byte-identical to the predicate.
+- The object has exactly the fields `schema`, `tenantId`, `lineageId`,
+  `sessionId`, `principalId`, `isolationEpochId`, `contextGeneration`,
+  `workloadId`, `serverId` and `workloadSignerPublicKey`. Unknown fields are
+  rejected.
+- Every string field is nonempty, with no control characters and no leading or
+  trailing whitespace. `contextGeneration` is a nonzero unsigned 64-bit
+  integer.
+- `workloadSignerPublicKey` is the canonical lowercase `PublicKey` hex
+  encoding, with no `0x` prefix.
+- `sig` MUST be absent. The capability signature covers the caveat.
+
+The kernel requires an authoritative invocation context for a security-bound
+capability. It compares the tenant, lineage root, session, principal,
+isolation epoch and context generation with that context, and the tenant,
+workload, server and signer key with the pinned workload identity, and denies
+on any mismatch. A security-bound capability MUST have an empty
+`delegation_chain`; it cannot be delegated. A bound capability is denied when
+no workload authority is pinned, and an unbound capability is denied once a
+workload authority is pinned. `tests/bindings/vectors/capability/security-binding-v1.json`
+holds positive and negative vectors for these rules.
 
 #### Chain-Binding Rule (W1.1)
 
@@ -790,6 +828,32 @@ reject unsupported receivers instead of downgrading to `tool_invocation` or
 moving the binding into advisory context. Session ownership remains the
 responsibility of the authenticated host coordinator; this intent body does
 not claim a kernel session binding.
+
+An active-response governed intent carries
+`body { kind: "active_response_plan", value }`, where `value` follows
+`agent/active-response-governed-intent.schema.json` with
+`plan_schema = "chio.response-plan.v1"`. Receivers MUST reject the value
+during deserialization unless:
+
+- `plan_id` and `operator_capability_id` are 1 to 256 UTF-8 bytes, with no
+  control characters and no leading or trailing whitespace
+- `operator_capability_hash` and `plan_body_hash` are lowercase hexadecimal
+  SHA-256 digests
+- `ordered_effects` holds 1 to 5 distinct effects
+- `expires_at` and `operator_capability_expires_at` are nonzero and
+  `expires_at` does not exceed `operator_capability_expires_at`
+- `canonical_plan_body` is a nonempty object without a top-level `planHash` or
+  `plan_hash` key, and its RFC 8785 canonical form is at most 65,536 bytes
+- `target_binding` and `rollback_binding` are nonempty objects whose canonical
+  forms are at most 16,384 bytes each
+- each of those three objects nests at most 32 levels below its root and holds
+  at most 4,096 JSON values, counting the root
+- `plan_body_hash` is the SHA-256 of the bytes `chio:response-plan:v1`, one
+  zero byte and the canonical plan body
+
+The schema states the remaining structural bounds. It cannot state the byte,
+nesting and value-count ceilings, the UTF-8 byte limit on identifiers (its
+`maxLength` counts characters), the expiry ordering or the hash binding.
 
 Chio's normative provenance model now distinguishes three evidence classes:
 

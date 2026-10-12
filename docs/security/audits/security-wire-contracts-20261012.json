@@ -1,0 +1,69 @@
+{
+  "schema": "chio.security-wire-contracts.qualification.v1",
+  "base": "2102f01b14eb7a7ef25d8104b1dda3fb5fe19535",
+  "source": {
+    "head": "6292ccbbc395a381da267d80afb9123bc6023b14",
+    "working_diff_sha256": "0437ab9ecf6390f2871b4d7439325828b1e62e8a4447cc84e4012c964b550d9c",
+    "complete_patch_from_base_sha256": "146aa48fe9a795b9c649ba49e4cb12020469df01903156dde5797350404ff114",
+    "dirty_candidate": true,
+    "files": 186
+  },
+  "findings": [
+    "F070",
+    "F071"
+  ],
+  "producers": [
+    "b4eae15e58ac29fcea77a939c37e7a32bbce34af",
+    "65eeee7447055f04814e9cd37ee1824da8647baa"
+  ],
+  "status": "private-local-qualification-and-independent-source-review-complete",
+  "source_repairs": [
+    "Require the canonical public-key spelling before binding a security context; never normalize signed predicate bytes.",
+    "Publish the existing capability caveat and response-plan constraints and update Go/Python bounds.",
+    "Regenerate four languages from the current 147 wire schemas, preserving unrelated source changes.",
+    "Use explicit Unicode White_Space/control ranges rather than dialect-dependent whitespace shorthand; preserve native-valid format characters."
+  ],
+  "originals": {
+    "F070": "0 passed, 1 failed because uppercase key spelling was accepted; repeated with a fixed seed before production repair.",
+    "F071": "0 passed, 1 failed because schema accepted duplicate effects refused by native Rust.",
+    "integration_unicode": "Current TypeScript public validator refused native-valid U+FEFF at identifier edges: 2 passed, 1 failed under the existing enrolled test names."
+  },
+  "local_evidence": {
+    "rust_core_types": "618 passed, 0 failed, 0 ignored; generated Rust consumers included.",
+    "rust_wire_schema": "13 passed including 15 binding vectors and format-character controls.",
+    "rust_xtask": "195 passed, 0 failed, 0 ignored.",
+    "rust_strict": "core-types and xtask, all targets, -D warnings: passed.",
+    "rust_no_std": "core-types --no-default-features --lib: passed.",
+    "python_owning": "223 passed; Python3.13.13, Pydantic2.14.1.",
+    "go_owning": "137 passing test/subtest invocations, 0 failed, 0 skipped.",
+    "current_consumer_gate": "17 Python cases, 21 TypeScript cases and exact Go inventory passed. Reports retained; only temporary driver cwd/output/cleanup adapted for retention.",
+    "typescript_builds": "node-http, express, fastify and conformance passed.",
+    "codegen": "rust, go, python and ts --check passed with current locked tools.",
+    "structural": "schema registry, vector manifest, wire identifier inventory, consumer inventory mutations, Rust hygiene, weak-negative gate and formatting passed; no baseline or ratchet waiver."
+  },
+  "review": {
+    "reviewer": "Claude/C7",
+    "observed_utc": "2026-10-12T04:36:20Z",
+    "result": "No P0/P1/P2 in the exact pinned patch. Valid source and generated changes confined to declared scope.",
+    "nonblocking_P3": [
+      "Go binding ContextGeneration is int64 while schema/native are u64; binding DTO text fields have no standalone UnmarshalJSON hardening.",
+      "Python and TypeScript schema identifier maxLength counts characters rather than UTF-8 bytes; native byte bounds remain authoritative and are disclosed.",
+      "Python currently uses rust-regex; retain an explicit trailing-newline rejection test before changing regex engines.",
+      "Add Python format-character parity controls alongside the existing native and TypeScript controls."
+    ]
+  },
+  "archive": "/home/connor/lanes/pr1160-root-evidence/security-wire-contracts-20261012",
+  "archive_manifest_sha256": "687a9b98fcbb9c434d102702e30b3cb2e0947c006a1af56d975660effa18069c",
+  "retained_setup_attempts": [
+    "First Python dependency install could not resolve uncached wheels offline; online installation succeeded in isolated venv.",
+    "One Unicode-test relocation command used the wrong cwd and made no source change; the enrolled-location renewal retains the genuine 2/1 result."
+  ],
+  "remaining_acceptance": [
+    "Compose onto actual main after current two-PR queue advances.",
+    "Obtain exact future-head hosted qualification and final landing review.",
+    "Operational authority, native release and cold-state readiness remain separate; no such acceptance follows from this wire follow-up."
+  ],
+  "published": false,
+  "merged": false,
+  "formal_engines_executed": false
+}

@@ -8,11 +8,10 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-163 of 529 identifier constants in the security crates are unpinned.
+162 of 529 identifier constants in the security crates are unpinned.
 
-## crates/core/chio-core-types (26)
+## crates/core/chio-core-types (25)
 
-- `crates/core/chio-core-types/src/capability/caveat.rs:10` `CAPABILITY_SECURITY_BINDING_SCHEMA` = `chio.capability-security-binding.v1`
 - `crates/core/chio-core-types/src/declassification.rs:12` `DECLASSIFICATION_GRANT_SIGNATURE_DOMAIN` = `chio:declassification-grant:v1`
 - `crates/core/chio-core-types/src/economic_continuity.rs:27` `RESOURCE_HEAD_DIGEST_DOMAIN` = `chio.economy.resource-head.digest.v1`
 - `crates/core/chio-core-types/src/economic_continuity.rs:28` `EFFECT_SLOT_ID_DOMAIN` = `chio.economy.effect-slot.id.v1`

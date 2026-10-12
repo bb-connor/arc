@@ -144,7 +144,34 @@ fn harden_python_generated_models(root_dir: &Path) -> Result<(), XtaskError> {
         &root_dir.join("capability").join("capabilities_schema.py"),
     )?;
     harden_python_capability_token(&root_dir.join("capability").join("token_schema.py"))?;
+    harden_python_active_response_plan(
+        &root_dir
+            .join("agent")
+            .join("active_response_governed_intent_schema.py"),
+    )?;
     Ok(())
+}
+
+/// Enforce the active-response plan constraints that datamodel-code-generator
+/// drops: `uniqueItems` on `ordered_effects`, `minProperties` on the plan body
+/// and both bindings, and the `propertyNames` exclusion of a top-level plan
+/// hash key.
+fn harden_python_active_response_plan(path: &Path) -> Result<(), XtaskError> {
+    let mut body =
+        fs::read_to_string(path).map_err(|err| XtaskError::Io(display_path(path), err))?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "from pydantic import ConfigDict, Field, conint, constr",
+        "from pydantic import ConfigDict, Field, conint, constr, model_validator",
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "    rollback_binding: dict[str, Any] = Field(\n        ...,\n        description=\"Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.\",\n    )\n",
+        "    rollback_binding: dict[str, Any] = Field(\n        ...,\n        description=\"Its RFC 8785 canonical form is at most 16384 bytes, nests at most 32 levels below the root and holds at most 4096 JSON values.\",\n    )\n\n    @model_validator(mode=\"after\")\n    def _validate_plan_shape(self) -> \"ChioGovernedActiveResponseIntentBody\":\n        if len(set(self.ordered_effects)) != len(self.ordered_effects):\n            raise ValueError(\"ordered_effects must be unique\")\n        if not (self.canonical_plan_body and self.target_binding and self.rollback_binding):\n            raise ValueError(\"plan body and bindings must be nonempty objects\")\n        if \"planHash\" in self.canonical_plan_body or \"plan_hash\" in self.canonical_plan_body:\n            raise ValueError(\"canonical_plan_body must not carry a plan hash\")\n        return self\n",
+    )?;
+    fs::write(path, body).map_err(|err| XtaskError::Io(display_path(path), err))
 }
 
 fn harden_python_capability_token(path: &Path) -> Result<(), XtaskError> {
