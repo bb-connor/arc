@@ -1,73 +1,90 @@
 # chio-web3-bindings architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-web3-bindings` is the Rust ABI boundary for Chio's official web3
-contract family. It holds no protocol logic of its own: it packages compiled
-Solidity output (ABI JSON, implementation bytecode) and turns it into typed
-Rust bindings via `alloy::sol!`. Trust and settlement semantics for the
-contract family live in `chio-web3`; this crate only proves that the Rust
-bindings and the packaged artifacts agree with each other and with the
-compiled Solidity output.
+The crate owns compile-time ABI bindings and embedded contract artifacts for
+five Chio interfaces. It exposes call/event data types for root and identity
+registries, escrow, bond vault, and price resolver. Consumers own providers,
+contract addresses, account authorization, and deployment trust.
 
-## Module map
+`ChioMerkleProof` is a shared Rust representation of Solidity proof fields.
+Its conversion implementations bridge the independently generated root-registry,
+escrow, and bond-vault proof types. This crate does not decide whether a proof
+is valid or whether a root is authorized for a particular operation.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Crate root (`#![cfg(feature = "web3")]`). Declares `interfaces`, re-exports its public types, and embeds the interface, implementation, deployment, and qualification JSON as `&str` constants via `include_str!`. Its `#[cfg(test)]` module validates artifact shape. |
-| `src/interfaces.rs` | Invokes `alloy::sol!` once per contract interface artifact, each inside its own private module (`root_registry_bindings`, `identity_registry_bindings`, `escrow_bindings`, `bond_vault_bindings`, `price_resolver_bindings`). Defines `ChioMerkleProof` and its conversions into the generated Merkle-proof struct. |
+## Structure
 
-## Artifact packaging
+`src/lib.rs` declares `interfaces`, re-exports the five generated interfaces and
+`ChioMerkleProof`, and embeds JSON with `include_str!`. Entire-crate `web3`
+gating removes all public items when the feature is disabled.
 
-1. The Solidity package in `contracts/` compiles to `contracts/artifacts/`,
-   `contracts/deployments/`, and `contracts/reports/`.
-2. Those directories are mirrored verbatim into this crate's `artifacts/`,
-   `deployments/`, and `reports/`; `scripts/check-web3-contract-parity.sh`
-   diffs them for drift as part of the workspace's web3 qualification path,
-   outside `cargo test`.
-3. `src/interfaces.rs` reads the five interface artifacts
-   (`artifacts/interfaces/IChio*.json`) at compile time through `alloy::sol!`
-   to generate typed bindings. `src/lib.rs` separately embeds those same five
-   files, the five matching implementation artifacts (`artifacts/Chio*.json`),
-   and the two fixtures under `deployments/` and `reports/` as raw JSON
-   constants.
-4. The mirrored directories also carry files this crate neither embeds nor
-   generates bindings for: the `IAggregatorV3`, `IERC20`, and `IERC20Permit`
-   interfaces, the `ChioMerkle` library artifact, and the Foundry mock
-   contracts under `mocks/`.
+`src/interfaces.rs` contains five private binding modules. Each invokes
+`alloy::sol!` on its corresponding `artifacts/interfaces/IChio*.json` path,
+resolved with `CARGO_MANIFEST_DIR`. Interface names are then re-exported.
+The generated Solidity `ChioMerkle::Proof` structs remain distinct Rust types.
 
-## Invariants and failure modes
+| Packaged directory | Contents |
+| --- | --- |
+| `artifacts/interfaces` | Compiled interface ABI inputs, including support interfaces. |
+| `artifacts` | Five Chio implementation artifacts with ABI and bytecode fields. |
+| `artifacts/lib`, `artifacts/mocks` | Merkle library and contract-test support artifacts. |
+| `deployments` | Embedded local-devnet deployment fixture. |
+| `reports` | Embedded local-devnet qualification fixture. |
 
-- Implementation artifacts must carry non-empty `bytecode` and
-  `deployedBytecode` whose keccak256 hashes match `creationBytecodeHash` and
-  `deployedRuntimeCodehash`; interface artifacts must carry empty
-  `bytecode`/`deployedBytecode` and empty hash fields. Both are checked by
-  `src/lib.rs`'s `#[cfg(test)]` module, not by a runtime or compile-time
-  guarantee.
-- `tests/parity.rs` fails closed on ABI drift: each interface's generated
-  call signatures (and, where checked, event signatures) must equal the
-  interface artifact's own signature set, and every interface function,
-  event, and error signature must remain a subset of the matching
-  implementation artifact's signatures.
-- `tests/parity.rs` also checks the `docs/standards/CHIO_WEB3_CONTRACT_PACKAGE.json`,
-  `CHIO_WEB3_CHAIN_CONFIGURATION.json`, and `CHIO_WEB3_SETTLEMENT_RECEIPT_EXAMPLE.json`
-  documents against the bundled artifacts: contract bytecode hashes, the Rust
-  binding's crate path and module name, and the Base-mainnet-primary /
-  Arbitrum-One-secondary chain roles.
-- `ChioMerkleProof` converts into the generated Merkle-proof type only for
-  the interfaces whose ABI references one (root registry, escrow, bond
-  vault); it has no conversion for the identity registry or price resolver
-  interfaces.
-- With the `web3` feature disabled, `src/lib.rs`'s
-  `#![cfg(feature = "web3")]` compiles the crate to an empty public surface
-  rather than failing the build.
+Only the five Chio interface and implementation artifacts, plus the two devnet
+fixtures, have string constants exported by the crate root. Supporting files
+remain package data rather than separately exported Rust constants.
+
+## Data and control flow
+
+A build reads interface JSON through the `sol!` macro and generates callable
+Solidity data types. A consumer constructs a call, uses Alloy's `SolCall` to
+encode it, and sends those bytes through its own transport. Return/event decoding
+uses the corresponding generated types; this crate performs no dispatch.
+
+Proof conversion copies `audit_path`, `leaf_index`, and `tree_size` into the
+Solidity field names. Borrowed conversions clone the audit path. Owned
+conversions delegate to the borrowed form and therefore also clone that vector.
+There is no validation, hashing, index narrowing, or signature operation in
+these conversions.
+
+## Trust and invariants
+
+Bundled artifacts determine ABI shape at compilation. The public API therefore
+tracks the packaged interface artifacts. Updating an ABI requires rebuilding
+and reviewing generated signature parity and implementation coverage.
+
+Artifact unit tests require names and nonempty ABIs, implementation creation
+and runtime bytecode, and correct Keccak bytecode hashes. Interface artifacts
+must contain empty bytecode/hash fields. These are test-enforced package
+conditions; exposing a string constant does not run validation automatically.
+
+The devnet manifest/report constants are fixed test fixtures. Their presence
+cannot authorize a deployment or prove a live address has matching code.
+An application must independently validate chain identity, runtime codehash,
+contract configuration, signer standing, and finality for its operation.
+ABI encoding supplies the wire shape; receipt truth and trust checks live in
+the consuming runtime and artifact verifiers.
 
 ## Dependencies
 
-Runtime: `alloy` (`json`, `json-abi`, `sol-types`, `std` features only; no
-`provider`, `contract`, `network`, or `rpc` features, so this crate has no
-wiring for live RPC calls) generates and encodes the bindings; `serde_json`
-backs the crate's own artifact-parsing tests. Dev-only: `chio-core` and
-`chio-link` support `tests/parity.rs`. `chio-web3` is also a dev-dependency,
-but `tests/parity.rs` reaches its types via `chio_core::web3` (`chio-core`
-re-exports `chio-web3` as `web3`) rather than importing `chio-web3` directly.
+Optional `alloy` enables JSON ABI/`sol!` support and the primitive types used by
+proof fields. Optional `serde_json` supports artifact parsing in tests.
+`web3` enables both dependencies, and `default` enables `web3`.
+Development dependencies `chio-core`, `chio-link`, and `chio-web3` support
+cross-crate parity with standards artifact types and oracle runtime constants.
+No transport or signing dependency is configured by this crate.
+
+## Verification
+
+Use `cargo test -p chio-web3-bindings` with default features.
+Unit tests parse all exported artifacts, reject empty implementation bytecode,
+recompute creation/runtime hashes, and check fixture IDs.
+`tests/parity.rs` rejects duplicate ABI entries, compares generated function
+and event signature sets/selectors, and checks each interface is a subset of
+its implementation. It also checks standards package/deployment references
+and oracle authority constants against sibling Rust types.
+These checks use packaged files; querying current chain code requires a
+separate deployment verification run.
+
+[README](README.md) · [Solidity package](../../../contracts/README.md)

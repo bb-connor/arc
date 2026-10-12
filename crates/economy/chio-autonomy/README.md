@@ -1,81 +1,71 @@
 # chio-autonomy
 
-`chio-autonomy` defines Chio's bounded autonomous insurance-automation
-contracts: pricing, capital-pool optimization, execution, rollback, drift,
-and comparison artifacts, each with a fail-closed validator. The crate is
-pure data and validation; it performs no I/O and holds no runtime state.
+`chio-autonomy` defines and validates artifacts for autonomous pricing,
+capital-pool optimization, execution records, comparison, drift, and rollback.
+It combines monetary and receipt types from `chio-core-types`, coverage classes
+from `chio-market`, and settlement lifecycle states from `chio-web3`.
 
-Every artifact stays evidence-referential: pricing and execution decisions
-embed or cite by id the prior underwriting, capital, market, and web3 truth
-that justifies them, rather than asserting new authority on their own.
-`chio-core` re-exports this crate as `autonomy`.
+The crate contains data models and synchronous validators. Applications own
+model execution, evidence retrieval, signing, persistence, and effect dispatch.
 
-## Responsibilities
+## Usage
 
-- Model ten `chio.autonomous-*` / `chio.capital-pool-*` wire artifacts (see
-  Public API) as serde structs, plus a `Signed<Name>` envelope alias for
-  each.
-- Validate each artifact fail-closed: schema id, required/non-empty fields,
-  duplicate and unknown references, and 3-letter uppercase currency codes
-  matched by exact string comparison (no case-folding or trimming).
-- Bound automation to its declared authority: suggested coverage/premium
-  capped by the authority envelope, bind gated on `live_bind_supported` and
-  `permitted_actions`, shadow automation forced into `review_state:
-  ShadowOnly`, and auto-approval blocked above the envelope's human-review
-  premium threshold.
-- Enforce execution and drift safety: `lifecycle_state: Executed` requires
-  every safety gate to pass, `Blocked` requires at least one to fail, and a
-  `Critical` drift signal requires both `fail_safe_engaged` and a matching
-  trigger in the paired rollback plan.
-- Report every violation through `AutonomyContractError`, a closed
-  `thiserror` enum.
+Construct and validate a rollback plan without services or runtime state:
 
-## Public API
+```rust
+use chio_autonomy::{
+    validate_autonomous_rollback_plan, AutonomousDriftKind,
+    AutonomousRollbackAction, AutonomousRollbackPlanArtifact,
+    AutonomousSafeState, CHIO_AUTONOMOUS_ROLLBACK_PLAN_SCHEMA,
+};
 
-One wire artifact and one validator per autonomy contract (`model.rs` /
-`validation.rs`):
+let plan = AutonomousRollbackPlanArtifact {
+    schema: CHIO_AUTONOMOUS_ROLLBACK_PLAN_SCHEMA.into(),
+    plan_id: "rollback-1".into(),
+    issued_at: 1,
+    subject_key: "agent-1".into(),
+    safe_state: AutonomousSafeState::FullPause,
+    triggers: vec![AutonomousDriftKind::SettlementFailureRate],
+    actions: vec![AutonomousRollbackAction::RequireHumanApproval],
+    requires_operator_ack: true,
+    note: None,
+};
+validate_autonomous_rollback_plan(&plan)?;
+# Ok::<(), chio_autonomy::AutonomyContractError>(())
+```
 
-| Artifact | Validator |
-|---|---|
-| `AutonomousPricingInputArtifact` | `validate_autonomous_pricing_input` |
-| `AutonomousPricingAuthorityEnvelopeArtifact` | `validate_autonomous_pricing_authority_envelope` |
-| `AutonomousPricingDecisionArtifact` | `validate_autonomous_pricing_decision` |
-| `CapitalPoolOptimizationArtifact` | `validate_capital_pool_optimization` |
-| `CapitalPoolSimulationReport` | `validate_capital_pool_simulation_report` |
-| `AutonomousExecutionDecisionArtifact` | `validate_autonomous_execution_decision` |
-| `AutonomousRollbackPlanArtifact` | `validate_autonomous_rollback_plan` |
-| `AutonomousComparisonReport` | `validate_autonomous_comparison_report` |
-| `AutonomousDriftReport` | `validate_autonomous_drift_report` |
-| `AutonomousQualificationMatrix` | `validate_autonomous_qualification_matrix` |
+Validation checks the plan's schema, identifiers, and nonempty unique trigger
+and action lists. The caller executes the declared rollback actions.
 
-Each artifact has a `Signed<Name>` alias for `SignedExportEnvelope<Name>`
-(from `chio_core_types::receipt::lineage`), e.g.
-`SignedAutonomousPricingDecision`.
+## Guarantees
 
-`AutonomousEvidenceReference` (`kind: AutonomousEvidenceKind`,
-`reference_id`, optional `observed_at` / `locator`) is the pointer type
-pricing input, explanation factors, and drift signals use to cite evidence
-from other crates. `AutonomousEvidenceKind` has 11 variants spanning
-underwriting, credit, capital, liability-market, web3-settlement, claim, and
-runtime-assurance evidence.
+- `validate_autonomous_pricing_input` requires underwriting, exposure, credit
+  scorecard, and capital-book evidence kinds; loss or settlement state adds
+  conditional evidence requirements. References are checked as identifiers.
+- `validate_autonomous_pricing_decision` checks nested input and authority,
+  matching subject/provider/currency, monetary ceilings, explanation factors,
+  shadow review state, and bind permission/human-review constraints.
+- `validate_autonomous_execution_decision` requires all gates to pass for
+  `Executed`, at least one to fail for `Blocked`, and a settlement dispatch
+  reference for an executed bind.
+- `validate_autonomous_drift_report` requires critical signals to declare an
+  engaged fail-safe and appear among the nested rollback plan's triggers.
 
-Also exported: `AutonomyContractError`; re-exports `capability`, `receipt`
-(from `chio-core-types`), `market` (`chio-market`), `web3` (`chio-web3`)
-used by artifact fields.
+## Status
 
-## Testing
+The artifact and validation surface is implemented. `SignedAutonomous*` and
+`SignedCapitalPool*` aliases use `SignedExportEnvelope`; callers must verify
+signatures and resolve referenced authority independently. Validators do not
+prove that an action ran, a reserve exists, or a rollback occurred. Authority
+limits such as daily decision counts require runtime accounting by the caller.
 
-`cargo test -p chio-autonomy` runs `src/tests.rs` (fixture builders and
-validator regression tests) and `tests/integration_smoke.rs` (a public-API
-smoke test). One unit test, `reference_artifacts_parse_and_validate`,
-deserializes and validates every reference example under
-`docs/standards/CHIO_AUTONOMOUS_*.json` and
-`docs/standards/CHIO_CAPITAL_POOL_*.json`.
+`cargo test -p chio-autonomy` covers reference fixtures, validator regressions,
+and construction through the public API. No Cargo features are declared.
 
-## See also
+## Related
 
-- `docs/standards/CHIO_AUTONOMOUS_PRICING_PROFILE.md` - the bounded-claim
-  spec these artifacts implement.
-- `chio-core` - re-exports this crate as `autonomy`.
-- `chio-market`, `chio-web3` - supply `LiabilityCoverageClass` and
-  `Web3SettlementLifecycleState` used in artifact fields.
+- [Architecture](ARCHITECTURE.md)
+- [Protocol trust-control contract](../../../spec/PROTOCOL.md#9-trust-control-contract)
+- [Autonomous pricing profile](../../../docs/standards/CHIO_AUTONOMOUS_PRICING_PROFILE.md)
+- [Market artifacts](../chio-market/README.md)
+- [License](../../../LICENSE)

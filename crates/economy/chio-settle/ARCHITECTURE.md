@@ -1,186 +1,154 @@
 # chio-settle architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-settle` executes approved Chio capital instructions against real
-chains and projects the results back into signed Chio settlement receipts.
-It is the money-moving layer directly downstream of the kernel: the kernel
-signs and persists a receipt, then calls into this crate (through
-`SettlementHook`) to turn that receipt into an EVM, Solana, or cross-chain
-settlement action, or into a payment-rail compatibility artifact (x402,
-EIP-3009, Circle, ERC-4337). The crate owns no persistence, scheduling, or
-kernel state, those live in `chio-store-sqlite` and `chio-kernel`, and every
-function re-verifies its own inputs (signatures, identity bindings, anchor
-proofs, chain config) instead of trusting the caller. Where a second
-on-chain call depends on a first (root publication after a Merkle release
-or bond impair/release), preparing the second call re-derives the same
-commitment from the caller-supplied `Prepared*` value and rejects any
-mismatch, so a tampered intermediate value cannot reach the chain.
+The crate exports EVM preparation, submission, confirmation, and observation
+functions; settlement hook/store traits; payment compatibility helpers;
+finding-enforcement verification and publishers; and `pub mod channel`.
+Other implementation modules are private, with selected items re-exported at
+the crate root. `#![cfg(feature = "web3")]` gates the whole library.
 
-## Diagram
+The library owns prepared call data and verification results. A runtime owns
+RPC accounts, deployed contracts, trusted policy, durable receipt storage,
+outcome leases, and publisher effects. `SettlementOutcomeStore` describes an
+atomic leased backend but supplies no backend implementation here.
 
-```mermaid
-flowchart TD
-    subgraph kernel_sg["Kernel handoff"]
-        kernel["Kernel signed receipt"]
-        hook["SettlementHook observe"]
-        retry["Retry and dead letter"]
-    end
-    subgraph gate_sg["Config and transport gate"]
-        config["SettlementChainConfig validate"]
-        egress["HttpEgressContract pinned RPC"]
-    end
-    subgraph dispatch_sg["EVM escrow dispatch"]
-        prepare["prepare_web3_escrow_dispatch"]
-        ready["ensure_instruction_ready"]
-        prepared["PreparedEvmCall"]
-        submit["submit_call and confirm"]
-        finalize["finalize escrow identity"]
-    end
-    subgraph rails_sg["Alternate settlement rails"]
-        solana["Solana Ed25519"]
-        ccip["CCIP cross chain"]
-        payments["x402 EIP-3009 Circle 4337"]
-    end
-    subgraph evidence_sg["Evidence"]
-        finality["inspect_finality"]
-        artifact["Web3 settlement receipt"]
-    end
-    kernel -->|observe| hook
-    hook -->|Retryable| retry
-    hook -->|Accepted| prepare
-    config -->|validate| prepare
-    config -->|pinned dns| egress
-    prepare --> ready
-    ready --> prepared
-    prepared --> submit
-    submit -->|json rpc| egress
-    submit --> finalize
-    finalize --> finality
-    solana -->|json rpc| egress
-    solana --> finality
-    ccip -->|json rpc| egress
-    ccip --> finality
-    payments --> artifact
-    finality --> artifact
-```
+`SettlementHook::observe` consumes observations after receipt signing and
+persistence. It is observer-only: implementations must leave the receipt store
+unchanged. Its accepted outcome requires a durable local effect. Hooks must
+deduplicate by receipt id even when recovery supplies a new row version.
+The trait requires concurrent safety and ordered batching; it supplies no queue.
 
-## Module map
+## Structure
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Facade: `#![cfg(feature = "web3")]` gates the whole crate body. Declares `SettlementError`, `SettlementCommitment`, and the completion-flow row-id binding helpers. |
-| `src/config.rs` | `SettlementChainConfig` and its policy/oracle/evidence sub-config; devnet RPC `HttpEgressContract` construction (loopback-only); `LocalDevnetDeployment` loader. |
-| `src/hook.rs` | `SettlementHook` trait, `SettlementObservation`, `SettlementOutcome`: the kernel post-dispatch extension point. |
-| `src/retry.rs` | `RetryPolicy`, `classify_attempt`, `DeadLetterRecord`: pure-function bounded backoff and dead-lettering for hook failures. |
-| `src/ops.rs` | Emergency controls, indexer/lane runtime-status classification, incident alerts, `SettlementRuntimeReport`, and the completion-flow binding check `evm::ensure_instruction_ready` calls. |
-| `src/automation.rs` | Watchdog job construction and fingerprint/ordering assessment for cron-triggered settlement automation. |
-| `src/evm/mod.rs` | EVM submodule aggregator; declares the ERC-20 `approve`-only `sol!` interface. |
-| `src/evm/types.rs` | EVM wire and snapshot types: `PreparedEvmCall`, the `Prepared*` family, `EscrowSnapshot`, `EvmBondSnapshot`, the JSON-RPC envelope. |
-| `src/evm/prepare.rs` | Call preparation for every EVM settlement action (escrow dispatch/release/refund, bond lock/release/impair/expire, root publication), on-chain snapshot reads, and RPC submission. |
-| `src/evm/sign.rs` | Capital-instruction and identity-binding readiness checks, the EIP-712 dual-sign digest, secp256k1 signing. |
-| `src/evm/decode.rs` | ABI/log decoding and the shared `HttpEgressContract`-gated JSON-RPC transport (`rpc_call`). |
-| `src/evm/finalize.rs` | Post-submission identity finalization (`finalize_escrow_dispatch`, `finalize_bond_lock`) and failure/reversal receipt builders. |
-| `src/observe.rs` | Finality assessment (confirmations, dispute window, reorg) and escrow/bond lifecycle projection into `Web3SettlementExecutionReceiptArtifact`. |
-| `src/solana.rs` | Bounded Solana-native Ed25519 settlement path; binding/receipt verification and cross-lane commitment comparison. |
-| `src/ccip.rs` | Chainlink CCIP settlement-message preparation and delivery reconciliation (duplicate suppression, delay detection). |
-| `src/payments.rs` | x402 payment requirements, EIP-3009 `transferWithAuthorization` (with a replay-resistant nonce store), Circle nanopayment, and ERC-4337 paymaster compatibility. |
+| Module | Responsibility |
+|---|---|
+| `config` | Chain, amount-tier, oracle, evidence-substrate, and local deployment configuration. |
+| `evm/{prepare,finalize,decode,sign,types}` | Solidity ABI calls, receipt/event decoding, proof and identity checks, signing, and prepared values. |
+| `observe` | Escrow/bond snapshots, confirmation/dispute-window assessment, execution receipt projection, and recovery actions. |
+| `hook`, `outcome_store`, `retry` | Observation/outcome schemas, typed failure reasons, leased claims, retry decisions, and dead letters. |
+| `payments` and `payments_approval` | x402 approval binding, EIP-3009 digests/nonces, Circle/paymaster checks, and off-chain receipt validation. |
+| `finding_enforcement/{verify,plan,publish,reconcile,observation_source}` | Pinned authority and collateral verification, impairment intent preparation, remote adapters, and post-dispatch recovery. |
+| `channel` | Asset/funding/open artifacts, signatures, reservations, state, lifecycle projections, replay, terminal outcomes, disputes, close, and release authorization. |
+| `solana`, `ccip`, `automation`, `ops` | Instruction preparation, coordination messages, watchdog evidence, and operator controls/reports. |
+| `input` | Bounded original-byte canonical JSON decoding for ingress. |
 
-## Settlement lifecycle
+## Data and control flow
 
-Two entry paths, both fail-closed at every step:
+`prepare_web3_escrow_dispatch` validates chain configuration, the capital
+instruction, and settlement identity binding. It derives the expected escrow
+id with an RPC call and builds a `PreparedEscrowCreate`. `prepare_bond_lock`
+similarly constructs bond-vault terms, preserving collateral and reserve
+requirement separately. `prepare_erc20_approval` is an offline ABI helper;
+its validation is limited to parsing the spender address.
 
-1. **Kernel-triggered observation.** The kernel signs and durably stores a
-   receipt, then calls `SettlementHook::observe` with a
-   `SettlementObservation` (finalized receipt id, amount, content and
-   policy hash). A hook implementation classifies it into
-   `Accepted`/`Skipped`/`Retryable`/`Permanent`; `retry::classify_attempt`
-   turns `Retryable` into a backoff-and-replay decision or a
-   `DeadLetterRecord`. `observe` must not mutate the receipt store, and a
-   settlement failure never rolls back dispatch.
-2. **EVM dispatch.** `evm::prepare_web3_escrow_dispatch` (or a bond
-   counterpart) validates the chain config, verifies the capital
-   instruction signature and identity binding, and derives the on-chain id
-   via a static `eth_call` before returning a `PreparedEvmCall`. The caller
-   submits it (`submit_call`), waits for the mined receipt
-   (`confirm_transaction`), and finalizes on-chain identity from the
-   emitted event (`finalize_escrow_dispatch`/`finalize_bond_lock`).
-   `observe::inspect_finality` then classifies confirmations, dispute
-   window, and reorg state against the configured amount tier, and
-   `observe::project_escrow_execution_receipt` folds the result into a
-   `Web3SettlementExecutionReceiptArtifact`.
+`submit_call` sends supported prepared calls through `eth_sendTransaction`.
+It rejects root-publication, escrow-release/refund, and bond-exit selectors
+before RPC. These operations require a durable publisher integration.
+`confirm_transaction` polls at most 100 times, waits 100 ms between empty
+results, and decodes receipt/block data. RPC latency contributes to total time.
+Finalizers recover identities from emitted events; bond finalization also
+checks the bond and facility hashes against the prepared lock.
 
-Every RPC call in both paths (`evm::decode::rpc_call`, `observe`'s own
-`settlement_rpc_call`) re-validates
-`SettlementChainConfig::validate_rpc_egress_contract` immediately before
-dispatch.
+`inspect_finality_for_receipt` compares the observed block hash with the current
+chain, confirmation depth with the amount tier, and supplied observation time
+with the dispute deadline. Without a time override, it uses the transaction's
+observed timestamp. `project_escrow_execution_receipt` combines finality and
+escrow state, then validates the resulting web3 execution artifact.
 
-## Invariants and failure modes
+For observer work, the backend claims a due receipt under a version and lease.
+The hook receives `SettlementIdempotencyKey`; the runtime converts its result
+into `SettlementRoutingInput` and commits through `record_claimed_outcome`.
+`classify_attempt` returns acceptance, skip, retry scheduling, or dead lettering.
+The backend must atomically enforce the exact unexpired claim and persist the
+transition; the pure classifier does no storage, sleeping, or policy validation.
 
-- `SettlementChainConfig::validate` gates every `prepare_*`, `read_*`, and
-  RPC call: required fields non-blank, oracle/evidence/policy sub-configs
-  valid, amount tiers non-empty and non-regressing with at least one
-  confirmation each, and the RPC URL allowed by its `HttpEgressContract`
-  with pinned-DNS revalidation at connect time.
-- `evm::ensure_instruction_ready` requires a verified capital-instruction
-  signature, `TransferFunds` action, `Web3` rail kind, jurisdiction
-  matching the chain id, a `governed_receipt_id`/`completion_flow_row_id`
-  pair that binds under `ops::ensure_settlement_completion_flow_binding`,
-  explicit `automatic_dispatch_supported`, and a destination address equal
-  to the beneficiary, before any escrow dispatch is prepared.
-- The Merkle release path binds the anchor proof's receipt nonce and
-  content hash to the dispatch's `governed_receipt_id`
-  (`ensure_anchor_receipt_binds_dispatch`) and its `chain_anchor` to the
-  configured registry contract, operator address, and a non-zero operator
-  key hash, before deriving the typed release leaf.
-- Dual-signature release re-reads the identity registry at a specific
-  block, rejects if the block hash changed before the digest was computed,
-  requires an active operator with a non-zero epoch, and only supports
-  full-amount release.
-- Bond impair requires slash shares to sum exactly to the slash amount,
-  beneficiaries to be non-zero addresses bounded to 16 entries, and the
-  slash to not exceed remaining collateral (`locked - already-slashed`).
-- CCIP reconciliation fails closed on payload-hash mismatch, suppresses
-  replays via a caller-supplied `seen_messages` set, and marks delivery
-  after `expires_at` as `Delayed` rather than `Reconciled`.
-- EIP-3009 preparation checks nonce freshness against the domain-scoped
-  `Eip3009NonceStore`, the `(validAfter, validBefore)` window against
-  `now`, that `validBefore` does not outlive the governing approval, and
-  that chain, payee, amount, and token contract all match the
-  `ApprovalBinding`; the nonce is recorded only after every other check
-  passes, so a rejected authorization never burns its nonce.
-- x402 requirement construction rejects blank or whitespace-bearing
-  facilitator, resource, or accepted-token fields.
-- The retry policy is a pure function with no owned clock or storage:
-  permanent outcomes dead-letter on the first attempt, and a `Retryable`
-  outcome dead-letters once `max_retries` is exhausted.
+Channel admission composes verified open/funding and reservation artifacts
+with economic state views. Projection helpers describe reservation, dispatch,
+cancellation, and terminal batch transitions. Replay descriptors retain the
+inputs and pinned authority needed to verify those transitions again.
+Close and release verification bind the effective close, lifecycle fences,
+amount allocation, and verified FROST authorization before EVM preparation.
+
+## Trust and invariants
+
+`SettlementChainConfig::validate` requires nonempty fields, amount policy,
+evidence flags, and a dispatchable pinned-DNS `HttpEgressContract` matching the
+RPC URL. RPC helpers use the contract-aware HTTP client. Evidence flags express
+required integration posture; setting them does not create or inspect durable
+receipts, checkpoints, or signer equality.
+
+`settlement_completion_flow_row_id` and its inverse require a nonblank,
+unpadded receipt id and the `economic-completion-flow:` prefix. Instruction
+readiness checks that this row id names its governed receipt before escrow
+preparation. The conversion identifies a row; it does not load durable state.
+
+`RetryPolicy::validate` allows at most 32 retries, nonzero backoff bounded by
+one day, and a multiplier in `1..=16`. The default is five retries with 250 ms
+initial backoff, doubling to a 60-second cap. `validate_settlement_claim`
+limits worker ids to 128 UTF-8 bytes, lease durations to one day, and batches
+to 1,024 rows. `SettlementFailureReason` stores a closed code and detail digest.
+Integrity failures remain permanent even when supplied as retryable outcomes.
+
+`prepare_transfer_with_authorization` requires an open validity interval around
+caller-supplied time, approval expiry coverage, and matching chain/payee/amount/
+token contract. It records the canonical chain/contract/sender/nonce tuple only
+after those checks. `InMemoryEip3009NonceStore` bounds retained entries and
+rejects mutex failures; restart-safe replay protection needs a durable store.
+
+Finding dispatch verification uses independently pinned, distinct signing roles,
+retained lifecycle policy, current authority status, fresh finalized collateral,
+exact snapshot digest and allocation binding, and permitted destinations.
+Reconciliation authenticates historical dispatched inputs without renewing
+fresh dispatch authority. Remote observation/publisher adapters require explicit
+configuration; their existence does not provision the external services.
+
+`channel::ChannelSignatureV1` signs canonical payloads containing a domain,
+signer id, epoch, public key, and artifact body. Verifiers check expected identity
+metadata before signature verification. Channel byte decoders enforce canonical
+input and size limits; replay descriptors allow 4 MiB and authority pins 256 KiB.
+Verified wrappers represent the checks performed by their named constructors.
+Applications still own anchored mutation storage and external publication.
+
+`verify_solana_binding_and_receipt` verifies carried binding and receipt
+signatures and requires the receipt kernel key to match the binding. The shared
+verifiers accept Ed25519, P-256, P-384, and hybrid signatures; this helper adds
+no algorithm restriction. `prepare_solana_settlement` prepares canonical
+instruction bytes and copies the carried signature/key into
+`PreparedSolanaSettlement::ed25519_signature` and `chio_public_key`, alongside
+the Ed25519 program id. Callers must enforce Ed25519 compatibility for the
+native lane; successful preparation alone does not establish it. The helpers
+provide no broadcast.
+
+CCIP reconciliation uses a caller-owned `HashSet` for duplicate tracking.
+Watchdog helpers assess supplied execution records; they run no scheduler.
+Circle and paymaster helpers validate supplied policy without contacting rails.
 
 ## Dependencies
 
-`chio-core` supplies the protocol types this crate consumes through its
-facade (`chio_core::credit`, `chio_core::web3::{anchors, identity,
-settlement, trust_profile}`, `chio_core::capability::scope::MonetaryAmount`,
-`chio_core::receipt`). `chio-credit`, `chio-web3`, and `sha2` are also
-direct Cargo dependencies, but no source file in this crate names them
-directly; every use goes through the `chio_core` facade. `chio-web3-bindings`
-supplies the generated Solidity interfaces (`IChioEscrow`, `IChioBondVault`,
-`IChioIdentityRegistry`, `IChioRootRegistry`) called through
-`alloy-sol-types`. `chio-egress-contract` supplies `HttpEgressContract` and
-the pinned-DNS HTTP client every RPC call routes through. `alloy-primitives`
-and `alloy-sol-types` provide EVM ABI encoding and Keccak; `secp256k1` signs
-the dual-signature EIP-712 digest; `bs58` validates Solana base58 addresses;
-`reqwest` is the underlying HTTP transport; `tokio` backs the confirmation
-poll loop. Dev-only: `chio-anchor` and `chio-link` build anchor proofs and
-oracle rates for the integration tests, `chio-kernel` supplies the
-checkpoint and evidence-export helpers those tests exercise, and
-`chio-test-support` provides the `test_unwrap`/`test_expect` assertion
-helpers used throughout the unit tests.
+`chio-core`, `chio-credit`, `chio-web3`, and `chio-finding` provide signed
+artifacts, canonical serialization, economic continuity, and validation.
+`chio-open-market` supplies penalty evidence; `chio-federation` supplies verified
+FROST authority. `chio-web3-bindings` and Alloy encode official Solidity ABIs.
+`chio-egress-contract`, `reqwest`, and `tokio` support bounded RPC transport.
+`secp256k1`, hashes, base58, `secrecy`, and `zeroize` support signing/key handling
+and chain encodings. Serde provides strict artifact shapes.
 
-## Extension points
+## Verification
 
-`SettlementHook` (in `hook`) is the trait a kernel deployment implements to
-route finalized receipts into this crate's settlement pipeline;
-`chio-kernel`'s post-dispatch observer slot holds it as
-`Arc<dyn SettlementHook>`. `Eip3009NonceStore` (in `payments`) is the trait
-a deployment implements for durable replay-resistant nonce storage;
-`InMemoryEip3009NonceStore` is the process-local default.
+`cargo test -p chio-settle --lib` exercises configuration, retries, typed hook
+failures, amount conversion, payment bindings, finding authority, and channel
+state transitions. Channel regressions include replay substitutions, canonical
+crypto strings, exact terminal batches, and close/release authority changes.
+`cargo test -p chio-settle --test channel_schemas` checks schema/wire agreement;
+`--test x402_approval_binding` checks token and approval binding behavior.
+
+`tests/runtime_devnet.rs` and `tests/web3_e2e_qualification.rs` launch local
+Node/Ganache infrastructure and exercise escrow and recovery flows against the
+contract family. They return early when `contracts/node_modules/ethers`,
+`contracts/node_modules/ganache`, or working Node imports are unavailable.
+Confirm prerequisite execution separately when evaluating those test results.
+
+See the [README](README.md),
+[protocol trust-control contract](../../../spec/PROTOCOL.md#9-trust-control-contract),
+and [web3 artifact crate](../chio-web3/README.md).

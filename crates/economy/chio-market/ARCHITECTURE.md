@@ -1,102 +1,107 @@
 # chio-market architecture
 
-## Overview
+## Responsibility and boundary
 
-chio-market is a pure data crate in the economy layer: signed-artifact type definitions, schema
-constants, and fail-closed validators for liability insurance over metered tool access. It forbids
-unsafe code, performs no I/O, and holds no runtime state; every `validate()` operates on
-already-constructed, in-memory artifacts and the signatures embedded in their `SignedExportEnvelope`
-wrappers. Two independent paths reach a settled claim: a chain of cryptographically linked artifacts
-meant for audit and cross-party exchange, and a lightweight `insurance_flow` path for direct,
-in-process binding and claims against kernel-verified receipts.
+The crate owns liability-market artifacts and validation: providers,
+delegated pricing authority, quotes, placements, bound coverage, claims,
+disputes, adjudications, payout instructions, and settlement reconciliation.
+It also exposes `quote_and_bind`, `BoundPolicy::file_claim`, and verified
+parametric policy, evidence, trigger, and lifecycle types.
 
-## Module map
+Host services own provider discovery, authority configuration, durable state,
+receipt resolution, and value-moving execution. `ClaimSettlementSink` is the
+dispatch seam. A successful sink call supplies a settlement reference; the
+library has no rail client or settlement store.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Facade re-exports (`appraisal`, `credit`, `underwriting`, and `chio-core-types`' `capability`/`crypto`/`receipt`), the `LIABILITY_*_SCHEMA` / `MAX_LIABILITY_*_LIMIT` constants, and shared validation helpers (`validate_currency_code`, `validate_positive_money`, `verify_signed_artifact`, `bounded_market_query_limit`, `liability_claim_adjudication_payable_amount`). |
-| `src/provider.rs` | Curated provider registry: `LiabilityProviderReport`, `LiabilityProviderArtifact`, list and resolution query/report types. |
-| `src/quote.rs` | Provider policy reference, pricing authority envelope, quote request/response artifacts, and `LiabilityPricingAuthorityArtifact`. |
-| `src/placement.rs` | `LiabilityPlacementArtifact`, `LiabilityBoundCoverageArtifact`, `LiabilityAutoBindDecisionArtifact`. |
-| `src/claim.rs` | Claim package, provider response, dispute, and adjudication artifacts. |
-| `src/settlement.rs` | Claim payout instruction/receipt and settlement instruction/receipt artifacts, plus claim-workflow query/report types. |
-| `src/workflow.rs` | Market-workflow query/row/summary/report types. |
-| `src/insurance_flow.rs` | `quote_and_bind`, `BoundPolicy`, `ClaimEvidence` / `ClaimDecision`, the `PremiumSource` / `ReceiptEvidenceSource` / `ClaimSettlementSink` traits, `ClaimSettlementRequest`. |
-| `src/tests.rs` | `#[cfg(test)]` regression coverage for the artifact-chain validators. |
+## Structure
 
-## Claim and coverage lifecycle
+`provider.rs` defines jurisdiction, coverage-class, evidence, provenance,
+lifecycle, and support-boundary records. `quote.rs` contains requests,
+responses, quote terms, and pricing authority. `placement.rs` models placement,
+bound coverage, and auto-bind decisions. `workflow.rs` projects market rows.
 
-### Signed artifact chain
+`claim.rs` defines packages, provider responses, disputes, and adjudications.
+`settlement.rs` defines payout and settlement instructions, receipts, role
+topologies, reconciliation states, and workflow queries. `error.rs` separates
+market validation failures from caller-seam failures.
 
-Each type after the first embeds its predecessor in a `SignedExportEnvelope`; `validate()`
-re-verifies the embedded signature and recurses into the embedded artifact's own `validate()` before
-checking its own fields:
+`insurance_flow.rs` implements premium binding and receipt-backed claims.
+`parametric.rs` defines policies, predicates, schedules, identities, and
+verification contexts. Its `evidence`, `claim`, and `lifecycle` submodules
+handle authenticated corpora, contest/payout contracts, and economic-state
+projections.
 
-1. `LiabilityQuoteRequestArtifact` embeds a `chio-credit` risk package and references a provider by
-   copying `LiabilityProviderPolicyReference` fields (not signature-linked).
-2. `LiabilityQuoteResponseArtifact` embeds the request.
-3. `LiabilityPlacementArtifact` embeds a quoted (not declined) response.
-4. `LiabilityBoundCoverageArtifact` embeds the placement.
-5. `LiabilityClaimPackageArtifact` embeds the bound coverage plus a `chio-credit` exposure ledger,
-   bond, and loss lifecycle.
-6. `LiabilityClaimResponseArtifact`, `LiabilityClaimDisputeArtifact`, and
-   `LiabilityClaimAdjudicationArtifact` each embed the previous.
-7. `LiabilityClaimPayoutInstructionArtifact` embeds the adjudication plus a `chio-credit` capital
-   execution instruction.
-8. `LiabilityClaimPayoutReceiptArtifact`, `LiabilityClaimSettlementInstructionArtifact` (also embeds
-   a capital book), and `LiabilityClaimSettlementReceiptArtifact` each embed the previous.
+## Data and control flow
 
-`LiabilityPricingAuthorityArtifact` branches off the quote request (embeds the request plus a
-`chio-credit` facility, `chio-underwriting` decision, and capital book) for delegated auto-bind.
-`LiabilityAutoBindDecisionArtifact` embeds that authority and the quote response; when it auto-binds,
-it also embeds a placement and bound coverage, cross-validated for consistency with its own quote
-response.
+1. A host validates a provider record and selects jurisdiction, currency,
+   coverage, and authority appropriate to its request.
+2. Signed quote, placement, coverage, and claim artifacts preserve the
+   references required by later payout and reconciliation artifacts.
+3. `quote_and_bind` obtains `PremiumInputs` from the injected source and
+   calls governed fiscal premium pricing. A quoted result becomes an active
+   `BoundPolicy`; default coverage is 100 times the premium, saturating at
+   the monetary integer limit.
+4. `file_claim` validates the supplied claim and current policy, resolves
+   every supporting receipt, and verifies its returned signature.
+5. An approved amount is capped by coverage and sent to the settlement sink.
+   Resolver failures produce classified denial reasons; sink failures return
+   seam errors for the host to handle.
 
-### insurance_flow path
+The parametric path verifies a signed policy against coverage and configured
+parties, verifies a complete evidence corpus under a trusted source registry,
+then evaluates a guard-denial, drift-severity, or settlement-failure predicate.
+Its claim identity commits policy and coverage body digests, subject,
+predicate, window, and evidence range. A verified fired trigger can open a
+claim and feed `prepare_parametric_claim_opening` for economic-state updates.
 
-`quote_and_bind` calls a caller-supplied `PremiumSource` (typically backed by kernel compliance and
-behavioral signals), prices the premium via `chio_underwriting::price_premium`, and derives a
-`BoundPolicy` with a deterministic `policy_id` (canonical-JSON hash of the agent, scope, quote, and
-effective window) and a default coverage limit of 100x the quoted premium.
-`BoundPolicy::file_claim` re-verifies each `ClaimEvidence` receipt fingerprint through a
-caller-supplied `ReceiptEvidenceSource` against the kernel's signing key, denies on the first
-unresolved, digest-mismatched, or signature-invalid receipt, caps the payout at the coverage limit,
-and hands the result to a caller-supplied `ClaimSettlementSink` as a `ClaimSettlementRequest`. This
-path does not touch the signed-artifact chain above.
+## Trust and invariants
 
-## Invariants and failure modes
+Artifact `validate` methods enforce their own amount, currency, state, and
+nested-reference conditions. Schema and authority enforcement varies by
+entry point; hosts must validate original wire inputs and select trusted
+signers. Shared envelope validation checks embedded signatures. The consuming
+service must prove referenced state is current and authorized for its action.
 
-- Every artifact's `validate()` fails closed: malformed shape, unverifiable signatures, currency
-  mismatches, amounts exceeding their parent's bound, and stale or inverted time windows all reject
-  before the artifact is treated as valid.
-- Chain artifacts re-verify every embedded `SignedExportEnvelope` signature and recursively call the
-  embedded artifact's own `validate()`; a valid outer signature never shortcuts inner validation.
-- `insurance_flow` denies rather than errors on evidence problems (`ClaimDecision::Denied`) but
-  returns `Err(InsuranceFlowError::InvalidInput)` on malformed input before any settlement sink runs;
-  a rejected path never submits a settlement request.
-- `chio-market` takes no dependency on `chio-settle` (`chio-settle` -> `chio-core` -> `chio-autonomy`
-  -> `chio-market` would cycle). `ClaimSettlementRequest` is a field-for-field projection of
-  `chio_settle::SettlementCommitment` that callers copy across the boundary.
-- Currency codes are validated as three-letter uppercase ISO-style strings wherever an artifact
-  carries one.
-- List and workflow query limits clamp through `bounded_market_query_limit`: unset defaults to 50,
-  clamped into `[1, MAX_LIABILITY_*_LIMIT]` (100 for provider, market-workflow, and claim-workflow
-  queries).
+`LiabilityProviderSupportBoundary` defaults to curated registration with
+automatic trust admission, permissionless federation, and bound coverage
+disabled. `LiabilityProviderReport::validate` requires jurisdiction policies,
+coverage classes, currencies, positive quote TTLs, and unique normalized
+jurisdictions. Those fields express policy rather than proving insurer status.
+
+`file_claim` compares the resolver's declared digest to each fingerprint and
+verifies returned bytes with the resolver's returned signer key. It does not
+independently pin that key or recompute the digest from those bytes. The
+evidence source owns those checks and the receipt's relevance to the incident.
+This flow has no retained claim replay ledger; sinks must coordinate duplicate
+requests and durable settlement independently.
+
+`VerifiedParametricPolicy` checks configured policy and coverage signers and
+binds parties, funding, payout rail, and evaluator context. Its canonical
+loader caps the original input. Evidence verification uses source checkpoints
+and authenticated ranges. Payout arithmetic rejects currency/unit mismatch,
+overflow, and coverage excess.
+
+Parametric claim state includes versions and lifecycle fences. Opening
+projections use a verified economic-state view and transition-proof verifier.
+Preparing a batch does not durably commit it. The shared economic coordinator
+and host store own atomic retention and effect reservation.
 
 ## Dependencies
 
-Internal: `chio-core-types` supplies `MonetaryAmount`, `SignedExportEnvelope`, and the crypto and
-canonical-JSON primitives every artifact and `insurance_flow` type builds on; `chio-credit` supplies
-the risk package, facility, capital book, and capital execution types referenced throughout quote,
-placement, and settlement; `chio-underwriting` supplies `price_premium`, `PremiumQuote`, and the
-underwriting-decision types used by `LiabilityPricingAuthorityArtifact` and `insurance_flow`.
-`chio-appraisal` is re-exported as `appraisal` but is not otherwise referenced by this crate's own
-types. No dependency aliasing: all four are imported under their real crate names in `Cargo.toml`.
-External: `serde` for artifact (de)serialization, `thiserror` for `InsuranceFlowError`.
+`chio-underwriting` prices premiums; `chio-fiscal` authorizes governed pricing.
+`chio-credit` supplies capital and execution contracts. `chio-appraisal`
+supplies risk-package types. `chio-core-types` supplies keys, envelopes,
+canonical JSON, receipts, Merkle proofs, and economic-continuity primitives.
+`serde`, `serde_json`, and `thiserror` support wire forms and errors.
 
-## Extension points
+## Verification
 
-`insurance_flow` defines three traits for callers to implement: `PremiumSource` (risk inputs for
-pricing a premium), `ReceiptEvidenceSource` (resolve a claim's receipt fingerprints back to
-kernel-signed evidence), and `ClaimSettlementSink` (submit an approved `ClaimSettlementRequest`,
-typically bridging into `chio_settle::SettlementCommitment`).
+`src/tests.rs` covers provider, quote, placement, claims, settlement, and
+parametric contracts. `tests/insurance_flow.rs` uses fiscal fixtures, in-memory
+receipt sources, and capturing settlement sinks to test binding and claims.
+Parametric input tests exercise duplicate/canonical-input rejection, while
+replay tests cover retained opening projections and semantic or batch drift.
+
+Run `cargo test -p chio-market`. The local fixture and seam tests exercise
+library decisions; they do not establish a live insurer relationship,
+durable duplicate-effect handling, or external payout finality.

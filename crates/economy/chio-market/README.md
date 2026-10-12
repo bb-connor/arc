@@ -1,70 +1,68 @@
 # chio-market
 
-chio-market defines Chio's liability-insurance contracts: a chain of signed artifacts running from
-provider registration through quote, placement, bound coverage, claims, and settlement, plus a
-lightweight `insurance_flow` for binding a policy and filing a claim without the full artifact
-chain. It builds on `chio-credit` (risk, facility, and capital types) and `chio-underwriting`
-(premium pricing); `chio-core` and `chio-autonomy` re-export it as `market`, extending its types
-into `chio-kernel`. The crate forbids unsafe code and performs no I/O.
-
-## Responsibilities
-
-- Define the liability-market artifact chain: provider registry, quote request/response, delegated
-  pricing authority, placement, bound coverage, claim package through adjudication, and payout and
-  settlement instructions/receipts, each a `SignedExportEnvelope<T>` with a fail-closed `validate()`.
-- Provide `LiabilityMarketWorkflowReport` and `LiabilityClaimWorkflowReport` query/row/summary types
-  for listing rows through the chain.
-- Provide `insurance_flow`: `quote_and_bind` prices and binds a `BoundPolicy` from a `PremiumSource`;
-  `BoundPolicy::file_claim` verifies a claim's receipt fingerprints against kernel-signed evidence
-  and hands an approved claim to a `ClaimSettlementSink` as a `ClaimSettlementRequest`.
-- Re-export `chio-appraisal`, `chio-credit`, `chio-underwriting` (as `appraisal`, `credit`,
-  `underwriting`) and `chio-core-types`' `capability`, `crypto`, `receipt` modules.
-
-## Public API
-
-All types below are re-exported flat at the crate root (`chio_market::TypeName`); the left column is
-the source file, not an import path. `insurance_flow` is also a public module.
-
-| Source | Key types |
-|---|---|
-| `provider.rs` | `LiabilityProviderReport`, `LiabilityProviderArtifact` / `SignedLiabilityProvider`, `LiabilityProviderListQuery` / `LiabilityProviderListReport`, `LiabilityProviderResolutionQuery` / `LiabilityProviderResolutionReport` |
-| `quote.rs` | `LiabilityProviderPolicyReference`, `LiabilityQuoteRequestArtifact`, `LiabilityQuoteResponseArtifact`, `LiabilityPricingAuthorityArtifact` |
-| `placement.rs` | `LiabilityPlacementArtifact`, `LiabilityBoundCoverageArtifact`, `LiabilityAutoBindDecisionArtifact` |
-| `claim.rs` | `LiabilityClaimPackageArtifact`, `LiabilityClaimResponseArtifact`, `LiabilityClaimDisputeArtifact`, `LiabilityClaimAdjudicationArtifact` |
-| `settlement.rs` | `LiabilityClaimPayoutInstructionArtifact`, `LiabilityClaimPayoutReceiptArtifact`, `LiabilityClaimSettlementInstructionArtifact`, `LiabilityClaimSettlementReceiptArtifact`, `LiabilityClaimWorkflowQuery` / `LiabilityClaimWorkflowReport` |
-| `workflow.rs` | `LiabilityMarketWorkflowQuery`, `LiabilityMarketWorkflowReport` |
-| `insurance_flow` | `quote_and_bind`, `BoundPolicy`, `ClaimEvidence`, `ClaimDecision`, `ClaimSettlementRequest`, traits `PremiumSource`, `ReceiptEvidenceSource`, `ClaimSettlementSink` |
-
-Each `Liability*Artifact` chain type also has a `Signed<Name>` alias (`SignedExportEnvelope<T>`) and
-a `.validate()` method. `LIABILITY_*_SCHEMA` constants pin each artifact's wire `schema` field;
-`MAX_LIABILITY_{PROVIDER_LIST,MARKET_WORKFLOW,CLAIM_WORKFLOW}_LIMIT` (all 100) bound query limits.
+`chio-market` defines Chio liability-provider, quote, placement, claim, payout,
+and settlement contracts. Its insurance flow consumes governed premium inputs
+and receipt evidence through caller-provided seams. Its parametric module
+verifies policies and evidence corpora, evaluates triggers, and prepares claim
+lifecycle transitions for shared economic state.
 
 ## Usage
 
-```rust
-use chio_market::{quote_and_bind, StaticPremiumSource};
-use chio_underwriting::{LookbackWindow, PremiumInputs};
+Evaluate a linear parametric payout using a count-valued trigger magnitude.
+The arithmetic helper checks currency, magnitude units, overflow, and coverage.
+Policy and evidence authentication precede this step in the full claim flow.
 
-let source = StaticPremiumSource::new(PremiumInputs::new(Some(950), None, 1_000, "USD"));
-let window = LookbackWindow::new(1_000_000, 1_000_600)?;
-let policy = quote_and_bind("agent-1", "tool:exec", window, &source, 1_000_600, 30 * 86_400)?;
+```rust
+use chio_market::{PayoutSchedule, TriggerMagnitude, TriggerMagnitudeUnit,
+                  TriggerPredicate};
+use chio_market::capability::scope::MonetaryAmount;
+
+let predicate = TriggerPredicate::SettlementFailureCount { min_failures: 1 };
+predicate.validate()?;
+let schedule = PayoutSchedule::Linear {
+    base: MonetaryAmount { units: 100, currency: "USD".into() },
+    per_unit_minor: 50,
+    magnitude_unit: TriggerMagnitudeUnit::Count,
+};
+let coverage = MonetaryAmount { units: 1_000, currency: "USD".into() };
+let payout = schedule.evaluate(
+    &predicate, &TriggerMagnitude::Count { value: 3 }, &coverage,
+)?;
+assert_eq!(payout.units, 250);
+assert_eq!(payout.currency, "USD");
+# Ok::<(), chio_market::ParametricContractError>(())
 ```
 
-`BoundPolicy::file_claim` then verifies a `ClaimEvidence` payload's receipt fingerprints through a
-caller-supplied `ReceiptEvidenceSource` and, on approval, submits a `ClaimSettlementRequest` to a
-caller-supplied `ClaimSettlementSink`.
+For premium binding, call `quote_and_bind` with a `PremiumSource` and a
+`chio_fiscal::FiscalResolver`. For receipt-backed claims, `BoundPolicy::file_claim`
+uses a `ReceiptEvidenceSource` and a `ClaimSettlementSink` supplied by the host.
 
-## Testing
+## Guarantees
 
-`cargo test -p chio-market`
+- `quote_and_bind` rejects missing identity/scope, zero duration, unavailable
+  premium inputs, fiscal pricing refusal, and expiry arithmetic overflow.
+- `BoundPolicy::file_claim` checks policy liveness and currency, requires
+  receipt fingerprints, compares resolved digests, verifies signatures using
+  resolved signer keys, and caps payout at coverage. The evidence source must
+  supply trusted keys and correct digest-to-byte bindings.
+- `VerifiedParametricPolicy::verify` checks the configured signer, signed
+  coverage, and policy/context bindings. Its canonical-byte loader bounds and
+  validates the wire input before verification.
+- `PayoutSchedule::evaluate` rejects incompatible units, currencies,
+  arithmetic overflow, zero payouts, and amounts above coverage.
 
-## See also
+## Status
 
-- `chio-credit` - supplies the risk package, facility, capital book, and capital execution types
-  embedded throughout the quote, placement, and settlement chain.
-- `chio-underwriting` - supplies `price_premium` and the underwriting-decision types used by
-  `LiabilityPricingAuthorityArtifact` and `insurance_flow`.
-- `chio-core`, `chio-autonomy` - re-export this crate as `market`; `chio-kernel` reaches these types
-  through `chio_core::market`.
-- `chio-settle` - not a dependency of this crate (would create a cycle); `ClaimSettlementRequest` is
-  a field-compatible projection of its `SettlementCommitment` that callers copy across.
+The library implements contract validation and caller-driven insurance and
+parametric flows. Provider support flags default to a curated registry with
+automatic trust admission, permissionless federation, and bound-coverage
+support disabled. A service must configure the supported provider path.
+Persistence, settlement dispatch, and duplicate-effect coordination live in
+the host. The Cargo package is marked `publish = false`.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Commerce evidence and authority](../../../spec/PROTOCOL.md#644-commerce-order-and-settlement-family)
+- [Underwriting](../chio-underwriting/README.md)
+- [License](../../../LICENSE)

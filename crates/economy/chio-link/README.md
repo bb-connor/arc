@@ -1,82 +1,75 @@
 # chio-link
 
-Oracle runtime for Chio cross-currency budget enforcement. It resolves
-exchange rates from Chainlink and Pyth behind a pluggable backend, cross-checks
-and caches them, checks L2 sequencer uptime, and converts amounts between
-currencies for budget decisions. `chio-kernel` embeds it via the `PriceOracle`
-trait; `chio-metering` enforces budgets against the units it converts.
+`chio-link` resolves exchange rates for cross-currency budget decisions.
+`ChioLinkOracle` reads Chainlink or Pyth behind `OracleBackend`, maintains an
+in-memory cache, applies operator and sequencer controls, and exports rate
+observations. Conversion helpers turn rates into minor-unit costs.
 
-## Responsibilities
+## Usage
 
-- Read prices from Chainlink (`AggregatorV3Interface.latestRoundData`,
-  on-chain via `alloy`, feature `web3`) and Pyth (Hermes REST
-  `latest_price_feeds`) behind a common `OracleBackend` trait.
-- Enforce a typed `HttpEgressContract` on every RPC/HTTP dispatch (Chainlink
-  JSON-RPC, Pyth Hermes, sequencer uptime reads) so oracle calls cannot reach
-  arbitrary hosts.
-- Cache the latest rate per pair and, when `PairPolicy::twap_enabled`,
-  average a rolling observation window into a TWAP.
-- Cross-check primary against fallback backend reads with a basis-point
-  circuit breaker and fail closed on divergence beyond
-  `divergence_threshold_bps`.
-- Check L2 sequencer uptime before trusting a chain's feed; fail closed while
-  the sequencer is down or inside its post-recovery grace period.
-- Apply operator runtime controls: global pause, per-chain enable/disable,
-  and per-pair overrides (forced backend, fallback allowance, divergence
-  threshold, degraded mode).
-- Convert amounts between currencies at fixed minor-unit scales with
-  basis-point margin and ceiling rounding (`convert::convert_units`).
-- Build a runtime health report (`OracleRuntimeReport`) with per-chain and
-  per-pair status and alerts.
-- Produce `OracleConversionEvidence` under the `chio_link_runtime_v1`
-  authority for auditable conversions. The evidence is unsigned when it
-  leaves this crate (`oracle_public_key`/`signature` are `None`); signing
-  happens downstream.
+Convert a caller-supplied observation without network access:
 
-## Public API
+```rust
+use chio_link::{convert::convert_supported_units, ExchangeRate};
 
-- `ChioLinkOracle` - the oracle runtime; implements `PriceOracle`. Construct
-  with `new` (builds backends from `PriceOracleConfig`) or
-  `new_with_backends` (inject backends directly). Exposes `cached_rate`,
-  `refresh_pair`, `runtime_report`, `operator_config`, `set_global_pause`,
-  `set_chain_enabled`, `set_pair_override`.
-- `PriceOracle` - `get_rate`, `supported_pairs`; the trait consumers program
-  against.
-- `OracleBackend` - `kind`, `read_rate`; implemented by
-  `chainlink::ChainlinkFeedReader` (feature `web3`) and
-  `pyth::PythHermesClient`.
-- `ExchangeRate` - a resolved rate plus `ensure_fresh`, `ensure_matches_pair`,
-  `age_seconds`, `with_degraded_mode`, `to_conversion_evidence`.
-- `PriceOracleError` - the fail-closed error surface (`Stale`,
-  `CircuitBreakerTripped`, `OperatorPaused`, `ChainDisabled`,
-  `SequencerDown`/`SequencerRecovering`, `InvalidFeed`,
-  `ArithmeticOverflow`, ...).
-- `config` - `PriceOracleConfig`, `OperatorConfig`, `PairConfig`,
-  `PairPolicy`, `PairRuntimeOverride`, `ChainlinkNetworkConfig`,
-  `build_default_egress_contract`.
-- `convert` - `convert_units`, `convert_supported_units`,
-  `minor_units_for_currency`.
-- `monitor` - `OracleRuntimeReport`, `ChainHealthReport`, `PairHealthReport`,
-  `OracleAlert`.
-- `control::ChioLinkControlState` - operator-action audit trail (global
-  pause, chain enable, pair override) with before/after snapshots. Nothing in
-  this crate writes to it automatically; callers record changes through it.
+fn main() -> Result<(), chio_link::PriceOracleError> {
+    let rate = ExchangeRate {
+        base: "ETH".into(), quote: "USD".into(),
+        rate_numerator: 300_000, rate_denominator: 100,
+        updated_at: 1_000, fetched_at: 1_010,
+        source: "example".into(), feed_reference: "offline-observation".into(),
+        max_age_seconds: 60, conversion_margin_bps: 200,
+        confidence_numerator: None, confidence_denominator: None,
+    };
+    rate.ensure_fresh(1_020)?;
+    let cost = convert_supported_units(
+        1_000_000_000_000_000, &rate, rate.conversion_margin_bps,
+    )?;
+    assert_eq!(cost, 306);
+    let evidence = rate.to_conversion_evidence(
+        1_000_000_000_000_000, "ETH", "USD", cost, 1_020,
+    )?;
+    assert!(evidence.signature.is_none());
+    Ok(())
+}
+```
 
-## Feature flags
+This converts 0.001 ETH at 3,000 USD/ETH with a 2% margin into 306 USD cents.
+The conversion helper checks arithmetic and scales; freshness is checked
+separately. The example observation has no external authenticity claim.
 
-| Flag | Effect |
-|------|--------|
-| `web3` (default) | Enables the on-chain `ChainlinkFeedReader` and L2 sequencer-uptime reads via `alloy-*`. Disabling it swaps in `chainlink_disabled`/`sequencer_disabled` stubs that return `PriceOracleError::UnsupportedBackend`; `ChioLinkOracle::new` fails if `primary`/`fallback` selects `Chainlink` without the feature. |
+## Features
 
-## Testing
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `default` | Yes | Enables `web3`. |
+| `web3` | Yes | Enables Alloy Chainlink RPC and sequencer reads. Pyth, cache, conversion, and runtime types remain available when disabled; Chainlink requests return `UnsupportedBackend`. |
 
-`cargo test -p chio-link` covers the default (`web3`-enabled) build.
-`cargo test -p chio-link --no-default-features` exercises the disabled-stub
-paths.
+## Guarantees
 
-## See also
+`ChioLinkOracle` enforces configured pause, chain, and sequencer controls before
+cache or backend resolution. Backend responses must match the configured pair
+and pass `ExchangeRate::ensure_fresh`. When both source reads succeed, the
+circuit breaker rejects excessive divergence. Secondary-source failure permits
+an otherwise valid primary result.
 
-- `chio-kernel` - embeds `ChioLinkOracle` and calls `convert_supported_units` during request evaluation.
-- `chio-metering` - enforces budgets against the units this crate converts.
-- `chio-control-plane` - drives `ChioLinkOracle` and records operator actions through `control::ChioLinkControlState`.
-- `chio-egress-contract` - supplies the `HttpEgressContract` this crate enforces on every dispatch.
+`convert_units` uses checked `u128` arithmetic and ceiling rounding for costs
+and margins. `to_conversion_evidence` checks freshness and integer width but
+accepts the supplied cost/currency fields; downstream validators bind those
+fields. It emits unsigned evidence with the Chio link authority label.
+
+## Status
+
+Chainlink and Hermes HTTP adapters, injected backends, runtime reports, and
+operator overrides are implemented. Cache and overrides live in process memory.
+Network adapters enforce `HttpEgressContract`; callers own feed trust and
+reconciliation with authoritative charging. Pyth parses Hermes observations
+without verifying a Pyth signed update in this crate.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol trust-control contract](../../../spec/PROTOCOL.md#9-trust-control-contract)
+- [Web3 evidence validators](../chio-web3/README.md)
+- [Egress contract](../../protocol/chio-egress-contract/README.md)
+- [License](../../../LICENSE)

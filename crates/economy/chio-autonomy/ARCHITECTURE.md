@@ -1,99 +1,116 @@
 # chio-autonomy architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-autonomy` is a pure protocol crate: in-memory artifact types and
-fail-closed validators, no I/O, no runtime state, `#![forbid(unsafe_code)]`.
-It sits in the economy layer of the dependency graph, drawing field types
-from the market and web3 domain crates below it and re-exported by
-`chio-core` (as `autonomy`) above it. The design idea is bounded,
-evidence-referential automation: every autonomous pricing or execution
-artifact embeds or cites by id the prior signed Chio truth that justifies
-it, and validation enforces that the artifact never asserts more authority
-than its authority envelope grants.
+The public surface contains ten artifact/report families and their
+`validate_*` functions, supporting enums and structs, schema constants,
+`AutonomyContractError`, and signed-envelope aliases for nine families.
+`AutonomousQualificationMatrix` is an unsigned model with a validator.
+The crate re-exports `capability`, `receipt`, `market`, and `web3` for field types.
 
-## Module map
+The library owns artifact shape and local consistency rules. Applications own
+pricing models, evidence resolution, signature verification, live authority
+accounting, capital mutation, settlement dispatch, and rollback execution.
+An execution record describes supplied state; validation does not observe the
+external action. The crate contains no storage or transport implementation.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Public API root. Re-exports `capability`/`receipt` (`chio-core-types`), `market` (`chio-market`), `web3` (`chio-web3`), and declares `error`, `model`, `validation`. |
-| `src/model.rs` | Schema-id constants, enums, and the wire-artifact structs for all ten autonomy contracts, plus their `Signed<Name>` envelope aliases. |
-| `src/validation.rs` | One fail-closed validator per artifact, plus shared helpers (`ensure_non_empty`, `ensure_unique_strings`, `ensure_unique_copy_values`, `validate_currency_code`, `money_currency_matches_declared`, `validate_positive_money`). |
-| `src/error.rs` | `AutonomyContractError`, the closed validation-error enum. |
-| `src/tests.rs` (`cfg(test)`) | Fixture builders and validator regression tests, excluded from the public build. |
+## Structure
 
-## Artifact lineage
+- `model.rs` defines pricing input, authority envelope, decision, capital
+  optimization/simulation, execution, rollback, comparison, drift, and
+  qualification types. Serde models reject unknown fields and encode enums
+  using snake case.
+- `validation.rs` implements the ten public validators and shared checks for
+  money, identifiers, unique lists, model provenance, and rollback references.
+- `error.rs` provides typed errors for schema, missing/duplicate fields,
+  reference requirements, and envelope/decision/optimization/execution/drift
+  or qualification inconsistencies.
+- `lib.rs` selects exports; `src/tests.rs` contains fixtures and regressions,
+  and `tests/integration_smoke.rs` checks public construction and defaults.
 
-The autonomy contracts form a reference chain, not a runtime pipeline (the
-crate does not execute or resolve anything itself):
+## Data and control flow
 
-1. `AutonomousPricingInputArtifact` cites upstream evidence by
-   `AutonomousEvidenceReference` / `AutonomousEvidenceKind`.
-2. `AutonomousPricingDecisionArtifact` embeds its
-   `AutonomousPricingInputArtifact` and
-   `AutonomousPricingAuthorityEnvelopeArtifact` in full; validating the
-   decision validates both nested artifacts.
-3. `CapitalPoolOptimizationArtifact` and `AutonomousExecutionDecisionArtifact`
-   instead cite the decision and each other by opaque `..._ref: String` id
-   (`pricing_decision_ref`, `optimization_ref`, `authority_envelope_ref`,
-   `rollback_plan_ref`, and similar); this crate does not resolve those ids.
-4. `CapitalPoolSimulationReport` and `AutonomousDriftReport` embed their
-   nested artifacts (baseline/candidate optimizations; rollback plan and
-   comparison report) and validate them inline.
+Pricing input records subject/provider/currency, requested coverage, reputation,
+loss/capital units, runtime assurance, and evidence references. Its validator
+requires underwriting decision, exposure ledger, credit scorecard, and capital
+book evidence kinds. Loss units require loss-lifecycle evidence; a populated
+settlement state requires web3 settlement evidence. These checks inspect kind
+and id presence, leaving retrieval and authentication to the caller.
 
-Consumers hold the receipt store or evidence index that resolves the
-id-only references.
+The authority envelope declares automation mode, permitted actions, money
+ceilings, rate/count limits, validity interval, and review thresholds. Decision
+validation first checks nested input/envelope and model provenance, then matches
+subject/provider/currency, bounds suggested money, and checks explanation and
+review state. Only bind dispositions explicitly check the `Bind` permission.
+Shadow mode requires `ShadowOnly`; auto-approved decisions cannot exceed a
+configured premium-review threshold.
 
-## Invariants and failure modes
+Optimization validation checks facility references, reserve/utilization bounds,
+positive capacity, and same-currency recommendations. Capacity shifts require a
+destination reference. Simulation validates both embedded optimizations and
+requires matching subject/currency, distinct ids, comparison support, deltas,
+and an operator action. Delta values are supplied observations; no optimization
+engine computes or verifies their economic effect here.
 
-- Every validator checks schema id, then required/non-empty fields, then
-  duplicate identifiers, before any cross-field rule.
-- Currency matching is exact string equality
-  (`money_currency_matches_declared`): a padded or lowercase currency code
-  fails validation rather than being normalized.
-- An authority envelope permits `Bind` only when `automation_mode ==
-  Active`; `RegulatedRole` and `DelegatedMarketAuthority` kinds each require
-  their own reference field; `not_before` must precede `not_after`; a
-  premium review threshold cannot exceed `max_premium_amount`.
-- A pricing decision's suggested coverage/premium must stay inside the
-  authority envelope's ceilings and share its subject/provider/currency.
-  `review_state: ShadowOnly` and `automation_mode: Shadow` require each
-  other. `disposition: BindWithinEnvelope` additionally requires bind
-  permission, `live_bind_supported`, and (when the envelope requires it)
-  that the decision is not auto-approved.
-- A capital-pool simulation's baseline and candidate optimizations must
-  share `subject_key` and `currency`, carry distinct `optimization_id`s, and
-  both have `scenario_comparison_supported`. A `ShiftCapacity`
-  recommendation requires `destination_ref`.
-- `AutonomousExecutionDecisionArtifact` requires every safety gate to pass
-  before `lifecycle_state: Executed`, at least one to fail before `Blocked`,
-  and action-specific references (`Bind` requires `quote_response_ref`,
-  `auto_bind_decision_ref`, `bound_coverage_ref`, and
-  `settlement_dispatch_ref` once executed; `Reprice`/`Renew`/`Decline`
-  forbid the bind and settlement references).
-- A `Critical` drift signal requires `fail_safe_engaged` on the report and a
-  matching entry in the paired rollback plan's `triggers`. Rollback plan
-  `triggers` and `actions` must each be non-empty and duplicate-free.
-- A qualification matrix requires at least one case; each case needs a
-  unique `id` and at least one `requirement_ids` entry.
-- Support-boundary defaults diverge by risk: `AutonomousPricingSupportBoundary::default()`
-  sets all four requirement/support flags `true` (an unset boundary assumes
-  the strictest posture). `CapitalPoolOptimizationSupportBoundary::default()`
-  is shadow-safe instead: `live_mutation_supported` and
-  `cross_currency_optimization_supported` default `false`, while
-  `web3_reconciliation_required` and `operator_override_required` default
-  `true`.
+Execution validation checks reference presence, unique safety gate names,
+rollback/contact references, and action-specific quote/bind/settlement fields.
+`Executed` requires all gates passed; `Blocked` requires a failed gate.
+Executed binds require a settlement dispatch reference. Drift validation checks
+nested rollback/comparison artifacts and requires every critical signal kind
+to appear in rollback triggers with `fail_safe_engaged` set.
+
+## Trust and invariants
+
+Each public validator checks its exact schema string. Monetary values checked
+by these validators must be positive and use a three-letter uppercase currency;
+comparisons use exact currency strings. Basis-point fields have the bounds
+specified by their owning validator. Required string helpers reject blank
+values; unique string lists also reject padding and duplicates.
+
+`SignedAutonomous*` and `SignedCapitalPool*` are aliases for
+`SignedExportEnvelope<T>`. The validators consume artifact bodies and do not
+verify envelope signatures, perform canonical ingress decoding, or authenticate
+referenced ids. Callers must apply the protocol's canonical signing and trusted
+key verification at their own ingress boundary.
+
+An authority interval is checked for ordering, but decision validation does not
+compare it against current time. Daily decision and rate-change limits are
+modeled fields; the validator checks their configured ranges without enforcing
+runtime usage counters or historical rate differences. Support flags describe
+supplied scope; only the specific flags consulted by a validator constrain it.
+
+Rollback validation requires nonempty, unique triggers/actions and identifiers.
+It does not enforce `requires_operator_ack` or execute the selected safe state.
+Drift validation trusts the supplied severity and engaged flag; it does not
+compare observed metrics with thresholds to infer severity. Qualification
+validation checks case shape and uniqueness without requiring expected and
+observed outcomes to agree. Preserve these distinctions in operator reports.
 
 ## Dependencies
 
-Internal: `chio-core-types` supplies `capability` (`MonetaryAmount`,
-`RuntimeAssuranceTier`) and `receipt::lineage::SignedExportEnvelope`,
-re-exported here as `capability` and `receipt`. `chio-market` supplies
-`LiabilityCoverageClass`, re-exported as `market`. `chio-web3` supplies
-`Web3SettlementLifecycleState`, re-exported as `web3`. No dependency is
-aliased under a different package name. External: `serde`/`serde_json` for
-artifact (de)serialization, `thiserror` for `AutonomyContractError`.
+`chio-core-types` supplies `MonetaryAmount`, runtime assurance tiers, and
+`SignedExportEnvelope`. `chio-market` supplies `LiabilityCoverageClass`;
+`chio-web3` supplies `Web3SettlementLifecycleState`. Serde implements artifact
+serialization and deserialization; `thiserror` formats the closed error enum.
+`serde_json` supports reference-fixture parsing in tests. The manifest declares
+no feature flags, optional dependencies, or benchmark targets.
 
-Only `chio-core` depends on this crate (re-exported as `autonomy`).
-`chio-market` and `chio-web3` do not depend back on it, avoiding a cycle
-through `chio-core`.
+## Verification
+
+Run `cargo test -p chio-autonomy` for the unit and integration tests.
+`reference_artifacts_parse_and_validate` loads the reference authority,
+decision, optimization, simulation, execution, comparison, drift, and
+qualification JSON documents from `docs/standards` and applies the validators.
+Regressions reject missing required evidence, padded money currency, duplicate
+explanations/triggers, invalid shadow and human-review states, mismatched
+simulation subjects, missing executed-bind dispatch, and unengaged critical drift.
+
+The public smoke tests construct evidence references and check the pricing
+support defaults: delegated authority, live bind, reserve optimization, and
+operator override are all enabled. Capital optimization defaults keep live
+mutation and cross-currency optimization disabled. These defaults are artifact
+metadata; runtime enforcement is owned by the integrating application.
+
+See the [README](README.md),
+[autonomous pricing profile](../../../docs/standards/CHIO_AUTONOMOUS_PRICING_PROFILE.md),
+and [protocol serialization contract](../../../spec/PROTOCOL.md#41-canonical-json).

@@ -1,60 +1,76 @@
 # chio-open-market
 
-`chio-open-market` defines Chio's open capability marketplace: the bid/ask/accept
-protocol that mints scoped capability tokens against published listings, and the
-fee-schedule and penalty state machines (bond holds, slashes, reverse slashes)
-that back it. It builds on `chio-listing` for listings and pricing hints and
-`chio-governance` for the charters and cases that authorize penalties.
+`chio-open-market` implements Chio capability bid/ask/accept contracts,
+fee and governance penalty checks, and finding-market admission, purchase,
+audit, slash allocation, and recovery verification. It combines signed
+listings with explicit authority and caller-supplied state. The host owns
+reservations, durable activation, settlement, and runtime admission.
 
-## Responsibilities
+## Usage
 
-- Run the bid/ask/accept flow (`bidding`): validate a signed bid, apply
-  fail-closed checks against the resolved listing and pricing hint, mint a
-  scoped `CapabilityToken`, and record settlement acceptance against a
-  verified funds reservation.
-- Define open-market economics (`fee_schedule`): economics scopes, bond
-  requirements, and signed fee schedules.
-- Define the penalty state machine (`penalty`): abuse classes, penalty
-  actions and states, signed penalty artifacts, and reverse-slash
-  supersession.
-- Evaluate penalties (`evaluation`): verify governance, activation, and
-  fee-schedule evidence and derive the effective state, downgrading failures
-  to a structured finding instead of an `Err`.
-- Carry the evidence references and finding codes evaluation reports use
-  (`evidence`).
+Authenticate a reservation statement under a selected reservation authority.
+This local example creates its own statement; a deployed buyer obtains one
+from its trusted funds-reservation service before calling `accept`.
 
-## Public API
+```rust
+use chio_open_market::{
+    bidding::{ReservationReceipt, SignedReservationReceipt,
+              VerifiedReservationReceipt, RESERVATION_RECEIPT_SCHEMA},
+    capability::scope::MonetaryAmount,
+    crypto::Keypair,
+};
 
-- `bidding::{bid, accept}` - the two entry points of the bid/ask/accept flow,
-  plus `BidRequest`, `RequestedScope`, `BidMintContext`, `AskResponse`,
-  `AcceptedBid`, `ReservationReceipt`, `VerifiedReservationReceipt`, and
-  `BiddingError`. Signed envelopes: `SignedBidRequest`, `SignedAskResponse`,
-  `SignedAcceptedBid`, `SignedReservationReceipt`.
-- `fee_schedule::{build_open_market_fee_schedule_artifact,
-  OpenMarketFeeScheduleArtifact, OpenMarketFeeScheduleIssueRequest,
-  OpenMarketEconomicsScope, OpenMarketBondRequirement, OpenMarketBondClass,
-  OpenMarketCollateralReferenceKind}` and `SignedOpenMarketFeeSchedule`.
-- `penalty::{build_open_market_penalty_artifact,
-  build_open_market_penalty_artifact_with_trusted_signers,
-  OpenMarketPenaltyArtifact, OpenMarketPenaltyIssueRequest,
-  OpenMarketAbuseClass, OpenMarketPenaltyAction, OpenMarketPenaltyState}` and
-  `SignedOpenMarketPenalty`.
-- `evaluation::{evaluate_open_market_penalty,
-  evaluate_open_market_penalty_with_trusted_signers,
-  OpenMarketPenaltyEvaluationRequest, OpenMarketPenaltyEvaluation}`.
-- `evidence::{OpenMarketEvidenceReference, OpenMarketEvidenceKind,
-  OpenMarketFinding, OpenMarketFindingCode}`.
-- Re-exported: `canonical_json_bytes`, `capability`, `crypto`, `receipt`
-  (from `chio-core-types`), `governance` (`chio-governance`), `listing`
-  (`chio-listing`).
+let authority = Keypair::from_seed(&[7; 32]);
+let signed = SignedReservationReceipt::sign(ReservationReceipt {
+    schema: RESERVATION_RECEIPT_SCHEMA.into(),
+    receipt_id: "reservation/example".into(),
+    agent_id: "agent/example".into(),
+    listing_id: "listing/example".into(),
+    ask_digest: "a".repeat(64),
+    reserved_amount: MonetaryAmount { units: 100, currency: "USD".into() },
+}, &authority)?;
+let verified = VerifiedReservationReceipt::from_signed(
+    &signed, &authority.public_key(),
+)?;
+assert_eq!(verified.receipt_id(), "reservation/example");
+assert_eq!(verified.reserved_amount().units, 100);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-## Testing
+## Features
 
-`cargo test -p chio-open-market`
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `kani` | Off | Empty marker for proof invocations. The harness module compiles only under the `cfg(kani)` supplied by cargo-kani; normal builds add no runtime behavior. |
 
-## See also
+There is no declared `default` feature set.
 
-- `chio-listing` - listings and pricing hints that bids resolve against.
-- `chio-governance` - charters and cases that authorize penalties.
-- `chio-core-types` - capability tokens, signing, and the signed-envelope
-  type every artifact in this crate uses.
+## Guarantees
+
+- `bid` checks bid/listing/pricing signatures, owner and provider bindings,
+  active and fresh listing state, price/currency, scope, and bounded arithmetic
+  before signing a capability offer.
+- `accept` requires a verified reservation, buyer subject equality, signed
+  ask/token consistency, a live acceptance window, and sufficient currency-matched
+  funds for the offered total liability.
+- `verify_finding_admission` checks a pinned venue, exact constituent envelope
+  digests, current allocation state, backing size, fee authority, penalty
+  posture, and expiry bounds before producing a private-construction witness.
+- `evaluate_open_market_penalty_with_trusted_signers` evaluates signed
+  governance and economics inputs under the supplied governing keys.
+
+## Status
+
+The crate implements pure checks, capability offers, and signed market
+records. Admission and recovery verifiers rely on trusted snapshots and
+authority inputs supplied by the host. They have no persistent allocation
+ledger, reservation ledger, status resolver, or settlement dispatcher.
+The Cargo package is marked `publish = false`.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Finding market envelopes](../../../spec/PROTOCOL.md#6471-market-envelope-discipline)
+- [Listing discovery](../chio-listing/README.md)
+- [Finding artifacts](../chio-finding/README.md)
+- [License](../../../LICENSE)

@@ -1,81 +1,13 @@
 # chio-appraisal
 
-Runtime attestation appraisal artifacts and deterministic marketplace pricing
-for the Chio protocol. It turns vendor-specific runtime attestation evidence
-into a portable, signed appraisal artifact, evaluates imported signed
-appraisal results against local trust policy without ever widening it, and
-prices marketplace guard invocations from a manifest base price and a
-tenant's reputation tier.
-
-The crate is pure data, validation, and cryptography: no I/O, no runtime
-state, `#![forbid(unsafe_code)]`. `chio-core` re-exports it as
-`chio_core::appraisal`; `chio-kernel`, `chio-underwriting`, `chio-credit`, and
-`chio-market` build on its types.
-
-## Responsibilities
-
-- Derive a portable `RuntimeAttestationAppraisal` from vendor-specific
-  evidence (Azure MAA, AWS Nitro, Google Confidential VM, enterprise
-  verifiers) and verify it into a `VerifiedRuntimeAttestationRecord` against
-  an optional local `AttestationTrustPolicy`.
-- Evaluate an imported, signed `RuntimeAttestationAppraisalResult` against
-  local import policy, producing a fail-closed `Allow` / `Attenuate` /
-  `Reject` disposition.
-- Publish static catalogs: the supported-verifier-family artifact inventory,
-  the normalized-claim vocabulary, and the appraisal reason-code taxonomy.
-- Build, validate, and verify signed export envelopes for verifier
-  descriptors, reference-value sets, and trust bundles.
-- Compute deterministic per-invocation marketplace prices from a guard
-  manifest base price and a tenant reputation tier.
-
-## Public API
-
-Appraisal (`appraisal`, `types`):
-
-- `derive_runtime_attestation_appraisal`, `verify_runtime_attestation_record`,
-  `evaluate_imported_runtime_attestation_appraisal` - the evaluation entry
-  points.
-- `RuntimeAttestationAppraisal`, `VerifiedRuntimeAttestationRecord`,
-  `RuntimeAttestationAppraisalResult`, `RuntimeAttestationImportedAppraisalPolicy`,
-  `RuntimeAttestationAppraisalImportReport` - artifact and report types.
-- Per-family schema constants, for example `AZURE_MAA_ATTESTATION_SCHEMA`,
-  `AWS_NITRO_ATTESTATION_SCHEMA`, `GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA`,
-  `ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA`.
-
-Static catalogs (`artifact_inventory`):
-
-- `runtime_attestation_appraisal_artifact_inventory`,
-  `runtime_attestation_normalized_claim_vocabulary`,
-  `runtime_attestation_reason_taxonomy`, `verifier_family_for_attestation_schema`.
-
-Signed export artifacts (`descriptor`):
-
-- `create_signed_runtime_attestation_verifier_descriptor` /
-  `verify_signed_runtime_attestation_verifier_descriptor`, args in
-  `RuntimeAttestationVerifierDescriptorArgs`.
-- `create_signed_runtime_attestation_reference_value_set` /
-  `verify_signed_runtime_attestation_reference_value_set`, args in
-  `RuntimeAttestationReferenceValueSetArgs`.
-- `create_signed_runtime_attestation_trust_bundle` /
-  `verify_signed_runtime_attestation_trust_bundle` (returns
-  `RuntimeAttestationTrustBundleVerification`), args in
-  `RuntimeAttestationTrustBundleArgs`.
-- Each `create_*` returns a `SignedRuntimeAttestation*` envelope
-  (`SignedExportEnvelope<T>` from `chio-core-types`).
-
-Marketplace pricing (`marketplace_pricing`):
-
-- `compute_checked_marketplace_invocation_price` - validates first; the
-  settlement-facing entry point.
-- `compute_marketplace_invocation_price` - unchecked, for already-validated
-  input.
-- `MarketplaceBasePrice`, `MarketplacePricingContext`,
-  `MarketplaceReputationTier`, `TIER_DISCOUNT_PER_HUNDRED`.
-
-Re-exported from `chio-core-types`: `canonical`, `capability`, `crypto`,
-`error`, `receipt`, `Error`, `AttestationVerifierFamily`.
+`chio-appraisal` projects runtime attestation evidence into portable appraisal
+artifacts and evaluates signed imports against local policy. It also computes
+marketplace invocation prices from a base price and caller-supplied reputation
+tier. Underwriting and market callers consume these data and evaluation APIs.
 
 ## Usage
+
+Compute a checked invocation price in minor currency units:
 
 ```rust
 use chio_appraisal::{
@@ -83,25 +15,49 @@ use chio_appraisal::{
     MarketplacePricingContext, MarketplaceReputationTier,
 };
 
-fn price_for_tenant() -> Result<(), chio_appraisal::MarketplacePricingError> {
+fn main() -> Result<(), chio_appraisal::MarketplacePricingError> {
     let base = MarketplaceBasePrice::try_new(1_000, "USD")?;
-    let ctx = MarketplacePricingContext::try_new("tenant-a", MarketplaceReputationTier::Tier1)?;
-    let price = compute_checked_marketplace_invocation_price(&base, &ctx)?;
+    let context = MarketplacePricingContext::try_new(
+        "tenant-a", MarketplaceReputationTier::Tier1,
+    )?;
+    let price = compute_checked_marketplace_invocation_price(&base, &context)?;
     assert_eq!(price.units, 950);
+    assert_eq!(price.currency, "USD");
     Ok(())
 }
 ```
 
-## Testing
+The checked entry point validates the tenant identifier and uppercase
+three-letter currency shape. The compatibility pricing helper assumes inputs
+were validated. Neither helper determines a tenant's reputation tier.
 
-`cargo test -p chio-appraisal`
+## Guarantees
 
-## See also
+`verify_signed_runtime_attestation_record` requires an independently pinned
+attestation authority key, validates its canonical envelope signature, and
+applies local policy and evidence validity checks. Authority authorization,
+revocation, hardware-quote verification, and fresh nonce binding belong to the
+caller. `verify_runtime_attestation_record` rejects unsigned evidence that
+would otherwise gain accepted assurance from local policy.
 
-- `chio-core` - re-exports this crate as `chio_core::appraisal`.
-- `chio-kernel` - consumes `VerifiedRuntimeAttestationRecord` for governed
-  validation and receipt scopes/metadata.
-- `chio-underwriting`, `chio-credit`, `chio-market` - build marketplace and
-  credit logic on these appraisal and pricing types.
-- `chio-cli` - the `guard market` subcommands price catalog entries through
-  the checked pricing boundary.
+`evaluate_imported_runtime_attestation_appraisal` evaluates signature, schema,
+family, age, exporter acceptance, and configured issuer/key/claim restrictions.
+Its output carries `Allow`, `Attenuate`, or `Reject` and explicit reason codes.
+`derive_runtime_attestation_appraisal` only projects carried evidence fields.
+
+## Status
+
+The crate implements in-memory artifact derivation, signed-envelope helpers,
+local import evaluation, and pricing. It has no network client or persistent
+store. Azure MAA, AWS Nitro, Google attestation, and enterprise verifier schemas
+have explicit claim projections. Signed descriptor verification authenticates
+the carried envelope key; applications must establish that key's trust.
+No Cargo features are declared.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol trust-control contract](../../../spec/PROTOCOL.md#9-trust-control-contract)
+- [Underwriting](../chio-underwriting/README.md)
+- [Core types](../../core/chio-core-types/README.md)
+- [License](../../../LICENSE)

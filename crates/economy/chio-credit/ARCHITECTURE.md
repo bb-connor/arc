@@ -1,129 +1,102 @@
 # chio-credit architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-credit` is a pure contract and validation crate for Chio's credit
-economy: IOU envelopes, exposure ledgers, credit scorecards, facilities,
-bonds, loss lifecycle, backtests, provider risk packages, and capital
-execution. It performs no network or disk I/O and forbids unsafe code
-(`#![forbid(unsafe_code)]`); the one piece of live behavior it owns is
-`local_account::LocalCreditAccount`, which independently re-verifies a
-kernel-signed `ChioReceipt` (signature, content-addressed id, action hash,
-signer trust) before minting a signed IOU, rather than trusting a caller's
-claim that the receipt is valid. Persistence, HTTP surfacing, and capital
-dispatch belong to downstream crates (`chio-store-sqlite`, `chio-control-plane`,
-`chio-settle`); this crate owns the wire shapes and the fail-closed validation
-those crates reuse, most notably the capital-execution authority-chain
-validator that `chio-kernel` and `chio-control-plane` both call through
-instead of duplicating.
+The public surface covers credit evidence, receivable IOUs, obligation state,
+factoring, clearing, and capital instructions. It owns the contracts and their
+validation. It accepts signed receipts and upstream appraisal or underwriting
+evidence, and returns artifacts or verified wrappers to downstream consumers.
 
-## Module map
+`CreditEvaluatorHook` maps a finalized receipt to zero or one legacy IOU.
+`LocalCreditAccount` holds a signing backend and receipt trust configuration.
+`IouEnvelopeStore` defines persistence by receipt ID; its implementation lives
+in `chio-store-sqlite`. The crate has no settlement network client.
 
-`src/credit/capital_and_execution.rs` is spliced into `lib.rs` with `include!`,
-not declared as `pub mod credit`. Every type it and its `#[path]` children
-re-export is therefore a crate-root item (`chio_credit::CapitalBookQuery`,
-never `chio_credit::credit::...`), on the same footing as the types defined
-directly in `lib.rs`.
+## Structure
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Crate root: exposure ledger, credit scorecard, credit facility, and credit bond contracts; re-exports `chio-core-types::{capability, crypto, receipt}`, `chio-appraisal`, and `chio-underwriting`; `include!`s `credit/capital_and_execution.rs`. |
-| `src/hook.rs` | `CreditEvaluatorHook` trait and the signed `IouEnvelope` / `IouEnvelopeBody` wire shape. |
-| `src/local_account.rs` | `LocalCreditAccount`, the only `CreditEvaluatorHook` implementation in this crate: deterministic, signature-verified IOU minting. |
-| `src/store_binding.rs` | `IouEnvelopeStore` durable-persistence trait. |
-| `src/risk_reports.rs` | Loss-lifecycle, backtest, and provider-risk-package report contracts. |
-| `src/credit/capital_and_execution.rs` | Declares and re-exports the six capital submodules below; `#[cfg(test)]`-includes `tests.rs`. |
-| `src/credit/capital_and_execution/capital_book.rs` | Capital book source and event contracts. |
-| `src/credit/capital_and_execution/capital_execution.rs` | `CapitalExecutionInstructionArtifact` and the owning capital-execution validator. |
-| `src/credit/capital_and_execution/capital_allocation.rs` | `CapitalAllocationDecisionArtifact`. |
-| `src/credit/capital_and_execution/bonded_execution.rs` | Bonded-execution control policy, evaluation, and simulation report. |
-| `src/credit/capital_book_query.rs` | `CapitalBookQuery`, the cross-cutting query for capital book / execution / allocation reports. |
-| `src/credit/capital_execution_authority.rs` | `CapitalExecutionAuthorityStep` and signed authority-step-proof verification. |
+- `lib.rs` defines exposure-ledger, scorecard, facility, and bond contracts and
+  includes the `credit` files for capital books, execution, and allocation.
+- `hook` defines the legacy IOU and evaluator trait; `local_account` implements
+  minting; `store_binding` defines insertion and lookup errors.
+- `obligation` owns atoms, dispositions, status proofs, facility binds, and
+  credit-admission authority resolution and reservation records.
+- `iou_v2` binds a receivable envelope to receipt, obligation, settlement
+  lifecycle, facility signatures, and committed admission evidence.
+- `factor` owns normalized assignment requests, claims, offers, quotes, signed
+  authorizations, and assignment results.
+- `clearing` separates netting computation, finalization, abort, and lifecycle
+  verification, including dispatch, reconciliation, and replay modules.
+- `financial_credentials` projects authenticated economic evidence using
+  `chio-fincred` types. `risk_reports` carries loss and backtest contracts.
+- `formal_economy` supplies checked floor and ceiling conversion helpers;
+  `kani_public_harnesses` is compiled under `cfg(kani)`.
 
-## IOU minting
+## Data and control flow
 
-1. A kernel-signed `ChioReceipt` is passed to `CreditEvaluatorHook::evaluate`.
-2. `LocalCreditAccount::evaluate` verifies the receipt's signature, recomputes
-   its content-addressed id, verifies the action-parameter hash, and checks
-   the embedded kernel key against the account's trusted-kernel-key set; any
-   failure returns `Err` and mints nothing.
-3. Receipts that are not `Allow`, carry no financial metadata, or have
-   `cost_charged == 0` evaluate to `Ok(None)`.
-4. Otherwise the account builds an `IouEnvelopeBody`, derives `iou_id`
-   deterministically from the receipt id (`iou-` plus the first 32 hex
-   characters of its SHA-256), signs the canonical body, and returns one
-   `IouEnvelope`.
-5. The caller persists the envelope through an `IouEnvelopeStore`
-   implementation; production uses `chio-store-sqlite::SqliteIouEnvelopeStore`.
+Legacy minting first verifies the receipt signature, derived receipt ID, action
+hash, and membership of the embedded kernel key in configured trust. It then
+checks `is_allowed`, financial metadata, and nonzero charged cost. The IOU ID
+is derived from the receipt ID, and the configured backend signs the body.
+Reevaluation leaves the receipt unchanged; persistence is a separate operation.
 
-Steps 2-4 are pure over `(receipt, trusted key set)`, so re-evaluating the same
-receipt reproduces a byte-identical envelope. `tests/iou_invariants.rs`
-property-tests that, plus the zero-or-one-IOU invariant, across receipt
-decision, pricing, and tampering scenarios.
+The receivable path builds an envelope from an obligation atom, its disposition
+and settlement lifecycle, a receipt, and a verified facility bind. Minting and
+verification both look up the committed credit admission by operation ID and
+validate its exact obligation and facility binding. A signed bind alone cannot
+supply that online reservation.
 
-## Invariants and failure modes
+`compute_netting_round` validates trust and input evidence, orders obligations,
+resolves participant routes, aggregates checked amounts, cancels bilateral
+balances, and returns statements, settlement intents, and digest roots.
+`verify_netting_round` recomputes the output. Lifecycle functions validate the
+separate evidence needed to advance a round or reconcile an external outcome.
 
-- IOU minting fails closed: signature-invalid receipts, action-hash mismatches,
-  and untrusted kernel keys all return `Err`; nothing is minted or persisted
-  from a rejected receipt.
-- `IouEnvelopeStore::insert` is idempotent per `receipt_id`: a byte-identical
-  re-insert returns `Ok(false)`, and a conflicting envelope for the same
-  `receipt_id` returns `Err(IouEnvelopeStoreError::Conflict)` rather than
-  overwriting it.
-- `validate_capital_execution_envelope` is the single owning validator for
-  capital-execution artifacts: a non-empty authority chain, non-empty rail and
-  custody-provider ids, `not_before <= not_after` on an unexpired execution
-  window, and per-step bounds (`approved_at <= expires_at`,
-  `approved_at <= issued_at`, `expires_at >= issued_at`,
-  `expires_at >= execution_window.not_after`) with a verified signed proof on
-  every step, plus one step in the `Custodian` role whose `principal_id`
-  matches the rail's `custody_provider_id`. `chio-kernel` re-exports this
-  function and the owner/custodian authority helpers rather than
-  reimplementing them, and `chio-control-plane` wraps that re-export with a
-  thin status-mapping layer.
-- `CapitalExecutionInstructionArtifact::validate` adds action-shaped rules:
-  `transfer_funds` requires `source_kind = facility_commitment` plus a
-  governed receipt id and completion-flow row id; reserve actions
-  (`lock_reserve` / `hold_reserve` / `release_reserve`) require
-  `source_kind = reserve_book` and forbid that provenance; `cancel_instruction`
-  carries no amount or observed execution and requires a
-  `related_instruction_id`; every other action requires a positive amount.
-- Observed capital execution reconciles fail-closed in both directions: an
-  `observed_execution` requires a matching amount, a timestamp inside the
-  execution window, and `reconciled_state = matched`; its absence requires
-  `reconciled_state = not_observed`.
-- Every report and artifact carries an explicit `*SupportBoundary` struct
-  (`ExposureLedgerSupportBoundary`, `CreditBondSupportBoundary`,
-  `CapitalExecutionInstructionSupportBoundary`, and others) whose booleans
-  state what is authoritative versus merely described; none imply automatic
-  external dispatch.
-- Subject-scoped queries fail validation without their anchor:
-  `CreditBacktestQuery`, `CreditProviderRiskPackageQuery`, and
-  `CapitalBookQuery` each require `agent_subject` on top of
-  `ExposureLedgerQuery`'s at-least-one-anchor rule; `CreditLossLifecycleQuery`
-  requires a non-empty `bond_id` (and a strictly positive `amount` when
-  present); `CreditBondedExecutionSimulationQuery` requires a non-empty
-  `bond_id`.
+## Trust and invariants
+
+`LocalCreditAccount::new` trusts no kernel signer. The legacy IOU signature
+verifier authenticates the embedded issuer key; it supplies no independent
+issuer allowlist or source-receipt verification. Its body carries receipt ID,
+time, scope, amount, and issuer key.
+
+`verify_credit_facility_bind` checks configured authority, debtor, and creditor
+keys and epochs, all three signatures, the lifetime ceiling, and current time.
+`SignedIouEnvelopeV2::from_canonical_bytes` performs bounded canonical decoding
+and body validation. `verify_iou_envelope_v2` adds signatures, crypto floors,
+role separation, exact source bindings, and committed store evidence.
+
+`CreditAdmissionStoreAdapter::lookup_committed_by_operation` validates operation
+identity and turns a validated committed record into a reservation wrapper.
+Preparing reservation records is pure. Authoritative atomic reservation and
+exposure updates depend on the integrating store and its mutation boundary.
+`IouEnvelopeStore` requires identical reinsertion to return false and different
+envelopes for the same receipt to fail with a conflict.
+
+Capital proof validation checks signature and step fields. Envelope validation
+adds time coverage and custody-provider approval; instruction validation adds
+owner approval and action/reconciliation shape. Default support flags mark
+external execution as non-authoritative and automatic dispatch as unsupported.
+The crate does not broadcast a capital instruction or settle a clearing intent.
 
 ## Dependencies
 
-- `chio-core-types` (re-exported as `capability`, `crypto`, `receipt`)
-  supplies `MonetaryAmount`, `GovernedAutonomyTier`, `RuntimeAssuranceTier`,
-  `Decision`, `SettlementStatus`, `SignedExportEnvelope`, `ChioReceipt`, and
-  the signing and hashing primitives the mint path and every contract use.
-- `chio-appraisal` (re-exported as `appraisal`) supplies
-  `AttestationVerifierFamily` for scorecard and provider-risk-package
-  runtime-assurance evidence.
-- `chio-underwriting` (re-exported as `underwriting`) supplies the decision
-  lifecycle, outcome, review, risk-class, certification, and compliance types
-  exposure and facility contracts reference instead of restating.
-- `serde` / `serde_json` for wire (de)serialization; `thiserror` for the hook
-  and store error enums.
-- Dev-only: `proptest` backs `tests/iou_invariants.rs`.
+`chio-core-types` supplies canonical JSON, signatures, receipts, capability
+amounts, and economic continuity contracts. `chio-appraisal` and
+`chio-underwriting` supply signed risk inputs. `chio-fincred` supplies financial
+credential wire types; `chio-did` and `chio-federation` support credential source
+identity and trust evidence. Serde models contracts and `thiserror` defines
+boundary-specific failures.
 
-## Extension points
+## Verification
 
-- `CreditEvaluatorHook` - implement to mint IOUs under another rule than
-  `LocalCreditAccount`'s; dyn-compatible (`&dyn CreditEvaluatorHook`).
-- `IouEnvelopeStore` - implement to persist envelopes on another backend;
-  `chio-store-sqlite::SqliteIouEnvelopeStore` is the shipped implementation.
+`cargo test -p chio-credit` exercises local minting, original-byte readers,
+credit admission, facility binds, receivable IOUs, factoring, clearing, and
+capital contracts. `tests/iou_v2.rs` covers exact committed admission, source
+request binding, role-key reuse, payee substitution, and crypto-floor rejection.
+`tests/credit_facility_bind.rs` checks role signatures and lifetime boundaries.
+`tests/clearing_lifecycle.rs` checks finalization/abort competition, effect
+fencing, unknown outcomes, retries, and reservation release.
+
+Property tests cover IOU invariants and conversion arithmetic. Kani harnesses
+have their own toolchain and execution path; enabling the Cargo marker does not
+run them. Downstream persistence, kernel observer integration, and settlement
+rails require checks in their owning crates and configured runtime.
