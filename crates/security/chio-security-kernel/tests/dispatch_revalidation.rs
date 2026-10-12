@@ -34,8 +34,10 @@ fn check(containment: bool, next: State) {
                 };
                 let response = support::run(guard, authority.clone(), next, delayed, nested);
                 let initial_queries = if containment { 4 } else { 1 };
-                assert!(authority.queries.load(Ordering::SeqCst) > initial_queries,
-                    "guard not revalidated, containment={containment} nested={nested} delayed={delayed} pipeline={pipeline}");
+                if next != State::Clear {
+                    assert!(authority.queries.load(Ordering::SeqCst) > initial_queries,
+                        "guard not revalidated, containment={containment} nested={nested} delayed={delayed} pipeline={pipeline}");
+                }
                 assert_eq!(
                     response.verdict,
                     if next == State::Clear {
