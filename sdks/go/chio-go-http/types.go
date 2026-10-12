@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 813d1d05bd6b1b323824612804103a8fcc91632b8aa4780eb84ae9db51340244
+// Schema content SHA-256: a853c82d36820f41a0738efc444e9f0de8e507ee9b10cdc6c4c57b4c2cacdeb4
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -220,11 +220,6 @@ const (
 	CapabilityTokenGrantSubsetRelationGrantKindTool     CapabilityTokenGrantSubsetRelationGrantKind = "tool"
 )
 
-// Defines values for CapabilityTokenLegacyApprovalConstraintType.
-const (
-	CapabilityTokenLegacyApprovalConstraintTypeRequireApprovalAbove CapabilityTokenLegacyApprovalConstraintType = "require_approval_above"
-)
-
 // Defines values for CapabilityTokenOperation.
 const (
 	CapabilityTokenOperationDelegate   CapabilityTokenOperation = "delegate"
@@ -233,6 +228,11 @@ const (
 	CapabilityTokenOperationRead       CapabilityTokenOperation = "read"
 	CapabilityTokenOperationReadResult CapabilityTokenOperation = "read_result"
 	CapabilityTokenOperationSubscribe  CapabilityTokenOperation = "subscribe"
+)
+
+// Defines values for CapabilityTokenRequireApprovalAboveConstraintType.
+const (
+	CapabilityTokenRequireApprovalAboveConstraintTypeRequireApprovalAbove CapabilityTokenRequireApprovalAboveConstraintType = "require_approval_above"
 )
 
 // Defines values for ErrorCapabilityDeniedCode.
@@ -2897,17 +2897,6 @@ type CapabilityTokenGrantSubsetRelation struct {
 // CapabilityTokenGrantSubsetRelationGrantKind defines model for CapabilityTokenGrantSubsetRelation.GrantKind.
 type CapabilityTokenGrantSubsetRelationGrantKind string
 
-// CapabilityTokenLegacyApprovalConstraint defines model for CapabilityTokenLegacyApprovalConstraint.
-type CapabilityTokenLegacyApprovalConstraint struct {
-	Type  CapabilityTokenLegacyApprovalConstraintType `json:"type"`
-	Value struct {
-		ThresholdUnits int64 `json:"threshold_units"`
-	} `json:"value"`
-}
-
-// CapabilityTokenLegacyApprovalConstraintType defines model for CapabilityTokenLegacyApprovalConstraint.Type.
-type CapabilityTokenLegacyApprovalConstraintType string
-
 // CapabilityTokenMonetaryAmount A monetary amount in the currency's smallest minor unit. Mirrors `MonetaryAmount`.
 type CapabilityTokenMonetaryAmount struct {
 	Currency string `json:"currency"`
@@ -2922,6 +2911,17 @@ type CapabilityTokenPromptGrant struct {
 	Operations []CapabilityTokenOperation `json:"operations"`
 	PromptName string                     `json:"prompt_name"`
 }
+
+// CapabilityTokenRequireApprovalAboveConstraint defines model for CapabilityTokenRequireApprovalAboveConstraint.
+type CapabilityTokenRequireApprovalAboveConstraint struct {
+	Type  CapabilityTokenRequireApprovalAboveConstraintType `json:"type"`
+	Value struct {
+		ThresholdUnits int64 `json:"threshold_units"`
+	} `json:"value"`
+}
+
+// CapabilityTokenRequireApprovalAboveConstraintType defines model for CapabilityTokenRequireApprovalAboveConstraint.Type.
+type CapabilityTokenRequireApprovalAboveConstraintType string
 
 // CapabilityTokenResourceGrant Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
 type CapabilityTokenResourceGrant struct {
@@ -8685,22 +8685,22 @@ func (t *CapabilityTokenConstraint) MergeCapabilityTokenGenericConstraint(v Capa
 	return err
 }
 
-// AsCapabilityTokenLegacyApprovalConstraint returns the union data inside the CapabilityTokenConstraint as a CapabilityTokenLegacyApprovalConstraint
-func (t CapabilityTokenConstraint) AsCapabilityTokenLegacyApprovalConstraint() (CapabilityTokenLegacyApprovalConstraint, error) {
-	var body CapabilityTokenLegacyApprovalConstraint
+// AsCapabilityTokenRequireApprovalAboveConstraint returns the union data inside the CapabilityTokenConstraint as a CapabilityTokenRequireApprovalAboveConstraint
+func (t CapabilityTokenConstraint) AsCapabilityTokenRequireApprovalAboveConstraint() (CapabilityTokenRequireApprovalAboveConstraint, error) {
+	var body CapabilityTokenRequireApprovalAboveConstraint
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromCapabilityTokenLegacyApprovalConstraint overwrites any union data inside the CapabilityTokenConstraint as the provided CapabilityTokenLegacyApprovalConstraint
-func (t *CapabilityTokenConstraint) FromCapabilityTokenLegacyApprovalConstraint(v CapabilityTokenLegacyApprovalConstraint) error {
+// FromCapabilityTokenRequireApprovalAboveConstraint overwrites any union data inside the CapabilityTokenConstraint as the provided CapabilityTokenRequireApprovalAboveConstraint
+func (t *CapabilityTokenConstraint) FromCapabilityTokenRequireApprovalAboveConstraint(v CapabilityTokenRequireApprovalAboveConstraint) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeCapabilityTokenLegacyApprovalConstraint performs a merge with any union data inside the CapabilityTokenConstraint, using the provided CapabilityTokenLegacyApprovalConstraint
-func (t *CapabilityTokenConstraint) MergeCapabilityTokenLegacyApprovalConstraint(v CapabilityTokenLegacyApprovalConstraint) error {
+// MergeCapabilityTokenRequireApprovalAboveConstraint performs a merge with any union data inside the CapabilityTokenConstraint, using the provided CapabilityTokenRequireApprovalAboveConstraint
+func (t *CapabilityTokenConstraint) MergeCapabilityTokenRequireApprovalAboveConstraint(v CapabilityTokenRequireApprovalAboveConstraint) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err

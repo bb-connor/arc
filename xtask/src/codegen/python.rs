@@ -180,8 +180,8 @@ fn harden_python_capability_token(path: &Path) -> Result<(), XtaskError> {
     replace_python_codegen_snippet(
         path,
         &mut body,
-        "    root: (\n        GenericConstraint\n        | LegacyApprovalConstraint\n        | CumulativeApprovalDirectConstraint\n        | CumulativeApprovalDelegableConstraint\n    )\n\n\nclass AttenuationProof(BaseModel):",
-        "    root: (\n        GenericConstraint\n        | LegacyApprovalConstraint\n        | CumulativeApprovalDirectConstraint\n        | CumulativeApprovalDelegableConstraint\n    )\n\n    @property\n    def type(self) -> str:\n        return self.root.type\n\n    @property\n    def value(self) -> Any:\n        return self.root.value\n\n\nclass AttenuationProof(BaseModel):",
+        "    root: (\n        GenericConstraint\n        | RequireApprovalAboveConstraint\n        | CumulativeApprovalDirectConstraint\n        | CumulativeApprovalDelegableConstraint\n    )\n\n\nclass AttenuationProof(BaseModel):",
+        "    root: (\n        GenericConstraint\n        | RequireApprovalAboveConstraint\n        | CumulativeApprovalDirectConstraint\n        | CumulativeApprovalDelegableConstraint\n    )\n\n    @property\n    def type(self) -> str:\n        return self.root.type\n\n    @property\n    def value(self) -> Any:\n        return self.root.value\n\n\nclass AttenuationProof(BaseModel):",
     )?;
     fs::write(path, body).map_err(|err| XtaskError::Io(display_path(path), err))
 }
