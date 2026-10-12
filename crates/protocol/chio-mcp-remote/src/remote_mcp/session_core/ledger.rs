@@ -14,6 +14,7 @@ impl RemoteSessionLedger {
                         .to_string(),
                 )
             })?;
+            complete_pending_terminal_transitions(path, keyring, clock.millis()?)?;
             load_terminal_session_records(path, keyring, clock.millis()?)?
         } else {
             HashMap::new()
@@ -249,7 +250,7 @@ impl RemoteSessionLedger {
                     terminal_epoch,
                 )?;
                 record.terminal_reason = tombstone.record.terminal_reason;
-                prepare_terminal_session_transition(path, &fence, keyring, terminal_at)?;
+                prepare_terminal_session_transition(path, &fence, &tombstone, keyring, terminal_at)?;
                 Some((path, keyring, tombstone))
             } else {
                 None

@@ -193,14 +193,16 @@ fn store_keeps_the_reason_and_refuses_a_mismatched_pair() {
         TerminalReason::SubscriptionAuthorityLost,
         RemoteSessionEnvelope::V3,
     );
-    prepare_terminal_session_transition(&path, &fence, &keyring, 13).unwrap();
-    assert!(finalize_terminal_session_transition(&path, &other_tombstone, &keyring, 13).is_err());
-
     let (tombstone, _) = sign(
         &keyring,
         TerminalReason::SubscriptionNotRestored,
         RemoteSessionEnvelope::V3,
     );
+    assert!(
+        prepare_terminal_session_transition(&path, &fence, &other_tombstone, &keyring, 13).is_err()
+    );
+    prepare_terminal_session_transition(&path, &fence, &tombstone, &keyring, 13).unwrap();
+    assert!(finalize_terminal_session_transition(&path, &other_tombstone, &keyring, 13).is_err());
     finalize_terminal_session_transition(&path, &tombstone, &keyring, 13).unwrap();
     let loaded = load_terminal_session_records(&path, &keyring, 13).unwrap();
     assert_eq!(

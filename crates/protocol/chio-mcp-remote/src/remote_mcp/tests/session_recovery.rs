@@ -404,6 +404,18 @@ async fn committed_expiry_fence_survives_failed_tombstone_finalization_and_resta
     .await?;
     assert!(!launched);
     assert!(persist_active_session_record(&path, &record, &keyring, 12).is_err());
+    let finished = load_terminal_session_records(&path, &keyring, 12)?;
+    let tombstone = finished
+        .get(&record.session_id)
+        .ok_or("startup did not finish the pending tombstone")?;
+    assert_eq!(tombstone.lifecycle.state, RemoteSessionState::Expired);
+    assert_eq!(tombstone.terminal_reason, Some(TerminalReason::Expired));
+    let pending: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM remote_session_pending_terminals",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(pending, 0);
     drop(restarted);
     drop(connection);
     drop(lease);
@@ -414,3 +426,57 @@ async fn committed_expiry_fence_survives_failed_tombstone_finalization_and_resta
 #[cfg(target_os = "linux")]
 #[path = "session_recovery/cursor_seed.rs"]
 mod cursor_seed;
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn tampered_pending_tombstone_keeps_the_store_unserved(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (directory, path) = private_test_session_database("pending-tamper");
+    let lease = acquire_test_session_store(&path);
+    let keyring = test_resume_hmac_keyring();
+    let record = sample_resume_record_with_keyring(&keyring);
+    persist_active_session_record(&path, &record, &keyring, 12)?;
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute_batch("CREATE TRIGGER refuse_finalization BEFORE INSERT ON remote_session_tombstones BEGIN SELECT RAISE(ABORT, 'injected tombstone outage'); END;")?;
+    let clock = RemoteClock::new(Arc::new(RecoveryClock(StdMutex::new(reading(12)))));
+    let sessions = RemoteSessionLedger::new(
+        clock.clone(),
+        SessionLifecyclePolicy::from_env(),
+        Some(path.clone()),
+        Some(keyring.clone()),
+    )?;
+    assert!(
+        restore_persisted_sessions(&path, &keyring, &sessions, |_| Ok(None))
+            .await
+            .is_err()
+    );
+    drop(sessions);
+    connection.execute_batch("DROP TRIGGER refuse_finalization")?;
+    let pending: String = connection.query_row(
+        "SELECT record_json FROM remote_session_pending_terminals",
+        [],
+        |row| row.get(0),
+    )?;
+    let mut tampered: Value = serde_json::from_str(&pending)?;
+    tampered["record"]["terminal_reason"] = json!("closed");
+    connection.execute(
+        "UPDATE remote_session_pending_terminals SET record_json = ?1",
+        [serde_json::to_string(&tampered)?],
+    )?;
+    assert!(RemoteSessionLedger::new(
+        clock,
+        SessionLifecyclePolicy::from_env(),
+        Some(path.clone()),
+        Some(keyring.clone()),
+    )
+    .is_err());
+    assert!(load_terminal_session_records(&path, &keyring, 12)?.is_empty());
+    drop(connection);
+    drop(lease);
+    std::fs::remove_dir_all(directory)?;
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+#[path = "session_recovery/terminal_journal.rs"]
+mod terminal_journal;

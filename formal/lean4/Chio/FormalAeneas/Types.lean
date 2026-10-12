@@ -29,7 +29,7 @@ structure ReservationLedger where
   retained : Std.U64
 
 /-- [formal_aeneas::InclusionStep]
-    Source: 'crates/kernel/chio-kernel-core/src/formal_aeneas.rs', lines 149:0-154:1
+    Source: 'crates/kernel/chio-kernel-core/src/formal_aeneas.rs', lines 155:0-160:1
     Visibility: public -/
 structure InclusionStep where
   consume_sibling : Bool
