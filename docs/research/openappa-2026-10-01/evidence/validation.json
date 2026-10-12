@@ -1,0 +1,96 @@
+{
+  "validated_at": "2026-10-01T19:06:36.665468+00:00",
+  "markdown_links_checked": 78,
+  "errors": [],
+  "research_checkouts_clean": {
+    "archestra-ai/OpenAPPA": true,
+    "backbay-labs/chio": true
+  },
+  "scoped_artifacts": [
+    {
+      "path": "README.md",
+      "sha256": "dc2c30627dbc2804df9f5d5f8306b08e1c0db6af8ea743ef9df1a0e2b38aa6c0"
+    },
+    {
+      "path": "chio-proposal.md",
+      "sha256": "ab9a375f1a32f7fdb0d61183a77723b50b3bafd76974c3fa49c9d684da1efc7e"
+    },
+    {
+      "path": "evidence/authored-replay.log",
+      "sha256": "f4a0eb25017aefe7e55c2472dcbb2d09c9c86ec6e90739ed38bc420da9b75c65"
+    },
+    {
+      "path": "evidence/core-tests.log",
+      "sha256": "3d35299d29c96fa8c1f1bab6afc201c9c3029240f4cad425e5c80506a2bb6417"
+    },
+    {
+      "path": "evidence/experiments.json",
+      "sha256": "031df24d09807458026e54e62c403c63ef705a4937862098056b5ce4a23a5629"
+    },
+    {
+      "path": "evidence/file-ledger-recreation.log",
+      "sha256": "994fc6029a9103cb98d026813d3d30bd51e29d267fbd94a227e4f8b4cd52ef29"
+    },
+    {
+      "path": "evidence/policy-description.log",
+      "sha256": "52a2791fd0ee22deba8b8bb8a1fdd535e50eb2aae2025484486470376a2eefe9"
+    },
+    {
+      "path": "evidence/probe-Cargo.lock",
+      "sha256": "6eb255bb0a5bf98d1af522b5893350ce3cb96f35aec21d73cea11d544bf3997c"
+    },
+    {
+      "path": "evidence/published-benchmark-crosscheck.json",
+      "sha256": "3077abd1f7cfc995a866b8c2c22dccfa555e4894584d4e3baf1481a32f77bd04"
+    },
+    {
+      "path": "evidence/runtime-tests.log",
+      "sha256": "c69103f301b058b4f4c8f5b6e575a0e76ab4b933f475d809194f3393e4e555e8"
+    },
+    {
+      "path": "evidence/source-inventory.json",
+      "sha256": "5dc721db507214d1fd02891b87efef6f83b77d535abd8c1c9054efcdf33a28d2"
+    },
+    {
+      "path": "evidence/source-manifest.json",
+      "sha256": "161108f14c7a75989b223c6978d030ce446012602f9eade25d6f71fbce3eb9da"
+    },
+    {
+      "path": "evidence/test-results.json",
+      "sha256": "fb79d9591a4f3ec857fafca43fcf6dbb3927a54c44a2c19b60ca16829144daac"
+    },
+    {
+      "path": "experiments/README.md",
+      "sha256": "e217f5ac60986a670db504c96a2c9d709426f54de3826e3054447be81e409c1e"
+    },
+    {
+      "path": "experiments/confidentiality.appa",
+      "sha256": "fae616e66ab800dc56351a39b1bb05eca5e0e5e87eacc6475a475ed794d00322"
+    },
+    {
+      "path": "experiments/file_restart.rs",
+      "sha256": "f7466616708be23f960ef508920bdbac7d9fdc80c70b76c5d4409620ce23fe21"
+    },
+    {
+      "path": "experiments/ordering.appa",
+      "sha256": "151af8379da7d7114d01d95c85157f87b61d2d319b692e94d305ef28e666d562"
+    },
+    {
+      "path": "experiments/policy.toml",
+      "sha256": "53850102745319625f7d794eade0281bd096fdff925b088412d8447d329fd9e7"
+    },
+    {
+      "path": "experiments/run.py",
+      "sha256": "634ae1b8006091d7f813780e6a6e9d51748820ccbfab7a624fcc1ba679ebec8f"
+    },
+    {
+      "path": "technical-review.md",
+      "sha256": "333ff49f3fed44dcb2d58f89a06b6e96e17684f0e1cd4d020a902df5197a2f7c"
+    }
+  ],
+  "notes": [
+    "No changes to production application source. Research files are untracked local additions.",
+    "The whole working tree has unrelated existing changes; its broad whitespace check reports an existing trailing whitespace issue outside this research directory. New research text passed the scoped check.",
+    "Checks do not establish public release, hosted CI, deployment, or end-to-end provider behavior."
+  ]
+}

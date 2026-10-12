@@ -1,0 +1,232 @@
+{
+  "schema": "chio.recovery-architecture-validation.v1",
+  "status": "structural_checks_passed",
+  "scope": "Architecture documents, traceability, source hashes and retained bounded-model evidence only",
+  "requirements": 111,
+  "functionality_mappings": 15,
+  "markdown_files": 16,
+  "local_links_checked": 113,
+  "development_source_inputs_verified": 57,
+  "source_findings": 22,
+  "model": {
+    "reachable_states": 325,
+    "transitions": 774,
+    "mutations_rejected": [
+      "OverlappingSelection",
+      "IgnoreOwnerEpoch",
+      "ReplayUnknown",
+      "UnknownMeansNoEffect"
+    ],
+    "scope": "One effectful step, two continuations/coordinators, two owner epochs; no production proof"
+  },
+  "review_models": {
+    "baselines": [
+      {
+        "name": "Admission",
+        "reachable_states": 22,
+        "transitions": 30
+      },
+      {
+        "name": "Knowledge",
+        "reachable_states": 9,
+        "transitions": 8
+      },
+      {
+        "name": "Replay",
+        "reachable_states": 10,
+        "transitions": 14
+      },
+      {
+        "name": "PartialEffect",
+        "reachable_states": 7,
+        "transitions": 8
+      }
+    ],
+    "mutations_rejected": [
+      "CloseFromProjection",
+      "IgnoreAdmissionTombstone",
+      "IgnoreCancellation",
+      "ReleaseWithoutJoin",
+      "IgnoreKnowledgeFence",
+      "RevisionBeforeReplay",
+      "CachedResponseAfterRevocation",
+      "PartialFailureAsNoEffect"
+    ],
+    "source_and_output_hashes_verified": true,
+    "scope": "Four independent bounded seams; not a composed or production proof",
+    "third_pass": {
+      "nonce_reachable_states": 133,
+      "nonce_transitions": 252,
+      "coverage_cases": 3844,
+      "mutations_rejected": [
+        "FinalizeWithoutCustody",
+        "PreflightBeforeIntent",
+        "RenewMissingNonce",
+        "RewriteProcessEnvelope",
+        "RequireLiveInitiator",
+        "AnyOwnerSuffices",
+        "IgnoreApprovalContext",
+        "CountSignatureAliases"
+      ],
+      "scope": "Bounded nonce custody protocol and symbolic coverage; not cryptographic or production qualification"
+    }
+  },
+  "root_manifest_and_lock_unchanged": true,
+  "implementation_tests_rerun": true,
+  "foundation_test_evidence": {
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-process",
+      "--test",
+      "nonce_recovery"
+    ],
+    "passed": 3,
+    "failed": 0,
+    "count_note": "Three top-level harness tests include one subprocess helper. Nested child invocations are not additional unique tests.",
+    "scope": "Existing process/kernel strict-nonce foundation only; no proposed grant-v2 or recovery-participant implementation.",
+    "record_kind": "Tool-observed command/result summary, not a full build attestation or retained stdout transcript.",
+    "new_architecture_implementation_qualified": false
+  },
+  "architecture_approved": false,
+  "inputs": [
+    {
+      "path": "01-security-model.md",
+      "sha256": "1fffc88f236d7c869c68c968df68b6e7ee58c8e3a3f09fc61a1dc45f317e5160"
+    },
+    {
+      "path": "02-rust-design.md",
+      "sha256": "c64494196045229cc5fd8a6cd6c2cc3fc3ff12fc846c8653b3cb38b38d9bc8f0"
+    },
+    {
+      "path": "03-recovery-protocol.md",
+      "sha256": "c9abf0ffbb12d376e71472ad434d5489b4346aebcfefcb0059f7db5663f17678"
+    },
+    {
+      "path": "04-counterfactuals.md",
+      "sha256": "1ff752ad13aabd4655e21db63a47f95b732fa15335c47dad7924651ff8d141b7"
+    },
+    {
+      "path": "05-semantic-contracts.md",
+      "sha256": "8d98f869225d67be41fcd3e5d953110f02a6ab045fc56bd2c77e289d4eedd4a8"
+    },
+    {
+      "path": "06-artifacts-memory.md",
+      "sha256": "6547879a4893866d06335a561c4109713eb9ee71218ec301c21af68a4593cc2c"
+    },
+    {
+      "path": "07-confined-returns.md",
+      "sha256": "e2e61718f141ced2fe36d5743a1893af9a36bafb7c64d4d81464dbbf41bbd29e"
+    },
+    {
+      "path": "08-protocol-operations.md",
+      "sha256": "33e107ad6c2df9febd23f50a5c28931d7e8a35fb90dceed53e20a4dbe15656ce"
+    },
+    {
+      "path": "09-conformance.md",
+      "sha256": "72cee862c55eff78c3123f8ceae0b5a0c463b6752fa50c3c97f3414562816a23"
+    },
+    {
+      "path": "10-delivery-decisions.md",
+      "sha256": "9e89cb757d5a1b14a6c9842c27bc9529434ff1b718fe32c0ac7055fc11bb9b1c"
+    },
+    {
+      "path": "11-contract-catalog.md",
+      "sha256": "fab53560b298ae852dfb5cbdd2d5833aaa966d1031387af784791ae1eb371cc0"
+    },
+    {
+      "path": "README.md",
+      "sha256": "2b9e9fd7fd3550ff9426258781fa5f9e0dbc6f4b8f124d91561fb875dee2c3fa"
+    },
+    {
+      "path": "check.py",
+      "sha256": "ebd7bb2df1a0aed95e3345b608be6901c9851bbba61e3b4f68ebb92aa47049f7"
+    },
+    {
+      "path": "foundation-tests-third-pass.json",
+      "sha256": "be13c631ccb74082f587aa0216bf69078c94d388d5dc6294b2924f2bab7d7ea0"
+    },
+    {
+      "path": "model/README.md",
+      "sha256": "32468d603497ee76427901d30fdd566a0697758d0f6d18799b0e49cb9f55086e"
+    },
+    {
+      "path": "model/evidence.json",
+      "sha256": "5f4df3d756624ca20b659f792fdd2c95adce12262d5819204aad1ee606df321b"
+    },
+    {
+      "path": "model/recovery.rs",
+      "sha256": "d5e821972460f58d60e1b7e754f522857e09094633e1dd7de72ce0246bd5b4bc"
+    },
+    {
+      "path": "model/results.txt",
+      "sha256": "ca35843e47885c2d4a0bd6404e017ba730581e2787712dda36e8f15244790e50"
+    },
+    {
+      "path": "model/review-results.txt",
+      "sha256": "06ce2675a45a122c0f705a000a3bd2614dab55c6478eac722fa676316fcc8e6c"
+    },
+    {
+      "path": "model/review.rs",
+      "sha256": "124e0818c0e5a9c569dc681de0974d15efe7eac3edcc09c9f5fc0579be24d6fd"
+    },
+    {
+      "path": "model/review_states.rs",
+      "sha256": "6648b0335b71819e10060dd1e8aad503fd842c9c9446a9a59bb41434bbe4d231"
+    },
+    {
+      "path": "model/run.py",
+      "sha256": "4aa8aa36dc25310ebfcca6e06df750326a854e07ad12912fba90a7319d6ad168"
+    },
+    {
+      "path": "model/state.rs",
+      "sha256": "deead8a7cd36d0beb20d54c7048b70a9184c6793ac378ccf2529d13d8f397100"
+    },
+    {
+      "path": "model/third-results.txt",
+      "sha256": "206cb04cc43bcd9cb429657194615536fc72f59648c2798272b31123637d2d25"
+    },
+    {
+      "path": "model/third.rs",
+      "sha256": "11cce2818c30d5577a08d91c331de7dc94d7d8631ccbf1fb419aa134533b3af7"
+    },
+    {
+      "path": "model/third_contracts.rs",
+      "sha256": "b1d9c65459ac960b34841663fde5baa8dcaadef0e11f9074b64e08d9c46e66cb"
+    },
+    {
+      "path": "model/third_nonce.rs",
+      "sha256": "8a6a2dfbc37701e26441df54f2111107646d962614f468503bff243146ffce6a"
+    },
+    {
+      "path": "requirements.json",
+      "sha256": "b3f56200499e037171c602fbbe815426620024073b73be4657fba785197cf125"
+    },
+    {
+      "path": "review-2026-10-02.md",
+      "sha256": "a70c0022f1fe8f6287e00538a7724286804d67f1c9399a2fa0ca68341fadaf15"
+    },
+    {
+      "path": "review-inputs.json",
+      "sha256": "c72d57c15aba711cb3231d9f9293b7e8f758490bcc38114e024779ae796bdac0"
+    },
+    {
+      "path": "review-third-pass-2026-10-02.md",
+      "sha256": "37efaab13698ae09f51aa83e9f5a876600f0138aa182c7293263251883c7d41d"
+    },
+    {
+      "path": "review-third-pass-inputs.json",
+      "sha256": "a4346cc5011157ac17f0c65aebb5380a19130f95a0eebcf3e79c52d051495935"
+    },
+    {
+      "path": "source-map.json",
+      "sha256": "62be0093b5f9347474b72780dffe7844a84683f8c350ac663def76a7159fefcc"
+    },
+    {
+      "path": "source-map.md",
+      "sha256": "de2f296c24411d4c999fb2164bb54334b7ff1bbcf7edd6df7034d68178986dc1"
+    }
+  ]
+}

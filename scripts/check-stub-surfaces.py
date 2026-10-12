@@ -375,6 +375,10 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "PQ-hybrid signing-state placeholder mirrors explicit unsigned lineage state",
         "2026-12-31",
     ),
+    "labs/openappa-recovery/evidence/source-manifest.json": allow(
+        "research-lab evidence boundaries record absent production features",
+        "2026-12-31",
+    ),
     "spec/schemas/chio-attest/v1/selective-disclosure-proof.schema.json": allow(
         "schema explicitly rejects proof schema identifiers ending in .stub",
         "2026-12-31",
@@ -684,6 +688,11 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     ),
     "crates/trust/chio-weights/src/lineage.rs": (
         r"signing state placeholder",
+    ),
+    "labs/openappa-recovery/evidence/source-manifest.json": (
+        r'^"offer_authentication": "not implemented",$',
+        r'^"production_offer_persistence": "not implemented",$',
+        r'^"native_recovery_workflow_integration": "not implemented",$',
     ),
     "spec/schemas/chio-attest/v1/selective-disclosure-proof.schema.json": (
         r'"schema": \{ "pattern": "\\\\.stub\$" \}',

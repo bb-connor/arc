@@ -1,0 +1,18 @@
+OpenAPPA world
+Adapter: claude-code
+Config: /Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01/experiments/policy.toml (loadable)
+Batteries: none
+Policy tools: mcp/files/read, mcp/files/read(path:/hr/*), mcp/mail/send, mcp/ops/backup, mcp/ops/deploy, mcp/ops/migrate, mcp/ops/wipe
+Authorities:
+  approver: unbound; permits attention=[signoff]
+Audience chain: self ⊆ internal ⊆ public (built-in)
+Audience sources: none
+  self from: none
+  internal from: none
+Named audiences: none
+MCP servers: railway
+Battery matches: unavailable (no installed version beside this config)
+Session tools: unavailable to this command; pass the names this session sees with --session-tools
+Connector accounts: unavailable to this command
+Validation: tools: 0 valid, 0 invalid, 7 unknown; inventory: partial or unavailable; new tools: possible; wildcard: absent
+  7 declared tools have no host observation to compare against; run inside a protected session to check them

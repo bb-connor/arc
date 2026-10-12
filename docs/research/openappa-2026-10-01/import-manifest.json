@@ -1,0 +1,138 @@
+{
+  "schema": "chio.openappa-research-import.v1",
+  "source_directory": "/Users/connor/Medica/backbay/standalone/chio-world/docs/research/openappa-2026-10-01",
+  "copied_without_modification": true,
+  "originals_preserved": true,
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "688fefa6ac992fa0d9e98deec0a90396918303a4c36abf3be3642da067ab88ce",
+      "bytes": 10126
+    },
+    {
+      "path": "chio-proposal.md",
+      "sha256": "8f24e33533396f13118f0057a76ea26100d45ac9be077c835e02f2de051eeaf5",
+      "bytes": 21886
+    },
+    {
+      "path": "evidence/authored-replay.log",
+      "sha256": "f4a0eb25017aefe7e55c2472dcbb2d09c9c86ec6e90739ed38bc420da9b75c65",
+      "bytes": 2412
+    },
+    {
+      "path": "evidence/core-tests.log",
+      "sha256": "3d35299d29c96fa8c1f1bab6afc201c9c3029240f4cad425e5c80506a2bb6417",
+      "bytes": 61864
+    },
+    {
+      "path": "evidence/experiments.json",
+      "sha256": "031df24d09807458026e54e62c403c63ef705a4937862098056b5ce4a23a5629",
+      "bytes": 2581
+    },
+    {
+      "path": "evidence/file-ledger-recreation.log",
+      "sha256": "994fc6029a9103cb98d026813d3d30bd51e29d267fbd94a227e4f8b4cd52ef29",
+      "bytes": 1042
+    },
+    {
+      "path": "evidence/policy-description.log",
+      "sha256": "52a2791fd0ee22deba8b8bb8a1fdd535e50eb2aae2025484486470376a2eefe9",
+      "bytes": 988
+    },
+    {
+      "path": "evidence/probe-Cargo.lock",
+      "sha256": "6eb255bb0a5bf98d1af522b5893350ce3cb96f35aec21d73cea11d544bf3997c",
+      "bytes": 11225
+    },
+    {
+      "path": "evidence/published-benchmark-crosscheck.json",
+      "sha256": "3077abd1f7cfc995a866b8c2c22dccfa555e4894584d4e3baf1481a32f77bd04",
+      "bytes": 1144
+    },
+    {
+      "path": "evidence/runtime-tests.log",
+      "sha256": "c69103f301b058b4f4c8f5b6e575a0e76ab4b933f475d809194f3393e4e555e8",
+      "bytes": 86176
+    },
+    {
+      "path": "evidence/second-pass-demo.json",
+      "sha256": "e6ae13d9f8ed04efc786ac5b6a37bf8f914fc8bf34673d8220b8248fb2e39466",
+      "bytes": 2199
+    },
+    {
+      "path": "evidence/second-pass-source-inventory.json",
+      "sha256": "5f0882aeed6f326d0930a9f51a8f78d6809f25e23525a688956d9f92da70fcbf",
+      "bytes": 7334
+    },
+    {
+      "path": "evidence/second-pass-test-results.json",
+      "sha256": "9ac706ec05085f35eb2aa30c4185fde84d8687771ec5170236b5ed0438a48598",
+      "bytes": 7031
+    },
+    {
+      "path": "evidence/second-pass-validation.json",
+      "sha256": "228b90a9a979f5d77bbc1ce038a0f6ee2b6cd700b17a30057286a17b29e6d4c3",
+      "bytes": 775
+    },
+    {
+      "path": "evidence/source-inventory.json",
+      "sha256": "5dc721db507214d1fd02891b87efef6f83b77d535abd8c1c9054efcdf33a28d2",
+      "bytes": 19944
+    },
+    {
+      "path": "evidence/source-manifest.json",
+      "sha256": "161108f14c7a75989b223c6978d030ce446012602f9eade25d6f71fbce3eb9da",
+      "bytes": 1109
+    },
+    {
+      "path": "evidence/test-results.json",
+      "sha256": "fb79d9591a4f3ec857fafca43fcf6dbb3927a54c44a2c19b60ca16829144daac",
+      "bytes": 1752
+    },
+    {
+      "path": "evidence/validation.json",
+      "sha256": "c0eb58ee62499c8855bebc1dc4bd83b61993de59a84a2e263212425a78f7bdb9",
+      "bytes": 3456
+    },
+    {
+      "path": "experiments/README.md",
+      "sha256": "e217f5ac60986a670db504c96a2c9d709426f54de3826e3054447be81e409c1e",
+      "bytes": 4199
+    },
+    {
+      "path": "experiments/confidentiality.appa",
+      "sha256": "fae616e66ab800dc56351a39b1bb05eca5e0e5e87eacc6475a475ed794d00322",
+      "bytes": 580
+    },
+    {
+      "path": "experiments/file_restart.rs",
+      "sha256": "f7466616708be23f960ef508920bdbac7d9fdc80c70b76c5d4409620ce23fe21",
+      "bytes": 2571
+    },
+    {
+      "path": "experiments/ordering.appa",
+      "sha256": "151af8379da7d7114d01d95c85157f87b61d2d319b692e94d305ef28e666d562",
+      "bytes": 305
+    },
+    {
+      "path": "experiments/policy.toml",
+      "sha256": "53850102745319625f7d794eade0281bd096fdff925b088412d8447d329fd9e7",
+      "bytes": 995
+    },
+    {
+      "path": "experiments/run.py",
+      "sha256": "634ae1b8006091d7f813780e6a6e9d51748820ccbfab7a624fcc1ba679ebec8f",
+      "bytes": 4173
+    },
+    {
+      "path": "security-branch-second-pass.md",
+      "sha256": "18471aa1bd7c6eeed986892f07fef157fca6fac4d0096653e4dd147830b0e62f",
+      "bytes": 16628
+    },
+    {
+      "path": "technical-review.md",
+      "sha256": "333ff49f3fed44dcb2d58f89a06b6e96e17684f0e1cd4d020a902df5197a2f7c",
+      "bytes": 27636
+    }
+  ]
+}

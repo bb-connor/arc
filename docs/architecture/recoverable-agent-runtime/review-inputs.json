@@ -1,0 +1,91 @@
+{
+  "schema": "chio.architecture-review-inputs.v1",
+  "review_date": "2026-10-02",
+  "input_revision": 1,
+  "files": [
+    {
+      "path": "01-security-model.md",
+      "sha256": "f9fb6ebd9567a4e705de8c5d781ab22f483f4a4f0a823a505876d91f222f17a5"
+    },
+    {
+      "path": "02-rust-design.md",
+      "sha256": "d677a8c17fad86068327b194f62e18fb42b46bdc862eceecd1e03842d831ea13"
+    },
+    {
+      "path": "03-recovery-protocol.md",
+      "sha256": "7d5768e7117bb6a01a0f2dac8cc205b8dac72976db3886ab4ad6adcd63ce9e93"
+    },
+    {
+      "path": "04-counterfactuals.md",
+      "sha256": "17d7d984338c765989a24cd308ad055c547d56a8aa00f99b49181e6573b5f035"
+    },
+    {
+      "path": "05-semantic-contracts.md",
+      "sha256": "2ba6de0c723adfe8e9fca301c2e1c884285ea21346c80d1789897c52f8959749"
+    },
+    {
+      "path": "06-artifacts-memory.md",
+      "sha256": "d646de2df50a1bd9c6b29f2ac806e4a9654703681cc7acce1304c0a86f347345"
+    },
+    {
+      "path": "07-confined-returns.md",
+      "sha256": "7dc20aaa2daa513132dfeb664ea7b23f809019e3335d6a9cf7caa3ed130b0058"
+    },
+    {
+      "path": "08-protocol-operations.md",
+      "sha256": "6cac6ede569eb1032d2f049343b44ca354450c0d6dfc15e64f24729eb44bbdaa"
+    },
+    {
+      "path": "09-conformance.md",
+      "sha256": "dfe1a2ec6328b262a2bfe85d9eccca22959013284c53490a1ca19f6ce4a6178f"
+    },
+    {
+      "path": "10-delivery-decisions.md",
+      "sha256": "bbee01209fb2657ce2fb38c5f24b8e7b844c7e0fabef230929e051cb3de492ce"
+    },
+    {
+      "path": "11-contract-catalog.md",
+      "sha256": "fcf09c4c20b02e19fe77297df64e27767b69e54e2723824e1b9bccf9a3b37210"
+    },
+    {
+      "path": "README.md",
+      "sha256": "a984c7e3d9167553550ba39f13df6403b00b6232b3305241549a1fbdf6f09107"
+    },
+    {
+      "path": "check.py",
+      "sha256": "afb8597d29863d0c23bc926702df99cfe11d75022476016addf1a65467dd6235"
+    },
+    {
+      "path": "model/README.md",
+      "sha256": "d6479050ad4620ac87bc3d082b9c7399abe4d8a5a667b0125e4bbd4645dd3d3f"
+    },
+    {
+      "path": "model/recovery.rs",
+      "sha256": "b8bb36e5d8c3cc553ba95ae047fcd3ed5abfbe8fad62e72ea7448d850bb26619"
+    },
+    {
+      "path": "model/results.txt",
+      "sha256": "ca35843e47885c2d4a0bd6404e017ba730581e2787712dda36e8f15244790e50"
+    },
+    {
+      "path": "model/state.rs",
+      "sha256": "deead8a7cd36d0beb20d54c7048b70a9184c6793ac378ccf2529d13d8f397100"
+    },
+    {
+      "path": "requirements.json",
+      "sha256": "11b2cecb4e5cb38e8a4c094e0e4bc864cffb6754d9c081f215a28ecf72f72d8c"
+    },
+    {
+      "path": "source-map.json",
+      "sha256": "e831b1b52f62317628e04c376120fef66ba067a4fd1478499260064433f28210"
+    },
+    {
+      "path": "source-map.md",
+      "sha256": "f8415aad24b35fae81f10b4065c4e428aebb48f53b71d3a3e0b6eb4669b36acb"
+    },
+    {
+      "path": "validation.json",
+      "sha256": "296942aef212dba2340e2937227b60758e0830dcd310e7a3947d9a3d1e4c1a7b"
+    }
+  ]
+}

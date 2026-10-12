@@ -1,0 +1,14 @@
+{
+  "json_files_valid": 14,
+  "source_and_prototype_hashes_verified": 38,
+  "local_markdown_links_verified": 38,
+  "new_public_artifacts_privacy_and_em_dash_checks": "passed",
+  "new_lab_em_dash_check": "passed",
+  "tracked_production_changes": "none",
+  "new_files_limited_to_lab_and_process_experiments": 26,
+  "root_manifest_and_lock_unchanged": true,
+  "demo_does_not_claim_dispatch": true,
+  "scope": "Isolated development research checkout and research documents only; unrelated original working-tree changes are outside these checks",
+  "original_development_checkout_preserved": "Original branch remains main with the same observed seven dirty entries; no stash/reset/switch",
+  "upstream_research_clones": "Both clones retain pinned heads and clean working trees"
+}
