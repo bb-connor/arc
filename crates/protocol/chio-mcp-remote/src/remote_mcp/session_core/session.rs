@@ -65,6 +65,8 @@ impl RemoteSession {
             resume_generation: AtomicU64::new(init.resume_generation),
             resume_envelope,
             subscriptions: StdMutex::new(BTreeMap::new()),
+            subscription_deadline: StdMutex::new(SubscriptionDeadline::Unbounded),
+            terminal_reason_latch: std::sync::OnceLock::new(),
             upstream_transport: RemoteSessionUpstreamTransport {
                 inner: init.upstream_transport,
             },
@@ -319,7 +321,75 @@ impl RemoteSession {
                 (uri.clone(), capability_id.clone())
             })
             .collect();
+        self.arm_subscription_deadline(&current);
         Ok(())
+    }
+
+    /// Arms the deadline at the earliest expiry among the capabilities bound
+    /// to `subscriptions`. A capability that is not held, or a clock that
+    /// cannot be read, leaves the deadline lapsed.
+    fn arm_subscription_deadline(&self, subscriptions: &BTreeMap<String, String>) {
+        let earliest = subscriptions
+            .values()
+            .map(|capability_id| {
+                self.issued_capabilities
+                    .iter()
+                    .find(|capability| &capability.id == capability_id)
+                    .map_or(0, |capability| capability.expires_at)
+            })
+            .min();
+        let deadline = match earliest {
+            None => SubscriptionDeadline::Unbounded,
+            Some(expires_at) => self
+                .clock
+                .read()
+                .and_then(|reading| {
+                    let expires_at = expires_at.checked_mul(1_000).ok_or(ClockError::Overflow)?;
+                    AuthorityDeadline::new(reading.unix_millis(), UnixMillis::new(expires_at), reading)
+                })
+                .map_or(SubscriptionDeadline::Lapsed, SubscriptionDeadline::Armed),
+        };
+        *self
+            .subscription_deadline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = deadline;
+    }
+
+    /// Whether a subscribed capability's authority window has closed. A clock
+    /// that cannot be read or that moved backwards counts as closed.
+    pub(super) fn subscription_authority_expired(&self) -> bool {
+        let mut deadline = self
+            .subscription_deadline
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        match &mut *deadline {
+            SubscriptionDeadline::Unbounded => false,
+            SubscriptionDeadline::Lapsed => true,
+            SubscriptionDeadline::Armed(armed) => self
+                .clock
+                .read()
+                .and_then(|reading| armed.remaining(reading))
+                .is_err(),
+        }
+    }
+
+    /// Latches `subscription_authority_lost`, drops retained resource updates
+    /// and wakes every HTTP wait. The next terminal transition uses the reason.
+    pub(super) fn latch_subscription_authority_lost(&self) {
+        self.terminal_reason_latch
+            .get_or_init(|| TerminalReason::SubscriptionAuthorityLost);
+        self.retained_notification_events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .retain(|event| {
+                event.message.get("method").and_then(Value::as_str)
+                    != Some("notifications/resources/updated")
+            });
+        self.worker_serving_closed.send_replace(true);
+    }
+
+    pub(super) fn latched_terminal_reason(&self) -> Option<TerminalReason> {
+        self.terminal_reason_latch.get().copied()
     }
 
     pub(super) fn persisted_subscriptions(&self) -> Result<Vec<PersistedSubscription>, CliError> {
@@ -357,6 +427,7 @@ impl RemoteSession {
                 .resume_record_for_lifecycle(lifecycle.clone(), standard_subscriptions(&candidate))?;
             self.persist_record(path, &record, self.clock.millis()?)?;
         }
+        self.arm_subscription_deadline(&candidate);
         *current = candidate;
         Ok(())
     }
@@ -690,6 +761,15 @@ impl SubscriptionPersistence {
     }
 }
 
+/// When the authority of a session's subscriptions runs out.
+#[derive(Debug)]
+pub(super) enum SubscriptionDeadline {
+    /// The session holds no subscription.
+    Unbounded,
+    Armed(AuthorityDeadline),
+    Lapsed,
+}
+
 impl chio_mcp_adapter::edge::ResourceSubscriptionObserver for SubscriptionPersistence {
     fn subscribed(&self, uri: &str, capability_id: &str) -> Result<(), AdapterError> {
         self.change(|subscriptions| {
@@ -701,5 +781,11 @@ impl chio_mcp_adapter::edge::ResourceSubscriptionObserver for SubscriptionPersis
         self.change(|subscriptions| {
             subscriptions.remove(uri);
         })
+    }
+
+    fn authority_lost(&self, _uri: &str) {
+        if let Some(session) = self.0.upgrade() {
+            session.latch_subscription_authority_lost();
+        }
     }
 }

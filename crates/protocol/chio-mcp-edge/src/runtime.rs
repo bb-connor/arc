@@ -166,6 +166,11 @@ pub struct ChioMcpEdge {
     pending_background_tasks: Vec<String>,
     upstream_transport: Option<Arc<dyn McpTransport>>,
     resource_subscription_observer: Option<Arc<dyn ResourceSubscriptionObserver>>,
+    /// The capability id that authorized each subscribed URI.
+    subscription_capabilities: BTreeMap<String, String>,
+    /// Set once a subscription fails its authority check; no resource update
+    /// is emitted afterwards.
+    subscription_authority_lost: bool,
 }
 
 impl ChioMcpEdge {
@@ -254,6 +259,8 @@ impl ChioMcpEdge {
             pending_background_tasks: Vec::new(),
             upstream_transport: None,
             resource_subscription_observer: None,
+            subscription_capabilities: BTreeMap::new(),
+            subscription_authority_lost: false,
         })
     }
 
@@ -290,7 +297,10 @@ impl ChioMcpEdge {
             })?;
         self.kernel
             .subscribe_session_resource(session_id, capability, &self.agent_id, uri)
-            .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))
+            .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))?;
+        self.subscription_capabilities
+            .insert(uri.to_owned(), capability_id.to_owned());
+        Ok(())
     }
 
     pub fn observe_resource_subscriptions(

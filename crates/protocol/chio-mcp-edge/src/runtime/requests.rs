@@ -620,6 +620,9 @@ impl ChioMcpEdge {
                 return jsonrpc_error(id, JSONRPC_INTERNAL_ERROR, &message);
             }
         }
+        self.subscription_capabilities
+            .entry(uri)
+            .or_insert_with(|| capability.id.clone());
         jsonrpc_result(id, json!({}))
     }
 
@@ -661,7 +664,10 @@ impl ChioMcpEdge {
             }
         }
         match self.kernel.unsubscribe_session_resource(&session_id, &uri) {
-            Ok(()) => jsonrpc_result(id, json!({})),
+            Ok(()) => {
+                self.subscription_capabilities.remove(&uri);
+                jsonrpc_result(id, json!({}))
+            }
             Err(error) => jsonrpc_error(
                 id,
                 JSONRPC_INTERNAL_ERROR,

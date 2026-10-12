@@ -670,6 +670,9 @@ struct RemoteSession {
     resume_envelope: ResumeEnvelopeRatchet,
     /// Standard resource subscriptions by URI, mapped to their capability id.
     subscriptions: StdMutex<BTreeMap<String, String>>,
+    subscription_deadline: StdMutex<session_core_session::SubscriptionDeadline>,
+    /// A terminal reason latched before the terminal transition runs.
+    terminal_reason_latch: std::sync::OnceLock<TerminalReason>,
     terminalization: Mutex<()>,
     upstream_transport: RemoteSessionUpstreamTransport,
 }

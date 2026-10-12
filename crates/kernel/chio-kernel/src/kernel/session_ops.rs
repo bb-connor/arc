@@ -327,10 +327,11 @@ impl ChioKernel {
         Ok(receipt)
     }
 
-    /// Subscribe the session to update notifications for a concrete resource URI.
-    pub fn subscribe_session_resource(
+    /// Checks that `capability` still authorizes a subscription to `uri`:
+    /// capability and lineage validity, revocation, scope and resource
+    /// existence. It registers nothing and consumes no budget.
+    pub fn check_resource_subscription_authority(
         &self,
-        session_id: &SessionId,
         capability: &CapabilityToken,
         agent_id: &str,
         uri: &str,
@@ -346,6 +347,18 @@ impl ChioKernel {
         if !self.resource_exists(uri)? {
             return Err(KernelError::ResourceNotRegistered(uri.to_string()));
         }
+        Ok(())
+    }
+
+    /// Subscribe the session to update notifications for a concrete resource URI.
+    pub fn subscribe_session_resource(
+        &self,
+        session_id: &SessionId,
+        capability: &CapabilityToken,
+        agent_id: &str,
+        uri: &str,
+    ) -> Result<(), KernelError> {
+        self.check_resource_subscription_authority(capability, agent_id, uri)?;
 
         self.with_session_mut(session_id, |session| {
             session.subscribe_resource(uri.to_string());
