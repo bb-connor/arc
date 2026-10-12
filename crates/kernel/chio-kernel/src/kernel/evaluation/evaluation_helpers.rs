@@ -600,7 +600,8 @@ impl ChioKernel {
             .map(crate::kernel::validation::ensure_fresh_budget_cleanup_custody)
             .transpose();
         let original_saga = denial.durable_operation.filter(|operation| {
-            matches!(outcome, PreDispatchCleanupOutcome::Cancelled)
+            cleanup_custody == Some(crate::budget_store::BudgetHoldCleanupCustody::Unknown)
+                && matches!(outcome, PreDispatchCleanupOutcome::Cancelled)
                 && runtime_release_confirmed
                 && lease_release.confirmed
                 && denial.payment_authorization.is_none()
