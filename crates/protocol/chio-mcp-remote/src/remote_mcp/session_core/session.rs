@@ -280,6 +280,24 @@ impl RemoteSession {
         self.resume_record_for_lifecycle(lifecycle).map(Some)
     }
 
+    /// Signs and persists the restored record at the generation its event
+    /// seed was derived from, before the session serves.
+    pub(super) fn persist_restored_generation(&self) -> Result<(), CliError> {
+        let path = self.session_db_path.as_deref().ok_or_else(|| {
+            CliError::cli_other_error(format!(
+                "restored MCP session {} has no session database",
+                self.session_id
+            ))
+        })?;
+        let record = self.resume_record()?.ok_or_else(|| {
+            CliError::cli_other_error(format!(
+                "restored MCP session {} is not ready",
+                self.session_id
+            ))
+        })?;
+        self.persist_record(path, &record, self.clock.millis()?)
+    }
+
     fn resume_record_for_lifecycle(
         &self,
         lifecycle: RemoteSessionLifecycleSnapshot,

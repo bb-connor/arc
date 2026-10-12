@@ -410,3 +410,7 @@ async fn committed_expiry_fence_survives_failed_tombstone_finalization_and_resta
     std::fs::remove_dir_all(directory)?;
     Ok(())
 }
+
+#[cfg(target_os = "linux")]
+#[path = "session_recovery/cursor_seed.rs"]
+mod cursor_seed;

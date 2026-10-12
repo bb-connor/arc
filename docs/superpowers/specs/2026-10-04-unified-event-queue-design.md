@@ -284,6 +284,10 @@ After A1 and A1d, lag can skip only notifications. Correlated responses and serv
   - the HTTP client disconnects, and A2a fails the call's undelivered and future server requests at once and its delivered ones after the grace window, so the tool can return.
 
   The stream ending does not release the lock by itself (A2b). The session-owned completion task (section 4.2) is unaffected by the stream ending.
+- **A16a. Response deadline.** A16's three ways do not cover an upstream that never answers while the client stays connected. Each dispatched request and each initialize therefore waits at most `request_response_timeout_millis` (env `CHIO_MCP_REQUEST_RESPONSE_TIMEOUT_MILLIS`, default 15 minutes, measured on the tokio monotonic clock from dispatch) for its terminal response. A response that arrives with the deadline is still delivered.
+  - On expiry the session closes fail closed: it becomes terminal `closed`, its upstream transport is shut down and its waiters are woken. The request then receives `-32603` "request response deadline exceeded; session closed; effect is uncertain"; an initialize receives `503` and its session is never inserted.
+  - Requests queued on the request lock fail with `503` without dispatch. A credential call keeps its durable pending fence, because its effect is unknown.
+  - **Why close, not release.** Releasing only the lock would let later requests enter the serial edge runtime behind the stuck call and dispatch after their clients had been told the outcome was unknown. Closing preserves ordering and ends every effect the session could still produce.
 
 ### 4.6 Retry rule
 
