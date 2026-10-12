@@ -1,11 +1,181 @@
 # Security and process landing ledger
 
-The first checkpoint below is the latest staged summary. For each requirement,
+The first checkpoints below record the latest source and landing observations. For each requirement,
 use `current_requirement_states` in the [canonical JSON ledger](landing-ledger.json),
 with its stated source and acceptance boundary. The remaining dated sections
 preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
+
+## Auditor replacement composed on landed main (October 12 UTC)
+
+PR #1201 landed as squash `659283481e` at 14:19:10Z.
+Build and lint, Workspace tests, MSRV, Cargo Vet and Cargo Deny passed on
+source `c94c8a1d9f`. Cognition first failed the pre-existing 100 ms recovery
+lease fixture and its second attempt was cancelled. The aggregate had not
+passed at merge. This records the landing without claiming full qualification.
+The deterministic fixture repair is a separate small PR owned by Claude.
+
+PR #1202 now incorporates that actual main, including the landed crate docs,
+and the reviewed `de664c85ee` release/nightly Drogon repair. The scoped source
+contracts pass locally; fresh hosted acceptance remains pending. Trusted
+authorization, definition activation, committed Linux evidence, open proofs,
+and cold-state readiness remain separate obligations. No repository settings
+or authorization were changed by this composition.
+
+## F060 reconciled with its newer landed repair (October 12 UTC)
+
+The original F060 argument-tripwire finding is addressed by the newer
+`FINAL-REVIEW-TRIPWIRE-INPUT` implementation already present on `main` at
+`28d826e3e6`. The [source reconciliation](audits/f060-source-reconciliation-20261012.json)
+verifies that all five source and test files exactly match the retained component
+qualification, including the padded-delimiter correction and real-registry controls.
+The older follow-up patch must not be reapplied over this implementation.
+
+The canonical F060 current state now links that repair, its original failures,
+78 passing owning tests and strict Clippy evidence. Claude independently
+confirmed the source mapping. Guard argument tests and real-registry port tests
+provide compositional coverage; they are not one full-path real-registry test.
+Those are historical scoped results, not a new run. Source landing is recorded separately from incomplete
+requirement acceptance: required hosted CI and the disclosed operational
+obligations remain open. All **2,029 original requirement records** are preserved;
+only the F060 current mapping advances.
+
+## Release and nightly dependency repair qualified locally (October 12 UTC)
+
+The [repair audit](audits/release-drogon-ci-repair-20261012.json) binds reviewed
+source `de664c85ee` to both omitted Drogon callers. The strict consumer contract
+fails on each original workflow and passes after provisioning the existing
+pinned dependencies. The full local C++ and HTTP smoke passes with signed
+allow/deny receipts and authority-permission controls.
+
+The first smoke correctly refused the group-writable `/home/connor/lanes`
+ancestor. A cold rebuild was aborted and retained separately. The successful
+run uses the supported private artifact path; custody checks and shared
+workspace permissions remain unchanged. Local aarch64 evidence does not
+establish hosted x86_64 or complete release qualification.
+
+The prospective composition with #1201 and the auditor repair passes the
+owning workflow contracts and 17 release-source controls. The live tag-release
+CLI, accidentally invoked without its required tag environment, refused;
+that invocation is retained as unqualified, not a passing static check.
+The exact repair is assigned to #1202's replacement batch after #1201 lands.
+No third PR is needed. There are still **2,029 requirements**; actual main
+integration, fresh hosted acceptance and the separate formal residuals remain.
+
+Duplicate main CI run `38183162158` was cancelled to free runners for #1201.
+The identical-tree original source run and #1201's run continue. Cancelled
+jobs and their rejecting aggregates remain incomplete acceptance evidence.
+
+## Post-merge CI triage and sequential landing (October 12 UTC)
+
+The [terminal CI triage](audits/postmerge-ci-triage-20261012.json) adds the
+release Drogon provisioning regression, for **2,029 requirements**. The original
+2,025 requirement records and their scoped acceptance states are unchanged.
+The release workflow now invokes a strict Drogon gate without installing its
+pinned dependencies. Claude owns the isolated repair; Root owns integration.
+It remains open until the actual smoke, workflow controls and landing pass.
+
+Both pheromone groups in [#1201](https://github.com/bb-connor/arc/pull/1201)
+passed on `a2734def20`: eleven pinned facets in 10m38s and four composite facets
+in 10m22s. Every facet step succeeded. Those durations are observed hosted job
+times, not a controlled savings estimate. Required Rust qualification remains
+separate and pending at this checkpoint.
+
+The reviewed auditor repair is draft [#1202](https://github.com/bb-connor/arc/pull/1202).
+Its `61b28ca217` CI was deliberately cancelled because the candidate must first
+incorporate #1201's actual landing base. Eight automatic runs remain cancelled;
+one metadata run succeeded. That head will not be rerun or described as qualified.
+The next candidate needs an actual-main integration, composition review and
+fresh exact-head checks. These two PRs are the bounded landing wave.
+
+The main release failure also prevented later formal-report production and
+promotion evidence. An older Aeneas snapshot-drift report needs its own exact
+diagnosis before a repair claim. Pages deployment remains unavailable with a
+404 configuration error. The revocation listener rejects an empty committed-
+evidence value before mutation. These are retained unresolved dispositions;
+no repository settings, trusted authorization or proof policies were changed.
+
+## Auditor repair and CI speed publication (October 12 UTC)
+
+The ledger now records **2,028 requirements**. All previous 2,025 requirements
+and current-state records remain unchanged; three new rows account for the
+REST compatibility repair, authenticated squash support and CI setup reduction.
+The [repair evidence](audits/landing-auditor-repair-20261012.json) binds exact
+commits, original failures, local results, independent reviews and retained logs.
+
+CI speed PR [#1201](https://github.com/bb-connor/arc/pull/1201), head
+`a2734def20c38f3cc6a02cec35dda64e99bbc5d3`, preserves fifteen fixture commands
+in two setup groups. All fifteen facets and both npm installations passed locally.
+Its starting staged diff exactly matches the committed candidate. Hosted checks
+and timing remain pending; local aarch64 results do not establish x86_64 savings.
+
+Auditor source `8324a2a704a26089763ffc9031515ff14f69ab5f` includes the compatible
+REST pin and strict one-parent squash support alongside the existing two-parent
+model. All 109 owning tests, sixteen focused tests, the complete security-contract
+mutation suite and final document controls passed. Claude reviewed the design,
+source and operator guide. Publication uses the separate
+`fix/security-landing-auditor` branch; its PR number is assigned when this
+committed checkpoint is published. These two candidates are the active landing
+wave. Trusted-definition deployment remains a separate operational decision.
+Neither repair changes #1160's historical incomplete qualification at merge.
+
+## Foundation merged with qualification incomplete (October 11 UTC)
+
+PR [#1160](https://github.com/bb-connor/arc/pull/1160) was squash-merged as
+`28d826e3e6b73af22388fc4eb117b3d8184ba5cf` at `2026-10-11T23:08:37Z`.
+The [post-merge audit](audits/foundation-postmerge-20261011.json) verifies that
+its tree exactly equals source `29327c5d7cb9782e8ed72932e436a96bd21b0ea9`.
+The source branch and `archive/pr1160-reviewed-29327c5d7c` remain preserved.
+All **2,025 requirements** and their recorded acceptance obligations remain.
+
+This was a bypass of the four-green landing bar. Cargo Vet and Cargo Deny
+had passed; Build/lint, workspace, cognition and MSRV were still running.
+Claude reports executing the temporary ruleset change and squash merge as
+`bb-connor` after an owner instruction to merge immediately. Root independently
+verified the merge and that ruleset `22033486` was active again, but did not execute
+the ruleset change or declare the candidate qualified. Source-run
+[38177003267](https://github.com/bb-connor/arc/actions/runs/38177003267)
+and main-run [38183162158](https://github.com/bb-connor/arc/actions/runs/38183162158)
+remain separate qualification records. Later success cannot establish that
+checks passed before the merge.
+
+The 57 retired foundation PRs have renewed preservation evidence: 54 heads
+remain ancestors of the archived source; three have byte-identical full-index
+patches in that history. Their original branches still point to the inventoried
+heads. None of those 57 heads is an ancestor of the squash commit. Their landing
+link is the verified source/merge tree identity, not invented main ancestry or
+automatic closure of their review obligations.
+
+The installed native recovery job `114591814902` passed on source `29327c5d7c`.
+Both operator scenarios passed the unchanged ten-second policy, three successful
+HTTP requests, eight verified receipts, replay and failure controls. This renews
+that scenario only; the earlier failed run and broader latency, concurrency and
+cold-state acceptance remain distinct. The audit retains the artifact and log
+hashes.
+
+Trusted-definition and authorization setup, incomplete Kani proofs and
+operational acceptance remain open. The post-merge audit job failed before
+executing its auditor because the pinned `c009ace` definition lacks the script.
+Both automatic Kani lanes timed out in the weights determinism/shape harness;
+those runs establish neither a proof nor a counterexample. The current native
+MCP job did pass the repaired tombstone restart case (43 passed, one ignored),
+and the FIPS smoke passed its exact 18-test crypto-wire inventory.
+
+F038's performance follow-up remains open, but the later external-writer
+omission claim was withdrawn: both the existing store regression and the
+isolated indexed proposal's four controls reject external mutations through
+the serving-owner `data_version` fence. This does not qualify the proposal's
+funded or outcome-unknown query cost. F086, F070/F071, F041, F038 and F020 retain
+their individual follow-up acceptance.
+
+The next CI change targets shared pheromone compilation while preserving all
+facet commands, environment coverage and failures. Critical run isolation stays:
+PR-number-only cancellation would reintroduce F074's sticky authority revocation.
+No repository variables, proof budgets, required tests or feature graphs were
+changed by this reconciliation. The JSON `foundation_postmerge_20261011` record
+is authoritative for the landing event. Per-requirement `merged: false` values
+retain their earlier scoped acceptance state; they do not mean #1160 is open.
 
 
 ## Cognition CI extraction qualified privately (October 11 UTC)

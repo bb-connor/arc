@@ -1,0 +1,132 @@
+{
+  "schema": "chio.landing-auditor-repair.v1",
+  "observed_utc": "2026-10-12T00:17:26.951379+00:00",
+  "api_source_commit": "78d887be5b4751a5ddad2cb6de44989e16265566",
+  "squash_source_commit": "8324a2a704a26089763ffc9031515ff14f69ab5f",
+  "auditor_sha256": "4c504e5faf84af85896283079f0f03f2a5fd7d4264668beb1dd914b6c9cd7d38",
+  "api_contract": {
+    "before": "2026-03-10 removed merge_commit_sha, used by all three merge-attribution reads",
+    "after": "Pin supported 2022-11-28 for the auditor client; missing merge identity remains a refusal",
+    "official_sources": [
+      "https://docs.github.com/en/rest/about-the-rest-api/breaking-changes",
+      "https://docs.github.com/en/rest/about-the-rest-api/api-versions"
+    ]
+  },
+  "squash_contract": {
+    "models": "Select strictly by one or two actual parents; no fallback",
+    "two_parents": "Preserve ordered [B,E]",
+    "one_parent": "P != E; sole parent B; exact E commit identity; tree(P)==tree(E)==qualified T; B...E strictly ahead, zero behind, merge_base B",
+    "unchanged": "Every existing CI attempt, original check, App authority, artifact, timing, attribution and final identity/main-reachability requirement",
+    "ruleset": "Existing merge-only example remains an explicit earlier unadopted proposal; no ruleset/settings change"
+  },
+  "api_tests": [
+    {
+      "name": "original.log",
+      "exit": 1,
+      "sha256": "4f0057a52509a04aca9aac50e01f9514db37f31bfdd8f70266a0cf6781df7184",
+      "scope": "Two tests: healthy version-shaped audit fails on removed field; missing-field refusal passes."
+    },
+    {
+      "name": "focused-green.log",
+      "exit": 0,
+      "sha256": "afff65850dd34f3b53b3c56f491be209b86974c511d3e2e1d4e4029ca098b78d",
+      "scope": "Both transport/refusal tests pass."
+    },
+    {
+      "name": "full-regressions.log",
+      "exit": 0,
+      "sha256": "0283e09f7135b965bdfcd6b9f1b854bf34d9dde4bc212e7ee2d80cbba1f74aa2",
+      "scope": "All 93 owning tests pass."
+    },
+    {
+      "name": "security-contract-regressions.log",
+      "exit": 0,
+      "sha256": "109521a14bea147985ab669b9dd3121ed9deb611abf9bd16d0203f093291c2fb",
+      "scope": "Complete security contract mutation suite passes."
+    },
+    {
+      "name": "comment-focused.log",
+      "exit": 0,
+      "sha256": "4dd7ad0f441fff8de411d0d214bb5bdfa02004871a3e363bb6b66c6e7977401d",
+      "scope": "Both tests pass after comment-only AST-equivalent nit."
+    },
+    {
+      "name": "comment-contract.log",
+      "exit": 0,
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92",
+      "scope": "Final compatible-API source contract passes."
+    }
+  ],
+  "squash_tests": [
+    {
+      "name": "original.log",
+      "exit": 1,
+      "sha256": "a32f5fb201dd19325d1e819c906f5721ae9656f34f22b873ab087abc5f68c64c",
+      "scope": "One healthy squash test fails exactly at original second-parent refusal."
+    },
+    {
+      "name": "focused-green.log",
+      "exit": 1,
+      "sha256": "f42b5c1c093604e04a70171655d934e9764bc62fc82f10ca152371158a3b13b5",
+      "scope": "Intermediate 16-test run: two Markdown assertions read comment.md rather than generated audit.md; test helper corrected explicitly."
+    },
+    {
+      "name": "focused-green-2.log",
+      "exit": 0,
+      "sha256": "89c63c964d11af38462f39d98649a7a0f0d5a376b5693b3898cad1add7835135",
+      "scope": "All 16 focused tests pass, covering both shapes and malformed shape, wrong identity/tree/base, same-tree sibling, changed PR, main withdrawal, incomplete/failed CI, missing/late authority."
+    },
+    {
+      "name": "full-regressions.log",
+      "exit": 0,
+      "sha256": "10977aef9974036d79c42a0f771eecbd2c1bb50b813c8614ddac0c64c6287db3",
+      "scope": "All 109 owning tests pass in 286.944s."
+    },
+    {
+      "name": "security-contract-regressions.log",
+      "exit": 0,
+      "sha256": "e99d9edd4f37772f59d63518b010c4f270a167c0d64a8c3d2cec15ce98478f07",
+      "scope": "Full security contract mutation suite passes on frozen reviewed source."
+    },
+    {
+      "name": "final-document-tests.log",
+      "exit": 0,
+      "sha256": "24adda79e21044fef19cdc7f0606a9cd7770fc9a99c705a8622ee923c13bce5d",
+      "scope": "Both existing document refusal controls pass after approved prose update."
+    },
+    {
+      "name": "final-security-contract.log",
+      "exit": 0,
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92",
+      "scope": "Final source and operator document contract passes."
+    }
+  ],
+  "independent_review": {
+    "reviewer": "Claude via coord/pr1160 to-codex.md",
+    "api": "2026-10-11T23:42:01Z approved; comment nit applied with AST equivalence",
+    "squash_design": "2026-10-11T23:48:24Z approved",
+    "squash_source": "2026-10-12T00:00:38Z approved exact source 4c504e5f",
+    "operator_document": "2026-10-12T00:04:34Z approved exact prepared patch"
+  },
+  "evidence_archive": "/home/connor/lanes/pr1160-root-evidence/landing-auditor-8324a2a704-20261012",
+  "evidence_manifest_sha256": "498f7962f21ebb9b64fbd8dd6ddec40198c5859350804dac8899ce41a4764825",
+  "ci_speed": {
+    "pr": 1201,
+    "head": "a2734def20c38f3cc6a02cec35dda64e99bbc5d3",
+    "source_review": "Root and Claude approved",
+    "local_facets_passed": 15,
+    "npm_installs_passed": 2,
+    "structural_tests_passed": 10,
+    "starting_staged_diff_equals_committed_diff_sha256": "199d7e5c9fb695b72bca5304a52892efd10469af9842e0a18aaf4876d4575875",
+    "source_at_campaign_start": "28d plus staged candidate; after both groups clean a273",
+    "evidence_archive": "/home/connor/lanes/pr1160-root-evidence/pheromone-ci-a2734def20-20261012",
+    "evidence_manifest_sha256": "3d7ba9ec73530f10784f9bfbce3e9c8d3038b59ca8044190bb50511cb64b99b4",
+    "limits": "Local aarch64 Node 22.23.3/24.16.0 versus hosted x86_64 Node 24.21; hosted checks and timings pending"
+  },
+  "remaining": [
+    "Publish the separate auditor PR and qualify exact hosted checks.",
+    "Trusted definition deployment and any authorization/evidence-variable change require separate reviewed operational action. None performed.",
+    "#1160 remains historically unqualified: shape support cannot erase incomplete or unsuccessful CI history.",
+    "Kani, cold-state, broader latency/concurrency and dedicated-App enforcement remain separate acceptance obligations."
+  ]
+}

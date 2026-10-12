@@ -20,7 +20,7 @@ for gate in scripts/check-chio-cpp.sh sdks/cpp/chio-cpp-kernel/scripts/check-wit
   grep -Fq -- '--no-tests=error' "${gate}"
   grep -Fq 'CARGO_TARGET_DIR' "${gate}"
 done
-for workflow in .github/workflows/chio-cpp.yml .github/workflows/release-cpp.yml .github/workflows/sdk-parity.yml; do
+for workflow in .github/workflows/chio-cpp.yml .github/workflows/nightly.yml .github/workflows/release-cpp.yml .github/workflows/release-qualification.yml .github/workflows/sdk-parity.yml; do
   grep -Fq 'CMAKE_PREFIX_PATH="$(./scripts/setup-drogon-test-deps.sh)"' "${workflow}"
   # Each pinned-bootstrap job needs the Linux UUID development dependency.
   bootstrap_count="$(grep -Fc 'CMAKE_PREFIX_PATH="$(./scripts/setup-drogon-test-deps.sh)"' "${workflow}")"

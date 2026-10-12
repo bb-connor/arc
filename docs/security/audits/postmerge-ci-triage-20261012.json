@@ -1,0 +1,320 @@
+{
+  "schema": "chio.security-postmerge-ci-triage.v1",
+  "observed_utc": "2026-10-12T01:04:12.529666+00:00",
+  "foundation_source": "29327c5d7cb9782e8ed72932e436a96bd21b0ea9",
+  "foundation_merge": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+  "scope": "Read-only terminal observations and assigned repair obligations. Foundation premerge qualification remains incomplete. Later success never changes its historical merge state.",
+  "requirements": [
+    {
+      "id": "postmerge-20261012:RELEASE-DROGON",
+      "priority": "P2",
+      "requirement": "Provision the pinned Drogon fixture dependencies before the strict release SDK parity gate; retain all SDK workloads and fail-closed dependency checks.",
+      "failed_job": 114599827936,
+      "source_repair": null,
+      "owner": "Claude implementation, Root integration",
+      "remaining_acceptance": [
+        "Reproduce the missing dependency against main28d; install pinned dependencies and run the real Drogon smoke locally.",
+        "Run the owning workflow contract and review the exact provisioning diff.",
+        "Land through the bounded queue after an exact-head qualification; classify any later release-lane failure separately."
+      ],
+      "landing_pr": null
+    }
+  ],
+  "main_failures": [
+    {
+      "observed_utc": "2026-10-12T00:01:05.049427+00:00",
+      "source": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+      "job": 114601883340,
+      "run": 38183162158,
+      "log_sha256": "13ebe56fd49a3479d0f8341d4cdab98ab0ef2caeecbf7d805c83bd4363ee7eee",
+      "classification": "known-postmerge-trusted-execution-inventory-prerequisite",
+      "scope": "Exact isolated security input preflight failed before Linux workload against stale authorized source d0496. Retained log does not identify individual comparison; no runtime pass or fresh Rust regression inferred."
+    },
+    {
+      "observed_utc": "2026-10-12T00:59:06.188659+00:00",
+      "source": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+      "job": 114614861909,
+      "run": 38188139278,
+      "log_sha256": "428df53061f6c52b637b1d6297ae868b81853e04c12d76a7c469666620bf5fb2",
+      "classification": "known-postmerge-committed-evidence-configuration-prerequisite",
+      "scope": "Cancellation of auditor standby CI38187765077 triggers listener. Authentic upstream check passes; next step fails initial COMMITTED_EVIDENCE_SHA 40-hex precondition because value is empty. Exact logged preflight reproduced locally rc1 before any network or authorization mutation. No authority revocation attempted; no production Rust regression. Keep prerequisite open, not passing."
+    },
+    {
+      "observed_utc": "2026-10-12T01:01:51.041438+00:00",
+      "source": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+      "job": 114599827936,
+      "run": 38183161833,
+      "log_sha256": "d6ad28bbe5e52bad10d1b1cde156c549b16107994343050fd090e436647d6afb",
+      "classification": "confirmed-release-dependency-provisioning-regression",
+      "scope": "Strict SDK parity invokes Drogon; CMake refuses absent Drogon::Drogon. Release workflow omits dependency provisioning. Later proof-report retention and promotion artifact staging fail because producing steps were skipped. Claude RELEASE-DROGON repair assigned, not fixed or qualified."
+    },
+    {
+      "observed_utc": "2026-10-12T01:01:51.042469+00:00",
+      "source": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+      "job": 114609404205,
+      "run": 38183161885,
+      "log_sha256": "9ee445af7449df34e7b4619251bc4108d6dc2aa1aef1b06f53aa60309ca70b28",
+      "classification": "pages-deployment-environment-unavailable",
+      "scope": "deploy-pages reports404 and Ensure GitHub Pages has been enabled for main28d. Deployment remains unavailable. No settings change, disabled job or publication performed."
+    },
+    {
+      "observed_utc": "2026-10-12T01:01:51.042591+00:00",
+      "source": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+      "job": 114601883414,
+      "run": 38183162158,
+      "log_sha256": "b6e61123b3101df97f9ed4b9a50f5d09a1ae4a63bad27405c84588bf4783b90e",
+      "classification": "known-postmerge-trusted-execution-inventory-prerequisite",
+      "scope": "Exact isolated execution-input preflight fails before adversarial workload against stale authorized source d0496. No xtrace for individual comparison; no runtime regression or workload pass inferred."
+    }
+  ],
+  "masked_failure_report": {
+    "origin": "Claude/C7 read-only historical diagnosis 2026-10-12T00:57:46Z",
+    "description": "Earlier main release runs failed on Aeneas generated snapshot drift. The current Drogon refusal skips that later step, so this run does not establish whether it is fixed.",
+    "remaining": "Obtain exact historical diff and toolchain cause; no proof campaign, snapshot refresh or waiver has been performed."
+  },
+  "ci_speed": {
+    "head": "a2734def20c38f3cc6a02cec35dda64e99bbc5d3",
+    "observed_utc": "2026-10-12T01:02:22.782413+00:00",
+    "jobs": [
+      {
+        "run": 38186776684,
+        "job": 114610683519,
+        "name": "Pheromone fixture gates (pinned actions)",
+        "started_at": "2026-10-12T00:15:06Z",
+        "completed_at": "2026-10-12T00:25:44Z",
+        "log_sha256": "760ceea0630af4ad355f03bc036f9527655d0e0f2445c0e791908b7bbbd1e8cc",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:15:07Z",
+            "completed_at": "2026-10-12T00:15:08Z"
+          },
+          {
+            "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:15:08Z",
+            "completed_at": "2026-10-12T00:15:16Z"
+          },
+          {
+            "name": "Run dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:15:16Z",
+            "completed_at": "2026-10-12T00:15:17Z"
+          },
+          {
+            "name": "Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:15:17Z",
+            "completed_at": "2026-10-12T00:15:25Z"
+          },
+          {
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:15:25Z",
+            "completed_at": "2026-10-12T00:15:26Z"
+          },
+          {
+            "name": "Install dashboard dependencies",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:15:26Z",
+            "completed_at": "2026-10-12T00:15:28Z"
+          },
+          {
+            "name": "Check Chio pheromone directory lifecycle",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:15:28Z",
+            "completed_at": "2026-10-12T00:22:03Z"
+          },
+          {
+            "name": "Check Chio pheromone relay alert assurance archive hardening",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:22:03Z",
+            "completed_at": "2026-10-12T00:22:50Z"
+          },
+          {
+            "name": "Check Chio pheromone relay alert assurance archive package",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:22:50Z",
+            "completed_at": "2026-10-12T00:22:59Z"
+          },
+          {
+            "name": "Check Chio pheromone relay alert assurance archive",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:22:59Z",
+            "completed_at": "2026-10-12T00:23:05Z"
+          },
+          {
+            "name": "Check Chio pheromone relay alert assurance export",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:23:05Z",
+            "completed_at": "2026-10-12T00:23:12Z"
+          },
+          {
+            "name": "Check Chio pheromone relay alert assurance external retention",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:23:12Z",
+            "completed_at": "2026-10-12T00:23:13Z"
+          },
+          {
+            "name": "Check Chio pheromone relay observability",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:23:13Z",
+            "completed_at": "2026-10-12T00:23:23Z"
+          },
+          {
+            "name": "Check Chio pheromone relay operations",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:23:23Z",
+            "completed_at": "2026-10-12T00:23:28Z"
+          },
+          {
+            "name": "Check Chio pheromone relay",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:23:28Z",
+            "completed_at": "2026-10-12T00:25:12Z"
+          },
+          {
+            "name": "Check Chio pheromone runtime",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:25:12Z",
+            "completed_at": "2026-10-12T00:25:20Z"
+          },
+          {
+            "name": "Run Chio pheromone transit gate",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:25:20Z",
+            "completed_at": "2026-10-12T00:25:22Z"
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:25:22Z",
+            "completed_at": "2026-10-12T00:25:24Z"
+          },
+          {
+            "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:25:24Z",
+            "completed_at": "2026-10-12T00:25:41Z"
+          },
+          {
+            "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:25:41Z",
+            "completed_at": "2026-10-12T00:25:41Z"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:25:41Z",
+            "completed_at": "2026-10-12T00:25:41Z"
+          }
+        ]
+      },
+      {
+        "run": 38186776622,
+        "job": 114610683471,
+        "name": "Pheromone fixture gates (setup-rust, Node 24)",
+        "started_at": "2026-10-12T00:45:45Z",
+        "completed_at": "2026-10-12T00:56:07Z",
+        "log_sha256": "f05f811f6a8b157b121e4dd3036ac9c7a8472e1301cdc157d9318eec33274e5b",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:45:45Z",
+            "completed_at": "2026-10-12T00:45:46Z"
+          },
+          {
+            "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:45:46Z",
+            "completed_at": "2026-10-12T00:45:55Z"
+          },
+          {
+            "name": "Run ./.github/actions/setup-rust",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:45:55Z",
+            "completed_at": "2026-10-12T00:46:19Z"
+          },
+          {
+            "name": "Run ./.github/actions/setup-node",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:46:19Z",
+            "completed_at": "2026-10-12T00:46:24Z"
+          },
+          {
+            "name": "Check Chio pheromone relay alert assurance",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:46:24Z",
+            "completed_at": "2026-10-12T00:55:13Z"
+          },
+          {
+            "name": "Check Chio pheromone relay alert delivery",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:55:13Z",
+            "completed_at": "2026-10-12T00:55:24Z"
+          },
+          {
+            "name": "Check Chio pheromone relay alert handoff",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:55:24Z",
+            "completed_at": "2026-10-12T00:55:34Z"
+          },
+          {
+            "name": "Check Chio pheromone relay alert routing",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:55:34Z",
+            "completed_at": "2026-10-12T00:55:49Z"
+          },
+          {
+            "name": "Post Run ./.github/actions/setup-node",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:55:49Z",
+            "completed_at": "2026-10-12T00:55:49Z"
+          },
+          {
+            "name": "Post Run ./.github/actions/setup-rust",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:55:49Z",
+            "completed_at": "2026-10-12T00:56:06Z"
+          },
+          {
+            "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:56:06Z",
+            "completed_at": "2026-10-12T00:56:06Z"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success",
+            "started_at": "2026-10-12T00:56:06Z",
+            "completed_at": "2026-10-12T00:56:06Z"
+          }
+        ]
+      }
+    ],
+    "scope": "Hosted exact-head two fixture groups. Required Rust aggregate and MSRV remain separate. Observed timings are not controlled before/after savings."
+  },
+  "auditor_standby": {
+    "pr": 1202,
+    "head": "61b28ca217f1fc54b2ff8a33f0e92e7c22279d5b",
+    "state": "reviewed-draft-standby",
+    "ci_run": 38187765077,
+    "ci_conclusion": "cancelled",
+    "all_automatic_runs": {
+      "success": 1,
+      "cancelled": 8
+    },
+    "cancellation_manifest_sha256": "c9f6da66d49e0065d1fabd10ec9185e788cdfe5557b1f97ec55a56f8c61516ff",
+    "reason": "The next candidate must incorporate the actual #1201 landing base. Do not spend a full qualification run on a known-to-be-replaced head.",
+    "remaining": "Merge the actual new main into the retained auditor branch, review composition, and obtain full exact-head qualification for the new candidate. Do not rerun this cancelled head to erase its history."
+  },
+  "operational_boundaries": [
+    "No repository variables, authorization pins, Pages settings or required checks changed.",
+    "Pages deployment is unavailable and has no automatic closure; configuring public publication requires a separate decision.",
+    "The revocation listener refuses its missing committed-evidence configuration; no authenticated authority was revoked.",
+    "The four-check landing decision and stricter trusted v3 qualification remain different acceptance boundaries."
+  ]
+}

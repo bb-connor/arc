@@ -1,0 +1,72 @@
+{
+  "schema": "chio.security-requirement-source-reconciliation.v1",
+  "observed_utc": "2026-10-12T02:15:28.488800+00:00",
+  "requirement": "incoming-pr1160-review-20261006:F060",
+  "requirement_text": "Feed tool arguments to the credential, file, cookie, and hostname tripwires",
+  "replacement_requirement": "incoming-pr1160-github-final-review-20261010:FINAL-REVIEW-TRIPWIRE-INPUT",
+  "disposition": "Source requirement addressed by newer foundation repair; do not reapply the old follow-up proposal. Full qualification remains incomplete.",
+  "older_proposal": "4006574d0a4d256323f3493895e0e3e9f3db8e57",
+  "replacement_commits": [
+    "f53b7e7119b0e323145e231e33b051eabddfb592",
+    "74e17cd71530fc70f6cc478f6f0491aeddc83c6e",
+    "208e29500275ca87825e19ced2de133ea7ee6fac"
+  ],
+  "archived_source": "29327c5d7cb9782e8ed72932e436a96bd21b0ea9",
+  "main_commit": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+  "source_tree": "9000ce6bb655ebb9be185190cad8ac4ecb53949d",
+  "main_tree": "9000ce6bb655ebb9be185190cad8ac4ecb53949d",
+  "files": [
+    {
+      "path": "crates/security/chio-security-kernel/src/tripwire.rs",
+      "retained_qualified_component_sha256": "a717257ee66dd177fd520f51ef1f89fc9bba24c03e97d0506ad848cc9575f891",
+      "archived_source_sha256": "a717257ee66dd177fd520f51ef1f89fc9bba24c03e97d0506ad848cc9575f891",
+      "main_sha256": "a717257ee66dd177fd520f51ef1f89fc9bba24c03e97d0506ad848cc9575f891"
+    },
+    {
+      "path": "crates/security/chio-security-kernel/src/tripwire/arguments.rs",
+      "retained_qualified_component_sha256": "e9b7f8f46c7bc683400442663ee3bf80d86ef6d2e241ea866ca77f987b7ece9f",
+      "archived_source_sha256": "e9b7f8f46c7bc683400442663ee3bf80d86ef6d2e241ea866ca77f987b7ece9f",
+      "main_sha256": "e9b7f8f46c7bc683400442663ee3bf80d86ef6d2e241ea866ca77f987b7ece9f"
+    },
+    {
+      "path": "crates/security/chio-security-kernel/tests/adapters.rs",
+      "retained_qualified_component_sha256": "fe6673ad21bed5b7aa48851b44b5188e0ed95a773112f0ef11b7c57af95669fb",
+      "archived_source_sha256": "fe6673ad21bed5b7aa48851b44b5188e0ed95a773112f0ef11b7c57af95669fb",
+      "main_sha256": "fe6673ad21bed5b7aa48851b44b5188e0ed95a773112f0ef11b7c57af95669fb"
+    },
+    {
+      "path": "crates/security/chio-security-kernel/tests/adapters/tripwire_arguments.rs",
+      "retained_qualified_component_sha256": "74f8384dd799b4c22edb7ba833df72d133c4d31593bb497b8ebd66e1c7b44f38",
+      "archived_source_sha256": "74f8384dd799b4c22edb7ba833df72d133c4d31593bb497b8ebd66e1c7b44f38",
+      "main_sha256": "74f8384dd799b4c22edb7ba833df72d133c4d31593bb497b8ebd66e1c7b44f38"
+    },
+    {
+      "path": "crates/security/chio-security-kernel/tests/decoy_argument_port.rs",
+      "retained_qualified_component_sha256": "5e4c83c6a705e79edb848a2fdfe998e696e2ac60891f34f56275e515a77b6a71",
+      "archived_source_sha256": "5e4c83c6a705e79edb848a2fdfe998e696e2ac60891f34f56275e515a77b6a71",
+      "main_sha256": "5e4c83c6a705e79edb848a2fdfe998e696e2ac60891f34f56275e515a77b6a71"
+    }
+  ],
+  "preserved_component_evidence": {
+    "path": "docs/security/audits/github-final-review-repairs-20261010.json",
+    "sha256": "fde8d5b624f7bda94e4dee5e789f721b79dee02b774abe261502fde6701408cc",
+    "original": "11 argument failures; real registry 8 passes/3 genuine failures; independent padded-delimiter residual 0 passes/1 genuine failure.",
+    "local": "Final owning 78 passes, zero failures/ignored; strict all-target Clippy passes. Independent final review pending.",
+    "scope": "Historical component tests and strict lint with the same five source/test files. Not a fresh run or current full dependency-graph qualification."
+  },
+  "behavior": {
+    "pre_dispatch": "Collect argument keys and string values before any detector lookup; check credential, file, cookie and hostname kinds before allowing dispatch.",
+    "exhaustion": "Depth, node, input-byte, candidate-count and candidate-byte exhaustion refuse before lookup or invocation.",
+    "compatibility": "Exact raw markers and common delimiter forms retained; encoded and arbitrary substring matching remain outside the documented contract.",
+    "evidence": "Detector failure refuses without fabricating a hit; detection records digests rather than raw markers."
+  },
+  "remaining_acceptance": [
+    "Current exact-head required CI must reach terminal results; historical local results are not hosted acceptance.",
+    "Trusted authorization/evidence and broader native, cold-state and operational acceptance retain their separate obligations.",
+    "The foundation was merged before four required checks passed. This reconciliation does not retroactively qualify that landing."
+  ],
+  "source_merged": true,
+  "full_qualified": false,
+  "production_changes": false,
+  "new_test_campaign": false
+}

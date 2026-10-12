@@ -210,8 +210,16 @@ jobs:
             --dev /dev \
             -- /bin/true
 
+      - name: Install Drogon build dependencies
+        uses: ./.github/actions/apt-install
+        with:
+          packages: libssl-dev zlib1g-dev uuid-dev
+
       - name: SDK parity contract lane
-        run: ./scripts/check-sdk-parity.sh
+        run: |
+          CMAKE_PREFIX_PATH="$(./scripts/setup-drogon-test-deps.sh)"
+          export CMAKE_PREFIX_PATH
+          ./scripts/check-sdk-parity.sh
 
       - name: Install Proof Room dashboard dependencies
         working-directory: crates/products/chio-cli/dashboard
