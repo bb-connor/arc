@@ -163,7 +163,7 @@ func decodeResponse(t *testing.T, rec *httptest.ResponseRecorder) AdmissionRevie
 // capability annotation at all. The webhook must deny.
 func TestAdmissionFailsClosedWithoutCapability(t *testing.T) {
 	signer := newKernelSigner(t)
-	server := NewServer(trustingConfig(t, signer, "db:invoke"), nil)
+	server := NewServer(trustingConfig(t, signer, "tool:*:db:invoke"), nil)
 
 	body := buildPodReview(t, map[string]string{}, "CREATE", "default")
 	req := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
@@ -188,7 +188,7 @@ func TestAdmissionFailsClosedWithoutCapability(t *testing.T) {
 // signature does not verify. The webhook must deny.
 func TestAdmissionFailsClosedWithUnsignedCapability(t *testing.T) {
 	signer := newKernelSigner(t)
-	server := NewServer(trustingConfig(t, signer, "db:invoke"), nil)
+	server := NewServer(trustingConfig(t, signer, "tool:*:db:invoke"), nil)
 
 	// Build a token with a real shape but a tampered signature.
 	token := signedToolToken(t, signer, "db", "invoke")
@@ -228,7 +228,7 @@ func TestAdmissionFailsClosedWithUntrustedSigner(t *testing.T) {
 	trusted := newKernelSigner(t)
 	untrusted := newKernelSigner(t)
 
-	server := NewServer(trustingConfig(t, trusted, "db:invoke"), nil)
+	server := NewServer(trustingConfig(t, trusted, "tool:*:db:invoke"), nil)
 
 	token := signedToolToken(t, untrusted, "db", "invoke")
 	body := buildPodReview(t,
@@ -256,7 +256,7 @@ func TestAdmissionFailsClosedWithUntrustedSigner(t *testing.T) {
 // requirement. The webhook must allow.
 func TestAdmissionAdmitsWithVerifiedCapability(t *testing.T) {
 	signer := newKernelSigner(t)
-	server := NewServer(trustingConfig(t, signer, "db:invoke"), nil)
+	server := NewServer(trustingConfig(t, signer, "tool:*:db:invoke"), nil)
 
 	now := time.Now().UTC()
 	token := signedTokenWith(t,
@@ -298,7 +298,7 @@ func TestAdmissionFailsClosedWhenTrustedKeysMissing(t *testing.T) {
 	signer := newKernelSigner(t)
 	emptyConfig := VerifierConfig{
 		TrustedKernelKeys: map[string]struct{}{},
-		RequiredScopes:    []string{"db:invoke"},
+		RequiredScopes:    []string{"tool:*:db:invoke"},
 	}
 	server := NewServer(emptyConfig, nil)
 
@@ -327,7 +327,7 @@ func TestAdmissionFailsClosedWhenTrustedKeysMissing(t *testing.T) {
 // are denied even when the signature and signer are valid.
 func TestAdmissionFailsClosedWithExpiredCapability(t *testing.T) {
 	signer := newKernelSigner(t)
-	server := NewServer(trustingConfig(t, signer, "db:invoke"), nil)
+	server := NewServer(trustingConfig(t, signer, "tool:*:db:invoke"), nil)
 
 	now := time.Now().UTC()
 	token := signedTokenWith(t,
@@ -367,7 +367,7 @@ func TestAdmissionFailsClosedWithExpiredCapability(t *testing.T) {
 // into namespace "default".
 func TestAdmissionFailsClosedWhenBindingMismatches(t *testing.T) {
 	signer := newKernelSigner(t)
-	server := NewServer(trustingConfig(t, signer, "db:invoke"), nil)
+	server := NewServer(trustingConfig(t, signer, "tool:*:db:invoke"), nil)
 
 	now := time.Now().UTC()
 	token := signedTokenWith(t,
@@ -408,13 +408,13 @@ func TestAdmissionFailsClosedWhenBindingMismatches(t *testing.T) {
 // being controlled by the workload itself.
 func TestAdmissionRejectsPodSuppliedRequiredScopes(t *testing.T) {
 	signer := newKernelSigner(t)
-	server := NewServer(trustingConfig(t, signer, "db:invoke"), nil)
+	server := NewServer(trustingConfig(t, signer, "tool:*:db:invoke"), nil)
 
 	token := signedToolToken(t, signer, "db", "invoke")
 	body := buildPodReview(t,
 		map[string]string{
 			AnnotationCapabilityToken: token,
-			AnnotationRequiredScopes:  "db:invoke",
+			AnnotationRequiredScopes:  "tool:*:db:invoke",
 		},
 		"CREATE",
 		"default",
@@ -438,7 +438,7 @@ func TestAdmissionRejectsPodSuppliedRequiredScopes(t *testing.T) {
 // declared by the workload.
 func TestAdmissionRejectsSelfAssertedExemption(t *testing.T) {
 	signer := newKernelSigner(t)
-	server := NewServer(trustingConfig(t, signer, "db:invoke"), nil)
+	server := NewServer(trustingConfig(t, signer, "tool:*:db:invoke"), nil)
 
 	body := buildPodReview(t,
 		map[string]string{AnnotationExempt: "true"},
@@ -464,7 +464,7 @@ func TestAdmissionRejectsSelfAssertedExemption(t *testing.T) {
 // silently permit pods that the validating webhook would reject.
 func TestMutateDeniesWhenValidationFails(t *testing.T) {
 	signer := newKernelSigner(t)
-	server := NewServer(trustingConfig(t, signer, "db:invoke"), nil)
+	server := NewServer(trustingConfig(t, signer, "tool:*:db:invoke"), nil)
 
 	body := buildPodReview(t, map[string]string{}, "CREATE", "default")
 	req := httptest.NewRequest(http.MethodPost, "/mutate", bytes.NewReader(body))
@@ -493,7 +493,7 @@ func TestHealthz(t *testing.T) {
 // requires explicit trusted keys.
 func TestLoadVerifierConfigFromEnvRejectsEmptyTrust(t *testing.T) {
 	t.Setenv(EnvTrustedKernelKeys, "")
-	t.Setenv(EnvRequiredScopes, "db:invoke")
+	t.Setenv(EnvRequiredScopes, "tool:*:db:invoke")
 
 	if _, err := LoadVerifierConfigFromEnv(); err == nil {
 		t.Fatal("expected loader to reject empty trusted-key configuration")
@@ -517,7 +517,7 @@ func TestLoadVerifierConfigFromEnvRejectsEmptyScopes(t *testing.T) {
 func TestLoadVerifierConfigFromEnvAcceptsValid(t *testing.T) {
 	signer := newKernelSigner(t)
 	t.Setenv(EnvTrustedKernelKeys, signer.issuerHex)
-	t.Setenv(EnvRequiredScopes, "db:invoke")
+	t.Setenv(EnvRequiredScopes, "tool:*:db:invoke")
 
 	config, err := LoadVerifierConfigFromEnv()
 	if err != nil {
@@ -528,5 +528,33 @@ func TestLoadVerifierConfigFromEnvAcceptsValid(t *testing.T) {
 	}
 	if len(config.RequiredScopes) != 1 {
 		t.Fatalf("expected 1 required scope, got %d", len(config.RequiredScopes))
+	}
+}
+
+func TestParseRequiredScopeRejectsAliasesAndShorthand(t *testing.T) {
+	for _, raw := range []string{
+		"db:invoke",
+		"db:read",
+		"tool:*:db:call",
+		"tool:*:db:exec",
+		"tool:*:db:execute",
+		"tool:*:db:watch",
+		"tool:*:db:result",
+		"tool:*:db:write",
+		"tool:*:db:Invoke",
+	} {
+		if _, err := parseRequiredScope(raw); err == nil {
+			t.Fatalf("expected %q to be rejected", raw)
+		}
+	}
+	for _, raw := range []string{
+		"tool:*:db:invoke",
+		"tool:srv:db:read_result",
+		"resource:logs:read",
+		"prompt:summarize:get",
+	} {
+		if _, err := parseRequiredScope(raw); err != nil {
+			t.Fatalf("expected %q to parse: %v", raw, err)
+		}
 	}
 }
