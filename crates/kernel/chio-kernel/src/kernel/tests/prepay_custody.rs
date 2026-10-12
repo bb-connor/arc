@@ -266,6 +266,10 @@ impl Fixture {
             metadata["chio_runtime"]["dispatch_credential_disposition"],
             "retained_after_authorization"
         );
+        assert_eq!(
+            metadata["chio_runtime"]["identity_disposition"], "retained",
+            "capture outcome still owns the request identity"
+        );
         assert!(!metadata.to_string().contains(SENSITIVE_ERROR));
         assert!(!response
             .reason
