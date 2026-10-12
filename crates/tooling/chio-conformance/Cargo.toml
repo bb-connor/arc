@@ -85,7 +85,7 @@ toml = "0.8"
 reqwest = { workspace = true, features = ["blocking", "form", "query", "rustls"] }
 tiny_http = "0.12"
 tempfile = { workspace = true }
-chio-selective-disclosure = { path = "../../trust/chio-selective-disclosure", default-features = false, optional = true }
+chio-selective-disclosure = { version = "=0.1.0", path = "../../trust/chio-selective-disclosure", default-features = false, optional = true }
 chio-workflow = { workspace = true, optional = true }
 
 [[test]]

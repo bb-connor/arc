@@ -379,6 +379,10 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "research-lab evidence boundaries record absent production features",
         "2026-12-31",
     ),
+    "spec/fixtures/chio-process-v1.json": allow(
+        "conformance corpus describes the scripted stub host that drives SDK client cases",
+        "2026-12-31",
+    ),
     "spec/schemas/chio-attest/v1/selective-disclosure-proof.schema.json": allow(
         "schema explicitly rejects proof schema identifiers ending in .stub",
         "2026-12-31",
@@ -693,6 +697,9 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
         r'^"offer_authentication": "not implemented",$',
         r'^"production_offer_persistence": "not implemented",$',
         r'^"native_recovery_workflow_integration": "not implemented",$',
+    ),
+    "spec/fixtures/chio-process-v1.json": (
+        r'^"description": "Shared conformance corpus for the chio\.process\.v1 worker protocol\. .* against a stub host that returns the given response bytes\.",$',
     ),
     "spec/schemas/chio-attest/v1/selective-disclosure-proof.schema.json": (
         r'"schema": \{ "pattern": "\\\\.stub\$" \}',
