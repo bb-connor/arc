@@ -15,18 +15,26 @@ fn ready_service() -> (tempfile::TempDir, ReceiptQuerySnapshots) {
         assert!(Instant::now() < deadline, "snapshot did not become ready");
         std::thread::sleep(Duration::from_millis(5));
     }
+    service.pause_extension_for_test(true);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !service.inner.extension_parked.load(Ordering::SeqCst) {
+        assert!(Instant::now() < deadline, "snapshot walker did not park");
+        std::thread::sleep(Duration::from_millis(5));
+    }
     (directory, service)
 }
 
 #[test]
 fn health_uses_a_coherent_sample_while_the_database_is_held() {
     let (_directory, service) = ready_service();
-    service.pause_extension_for_test(true);
     let Phase::Ready(published) = service.inner.phase() else {
         panic!("service was not ready");
     };
-    let held = published.owned.lock().unwrap();
-    let expected = published.watermark_of(&held.meta);
+    let mut held = published.owned.lock().unwrap();
+    // Model the legal gap between advancing metadata and sampling telemetry.
+    held.meta.observed_at_ms = held.meta.observed_at_ms.checked_add(1).unwrap();
+    let expected = published.health_sample.lock().unwrap().clone().unwrap();
+    assert!(held.meta.observed_at_ms > expected.watermark.observed_at_unix_ms);
     let (sent, received) = std::sync::mpsc::channel();
     let status = std::thread::scope(|scope| {
         scope.spawn(|| sent.send(service.health_status()).unwrap());
@@ -37,9 +45,15 @@ fn health_uses_a_coherent_sample_while_the_database_is_held() {
     .expect("health queued behind a held database connection");
     assert_eq!(status.state, ReceiptQuerySnapshotState::Ready);
     assert_eq!(status.tool_receipts, 0);
-    assert_eq!(status.watermark, Some(expected));
+    assert_eq!(status.watermark, Some(expected.watermark));
+    assert_eq!(status.quota_bytes, expected.quota_bytes);
+    assert_eq!(status.used_bytes, expected.used_bytes);
     assert!(status.used_bytes > 0);
+    assert_eq!(status.tool_receipts, expected.tool_receipts);
+    assert_eq!(status.dimensions, expected.dimensions);
     assert_eq!(status.dimensions, 0);
+    assert_eq!(status.dimension_bytes, expected.dimension_bytes);
+    assert_eq!(service.inner.readers.load(Ordering::SeqCst), 0);
     service.shutdown();
     let stopped = service.health_status();
     assert_eq!(stopped.state, ReceiptQuerySnapshotState::Stopped);

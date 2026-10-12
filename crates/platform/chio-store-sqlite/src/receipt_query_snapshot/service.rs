@@ -649,6 +649,8 @@ pub(super) struct Inner {
     last_recertification_ms: AtomicU64,
     #[cfg(test)]
     pause_extension: AtomicBool,
+    #[cfg(test)]
+    extension_parked: AtomicBool,
     /// Whether a lineage was published since the walker's last integrity
     /// failure.
     published_since_failure: AtomicBool,
@@ -703,6 +705,8 @@ impl ReceiptQuerySnapshots {
             last_recertification_ms: AtomicU64::new(0),
             #[cfg(test)]
             pause_extension: AtomicBool::new(false),
+            #[cfg(test)]
+            extension_parked: AtomicBool::new(false),
             published_since_failure: AtomicBool::new(false),
             #[cfg(test)]
             integrity_waits: Mutex::new(Vec::new()),
@@ -1452,9 +1456,12 @@ fn serve(
         }
         #[cfg(test)]
         if inner.pause_extension.load(Ordering::SeqCst) {
+            inner.extension_parked.store(true, Ordering::SeqCst);
             inner.sleep(inner.config.extension_tick);
             continue;
         }
+        #[cfg(test)]
+        inner.extension_parked.store(false, Ordering::SeqCst);
         published.hold(|owned| owned.db.increase_quota(inner.requested_quota()))?;
         match extend_cycle(ctx, published, &|| inner.now_ms()) {
             Ok(observation) => covered = Some(observation),

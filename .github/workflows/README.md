@@ -212,78 +212,29 @@ workspace and tests it with the carveouts above.
 > console build pipelines referenced by the PR build/lint/test gate live in their own repos and
 > are out of scope for this workflow.
 
-## The `chio-pheromone-*` gate family is kept as separate files
+## The pheromone fixture gates run in two workflows
 
-The 15 `chio-pheromone-*.yml` workflows look like near-duplicates but must not be
-consolidated into a single matrix workflow. Two constraints rule out the obvious
-collapses.
+The 15 facets of `cargo xtask check fixtures` (`KNOWN_FACETS` in
+`xtask/src/fixtures.rs`, described in `ci-gates/pheromone.toml`) run as steps in
+two workflows, one per setup group. Each job builds `xtask` and `chio` once and
+runs every facet of its group as its own step.
 
-### The 15 files
+| Workflow | Job | Setup | Facets |
+| -------- | --- | ----- | ------ |
+| `chio-pheromone-pinned.yml` | `pinned-fixture-gates` | `dtolnay/rust-toolchain`, `Swatinem/rust-cache`, `actions/setup-node` 22 and `npm ci` in the dashboard | directory-lifecycle, the five archive, export and external-retention facets, relay-observability, relay-ops, relay, runtime, transit |
+| `chio-pheromone-composite.yml` | `composite-fixture-gates` | `./.github/actions/setup-rust` and `./.github/actions/setup-node` 24 | relay-alert-assurance, relay-alert-delivery, relay-alert-handoff, relay-alert-routing |
 
-Relay subsystem gates (each runs one `scripts/check-<name>.sh`):
+Both groups compile with the toolchain pinned by `rust-toolchain.toml`: the
+toolchain actions install and default `stable`, and the repository override
+selects the pinned channel for every cargo invocation. The groups differ in the
+environment their setup actions export and in the Node major they install, so
+they stay separate jobs.
 
-- `chio-pheromone-relay.yml`
-- `chio-pheromone-relay-ops.yml`
-- `chio-pheromone-relay-observability.yml`
-- `chio-pheromone-relay-alert-routing.yml`
-- `chio-pheromone-relay-alert-delivery.yml`
-- `chio-pheromone-relay-alert-handoff.yml`
-- `chio-pheromone-relay-alert-assurance.yml`
-- `chio-pheromone-relay-alert-assurance-archive.yml`
-- `chio-pheromone-relay-alert-assurance-archive-package.yml`
-- `chio-pheromone-relay-alert-assurance-archive-hardening.yml`
-- `chio-pheromone-relay-alert-assurance-export.yml`
-- `chio-pheromone-relay-alert-assurance-external-retention.yml`
-- `chio-pheromone-directory-lifecycle.yml`
-- `chio-pheromone-runtime.yml`
-- `chio-pheromone-transit.yml`
+Every facet step runs with `if: ${{ !cancelled() }}`, so one failing facet still
+lets the remaining facets report while failing the job. Each workflow triggers
+on the union of the paths its facets used, plus its own file and the coverage
+checker. Token scope is `contents: read`, the repository default.
 
-### A single matrix workflow cannot path-scope per gate
-
-Each file carries its own `on.paths` trigger (a different set of crate, spec,
-script, and doc globs). A single matrix workflow has one `on:` block and cannot
-express per-matrix-entry path filters, so collapsing them forces every gate to
-run on every pheromone-related change, defeating the path-scoping these files
-provide.
-
-### The reusable-workflow (`workflow_call`) pattern does not fit either
-
-Extracting the shared job body into one `workflow_call` reusable workflow with
-thin path-triggered callers fails because the job bodies are not uniform. They
-fall into four distinct shapes:
-
-| Shape | Files | `permissions:` block | `Swatinem/rust-cache` | `setup-node` | node version |
-| ----- | ----- | -------------------- | --------------------- | ------------ | ------------ |
-| A | relay, relay-ops, directory-lifecycle, runtime, transit | none | no | no | - |
-| B | relay-observability | none | no | yes | 22 |
-| C | alert-routing, alert-delivery, alert-handoff, alert-assurance | `contents: read` | yes | yes | 24 |
-| D | the five `...-assurance-archive` / `-export` / `-external-retention` | `contents: read` | yes | no | - |
-
-`workflow_call` inputs could express these differences (booleans gating the
-cache / node steps via `if:`, a string for the node version, strings for the
-gate name and script path), but four constraints block the conversion, each on
-its own sufficient:
-
-1. The four shapes require conditional (`if: inputs.*`) steps. The resulting
-   single file is harder to reason about than the 15 flat files it replaces.
-2. Permissions posture differs. Shapes A and B set no `permissions:` block (they
-   inherit the repository / org default token scope); shapes C and D pin
-   `contents: read`. Under `workflow_call`, the effective token scope is governed
-   by the called workflow plus the caller job's `permissions:`. Folding files
-   with different permission postures into one reusable workflow risks silently
-   changing the token scope for some gates, over-granting a fail-closed CI
-   surface.
-3. The node-version split (22 in shape B vs 24 in shape C) is not reconcilable
-   from the YAML alone; collapsing to one version would change at least one
-   gate's node runtime.
-4. Required status-check matching. Branch-protection / ruleset config lives in
-   GitHub settings outside this repo. Converting these to callers changes how
-   each check surfaces (it appears as `caller / reusable-job` instead of the
-   current top-level job name), which can silently break a required-check rule.
-
-Any consolidation must be validated on a branch where GitHub Actions runs, with
-Actions executing, against four invariants: the per-file `on.paths` triggers
-still gate correctly on both `pull_request` and `push`; the effective token
-permissions per gate are unchanged; the node version choice is deliberate; and
-the surfaced check names still satisfy the required-status-check rules
-configured in GitHub settings.
+`scripts/check-pheromone-ci.py` runs in the build-lint structural gates and
+requires exactly one step per known facet across the two jobs, the exact setup
+prefixes, triggers, permissions and concurrency, and no per-facet workflow file.

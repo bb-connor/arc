@@ -1,0 +1,76 @@
+name: Chio Pheromone Composite Fixture Gates
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/chio-pheromone-composite.yml"
+      - "ci-gates/pheromone.toml"
+      - "crates/observability/chio-metrics-spec/**"
+      - "crates/products/chio-cli/**"
+      - "crates/tooling/chio-spec-validate/**"
+      - "crates/trust/chio-pheromone-relay/**"
+      - "deploy/prometheus/**"
+      - "docs/release/CHIO_PHEROMONE_RELAY_RUNBOOK.md"
+      - "docs/release/chio-pheromone-relay/**"
+      - "examples/chio-3vendor/fixtures/pheromone/relay/**"
+      - "scripts/check-pheromone-ci.py"
+      - "scripts/tests/check-pheromone-ci.test.py"
+      - "spec/schemas/chio-pheromone/v1/**"
+      - "spec/schemas/registry.json"
+      - "xtask/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/chio-pheromone-composite.yml"
+      - "ci-gates/pheromone.toml"
+      - "crates/observability/chio-metrics-spec/**"
+      - "crates/products/chio-cli/**"
+      - "crates/tooling/chio-spec-validate/**"
+      - "crates/trust/chio-pheromone-relay/**"
+      - "deploy/prometheus/**"
+      - "docs/release/CHIO_PHEROMONE_RELAY_RUNBOOK.md"
+      - "docs/release/chio-pheromone-relay/**"
+      - "examples/chio-3vendor/fixtures/pheromone/relay/**"
+      - "scripts/check-pheromone-ci.py"
+      - "scripts/tests/check-pheromone-ci.test.py"
+      - "spec/schemas/chio-pheromone/v1/**"
+      - "spec/schemas/registry.json"
+      - "xtask/**"
+
+permissions:
+  contents: read
+
+jobs:
+  composite-fixture-gates:
+    name: Pheromone fixture gates (setup-rust, Node 24)
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-composite-fixture-gates-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: ./.github/actions/setup-rust
+        with:
+          toolchain: stable
+      - uses: ./.github/actions/setup-node
+        with:
+          node-version: "24"
+          cache-dependency-path: crates/products/chio-cli/dashboard/package-lock.json
+          working-directory: crates/products/chio-cli/dashboard
+
+      - name: Check Chio pheromone relay alert assurance
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay-alert-assurance
+
+      - name: Check Chio pheromone relay alert delivery
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay-alert-delivery
+
+      - name: Check Chio pheromone relay alert handoff
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay-alert-handoff
+
+      - name: Check Chio pheromone relay alert routing
+        if: ${{ !cancelled() }}
+        run: cargo xtask check fixtures relay-alert-routing

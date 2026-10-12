@@ -145,6 +145,8 @@ jobs:
           run_gate python3 scripts/tests/msrv-cache-target.test.py
           run_gate python3 scripts/check-native-protocol-ci.py
           run_gate python3 scripts/tests/check-native-protocol-ci.test.py
+          run_gate python3 scripts/check-pheromone-ci.py
+          run_gate python3 scripts/tests/check-pheromone-ci.test.py
           run_gate python3 scripts/tests/process-consumer-jobs.test.py
           run_gate python3 scripts/tests/prepare-enforced-native-fixture.test.py
           run_gate python3 -m unittest discover -s integrations/required-agents/qualification -p 'test_*.py'
