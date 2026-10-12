@@ -2,7 +2,7 @@
 use super::*;
 
 #[derive(Debug)]
-struct ReadOnlyTransport;
+pub(super) struct ReadOnlyTransport;
 
 impl McpTransport for ReadOnlyTransport {
     fn list_tools(&self) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, AdapterError> {
@@ -26,7 +26,9 @@ impl McpTransport for ReadOnlyTransport {
     }
 }
 
-async fn ready_factory_session(session: &RemoteSession) -> Result<(), Box<dyn std::error::Error>> {
+pub(super) async fn ready_factory_session(
+    session: &RemoteSession,
+) -> Result<(), Box<dyn std::error::Error>> {
     let params = json!({"protocolVersion":"2025-11-25", "capabilities":{},
         "clientInfo":{"name":"cursor-seed","version":"1"}});
     let mut events = session.subscribe();

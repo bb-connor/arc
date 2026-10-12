@@ -494,6 +494,9 @@ impl RemoteSessionFactory {
             resume_generation: 0,
             upstream_transport: upstream_notification_source,
         })?);
+        edge.observe_resource_subscriptions(Arc::new(
+            super::session_core_session::SubscriptionPersistence(Arc::downgrade(&session)),
+        ));
         let writer = BroadcastJsonRpcWriter::new(
             session.event_tx.clone(),
             session.retained_notification_events.clone(),
@@ -725,6 +728,9 @@ impl RemoteSessionFactory {
             upstream_transport: upstream_notification_source,
         })?);
         session.resume_envelope.raise(record.resume_integrity.envelope);
+        edge.observe_resource_subscriptions(Arc::new(
+            super::session_core_session::SubscriptionPersistence(Arc::downgrade(&session)),
+        ));
         let writer = BroadcastJsonRpcWriter::new(
             session.event_tx.clone(),
             session.retained_notification_events.clone(),

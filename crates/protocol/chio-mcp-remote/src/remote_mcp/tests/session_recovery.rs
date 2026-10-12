@@ -480,3 +480,7 @@ async fn tampered_pending_tombstone_keeps_the_store_unserved(
 #[cfg(target_os = "linux")]
 #[path = "session_recovery/terminal_journal.rs"]
 mod terminal_journal;
+
+#[cfg(target_os = "linux")]
+#[path = "session_recovery/subscription_persistence.rs"]
+mod subscription_persistence;

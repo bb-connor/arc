@@ -14,6 +14,7 @@ pub mod edge {
     pub use chio_mcp_edge::{
         decode_mcp_request, project_tool_result, AdapterError, ChioMcpEdge, McpEdgeConfig,
         McpExposedTool, McpServerCapabilities, McpToolInfo, McpToolResult, McpTransport,
+        ResourceSubscriptionObserver,
     };
 }
 mod errors;

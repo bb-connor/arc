@@ -64,6 +64,7 @@ impl RemoteSession {
             resume_hmac_keyring: init.resume_hmac_keyring,
             resume_generation: AtomicU64::new(init.resume_generation),
             resume_envelope,
+            subscriptions: StdMutex::new(BTreeMap::new()),
             upstream_transport: RemoteSessionUpstreamTransport {
                 inner: init.upstream_transport,
             },
@@ -279,7 +280,8 @@ impl RemoteSession {
         if lifecycle.state != RemoteSessionState::Ready {
             return Ok(None);
         }
-        self.resume_record_for_lifecycle(lifecycle).map(Some)
+        self.resume_record_for_lifecycle(lifecycle, self.persisted_subscriptions()?)
+            .map(Some)
     }
 
     /// Signs and persists the restored record at the generation its event
@@ -300,9 +302,49 @@ impl RemoteSession {
         self.persist_record(path, &record, self.clock.millis()?)
     }
 
+    pub(super) fn persisted_subscriptions(&self) -> Result<Vec<PersistedSubscription>, CliError> {
+        let subscriptions = self
+            .subscriptions
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        Ok(standard_subscriptions(&subscriptions))
+    }
+
+    /// Applies `change` to the subscription set. A durable session signs and
+    /// persists the changed record first, and keeps the old set if that fails.
+    fn change_subscriptions(
+        &self,
+        change: impl FnOnce(&mut BTreeMap<String, String>),
+    ) -> Result<(), CliError> {
+        let lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+        let mut current = self
+            .subscriptions
+            .lock()
+            .map_err(|_| ClockError::Unavailable)?;
+        let mut candidate = current.clone();
+        change(&mut candidate);
+        if candidate == *current {
+            return Ok(());
+        }
+        if let Some(path) = self.session_db_path.as_deref() {
+            if lifecycle.state != RemoteSessionState::Ready {
+                return Err(CliError::cli_other_error(format!(
+                    "MCP session {} persists subscriptions only while ready",
+                    self.session_id
+                )));
+            }
+            let record = self
+                .resume_record_for_lifecycle(lifecycle.clone(), standard_subscriptions(&candidate))?;
+            self.persist_record(path, &record, self.clock.millis()?)?;
+        }
+        *current = candidate;
+        Ok(())
+    }
+
     fn resume_record_for_lifecycle(
         &self,
         lifecycle: RemoteSessionLifecycleSnapshot,
+        subscriptions: Vec<PersistedSubscription>,
     ) -> Result<RemoteSessionResumeRecord, CliError> {
         let protocol_version = self
             .protocol_version
@@ -351,6 +393,7 @@ impl RemoteSession {
             protocol_version,
             peer_capabilities,
             initialize_params,
+            subscriptions,
         )
     }
 
@@ -360,6 +403,7 @@ impl RemoteSession {
         protocol_version: Option<String>,
         peer_capabilities: PeerCapabilities,
         initialize_params: Value,
+        subscriptions: Vec<PersistedSubscription>,
     ) -> Result<RemoteSessionResumeRecord, CliError> {
         let keyring = self.resume_hmac_keyring.as_ref().ok_or_else(|| {
             CliError::cli_other_error(format!(
@@ -367,7 +411,6 @@ impl RemoteSession {
                 self.session_id
             ))
         })?;
-        let subscriptions = Vec::new();
         let envelope = self.resume_envelope.select(&subscriptions);
         let resume_generation = crate::clock::next_counter(&self.resume_generation)?;
         let mut record = RemoteSessionResumeRecord {
@@ -480,6 +523,7 @@ impl RemoteSession {
                 protocol_version.clone(),
                 peer_capabilities.clone(),
                 initialize_params.clone(),
+                self.persisted_subscriptions()?,
             )?;
             self.persist_record(path, &record, now.get())?;
         }
@@ -513,7 +557,8 @@ impl RemoteSession {
         proposed.deadline = Some(deadline);
         if persist {
             if let Some(path) = self.session_db_path.as_deref() {
-                let record = self.resume_record_for_lifecycle(proposed.clone())?;
+                let record = self
+                    .resume_record_for_lifecycle(proposed.clone(), self.persisted_subscriptions()?)?;
                 self.persist_record(path, &record, now.get())?;
             }
         }
@@ -597,5 +642,44 @@ impl RemoteSession {
             notification_stream_attached,
             ..RemoteSessionOwnershipSnapshot::default()
         }
+    }
+}
+
+fn standard_subscriptions(subscriptions: &BTreeMap<String, String>) -> Vec<PersistedSubscription> {
+    subscriptions
+        .iter()
+        .map(|(uri, capability_id)| PersistedSubscription::Standard {
+            uri: uri.clone(),
+            capability_id: capability_id.clone(),
+        })
+        .collect()
+}
+
+/// Persists the edge's standard resource subscriptions with the session's
+/// resume record before the client is answered.
+pub(super) struct SubscriptionPersistence(pub(super) Weak<RemoteSession>);
+
+impl SubscriptionPersistence {
+    fn change(&self, change: impl FnOnce(&mut BTreeMap<String, String>)) -> Result<(), AdapterError> {
+        let session = self.0.upgrade().ok_or_else(|| {
+            AdapterError::ConnectionFailed("MCP session ended before its subscription change".into())
+        })?;
+        session
+            .change_subscriptions(change)
+            .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))
+    }
+}
+
+impl chio_mcp_adapter::edge::ResourceSubscriptionObserver for SubscriptionPersistence {
+    fn subscribed(&self, uri: &str, capability_id: &str) -> Result<(), AdapterError> {
+        self.change(|subscriptions| {
+            subscriptions.insert(uri.to_owned(), capability_id.to_owned());
+        })
+    }
+
+    fn unsubscribed(&self, uri: &str) -> Result<(), AdapterError> {
+        self.change(|subscriptions| {
+            subscriptions.remove(uri);
+        })
     }
 }

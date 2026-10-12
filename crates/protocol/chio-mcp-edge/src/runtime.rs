@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::ingress::{
     mcp_inbox, AccountedMessage, ClientInbound, InboxAdmission, McpInboxReceiver,
 };
-use crate::{AdapterError, McpTransport};
+use crate::{AdapterError, McpTransport, ResourceSubscriptionObserver};
 use chio_core::capability::{
     governance::{GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal},
     scope::{ModelMetadata, Operation},
@@ -165,6 +165,7 @@ pub struct ChioMcpEdge {
     tasks: BTreeMap<String, EdgeTask>,
     pending_background_tasks: Vec<String>,
     upstream_transport: Option<Arc<dyn McpTransport>>,
+    resource_subscription_observer: Option<Arc<dyn ResourceSubscriptionObserver>>,
 }
 
 impl ChioMcpEdge {
@@ -252,11 +253,19 @@ impl ChioMcpEdge {
             tasks: BTreeMap::new(),
             pending_background_tasks: Vec::new(),
             upstream_transport: None,
+            resource_subscription_observer: None,
         })
     }
 
     pub fn attach_upstream_transport(&mut self, transport: Arc<dyn McpTransport>) {
         self.upstream_transport = Some(transport);
+    }
+
+    pub fn observe_resource_subscriptions(
+        &mut self,
+        observer: Arc<dyn ResourceSubscriptionObserver>,
+    ) {
+        self.resource_subscription_observer = Some(observer);
     }
 
     pub fn set_initial_session_id(&mut self, session_id: SessionId) -> Result<(), AdapterError> {
