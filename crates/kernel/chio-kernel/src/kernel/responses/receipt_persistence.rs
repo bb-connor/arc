@@ -536,17 +536,23 @@ impl ChioKernel {
                 source: Box::new(source),
             })?
         {
-            self.observe_runtime_trace(RuntimeTraceEvent::ReceiptAppended {
-                source_sequence,
-                receipt: Box::new(receipt.clone()),
-            });
+            crate::kernel::security_dispatch::receipt_delivery(
+                &receipt_id,
+                ReceiptDeliveryStep::Trace,
+                || {
+                    self.observe_runtime_trace(RuntimeTraceEvent::ReceiptAppended {
+                        source_sequence,
+                        receipt: Box::new(receipt.clone()),
+                    });
+                    Ok(())
+                },
+            )?;
         }
-        self.finish_receipt_settlement(receipt, settlement_visible_at_ms)
-            .map_err(|source| KernelError::DeliveryFailedAfterReceipt {
-                receipt_id,
-                step: ReceiptDeliveryStep::Settlement,
-                source: Box::new(source),
-            })
+        crate::kernel::security_dispatch::receipt_delivery(
+            &receipt_id,
+            ReceiptDeliveryStep::Settlement,
+            || self.finish_receipt_settlement(receipt, settlement_visible_at_ms),
+        )
     }
 
     fn finish_receipt_settlement(

@@ -63,23 +63,19 @@ impl PreparedResponse {
         if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
             tail.memory_action.as_ref()
         {
-            kernel
-                .append_memory_provenance_for_write(store, key, request, receipt)
-                .map_err(|source| KernelError::DeliveryFailedAfterReceipt {
-                    receipt_id: receipt.id.clone(),
-                    step: ReceiptDeliveryStep::Provenance,
-                    source: Box::new(source),
-                })?;
+            crate::kernel::security_dispatch::receipt_delivery(
+                &receipt.id,
+                ReceiptDeliveryStep::Provenance,
+                || kernel.append_memory_provenance_for_write(store, key, request, receipt),
+            )?;
         }
         self.response.execution_nonce = match tail.nonce {
             AllowResponseNonce::Preminted(nonce) => Some(nonce),
-            AllowResponseNonce::MintForAllow => kernel
-                .mint_execution_nonce_for_allow(request, &request.capability, receipt)
-                .map_err(|source| KernelError::DeliveryFailedAfterReceipt {
-                    receipt_id: receipt.id.clone(),
-                    step: ReceiptDeliveryStep::ExecutionNonce,
-                    source: Box::new(source),
-                })?,
+            AllowResponseNonce::MintForAllow => crate::kernel::security_dispatch::receipt_delivery(
+                &receipt.id,
+                ReceiptDeliveryStep::ExecutionNonce,
+                || kernel.mint_execution_nonce_for_allow(request, &request.capability, receipt),
+            )?,
             AllowResponseNonce::Suppressed => None,
         };
         Ok(self.response)

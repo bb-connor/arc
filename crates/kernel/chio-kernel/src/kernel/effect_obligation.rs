@@ -566,25 +566,22 @@ impl<'a> Discharged<'a> {
                         &transition,
                     );
                 drop(transition);
-                super::security_dispatch::receipt_delivery(
-                    &receipt_id,
-                    ReceiptDeliveryStep::Trace,
-                    || {
-                        self.kernel
-                            .finish_record_chio_receipt(prepared.receipt(), committed)
-                    },
-                )?;
+                self.kernel
+                    .finish_record_chio_receipt(prepared.receipt(), committed)?;
                 if matches!(
                     prepared.record_mode(),
                     crate::kernel::responses::ReceiptRecordMode::WithFederation
                 ) {
-                    self.kernel
-                        .apply_federation_cosign_for_admitted_request(request, prepared.receipt())
-                        .map_err(|source| KernelError::DeliveryFailedAfterReceipt {
-                            receipt_id: receipt_id.clone(),
-                            step: ReceiptDeliveryStep::Federation,
-                            source: Box::new(source),
-                        })?;
+                    super::security_dispatch::receipt_delivery(
+                        &receipt_id,
+                        ReceiptDeliveryStep::Federation,
+                        || {
+                            self.kernel.apply_federation_cosign_for_admitted_request(
+                                request,
+                                prepared.receipt(),
+                            )
+                        },
+                    )?;
                 }
                 if let Some(outcome) = outcome {
                     (if returned {
@@ -609,11 +606,7 @@ impl<'a> Discharged<'a> {
                         }
                     })?;
                 }
-                let response = super::security_dispatch::receipt_delivery(
-                    &receipt_id,
-                    ReceiptDeliveryStep::Provenance,
-                    || prepared.finish_delivery(self.kernel, request),
-                )?;
+                let response = prepared.finish_delivery(self.kernel, request)?;
                 deferred_error.map_or(Ok(response), Err)
             }
             Delivery::Durable {
