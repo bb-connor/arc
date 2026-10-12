@@ -500,17 +500,22 @@ fn drop_guard_reverse_failure_records_cleanup_fault() {
     assert_eq!(
         receipt_log.len(),
         1,
-        "drop guard must emit exactly one cancellation receipt"
+        "drop guard must emit exactly one fault observation"
     );
     let receipt = receipt_log.get(0).unwrap();
-    assert!(
-        receipt.is_cancelled(),
-        "drop guard receipt must be a cancellation"
+    assert_eq!(
+        receipt.receipt_kind,
+        chio_core::receipt::kinds::ReceiptKind::TraceObservation
     );
+    assert!(receipt.decision.is_none());
+    assert!(receipt.verify_signature().expect("observation signature"));
     let metadata = receipt
         .metadata
         .as_ref()
-        .expect("cancellation receipt must carry metadata");
+        .expect("fault observation must carry metadata");
+    assert!(metadata
+        .pointer("/chio_runtime/identity_disposition")
+        .is_none());
     assert_eq!(
         metadata["chio_runtime"]["pre_dispatch_cleanup_failed"], true,
         "reverse failure must be visible as a pre-dispatch cleanup fault"
@@ -945,11 +950,19 @@ fn drop_pre_dispatch_records_receipt_on_cleanup_fault() -> Result<(), Box<dyn st
     let receipt = receipt_log
         .get(0)
         .ok_or_else(|| std::io::Error::other("pre-dispatch cleanup fault receipt missing"))?;
-    assert!(receipt.is_cancelled());
+    assert_eq!(
+        receipt.receipt_kind,
+        chio_core::receipt::kinds::ReceiptKind::TraceObservation
+    );
+    assert!(receipt.decision.is_none());
+    assert!(receipt.verify_signature()?);
     let receipt_metadata = receipt
         .metadata
         .as_ref()
         .ok_or_else(|| std::io::Error::other("fault receipt metadata missing"))?;
+    assert!(receipt_metadata
+        .pointer("/chio_runtime/identity_disposition")
+        .is_none());
     assert_eq!(
         receipt_metadata["chio_runtime"]["pre_dispatch_cleanup_failed"],
         true

@@ -1,13 +1,26 @@
-use chio_core::receipt::metadata::GuardEvidence;
+use chio_core::canonical::canonical_json_bytes;
+use chio_core::crypto::sha256_hex;
+use chio_core::receipt::{
+    body::ChioReceiptBody,
+    decision::ToolCallAction,
+    kinds::{
+        BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
+    },
+    metadata::GuardEvidence,
+    signing::ReceiptSigningHandle,
+};
 use chio_log_redact::redacted;
 use tracing::warn;
 
-use crate::admission_operation::AdmissionOperationV1;
+use crate::admission_operation::{AdmissionOperationV1, LOCAL_SYSTEM_TENANT_ID};
+use crate::receipt_support::{
+    next_receipt_id, receipt_attribution_metadata, request_receipt_metadata_with_payee_binding,
+};
 use crate::{CapabilityToken, PaymentAuthorization, ToolCallRequest};
 
 use super::{
-    merge_metadata_objects, scope_pre_invocation_guard_evidence, ChioKernel, IdentityDisposition,
-    PreExecutionBudgetMutation, RefusalReceiptMetadata, VerifiedGovernedPayeeBinding,
+    current_scoped_receipt_tenant_id, merge_metadata_objects, ChioKernel,
+    PreExecutionBudgetMutation, VerifiedGovernedPayeeBinding,
 };
 
 const PRE_DISPATCH_CLEANUP_FAULT_REASON: &str =
@@ -291,7 +304,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
         }
     }
 
-    /// Record a signed cancellation receipt documenting a pre-dispatch cleanup
+    /// Record a signed observation documenting a pre-dispatch cleanup
     /// fault. Best-effort from Drop: clock, construction or append failure is
     /// logged with the `audit_fault` field. The failing steps and the reserved
     /// lease/continuation ids (carried in the admission metadata) are folded
@@ -307,29 +320,125 @@ impl<'a> PostAdmissionDropGuard<'a> {
                 })
             })
             .collect();
-        let metadata = merge_metadata_objects(
-            self.receipt_context.extra_metadata.clone(),
-            Some(serde_json::json!({
-                "chio_runtime": {
-                    "pre_dispatch_cleanup_failed": true,
-                    "pre_dispatch_cleanup_faults": fault_entries,
-                }
-            })),
-        );
-
-        let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
-            self.receipt_context.pre_invocation_guard_evidence.clone(),
-        );
         if let Err(error) = self.kernel.trusted_now_millis().and_then(|now| {
-            self.kernel
-                .build_cancelled_response_with_metadata_and_payee_binding(
-                    self.request,
-                    PRE_DISPATCH_CLEANUP_FAULT_REASON,
-                    now.as_secs(),
-                    self.matched_grant_index,
-                    RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
-                    self.receipt_context.verified_payee_binding.as_ref(),
-                )
+            self.kernel.ensure_receipt_persistence_ready()?;
+            let authority = self.kernel.signing_authority.backend.as_ref();
+            if !self
+                .kernel
+                .signing_authority
+                .floor
+                .allowed_signing_algorithms()
+                .contains(&authority.algorithm())
+            {
+                return Err(super::KernelError::ReceiptSigningFailed(
+                    "cleanup observation authority does not satisfy the boot signing floor".into(),
+                ));
+            }
+            let namespace = match self.durable_operation {
+                Some(operation) => operation.binding().request_namespace_digest().clone(),
+                None => self
+                    .kernel
+                    .authenticated_receipt_namespace(&self.request.request_id)?
+                    .digest()
+                    .clone(),
+            };
+            let tenant_id = match self.durable_operation {
+                Some(operation) => {
+                    let binding = operation.binding().to_persisted();
+                    let tenant = binding.authenticated_tenant_id.as_str();
+                    (tenant != LOCAL_SYSTEM_TENANT_ID).then(|| tenant.to_owned())
+                }
+                None => self
+                    .kernel
+                    .receipt_tenant_id_for_request(Some(&self.request.request_id))
+                    .or_else(current_scoped_receipt_tenant_id),
+            };
+            let mut metadata = self
+                .receipt_context
+                .extra_metadata
+                .as_ref()
+                .and_then(serde_json::Value::as_object)
+                .cloned()
+                .unwrap_or_default();
+            let mut runtime = metadata
+                .remove("chio_runtime")
+                .and_then(|value| value.as_object().cloned())
+                .unwrap_or_default();
+            // A fault observes unfinished cleanup. The original operation still
+            // owns any terminal decision, regardless of its current custody.
+            runtime.remove("identity_disposition");
+            runtime.insert(
+                "pre_dispatch_cleanup_failed".into(),
+                serde_json::json!(true),
+            );
+            runtime.insert(
+                "pre_dispatch_cleanup_faults".into(),
+                serde_json::json!(fault_entries),
+            );
+            runtime.insert(
+                "pre_dispatch_cleanup_reason".into(),
+                serde_json::json!(PRE_DISPATCH_CLEANUP_FAULT_REASON),
+            );
+            metadata.insert("chio_runtime".into(), serde_json::Value::Object(runtime));
+            metadata.insert(
+                "receipt_context".into(),
+                serde_json::json!({
+                    "request_id": self.request.request_id,
+                    "request_namespace_digest": namespace.as_str(),
+                }),
+            );
+            let metadata = Some(serde_json::Value::Object(metadata));
+            let request_metadata = request_receipt_metadata_with_payee_binding(
+                self.request,
+                self.kernel.attestation_trust_policy.as_ref(),
+                now.as_secs(),
+                metadata.as_ref(),
+                self.receipt_context.verified_payee_binding.as_ref(),
+            )?;
+            let metadata = merge_metadata_objects(
+                merge_metadata_objects(metadata, request_metadata),
+                receipt_attribution_metadata(self.cap, self.matched_grant_index)?,
+            );
+            let encode_error = |error: chio_core::error::Error| {
+                super::KernelError::ReceiptSigningFailed(error.to_string())
+            };
+            let content = canonical_json_bytes(&metadata).map_err(encode_error)?;
+            let action = ToolCallAction::from_parameters(self.request.arguments.clone())
+                .map_err(encode_error)?;
+            let body = ChioReceiptBody {
+                id: next_receipt_id("rcpt-cleanup-observation")?,
+                timestamp: now.as_secs(),
+                capability_id: self.cap.id.clone(),
+                tool_server: self.request.server_id.clone(),
+                tool_name: self.request.tool_name.clone(),
+                action,
+                decision: None,
+                receipt_kind: ReceiptKind::TraceObservation,
+                boundary_class: BoundaryClass::DetectOnly,
+                observation_outcome: Some(ObservationOutcome::Observed),
+                tool_origin: ToolOrigin::ChioInternal,
+                redaction_mode: RedactionMode::None,
+                actor_chain: Vec::new(),
+                content_hash: sha256_hex(&content),
+                policy_hash: self.kernel.config.policy_hash.clone(),
+                evidence: self.receipt_context.pre_invocation_guard_evidence.clone(),
+                metadata,
+                trust_level: TrustLevel::Verified,
+                tenant_id,
+                kernel_key: authority.public_key(),
+                bbs_projection_version: None,
+            };
+            let receipt = chio_kernel_core::sign_receipt_with_handle(
+                body,
+                authority,
+                ReceiptSigningHandle::from_content_preimage(content),
+            )
+            .map_err(|error| {
+                super::KernelError::ReceiptSigningFailed(format!(
+                    "cleanup observation signing failed: {error:?}"
+                ))
+            })?;
+            self.kernel.record_chio_receipt_without_settlement(&receipt)
         }) {
             warn!(
                 request_id = %self.request.request_id,

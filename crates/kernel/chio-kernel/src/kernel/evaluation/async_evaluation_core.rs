@@ -556,6 +556,11 @@ impl ChioKernel {
                             .map(DurableToolAdmission::operation),
                         runtime_metadata,
                     );
+                if !runtime_release_confirmed && durable_admission.is_some() {
+                    return Err(KernelError::DurableAdmission(
+                        "runtime admission reservation release could not be confirmed".into(),
+                    ));
+                }
                 if runtime_release_confirmed {
                     self.compensate_durable_admission_after_pre_dispatch_cleanup(
                         durable_admission
@@ -706,6 +711,9 @@ impl ChioKernel {
                                 .map(DurableToolAdmission::operation),
                             runtime_metadata,
                         );
+                    if !runtime_release_confirmed && durable_admission.is_some() {
+                        return Err(error);
+                    }
                     if runtime_release_confirmed {
                         self.compensate_durable_admission_after_pre_dispatch_cleanup(
                             durable_admission
@@ -795,6 +803,9 @@ impl ChioKernel {
                 )
             });
             let msg = error.to_string();
+            if runtime_release_retained && durable_admission.is_some() {
+                return Err(error);
+            }
             // An unconfirmed runtime release keeps the operation on its
             // recovery path, as at every other pre-dispatch denial.
             if !runtime_release_retained

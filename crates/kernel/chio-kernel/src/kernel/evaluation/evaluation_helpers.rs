@@ -629,6 +629,9 @@ impl ChioKernel {
                     reason = %redacted!(&failure.error),
                     "pre-dispatch cleanup could not be confirmed"
                 );
+                if denial.durable_operation.is_some() {
+                    return Err(*failure.error);
+                }
                 let metadata = match denial.budget_mutation.durable_hold_result() {
                     Some(charge) if charge.invocation_capture.is_some() => self
                         .captured_admission_retained_receipt_metadata(
@@ -720,6 +723,13 @@ impl ChioKernel {
             ),
             None => runtime_admission_metadata,
         };
+        if denial.durable_operation.is_some()
+            && (!runtime_release_confirmed || !lease_release.confirmed)
+        {
+            return Err(KernelError::DurableAdmission(
+                "pre-dispatch reservation release could not be confirmed".into(),
+            ));
+        }
         if !saga_compensated && runtime_release_confirmed && lease_release.confirmed {
             self.compensate_durable_admission_after_pre_dispatch_cleanup_with_payment_unwind(
                 denial.durable_operation,
@@ -831,6 +841,9 @@ impl ChioKernel {
                     reason = %redacted!(&error),
                     "execution nonce preflight cleanup could not be confirmed"
                 );
+                if durable_admission.is_some() {
+                    return Err(error);
+                }
                 let budget_metadata = budget_mutation
                     .durable_hold_result()
                     .map(|charge| self.budget_execution_receipt_metadata(charge, None, None));
@@ -891,6 +904,11 @@ impl ChioKernel {
         );
 
         if !runtime_release_confirmed || !lease_release.confirmed {
+            if durable_admission.is_some() {
+                return Err(KernelError::DurableAdmission(
+                    "execution nonce preflight cleanup could not be confirmed".into(),
+                ));
+            }
             return self.build_deny_response_with_metadata(
                 request,
                 "execution nonce preflight cleanup could not be confirmed",
