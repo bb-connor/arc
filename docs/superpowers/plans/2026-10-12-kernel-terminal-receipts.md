@@ -42,7 +42,7 @@
 
 **Interfaces:** Produce `IdentityDisposition::{Reusable, Retained, Terminal}` and `with_identity_disposition(Option<Value>, IdentityDisposition) -> Option<Value>`. The producing transition chooses the enum. The helper writes the snake-case signed field while preserving other kernel metadata. KERN-1 derives `retryable_after_resume` from `disposition == Reusable`; it never chooses Retained for a definite stop.
 
-- [ ] Run the new evaluator controls on Original: malformed redaction leaves zero receipts after one actual invocation; caller `receipt_context` is accepted. Keep a successful one-receipt control.
+- [x] Run the new evaluator controls on Original: malformed redaction leaves zero receipts after one actual invocation; caller `receipt_context` is accepted. Keep a successful one-receipt control.
 - [ ] Add producing-row controls: early reusable denial, persisted compensated terminal, unknown submitted-commit retained denial, post-effect terminal, Allow and pending-approval exceptions. Include duplicate request ids in distinct authenticated namespaces.
 - [ ] Implement the typed helper, reserve `receipt_context`, and derive namespace metadata from the existing authenticated replay binding. Do not classify by error text or infer Terminal from the verdict alone.
 - [ ] Run focused identity tests. Expected: correct disposition and unchanged existing metadata; caller forgery denied before invocation. Commit the task without publishing the incomplete unit.
@@ -93,5 +93,10 @@
 
 ## Progress
 
-- `8202e93624`: five initial Original controls committed. No production edit; runtime result pending.
-- Implementation awaits boundary review with Claude. Existing source/spec drift is recorded above; phase 2 escape-hatch tooling and full reservation-ledger conversion remain separate roadmap work.
+- Plan approved by Claude at 2026-10-12T17:15Z; the shared identity helper was requested as an early standalone prerequisite.
+- `8202e93624`: initial evaluator Original, one safe control passed and four expected failures. `/tmp/kern2-original.log`.
+- Early helper #1242 `dfe5a6a621`: four Original failures at `86938625ea`; 49 focused tests and strict all-target kernel Clippy passed at Rust-identical `98d8131906`. Remaining M20 transitions and namespace binding stay in this plan.
+- `0f9fedf5a2`: publication and security-release Original, one safe control passed and four expected failures. `/tmp/receipt-publication-original2.log`, SHA256 `5e43427a99c10f1b4c0729f8b1d58d31c12a1d3c6d830caa767d71bbc458472c`. The preceding fixture registration error is not runtime evidence.
+- `6593042a01`: publication outcome repair, 140 focused tests passed; strict Clippy pending. The trace sequence remains allocated under the transition lock. Public error variants describe the outcome but cannot be accepted as unforgeable discharge evidence.
+- `be7b7b31f1`: latch Original failed as expected: two invocations instead of one after an unresolved append. `/tmp/receipt-latch-original.log`.
+- Five formal abstraction entries (seven symbol hashes) reviewed against the four named models. No proof execution. Task 3 latch/recovery, Task 4 owned finalization and Task 5 monetary outcomes remain open. Phase 2 escape-hatch tooling and full reservation-ledger conversion remain separate roadmap work.
