@@ -73,7 +73,7 @@ impl ReservedCaptureFailure {
     }
 
     pub(crate) fn error_code(&self) -> &'static str {
-        payment_error_code(&self.error)
+        payment_outcome::payment_error_code(&self.error)
     }
 }
 
