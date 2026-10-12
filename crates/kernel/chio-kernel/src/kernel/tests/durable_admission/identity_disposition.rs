@@ -41,8 +41,12 @@ fn conflicting_begin_keeps_the_original_identity_terminal() {
         .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
         .unwrap()
         .unwrap();
-    let original = store.operation();
     drop(admission);
+    let original = store.operation();
+    assert_eq!(
+        original.state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
     request.arguments["value"] = serde_json::json!("changed");
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert!(response
