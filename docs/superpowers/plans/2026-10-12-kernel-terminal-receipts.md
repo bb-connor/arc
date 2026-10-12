@@ -168,14 +168,15 @@ The response builders require a typed disposition supplied by the producing row.
 | --- | --- |
 | Validation, negotiation, overload and persistence refusal before admission | Reusable |
 | Resource read refused without a persisted operation or effect | Reusable |
-| Submitted durable Begin without an authoritative outcome | Retained |
-| Confirmed operation, replay conflict or completed compensation | Terminal |
+| Typed unknown outcome from submitted durable Begin or participant mutation | Retained |
+| Confirmed live operation or conflicting replay | No new receipt; return the admission error and preserve the original owner |
+| Confirmed compensation or durable terminal projection | Terminal |
 | Explicit unconfirmed dispatch commit | Retained |
 | Effect already executed, including cancellation or output refusal | Terminal |
 | Successful cleanup without a durable operation or remaining custody | Reusable |
 | Cleanup that leaves custody bound to the request | Terminal |
 
-Durable admission must return a typed failure carrying the disposition selected at its storage boundary: before submission, after submission without acknowledgement, or after an authoritative result. Plain `KernelError` currently conflates these stages. Preserve the underlying error and existing signed rejection metadata.
+Durable admission returns a typed failure with an optional receipt disposition selected at its storage boundary. Before admission it may sign Reusable. A typed storage OutcomeUnknown permits Retained. A confirmed live operation permits no new receipt; confirmed compensation permits Terminal. The original typed error remains available to the caller.
 
 Original controls use the actual ordinary and nested entrypoints: expired signed capabilities must produce Reusable with no invocation; a missing session root after durable admission must produce Terminal after compensation. Keep healthy Allow and approval-required controls, and the existing CommitUnconfirmed Retained control. Approval-required is a distinct response state even when its signed wire decision is Deny.
 
@@ -184,5 +185,12 @@ No caller gains retry authority from a Terminal or Retained response. The remain
 ## Producer validation checkpoint
 
 - Original `8bedb91905`: early-refusal controls pass twice and fail twice (ordinary missing Reusable; nested loses the benign metadata field before reaching its disposition assertion). The persisted-compensation control fails on missing Terminal. The approval-required control passes without a disposition.
-- Original `8f3aa7d058`: both durable Begin controls fail on the intended signed metadata assertions. An acknowledgement lost after storing the row lacks Retained; a conflicting request lacks Terminal. The conflict preserves its live original owner, unchanged operation and zero dispatch count. Earlier conflict-fixture attempts allowed startup recovery to compensate the owner and do not establish the disposition defect.
+- Original `8f3aa7d058`: both durable Begin controls fail on the intended signed metadata assertions. An acknowledgement lost after storing the row lacks Retained. The conflicting-request oracle expected Terminal, but source review rejected that expectation: the original operation was still live, so the M20 contract permits no new terminal receipt. That assertion is superseded by the genuine failure at `4eace87424`. The conflict preserves its live original owner, unchanged operation and zero dispatch count. Earlier conflict-fixture attempts allowed startup recovery to compensate the owner and do not establish the disposition defect.
 - `11aa111f7b` composes the typed refusal producers and explicit Begin phase errors. Library compilation passed; focused runtime tests and the actual SQLite mutual-refusal test are pending. The direct durable terminal builder and its replay metadata validation are under separate review before final qualification.
+
+## Durable producer and replay checks
+
+- `aff93ea615`: 38 focused kernel tests pass, including namespace separation, compensation, cancellation and unknown dispatch. The exact SQLite mutual-refusal control passes one test covering both write orders; the earlier incorrect filter ran zero tests and is excluded.
+- Original `773b6848a6`: unknown broker acknowledgement fails because it reports Terminal rather than Retained. Durable output finalization has two passing controls and three failures for missing Terminal (delivery denial, incomplete stream and recovered incomplete stream).
+- Original `4eace87424`: a conflicting reentry into a live operation incorrectly returns a new signed Terminal receipt. The test requires an error while preserving the original operation and zero effects.
+- `e8d9429e82`: production repairs bind durable terminal receipt metadata to the authenticated stored namespace and reproduce it during exact replay validation. Typed unknown storage outcomes sign Retained; confirmed live failures preserve their owner without a competing receipt. Focused validation is running.
