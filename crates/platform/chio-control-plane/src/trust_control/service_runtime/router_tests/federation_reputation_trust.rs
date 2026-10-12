@@ -16,17 +16,17 @@ use chio_store_sqlite::{SqliteCapabilityAuthority, SqliteReceiptStore};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 const POLICY_ID: &str = "reputation-trust";
-const NOW: u64 = 1_800_000_000;
 
 struct Fixture {
     _directory: tempfile::TempDir,
     state: TrustServiceState,
+    now: u64,
     old_local: Keypair,
     admitted: Keypair,
 }
 
 impl Fixture {
-    fn recovered() -> Result<Self, Box<dyn std::error::Error>> {
+    fn recovered(now: u64) -> Result<Self, Box<dyn std::error::Error>> {
         let directory = chio_test_support::private_tempdir()?;
         let mut state = metrics_state("service-secret");
         state.finding_challenge_clock = chio_test_support::clock::clock();
@@ -66,6 +66,7 @@ impl Fixture {
         let fixture = Self {
             _directory: directory,
             state,
+            now,
             old_local,
             admitted,
         };
@@ -85,7 +86,7 @@ impl Fixture {
         let artifact = FederatedOpenAdmissionPolicyArtifact {
             schema: CHIO_FEDERATION_OPEN_ADMISSION_POLICY_SCHEMA.to_string(),
             policy_id: POLICY_ID.to_string(),
-            issued_at: NOW,
+            issued_at: self.now,
             namespace: "chio://federation/reputation".to_string(),
             governing_operator_id: "operator".to_string(),
             allowed_admission_classes: vec![GenericTrustAdmissionClass::PublicUntrusted],
@@ -99,7 +100,7 @@ impl Fixture {
         let mut registry = FederationAdmissionPolicyRegistry::default();
         registry.upsert(FederationAdmissionPolicyRecord {
             schema: crate::federation_policy::FEDERATION_ADMISSION_POLICY_RECORD_SCHEMA.to_string(),
-            published_at: NOW,
+            published_at: self.now,
             policy: SignedFederatedOpenAdmissionPolicy::sign(artifact, &self.admitted)?,
             anti_sybil: Default::default(),
             minimum_reputation_score,
@@ -143,7 +144,7 @@ impl Fixture {
         let receipt = ChioReceipt::sign(
             ChioReceiptBody {
                 id: format!("receipt-{}", capability.id),
-                timestamp: NOW,
+                timestamp: self.now,
                 capability_id: capability.id.clone(),
                 tool_server: "filesystem".to_string(),
                 tool_name: "read_file".to_string(),
@@ -187,15 +188,16 @@ impl Fixture {
                 requested_admission_class: GenericTrustAdmissionClass::PublicUntrusted,
                 proof_of_work_nonce: None,
             },
-            NOW,
+            self.now,
         )
     }
 }
 
 #[test]
 fn federation_reputation_accepts_the_recovered_authority_receipts() -> TestResult {
-    let _clock = chio_test_support::clock::scope_unix_secs(NOW);
-    let fixture = Fixture::recovered()?;
+    let now = now_unix_secs()?;
+    let _clock = chio_test_support::clock::scope_unix_secs(now);
+    let fixture = Fixture::recovered(now)?;
     let subject = fixture.history(&fixture.admitted)?;
     let response = fixture.evaluate(subject)?;
     assert!(
@@ -207,8 +209,9 @@ fn federation_reputation_accepts_the_recovered_authority_receipts() -> TestResul
 
 #[test]
 fn federation_reputation_excludes_the_displaced_local_key() -> TestResult {
-    let _clock = chio_test_support::clock::scope_unix_secs(NOW);
-    let fixture = Fixture::recovered()?;
+    let now = now_unix_secs()?;
+    let _clock = chio_test_support::clock::scope_unix_secs(now);
+    let fixture = Fixture::recovered(now)?;
     let subject = fixture.history(&fixture.old_local)?;
     let response = fixture.evaluate(subject)?;
     assert!(
@@ -220,8 +223,9 @@ fn federation_reputation_excludes_the_displaced_local_key() -> TestResult {
 
 #[test]
 fn federation_reputation_requires_an_admitted_authority_even_at_zero_threshold() -> TestResult {
-    let _clock = chio_test_support::clock::scope_unix_secs(NOW);
-    let mut fixture = Fixture::recovered()?;
+    let now = now_unix_secs()?;
+    let _clock = chio_test_support::clock::scope_unix_secs(now);
+    let mut fixture = Fixture::recovered(now)?;
     fixture.policy(Some(0.0))?;
     fixture.state.config.authority_db_path = None;
     assert!(fixture
@@ -232,8 +236,9 @@ fn federation_reputation_requires_an_admitted_authority_even_at_zero_threshold()
 
 #[test]
 fn federation_without_reputation_keeps_authority_optional() -> TestResult {
-    let _clock = chio_test_support::clock::scope_unix_secs(NOW);
-    let mut fixture = Fixture::recovered()?;
+    let now = now_unix_secs()?;
+    let _clock = chio_test_support::clock::scope_unix_secs(now);
+    let mut fixture = Fixture::recovered(now)?;
     fixture.policy(None)?;
     fixture.state.config.authority_db_path = None;
     assert!(
