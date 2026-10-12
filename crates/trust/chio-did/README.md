@@ -1,66 +1,58 @@
 # chio-did
 
-Self-certifying `did:chio` identifiers and DID Document resolution. The
-method-specific identifier is the lowercase hex form of an Ed25519 public key
-already used by Chio agents and operators, so basic resolution needs no
-registry lookup. The resolving environment may attach optional receipt-log and
-passport-status service endpoints.
-
-## Responsibilities
-
-- Derive a canonical `did:chio:<64-hex>` identifier from an Ed25519
-  `PublicKey` and parse it back (`DidChio`, `FromStr`, `Display`).
-- Resolve a `DidChio` into a W3C-shaped `DidDocument` with one Ed25519
-  verification method, with no network or registry lookups.
-- Validate and attach resolver-provided service endpoints (`DidService`),
-  rejecting anything that is not a well-formed `https` URL.
-- Reject non-Ed25519 key material and malformed method-specific identifiers.
-
-## Public API
-
-- `DidChio` - parses, renders, and resolves a `did:chio` identifier.
-  `from_public_key`/`try_from_public_key`, `as_str`, `verification_method_id`,
-  `public_key_multibase`, `resolve`, `resolve_with_options`; implements
-  `Display`, `FromStr`, `TryFrom<PublicKey>`.
-- `DidDocument`, `DidVerificationMethod`, `DidService` - the resolved document
-  and its parts (`serde::Serialize`/`Deserialize`, DID-spec field names).
-- `DidService::new` / `::receipt_log` / `::passport_status` - validated
-  service-endpoint constructors; `RECEIPT_LOG_SERVICE_TYPE` and
-  `PASSPORT_STATUS_SERVICE_TYPE` name the two known service types.
-- `ResolveOptions` - builder for the services attached during resolution.
-- `resolve_did_arc` - parse-and-resolve convenience over a raw
-  `did:chio:...` string.
-- `DidError` - the crate's fail-closed error enum.
+`chio-did` constructs and resolves Chio's self-certifying Ed25519 identity.
+It maps a canonical `did:chio` identifier to a DID document locally, without
+registry access. Credentials use these identifiers for issuer and holder keys.
 
 ## Usage
 
+Create an identity and attach an HTTPS receipt-log endpoint. Resolution performs
+no network request; the endpoint is metadata supplied by the caller.
+
 ```rust
-use chio_core::Keypair;
-use chio_did::{DidChio, DidService, ResolveOptions};
+use chio_core_types::Keypair;
+use chio_did::{DidChio, DidService, ResolveOptions, resolve_did_arc};
 
-let keypair = Keypair::from_seed(&[7u8; 32]);
-let did = DidChio::from_public_key(keypair.public_key())?;
-
-let options = ResolveOptions::default().with_service(
-    DidService::receipt_log(&did, 0, "https://trust.example.com/v1/receipts")?,
-);
-let document = did.resolve_with_options(&options);
-assert_eq!(document.id, did.to_string());
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let did = DidChio::from_public_key(Keypair::from_seed(&[7; 32]).public_key())?;
+    let options = ResolveOptions::default().with_service(
+        DidService::receipt_log(&did, 0, "https://trust.example.com/receipts")?
+    );
+    let document = resolve_did_arc(&did.to_string(), &options)?;
+    assert_eq!(document.authentication, vec![did.verification_method_id()]);
+    assert_eq!(document.service.len(), 1);
+    Ok(())
+}
 ```
 
-## Feature flags
+## Features
 
-| Flag | Effect |
-|------|--------|
-| `fuzz` | Enables `chio_did::fuzz` (`fuzz_did_resolve`), the libFuzzer entry point. Off by default; pulls in `arbitrary` and `serde_json`. Enabled only by the standalone `fuzz` workspace. |
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `fuzz` | Off | Exposes the fuzz entry point and enables `arbitrary` and `serde_json`. |
 
-## Testing
+## Guarantees
 
-`cargo test -p chio-did`
+- `DidChio::from_str` requires `did:chio:` followed by exactly 64 lowercase hex
+  characters and decodes the Ed25519 public key.
+- `DidChio::from_public_key` rejects algorithms other than Ed25519.
+- `resolve_with_options` emits one `#key-1` verification method, referenced by
+  authentication and assertion methods, with base58btc multicodec key material.
+- `DidService::new` parses the URL and requires HTTPS. Direct construction or
+  deserialization of public `DidService` fields bypasses that constructor.
 
-## See also
+## Status
 
-- `chio-core` - supplies the `PublicKey` and `SigningAlgorithm` types every `did:chio` identifier wraps.
-- `chio-credentials` - anchors credential subjects and issuers to resolved `did:chio` identities.
-- `chio-control-plane` - resolves `did:chio` identifiers for reputation and trust-control subjects.
-- `chio-cli` - implements the `did resolve` command over `DidChio`, `DidService`, and `ResolveOptions`.
+Local resolution and service constructors are implemented. Service reachability,
+key possession, issuer trust, revocation, and endpoint ownership require caller
+checks. `DidDocument` deserialization alone establishes no identity authenticity.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol identity](../../../spec/PROTOCOL.md#44-identity)
+- [Credentials](../chio-credentials/README.md)
+
+## License
+
+[Workspace license](../../../LICENSE)

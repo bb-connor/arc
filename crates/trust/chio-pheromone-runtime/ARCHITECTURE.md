@@ -1,131 +1,86 @@
 # chio-pheromone-runtime architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-pheromone-runtime` is the local receive-side trust boundary for Chio
-pheromone signals. It holds the only durable state in the pheromone stack
-(admitted deposits, replay nonces, scarcity/diversity counters, and receive
-reports) in a SQLite store, and gates every admission on a signed transit
-policy, replay/scarcity/diversity checks, and optional Chio workflow
-verification. Deposit and scarcity-policy semantics belong to
-`chio-pheromone`; gossip transport and envelope shapes belong to
-`chio-federation` and `chio-pheromone-relay`; this crate is the durable,
-policy-enforcing landing point between them.
+`PheromoneReceiver` combines a `PheromoneRuntimeStore`, a
+`WorkflowContextResolver`, and receiver-owned `PheromoneReceiverConfig`.
+Its public operations receive a batch or query concentration at the time
+captured in that configuration. Transport authentication and periodic policy
+refresh remain caller responsibilities.
 
-## Module map
+`SqlitePheromoneRuntimeStore` owns deposit, replay, scarcity, pair/diversity,
+passport history, and receive-report persistence. `open` creates parent
+folders and a persistent database; `open_in_memory` uses an ephemeral database.
+The crate provides no HTTP listener or automatic kernel-verdict integration.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | `PheromoneRuntimeError`; Chio-named workflow wrappers (`ChioWorkflowProofPackage`, `ChioWorkflowVerifierTrustBundle`, `ChioWorkflowVerificationContext`) and `VerifiedChioWorkflowResolver`; signed transit-policy loading (`runtime_policy_from_json`) and embedded-schema validation; peer-weights loading (`peer_weights_from_json`) and `StaticPeerWeightProvider`; the `PheromoneRuntimeStore`, `WorkflowContextResolver`, `PeerWeightProvider` traits; `PheromoneReceiver`. |
-| `src/store.rs` | `SqlitePheromoneRuntimeStore`: schema migrations, atomic batch receive with per-frame `SAVEPOINT`s, scarcity/diversity/sqrt-N admission bookkeeping, replay-nonce tracking, crash-recovery report lookup, deposit and concentration queries. |
-| `schemas/transit-policy.schema.json`, `schemas/peer-weights.schema.json` | JSON Schema (draft 2020-12) contracts for the signed transit-policy envelope and the peer-weights document, embedded via `include_str!` and enforced before serde deserialization. |
+## Structure
 
-## Batch receive lifecycle
+| Module or asset | Responsibility |
+|-----------------|----------------|
+| `lib` | Receiver, trust wrappers, policy import, peer weights, proof resolver |
+| `input` | Bounded duplicate-aware wire JSON projection |
+| `store` | SQLite migration, scoped admission, report custody, concentration |
+| `schemas/transit-policy.schema.json` | Signed policy's required field shape |
+| `schemas/peer-weights.schema.json` | Weight document shape and ranges |
 
-1. The caller loads a signed transit policy with `runtime_policy_from_json`,
-   which schema-validates the raw JSON, verifies the `SignedExportEnvelope`
-   signature, requires the signer to be trusted by both the caller-supplied
-   issuer keys and the admission document's own issuer roots, and rejects
-   empty or overlapping scarcity policies. This yields a
-   `PheromoneTransitPolicy` and a `PheromoneReceiverConfig`.
-2. The caller builds a `WorkflowContextResolver` (usually
-   `VerifiedChioWorkflowResolver::from_verified_package`, which verifies a
-   Chio workflow proof package against a trust bundle and verification
-   context) and a `PheromoneRuntimeStore` (usually
-   `SqlitePheromoneRuntimeStore`), then combines them with the config in a
-   `PheromoneReceiver`.
-3. `PheromoneReceiver::receive_batch` forwards to the store.
-   `SqlitePheromoneRuntimeStore::receive_batch` first verifies the
-   whole-batch envelope (recipient, authenticated sender, time window); a
-   failure records one batch-level rejection frame and returns.
-4. Otherwise each frame is preflighted (transit-policy and envelope checks,
-   then `WorkflowContextResolver::resolve` if the deposit carries a workflow
-   context) and admitted inside its own SQL `SAVEPOINT`, so one frame's
-   rejection rolls back only that frame's writes while the rest of the batch
-   proceeds.
-5. Admission validates the deposit's passport, claims a replay nonce, checks
-   and increments the scarcity/pair/sqrt-N buckets, and inserts the deposit
-   row keyed by its canonical SHA-256 (idempotent under `ON CONFLICT DO
-   NOTHING`).
-6. The resulting `PheromoneReceiveReport` is persisted in the same outer
-   transaction before commit, so a durable report always corresponds to
-   durable admission state; if report persistence fails, the whole
-   transaction (including any frames admitted in step 5) rolls back.
+The public workflow wrappers keep proof package, trust bundle, and verification
+context parsing behind Chio-owned types. `PheromoneReceiveReport` distinguishes
+accepted, rejected, and partial batches with per-frame codes and counts.
 
-## Invariants and failure modes
+## Data and control flow
 
-- `PheromoneRuntimeStore::receive_batch` and `admit_deposit_for_treaty`
-  default to a hard error; only a store that opts into atomic, treaty-scoped
-  persistence can serve live receive.
-- A signed runtime policy is accepted only if its `SignedExportEnvelope`
-  signature verifies and its signer key is present in both the
-  caller-supplied trust-bundle issuer roots and the admission document's own
-  `runtimePolicyIssuerPublicKeys`; a signer trusted only by the document it
-  signs is rejected (`invalid_field`).
-- JSON Schema validation runs on the raw `serde_json::Value` before typed
-  deserialization, so a missing required field cannot be silently filled by
-  a serde default and an unknown field cannot be silently dropped; the
-  `deny_unknown_fields` structs the loaders populate enforce the same
-  contract as defense in depth.
-- Scarcity policies must be non-empty and pairwise non-overlapping per
-  window; `runtime_policy_document_sha256` strips
-  `runtimePolicySha256`/`policySha256`/`issuerSignature` before hashing so
-  each scarcity policy's hash binds to the exact signed document without
-  self-reference.
-- Replay protection is a `(kernel_id, passport_key_hash, nonce)` insert that
-  must affect a row (`ON CONFLICT DO NOTHING`, checked by affected-row
-  count) or admission fails as `replay_window_exceeded`; expired nonces are
-  purged first.
-- Rate limiting is bucketed by `(reputation_epoch, window_id, treaty_id,
-  subject_class_namespace, subject_class)`: a scarcity bucket rejects at
-  `token_capacity`, a per-`(kernel_id, passport_key_hash)` bucket rejects at
-  `max_deposits_per_pair`, and a sqrt-N cap rejects distinct passports per
-  kernel above `ceil(sqrt(active_peers_in_treaty))`.
-- A deposit's `workflow_context`, when present, must match the resolver's
-  verified evidence field-for-field; any mismatch rejects the frame before
-  storage.
-- Crash-recovery lookup (`lookup_receive_report_by_batch`) is scoped to
-  `(batch_sha256, authenticated_sender_kernel_id)` and prefers a committed
-  admitting verdict (accepted or partial) over a later replay rejection of
-  the same batch, so retrying after a crash cannot dead-letter
-  already-admitted deposits.
-- `query_concentration` rejects a `reputation_epoch` outside
-  `known_reputation_epochs`; `StaticPeerWeightProvider` rejects non-finite or
-  out-of-`[0,1]` weights.
-- Public Chio-named wrapper types do not expose `chio_attest_buyer_core::`
-  types or aliases through the public API (enforced by
-  `tests/public_surface.rs`).
-- `#![forbid(unsafe_code)]`.
+1. Import the signed transit/admission policy with trusted verifier issuer keys
+   and trusted time. Check the schema, issuer key pins, policy hash bindings,
+   explicit scarcity policies, and overlapping windows.
+2. Build a workflow resolver from a package verified against its trust bundle
+   and verification context. Retain package/trust/context digests.
+3. Begin a receive transaction and authenticate the batch envelope against the
+   configured recipient and authenticated sender.
+4. Verify each frame's transit policy, then resolve any workflow reference.
+5. Admit that deposit for the frame's exact treaty under a savepoint. An invalid
+   frame rolls back its state, while valid frames remain eligible to commit.
+6. Persist the report and commit all accepted state in the same transaction.
+7. Query concentration using persisted passport history and supplied weights.
+
+A malformed envelope yields a persisted rejected report. Storage failures
+return errors or rejected frame codes at their respective boundary; they cannot
+produce a committed acceptance when report persistence fails.
+
+## Trust and invariants
+
+The default `PheromoneRuntimeStore::receive_batch` rejects implementations that
+lack atomic receive/report persistence. The default scoped deposit method also
+rejects; custom stores must implement the treaty-specific live boundary.
+
+Policy issuer keys must occur in both verifier trust roots and admission roots.
+An envelope cannot authorize itself by embedding a new key. Local policy and
+peer weights must come from verifier-owned configuration. Weight import rejects
+duplicate kernel ids; an unknown configured peer uses weight 1.0 in the static
+provider, while a mismatched epoch or invalid numeric weight rejects on lookup.
+
+SQLite replay identity is keyed by kernel, passport hash, and nonce until its
+window expires. Quota buckets include epoch, scarcity window, treaty, namespace,
+and class. File-backed state survives reopening, including passport admission
+history used for newcomer discount.
+
+Receive-report recovery lookup uses both batch digest and authenticated sender.
+It prefers committed acceptance/partial evidence over later replay rejection so
+relay recovery can retain the original admitted result. A query report is an
+observation result; a runtime policy consumer separately chooses its effect.
 
 ## Dependencies
 
-Internal: `chio-pheromone` supplies deposit, scarcity-policy, and
-transit-evidence types and the validation functions
-(`validate_deposit_for_admission`, `scarcity_admissions_for_deposit`,
-`scarcity_admissions_for_deposit_treaty`, `newcomer_discount_for_deposit`,
-`reject_overlapping_scarcity_windows`, `validate_scarcity_policy_material`)
-this crate calls during admission and query. `chio-federation` supplies
-`PheromoneGossipBatch`, `PheromoneTransitPolicy`, and gossip envelope/frame
-verification (`pheromone_gossip` module). `chio-attest-buyer-core` supplies
-Chio workflow proof-package, trust-bundle, and verification-context parsing
-and verification, wrapped by this crate's Chio-named types so its own types
-stay off the public surface. `chio-core-types` supplies canonical JSON
-hashing (`canonical_json_bytes`, `sha256_hex`), `SignedExportEnvelope`, and
-`PublicKey`.
+`chio-federation` validates gossip envelopes and transit frames.
+`chio-pheromone` supplies deposit validation, scarcity, decay, and discounts.
+`chio-attest-buyer-core` verifies workflow proof packages behind public wrappers.
+`chio-core-types` supplies canonical commitments; `jsonschema` checks imported
+policy shapes; `rusqlite` supplies transactional persistence.
 
-External: `jsonschema` validates runtime-policy and peer-weights documents
-against the embedded schemas; `rusqlite` backs
-`SqlitePheromoneRuntimeStore`; `thiserror` derives `PheromoneRuntimeError`.
+## Verification
 
-No dependency is aliased via `package = ...`; every `chio-*` dependency is
-used under its own crate name.
-
-## Extension points
-
-- Implement `PheromoneRuntimeStore` for an alternative durable backend; the
-  trait's default `receive_batch` and `admit_deposit_for_treaty` fail closed
-  until overridden with an atomic, treaty-scoped implementation.
-- Implement `WorkflowContextResolver` for a workflow-verification source
-  other than `VerifiedChioWorkflowResolver`.
-- Implement `PeerWeightProvider` for a weighting source other than
-  `StaticPeerWeightProvider`.
+Run `cargo test -p chio-pheromone-runtime` from the workspace root.
+`tests/runtime_receiver.rs` covers signed-policy import, overlapping windows,
+frame treaty scope, rollback on report failure, replay after reopening, workflow
+mismatch, partial batches, and persisted newcomer history.
+`tests/public_surface.rs` checks resolver names and public error ownership.
+The README opens SQLite in memory and imports weights without network access.

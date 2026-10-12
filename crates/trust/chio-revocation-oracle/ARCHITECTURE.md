@@ -1,101 +1,83 @@
 # chio-revocation-oracle architecture
 
-## Overview
+## Responsibility and boundary
 
-The crate is a pure library: no async runtime, no network I/O, and
-(deliberately) no dependency on `chio-kernel-core` -- `chio-kernel-core`
-defines its own `RevocationViewSubject` / `RevocationSnapshot` types rather
-than depending on this crate, so the kernel's read path stays decoupled from
-the federation / revocation-oracle layer above it and does not re-verify a
-snapshot's signature itself. Trust flows outward instead: `chio-custody-hw`
-and `chio-federation` link against this crate, call into it at their own
-trust boundaries (credential-mint gate, gossip push/merge), and hand the
-verified result to whatever local cache their layer owns. The core design
-idea is a type-level split between signing and verifying: `EpochRootSigner`
-implementations hold private key material, `EpochRootVerifier`
-implementations hold only a pinned public key, so a verify-only deployment
-can never forge a root.
+The crate owns revocation-key indexing, Merkle proof material, signed epoch
+roots, age checks, and conversion of passport revocation events into keys.
+It also owns a distinct 256-level sparse map keyed by finding IDs.
+Consumers provide persistence, signer provisioning, transport, and admission.
 
-## Module map
+`RevocationOracle` separates insertion and lookup from signing and broadcasting.
+`EpochRootSigner` holds the signing role; `EpochRootVerifier` provides the
+verify-only role with a pinned identity and public key.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Crate root. `forbid(unsafe_code)`; declares the six modules and re-exports the public API. |
-| `src/api.rs` | Core types (`SubjectId`, `EpochNonce`, `RevocationKey`, `EpochRoot`, `RootSignature`, `InclusionProof`, `NonInclusionProof`, `RevocationOracleError`) and the `RevocationOracle` trait. |
-| `src/sparse_merkle.rs` | `InMemoryRevocationOracle`, the only `RevocationOracle` implementation: an append-only Merkle accumulator over `(subject, epoch_nonce)` leaves. |
-| `src/signer.rs` | `Ed25519RootSigner` / `Ed25519RootVerifier` and the `EpochRootSigner` / `EpochRootVerifier` traits; domain-separated signing over canonical JSON. |
-| `src/epoch.rs` | `SignedEpochRoot`, the `EpochBroadcaster` trait, `InMemoryEpochBroadcaster`, and `tick_and_broadcast`. |
-| `src/freshness.rs` | `FreshnessConfig` and `verify_fresh_epoch_root`: bounds how old a root may be before a caller must treat it as stale. |
-| `src/passport_bridge.rs` | `PassportRevocationEvent` and `apply_passport_revocation`: maps passport-lifecycle revocations onto oracle inserts without a `chio-credentials` dependency. |
+## Structure
 
-## Epoch lifecycle
+| Module | Responsibility |
+| --- | --- |
+| `api` | Key, epoch, signature, proof, trait, and error definitions. |
+| `sparse_merkle` | Append-only in-memory revocation log and local absence checks. |
+| `signer` | Domain-separated canonical root signing and verification. |
+| `freshness` | Root age and offline-grace policy. |
+| `epoch` | Signed-root carrier, manual tick, bounded broadcaster queue. |
+| `passport_bridge` | Validated events and revocation-key conversion. |
+| `finding_status_sparse` | Portable sparse inclusion and empty-leaf absence proofs. |
 
-1. A caller inserts a `RevocationKey` via `InMemoryRevocationOracle::insert`.
-   The oracle appends a Merkle leaf, advances `epoch` by one, and clamps
-   `issued_at_unix_ms` to the max of its previous value and the caller's
-   timestamp.
-2. `tick_and_broadcast` (or a direct `signed_epoch_root` call) signs the
-   current `EpochRoot` with an `EpochRootSigner`, producing a
-   `SignedEpochRoot`, and publishes it to every registered
-   `EpochBroadcaster`.
-3. A remote holder calls `SignedEpochRoot::verify` against a pinned
-   `EpochRootVerifier` before merging the root into any local cache.
-   Verification checks `signer_id`, `algorithm`, exact 64-byte signature
-   length, and the Ed25519 signature over the domain-separated canonical
-   JSON bytes.
-4. A verifier proves revocation with `inclusion_proof` plus the static
-   `InMemoryRevocationOracle::verify_inclusion`, a self-contained Merkle
-   audit-path check against `root_hash`. It checks non-revocation with
-   `non_inclusion_proof` plus `verify_non_inclusion`, which re-queries the
-   live oracle rather than checking a standalone cryptographic absence
-   proof.
-5. `verify_fresh_epoch_root` gates any received root on `issued_at_unix_ms`:
-   one issued in the future is an invalid epoch transition, and one older
-   than `max_staleness_ms + offline_grace_ms` is stale.
+## Data and control flow
 
-## Invariants and failure modes
+`InMemoryRevocationOracle::insert` hashes a length-prefixed subject and big-endian
+nonce, appends a leaf, updates tree layers, and records the key's index.
+It increments the epoch with saturation and clamps issuance time to its prior
+maximum. An empty log uses a zero root hash.
 
-- `insert` fails closed on a duplicate key (`AlreadyRevoked`) and on an
-  empty or whitespace-padded `subject_id` (`InvalidRevocationKey`), so no
-  leaf is ever minted for a noncanonical subject.
-- `issued_at_unix_ms` is monotone non-decreasing across inserts
-  (`self.issued_at_unix_ms.max(now_unix_ms)`), so backward clock skew cannot
-  make a newer epoch appear to predate an older one to a freshness cache.
-- `RevocationOracle` has no removal or expiry method: once inserted, a key
-  stays revoked for the life of the oracle.
-- `Ed25519RootVerifier::verify_epoch_root` denies on any mismatch (wrong
-  `signer_id`, wrong `algorithm` tag, a `signature_bytes` length other than
-  64, or a failed Ed25519 check); there is no partial-credit path.
-- `InMemoryEpochBroadcaster::new` rejects a zero capacity fail-closed
-  (`SignerRejected`); a full queue drops the oldest entry (FIFO) rather than
-  the new one, relying on a catch-up path for peers that fell behind.
-- `tick_and_broadcast` returns the first broadcaster error it hits and
-  stops, so a rejected publish is never swallowed while remaining
-  broadcasters keep going silently.
-- `DEFAULT_EPOCH_TICK_MS` (250ms) trades gossip-storm avoidance under high
-  revoke rates against the 500ms median revoke-to-deny budget the
-  `swarm_revocation_e2e` acceptance test enforces.
-- `passport_bridge::apply_passport_revocation` maps an oracle
-  `AlreadyRevoked` into `PassportRevocationBridgeError::AlreadyApplied` and
-  treats it as an idempotent no-op: the epoch does not advance a second
-  time, so federation does not re-broadcast a duplicate.
+Inclusion proof production returns the key, leaf position, current root, and
+sibling bytes. Verification reconstructs the key hash and uses `rs_merkle` to
+check membership against the root carried in that proof.
+
+`SignedEpochRoot::sign` signs a supplied root. `tick_and_broadcast` signs and
+publishes to each sink sequentially; a later sink failure leaves earlier
+publications in place. The constant tick interval does not start a scheduler.
+The bounded queue drains FIFO and discards its oldest entry at capacity.
+
+## Trust and invariants
+
+Root signatures cover a fixed domain prefix followed by RFC 8785 canonical
+root bytes. Verification authenticates the root using a pinned key and signer
+ID. It does not check freshness, epoch rollback, or correspondence with a
+separately supplied inclusion proof; the consumer must bind these checks.
+
+`verify_fresh_epoch_root` rejects future issuance and age beyond the saturating
+sum of staleness and grace. `FreshnessConfig::default` accepts age zero only.
+Caller-provided time determines this decision.
+
+General non-inclusion material contains a key, root, and checked timestamp.
+`verify_non_inclusion` compares the root to current local state and checks key
+absence. It does not authenticate the checked timestamp or provide a portable
+Merkle absence path.
+
+Finding-status proofs hash the exact finding ID and require 256 siblings.
+Inclusion binds a retraction-intent digest; absence starts from the canonical
+empty leaf. The consumer separately authenticates the supplied root and its
+status-authority lifecycle.
+
+The passport event constructor validates text and a nonzero timestamp.
+`apply_passport_revocation` does not rerun constructor validation.
+Its key uses subject and a salted timestamp, so passport IDs with equal subject
+and timestamp collide. Repeated keys return `AlreadyApplied` without advancing
+state. This bridge does not itself change credential lifecycle records.
 
 ## Dependencies
 
-Internal: `chio-core-types` supplies `Keypair`, `PublicKey`, `Signature`, and
-`canonical_json_bytes` (RFC 8785 canonical JSON), used by `signer.rs` for
-epoch-root signing and verification. Dev-only: `chio-federation` and
-`chio-kernel-core` back the `delegation`-gated swarm acceptance test and are
-never linked into the library itself. External: `rs_merkle` implements the
-Merkle accumulator and its audit-path proofs; `serde` and `thiserror`
-provide artifact (de)serialization and error types; `criterion` and
-`proptest` back the throughput benchmark and property tests.
+`rs_merkle` supplies proof verification and SHA-256 tree operations.
+`chio-core-types` supplies canonical signing and key primitives; `sha2` supports
+the finding-status map. Serde encodes carriers; `thiserror` names oracle errors.
 
-## Extension points
+## Verification
 
-- `RevocationOracle` - implement to back a different storage engine; only
-  `InMemoryRevocationOracle` ships here.
-- `EpochRootSigner` / `EpochRootVerifier` - implement for a different
-  signature scheme; only the Ed25519 pair ships here.
-- `EpochBroadcaster` - implement to route signed roots to a real transport;
-  only the bounded in-memory queue ships here.
+Run `cargo test -p chio-revocation-oracle` for membership, absence, signatures,
+freshness, epoch monotonicity, finding-status paths, and bridge fixtures.
+Run `cargo test -p chio-revocation-oracle --features delegation` for the in-process
+swarm latency and receipt-chain checks using federation and kernel caches.
+`cargo bench -p chio-revocation-oracle --bench oracle_throughput` measures insert
+and proof production at 10,000 baseline subjects and asserts a fixture budget.
+These checks use local state and do not measure deployed network propagation.

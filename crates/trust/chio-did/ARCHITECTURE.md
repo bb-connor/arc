@@ -1,65 +1,70 @@
 # chio-did architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-did` is a pure library: no I/O, no runtime state, `#![forbid(unsafe_code)]`.
-It owns the `did:chio` method end to end, identifier derivation, parsing, and
-resolution, all of which are self-certifying functions of the public key
-bytes. Downstream crates (`chio-credentials`, `chio-control-plane`, `chio-cli`)
-treat a resolved `DidChio` as an identity anchor, so the validation performed
-here is the compatibility boundary for every consumer.
+The crate owns canonical `did:chio` identifiers and deterministic DID document
+construction. Its public surface is `DidChio`, `DidDocument`, verification-method
+and service structs, `ResolveOptions`, and the resolver `resolve_did_arc`.
+The resolver's exported name retains the legacy project spelling.
 
-## Module map
+An identifier binds an Ed25519 key representation to a DID string. A resolved
+document does not establish possession of its private key or admission to a
+kernel. Consumers verify signatures and apply their own authority policy.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | The full public surface: `DidChio`, `DidDocument` and its parts, `DidService`, `ResolveOptions`, `DidError`, and `resolve_did_arc`. |
-| `src/fuzz.rs` | `fuzz` feature only. `fuzz_did_resolve`, the libFuzzer entry point driving the crate's parse paths. |
+## Structure
 
-## Resolution flow
+| Source | Responsibility |
+| --- | --- |
+| `src/lib.rs` | DID parsing, document construction, service constructors, errors, unit tests. |
+| `src/fuzz.rs` | Feature-gated parser and document fuzz entry point. |
+| `tests/integration_smoke.rs` | Public resolver with service metadata. |
 
-1. A caller holds an Ed25519 `chio_core::PublicKey`.
-2. `DidChio::from_public_key` checks `SigningAlgorithm::Ed25519` and wraps the
-   key; any other algorithm is rejected with `UnsupportedKeyAlgorithm`.
-3. `DidChio::as_str` / `Display` render `did:chio:<64 lowercase hex chars>`.
-4. `DidChio::from_str` (or the `resolve_did_arc` convenience) reverses this:
-   strip the `did:chio:` prefix, require exactly 64 lowercase hex bytes,
-   decode the public key, and re-check the algorithm.
-5. `resolve` / `resolve_with_options` build a `DidDocument`: one
-   `Ed25519VerificationKey2020` verification method (multibase-encoded key
-   with the `0xed01` Ed25519 multicodec prefix), referenced by both
-   `authentication` and `assertionMethod`, plus any `service` entries carried
-   in `ResolveOptions`.
-6. A caller may attach `DidService` entries (`receipt_log`, `passport_status`,
-   or `new` for a custom type); each is validated at construction time.
+`DidChio` keeps its public key and Ed25519 bytes private. In contrast,
+`DidDocument`, `DidVerificationMethod`, and `DidService` expose serializable
+fields so consumers can exchange documents.
 
-## Invariants and failure modes
+## Data and control flow
 
-- The method-specific identifier must be exactly 64 lowercase hex characters;
-  wrong length, uppercase, or non-hex bytes all fail with
-  `InvalidMethodSpecificId`.
-- Only `SigningAlgorithm::Ed25519` keys form a valid `did:chio`; `P256`,
-  `P384`, and `Hybrid` keys fail with `UnsupportedKeyAlgorithm`, checked both
-  on construction from a `PublicKey` and after parsing from a string.
-- Every `DidService` endpoint must parse as a URL with an `https` scheme;
-  anything else (`http`, `file`, `ftp`, or unparseable) fails with
-  `InvalidServiceEndpoint` at construction, so an invalid service can never
-  reach a `DidDocument`.
-- `DidService::receipt_log` and `::passport_status` deduplicate same-kind
-  services deterministically: the first entry is unsuffixed (`#receipt-log`),
-  later ones get `-2`, `-3`, and so on.
-- Resolution is pure: no I/O, no network, no registry. A `DidDocument` is a
-  deterministic function of the DID's own bytes and the caller-supplied
-  `ResolveOptions`.
-- `DidDocument` and its parts (de)serialize with the DID-spec field names
-  (`@context`, `verificationMethod`, `assertionMethod`, `serviceEndpoint`,
-  `publicKeyMultibase`); `service` is omitted entirely when empty.
+`from_public_key` checks the key algorithm before retaining its 32-byte key.
+`FromStr` checks the exact prefix, lowercase hex alphabet, and suffix length,
+then delegates key decoding to `chio-core-types`.
+
+Resolution creates the W3C DID context, one `Ed25519VerificationKey2020`, and
+matching authentication and assertion references. The multibase representation
+prefixes the key bytes with the Ed25519 multicodec bytes `0xed, 0x01`, encodes
+that buffer as base58btc, and adds the `z` prefix.
+
+`ResolveOptions::with_service` appends service objects in caller order.
+`DidService::receipt_log` and `passport_status` derive fragment identifiers and
+call the HTTPS URL constructor. Ordinal zero has no numeric suffix; subsequent
+ordinals use one-based suffixes beginning with `-2`.
+
+## Trust and invariants
+
+Only the `did:chio` method is parsed here. P-256, P-384, hybrid keys, and other
+DID methods fail the `DidChio` constructor or parser.
+The protocol permits broader methods as compatibility inputs elsewhere.
+
+HTTPS validation proves URL scheme and syntax. It does not contact the endpoint,
+verify its owner, or bind the service to a signed document.
+`resolve_with_options` clones supplied services without revalidation.
+A caller can construct or deserialize a service with arbitrary public fields;
+use constructors when their checks are required.
+
+Document deserialization is schema decoding through Serde. The crate has no
+public verifier for a received document's method references, service identities,
+or consistency with an externally trusted DID.
 
 ## Dependencies
 
-`chio-core` supplies `PublicKey` and `SigningAlgorithm` (production) and
-`Keypair` (tests). `serde` (with `derive`) implements the document
-(de)serialization; `thiserror` implements `DidError`; `bs58` encodes the
-multibase public key; `url` parses and validates service-endpoint URLs. The
-`fuzz` feature adds `arbitrary` and `serde_json`, used only by the standalone
-`fuzz` workspace's `did_resolve` target.
+`chio-core-types` provides key decoding and algorithm identity.
+`bs58` renders the multibase key, `url` parses service URLs, and Serde supplies
+document serialization. `thiserror` names parser and constructor failures.
+`fuzz` adds `arbitrary` and JSON decoding for fuzz inputs.
+
+## Verification
+
+Run `cargo test -p chio-did` for parser, unsupported-key, multibase, service
+fragment, HTTPS rejection, and public resolver cases.
+The tests operate locally with deterministic keys and inspect emitted metadata.
+They exercise neither remote DID discovery nor endpoint ownership.

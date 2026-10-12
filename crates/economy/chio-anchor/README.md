@@ -1,83 +1,80 @@
 # chio-anchor
 
-`chio-anchor` publishes Chio checkpoints to external chains and verifies the
-proofs that come back. It covers direct EVM root-registry publication and
-confirmation, checkpoint-to-Bitcoin super-root aggregation via
-OpenTimestamps, canonical Solana memo publication, and fail-closed
-multi-lane proof-bundle verification. It also owns a second, independent
-mechanism: `chio.anchor_batch.v1`, which Merkle-batches checkpoint IDs and
-binds them to a public witness (Rekor or OpenTimestamps).
+`chio-anchor` builds signed checkpoint-ID batches and normalizes checkpoint
+proofs across EVM root registries, Bitcoin OTS, and Solana memo records.
+It consumes kernel checkpoints and evidence exports, with separate APIs for
+local proof checks, EVM publication, and public-witness verification.
 
-Nearly all production code lives behind the default `web3` feature; without
-it the crate compiles with zero items (`lib.rs` is
-`#![cfg(feature = "web3")]`).
+## Usage
 
-## Responsibilities
+Build and verify a local batch without contacting a witness service:
 
-- Prepare, dispatch, and confirm EVM root-registry publication calls against
-  `IChioRootRegistry`, including delegate-publisher authorization and
-  publication-sequencing preflight checks.
-- Aggregate checkpoints into a Bitcoin super-root and attach/verify an
-  OpenTimestamps proof against an `AnchorInclusionProof`.
-- Prepare and verify canonical Solana memo publication records.
-- Verify `AnchorProofBundle` (the primary EVM proof plus any declared
-  Bitcoin OTS / Solana memo secondary lanes) and checkpoint publication
-  transparency records.
-- Build DID-style anchor-service discovery artifacts, including runtime
-  freshness classification and discovery-gated bundle verification.
-- Build, sign, and verify `chio.anchor_batch.v1` Merkle batches of
-  checkpoint IDs against a `WitnessPolicy`, backed by a production Rekor
-  client and an advisory-only OpenTimestamps client.
-- Prepare bounded Chainlink Functions fallback-verification requests over a
-  receipt batch.
-- Track runtime control state: emergency modes, lane health, indexer lag,
-  and incident alerts.
-- Schedule and validate cron-triggered publication jobs, including delegate
-  forwarding and replay-window enforcement.
-- Export `chio_anchor_round_latency_seconds` as Prometheus text.
+```rust
+use chio_anchor::{
+    build_anchor_batch, verify_anchor_batch, AnchorBatchWitness,
+    AnchorBatchWitnessKind, WitnessState,
+};
+use chio_core::{hashing::Hash, Keypair};
 
-## Public API
-
-Everything below is re-exported flat from the crate root over private lane
-modules. `metrics`, and `fuzz` under its feature flag, are the only real
-public module paths.
-
-| Area | Key items |
-|------|-----------|
-| Root (`lib.rs`) | `AnchorError`, `AnchorServiceConfig`, `checkpoint_statement_from_kernel`, `kernel_checkpoint_from_statement`, `build_anchor_inclusion_proof`, `build_anchor_inclusion_proof_from_evidence_bundle` |
-| EVM | `EvmAnchorTarget`, `prepare_root_publication`, `prepare_delegate_registration`, `publish_root`, `confirm_root_publication`, `ensure_publication_ready`, `inspect_publication_guard`, `verify_inclusion_onchain`, `build_chain_anchor_record` |
-| Bitcoin (checkpoint anchor) | `prepare_ots_submission`, `attach_bitcoin_anchor`, `verify_bitcoin_anchor_for_proof`, `inspect_ots_proof` |
-| Solana | `prepare_solana_memo_publication`, `verify_solana_anchor`, `SolanaMemoAnchorRecord` |
-| Proof bundle | `AnchorProofBundle`, `verify_proof_bundle`, `verify_checkpoint_publication_records`, `AnchorLaneKind` |
-| Discovery | `build_anchor_discovery_artifact`, `build_anchor_discovery_artifact_with_runtime`, `verify_proof_bundle_with_discovery`, `AnchorDiscoveryArtifact` |
-| Anchor batch + witness | `AnchorBatch`, `build_anchor_batch`, `verify_anchor_batch`, `verify_anchor_batch_with_witness_policy`, `verify_anchor_batch_with_witness_policy_async`, `WitnessPolicy`, `AnchorWitnessClient`, `RekorClient`, `OtsClient` |
-| Functions fallback | `prepare_functions_batch_verification`, `assess_functions_verification`, `ChainlinkFunctionsTarget` |
-| Runtime ops | `AnchorEmergencyControls`, `ensure_anchor_operation_allowed`, `classify_anchor_lane`, `AnchorRuntimeReport` |
-| Automation | `build_anchor_publication_job`, `assess_anchor_automation_execution`, `AnchorAutomationJob` |
-| Metrics (`chio_anchor::metrics`) | `observe_anchor_round_latency_nanos`, `render_anchor_metrics_prometheus`, `anchor_round_count` |
-
-## Feature flags
-
-| Flag | Effect |
-|------|--------|
-| `web3` (default) | Gates the entire crate body. Without it `chio-anchor` compiles with zero items. |
-| `fuzz` | Exposes `chio_anchor::fuzz`, the libFuzzer entry point over `verify_proof_bundle` and `verify_checkpoint_publication_records`. Implies `web3`. Enabled only by the standalone `fuzz` workspace. |
-| `kani` | Opt-in toggle for the `#[cfg(kani)]`-gated model-checked harness module. Implies `web3` so a Kani build has a non-empty crate to check. No production code path depends on it. |
-
-## Testing
-
-```
-cargo test -p chio-anchor
+fn main() -> Result<(), chio_anchor::AnchorError> {
+    let signer = Keypair::generate();
+    let batch = build_anchor_batch(
+        vec!["checkpoint-1".into(), "checkpoint-2".into()],
+        AnchorBatchWitness {
+            kind: AnchorBatchWitnessKind::Rekor,
+            witness_id: "local-pending".into(),
+            root: Hash::zero(),
+            observed_at: None,
+        },
+        1_700_000_000,
+        &signer,
+    )?;
+    verify_anchor_batch(&batch)?;
+    assert_eq!(batch.body.witness_state, WitnessState::Pending);
+    Ok(())
+}
 ```
 
-Integration tests under `tests/` (`integration_smoke.rs`,
-`mutation_gap_closure.rs`) and the Kani harnesses require the default `web3`
-feature. The `fuzz` feature is driven from the standalone `fuzz` workspace,
-not from this crate directly.
+The builder replaces the supplied witness root with the computed Merkle root.
+The pending descriptor records an intended lane; public-witness acceptance
+requires the asynchronous policy verifier and a trusted lane client.
 
-## See also
+## Features
 
-- `chio-core` - supplies the wire types this crate anchors (`AnchorInclusionProof`, checkpoint statements, web3 identity bindings).
-- `chio-kernel` - supplies `KernelCheckpoint`, receipt inclusion proofs, and evidence-export bundles that feed `build_anchor_inclusion_proof*`.
-- `chio-web3-bindings` - generated `IChioRootRegistry` Solidity bindings used to build and decode EVM calls.
-- `chio-egress-contract` - mediates all EVM RPC dispatch through `HttpEgressContract`.
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `default` | Yes | Enables `web3`. |
+| `web3` | Yes | Enables the entire crate API and its cryptographic, HTTP, kernel, and contract-binding dependencies. Disabling it leaves no public items. |
+| `fuzz` | No | Enables `web3`, `arbitrary`, and the public verifier fuzz entry point. |
+| `kani` | No | Enables `web3`; harness code additionally requires the Kani toolchain's `cfg(kani)`. |
+
+## Guarantees
+
+`verify_anchor_batch` reconstructs the Merkle root, checks ordered inclusions
+and witness-root binding, and verifies the canonical body signature using the
+embedded signer key. Callers independently authorize that key.
+`verify_anchor_batch_with_witness_policy` rejects required public-witness
+policies; use `verify_anchor_batch_with_witness_policy_async` for that route.
+Its stale fallback uses verifier-owned cache times keyed by `batch_body_hash`.
+
+`confirm_root_publication` checks the transaction receipt, matching
+`RootPublished` event, and registry state at the publication block.
+`verify_proof_bundle` checks carried proof material locally; external chain
+observations and finality remain separate inputs.
+
+## Status
+
+EVM RPC dispatch and Rekor HTTP clients are implemented. Rekor authenticates
+signed-entry timestamps and validates any supplied Merkle inclusion path
+against the response root. It does not authenticate that root as a checkpoint.
+`OtsClient` yields advisory receipts and rejects required-witness verification.
+Solana support prepares memo data and validates records supplied by the caller.
+The application owns durable checkpoint storage, scheduling, and key trust.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol anchor batches](../../../spec/PROTOCOL.md#651-anchor-batch-v1)
+- [Contract bindings](../chio-web3-bindings/README.md)
+- [Kernel checkpoints](../../kernel/chio-kernel/README.md)
+- [License](../../../LICENSE)

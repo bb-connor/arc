@@ -1,102 +1,92 @@
 # chio-appraisal architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-appraisal` is a pure evaluation crate: in-memory appraisal, validation,
-and cryptographic signing, with no I/O and no runtime state
-(`#![forbid(unsafe_code)]`). It projects vendor-specific runtime attestation
-evidence into a portable, signed appraisal artifact, evaluates imported
-appraisal results against local trust policy without ever widening it, and
-prices marketplace guard invocations. `chio-kernel` and the
-underwriting/credit/market crates build on its output types; `chio-core`
-re-exports it whole as `chio_core::appraisal`.
+This crate owns appraisal projections, attestation-record authentication,
+signed descriptor/reference-value/trust-bundle artifacts, import policy
+reports, and marketplace invocation pricing. It stores no evidence and performs
+no network I/O. Applications supply evidence, authority pins, policy, and time.
 
-## Module map
+An appraisal's projected verdict describes carried fields. Only the explicit
+signed-record boundary can authenticate an authority's assertions for local
+assurance promotion. Hardware evidence verification, authority authorization,
+revocation, and live challenge binding are supplied by the surrounding system.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Re-exports `canonical`, `capability`, `crypto`, `error`, `receipt`, `Error`, and `AttestationVerifierFamily` from `chio-core-types`. Declares `appraisal`, `artifact_inventory`, `descriptor`, `types` as private modules flattened via `pub use *`, so only the re-exported names are public, not the module paths. `marketplace_pricing` is `pub mod` with a curated top-level re-export, so both the module path and the flattened names are public. |
-| `src/types.rs` | Schema constants and wire types for appraisal artifacts, imported-result evaluation, verifier descriptors, reference-value sets, and trust bundles; the `thiserror` error enums for derivation and verification failures. |
-| `src/appraisal.rs` | Per-verifier-family evidence-to-appraisal derivation, `VerifiedRuntimeAttestationRecord` construction against an optional trust policy, and imported-result policy evaluation. |
-| `src/artifact_inventory.rs` | Static catalogs: the supported-verifier-family inventory, the normalized-claim vocabulary, and the reason taxonomy. |
-| `src/descriptor.rs` | Builds and verifies signed `SignedExportEnvelope` artifacts for verifier descriptors, reference-value sets, and trust bundles. |
-| `src/validate.rs` | Private, fail-closed structural validators consumed by `descriptor.rs` (not re-exported). |
-| `src/marketplace_pricing.rs` | Deterministic per-invocation marketplace pricing from a base price and tenant reputation tier. |
-| `src/tests.rs` | `cfg(test)` unit coverage for the modules above. |
+## Structure
 
-## Appraisal and artifact flows
+| Module | Responsibility |
+| --- | --- |
+| `types` | Schema constants, appraisal/import records, descriptors and errors. |
+| `appraisal` | Claim projection, result IDs, vocabulary helpers and import evaluation. |
+| `attestation_verification` | Unsigned observation and pinned signed-record boundaries. |
+| `descriptor` | Constructs and verifies signed artifact envelopes. |
+| `validate` | Validity, uniqueness, schema/family and cross-artifact constraints. |
+| `artifact_inventory` | Supported bridges, claim vocabulary and reason taxonomy. |
+| `marketplace_pricing` | Checked invocation prices and fiscal discount adapters. |
 
-Evidence to verified record:
+`marketplace_pricing` is a public module. Other modules expose their public
+items through root re-exports. Shared canonical, capability, crypto, receipt,
+and error APIs come from `chio-core-types`.
 
-1. `derive_runtime_attestation_appraisal` matches `evidence.schema` against
-   one of four supported families and normalizes vendor claims into portable
-   `RuntimeAttestationNormalizedClaim`s; an unmatched schema fails closed
-   with `UnsupportedSchema`.
-2. `verify_runtime_attestation_record` wraps the derived appraisal with a
-   `RuntimeAttestationPolicyOutcome`. If a local `AttestationTrustPolicy` is
-   configured and matches, the record is accepted at the matched rule's
-   tier. Otherwise the evidence's own workload-identity binding and
-   freshness are checked directly, but the record's effective tier still
-   collapses to `None`: the evidence's claimed tier never promotes a record
-   on its own.
+## Data and control flow
 
-Imported result evaluation:
+`derive_runtime_attestation_appraisal` dispatches on the four supported schemas.
+Each projection copies selected vendor claims into normalized assertions and
+retains vendor-specific claims. Unknown schemas return `UnsupportedSchema`.
+Derivation itself performs no authority-signature or hardware-quote check.
 
-- `evaluate_imported_runtime_attestation_appraisal` checks signature,
-  schema, result and evidence freshness, exporter policy acceptance,
-  issuer/signer/verifier-family allowlists, and required-claim matches,
-  collecting a `RuntimeAttestationImportReasonCode` per failure. Any failure
-  forces `Reject` with `effective_tier = None`; otherwise the imported tier
-  is the minimum of the appraisal's and the exporter's own accepted tier,
-  further capped (`Attenuate`) by a configured `maximum_effective_tier`.
+`verify_signed_runtime_attestation_record` compares the envelope signer to a
+caller-provided key pin, verifies the envelope, then builds the record.
+Record construction derives claims, projects workload identity, and evaluates
+local trust policy. Without configured rules, valid evidence remains locally
+unaccepted with effective tier `None`. The unsigned entry point rejects a
+record that would become locally accepted.
 
-Signed export artifacts:
+Imported results pass through `evaluate_imported_runtime_attestation_appraisal`.
+It collects reasons from signature/schema/family mismatches, age limits,
+exporter acceptance, and populated local policy restrictions. Any rejection
+reason sets tier `None`; a maximum-tier cap can instead produce `Attenuate`.
+Result IDs derive from SHA-256 over canonical result content.
 
-- `descriptor.rs` builds a document, runs it through `validate.rs`, and
-  signs it with `SignedExportEnvelope::sign`. Verification re-validates
-  shape, checks the `issued_at`/`expires_at` window against `now`, and
-  checks the signature. Trust bundles additionally enforce unique
-  descriptor and reference-value ids, resolve each reference-value's
-  `descriptor_id` and `verifier_family` against a bundled descriptor, and
-  allow at most one `Active` reference-value set per `(descriptor_id,
-  attestation_schema)`.
+## Trust and invariants
 
-Marketplace pricing:
+Import policy must be explicit. Issuer, signer-key, verifier-family, age, and
+claim filters apply when configured; empty individual allow-lists do not each
+force rejection. Age calculations use saturating subtraction, so callers
+must account for their own clock and issuance policy.
 
-- `compute_checked_marketplace_invocation_price` validates the base price's
-  currency and the tenant context's id, then calls the unchecked
-  `compute_marketplace_invocation_price`, which applies
-  `TIER_DISCOUNT_PER_HUNDRED` with saturating integer arithmetic.
+Signed descriptor helpers validate the artifact and its envelope signature
+and validity window. Their verifier uses the carried envelope key, with no
+independent pin argument. Trust-bundle validation requires descriptors, unique
+IDs, valid nested signatures, family/schema agreement, known successors, and
+at most one active reference-value slot per descriptor/schema. Applications authorize
+bundle publishers and nested signers independently.
 
-## Invariants and failure modes
-
-- Trust widening requires an explicit local policy match; the evidence's own
-  claimed tier never promotes a `VerifiedRuntimeAttestationRecord` by itself.
-- Importing with no explicit local policy configured is itself a
-  fail-closed rejection reason (`NoLocalPolicy`), not an implicit allow.
-- A descriptor's `attestation_schemas` and `signing_key_fingerprints` must be
-  non-empty, sorted, and deduplicated, and must reference the crate's
-  current canonical appraisal artifact and result schema constants.
-- Reference-value-set state fields are mutually exclusive by state: `Active`
-  carries neither `superseded_by` nor `revoked_reason`, `Superseded`
-  requires a `superseded_by` that is not self-referential, `Revoked`
-  requires a non-empty `revoked_reason`.
-- Every signed envelope (descriptor, reference-value set, trust bundle) is
-  re-validated and signature-checked on verify, never trusted from
-  deserialization alone.
-- Marketplace pricing is deterministic and integer-only: a zero base price
-  stays zero at every tier, and the checked boundary rejects non-uppercase
-  or non-three-letter currency codes and empty or whitespace-padded tenant
-  ids before a price is computed.
+`compute_checked_marketplace_invocation_price` validates nonblank, unpadded
+tenant IDs and three uppercase ASCII currency letters, then applies the fixed
+0/5/10/20 percent tier discounts with integer truncation. Zero prices remain
+zero. Currency validation checks shape rather than membership in a currency
+registry. Fiscal pricing resolves governed discounts, explicit fallback, or
+denial and uses checked arithmetic. The compatibility helper relies on caller
+validation; callers establish the reputation tier and persist pricing evidence.
 
 ## Dependencies
 
-Internal: `chio-core-types` supplies the types this crate builds on -
-`capability::runtime_attestation` (evidence, assurance tiers),
-`capability::trust_policy` (`AttestationTrustPolicy`),
-`capability::workload_identity`, `crypto` (`Keypair` for signing,
-`sha256_hex` for result-id hashing), `receipt::lineage::SignedExportEnvelope`
-(the signed-artifact wrapper), and `canonical::canonical_json_bytes`
-(result-id derivation). External: `serde`/`serde_json` for wire types,
-`thiserror` for the crate's error enums. Dev-only: `chio-test-support`
-(`test_expect`/`test_expect_err` helpers).
+`chio-core-types` supplies canonical signing, attestation/workload evidence,
+trust policy, and `SignedExportEnvelope`. `chio-fiscal` resolves governed
+marketplace discounts. Serde defines portable records; `serde_json` carries
+vendor claim values and canonical ID inputs. `thiserror` defines typed pricing
+and attestation verification errors. No Cargo features are declared.
+
+## Verification
+
+Use `cargo test -p chio-appraisal`.
+`tests/authentication.rs` checks unsigned promotion rejection, signer pins,
+field tampering, freshness, and identity binding. `tests.rs` covers all four
+claim projections, invalid signed descriptors/reference values, ambiguous active
+trust-bundle entries, import signature rejection, local attenuation, and age
+limits. Pricing tests cover tier discounts, zero prices, upper monetary bounds,
+input validation, and fiscal discount arithmetic. The public integration smoke
+test checks the vocabulary schema contract.
+
+[README](README.md) · [Underwriting](../chio-underwriting/README.md)

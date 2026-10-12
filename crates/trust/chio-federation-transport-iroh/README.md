@@ -1,91 +1,70 @@
 # chio-federation-transport-iroh
 
-Iroh (QUIC, direct-dial) transport for `chio-federation`. iroh authenticates a
-peer's transport key at the QUIC/TLS handshake; this crate resolves the
-authenticated `EndpointId` to a `kernel_id` through an issuer-signed directory
-and admits or rejects the connection before any lane handler runs. It sits
-strictly underneath `chio-federation` and replaces no trust logic: the
-per-frame verifiers `chio-federation` already runs stay unchanged above the
-transport.
+`chio-federation-transport-iroh` carries federation traffic over Iroh QUIC,
+Iroh Gossip, and Iroh Blobs. An issuer-signed directory binds transport
+endpoint IDs to long-term passport keys. Chio admission and frame verifiers
+then authorize the authenticated transport peer.
 
-## Responsibilities
+## Usage
 
-- Verify an issuer-signed transport-directory bundle at load time (schema pin,
-  rollback gate, validity window, body-hash pin, issuer signature, per-entry
-  passport endorsements) and build the `VerifiedDirectory` every other seam
-  reads.
-- Enforce a fail-closed, accept-time admission gate (`DirectoryGate`) shared by
-  every lane: an `EndpointId` not bound to an admitted, non-removed
-  `kernel_id` is rejected (403) before any lane handler runs.
-- Carry `chio-federation`'s wire protocols over iroh, one lane per ALPN behind
-  the shared gate: pheromone directed batches (lane a), revocation epoch roots
-  (lane b), cross-operator gossip fan-out (lane c), bilateral DSSE co-signing
-  (lane d).
-- Implement `chio_federation::bilateral::BilateralCoSigningProtocol` so a
-  networked co-signer (`IrohBilateralCoSigner`) can substitute for
-  `chio-federation`'s in-process `InProcessCoSigner`.
-- Serve bulk signed epoch roots content-addressed over iroh-blobs (lane e,
-  paired with lane b) so catch-up does not have to inline a large history on
-  the bounded direct stream.
-- Bound every direct lane's accept path against slowloris and resource
-  exhaustion: per-phase timeouts plus lane-wide and per-peer concurrency caps.
-- Emit hand-rolled `chio_federation_transport_*` Prometheus metrics and
-  `tracing` spans for admission, verification, lane outcomes, and directory
-  reloads.
+Build a fail-closed gate before loading trusted directory material. This
+example opens no endpoint and performs no network operations.
 
-## Public API
+```rust
+use std::sync::Arc;
+use chio_federation_transport_iroh::{admission::DirectoryGate, identity::VerifiedDirectory};
+use iroh::{endpoint::AfterHandshakeOutcome, SecretKey};
 
-- `admission::DirectoryGate` - the accept-time `EndpointHooks` gate shared by
-  every lane; `NOT_ADMITTED_ERROR_CODE` / `NOT_ADMITTED_REASON` for the reject.
-- `identity::{TransportDirectoryBundleDocument, TransportDirectoryBundleTrust,
-  VerifiedDirectory, IdentityError}` - load-time directory verification
-  (`verify_bundle`) and the directory it produces.
-- `catchup::{BlobCatchupClient, BlobBackedHistory, RevocationRootPublisher,
-  RevocationCatchupManifest}` - content-addressed epoch-root catch-up over
-  iroh-blobs (lane e).
-- `lanes::pheromone::{PheromoneBatchHandler, mount_pheromone_lane,
-  drain_outbox_over_iroh, enqueue_batch_for_delivery}` - lane a.
-- `lanes::revocation::{RevocationHandler, VerifiedSignerDirectory,
-  RevocationRootSink}` - lane b.
-- `lanes::fanout::{FanoutLane, FanoutTopic, TreatyMembership,
-  OriginKeyResolver}` - lane c.
-- `lanes::bilateral::{IrohBilateralCoSigner, BilateralCoSignHandler,
-  OrgAddressBook, PinnedPassportKeys}` - lane d; `IrohBilateralCoSigner`
-  implements `chio_federation::bilateral::BilateralCoSigningProtocol`.
-- `lanes::limits::{AcceptLimiter, AcceptLimitConfig, AcceptPhase}` - shared
-  accept-side hardening for the three direct lanes.
-- `metrics::render_iroh_transport_metrics_prometheus`,
-  `observability::lane_accept_span` - Prometheus export and tracing spans.
-
-## Testing
-
-```bash
-cargo test -p chio-federation-transport-iroh
+let gate = DirectoryGate::new(Arc::new(VerifiedDirectory::empty_deny_all()));
+let peer = SecretKey::from_bytes(&[7; 32]).public();
+assert!(gate.resolve(&peer).is_none());
+assert!(matches!(
+    gate.decide(&peer),
+    AfterHandshakeOutcome::Reject { .. }
+));
 ```
 
-Nightly loom models for the per-peer accept counter and the directory
-`ArcSwap` publish/read are cfg-gated behind `chio_iroh_transport_loom` (off by
-default):
+To admit peers, call `TransportDirectoryBundleDocument::verify_bundle` with
+pinned issuers, a version floor, predecessor hash, and current Unix milliseconds.
+Install the resulting directory in the gate and register the gate with the
+Iroh endpoint's `hooks` before mounting lane handlers.
 
-```bash
-RUSTFLAGS="--cfg chio_iroh_transport_loom" cargo test -p chio-federation-transport-iroh --lib loom_ -- --nocapture
-```
+## Guarantees
 
-Every lane also has a runnable, deterministic example under `examples/`
-(`cargo run -p chio-federation-transport-iroh --example <name>`); each one
-doubles as a smoke test and exits non-zero if its fail-closed invariant is
-violated.
+- `verify_bundle` checks schema, canonical directory hash, issuer signature,
+  validity window, rollback pins, active-entry passport endorsements, and
+  duplicate identity bindings before returning `VerifiedDirectory`.
+- `DirectoryGate::decide` rejects unknown and removed endpoints with code 403.
+  It reads the current verified snapshot; expiry handling requires a reloader.
+- `RevocationHandler::verify_batch` checks recipient, signer-to-endpoint binding,
+  envelope consistency, and pinned oracle signatures before returning roots.
+- `BlobCatchupClient` checks downloaded content addresses, signatures, epoch
+  order, and bounded ranges. A content hash alone grants no oracle authority.
+- Pheromone handlers preserve relay receiver verification and SQLite inbox/
+  outbox handling. Bilateral handlers verify the directory-bound remote key
+  before requesting a DSSE co-signature.
 
-## See also
+## Status
 
-- `chio-federation` - defines the wire protocols this crate transports
-  (`pheromone_gossip`, `revocation_gossip`, `bilateral`) and the
-  `BilateralCoSigningProtocol` trait it implements; the per-frame verifiers run
-  unchanged above this transport.
-- `chio-pheromone-relay` - lane a reuses its `RelayBatchReceiver` trait and
-  `SqlitePheromoneRelayStore` outbox/inbox verbatim; this crate substitutes
-  only the wire hop.
-- `chio-revocation-oracle` - the pinned Ed25519 root verifier lane b and the
-  blob catch-up path check every signed epoch root against.
-- `chio-cli` - wires `DirectoryGate`, the directory reloader, and
-  `mount_pheromone_lane` into the production pheromone dispatch path.
+The CLI's opt-in Iroh path supports directed pheromone batches on relay serve
+and relay tick. Revocation, blob catch-up, and bilateral co-sign APIs are
+library surfaces requiring application collaborators. The CLI lane parser
+rejects revocation and bilateral selections; fan-out is experimental and
+library-only.
+
+Fan-out checks local subscription and received origin treaty membership.
+Iroh Gossip 0.101 provides no inbound per-topic admission hook, so a
+federation-admitted non-party can passively observe forwarded treaty traffic.
+Applications must account for this confidentiality limit.
+
+This crate declares no Cargo features. Its Iroh dependency disables default
+features and selects `tls-ring`.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Federation contracts](../chio-federation/README.md)
+- [Pheromone relay](../chio-pheromone-relay/README.md)
+- [Portable trust and federation](../../../spec/PROTOCOL.md#10-portable-trust-and-federation)
+
+[License](../../../LICENSE)

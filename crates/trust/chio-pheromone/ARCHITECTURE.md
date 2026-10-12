@@ -1,85 +1,82 @@
 # chio-pheromone architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-pheromone` is the receiver-owned trust boundary for pheromone deposits: a
-pure data and validation crate (`#![forbid(unsafe_code)]`) with no I/O and no
-network dependency. Every admission decision is a function of an explicit
-`PheromoneValidationContext` the caller supplies (passports, kernel keys,
-subject-class policy, scarcity policies, trust-floor state); the crate holds no
-ambient policy or clock. The only mutable state it owns is the in-memory
-bookkeeping inside `InMemoryPheromoneSubstrate`. Durable storage and policy
-loading belong to `chio-pheromone-runtime`; moving deposits between kernels over
-the network belongs to `chio-pheromone-relay`.
+The crate owns observation deposit types, local validation, scarcity admission
+calculations, and the `PheromoneSubstrate` abstraction. The supplied
+`InMemoryPheromoneSubstrate` keeps deposits, nonce state, pair counters,
+scarcity counters, and passport diversity state in process-local mutexes.
 
-## Module map
+`PheromoneValidationContext` supplies the caller's time, accepted reputation
+epochs, admitted passports, kernel keys, subject policies, scarcity windows,
+runtime policy digest/issuer roots, cost-verifier roots, and trust-floor state.
+This context must originate from the verifier's local policy boundary.
+Network transit, persistent storage, workflow proof resolution, and runtime
+verdict changes are handled by other crates and their callers.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Schema constants, `PheromoneError`, all wire types (deposit, scarcity policy, observation-cost evidence, workflow context, runtime trust-floor state), and the public entry points: `sign_deposit`, `validate_deposit_for_admission`, scarcity-admission resolution, passport-hash helpers. |
-| `src/validation.rs` | Fail-closed validation internals: static deposit checks, passport resolution and signature verification, scarcity-policy material checks, observation-cost commitment verification, and the substrate's admission-state commit. Private except for the re-exported `validate_scarcity_policy_material`. |
-| `src/substrate.rs` | `PheromoneSubstrate` trait and `InMemoryPheromoneSubstrate`: `Mutex`-guarded deposit store and nonce/scarcity/pair/passport bookkeeping, concentration query, evaporation garbage collection. |
+## Structure
 
-## Admission path
+| Module | Responsibility |
+|--------|----------------|
+| `lib` | Typed deposits, policies, cost evidence, hashes, public validators |
+| `validation` | Fields, passport signatures, cost proofs, quotas, decay |
+| `substrate` | Nonce reservation, local storage, queries, evaporation |
 
-1. **Sign.** `sign_deposit` signs the canonical JSON of a `PheromoneDepositBody`
-   with `cost_commitment` cleared, so attaching a commitment after signing
-   cannot change the signed bytes.
-2. **Admit.** `validate_deposit_for_admission` checks static shape and value
-   ranges, matches `treaty_scope` against the subject-class policy, requires a
-   cost commitment when the policy demands one, resolves scarcity admission for
-   every accepted treaty (selecting the single active policy, recomputing its
-   `window_id`/`policy_sha256` to catch tampering, and verifying any required
-   observation-cost commitment: statement binding, verifier-root trust and
-   non-revocation, signature, and Merkle inclusion), checks the replay window
-   and future-timestamp bounds, resolves the origin passport (rejecting
-   kernel-signed, unknown, revoked, or time-invalid passports), and verifies
-   the deposit signature against that passport's key.
-3. **Commit.** `InMemoryPheromoneSubstrate::deposit` calls step 2, then
-   `commit_admission_state`: rejects a reused `(kernel, passport, nonce)`,
-   enforces each scarcity bucket's `token_capacity`, each `(kernel, passport)`
-   pair's `max_deposits_per_pair`, and a sqrt(active-peers)-scaled cap on
-   distinct passports per kernel/treaty/window, then stores the deposit.
-4. **Query.** `query_concentration` folds stored deposits into total and peak
-   strength using half-life decay, a caller-supplied peer weight, and a
-   newcomer discount; `gc_evaporated` drops deposits whose decayed strength has
-   crossed their evaporation floor.
+`PheromoneDepositBody` carries origin identity, subject/namespace, treaty scope,
+confidence, decay parameters, nonce, and optional workflow/cost attachments.
+`PheromoneConcentration` reports weighted and unweighted totals, distinct
+origins, peak confidence, evaluated epoch/time, and treaty scopes.
 
-## Invariants and failure modes
+## Data and control flow
 
-- Every admission check fails closed: unknown schema, malformed or
-  out-of-range fields, an unmatched treaty, a missing required cost commitment,
-  and malformed observation-cost evidence all return a `PheromoneError` before
-  a deposit is admitted.
-- A deposit signed by a kernel key is rejected (`KernelKeyUsedForDeposit`) even
-  if that key would otherwise resolve to a passport.
-- A revoked or time-invalid passport is reported as `UnknownOriginAgent`, the
-  same code as an unrecognized passport; the crate does not leak a distinct
-  "revoked" signal.
-- A scarcity policy's `window_id` and `policy_sha256` are recomputed from its
-  own fields and compared to the values carried on the policy; a mismatch is
-  tampering (`ScarcityPolicyInvalid`), not authoritative input.
-- An observation-cost verifier root is untrusted unless its issuer signature
-  verifies against `runtime_policy_issuer_public_keys` and a matching,
-  well-formed `runtime_trust_floor_state` entry vouches for it; no matching
-  entry means revoked.
-- `query_concentration` fails closed on an unknown `reputation_epoch` or a peer
-  weight outside `[0.0, 1.0]`/non-finite, instead of defaulting silently.
-- `commit_admission_state` runs its nonce, bucket, pair, and passport-cap
-  checks under the substrate's mutexes so capacity accounting is atomic per
-  process; a poisoned lock becomes `PheromoneError::StorePoisoned`, not a
-  panic.
+1. `sign_deposit` signs canonical deposit material with the agent key.
+2. Static validation checks field ranges, schema, subject policy, accepted
+   treaties, scarcity material, and the deposit's replay-window timestamp.
+3. Passport resolution binds origin kernel, passport key hash, JWK thumbprint,
+   validity at deposit time, and supplied revocation state. Kernel keys cannot
+   stand in for agent deposit keys.
+4. Substrate admission consumes replay identity and applicable quota buckets,
+   then appends the validated deposit.
+5. Concentration queries filter subject and namespace, apply exponential
+   half-life decay, optional evaporation floor, peer weight, and newcomer age.
+6. Garbage collection removes deposits below their explicit floor or the
+   default 0.01 floor while retained nonce/quota state remains in the instance.
+
+Preflight reservations support expensive receiver-owned resolution. Callers
+must release a reservation on resolution failure or commit it through
+`deposit_reserved`; the trait documents that lifecycle explicitly.
+
+## Trust and invariants
+
+`validate_deposit_for_admission` is a stateless validator. Duplicate nonces and
+rate limits are enforced when the substrate commits admission state.
+The replay key combines origin kernel, passport hash, and nonce.
+The in-memory implementation records seen nonces for the instance lifetime;
+it does not reclaim replay custody through garbage collection.
+
+Deposit signing omits the cost commitment from its preimage. Cost evidence has
+its own signature and binds the deposit through statement commitments.
+Live cost verification checks the admitted verifier root and telemetry Merkle
+path, statement identity/window/unit, runtime policy, and revocation-floor
+material. Workflow references receive shape validation; this crate does not
+resolve a proof package behind those references.
+
+Peer weights must be finite and within [0, 1]. Reputation epochs must appear in
+the supplied known-epoch list. Concentration can aggregate many observations;
+its total is a sum rather than a probability bounded by one. No concentration
+query grants capability authority or changes a kernel admission verdict.
 
 ## Dependencies
 
-`chio-core-types` supplies canonical JSON, hashing, Merkle proofs, and the
-`Keypair`/`PublicKey`/`Signature`/`SigningAlgorithm` crypto types. `base64`,
-`hex`, and `sha2` back passport-hash, JWK-thumbprint, and canonical SHA-256
-derivation. `serde`/`serde_json` define the wire types and feed
-canonicalization. `thiserror` derives `PheromoneError`. No async runtime,
-network, or persistence dependency.
+`chio-core-types` supplies canonical serialization, signatures, and Merkle
+proofs. `sha2`, `hex`, and `base64` derive passport and policy identifiers.
+`serde` and `serde_json` encode observation evidence and policy material.
+No database, transport, or kernel dependency is present.
 
-## Extension points
+## Verification
 
-`PheromoneSubstrate` is the trait an alternative admission store implements;
-`InMemoryPheromoneSubstrate` is the only implementation in this crate.
+Run `cargo test -p chio-pheromone` from the workspace root.
+`tests/pheromone_substrate.rs` covers signed deposits, passport standing,
+replay/quota limits, cost proofs, scarcity windows, decay, and newcomer weights.
+`tests/public_surface.rs` checks ownership of exported schema constants.
+The README exercises empty-store querying and garbage collection in memory.

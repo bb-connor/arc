@@ -1,61 +1,62 @@
 # chio-metering
 
-Attributes cost to receipts and enforces spending limits against that cost.
-The crate owns two independent budget models: a flat enforcer scoped to a
-session, agent, or tool, and a tree-shaped hierarchy where every ancestor node
-caps a draft spend. Query and billing-export projections read the same cost
-records. The crate holds no state beyond a single call: no persistence, no
-receipt signing, no kernel execution.
+`chio-metering` models receipt cost dimensions, queries cost records, exports
+billing rows, and evaluates budget hierarchies. Callers supply cost records and
+spend snapshots; this crate provides the arithmetic and decision logic.
 
-## Responsibilities
+## Usage
 
-- Attach cost metadata to a receipt across five dimensions: compute time,
-  data volume, monetary API cost, warehouse-query cost, and an open-ended
-  custom dimension (`cost::CostMetadata`, `cost::CostDimension`).
-- Filter and aggregate cost metadata by session, agent, tool, time range, and
-  currency, with grouping and a 500-record result cap
-  (`query::execute_cost_query`).
-- Enforce a flat budget policy scoped to total, per-session, per-agent, and
-  per-tool spend (`budget::BudgetEnforcer`).
-- Enforce a tree-shaped budget hierarchy where every ancestor node caps a
-  draft spend across four dimensions (spend, tokens, requests, warehouse
-  bytes) and reports the offending scope closest to the root
-  (`budget_hierarchy::BudgetTree`).
-- Project cost metadata into a flat, denormalized billing-export schema for
-  external billing pipelines (`export::create_billing_export`).
+Evaluate a token budget with a current snapshot. An empty snapshot at the
+specified evaluation time represents zero spend for missing nodes.
 
-## Public API
+```rust
+use chio_metering::{
+    AggregateSpend, BudgetDecision, BudgetLimits, BudgetNode, BudgetNodeId,
+    BudgetTree, BudgetWindow, SpendSnapshot,
+};
 
-Re-exported at the crate root:
+fn main() -> Result<(), chio_metering::BudgetError> {
+    let mut tree = BudgetTree::new();
+    tree.insert(BudgetNode::new("agent", BudgetWindow::Daily).with_limits(
+        BudgetLimits { max_tokens: Some(100), ..BudgetLimits::default() },
+    ))?;
+    let snapshot = SpendSnapshot::new(0);
+    let decision = tree.evaluate(
+        &BudgetNodeId::new("agent"), AggregateSpend::with_tokens(50), &snapshot,
+    );
+    assert_eq!(decision, BudgetDecision::Allow);
+    Ok(())
+}
+```
 
-- `cost::{CostMetadata, CostDimension}` - a receipt's cost record and its
-  per-dimension breakdown.
-- `budget::{BudgetEnforcer, BudgetPolicy, BudgetViolation}` - flat budget
-  tracking and enforcement.
-- `budget_hierarchy::{BudgetTree, BudgetNode, BudgetNodeId, BudgetWindow,
-  BudgetLimits, AggregateSpend, SpendSnapshot, PerWindowSpend,
-  BudgetDecision, BudgetDenyReason, BudgetError}` - tree-shaped, parent-capped
-  budget policy and evaluation.
-- `export::{BillingExport, BillingRecord}` - the flattened billing-record
-  schema.
-- `query::{CostQuery, CostQueryResult, CostSummary}` - query parameters and
-  results.
+Evaluation leaves the snapshot unchanged. Runtime enforcement must atomically
+reserve or record accepted usage in an authoritative store.
 
-Public but not re-exported at the crate root, so callers reach them through
-the module path:
+## Guarantees
 
-- `query::execute_cost_query`, `query::GroupBy`, `query::CostGroup` - the
-  query entry point and its grouping types.
-- `export::create_billing_export` - the export entry point.
+- `BudgetTree::insert` and `deserialize` validate limits, duplicate IDs, parent
+  references, and acyclic structure.
+- `BudgetTree::evaluate` checks the selected node and every ancestor. It denies
+  unknown/disabled nodes, stale or undated snapshots, incompatible currencies
+  for capped spend, arithmetic overflow, and exceeded configured dimensions.
+- `execute_cost_query` caps results at 500 and reports truncation. Totals and
+  groups describe the capped records in their input order.
+- `create_billing_export` suppresses the batch monetary total for mixed
+  currencies. Individual rows preserve the supplied monetary totals.
 
-## Testing
+## Status
 
-`cargo test -p chio-metering`
+The crate implements local metering models and projections. `BudgetEnforcer`
+is deprecated: its counters reset on restart, and `check` and `record` are
+separate operations. `BudgetTree` evaluates caller-provided state and has no
+persistence. Kernel charging, durable budgets, oracle conversion, and external
+settlement need their own integration; billing exports carry no signatures.
 
-## See also
+## Related
 
-- `chio-core` - supplies `MonetaryAmount` (`capability::scope`), used by
-  `cost`, `budget`, `query`, and `export`.
-- `chio-data-guards` - `WarehouseCostGuard` constructs
-  `CostDimension::WarehouseQuery` values from dry-run warehouse cost
-  estimates.
+- [Architecture](ARCHITECTURE.md)
+- [Protocol metered evidence](../../../spec/PROTOCOL.md#64-receipt-metadata)
+- [Credit](../chio-credit/README.md)
+- [Kernel](../../kernel/chio-kernel/README.md)
+
+License: [Apache-2.0](../../../LICENSE).

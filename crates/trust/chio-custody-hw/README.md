@@ -1,129 +1,78 @@
 # chio-custody-hw
 
-Chio's hardware-backed custody surface. It verifies WebAuthn passkey
-assertions and mobile device attestations (Apple App Attest, Android Play
-Integrity), and its `IssuerService` mints short-lived (5-minute), audience-pinned
-`PasskeyCapability` envelopes signed through a configured `SigningBackend`.
-Issuance runs through a fixed, fail-closed gate pipeline and never returns an
-unsigned capability.
-
-## Responsibilities
-
-- Verify WebAuthn passkey assertions with their own per-credential replay
-  resistance, independent of the issuer's replay store (`verifier`, feature
-  `passkey`).
-- Verify Apple App Attest and Android Play Integrity mobile attestations
-  against pinned trust roots, never a caller-supplied key in production
-  (`attestation`).
-- Issue cryptographically random, application- and audience-bound mobile
-  challenges and consume verified evidence exactly once, with atomic App Attest
-  counter advancement (`mobile_challenge`).
-- Define the audience-pinned `PasskeyCapability` envelope and its RFC 8785
-  canonical-JSON encoding (`capability`).
-- Sign capabilities and reconstruct the signed message over any
-  `chio_core_types::crypto::SigningBackend` (`mint`).
-- Orchestrate issuance through a fixed, ordered gate pipeline that never
-  emits an unsigned capability (`issuer`).
-- Gate issuance with a pluggable per-subject rate limiter, replay nonce
-  store, and transactional revocation cascade, each with an in-memory and a
-  SQLite-backed implementation (`rate_limit`, `nonce_store`, `revocation`).
-- Own the `urn:chio:error:custody:*` error taxonomy mirrored in
-  `spec/errors/registry.yaml` (`error`).
-
-Every item below is also re-exported at the crate root
-(`chio_custody_hw::IssuerService`, and so on).
-
-## Public API
-
-- `capability::{PasskeyCapability, ScopeSet}` - the audience-pinned
-  capability envelope and its scope set.
-- `mint::{sign_capability, signing_message}` - detached-signature mint and
-  the inverse message reconstruction verifiers use.
-- `issuer::{IssuerService, MintRequest, MintResponse}` - the fail-closed
-  issuance pipeline.
-- `verifier::{PasskeyVerifier, VerifiedAssertion}` - WebAuthn assertion
-  verification (`PasskeyVerifier` requires feature `passkey`).
-- `attestation::{verify_app_attest, verify_play_integrity,
-  parse_mobile_receipt_envelopes, AppAttestVerificationInput,
-  PlayIntegrityVerificationInput, VerifiedAppAttest, VerifiedPlayIntegrity,
-  ParsedMobileReceiptEnvelopes, AttestationError, APP_ATTEST_FORMAT,
-  MEETS_DEVICE_INTEGRITY, PLAY_RECOGNIZED}` - mobile device-attestation
-  verifiers.
-- `mobile_challenge::{MobileChallengeAuthority, MobileAttestationBinding,
-  IssuedMobileChallenge, VerifiedMobileAttestation,
-  VerifiedMobileAttestationEvidence, MobileChallengeStore,
-  InMemoryMobileChallengeStore, SqliteMobileChallengeStore}` - server-owned,
-  one-time mobile challenge issuance and atomic replay/counter custody
-  (`SqliteMobileChallengeStore` requires feature `sqlite-store` and private
-  Unix file custody).
-- `nonce_store::{PasskeyNonceStore, InMemoryPasskeyNonceStore,
-  SqlitePasskeyNonceStore, RecordOutcome, DEFAULT_CLOCK_SKEW_SECONDS}` -
-  replay detection (`SqlitePasskeyNonceStore` requires feature
-  `sqlite-store`).
-- `rate_limit::{IssuanceRateLimiter, RateLimiter, RateLimitOutcome,
-  DEFAULT_MAX_PER_WINDOW, DEFAULT_WINDOW_SECONDS}` - per-subject issuance
-  throttling.
-- `revocation::{CredentialRevocationOracle, InMemoryCredentialRevocationOracle,
-  SqliteCredentialRevocationOracle, credential_revocation_nonce,
-  CREDENTIAL_REVOCATION_NONCE_VALUE}` - the revocation cascade
-  (`SqliteCredentialRevocationOracle` requires feature `sqlite-store`).
-- `error::CustodyError` - the crate's fail-closed error taxonomy.
+Passkey capability issuance and mobile attestation verification for Chio.
+The issuer signs audience-bound, five-minute capabilities through an injected
+`SigningBackend`. Separate stores implement replay, revocation, and mobile
+challenge/counter state.
 
 ## Usage
 
+Mint with fixture assertion evidence and explicitly wired in-memory gates:
+
 ```rust
 use std::sync::Arc;
-
-use chio_core_types::crypto::{Ed25519Backend, Keypair, SigningBackend};
-use chio_custody_hw::{IssuerService, MintRequest, ScopeSet, VerifiedAssertion};
-
-let signer: Arc<dyn SigningBackend> =
-    Arc::new(Ed25519Backend::new(Keypair::from_seed(&[7u8; 32])));
-// Production deployments also wire durable stores (`with_durable_stores`, or
-// `enforce_revocation_replay()` to make the requirement a construction-time
-// error): a bare `with_signer` issuer skips revocation and replay checks.
-let issuer = IssuerService::with_signer("urn:chio:audience:kernel", signer);
-
+use chio_core_types::crypto::{Ed25519Backend, Keypair};
+use chio_custody_hw::{
+    InMemoryCredentialRevocationOracle, InMemoryPasskeyNonceStore,
+    IssuerService, MintRequest, ScopeSet, VerifiedAssertion,
+};
+let issuer = IssuerService::with_signer("kernel-a", Arc::new(
+    Ed25519Backend::new(Keypair::from_seed(&[7; 32]))
+))
+.with_nonce_store(Arc::new(InMemoryPasskeyNonceStore::new()))
+.with_revocation_oracle(Arc::new(InMemoryCredentialRevocationOracle::new()))
+.enforce_revocation_replay()?;
 let verified = VerifiedAssertion {
-    credential_id_b64: "AAAA".into(),
-    user_verified: true,
+    credential_id_b64: "credential_a".into(), user_verified: true,
 };
 let request = MintRequest {
-    audience: "urn:chio:audience:kernel".into(),
-    scope_set: ScopeSet::new(["tool:read"]),
-    challenge_nonce: "n-1".into(),
+    audience: "kernel-a".into(), scope_set: ScopeSet::new(["tool:read"]),
+    challenge_nonce: "challenge_a".into(),
 };
-
-let response = issuer.mint_capability(&verified, &request, chrono::Utc::now())?;
-assert!(!response.capability.signature.is_empty());
+let now = chrono::DateTime::parse_from_rfc3339("2026-04-29T12:00:00Z")?
+    .with_timezone(&chrono::Utc);
+let minted = issuer.mint_capability(&verified, &request, now)?;
+assert!(!minted.capability.signature.is_empty());
+assert!(issuer.mint_capability(&verified, &request, now).is_err());
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## Feature flags
+Real assertion evidence comes from `PasskeyVerifier::verify_assertion` with
+server-owned authentication state. Use `with_durable_stores_handle` when
+replay/revocation must survive restart and operator revocations share the cache.
 
-| Flag | Effect |
-|------|--------|
-| `passkey` (default) | Enables `PasskeyVerifier`, pulling in `webauthn-rs` / `webauthn-rs-proto`. |
-| `sqlite-store` (default) | Enables `SqlitePasskeyNonceStore`, `SqliteCredentialRevocationOracle`, and `SqliteMobileChallengeStore`, durable stores sharing the workspace's pinned `rusqlite` version with `chio-store-sqlite`. The mobile store requires an absolute normalized path in a caller-owned, non-group/world-writable Unix directory and a single-link owner-only database file. |
-| `pq` | Enables post-quantum `HybridBackend` signing via `chio-core-types/pq` (ML-DSA-65). |
-| `dev-fixtures` | Compiles in synthetic mobile-attestation fixtures (the App Attest compact-map shape, a caller-supplied Play Integrity JWKS). Test/dev only; never enable in a shipped binary. |
+## Features
 
-## Testing
+| Feature | Default | Effect |
+| --- | --- | --- |
+| `default` | Yes | Enables `passkey` and `sqlite-store`. |
+| `passkey` | Yes | Adds WebAuthn relying-party verification and its dependencies. |
+| `sqlite-store` | Yes | Adds durable nonce, revocation, mobile challenge, and counter stores. |
+| `pq` | No | Enables core hybrid ML-DSA signing support. |
+| `dev-fixtures` | No | Enables synthetic App Attest and caller-JWKS test paths; exclude from deployment builds. |
 
-`cargo test -p chio-custody-hw`
+## Guarantees
 
-Integration tests under `tests/` cover attestation verification, replay
-resistance, the revocation cascade, audience confusion, canonical-JSON
-stability, and an end-to-end issuer-to-kernel-verifier flow.
-`fixtures/passkey/` pins a JSON descriptor corpus mapping WebAuthn failure
-modes to their expected `urn:chio:error:custody:*` code.
-Unit tests cover mobile challenge binding, expiry, one-time consume,
-concurrent counter compare-and-swap, SQLite restart durability, parallel
-consumers, and fail-closed database permission and identity drift.
+- `mint_capability` checks audience, user verification, transport fields,
+  configured rate/revocation/replay gates, then signs canonical unsigned bytes.
+- `with_signer` wires rate limiting only. `enforce_revocation_replay` refuses
+  construction unless both replay and revocation stores are attached.
+- `MobileChallengeAuthority` verifies stored application-bound evidence before
+  atomically consuming the challenge and advancing App Attest counter state.
+- Canonical capability parsing checks original bytes; callers separately check
+  signature, audience, expiry, scope, and revocation before accepting authority.
 
-## See also
+## Status
 
-- `chio-core-types` - supplies the `SigningBackend` family and canonical-JSON
-  encoding the issuer signs over.
-- `chio-revocation-oracle` - the sparse-Merkle oracle `CredentialRevocationOracle` wraps.
-- `chio-kernel` - its `custody::PasskeyCapabilityVerifier` verifies capabilities minted here.
-- `chio-kernel-mobile` - consumes the App Attest / Play Integrity verifiers with `default-features = false` to avoid the OpenSSL-backed `webauthn-rs` graph in iOS staticlib builds.
+Implemented issuance and verification surfaces with synthetic test corpora.
+The production Play Integrity path rejects every token while its key pin is
+synthetic. App Attest callers must select the production AAGUID policy and
+retain prior counters; the challenge authority fixes those choices.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol contract](../../../spec/PROTOCOL.md#9-trust-control-contract)
+- [chio-revocation-oracle](../chio-revocation-oracle/README.md)
+
+[License](../../../LICENSE)

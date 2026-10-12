@@ -1,67 +1,55 @@
 # chio-attest-buyer
 
-Public Chio buyer attestation verification boundary. Defines the Chio-owned
-packet, review-package, lineage, continuation, and report types so callers
-depend on Chio shapes, not on either verification backend directly.
+Chio-owned buyer packet and review APIs connect runtime evidence checks to
+`chio-attest-buyer-core` proof replay. The public types preserve artifact
+roles, byte hashes, lineage classifications, and structured rejection reports.
 
-Packet- and review-level verification delegates to `chio-runtime-core`, which
-owns the live admission algorithms. Full proof replay (DSSE, trust bundle,
-selective disclosure) delegates to `chio-attest-buyer-core`, the hardened
-offline proof-package verifier; that path keeps strict treaty-bound DSSE
-semantics and leaves hash-only DSSE unresolved until replayed.
+## Usage
 
-## Responsibilities
+Run the repository's offline three-vendor proof fixture through the JSON
+boundary. Its trust bundle and verification context are test inputs.
 
-- Own the Chio-facing attestation types (`BuyerAttestationPacket`,
-  `BuyerAttestationReviewPackage`, lineage, continuation, admission, and
-  report shapes) and their schema-id constants, kept local rather than
-  re-exported from `chio-runtime-core`.
-- Validate every `*_from_json` constructor before returning a trusted struct:
-  schema id, required identifiers, sha256-hex hash fields, and, for review
-  packages, safe relative artifact paths with no duplicate role or path.
-- Convert between Chio types and `chio_runtime_core` types (`conversions.rs`)
-  and rewrite the backend's internal error and check-code namespace into
-  `chio_attest_buyer.*` so no backend naming leaks through the public API.
-- Provide the optional full proof-replay path that re-verifies a bundled
-  proof package through `chio-attest-buyer-core` and can downgrade an
-  already-accepted review report to rejected.
+```rust
+use chio_attest_buyer::verify_proof_package_json;
+let report = verify_proof_package_json(
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"),
+        "/../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json")),
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"),
+        "/../../../examples/chio-3vendor/fixtures/verifier-trust-bundle.json")),
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"),
+        "/../../../examples/chio-3vendor/fixtures/verification-context.json")),
+)?;
+assert!(report.accepted);
+assert!(report.failure_code.is_none());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-## Public API
+For a hydrated review, supply `BuyerAttestationReviewSource` bytes for every
+required artifact. Use
+`verify_buyer_attestation_review_package_with_proof_replay_json` to add core
+proof replay after the runtime review succeeds.
 
-- `types::{BuyerAttestationPacket, BuyerAttestationReviewPackage,
-  BuyerAttestationReviewSource, ReceiptLineageStatement, ReceiptLineageBundle,
-  CrossKernelContinuation, CrossBoundaryAdmissionReport, BilateralInvocation}`
-  - Chio-owned request artifacts.
-- `types::{BuyerAttestationVerificationReport, BuyerAttestationReviewReport,
-  BuyerAttestationReviewCheck, ChioProofVerificationReport,
-  RuntimeEvidenceManifest}` - Chio-owned report artifacts.
-- `buyer_attestation_packet_from_json`,
-  `buyer_attestation_review_package_from_json`,
-  `runtime_evidence_manifest_from_json` - validating JSON constructors.
-- `verify_buyer_attestation_packet`, `verify_buyer_attestation_review_package`,
-  `verify_buyer_attestation_review_package_with_trust`,
-  `verify_receipt_lineage_bundle` - verification against `chio-runtime-core`.
-- `verify_proof_package_json`,
-  `verify_buyer_attestation_review_package_with_proof_replay_json` - full DSSE
-  proof replay against `chio-attest-buyer-core`.
-- `buyer_attestation_packet_sha256`, `receipt_lineage_statement_sha256`,
-  `bilateral_invocation_binding_sha256` - canonical artifact hashing.
-- `buyer_attestation_verification_report_json`,
-  `buyer_attestation_review_report_json` - canonical JSON rendering of
-  reports.
-- `error::BuyerAttestationError` - public error type (`code()`, `Display`,
-  `std::error::Error`).
-- `schemas::CHIO_*` - the nine schema-id constants this crate's types declare.
+## Guarantees
 
-## Testing
+- JSON readers enforce a 16 MiB original-input bound and duplicate-aware
+  signed decoding. Packet and review readers then validate typed boundaries.
+- `verify_buyer_attestation_packet` delegates cross-artifact binding checks;
+  packet-carried DSSE hashes alone leave verification unresolved.
+- The proof-replay review entrypoint turns an otherwise accepted review into
+  a rejected report when `chio-attest-buyer-core` rejects its proof package.
+- `BuyerAttestationError::code` preserves a public rejection code while
+  runtime buyer codes are mapped into this crate's namespace.
 
-`cargo test -p chio-attest-buyer`
+## Status
 
-## See also
+Implemented local evidence verification. Acceptance depends on externally
+chosen trust and context material. Budget references do not claim settlement;
+full runtime closure also requires kernel admission and regenerated proofs.
 
-- `chio-attest-buyer-core` - offline proof-package verifier this crate calls
-  for full DSSE replay.
-- `chio-runtime-core` - owns the live packet and review verification
-  algorithms this crate wraps.
-- `chio-cli` - depends on this crate for its buyer attestation command
-  surface.
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol contract](../../../spec/PROTOCOL.md#9-trust-control-contract)
+- [chio-attest-buyer-core](../chio-attest-buyer-core/README.md)
+
+[License](../../../LICENSE)

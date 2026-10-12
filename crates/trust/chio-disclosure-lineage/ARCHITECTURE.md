@@ -1,115 +1,77 @@
 # chio-disclosure-lineage architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-disclosure-lineage` is a pure verification library: no I/O, no runtime
-state, invoked synchronously by a caller holding a `DisclosureLineageBundle`
-and a set of trusted signer keys supplied per call through
-`DisclosureLineageVerifierTrust`. It holds no keys and no kernel state of its
-own, and it is not part of any async runtime.
+The crate owns typed capsule, lineage, ledger, privacy-profile, crypto-context,
+and verifier-report artifacts. Its public bundle verifier accepts these supplied
+objects and a `DisclosureLineageVerifierTrust` containing pinned signer keys.
 
-A selective disclosure is accepted only when five artifacts agree: a capsule
-declaring what was disclosed and hidden, a signed lineage subgraph proving
-graph-bound receipt evidence backs it, a leakage ledger accounting for every
-unit of disclosed information and its score, a privacy profile stating what
-the verifier permits, and a crypto context report attesting the underlying
-cryptographic proof was checked. The crate cross-validates and binds these
-five artifacts; it does not produce any of them, evaluate cryptographic key
-or revocation state, or generate BBS proofs (`chio-selective-disclosure` owns
-all three).
+Its proof boundary is signed artifact consistency. A crypto-context report
+carries a producer's verified verdict and claims. This crate authenticates that
+report and binds its references; BBS proof computation lives in the sibling
+selective-disclosure crate.
 
-## Module map
+## Structure
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Re-exports the public types and verifier functions. No logic. |
-| `src/types.rs` | Serde data model for all five artifact kinds, their schema-tag constants, and `DisclosureLineageError`. Every struct carries `#[serde(deny_unknown_fields)]`. |
-| `src/verifier.rs` | Digesting, Ed25519 signing/verification, per-artifact validators, cross-artifact binding checks, and the fixed hidden-predicate catalog. |
+| Source | Responsibility |
+| --- | --- |
+| `src/types.rs` | Strict Serde artifact shapes, schema constants, verdicts, errors. |
+| `src/verifier.rs` | Digests, signatures, graph and privacy checks, report assembly. |
+| `src/lib.rs` | Re-exports the public artifact and verifier surface. |
+| `tests/disclosure_lineage.rs` | Signed fixtures and adversarial bundle mutations. |
 
-## Verification pipeline
+There are no Cargo feature switches. The library unit-test target is disabled;
+integration tests exercise the exported surface.
 
-`verify_disclosure_lineage_bundle_with_trust` runs eight steps in order and
-returns on the first error:
+## Data and control flow
 
-1. `validate_capsule` - schema tag, non-empty refs, unique disclosed fields
-   and hidden-predicate ids.
-2. `validate_privacy_profile` - schema tag, non-empty core fields, uniqueness
-   of the allow/forbid lists, at least one sensitivity class.
-3. `validate_lineage` (with trust) - schema tag; sha256-shape digests; node
-   kind, evidence-class, and derived-hash checks; root-receipt shape; edge
-   shape and kind/relation restriction; graph closure
-   (`validate_lineage_closure`); redaction consistency
-   (`validate_lineage_redactions`); recomputes the frontier,
-   checkpoint-inclusion, and subgraph digests and compares them to the
-   declared values; verifies the Ed25519 signature against
-   `trusted_lineage_signer_keys`.
-4. `validate_leakage_ledger` (against the profile) - schema tag,
-   ledger-to-profile identity (`policy_profile_id`, `privacy_profile_ref`,
-   `audience`), `accepted == true`, per-entry checks (sensitivity-class
-   membership, residual-inference-note requirement for sensitive entries,
-   uniqueness), and a recomputed total score within the profile's maximum.
-5. `validate_bundle_bindings` - cross-artifact ref identity across capsule,
-   lineage, leakage ledger, and privacy profile; requires
-   `crypto_context_report` to be present and checks its schema, refs,
-   verdict, claim whitelist, and disclosed-field-set equality with the
-   capsule (signature not yet checked here).
-6. `validate_privacy_profile_policy` - capsule leakage budget against the
-   profile; disclosed fields checked for sensitivity classification and
-   allow/forbid membership; hidden predicates matched against
-   `SUPPORTED_HIDDEN_PREDICATES` and checked for allow/forbid membership.
-7. `validate_leakage_coverage` - every disclosed field and hidden predicate
-   has a matching, policy-allowed leakage-ledger entry; if the capsule
-   discloses anything, all `REQUIRED_DISCLOSURE_DERIVED_FACTS` must also be
-   present.
-8. `verify_crypto_context_report_signature_with_trust` - Ed25519 check
-   against `trusted_crypto_context_report_signer_keys`; the report's
-   `verified_claims` are appended to the result.
+The bundle verifier validates capsule and profile, checks lineage and ledger,
+binds their references, applies reveal policy, and verifies leakage coverage.
+It then authenticates the required crypto-context report and returns a report
+containing counts and the accepted claim identifiers.
 
-The returned `DisclosureLineageVerifierReport` carries the union of claims
-proven by the lineage subgraph, the leakage ledger, and the crypto context
-report.
+Lineage validation checks unique nodes, roots, edges, declared parent closure,
+increasing depths, maximum depth, supported kinds, and node evidence floors.
+It checks redaction reasons, recomputes frontier and subgraph digests, and
+verifies the subgraph signature against the trusted lineage keys.
 
-## Invariants and failure modes
+Ledger validation checks classification, duplicate entries, audience, total
+score, maximum score, and residual-inference notes for sensitive entries.
+Coverage requires entries for each disclosed field and hidden predicate.
+When either is present, three derived crypto facts must also be recorded.
 
-- Every validator fails closed: the first mismatch returns
-  `DisclosureLineageError::InvalidArtifact` and no partial report is built.
-- Layered digest binding: a node's `artifact_sha256` and `source_id_hash`
-  must equal `sha256(receipt_ref)`; the frontier digest hashes the sorted
-  `id:artifact_sha256:depth` triples of nodes that are never an edge's `from`
-  (leaf nodes); the checkpoint-inclusion digest is
-  `sha256(checkpoint_ref|frontier_sha256)`; the subgraph digest is the
-  canonical-JSON hash of the subgraph excluding `schema`, `subgraph_sha256`,
-  and `signature`.
-- The two signed artifacts use different signature schemes: a lineage
-  subgraph signs the hex digest string's bytes (`Keypair::sign`); a crypto
-  context report signs the artifact canonically with its own `signature`
-  field cleared first (`Keypair::sign_canonical`). Both produce the same
-  `sig-ed25519:<pubkey-hex>:<signature-hex>` wire format.
-- Trust is two independent key sets held in `DisclosureLineageVerifierTrust`:
-  a lineage signer is never accepted as a crypto-context-report signer
-  unless the caller adds the same key to both sets.
-- Evidence-class floor: every lineage node's rank (`asserted` < `observed` <
-  `verified`/`derived`, the latter two tied) must be at least the subgraph's
-  declared `required_evidence_class` rank.
-- Hidden predicates are restricted to the `SUPPORTED_HIDDEN_PREDICATES` allowlist,
-  which currently holds one entry (`amount_lte_100`); every field of a capsule's
-  predicate must match that entry exactly and its `result` must be `true`.
-- `crypto_context_report` is `Option` on the wire (omittable in JSON) but
-  mandatory for verification: `validate_bundle_bindings` rejects `None`.
-- The privacy profile's cryptographic policy fields
-  (`required_key_epoch_min`, `forbidden_key_epochs`,
-  `required_status_freshness_seconds`, `required_transparency_state`,
-  `max_presentation_age_seconds`, `required_holder_binding`) are carried and
-  shape-checked but never evaluated in this crate.
-  `chio-selective-disclosure::crypto_context::policy` evaluates them against
-  a `CryptoVerificationContext` before producing the signed report this
-  crate verifies.
+## Trust and invariants
+
+Lineage signing covers the SHA-256 digest of canonical selected subgraph fields.
+The signature string carries a key and signature under `sig-ed25519:`.
+Crypto-context signing clears its signature field and signs canonical report
+bytes. Empty trust lists accept no signer.
+
+Node artifact and source-ID digests are hashes of `receipt_ref` strings.
+Edge digests hash edge IDs and `from|to|kind` strings. Checkpoint inclusion is a
+hash of `checkpoint_ref|frontier_sha256`. These checks do not load receipt bodies
+or authenticate an external Merkle checkpoint.
+
+The evidence floor applies to nodes. Edge evidence labels are checked against
+supported values, without applying that floor to each edge.
+The accepted labels are `asserted`, `observed`, `verified`, and `derived`.
+
+The hidden-predicate validator recognizes the fixed `amount_lte_100` descriptor,
+including USD, slot 2, and a true result. It checks descriptor equality without
+computing a cryptographic range proof.
+Profile key, epoch, timing, replay, and transparency requirements need a trusted
+crypto-context producer; this verifier does not retrieve those inputs.
 
 ## Dependencies
 
-- `chio-core-types` - canonical JSON (`canonical_json_bytes`), sha256 hashing
-  (`sha256_hex`), and the Ed25519 `Keypair`/`PublicKey`/`Signature` types
-  used for every digest and signature in the crate. Imported under its own
-  name; no `package = ` aliasing.
-- `serde` (`derive`) - (de)serializes every artifact type.
-- `thiserror` - derives `DisclosureLineageError`.
+`chio-core-types` supplies canonical bytes, SHA-256, and signature primitives.
+Serde rejects unknown artifact fields; semantic checks remain in the verifier.
+`thiserror` exposes `DisclosureLineageError::InvalidArtifact` with failure detail.
+
+## Verification
+
+Run `cargo test -p chio-disclosure-lineage --test disclosure_lineage` for budget,
+sensitivity, reference, depth, digest, redaction, trust, and signature cases.
+Fixtures test supplied graph consistency and report signatures. Source receipt
+validation and externally authenticated checkpoint membership need integration
+at the consumer boundary.

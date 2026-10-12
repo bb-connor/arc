@@ -1,132 +1,129 @@
 # chio-federation-transport-iroh architecture
 
-## Overview
+## Responsibility and boundary
 
-This crate is a transport, not a trust authority. It sits strictly underneath
-`chio-federation` (ADR-0014) and replaces no trust logic: the per-frame
-verifiers `chio-federation` runs above the transport are unchanged, so this
-crate's own trust surface is narrow and verified once, at load time. An
-issuer-signed `TransportDirectoryBundleDocument` binds each operator's
-long-term passport key to a rotatable iroh `EndpointId` (and, additively, to
-oracle revocation-signer keys and per-treaty party sets), producing the one
-`VerifiedDirectory` every lane resolves against. Four ALPN-mounted lanes carry
-`chio-federation`'s wire protocols over iroh behind one shared accept-time
-gate; a fifth substrate (iroh-blobs) carries bulk catch-up data
-content-addressed rather than framed.
+This adapter owns transport identity bindings, an endpoint admission hook,
+framing, lane handlers, catch-up downloads, and transport telemetry.
+`lib.rs` exports `identity`, `admission`, `lanes`, `catchup`, `metrics`, and
+`observability`. Long-term trust decisions and tool execution remain with
+federation verifiers and embedding runtimes.
 
-## Module map
+Iroh proves possession of an endpoint's transport key during QUIC/TLS.
+`VerifiedDirectory` maps that endpoint to a passport identity authorized by
+a pinned directory issuer. The passport key and transport key have separate
+roles and can rotate independently through a successor directory bundle.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Crate doc and module declarations (`admission`, `catchup`, `identity`, `lanes`, `metrics`, `observability`). |
-| `src/identity.rs` | Issuer-signed transport-directory bundle types, fail-closed `verify_bundle`, and the resulting `VerifiedDirectory`. |
-| `src/admission.rs` | `DirectoryGate`: the accept-time `EndpointHooks` gate every lane shares. |
-| `src/catchup.rs` | Content-addressed catch-up (lane e) over iroh-blobs: publish/fetch signed epoch roots, the `RevocationCatchupManifest` control shape. |
-| `src/lanes.rs` | Declares the four lane submodules plus the cfg-gated loom test module. |
-| `src/lanes/limits.rs` | `AcceptLimiter` / `AcceptLimitConfig`: shared per-phase timeouts and concurrency caps for the three direct lanes. |
-| `src/lanes/limits_loom.rs` | Loom concurrency models for the per-peer counter and the directory `ArcSwap`; `#[cfg(all(test, chio_iroh_transport_loom))]`, off by default. |
-| `src/lanes/pheromone.rs` | Lane a: directed batches over a direct QUIC stream; reuses `chio-pheromone-relay`'s receiver, store, and outbox verbatim. |
-| `src/lanes/revocation.rs` | Lane b: pushed signed epoch roots plus the catch-up control envelope over a direct QUIC stream. |
-| `src/lanes/fanout.rs` | Lane c: cross-operator fan-out over iroh-gossip, one topic per treaty, with a treaty-party join/receive gate. |
-| `src/lanes/bilateral.rs` | Lane d: DSSE co-signing over a dedicated-ALPN bidirectional QUIC RPC; implements `chio_federation::bilateral::BilateralCoSigningProtocol`. |
-| `src/metrics.rs` | Hand-rolled `AtomicU64` counters/histogram and `render_iroh_transport_metrics_prometheus`. |
-| `src/observability.rs` | `tracing` span/target helpers shared by the lanes. |
+## Structure
 
-## Lane lifecycle
+| Module | Public surface and responsibility |
+| --- | --- |
+| `identity` | Directory documents, issuer trust inputs, endorsement preimages, verified indices. |
+| `admission` | `DirectoryGate`, current snapshot swaps, and post-handshake rejection. |
+| `lanes::pheromone` | Directed batch handler, durable enqueue, and outbox drain over QUIC. |
+| `lanes::revocation` | Signed-root push, catch-up RPC, signer directory, and root sink seam. |
+| `lanes::fanout` | Treaty topic derivation, gossip subscription, and origin-verified frames. |
+| `lanes::bilateral` | `IrohBilateralCoSigner`, address/key seams, and co-sign handler. |
+| `lanes::limits` | Timeouts, global/per-peer permits, bounded I/O, and connection teardown. |
+| `catchup` | Blob publisher, manifests, bounded downloads, and verified-root history. |
+| `metrics`, `observability` | Registered counter names, snapshots, and structured trace targets. |
 
-1. **Load time.** A `TransportDirectoryBundleDocument` is verified
-   (`verify_bundle`) against a pinned issuer set and rollback floor, producing
-   a `VerifiedDirectory`. It is wrapped in a `DirectoryGate`
-   (`Arc<ArcSwap<VerifiedDirectory>>`) so a reloader can publish a freshly
-   verified successor without reconstructing the gate.
-2. **Accept time.** The gate is installed via
-   `Endpoint::builder(..).hooks(gate)`. `after_handshake` resolves the
-   authenticated `EndpointId` and returns `Accept` or `Reject` (403) before
-   any `ProtocolHandler::accept` runs.
-3. **Direct-lane accept (a/b/d).** Each handler re-resolves `conn.remote_id()`
-   through the same gate (defense in depth), then runs bounded `accept_bi` ->
-   bounded frame read -> `chio-federation` per-frame verification -> bounded
-   response write -> bounded linger, all under the lane's `AcceptLimiter`.
-4. **Fan-out (c).** Instead of accepting a connection, a node joins a gossip
-   topic derived from the treaty id (`blake3(label || 0x00 || treaty_id)`),
-   gated by treaty-party membership at join and again at receive; every
-   payload is origin-verified from its own embedded signature, never from
-   `Message::delivered_from`.
-5. **Catch-up (e).** A follower fetches signed roots addressed by their BLAKE3
-   hash over iroh-blobs, then re-checks both content integrity and
-   pinned-signer authenticity per blob before merging, all-or-nothing.
+The direct lane ALPNs are `chio/federation/pheromone-batch/1`,
+`chio/federation/revocation-root/1`, and
+`chio/federation/bilateral-dsse-cosign/1`. Fan-out uses `iroh_gossip::ALPN`;
+content downloads use `iroh_blobs::ALPN`.
 
-## Invariants and failure modes
+## Data and control flow
 
-- The gate resolves only through a `VerifiedDirectory` that passed every
-  `verify_bundle` check; no constructor skips verification.
-- A removed (tombstoned) directory entry never resolves, inbound (`authorize`)
-  or outbound (`resolve_transport_endpoint`).
-- Every direct-lane accept step is bounded by `AcceptLimitConfig`; a stalled
-  peer is reset rather than left to hang a task, and concurrency is capped
-  both lane-wide and per-peer.
-- Revocation and catch-up authenticity is independent of transport identity: a
-  `SignedEpochRoot` must verify against its pinned `Ed25519RootVerifier`, and
-  BLAKE3 integrity is re-checked even though iroh-blobs already verifies it in
-  transit (integrity is not authenticity).
-- Fan-out never trusts `delivered_from`: every payload is verified from its
-  own self-signature plus `chio-federation`'s transport-independent frame
-  verifier.
-- Fan-out's inbound gossip join is not gated at the protocol level
-  (iroh-gossip 0.101 exposes no admission hook); the treaty-party gate at join
-  and receive stops a non-party from injecting an accepted frame, but a
-  bypassing client can still observe forwarded swarm traffic. This is a
-  documented residual, not a silent gap.
-- Bilateral co-sign verifies Org B's signature against the passport key the
-  same verified directory snapshot binds for that peer, so a rotated-away or
-  revoked passport is never accepted.
-- Every verification failure and admission reject increments a
-  bounded-cardinality Prometheus counter and emits a `tracing::warn!`
-  additively, without changing the returned `Result`.
+1. `verify_bundle` checks the v2 directory body and canonical directory digest
+   against caller-supplied issuer and rollback pins. Active entries must carry
+   domain-separated passport endorsements for their endpoints and oracle keys.
+2. The resulting directory derives endpoint, passport, oracle-signer, and
+   treaty-party indices together. Tombstones suppress admission and signing
+   authority. Removed entries do not need valid endorsements.
+3. `DirectoryGate::after_handshake` decides admission before a mounted handler
+   runs. Direct handlers resolve the authenticated endpoint again and apply
+   their lane checks before handing accepted data to application collaborators.
+4. Directed pheromone traffic uses `RelayBatchReceiver` and the SQLite relay
+   store. Inbox reservations serialize concurrent delivery of the same batch;
+   stored verdicts support redelivery without repeating receiver mutations.
+5. Revocation push verifies an entire batch before returning its signed roots.
+   The handler passes roots to `RevocationRootSink`; its implementation owns
+   monotone installation and persistence in the application's revocation view.
+6. Blob catch-up fetches canonical signed-root bytes, validates them, and
+   returns a contiguous verified run. `BlobBackedHistory` retains roots in a
+   process-local map for subsequent history queries.
 
-## Dependencies
+## Trust and invariants
 
-- `chio-core-types` - canonical JSON, hashing, and the algorithm-agnostic
-  `PublicKey` / `Signature` / `Keypair` types the directory bundle and every
-  lane sign and verify against.
-- `chio-federation` - defines the wire protocols this crate transports
-  (`pheromone_gossip`, `revocation_gossip`, `bilateral`) and the
-  `BilateralCoSigningProtocol` / `RevocationCatchupHistory` traits this crate
-  implements; its per-frame verifiers run unchanged above the transport.
-- `chio-pheromone-relay` - lane a reuses its `RelayBatchReceiver` trait and
-  `SqlitePheromoneRelayStore` outbox/inbox verbatim.
-- `chio-revocation-oracle` - `Ed25519RootVerifier` / `EpochRootVerifier` /
-  `SignedEpochRoot`, the pinned signature check for lane b and blob catch-up.
-- `chio-metrics-spec` - registered Prometheus metric-name and bucket
-  constants; adds no runtime dependency.
-- `iroh` (`tls-ring` only, default features off) - the QUIC/TLS endpoint,
-  `EndpointHooks`, `ProtocolHandler`, and `Router` every lane mounts on.
-- `iroh-gossip` - the per-treaty swarm lane c joins.
-- `iroh-blobs` - the content-addressed store and downloader lane e uses.
-- `arc-swap` - lock-free directory reads on the hot admission path behind the
-  reloader's single-writer swap.
-- `tokio`, `serde` / `serde_json`, `thiserror`, `tracing`, `blake3`, `bytes`,
-  `n0-future` - async runtime, wire codec, typed errors, structured logging,
-  gossip topic derivation, and the `Stream` driving `GossipReceiver`.
+The trust inputs include exact issuer/key IDs, public keys, a strictly lower
+version floor, expected predecessor digest, and caller time. Those pins are
+caller-owned state. `DirectoryGate::swap` publishes an already verified
+snapshot through `ArcSwap`; it does not independently compare successor
+versions. `authorize` checks endpoint membership and tombstones, without
+consulting a clock. The embedding reloader must reject expired snapshots,
+preserve rollback state, and install `empty_deny_all` when required.
+`RevocationHandler` and `BlobCatchupClient` hold fixed directory `Arc`s;
+applications must replace those collaborators when their trust snapshot changes.
+A gate swap alone does not update their signer bindings.
 
-## Extension points
+Oracle bindings accept Ed25519 root keys and require a separate passport
+over-oracle endorsement. `RevocationHandler::verify_batch` checks that each
+signer belongs to the authenticated sender endpoint and that the batch names
+its responder. Structural `validate_envelope` alone does not verify a root.
 
-- `lanes::revocation::RevocationRootSink` - caller-provided cache-update hook
-  for verified pushed roots; must stage-then-commit a batch atomically (the
-  default fails closed rather than risk a partial merge).
-- `chio_federation::revocation_gossip::RevocationCatchupHistory` - implemented
-  by `catchup::BlobBackedHistory`; a caller may supply its own history source.
-- `lanes::fanout::TreatyMembership` - the treaty-party oracle the fan-out lane
-  gates join and receive on: membership, local-endpoint-to-kernel resolution
-  (for the join gate), and origin-key resolution (for receive).
-  `identity::VerifiedDirectory` implements it directly in production;
-  `StaticTreatyMembership` is an in-memory double for tests and examples.
-- `lanes::fanout::OriginKeyResolver` - fallback origin-key resolution when a
-  `TreatyMembership` backend binds no keys of its own; `StaticOriginKeys` is
-  the in-memory double.
-- `lanes::bilateral::{OrgAddressBook, PinnedPassportKeys}` - pluggable
-  peer-address and passport-key resolution for the bilateral co-signer and
-  handler.
-- `chio_federation::bilateral::BilateralCoSigningProtocol` - implemented by
-  `lanes::bilateral::IrohBilateralCoSigner`, so a networked co-signer can
-  substitute for `chio-federation`'s `InProcessCoSigner`.
+`BlobBackedHistory::from_verified` trusts its input contract; it performs no
+cryptographic or order checks. Fetch paths verify BLAKE3 addresses and oracle
+signatures and cap a requested range at 4,096 epochs. They inspect completed
+blob size before reading bytes into memory, with a one-MiB per-blob cap. The
+blob download itself has already written into the follower store at that point.
+
+Pheromone frames cap declared lengths at eight MiB before allocation;
+bilateral frames cap lengths at four MiB. Revocation reads cap at sixteen MiB.
+`AcceptLimiter` bounds stream acceptance, reads, writes, lingering, and global
+and per-peer concurrency. Endpoint QUIC stream/window settings remain wiring
+responsibilities; the crate exposes recommended values.
+
+Fan-out derives deterministic treaty topics and verifies deposit signatures
+against the origin passport key. A forwarding neighbor is not the author.
+Subscription checks the local authenticated endpoint's treaty membership;
+receive checks the origin membership and swarm/treaty binding. Inbound gossip
+joins lack an upstream per-topic authorization callback, leaving passive
+observation possible for an admitted non-party. The lane is experimental.
+
+`BilateralCoSignHandler::cosign` checks the request address, endpoint identity,
+directory passport binding, matching co-sign allowlist key, and remote
+signature before signing the supplied opaque PAE bytes. It does not parse or
+admit the invocation represented by those bytes; the application must apply
+its operational verifier and co-sign policy separately.
+
+## Dependencies and integration
+
+Iroh provides authenticated QUIC endpoints; `iroh-gossip` provides fan-out,
+and `iroh-blobs` provides content-addressed storage and downloads.
+`chio-core-types` supplies canonical JSON and cryptography;
+`chio-federation` supplies frame and DSSE contracts;
+`chio-revocation-oracle` supplies pinned root verification.
+`chio-pheromone-relay` supplies receiver and SQLite delivery state.
+Tokio, bytes, `n0-future`, `arc-swap`, and tracing support asynchronous I/O,
+shared directory snapshots, and telemetry.
+
+The CLI mounts only directed pheromone traffic when Iroh is enabled.
+Its serve path runs alongside the HTTP relay; its tick path drains one chosen
+transport. The CLI defaults to direct addressing with relays disabled and
+accepts explicit relay URLs. Library endpoint configuration remains the
+caller's responsibility. Revocation and bilateral selection fails at the CLI
+lane parser because that relay process does not supply their collaborators.
+
+## Verification
+
+Run `cargo test -p chio-federation-transport-iroh` from the workspace root.
+Identity and admission tests cover signature/hash tampering, expiry, rollback,
+endorsement binding, tombstones, and snapshot swaps. Lane tests exercise
+loopback QUIC, bounded frames and timeouts, origin pins, recipient mismatches,
+co-sign responses, inbox recovery, and catch-up ordering.
+
+`lanes/fanout/tests.rs` covers treaty checks and origin verification, including
+relayed delivery. `lanes/limits_loom.rs` contains additional concurrency models
+under the custom `chio_iroh_transport_loom` test configuration. Default test
+execution does not enable that configuration. The examples in `examples/`
+exercise individual lanes; they are separate from the CLI-supported path.
