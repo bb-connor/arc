@@ -31,13 +31,13 @@ use chio_runtime_core::{
     RuntimeAdmissionProfile, RuntimeAdmissionStore, RuntimePeerWeight, RuntimePeerWeights,
     RuntimePheromoneAdvisory, RuntimePheromonePolicy, RuntimePheromonePolicyRule,
     RuntimeRequestBinding, RuntimeTrustFloorEntry, RuntimeTrustedVerifierKey,
-    RuntimeVerifierTrustBundleV4, SignedRuntimePheromoneQueryReport,
-    SqliteRuntimeOrchestrationStore, TreatyRuntimeArtifactRecord, TreatyScope,
-    CHIO_BILATERAL_INVOCATION_SCHEMA, CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA,
-    CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA, CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
-    CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
-    CHIO_RUNTIME_FAILURE_CODES, CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA,
-    CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA, CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
+    RuntimeVerifierTrustBundle, SignedRuntimePheromoneQueryReport, SqliteRuntimeOrchestrationStore,
+    TreatyRuntimeArtifactRecord, TreatyScope, CHIO_BILATERAL_INVOCATION_SCHEMA,
+    CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA, CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA,
+    CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA, CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA,
+    CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_FAILURE_CODES,
+    CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA, CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA,
+    CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
 };
 use chio_swarm_authority::{
     sign_swarm_continuation_token, sign_swarm_delegation_witness_hop, sign_swarm_join_receipt,
@@ -209,8 +209,8 @@ fn trusted_keys(verifier: &Keypair) -> Vec<RuntimeTrustedVerifierKey> {
     }]
 }
 
-fn trust_body(version: u64, previous_hash_sha256: Option<String>) -> RuntimeVerifierTrustBundleV4 {
-    RuntimeVerifierTrustBundleV4 {
+fn trust_body(version: u64, previous_hash_sha256: Option<String>) -> RuntimeVerifierTrustBundle {
+    RuntimeVerifierTrustBundle {
         schema: CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA.to_string(),
         verifier_id: "did:chio:buyer-verifier".to_string(),
         key_id: "verifier-key-1".to_string(),
@@ -282,7 +282,7 @@ fn peer_weights() -> RuntimePeerWeights {
 }
 
 type SignedPolicyInputs = (
-    SignedExportEnvelope<RuntimeVerifierTrustBundleV4>,
+    SignedExportEnvelope<RuntimeVerifierTrustBundle>,
     Vec<RuntimeTrustedVerifierKey>,
     SignedRuntimePheromoneQueryReport,
     SignedExportEnvelope<RuntimePheromonePolicy>,

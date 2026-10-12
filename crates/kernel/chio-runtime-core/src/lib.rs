@@ -186,7 +186,7 @@ pub use types::{
     RuntimeRecoveryDrillReport, RuntimeRequestBinding, RuntimeRunContract, RuntimeRunLease,
     RuntimeSchedulerTickReport, RuntimeStepEvidence, RuntimeSupervisorProfile,
     RuntimeTrustFloorEntry, RuntimeTrustFloorState, RuntimeTrustedVerifierKey,
-    RuntimeTrustedVerifierKeysDocument, RuntimeVerifierTrustBundleV4, RuntimeWorkflowRunReport,
+    RuntimeTrustedVerifierKeysDocument, RuntimeVerifierTrustBundle, RuntimeWorkflowRunReport,
     SignedRuntimeAdmissionReport, SignedRuntimePeerWeights, SignedRuntimePheromonePolicy,
     SignedRuntimePheromoneQueryReport, SignedRuntimeVerifierTrustBundle,
     TreatyRuntimeArtifactRecord, TreatyScope, WeightsBindingMode,

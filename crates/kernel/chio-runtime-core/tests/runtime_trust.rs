@@ -52,8 +52,8 @@ fn trusted_keys(verifier: &Keypair) -> Vec<RuntimeTrustedVerifierKey> {
     }]
 }
 
-fn trust_body(version: u64, previous_hash_sha256: Option<String>) -> RuntimeVerifierTrustBundleV4 {
-    RuntimeVerifierTrustBundleV4 {
+fn trust_body(version: u64, previous_hash_sha256: Option<String>) -> RuntimeVerifierTrustBundle {
+    RuntimeVerifierTrustBundle {
         schema: CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA.to_string(),
         verifier_id: "did:chio:buyer-verifier".to_string(),
         key_id: "verifier-key-1".to_string(),
@@ -273,7 +273,7 @@ fn strict_runtime_trust_input_binds_bundle_and_signer() -> Result<(), Box<dyn st
     store.insert_bundle(bundle.clone())?;
 
     let verifier = Keypair::generate();
-    let trust_body = RuntimeVerifierTrustBundleV4 {
+    let trust_body = RuntimeVerifierTrustBundle {
         schema: CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA.to_string(),
         verifier_id: "did:chio:buyer-verifier".to_string(),
         key_id: "verifier-key-1".to_string(),
@@ -685,7 +685,7 @@ fn strict_runtime_trust_input_rejects_bundle_hash_mismatch(
 
     let verifier = Keypair::generate();
     let signed_trust = SignedExportEnvelope::sign(
-        RuntimeVerifierTrustBundleV4 {
+        RuntimeVerifierTrustBundle {
             schema: CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA.to_string(),
             verifier_id: "did:chio:buyer-verifier".to_string(),
             key_id: "verifier-key-1".to_string(),
