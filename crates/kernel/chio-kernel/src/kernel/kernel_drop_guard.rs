@@ -1,4 +1,3 @@
-use crate::kernel::receipt_identity::{with_identity_disposition, IdentityDisposition};
 use chio_core::receipt::metadata::GuardEvidence;
 use chio_log_redact::redacted;
 use tracing::warn;
@@ -11,7 +10,6 @@ use super::{
     PreExecutionBudgetMutation, VerifiedGovernedPayeeBinding,
 };
 
-const POST_ADMISSION_DROP_REASON: &str = "tool evaluation future dropped after admission";
 const PRE_DISPATCH_CLEANUP_FAULT_REASON: &str =
     "tool evaluation future dropped before dispatch with cleanup fault";
 
@@ -59,6 +57,8 @@ pub(crate) fn reserved_runtime_admission_ids(metadata: Option<&serde_json::Value
     ids
 }
 
+/// Owns cleanup while an admitted request remains before dispatch.
+/// PostEffectObligation takes custody when execution can begin.
 pub(crate) struct PostAdmissionDropGuard<'a> {
     kernel: &'a ChioKernel,
     request: &'a ToolCallRequest,
@@ -67,10 +67,6 @@ pub(crate) struct PostAdmissionDropGuard<'a> {
     budget_mutation: &'a PreExecutionBudgetMutation,
     payment_authorization: Option<&'a PaymentAuthorization>,
     receipt_context: PostAdmissionReceiptContext,
-    /// Signed child-request receipts buffered by the nested-flow bridge during
-    /// dispatch. Owned by the guard (rather than the evaluation stack frame) so
-    /// a post-dispatch drop can still flush them onto the append-only log,
-    /// preserving receipt-completeness for nested child operations.
     /// Whether THIS evaluation acquired a sibling-sum child-budget holder lease
     /// (the `Ok(true)` from `admit_capability_budget`). `false` means the
     /// capability had no parent to admit against, so there is no lease to drop.
@@ -80,9 +76,7 @@ pub(crate) struct PostAdmissionDropGuard<'a> {
     /// Gates the step-4 child-budget release in `handle_pre_dispatch_drop`.
     budget_lease_acquired: bool,
     durable_operation: Option<&'a AdmissionOperationV1>,
-    post_dispatch_reason: &'static str,
     armed: bool,
-    dispatch_started: bool,
 }
 
 impl<'a> PostAdmissionDropGuard<'a> {
@@ -110,9 +104,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
             receipt_context,
             budget_lease_acquired,
             durable_operation: None,
-            post_dispatch_reason: POST_ADMISSION_DROP_REASON,
             armed: true,
-            dispatch_started: false,
         }
     }
 
@@ -122,15 +114,6 @@ impl<'a> PostAdmissionDropGuard<'a> {
     ) -> Self {
         self.durable_operation = operation;
         self
-    }
-
-    /// Mark that the tool-server dispatch await has been entered. After this
-    /// point a dropped future may correspond to an executed side effect, so
-    /// the drop path attempts a cancellation receipt and fails closed on
-    /// reservations. Clock, construction or append failures emit an audit fault.
-    #[cfg(test)]
-    pub(crate) fn mark_dispatch_started(&mut self) {
-        self.dispatch_started = true;
     }
 
     pub(crate) fn disarm(&mut self) {
@@ -360,67 +343,8 @@ impl<'a> PostAdmissionDropGuard<'a> {
 
 impl Drop for PostAdmissionDropGuard<'_> {
     fn drop(&mut self) {
-        if !self.armed {
-            return;
-        }
-
-        if !self.dispatch_started {
-            // Pre-dispatch drop (or a panic unwinding before dispatch).
-            // Nothing was written to the tool server, so no side effect is
-            // possible: fully reverse every pre-execution mutation. A clean
-            // unwind records NO cancellation receipt; a cleanup fault attempts
-            // a signed fault receipt (see `handle_pre_dispatch_drop`).
+        if self.armed {
             self.handle_pre_dispatch_drop();
-            return;
-        }
-
-        // An original durable admission is the terminal owner. Legacy guard
-        // callers never append a competing cancellation alongside its saga.
-        // Idle finalization requires a resource-owned durable driver; this Drop
-        // records the pending obligation without pretending to run that driver.
-        if let Some(operation) = self.durable_operation {
-            warn!(operation_id = %operation.binding().operation_id().as_str(),
-                audit_fault = "durable_post_effect_reconciliation_pending",
-                "dropped invocation remains owned by its original durable saga");
-            return;
-        }
-
-        // Post-dispatch drop. The tool-server invoke was in flight; a side
-        // effect MAY have executed. Fail closed: retain the runtime-
-        // admission reservations (releasing a single-use destructive lease
-        // here would license a replay) and attempt a cancellation receipt for
-        // the executed-or-not side effect. Clock, construction or append failure
-        // emits an audit fault and may leave no signed parent receipt. When
-        // published, receipt metadata identifies the retained reservations.
-        let receipt_metadata = with_identity_disposition(
-            self.kernel.ambiguous_dispatch_receipt_metadata(
-                self.budget_mutation,
-                self.payment_authorization,
-                self.receipt_context.extra_metadata.clone(),
-            ),
-            IdentityDisposition::Terminal,
-        );
-
-        let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
-            self.receipt_context.pre_invocation_guard_evidence.clone(),
-        );
-        if let Err(error) = self.kernel.trusted_now_millis().and_then(|now| {
-            self.kernel
-                .build_cancelled_response_with_metadata_and_payee_binding(
-                    self.request,
-                    self.post_dispatch_reason,
-                    now.as_secs(),
-                    self.matched_grant_index,
-                    receipt_metadata,
-                    self.receipt_context.verified_payee_binding.as_ref(),
-                )
-        }) {
-            warn!(
-                request_id = %self.request.request_id,
-                reason = %redacted!(&error),
-                audit_fault = "post_admission_drop_receipt_unrecorded",
-                "failed to record cancellation receipt for dropped post-admission invocation"
-            );
         }
     }
 }

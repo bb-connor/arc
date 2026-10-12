@@ -1,4 +1,4 @@
-//! Original dispatch custody until its return is recorded or terminal unknown.
+//! Authority-clock timing for an invocation owned by its post-effect obligation.
 use super::*;
 
 impl ChioKernel {
@@ -6,12 +6,10 @@ impl ChioKernel {
     /// An ordinary value has no elapsed-time consumer: stream limits ignore it,
     /// and no raw outcome is persisted. Preserve its observed value and cost
     /// without an unnecessary fallible end read; its unused duration is zero.
-    /// Callers own the dispatch through an armed, started drop guard first. The
-    /// dispatch future runs only after the start reading succeeds. A failed or
-    /// regressed reading reaches the caller's post-commit failure arm, which
-    /// keeps the operation and holds and records the outcome as unknown. An end
-    /// reading failure discards the observed output without recording a successful
-    /// return; the original committed operation remains authoritative for recovery.
+    /// The caller enters PostEffectObligation before polling this future. A
+    /// failed start reading prevents connector polling; a failed or regressed
+    /// end reading withholds output. The same owner retains evidence and holds,
+    /// and a durable failure remains bound to its original saga.
     pub(super) async fn timed_dispatch(
         &self,
         durable: bool,

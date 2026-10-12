@@ -187,14 +187,12 @@ fn record_durable_return<'a>(
     let Some(mut parts) = obligation.parts.take() else {
         return obligation.ownership_failure("durable_return_handoff");
     };
-    let binding = parts.inputs.prepared.binding.clone();
     let Some(admission) = parts.inputs.admission.take() else {
         obligation.parts = Some(parts);
         return obligation.ownership_failure("durable_admission_handoff");
     };
     let discharged = Discharged {
         kernel: obligation.kernel,
-        binding,
         delivery: Some(Delivery::Durable(Box::new(DurableDelivery {
             request: parts.inputs.request,
             admission,

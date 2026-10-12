@@ -64,15 +64,14 @@ pub(in crate::kernel) struct PostEffectObligation<'a> {
 #[must_use = "a discharged call still owes delivery"]
 pub(in crate::kernel) struct Discharged<'a> {
     kernel: &'a ChioKernel,
-    binding: DischargeBinding,
     delivery: Option<Delivery<'a>>,
 }
 
 enum Delivery<'a> {
     Receipt(Box<ReceiptDelivery<'a>>),
     Durable(Box<DurableDelivery<'a>>),
-    Buffered(Option<Box<KernelError>>),
-    Saga(Option<Box<KernelError>>),
+    Buffered(Box<KernelError>),
+    Saga(Box<KernelError>),
     OwnershipFailure(Box<KernelError>),
 }
 
@@ -80,7 +79,6 @@ struct ReceiptDelivery<'a> {
     parts: Box<ObligationParts<'a>>,
     prepared: PreparedResponse,
     committed: ReceiptCommit,
-    original: UnknownAppend,
     transition: MutexGuard<'a, ()>,
     returned: bool,
     deferred_error: Option<KernelError>,
@@ -160,14 +158,12 @@ impl<'a> PostEffectObligation<'a> {
 
     fn ownership_failure(self, step: &'static str) -> Discharged<'a> {
         let kernel = self.kernel;
-        let binding = self.binding.clone();
         // Any still-live custody follows the same Drop handoff before this
         // diagnostic can leave the typed region. No receipt or saga success is
         // manufactured from an inconsistent internal state.
         drop(self);
         Discharged {
             kernel,
-            binding,
             delivery: Some(Delivery::OwnershipFailure(Box::new(KernelError::Internal(
                 format!("post-effect ownership invariant failed at {step}; output withheld"),
             )))),
@@ -291,15 +287,12 @@ impl<'a> PostEffectObligation<'a> {
             }));
         };
         self.submitted = None;
-        let binding = parts.inputs.prepared.binding.clone();
         Ok(Discharged {
             kernel,
-            binding,
             delivery: Some(Delivery::Receipt(Box::new(ReceiptDelivery {
                 parts,
                 prepared,
                 committed,
-                original,
                 transition,
                 returned,
                 deferred_error,
@@ -340,8 +333,7 @@ impl<'a> PostEffectObligation<'a> {
                 audit_fault = "durable_post_effect_reconciliation", "durable saga retains terminal ownership");
             return Discharged {
                 kernel: self.kernel,
-                binding,
-                delivery: Some(Delivery::Saga(Some(Box::new(source)))),
+                delivery: Some(Delivery::Saga(Box::new(source))),
             };
         }
         let Some(parts) = self.parts.as_mut() else {
@@ -421,26 +413,21 @@ impl<'a> PostEffectObligation<'a> {
                     Err(failed) => {
                         return failed
                             .obligation
-                            .buffer(failed.original, Some(*failed.error.source))
+                            .buffer(failed.original, *failed.error.source)
                     }
                 }
             }
         }
-        self.buffer(original, Some(source))
+        self.buffer(original, source)
     }
 
-    fn buffer(
-        mut self,
-        original: Option<UnknownAppend>,
-        source: Option<KernelError>,
-    ) -> Discharged<'a> {
+    fn buffer(mut self, original: Option<UnknownAppend>, source: KernelError) -> Discharged<'a> {
         if original.is_some() {
             self.submitted.clone_from(&original);
         }
         let Some(mut parts) = self.parts.take() else {
             return self.ownership_failure("buffer_handoff");
         };
-        let binding = parts.inputs.prepared.binding.clone();
         let Some((slot, fault)) = take_reserved_fault(&mut parts) else {
             self.parts = Some(parts);
             self.submitted = original;
@@ -465,8 +452,7 @@ impl<'a> PostEffectObligation<'a> {
         );
         Discharged {
             kernel: self.kernel,
-            binding,
-            delivery: Some(Delivery::Buffered(source.map(Box::new))),
+            delivery: Some(Delivery::Buffered(Box::new(source))),
         }
     }
 }
@@ -495,6 +481,11 @@ fn buffer_durable_children(kernel: &ChioKernel, parts: &mut ObligationParts<'_>)
                     unknown_child: parts.unknown_child.take(),
                 },
             );
+        } else {
+            tracing::warn!(request_id = %parts.inputs.request.request_id,
+                child_receipts = parts.children.len(),
+                audit_fault = "post_effect_child_evidence_slot_missing",
+                "retained child evidence has no reserved recovery capacity");
         }
     }
 }
@@ -530,6 +521,13 @@ impl Drop for PostEffectObligation<'_> {
                         unknown_child: parts.unknown_child.take(),
                     },
                 );
+            } else {
+                tracing::warn!(request_id = %parts.inputs.request.request_id,
+                    fault_template_reserved = parts.inputs.prepared.fault.is_some(),
+                    evidence_slot_reserved = parts.inputs.prepared.slot.is_some(),
+                    child_receipts = parts.children.len(),
+                    audit_fault = "post_effect_reserved_evidence_missing",
+                    "dropped post-effect owner has incomplete reserved evidence custody");
             }
         }));
         if guarded.is_err() {
@@ -542,109 +540,18 @@ impl Drop for PostEffectObligation<'_> {
 }
 
 impl<'a> Discharged<'a> {
-    fn enforce_binding(mut self, expected: DischargeBinding) -> Self {
-        if self.binding == expected {
-            return self;
-        }
-        tracing::warn!(request_id = %expected.request_id, audit_fault = "post_effect_discharge_binding_mismatch",
-            "discharged output does not match its original evaluation");
-        match self.delivery.take() {
-            Some(Delivery::Receipt(delivery)) => {
-                let ReceiptDelivery {
-                    mut parts,
-                    original,
-                    transition,
-                    ..
-                } = *delivery;
-                drop(transition);
-                let Some((slot, mut fault)) = take_reserved_fault(&mut parts) else {
-                    let obligation = PostEffectObligation {
-                        kernel: self.kernel,
-                        binding: parts.inputs.prepared.binding.clone(),
-                        parts: Some(parts),
-                        submitted: Some(original),
-                    };
-                    let mut failed = obligation.ownership_failure("discharge_binding_custody");
-                    failed.binding = expected;
-                    return failed;
-                };
-                fault.body.metadata = merge_metadata_objects(
-                    fault.body.metadata.take(),
-                    Some(serde_json::json!({
-                        "chio_runtime": { "post_effect_fault": { "step": "discharge_binding",
-                            "code": "CHIO-KERNEL-POST-EFFECT-BINDING", "original_receipt_id": original.id } }
-                    })),
-                );
-                self.kernel.buffer_post_effect_evidence(
-                    slot,
-                    PendingPostEffectRecord {
-                        evidence: PendingPostEffectEvidence::Unknown {
-                            receipt_id: original.id,
-                            receipt_sha256: original.sha256,
-                            kernel_key: original.key,
-                            fault,
-                        },
-                        child_receipts: parts.children,
-                        unknown_child: parts.unknown_child,
-                    },
-                );
-                Self {
-                    kernel: self.kernel,
-                    binding: expected,
-                    delivery: Some(Delivery::Buffered(None)),
-                }
-            }
-            Some(Delivery::Durable(_)) => Self {
-                kernel: self.kernel,
-                binding: expected,
-                delivery: Some(Delivery::Saga(None)),
-            },
-            Some(
-                delivery @ (Delivery::Buffered(_)
-                | Delivery::Saga(_)
-                | Delivery::OwnershipFailure(_)),
-            ) => {
-                // Non-receipt discharges already transferred their evidence to
-                // the buffer or durable saga. Withhold delivery on the mismatch.
-                self.delivery = Some(delivery);
-                self.binding = expected;
-                self
-            }
-            None => Self {
-                kernel: self.kernel,
-                binding: expected,
-                delivery: Some(Delivery::OwnershipFailure(Box::new(KernelError::Internal(
-                    "discharge binding check lost its delivery custody; output withheld".into(),
-                )))),
-            },
-        }
-    }
-
     pub(in crate::kernel) fn deliver(mut self) -> Result<ToolCallResponse, KernelError> {
         let delivery = self.delivery.take().ok_or_else(|| {
             KernelError::Internal("discharge has no remaining delivery custody".into())
         })?;
         match delivery {
             Delivery::OwnershipFailure(error) => Err(*error),
-            Delivery::Buffered(source) => Err(source.map_or_else(
-                || KernelError::PostEffectFaultLatched {
-                    request_id: self.binding.request_id.clone(),
-                },
-                |source| *source,
-            )),
-            Delivery::Saga(Some(source)) => Err(*source),
-            Delivery::Saga(None) => Err(match self.binding.operation_id.clone() {
-                Some(operation_id) => KernelError::DurableOutcomePending { operation_id },
-                None => {
-                    KernelError::Internal("durable discharge lost its operation binding".into())
-                }
-            }),
+            Delivery::Buffered(source) | Delivery::Saga(source) => Err(*source),
             Delivery::Receipt(delivery) => {
                 let ReceiptDelivery {
                     mut parts,
                     prepared,
                     committed,
-                    original: _,
                     transition,
                     returned,
                     deferred_error,
@@ -770,6 +677,5 @@ pub(in crate::kernel) fn run_post_effect<'a>(
     obligation: PostEffectObligation<'a>,
     returned: ObservedToolReturn,
 ) -> Discharged<'a> {
-    let expected = obligation.binding.clone();
-    post_effect::run(obligation, returned).enforce_binding(expected)
+    post_effect::run(obligation, returned)
 }

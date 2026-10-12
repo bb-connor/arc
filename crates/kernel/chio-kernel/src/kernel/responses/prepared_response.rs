@@ -83,8 +83,8 @@ impl PreparedResponse {
 }
 
 impl ChioKernel {
-    /// Compatibility path for callers that do not own a post-effect obligation.
-    /// This helper publishes a response but mints no discharge evidence.
+    /// Publish a prepared pre-dispatch or retained replay response.
+    /// Executed calls publish through their owning post-effect obligation.
     pub(in crate::kernel) fn publish_prepared_response(
         &self,
         request: &ToolCallRequest,
