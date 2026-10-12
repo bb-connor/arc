@@ -347,6 +347,7 @@ fn retain_unsigned(kernel: &ChioKernel, receipt: ChioReceipt) {
 }
 
 struct RecoveringClock {
+    reading: chio_security_types::clock::ClockReading,
     ready: AtomicBool,
     reads: AtomicU64,
 }
@@ -358,7 +359,7 @@ impl chio_security_types::clock::Clock for RecoveringClock {
     {
         self.reads.fetch_add(1, Ordering::SeqCst);
         if self.ready.load(Ordering::SeqCst) {
-            chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock)
+            Ok(self.reading)
         } else {
             Err(chio_security_types::clock::ClockError::Unavailable)
         }
@@ -369,6 +370,7 @@ impl chio_security_types::clock::Clock for RecoveringClock {
 fn unavailable_clock_retains_unsigned_fault_until_idle_recovery() {
     let (mut kernel, receipt, state) = fixture();
     let clock = Arc::new(RecoveringClock {
+        reading: kernel.authority_clock_reading().unwrap(),
         ready: AtomicBool::new(false),
         reads: AtomicU64::new(0),
     });
@@ -444,6 +446,7 @@ fn unsigned_child_survives_clock_outage_and_kernel_teardown() {
     use crate::kernel::effect_obligation::recovery::PendingChildReceipt;
     let (mut kernel, _, state) = fixture();
     let clock = Arc::new(RecoveringClock {
+        reading: kernel.authority_clock_reading().unwrap(),
         ready: AtomicBool::new(false),
         reads: AtomicU64::new(0),
     });
@@ -532,24 +535,30 @@ fn evidence_resource_selection_does_not_hold_control_lock_during_signer_callback
     drop(slot);
 }
 
-struct OncePanickingClock(AtomicBool);
+struct OncePanickingClock {
+    panics: AtomicBool,
+    reading: chio_security_types::clock::ClockReading,
+}
 impl chio_security_types::clock::Clock for OncePanickingClock {
     fn read(
         &self,
     ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
     {
         assert!(
-            !self.0.swap(false, Ordering::SeqCst),
+            !self.panics.swap(false, Ordering::SeqCst),
             "transient clock callback panic"
         );
-        chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock)
+        Ok(self.reading)
     }
 }
 
 #[test]
 fn clock_callback_panic_does_not_poison_recovery_authority_fence() {
     let (mut kernel, receipt, state) = fixture();
-    kernel.clock = Arc::new(OncePanickingClock(AtomicBool::new(true)));
+    kernel.clock = Arc::new(OncePanickingClock {
+        panics: AtomicBool::new(true),
+        reading: kernel.authority_clock_reading().unwrap(),
+    });
     state.barrier_open.store(true, Ordering::SeqCst);
     retain_unsigned(&kernel, receipt);
     wait_until(|| kernel.ensure_post_effect_evidence_latch_clear().is_ok());
