@@ -28,6 +28,7 @@ mod admission_terminal_receipt;
 mod approval_cleanup;
 mod credential_reservation;
 mod effect_obligation;
+pub use effect_obligation::evidence::PostEffectEvidenceBudget;
 mod error;
 mod guard_invocation_attempt;
 pub(crate) use guard_invocation_attempt::GuardInvocationAttempt;

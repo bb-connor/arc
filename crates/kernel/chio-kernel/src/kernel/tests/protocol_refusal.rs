@@ -236,9 +236,9 @@ fn protocol_refusal_persistence_failure_returns_no_receipt_or_local_mirror() -> 
     }))?;
     assert!(matches!(
         kernel.record_session_protocol_refusal(&context, &summary()),
-        Err(KernelError::ReceiptPersistence(
-            ReceiptStoreError::Conflict(_)
-        ))
+        Err(KernelError::ReceiptAppendOutcomeUnknown { receipt_id, source })
+            if !receipt_id.is_empty()
+                && matches!(*source, KernelError::ReceiptPersistence(ReceiptStoreError::Conflict(_)))
     ));
     assert!(called.load(Ordering::SeqCst));
     assert!(kernel.receipt_log().receipts().is_empty());

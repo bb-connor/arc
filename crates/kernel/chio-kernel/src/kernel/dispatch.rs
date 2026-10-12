@@ -745,6 +745,7 @@ impl ChioKernel {
         self.ensure_federated_receipt_persistence_ready(
             request.federated_origin_kernel_id.as_deref(),
         )?;
+        self.ensure_post_effect_evidence_latch_clear()?;
         self.ensure_receipt_persistence_ready()?;
         self.validate_governed_transaction_pure(
             request,

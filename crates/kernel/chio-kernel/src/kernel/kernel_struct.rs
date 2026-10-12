@@ -409,6 +409,14 @@ pub const DEFAULT_MAX_SIZE_BYTES: u64 = 10_737_418_240;
 /// limit: the kernel sheds (Overloaded) before the OS OOM-kills it.
 #[derive(Debug, Clone)]
 pub struct MemoryBudgetConfig {
+    /// Maximum unresolved non-durable calls retained by this kernel. Must be nonzero.
+    pub post_effect_evidence_slots: usize,
+    /// Aggregate bytes reserved for retained fault and child evidence.
+    pub post_effect_evidence_bytes: usize,
+    /// Size of a prepared fault template admitted before a non-durable dispatch.
+    pub max_post_effect_fault_template_bytes: usize,
+    /// Nested child calls admitted by one parent before any child effect.
+    pub max_post_effect_child_receipts: usize,
     pub receipt_mirror_capacity: usize,
     pub federation_cache_capacity: usize,
     pub federation_cache_idle_ttl_secs: u64,
@@ -440,6 +448,10 @@ pub struct MemoryBudgetConfig {
 impl MemoryBudgetConfig {
     pub fn defaults() -> Self {
         Self {
+            post_effect_evidence_slots: 1024,
+            post_effect_evidence_bytes: 16 * 1024 * 1024,
+            max_post_effect_fault_template_bytes: 1024 * 1024,
+            max_post_effect_child_receipts: 256,
             receipt_mirror_capacity: 4096,
             federation_cache_capacity: 8192,
             federation_cache_idle_ttl_secs: 3600,
@@ -596,16 +608,20 @@ pub struct ChioKernel {
     pub(super) resource_providers: Vec<Box<dyn ResourceProvider>>,
     pub(super) prompt_providers: Vec<Box<dyn PromptProvider>>,
     pub(super) sessions: DashMap<SessionId, Arc<Session>>,
-    pub(super) receipt_log: Mutex<ReceiptLog>,
-    pub(super) child_receipt_log: Mutex<ChildReceiptLog>,
+    pub(super) receipt_log: Arc<Mutex<ReceiptLog>>,
+    pub(super) child_receipt_log: Arc<Mutex<ChildReceiptLog>>,
     /// Live entry-count gauges for the two receipt mirrors. Cloned from the
     /// ring's gauge at construction so telemetry and the
     /// bounded-structure registry (`bounded_structure_gauges`) can read the
     /// count without locking the log.
     pub(super) receipt_mirror_gauge: chio_bounded::SizeGauge,
     pub(super) child_receipt_mirror_gauge: chio_bounded::SizeGauge,
+    pub(super) post_effect_evidence:
+        Mutex<Option<super::effect_obligation::recovery::EvidenceRecovery>>,
+    pub(super) post_effect_host_budget:
+        Arc<super::effect_obligation::evidence::PostEffectEvidenceBudget>,
     pub(super) receipt_store: Option<Arc<dyn ReceiptStore>>,
-    pub(super) receipt_store_write_lock: Mutex<()>,
+    pub(super) receipt_store_write_lock: Arc<Mutex<()>>,
     /// Retention maintenance worker, spawned at store attach when
     /// `config.retention_config` is `Some`. Owns a dedicated OS thread that
     /// calls `ReceiptStore::rotate_receipts` on `RetentionConfig.check_interval_secs`;
@@ -649,8 +665,8 @@ pub struct ChioKernel {
     pub(super) security_pre_dispatch_hook: Option<Arc<dyn SecurityPreDispatchHook>>,
     pub(super) runtime_admission_readiness_timeout: Duration,
     pub(super) runtime_trace_observer: Option<Arc<dyn RuntimeTraceObserver>>,
-    pub(super) runtime_trace_transition_lock: Mutex<()>,
-    pub(super) runtime_trace_sequence: AtomicU64,
+    pub(super) runtime_trace_transition_lock: Arc<Mutex<()>>,
+    pub(super) runtime_trace_sequence: Arc<AtomicU64>,
     pub(super) attestation_trust_policy: Option<AttestationTrustPolicy>,
     pub(super) capability_crypto_floor: KernelCryptoFloor,
     /// How many receipts per Merkle checkpoint batch. Default: 100.

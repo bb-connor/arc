@@ -340,6 +340,7 @@ impl ChioKernel {
                 request, &msg, now, None, None,
             );
         }
+        self.ensure_post_effect_evidence_latch_clear()?;
         if let Err(error) = self.ensure_receipt_persistence_ready() {
             let msg = error.to_string();
             warn!(

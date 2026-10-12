@@ -1,3 +1,5 @@
+#[path = "admission_coordinator/receipt_namespace.rs"]
+mod receipt_namespace;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -771,17 +773,7 @@ impl ChioKernel {
             observation_attempt_zero: observer_required,
             ..AdmissionParticipantRequirements::NONE
         };
-        let coordinator_authority_id = AdmissionIdentifier::try_new(
-            "coordinator_authority_id",
-            runtime.fence.store_uuid.clone(),
-        )?;
-        let namespace = match self.receipt_tenant_id_for_request(Some(&request.request_id)) {
-            Some(tenant_id) => AuthenticatedRequestNamespace::from_authentication_context(
-                coordinator_authority_id,
-                tenant_id,
-            )?,
-            None => AuthenticatedRequestNamespace::for_local_system(coordinator_authority_id)?,
-        };
+        let namespace = self.authenticated_receipt_namespace(&request.request_id)?;
         let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
             kind: AdmissionOperationKind::ToolDispatch,
             namespace,
@@ -1114,17 +1106,7 @@ impl ChioKernel {
             approval: true,
             ..AdmissionParticipantRequirements::NONE
         };
-        let coordinator_authority_id = AdmissionIdentifier::try_new(
-            "coordinator_authority_id",
-            runtime.fence.store_uuid.clone(),
-        )?;
-        let namespace = match self.receipt_tenant_id_for_request(Some(&request.request_id)) {
-            Some(tenant_id) => AuthenticatedRequestNamespace::from_authentication_context(
-                coordinator_authority_id,
-                tenant_id,
-            )?,
-            None => AuthenticatedRequestNamespace::for_local_system(coordinator_authority_id)?,
-        };
+        let namespace = self.authenticated_receipt_namespace(&request.request_id)?;
         let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
             kind: AdmissionOperationKind::GovernedActiveResponse,
             namespace,

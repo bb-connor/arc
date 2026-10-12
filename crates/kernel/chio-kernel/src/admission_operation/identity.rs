@@ -127,6 +127,10 @@ pub struct AuthenticatedRequestNamespace {
 }
 
 impl AuthenticatedRequestNamespace {
+    pub(crate) fn digest(&self) -> &RequestNamespaceDigest {
+        &self.digest
+    }
+
     pub fn for_local_system(
         coordinator_authority_id: AdmissionIdentifier,
     ) -> Result<Self, AdmissionOperationError> {
