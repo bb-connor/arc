@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::kernel::admission_coordinator::{DurableToolReturn, DurableToolReturnContext};
+use crate::kernel::credential_reservation::DispatchCredentialReservation;
 use crate::kernel::responses::{PrepareToolOutputCostContext, PreparedResponse};
 use std::sync::MutexGuard;
 
@@ -297,27 +298,31 @@ impl<'a> PostEffectObligation<'a> {
             })),
         );
         if original.is_none() && parts.children.is_empty() {
-            let signed = self.kernel.read_authority_time().and_then(|now| {
-                fault.body.timestamp = now.as_secs();
-                fault.body.metadata = merge_metadata_objects(
-                    fault.body.metadata.take(),
-                    Some(serde_json::json!({
-                        "chio_runtime": { "post_effect_fault": { "observed_at": now.get() } }
-                    })),
-                );
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    if !self
-                        .kernel
-                        .signing_authority
-                        .floor
-                        .allowed_signing_algorithms()
-                        .contains(&self.kernel.signing_authority.backend.algorithm())
-                    {
-                        return Err(KernelError::ReceiptSigningFailed(
-                            "fault signer does not satisfy the boot floor".into(),
-                        ));
-                    }
-                    chio_kernel_core::sign_receipt_with_handle(
+            let signed = self
+                .kernel
+                .read_authority_time()
+                .map_err(KernelError::from)
+                .and_then(|now| {
+                    fault.body.timestamp = now.as_secs();
+                    fault.body.metadata = merge_metadata_objects(
+                        fault.body.metadata.take(),
+                        Some(serde_json::json!({
+                            "chio_runtime": { "post_effect_fault": { "observed_at": now.get() } }
+                        })),
+                    );
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        if !self
+                            .kernel
+                            .signing_authority
+                            .floor
+                            .allowed_signing_algorithms()
+                            .contains(&self.kernel.signing_authority.backend.algorithm())
+                        {
+                            return Err(KernelError::ReceiptSigningFailed(
+                                "fault signer does not satisfy the boot floor".into(),
+                            ));
+                        }
+                        chio_kernel_core::sign_receipt_with_handle(
                         fault.body.clone(),
                         self.kernel.signing_authority.backend.as_ref(),
                         chio_core::receipt::signing::ReceiptSigningHandle::from_content_preimage(
@@ -327,11 +332,13 @@ impl<'a> PostEffectObligation<'a> {
                     .map_err(|_| {
                         KernelError::ReceiptSigningFailed("post-effect fault signing failed".into())
                     })
-                }))
-                .map_err(|_| {
-                    KernelError::ReceiptSigningFailed("post-effect fault signer panicked".into())
-                })?
-            });
+                    }))
+                    .map_err(|_| {
+                        KernelError::ReceiptSigningFailed(
+                            "post-effect fault signer panicked".into(),
+                        )
+                    })?
+                });
             if let Ok(receipt) = signed {
                 let prepared = fault_response(receipt, &parts.inputs.request.request_id);
                 match self.commit_terminal_receipt(prepared, false, None) {
@@ -517,7 +524,7 @@ impl<'a> Discharged<'a> {
                 if let Some(lifecycle) = lifecycle {
                     lifecycle.ensure_final_release().map_err(|source| {
                         KernelError::DeliveryFailedAfterReceipt {
-                            receipt_id,
+                            receipt_id: receipt_id.clone(),
                             step: ReceiptDeliveryStep::SecurityRelease,
                             source: Box::new(source),
                         }

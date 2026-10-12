@@ -2,31 +2,6 @@ use super::receipt_scopes::next_fixed_runtime_receipt_id;
 use crate::*;
 use uuid::Uuid;
 
-pub(crate) fn build_child_request_receipt(
-    policy_hash: &str,
-    keypair: &Keypair,
-    context: &OperationContext,
-    operation_kind: OperationKind,
-    terminal_state: OperationTerminalState,
-    outcome_payload: serde_json::Value,
-    now: chio_security_types::clock::UnixMillis,
-) -> Result<ChildRequestReceipt, KernelError> {
-    let body = prepare_child_request_receipt(
-        policy_hash,
-        keypair.public_key(),
-        context,
-        operation_kind,
-        terminal_state,
-        outcome_payload,
-    )?;
-    let body = ChildRequestReceiptBody {
-        timestamp: now.as_secs(),
-        ..body
-    };
-    ChildRequestReceipt::sign(body, keypair)
-        .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))
-}
-
 pub(crate) fn prepare_child_request_receipt(
     policy_hash: &str,
     kernel_key: chio_core::PublicKey,

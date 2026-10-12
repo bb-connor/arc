@@ -46,7 +46,7 @@ fn flush_children(obligation: &mut PostEffectObligation<'_>) -> Result<(), PostE
             let now = obligation
                 .kernel
                 .read_authority_time()
-                .map_err(|error| failure("child_receipt_flush", error))?;
+                .map_err(|error| failure("child_receipt_flush", error.into()))?;
             let body = ChildRequestReceiptBody {
                 timestamp: now.as_secs(),
                 ..body.clone()
@@ -148,7 +148,7 @@ fn record_durable_return<'a>(
     };
     let now = match obligation.kernel.read_authority_time() {
         Ok(now) => now.get(),
-        Err(error) => return obligation.fail(failure("authority_time", error), None),
+        Err(error) => return obligation.fail(failure("authority_time", error.into()), None),
     };
     let admission = inputs
         .admission
@@ -210,7 +210,7 @@ fn prepare_ordinary(
     let inputs = &mut parts.inputs;
     let now = kernel
         .read_authority_time()
-        .map_err(|error| failure("authority_time", error))?
+        .map_err(|error| failure("authority_time", error.into()))?
         .as_secs();
     let metadata = merge_metadata_objects(
         inputs.metadata.clone(),
