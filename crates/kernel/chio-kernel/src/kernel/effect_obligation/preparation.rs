@@ -72,6 +72,7 @@ impl DischargeBinding {
 
 pub(in crate::kernel) struct PreparedPostEffect {
     pub(super) binding: DischargeBinding,
+    pub(super) evaluation_timestamp: u64,
     pub(super) fault: Option<PreparedFaultReceipt>,
     pub(super) slot: Option<EvidenceSlot>,
 }
@@ -127,6 +128,7 @@ impl ChioKernel {
         if input.admission.is_some() {
             return Ok(PreparedPostEffect {
                 binding,
+                evaluation_timestamp: input.evaluation_started_at / 1_000,
                 fault: None,
                 slot: None,
             });
@@ -199,6 +201,7 @@ impl ChioKernel {
         let slot = self.acquire_post_effect_evidence_slot(bytes)?;
         Ok(PreparedPostEffect {
             binding,
+            evaluation_timestamp: input.evaluation_started_at / 1_000,
             fault: Some(PreparedFaultReceipt {
                 body,
                 canonical_content,

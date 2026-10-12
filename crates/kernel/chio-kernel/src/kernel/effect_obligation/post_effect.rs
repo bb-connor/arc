@@ -221,10 +221,9 @@ fn prepare_ordinary(
         )
     })?;
     let inputs = &mut parts.inputs;
-    let now = kernel
-        .read_authority_time()
-        .map_err(|error| failure("authority_time", error.into()))?
-        .as_secs();
+    // Ordinary value finalization keeps the admission-time receipt timestamp.
+    // Streams and durable returns obtain their required timing in timed_dispatch.
+    let now = inputs.prepared.evaluation_timestamp;
     let metadata = merge_metadata_objects(
         inputs.metadata.clone(),
         Some(serde_json::json!({
