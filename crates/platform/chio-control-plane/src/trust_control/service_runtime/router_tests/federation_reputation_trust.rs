@@ -130,7 +130,7 @@ impl Fixture {
                     tool_name: "read_file".to_string(),
                     operations: vec![Operation::Read],
                     constraints: Vec::new(),
-                    max_invocations: Some(10),
+                    max_invocations: None,
                     max_cost_per_invocation: None,
                     max_total_cost: None,
                     dpop_required: None,
@@ -173,6 +173,18 @@ impl Fixture {
             signer,
         )?;
         store.append_chio_receipt(&receipt)?;
+        let inspection = crate::issuance::inspect_local_reputation_with_store(
+            &subject.to_hex(),
+            store,
+            None,
+            None,
+            None,
+            None,
+            &[signer.public_key().to_hex()],
+            &chio_kernel::ReceiptReadContext::admin_service(),
+        )?;
+        assert_eq!(inspection.scorecard.history_depth.receipt_count, 1);
+        assert!(inspection.effective_score > 0.01);
         Ok(subject.to_hex())
     }
 
@@ -228,9 +240,15 @@ fn federation_reputation_requires_an_admitted_authority_even_at_zero_threshold()
     let mut fixture = Fixture::recovered(now)?;
     fixture.policy(Some(0.0))?;
     fixture.state.config.authority_db_path = None;
-    assert!(fixture
+    let error = fixture
         .evaluate(Keypair::generate().public_key().to_hex())
-        .is_err());
+        .test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("admitted trust-control authority"),
+        "unexpected refusal: {error}"
+    );
     Ok(())
 }
 
