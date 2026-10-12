@@ -18,6 +18,8 @@ use super::{
 pub(super) const SESSION_ACTIVE_TABLE: &str = "remote_active_sessions";
 pub(super) const SESSION_TOMBSTONE_TABLE: &str = "remote_session_tombstones";
 pub(super) const SESSION_TERMINAL_FENCE_TABLE: &str = "remote_session_terminal_fences";
+/// Signed tombstones whose fence has committed but whose finalization has not.
+pub(super) const SESSION_PENDING_TERMINAL_TABLE: &str = "remote_session_pending_terminals";
 
 #[cfg(target_os = "linux")]
 #[derive(Debug)]
@@ -670,10 +672,15 @@ pub(super) fn open_session_state_db(path: &FsPath) -> Result<Connection, CliErro
             terminal_at INTEGER NOT NULL,
             terminal_epoch INTEGER NOT NULL,
             record_json TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS {pending_table} (
+            session_id TEXT PRIMARY KEY NOT NULL,
+            record_json TEXT NOT NULL
         );",
         active_table = SESSION_ACTIVE_TABLE,
         tombstone_table = SESSION_TOMBSTONE_TABLE,
         fence_table = SESSION_TERMINAL_FENCE_TABLE,
+        pending_table = SESSION_PENDING_TERMINAL_TABLE,
     ))?;
     let observed = require_active_session_store_lease(&canonical_path)?;
     if observed.parent_descriptor != lease.parent_descriptor
@@ -934,13 +941,38 @@ pub(super) fn stored_capability_issuers_are_trusted(
         .all(|capability| kernel.capability_issuer_is_trusted(&capability.issuer))
 }
 
+fn require_matching_terminal_pair(
+    tombstone: &RemoteSessionTombstoneRecord,
+    fence: &RemoteSessionTerminalFence,
+) -> Result<(), CliError> {
+    if tombstone.record.session_id != fence.session_id
+        || tombstone.resume_generation != fence.resume_generation
+        || tombstone.terminal_epoch != fence.terminal_epoch
+        || tombstone.record.terminal_at != fence.terminal_at
+        || tombstone.record.lifecycle.state != fence.terminal_state
+        || tombstone.record.terminal_reason != fence.terminal_reason
+    {
+        return Err(CliError::cli_other_error(format!(
+            "terminal MCP session {} tombstone does not match its prepared terminal intent",
+            tombstone.record.session_id
+        )));
+    }
+    Ok(())
+}
+
+/// Commits the fence, the exact signed tombstone it will be finalized with,
+/// and the removal of active state in one transaction. Startup finishes any
+/// tombstone left pending here before it loads or restores a session.
 pub(super) fn prepare_terminal_session_transition(
     path: &FsPath,
     fence: &RemoteSessionTerminalFence,
+    tombstone: &RemoteSessionTombstoneRecord,
     keyring: &RemoteSessionHmacKeyring,
     now: u64,
 ) -> Result<(), CliError> {
     validate_terminal_fence_integrity(keyring, fence, now)?;
+    validate_terminal_tombstone_integrity(keyring, tombstone, now)?;
+    require_matching_terminal_pair(tombstone, fence)?;
 
     let mut conn = open_session_state_db(path)?;
     let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -1008,6 +1040,36 @@ pub(super) fn prepare_terminal_session_transition(
                 "terminal MCP session {} attempted to rewrite retained terminal intent epoch {}",
                 fence.session_id, fence.terminal_epoch
             )));
+        }
+    }
+
+    let tombstone_json = serde_json::to_string(tombstone)?;
+    let pending_json: Option<String> = transaction
+        .query_row(
+            &format!(
+                "SELECT record_json FROM {table} WHERE session_id = ?1",
+                table = SESSION_PENDING_TERMINAL_TABLE,
+            ),
+            params![fence.session_id.as_str()],
+            |row| row.get(0),
+        )
+        .optional()?;
+    match pending_json {
+        Some(pending_json) if pending_json != tombstone_json => {
+            return Err(CliError::cli_other_error(format!(
+                "terminal MCP session {} attempted to rewrite its pending tombstone",
+                fence.session_id
+            )));
+        }
+        Some(_) => {}
+        None => {
+            transaction.execute(
+                &format!(
+                    "INSERT INTO {table} (session_id, record_json) VALUES (?1, ?2)",
+                    table = SESSION_PENDING_TERMINAL_TABLE,
+                ),
+                params![fence.session_id.as_str(), tombstone_json],
+            )?;
         }
     }
 
@@ -1081,17 +1143,14 @@ pub(super) fn finalize_terminal_session_transition(
             ))
         })?;
     let fence = parse_terminal_fence(&tombstone.record.session_id, &fence_json, keyring, now)?;
-    if tombstone.resume_generation != fence.resume_generation
-        || tombstone.terminal_epoch != fence.terminal_epoch
-        || tombstone.record.terminal_at != fence.terminal_at
-        || tombstone.record.lifecycle.state != fence.terminal_state
-        || tombstone.record.terminal_reason != fence.terminal_reason
-    {
-        return Err(CliError::cli_other_error(format!(
-            "terminal MCP session {} tombstone does not match its prepared terminal intent",
-            tombstone.record.session_id
-        )));
-    }
+    require_matching_terminal_pair(tombstone, &fence)?;
+    transaction.execute(
+        &format!(
+            "DELETE FROM {table} WHERE session_id = ?1",
+            table = SESSION_PENDING_TERMINAL_TABLE,
+        ),
+        params![tombstone.record.session_id.as_str()],
+    )?;
 
     let existing_tombstone_json: Option<String> = transaction
         .query_row(
@@ -1137,6 +1196,34 @@ pub(super) fn finalize_terminal_session_transition(
     Ok(())
 }
 
+/// Finalizes every tombstone a committed fence left pending. Any pending
+/// tombstone that fails verification or no longer matches its fence fails
+/// startup, so the store is never served with an unfinished terminal intent.
+pub(super) fn complete_pending_terminal_transitions(
+    path: &FsPath,
+    keyring: &RemoteSessionHmacKeyring,
+    now: u64,
+) -> Result<(), CliError> {
+    let pending = {
+        let conn = open_session_state_db(path)?;
+        let mut statement = conn.prepare(&format!(
+            "SELECT session_id, record_json FROM {table} ORDER BY session_id",
+            table = SESSION_PENDING_TERMINAL_TABLE,
+        ))?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows
+    };
+    for (session_id, record_json) in pending {
+        let tombstone = parse_terminal_session_record(&session_id, &record_json, keyring, now)?;
+        finalize_terminal_session_transition(path, &tombstone, keyring, now)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 #[cfg(target_os = "linux")]
 pub(super) fn persist_terminal_session_transition(
@@ -1146,7 +1233,7 @@ pub(super) fn persist_terminal_session_transition(
     keyring: &RemoteSessionHmacKeyring,
     now: u64,
 ) -> Result<(), CliError> {
-    prepare_terminal_session_transition(path, fence, keyring, now)?;
+    prepare_terminal_session_transition(path, fence, tombstone, keyring, now)?;
     finalize_terminal_session_transition(path, tombstone, keyring, now)
 }
 
