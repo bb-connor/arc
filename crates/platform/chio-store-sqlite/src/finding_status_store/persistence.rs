@@ -1959,50 +1959,26 @@ fn sqlite_error(error: rusqlite::Error) -> FindingStatusStoreError {
 pub(crate) fn initialize_finding_status_schema(
     connection: &mut Connection,
 ) -> Result<(), FindingStatusStoreError> {
-    let on_disk = crate::check_schema_version(
+    let state = crate::check_current_schema(
         connection,
         FINDING_STATUS_SCHEMA_KEY,
-        FINDING_STATUS_SUPPORTED_SCHEMA_VERSION,
+        FINDING_STATUS_SCHEMA_VERSION,
         FINDING_STATUS_SCHEMA_ANCHORS,
     )
     .map_err(|error| invariant(error.to_string()))?;
-    if on_disk == FINDING_STATUS_SUPPORTED_SCHEMA_VERSION {
+    if state == crate::SchemaState::Current {
         return verify_finding_status_invariants(connection);
     }
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
-    if on_disk == 1 {
-        // Revision 2 starts the enforceable inclusion window at finality.
-        // The only schema change is the lifecycle trigger that permits the
-        // waiting-to-eligible edge to atomically replace the provisional
-        // timestamps with that finality-derived window.
-        transaction
-            .execute_batch("DROP TRIGGER IF EXISTS finding_retraction_intents_lifecycle;")
-            .map_err(sqlite_error)?;
-    }
-    if (1..=4).contains(&on_disk) {
-        // Revision 3 permits authenticated revocation-state changes for the
-        // same operator key and key epoch. Key substitution remains fenced.
-        // Revision 3 permits deletion of superseded non-inclusion proofs, and
-        // revision 5 extends that bounded retention to inclusion proofs.
-        // Recreate both changed triggers because older databases retain a
-        // stricter proof-retention definition. Revision 4 also lets an otherwise
-        // unchanged feed floor advance its trusted-time high-water.
-        transaction
-            .execute_batch(
-                "DROP TRIGGER IF EXISTS finding_status_feed_floors_monotonic;\
-                 DROP TRIGGER IF EXISTS finding_status_proofs_no_delete;",
-            )
-            .map_err(sqlite_error)?;
-    }
     transaction
         .execute_batch(FINDING_STATUS_SCHEMA)
         .map_err(sqlite_error)?;
     crate::stamp_schema_version(
         &transaction,
         FINDING_STATUS_SCHEMA_KEY,
-        FINDING_STATUS_SUPPORTED_SCHEMA_VERSION,
+        FINDING_STATUS_SCHEMA_VERSION,
     )
     .map_err(|error| invariant(error.to_string()))?;
     verify_finding_status_invariants(&transaction)?;

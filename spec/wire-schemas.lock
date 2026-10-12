@@ -2275,11 +2275,6 @@ files = ["crates/products/chio-finding-market-canary/src/main.rs"]
 first_seen = "412dd041f1"
 
 [[schema]]
-value = "chio.finding.legacy-challenge-repair.v1"
-files = ["crates/products/chio-cli/src/cli/dispatch/finding/operator.rs"]
-first_seen = "412dd041f1"
-
-[[schema]]
 value = "chio.finding.liability.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs"]
 first_seen = "b6daa36f52"

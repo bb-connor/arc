@@ -106,14 +106,7 @@ use submission_retention::{
 };
 
 const FINDING_CHALLENGE_SCHEMA_KEY: &str = "finding_challenge";
-/// Revision 14 retains exact signed challenge submissions atomically.
-/// Revision 13 combines authenticated seller-impairment reconciliations,
-/// append-only enforcement-root refreshes, and exact legacy anchor-binding
-/// recovery; revision 11 retains pre-dispatch authorization refreshes.
-/// revision 10 retains the initial exact finalizing authorization atomically
-/// with the liability transition; revision 9 retains exact signed evaluator
-/// outcomes with their verdict.
-pub(crate) const FINDING_CHALLENGE_SUPPORTED_SCHEMA_VERSION: i32 = 14;
+pub(crate) const FINDING_CHALLENGE_SCHEMA_VERSION: i32 = 1;
 const FINDING_CHALLENGE_SCHEMA_ANCHORS: &[&str] = &[
     "challenges",
     "finding_challenge_projection_commits",
@@ -121,11 +114,6 @@ const FINDING_CHALLENGE_SCHEMA_ANCHORS: &[&str] = &[
     "chio_serving_owner",
 ];
 const FINDING_CHALLENGE_SCHEMA: &str = include_str!("finding_challenge_store.sql");
-/// Explicit non-key carried only by projected legacy terminal liabilities.
-/// Those rows remain auditable, but this value cannot authorize a future
-/// seller impairment and terminal lifecycle triggers forbid any transition.
-const LEGACY_TERMINAL_UNBOUND_SELLER_HEX: &str =
-    "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
 /// Upper bound on every opaque identifier this store persists. An
 /// unbounded identifier is an amplification vector rather than a name.

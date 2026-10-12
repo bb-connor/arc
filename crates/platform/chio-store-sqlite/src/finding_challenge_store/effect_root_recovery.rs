@@ -1,19 +1,5 @@
-fn replace_legacy_effect_root_binding_trigger(
-    transaction: &Transaction<'_>,
-    on_disk: i32,
-) -> Result<(), FindingChallengeStoreError> {
-    if matches!(on_disk, 8..=12) {
-        transaction
-            .execute_batch("DROP TRIGGER effect_root_bindings_valid_intent;")
-            .map_err(sqlite_error)?;
-    }
-    Ok(())
-}
-
-/// Install the exact binding for an anchor intent retained from before root
-/// bindings were mandatory. The immutable intent key and digest must already
-/// commit to the caller-reconstructed proof, and only the legacy anchor lane
-/// may use a post-dispatch state.
+/// Install the exact root binding for an anchor intent. The immutable intent
+/// key and digest must already commit to the caller-reconstructed proof.
 impl SqliteFindingChallengeStore {
 pub fn reconcile_anchor_effect_root_binding(
     &self,
@@ -46,7 +32,7 @@ pub fn reconcile_anchor_effect_root_binding(
         || !recoverable_state
     {
         return Err(FindingChallengeStoreError::Conflict(
-            "legacy anchor intent does not match the reconstructed root binding".to_owned(),
+            "anchor intent does not match the reconstructed root binding".to_owned(),
         ));
     }
     if let Some(existing) = load_effect_root_binding_tx(&transaction, intent_key)? {
@@ -78,7 +64,7 @@ pub fn reconcile_anchor_effect_root_binding(
         .map_err(sqlite_error)?;
     if inserted != 1 {
         return Err(invariant(
-            "legacy anchor root binding insert did not affect one row",
+            "anchor root binding insert did not affect one row",
         ));
     }
     self.commit_write(transaction)?;

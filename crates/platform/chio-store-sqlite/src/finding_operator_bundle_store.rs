@@ -88,9 +88,8 @@ pub struct FindingOperatorBundleArtifactIndex {
     pub kind: FindingOperatorBundleArtifactKind,
     pub envelope_sha256: String,
     /// Canonical policy bytes that were externally authenticated when this
-    /// artifact was admitted. Only admission and verifier-profile indexes may
-    /// carry a policy. Legacy backfill leaves this absent and therefore cannot
-    /// invent historical authority after rotation.
+    /// artifact was admitted. Only admission and verifier-profile indexes
+    /// carry a policy.
     pub authority_policy_json: Option<Vec<u8>>,
 }
 
@@ -878,63 +877,6 @@ impl SqliteFindingOperatorBundleStore {
             return Err(FindingOperatorBundleStoreError::DigestMismatch);
         }
         Ok(record)
-    }
-
-    /// Return only bundles that have not yet received all four closed artifact
-    /// indexes. This supports one bounded upgrade backfill without rescanning
-    /// fully indexed state on every operator restart.
-    pub fn list_without_complete_artifact_index(
-        &self,
-        limit: u64,
-    ) -> Result<Vec<FindingOperatorBundleRecord>, FindingOperatorBundleStoreError> {
-        if limit == 0 || limit > 10_000 {
-            return Err(FindingOperatorBundleStoreError::Invalid(
-                "bundle artifact backfill limit",
-            ));
-        }
-        let limit = i64::try_from(limit).map_err(|_| {
-            FindingOperatorBundleStoreError::Invalid("bundle artifact backfill limit")
-        })?;
-        let conn = self
-            .pool
-            .get()
-            .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-        let mut statement = conn
-            .prepare(
-                r#"
-                SELECT b.finding_id, b.bundle_sha256, b.bundle_json
-                FROM chio_finding_operator_bundles AS b
-                WHERE (
-                    SELECT COUNT(DISTINCT a.artifact_kind)
-                    FROM chio_finding_operator_bundle_artifacts AS a
-                    WHERE a.finding_id = b.finding_id
-                ) < 4
-                ORDER BY b.finding_id ASC
-                LIMIT ?1
-                "#,
-            )
-            .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-        let rows = statement
-            .query_map([limit], |row| {
-                Ok(FindingOperatorBundleRecord {
-                    finding_id: row.get(0)?,
-                    bundle_sha256: row.get(1)?,
-                    bundle_json: row.get(2)?,
-                })
-            })
-            .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-        let mut records = Vec::new();
-        for row in rows {
-            let record = row
-                .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-            validate_finding_id(&record.finding_id)?;
-            if record.bundle_sha256 != sha256_hex(&record.bundle_json) {
-                return Err(FindingOperatorBundleStoreError::DigestMismatch);
-            }
-            validate_canonical_bundle(&record.bundle_json)?;
-            records.push(record);
-        }
-        Ok(records)
     }
 
     /// Return retained bundles in deterministic Finding-id order. The caller

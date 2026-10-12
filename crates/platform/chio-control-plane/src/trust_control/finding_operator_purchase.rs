@@ -626,9 +626,9 @@ impl FindingOperatorPurchaseExecutor {
                 .get_purchase_job(&claim.request_id)
                 .map_err(execution_unavailable)?
             else {
-                // The store API predates prepared purchase jobs and permits a
-                // standalone claim. Preserve opaque claims because no signed
-                // expiry or coordinator identity exists to authorize release.
+                // A standalone claim has no prepared purchase job. Preserve it
+                // because no signed expiry or coordinator identity exists to
+                // authorize release.
                 continue;
             };
             if job_record.principal_id != claim.principal_id
@@ -1145,8 +1145,8 @@ impl FindingOperatorPurchaseExecutor {
         };
         let stored_job = self.load_purchase_job(authenticated, request, &request_sha256)?;
         if existing_reservation.is_some() && stored_job.is_none() {
-            return Err(FindingPurchaseExecutionError::Pending(
-                "legacy durable reservation has no prepared recovery job".to_owned(),
+            return Err(execution_internal(
+                "durable reservation has no prepared recovery job",
             ));
         }
         let prepared_at = stored_job.as_ref().map_or(now, |job| job.prepared_at);

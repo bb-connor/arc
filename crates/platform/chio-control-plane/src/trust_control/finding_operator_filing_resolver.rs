@@ -17,8 +17,6 @@ use super::finding_challenge_coordinator::{FindingAuditRound, FindingFilingResol
 use super::finding_operator_bundle::FindingOperatorBundle;
 use super::{FindingAuthorityPin, FindingMarketConfig};
 
-const ARTIFACT_INDEX_BACKFILL_BATCH: u64 = 16;
-
 /// Resolver over the exact durable bundles admitted by this operator.
 /// Unsupported artifact families return `None`, which keeps later challenge
 /// phases fail closed instead of inventing historical policy.
@@ -38,27 +36,6 @@ impl FindingOperatorFilingResolver {
         market: FindingMarketConfig,
     ) -> Result<Self, String> {
         market.validate().map_err(|error| error.to_string())?;
-        loop {
-            let records = bundles
-                .list_without_complete_artifact_index(ARTIFACT_INDEX_BACKFILL_BATCH)
-                .map_err(|error| error.to_string())?;
-            if records.is_empty() {
-                break;
-            }
-            for record in records {
-                let bundle: FindingOperatorBundle =
-                    chio_core::canonical::UntrustedJsonText::from_wire(
-                        &record.bundle_json,
-                        64 * 1024 * 1024,
-                    )
-                    .and_then(|input| input.decode_signed())
-                    .map_err(|error| error.code().to_owned())?;
-                let indexes = finding_operator_bundle_artifact_indexes(&bundle, None)?;
-                bundles
-                    .put_with_artifact_indexes(&record.finding_id, &record.bundle_json, &indexes)
-                    .map_err(|error| error.to_string())?;
-            }
-        }
         Ok(Self { bundles, market })
     }
 
@@ -78,11 +55,7 @@ impl FindingOperatorFilingResolver {
         )
         .and_then(|input| input.decode_signed())
         .map_err(|error| error.code().to_owned())?;
-        let expected = finding_operator_bundle_artifact_indexes(&bundle, None)?
-            .into_iter()
-            .find(|index| index.kind == kind)
-            .ok_or_else(|| "retained operator bundle artifact index is incomplete".to_owned())?;
-        if expected.envelope_sha256 != envelope_sha256 {
+        if artifact_envelope_sha256(&bundle, kind)? != envelope_sha256 {
             return Err("retained operator bundle artifact index is inconsistent".to_owned());
         }
         Ok(Some(IndexedOperatorBundle {
@@ -298,70 +271,74 @@ impl FindingOperatorFilingResolver {
 }
 
 /// Derive the four challenge-facing signed-envelope indexes carried by one
-/// verified operator bundle. New admissions supply the authenticating market
-/// profile so the exact venue and governance policies are retained with their
-/// indexes. A policy-less call is only for legacy digest-index backfill and
-/// remains fail closed for historical authority resolution.
+/// verified operator bundle, retaining the exact venue and governance policies
+/// that authenticate its admission and verifier profile.
 pub fn finding_operator_bundle_artifact_indexes(
     bundle: &FindingOperatorBundle,
-    market: Option<&FindingMarketConfig>,
+    market: &FindingMarketConfig,
 ) -> Result<[FindingOperatorBundleArtifactIndex; 4], String> {
-    if let Some(market) = market {
-        market.validate().map_err(|error| error.to_string())?;
-        let venue = market.venue.key().map_err(|error| error.to_string())?;
-        if !market.venue.covers(bundle.admission.body.issued_at)
-            || verify_signed_admission(&bundle.admission, &venue, &market.venue_id).is_err()
-        {
-            return Err("venue policy does not authenticate the indexed admission".to_owned());
+    market.validate().map_err(|error| error.to_string())?;
+    let venue = market.venue.key().map_err(|error| error.to_string())?;
+    if !market.venue.covers(bundle.admission.body.issued_at)
+        || verify_signed_admission(&bundle.admission, &venue, &market.venue_id).is_err()
+    {
+        return Err("venue policy does not authenticate the indexed admission".to_owned());
+    }
+    let governance = market
+        .governance_root
+        .key()
+        .map_err(|error| error.to_string())?;
+    if !market
+        .governance_root
+        .covers(bundle.verifier_profile.body.issued_at)
+        || verify_signed_profile(&bundle.verifier_profile, &governance).is_err()
+    {
+        return Err(
+            "governance policy does not authenticate the indexed verifier profile".to_owned(),
+        );
+    }
+    let venue_policy_json =
+        chio_core::canonical_json_bytes(&market.venue).map_err(|error| error.to_string())?;
+    let governance_policy_json = chio_core::canonical_json_bytes(&market.governance_root)
+        .map_err(|error| error.to_string())?;
+    let index = |kind, authority_policy_json| -> Result<_, String> {
+        Ok(FindingOperatorBundleArtifactIndex {
+            kind,
+            envelope_sha256: artifact_envelope_sha256(bundle, kind)?,
+            authority_policy_json,
+        })
+    };
+    Ok([
+        index(FindingOperatorBundleArtifactKind::FeeSchedule, None)?,
+        index(
+            FindingOperatorBundleArtifactKind::Admission,
+            Some(venue_policy_json),
+        )?,
+        index(
+            FindingOperatorBundleArtifactKind::VerifierProfile,
+            Some(governance_policy_json),
+        )?,
+        index(FindingOperatorBundleArtifactKind::MarketTerms, None)?,
+    ])
+}
+
+fn artifact_envelope_sha256(
+    bundle: &FindingOperatorBundle,
+    kind: FindingOperatorBundleArtifactKind,
+) -> Result<String, String> {
+    match kind {
+        FindingOperatorBundleArtifactKind::FeeSchedule => {
+            signed_envelope_sha256(&bundle.fee_schedule)
         }
-        let governance = market
-            .governance_root
-            .key()
-            .map_err(|error| error.to_string())?;
-        if !market
-            .governance_root
-            .covers(bundle.verifier_profile.body.issued_at)
-            || verify_signed_profile(&bundle.verifier_profile, &governance).is_err()
-        {
-            return Err(
-                "governance policy does not authenticate the indexed verifier profile".to_owned(),
-            );
+        FindingOperatorBundleArtifactKind::Admission => signed_envelope_sha256(&bundle.admission),
+        FindingOperatorBundleArtifactKind::VerifierProfile => {
+            signed_envelope_sha256(&bundle.verifier_profile)
+        }
+        FindingOperatorBundleArtifactKind::MarketTerms => {
+            signed_envelope_sha256(&bundle.market_terms)
         }
     }
-    let venue_policy_json = market
-        .map(|market| chio_core::canonical_json_bytes(&market.venue))
-        .transpose()
-        .map_err(|error| error.to_string())?;
-    let governance_policy_json = market
-        .map(|market| chio_core::canonical_json_bytes(&market.governance_root))
-        .transpose()
-        .map_err(|error| error.to_string())?;
-    Ok([
-        FindingOperatorBundleArtifactIndex {
-            kind: FindingOperatorBundleArtifactKind::FeeSchedule,
-            envelope_sha256: signed_envelope_sha256(&bundle.fee_schedule)
-                .map_err(|error| error.to_string())?,
-            authority_policy_json: None,
-        },
-        FindingOperatorBundleArtifactIndex {
-            kind: FindingOperatorBundleArtifactKind::Admission,
-            envelope_sha256: signed_envelope_sha256(&bundle.admission)
-                .map_err(|error| error.to_string())?,
-            authority_policy_json: venue_policy_json,
-        },
-        FindingOperatorBundleArtifactIndex {
-            kind: FindingOperatorBundleArtifactKind::VerifierProfile,
-            envelope_sha256: signed_envelope_sha256(&bundle.verifier_profile)
-                .map_err(|error| error.to_string())?,
-            authority_policy_json: governance_policy_json,
-        },
-        FindingOperatorBundleArtifactIndex {
-            kind: FindingOperatorBundleArtifactKind::MarketTerms,
-            envelope_sha256: signed_envelope_sha256(&bundle.market_terms)
-                .map_err(|error| error.to_string())?,
-            authority_policy_json: None,
-        },
-    ])
+    .map_err(|error| error.to_string())
 }
 
 impl FindingFilingResolver for FindingOperatorFilingResolver {

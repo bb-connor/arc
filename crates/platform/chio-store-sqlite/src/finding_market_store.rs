@@ -44,7 +44,7 @@ use participation::{paid_through_epoch_tx, require_current_participation_admissi
 mod collateral_registration;
 
 const FINDING_MARKET_SCHEMA_KEY: &str = "finding_market";
-pub(crate) const FINDING_MARKET_SUPPORTED_SCHEMA_VERSION: i32 = 3;
+pub(crate) const FINDING_MARKET_SCHEMA_VERSION: i32 = 1;
 const FINDING_MARKET_SCHEMA_ANCHORS: &[&str] =
     &["findings", "admission_operations", "chio_serving_owner"];
 const FINDING_MARKET_SCHEMA: &str = include_str!("finding_market_store.sql");
@@ -2119,14 +2119,14 @@ fn require_verified_live_status_tx(
 pub(crate) fn initialize_finding_market_schema(
     connection: &mut Connection,
 ) -> Result<(), FindingMarketStoreError> {
-    let on_disk = crate::check_schema_version(
+    let state = crate::check_current_schema(
         connection,
         FINDING_MARKET_SCHEMA_KEY,
-        FINDING_MARKET_SUPPORTED_SCHEMA_VERSION,
+        FINDING_MARKET_SCHEMA_VERSION,
         FINDING_MARKET_SCHEMA_ANCHORS,
     )
     .map_err(|error| invariant(error.to_string()))?;
-    if on_disk == FINDING_MARKET_SUPPORTED_SCHEMA_VERSION {
+    if state == crate::SchemaState::Current {
         return verify_finding_market_invariants(connection);
     }
     let transaction = connection
@@ -2135,33 +2135,16 @@ pub(crate) fn initialize_finding_market_schema(
     transaction
         .execute_batch(FINDING_MARKET_SCHEMA)
         .map_err(sqlite_error)?;
-    if on_disk < 2 {
-        transaction
-            .execute(
-                r#"
-                INSERT INTO finding_activation_attempts (
-                    admission_id, finding_id, listing_id, backing_allocation_id,
-                    admission_envelope_sha256, admission_envelope_json,
-                    prepared_at, state
-                )
-                SELECT admission_id, finding_id, listing_id, backing_allocation_id,
-                       admission_envelope_sha256, admission_envelope_json,
-                       activated_at, 'activated'
-                FROM admissions
-                "#,
-                [],
-            )
-            .map_err(sqlite_error)?;
-    }
     crate::stamp_schema_version(
         &transaction,
         FINDING_MARKET_SCHEMA_KEY,
-        FINDING_MARKET_SUPPORTED_SCHEMA_VERSION,
+        FINDING_MARKET_SCHEMA_VERSION,
     )
     .map_err(|error| invariant(error.to_string()))?;
     verify_finding_market_invariants(&transaction)?;
     transaction.commit().map_err(sqlite_error)
 }
+
 /// Verify the market schema's shape: this database's table, index, and
 /// trigger definitions against a freshly created canonical schema. The
 /// cost is a handful of `sqlite_schema` rows, independent of how much

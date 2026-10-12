@@ -29,7 +29,7 @@ fn operator_filing_resolver_retains_pre_rotation_authority_policies() -> TestRes
         unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )?;
     let bundle_json = bundle.to_canonical_json()?;
-    let indexes = finding_operator_bundle_artifact_indexes(&bundle, Some(&original))
+    let indexes = finding_operator_bundle_artifact_indexes(&bundle, &original)
         .map_err(std::io::Error::other)?;
     let store = SqliteFindingOperatorBundleStore::open(
         deployment
@@ -62,32 +62,6 @@ fn operator_filing_resolver_retains_pre_rotation_authority_policies() -> TestRes
         Some(original.governance_root)
     );
 
-    let legacy_store = SqliteFindingOperatorBundleStore::open(
-        deployment
-            .database
-            .with_file_name("operator-legacy-filing-policies.db"),
-    )?;
-    let legacy_indexes =
-        finding_operator_bundle_artifact_indexes(&bundle, None).map_err(std::io::Error::other)?;
-    legacy_store.put_with_artifact_indexes(
-        &deployment.web.finding_id,
-        &bundle_json,
-        &legacy_indexes,
-    )?;
-    let legacy =
-        FindingOperatorFilingResolver::new(legacy_store, rotated).map_err(std::io::Error::other)?;
-    assert_eq!(
-        legacy
-            .venue_policy_for_admission(&admission_digest)
-            .map_err(std::io::Error::other)?,
-        None
-    );
-    assert_eq!(
-        legacy
-            .governance_policy_for_profile(&profile_digest)
-            .map_err(std::io::Error::other)?,
-        None
-    );
     Ok(())
 }
 
