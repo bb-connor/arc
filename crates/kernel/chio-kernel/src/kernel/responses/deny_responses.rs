@@ -514,6 +514,75 @@ impl ChioKernel {
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         record_mode: ReceiptRecordMode,
     ) -> Result<ToolCallResponse, KernelError> {
+        let prepared = self.prepare_deny_response_with_recording(
+            request,
+            reason,
+            timestamp,
+            matched_grant_index,
+            extra_metadata,
+            verified_payee_binding,
+            record_mode,
+        )?;
+        self.publish_prepared_response(request, prepared)
+    }
+
+    pub(in crate::kernel) fn prepare_deny_response_with_metadata(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<PreparedResponse, KernelError> {
+        self.prepare_deny_response_with_recording(
+            request,
+            reason,
+            timestamp,
+            matched_grant_index,
+            extra_metadata,
+            None,
+            ReceiptRecordMode::WithFederation,
+        )
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Preparation preserves the existing response input contract."
+    )]
+    pub(in crate::kernel) fn prepare_deny_response_with_metadata_and_payee_binding(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+    ) -> Result<PreparedResponse, KernelError> {
+        self.prepare_deny_response_with_recording(
+            request,
+            reason,
+            timestamp,
+            matched_grant_index,
+            extra_metadata,
+            verified_payee_binding,
+            ReceiptRecordMode::WithFederation,
+        )
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Preparation preserves the existing response input contract."
+    )]
+    fn prepare_deny_response_with_recording(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+        record_mode: ReceiptRecordMode,
+    ) -> Result<PreparedResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -552,16 +621,17 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_chio_receipt_with_mode(request, &receipt, record_mode)?;
-
-        Ok(ToolCallResponse {
-            request_id: request.request_id.clone(),
-            verdict: Verdict::Deny,
-            output: None,
-            reason: Some(reason.to_string()),
-            terminal_state: OperationTerminalState::Completed,
-            receipt,
-            execution_nonce: None,
-        })
+        Ok(PreparedResponse::terminal(
+            ToolCallResponse {
+                request_id: request.request_id.clone(),
+                verdict: Verdict::Deny,
+                output: None,
+                reason: Some(reason.to_string()),
+                terminal_state: OperationTerminalState::Completed,
+                receipt,
+                execution_nonce: None,
+            },
+            record_mode,
+        ))
     }
 }

@@ -211,3 +211,25 @@ fn a_tool_publication_error_cannot_discharge_the_current_call() {
         assert_eq!(receipts.get(0).unwrap().id, response.receipt.id);
     }
 }
+
+#[test]
+fn preparing_a_terminal_response_does_not_append_it() {
+    let (kernel, request, _) = fixture();
+    let prepared = kernel
+        .prepare_allow_response_with_metadata_and_payee_binding(
+            &request,
+            ToolCallOutput::Value(serde_json::json!({"prepared": true})),
+            current_unix_timestamp(),
+            Some(0),
+            None,
+            None,
+            crate::kernel::responses::AllowResponseNonce::Suppressed,
+        )
+        .unwrap();
+    assert!(kernel.receipt_log().is_empty());
+    let response = kernel
+        .publish_prepared_response(&request, prepared)
+        .unwrap();
+    assert_eq!(kernel.receipt_log().len(), 1);
+    assert!(response.receipt.is_allowed());
+}

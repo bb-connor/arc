@@ -30,6 +30,34 @@ impl ChioKernel {
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         security_context: Option<&SecurityInvocationContext>,
     ) -> Result<ToolCallResponse, KernelError> {
+        let prepared = self.prepare_tool_output_with_metadata_and_payee_binding(
+            request,
+            output,
+            elapsed,
+            timestamp,
+            matched_grant_index,
+            extra_metadata,
+            verified_payee_binding,
+            security_context,
+        )?;
+        self.publish_prepared_response(request, prepared)
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Preparation preserves the existing finalization input contract."
+    )]
+    pub(in crate::kernel) fn prepare_tool_output_with_metadata_and_payee_binding(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolServerOutput,
+        elapsed: Duration,
+        timestamp: u64,
+        matched_grant_index: usize,
+        extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+        security_context: Option<&SecurityInvocationContext>,
+    ) -> Result<PreparedResponse, KernelError> {
         let output = self.apply_stream_limits(output, elapsed)?;
         let post_invocation = self.apply_post_invocation_pipeline(
             request,
@@ -41,7 +69,7 @@ impl ChioKernel {
         let _post_invocation_evidence_scope =
             scope_post_invocation_guard_evidence(post_invocation.evidence);
         if let Some(reason) = post_invocation.blocked_reason.as_deref() {
-            return self.build_deny_response_with_metadata_and_payee_binding(
+            return self.prepare_deny_response_with_metadata_and_payee_binding(
                 request,
                 reason,
                 timestamp,
@@ -64,7 +92,7 @@ impl ChioKernel {
             &post_invocation.output,
             true,
         ) {
-            return self.build_deny_response_with_metadata_and_payee_binding(
+            return self.prepare_deny_response_with_metadata_and_payee_binding(
                 request,
                 &error.to_string(),
                 timestamp,
@@ -78,7 +106,7 @@ impl ChioKernel {
 
         match post_invocation.output {
             ToolServerOutput::Value(value) => self
-                .build_allow_response_with_metadata_and_payee_binding(
+                .prepare_allow_response_with_metadata_and_payee_binding(
                     request,
                     ToolCallOutput::Value(value),
                     timestamp,
@@ -88,7 +116,7 @@ impl ChioKernel {
                     AllowResponseNonce::MintForAllow,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => self
-                .build_allow_response_with_metadata_and_payee_binding(
+                .prepare_allow_response_with_metadata_and_payee_binding(
                     request,
                     ToolCallOutput::Stream(stream),
                     timestamp,
@@ -98,7 +126,7 @@ impl ChioKernel {
                     AllowResponseNonce::MintForAllow,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => self
-                .build_incomplete_response_with_output_metadata_and_payee_binding(
+                .prepare_incomplete_response_with_output_metadata_and_payee_binding(
                     request,
                     Some(ToolCallOutput::Stream(stream)),
                     &reason,

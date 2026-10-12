@@ -103,7 +103,7 @@ impl ChioKernel {
 
     fn build_and_sign_receipt_with_authority(
         &self,
-        params: ReceiptParams<'_>,
+        mut params: ReceiptParams<'_>,
         authority: &dyn chio_core::crypto::SigningBackend,
         expected_key: Option<&chio_core::PublicKey>,
     ) -> Result<ChioReceipt, KernelError> {
@@ -117,6 +117,60 @@ impl ChioKernel {
                 "receipt authority does not satisfy the boot signing floor".into(),
             ));
         }
+        let canonical_content = std::mem::take(&mut params.canonical_content);
+        let body = self.prepare_receipt_body(
+            params,
+            expected_key
+                .cloned()
+                .unwrap_or_else(|| authority.public_key()),
+        )?;
+
+        // WYSIWYS: bind the signature to the exact content this receipt's
+        // `content_hash` was derived from. The handle recomputes
+        // `sha256_hex(canonical_content)` and the signing primitive refuses to
+        // sign if it disagrees with `body.content_hash`, closing the
+        // render-A / sign-B hole on the production path. The
+        // canonical_content is the same preimage `receipt_content_for_output`
+        // hashed to produce `content_hash`.
+        let handle = ReceiptSigningHandle::from_content_preimage(canonical_content);
+
+        // Delegate the pure signing step to chio-kernel-core so the portable
+        // TCB stays in one place. The full kernel still owns body construction
+        // (tenant scope resolution, policy_hash injection, evidence assembly)
+        // because those are std/tokio-aware concerns.
+        //
+        // Verified-core boundary note:
+        // `formal/proof-manifest.toml` includes this shell method only for the
+        // direct call into `chio_kernel_core::sign_receipt_with_handle`. Receipt
+        // body assembly, metadata shaping, and persistence remain
+        // operational-shell behavior outside the current bounded proof claim.
+        chio_kernel_core::sign_receipt_with_handle(body, authority, handle).map_err(|error| {
+            use chio_kernel_core::ReceiptSigningError;
+            let message = match error {
+                ReceiptSigningError::KernelKeyMismatch => {
+                    "kernel signing key does not match receipt body kernel_key".to_string()
+                }
+                ReceiptSigningError::ContentHashMismatch {
+                    recomputed,
+                    claimed,
+                } => format!(
+                    "receipt content_hash mismatch: body claimed {claimed} but signer \
+                     recomputed {recomputed} over the canonical content (WYSIWYS refused)"
+                ),
+                ReceiptSigningError::SigningFailed(reason) => reason,
+            };
+            KernelError::ReceiptSigningFailed(message)
+        })
+    }
+
+    /// Prepare the exact unsigned body, including authenticated receipt scope.
+    /// Recovery can sign this owned body without borrowing the kernel or
+    /// reconstructing any caller-controlled request material.
+    pub(in crate::kernel) fn prepare_receipt_body(
+        &self,
+        params: ReceiptParams<'_>,
+        expected_key: chio_core::PublicKey,
+    ) -> Result<ChioReceiptBody, KernelError> {
         let expected_action = params.action.clone();
         let expected_decision = params.decision.clone();
         let expected_content_hash = params.content_hash.clone();
@@ -168,9 +222,7 @@ impl ChioKernel {
             metadata,
             trust_level: params.trust_level,
             tenant_id,
-            kernel_key: expected_key
-                .cloned()
-                .unwrap_or_else(|| authority.public_key()),
+            kernel_key: expected_key,
             bbs_projection_version: None,
         };
         let expected = ReceiptCouplingExpectation {
@@ -185,42 +237,7 @@ impl ChioKernel {
         };
         require_receipt_body_fields_coupled(&body, &expected)?;
 
-        // WYSIWYS: bind the signature to the exact content this receipt's
-        // `content_hash` was derived from. The handle recomputes
-        // `sha256_hex(canonical_content)` and the signing primitive refuses to
-        // sign if it disagrees with `body.content_hash`, closing the
-        // render-A / sign-B hole on the production path. The
-        // canonical_content is the same preimage `receipt_content_for_output`
-        // hashed to produce `content_hash`.
-        let handle = ReceiptSigningHandle::from_content_preimage(params.canonical_content);
-
-        // Delegate the pure signing step to chio-kernel-core so the portable
-        // TCB stays in one place. The full kernel still owns body construction
-        // (tenant scope resolution, policy_hash injection, evidence assembly)
-        // because those are std/tokio-aware concerns.
-        //
-        // Verified-core boundary note:
-        // `formal/proof-manifest.toml` includes this shell method only for the
-        // direct call into `chio_kernel_core::sign_receipt_with_handle`. Receipt
-        // body assembly, metadata shaping, and persistence remain
-        // operational-shell behavior outside the current bounded proof claim.
-        chio_kernel_core::sign_receipt_with_handle(body, authority, handle).map_err(|error| {
-            use chio_kernel_core::ReceiptSigningError;
-            let message = match error {
-                ReceiptSigningError::KernelKeyMismatch => {
-                    "kernel signing key does not match receipt body kernel_key".to_string()
-                }
-                ReceiptSigningError::ContentHashMismatch {
-                    recomputed,
-                    claimed,
-                } => format!(
-                    "receipt content_hash mismatch: body claimed {claimed} but signer \
-                     recomputed {recomputed} over the canonical content (WYSIWYS refused)"
-                ),
-                ReceiptSigningError::SigningFailed(reason) => reason,
-            };
-            KernelError::ReceiptSigningFailed(message)
-        })
+        Ok(body)
     }
 
     /// Record the receipt and drive the bilateral co-signing hook when the

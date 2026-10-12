@@ -14,6 +14,30 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
+        let prepared = self.prepare_cancelled_response_with_metadata_and_payee_binding(
+            request,
+            reason,
+            timestamp,
+            matched_grant_index,
+            extra_metadata,
+            verified_payee_binding,
+        )?;
+        self.publish_prepared_response(request, prepared)
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Preparation preserves the existing response input contract."
+    )]
+    pub(in crate::kernel) fn prepare_cancelled_response_with_metadata_and_payee_binding(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+    ) -> Result<PreparedResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -51,19 +75,20 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_chio_receipt_with_federation(request, &receipt)?;
-
-        Ok(ToolCallResponse {
-            request_id: request.request_id.clone(),
-            verdict: Verdict::Deny,
-            output: None,
-            reason: Some(reason.to_string()),
-            terminal_state: OperationTerminalState::Cancelled {
-                reason: reason.to_string(),
+        Ok(PreparedResponse::terminal(
+            ToolCallResponse {
+                request_id: request.request_id.clone(),
+                verdict: Verdict::Deny,
+                output: None,
+                reason: Some(reason.to_string()),
+                terminal_state: OperationTerminalState::Cancelled {
+                    reason: reason.to_string(),
+                },
+                receipt,
+                execution_nonce: None,
             },
-            receipt,
-            execution_nonce: None,
-        })
+            ReceiptRecordMode::WithFederation,
+        ))
     }
 
     #[allow(
@@ -80,6 +105,32 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
+        let prepared = self.prepare_incomplete_response_with_output_metadata_and_payee_binding(
+            request,
+            output,
+            reason,
+            timestamp,
+            matched_grant_index,
+            extra_metadata,
+            verified_payee_binding,
+        )?;
+        self.publish_prepared_response(request, prepared)
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Preparation preserves the existing response input contract."
+    )]
+    pub(in crate::kernel) fn prepare_incomplete_response_with_output_metadata_and_payee_binding(
+        &self,
+        request: &ToolCallRequest,
+        output: Option<ToolCallOutput>,
+        reason: &str,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+    ) -> Result<PreparedResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(output.as_ref(), None)?;
 
@@ -117,18 +168,19 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_chio_receipt_with_federation(request, &receipt)?;
-
-        Ok(ToolCallResponse {
-            request_id: request.request_id.clone(),
-            verdict: Verdict::Deny,
-            output,
-            reason: Some(reason.to_string()),
-            terminal_state: OperationTerminalState::Incomplete {
-                reason: reason.to_string(),
+        Ok(PreparedResponse::terminal(
+            ToolCallResponse {
+                request_id: request.request_id.clone(),
+                verdict: Verdict::Deny,
+                output,
+                reason: Some(reason.to_string()),
+                terminal_state: OperationTerminalState::Incomplete {
+                    reason: reason.to_string(),
+                },
+                receipt,
+                execution_nonce: None,
             },
-            receipt,
-            execution_nonce: None,
-        })
+            ReceiptRecordMode::WithFederation,
+        ))
     }
 }
