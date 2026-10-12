@@ -1,95 +1,123 @@
 # chio-lineage architecture
 
-## Overview
+## Responsibility and boundary
 
-`chio-lineage` is a pure in-memory library: no file or network I/O, no
-runtime state beyond what a caller constructs and holds. It projects two
-source feeds, OTEL receipt-exporter NDJSON and the deterministic replay
-corpus, into one graph shape, and tags every node and edge with an
-`EvidenceClass` so a consumer never has to reinterpret raw receipt or span
-fields to know how much to trust a fact. The `anchor` module touches
-signature verification, but the crate never embeds a trusted key: a caller
-must supply the public key it already trusts, so an attacker-supplied key
-and signature pair can never satisfy verification on its own.
+The public surface describes and transforms in-memory provenance graphs.
+`LineageGraph` contains versioned nodes, typed edges, and an optional
+`TruncationMarker`. Nodes and edges carry `Asserted`, `Observed`, or `Verified`
+evidence labels alongside optional tenant, timestamp, and source metadata.
+The graph structs and evidence enums are publicly constructible; a label is
+meaningful only with the verification policy of its producing path.
 
-## Module map
+Callers provide OTEL frame strings, typed replay rows, or native receipts.
+They retain responsibility for input size limits, authenticated source feeds,
+tenant and time-window selection, and persisted graph state. Library code
+performs no file or network I/O and does not enforce graph acyclicity.
 
-| Path | Responsibility |
-|------|----------------|
-| `src/lib.rs` | Declares the six public modules, the `LINEAGE_GRAPH_SCHEMA` tag, and `LineageError` (aggregates `OtelIngestError` and `CorpusIngestError`). |
-| `src/schema.rs` | Graph types: `LineageNode`, `LineageEdge`, `NodeKind`, `EdgeKind`, `EvidenceClass`, `TruncationMarker`, `LineageGraph`. Source of truth for `schemas/lineage-graph.v1.json`. |
-| `src/ingest_otel.rs` | Folds OTEL receipt-exporter NDJSON frames into the graph. Schema-version gated; dedups by natural key. |
-| `src/ingest_replay_corpus.rs` | Folds replay-corpus rows into the same graph shape. Validates every field before construction; verifies signed lineage statements. |
-| `src/query.rs` | Bounded forward/reverse BFS traversal with depth and row caps. |
-| `src/diff.rs` | Symmetric edge diff between two graphs, sorted for byte-stable output. |
-| `src/anchor.rs` | Frontier hashing, signed/unsigned pinning, signature verification against a caller-supplied key. Carries an embedded SHA-256 (FIPS 180-4) to avoid a new crypto dependency for a public, non-secret digest. |
+## Structure
 
-## Projection pipeline
+| Module | Responsibility |
+| --- | --- |
+| `schema` | `LineageNode`, `LineageEdge`, kinds, evidence classes, graph and truncation types. |
+| `ingest_otel` | Stateful `OtelIngest`, typed frames, schema and required-ID checks. |
+| `ingest_replay_corpus` | One-shot `ingest_corpus` and optional signed edge projection. |
+| `ingest_active_defense` | Trusted native receipt batch verification and causal projection. |
+| `query` | Forward/reverse breadth-first walks and typed Finding dependency queries. |
+| `diff` | Edge-key comparison with evidence-change reporting and text output. |
+| `anchor` | Sorted frontier bytes, embedded SHA-256, unsigned pinning and signature checks. |
 
-1. A source feed (an OTEL NDJSON line, or a `CorpusReceiptRow` slice) enters
-   through `ingest_otel` or `ingest_replay_corpus`.
-2. Each ingest path validates required and optional string fields (non-empty,
-   unpadded, and for OTEL, control-character-free) before constructing any
-   node or edge, so a malformed field never reaches the graph as a blank or
-   whitespace-padded id.
-3. Nodes and edges get natural-key ids (`rcpt:`, `cap:`, `tool:` prefixes)
-   and are deduplicated against a `HashSet` of ids already seen, so
-   re-ingesting the same frame or row is a no-op.
-4. The resulting `LineageGraph` feeds `query` (bounded traversal), `diff`
-   (symmetric comparison against another graph), and `anchor` (frontier
-   hashing and pinning). None of the three mutate the graph.
+`LINEAGE_GRAPH_SCHEMA` is `chio.lineage.graph/v1`. The JSON artifact in
+`schemas/lineage-graph.v1.json` describes graph serialization.
+`LineageGraph::empty` stamps this version; derived `Default` leaves its
+version string empty. `LineageError` combines OTEL and corpus errors;
+active-defense and anchor errors have separate public types.
 
-## Invariants and failure modes
+## Data and control flow
 
-- Natural-key integrity is the trust boundary: node and edge ids are derived
-  from receipt ids, capability ids, span ids, tool names, and tenant ids.
-  `ingest_otel` rejects a blank, whitespace-padded, or control-character id
-  with `OtelIngestError::InvalidRequiredField`; `ingest_replay_corpus`
-  rejects a blank or padded field with `CorpusIngestError::InvalidField`
-  before any node is built.
-- `ingest_otel` fails closed on an `otel.schema` value other than
-  `OTEL_INGEST_SCHEMA` (`otlp.grpc.trace.v1`) via
-  `OtelIngestError::SchemaMismatch`; nothing is ingested from a rejected frame.
-- Evidence-class upgrades are one-directional and narrow. OTEL tool-call and
-  capability nodes are always `Asserted`; an OTEL receipt is `Observed` only
-  when the frame carries `correlation_source_chio_receipt_id` (the kernel
-  wrote that receipt itself). Corpus rows default to `Observed`; a
-  `ReceiptLineageParent` edge upgrades to `Verified` only when the row's
-  `signed_lineage_statement` names the same parent and child receipt ids,
-  carries `ProvenanceEvidenceClass::Verified`, and its signature verifies.
-- `query::forward`/`reverse` bound traversal with `QueryBounds` (default
-  depth 20, matching the recursive-CTE bound in
-  `capability_lineage::get_delegation_chain`; default row cap 10,000) and
-  emit a `TruncationMarker` on overflow. A cycle back to an already-visited
-  node is dropped, not re-queued, so it cannot loop forever.
-- `anchor::pin_frontier` never produces `SigningState::Signed`: a signer
-  hint without a real signature payload records `UnsignedSignerStubbed` so a
-  verifier cannot mistake a stub for a real signature. Only
-  `pin_frontier_signed` can produce `Signed`, and only after the signature
-  verifies against the caller-supplied `trusted_signer` key.
-  `AnchoredFrontier::is_signed()` always returns `false` by design (it has no
-  trusted-key context); callers must use `is_signed_by` or
-  `verify_frontier_signature` with an explicit key.
-- Frontier signatures are domain-separated (`FRONTIER_SIGNATURE_DOMAIN`
-  prefix), so a signature over a frontier payload cannot be replayed as a
-  signature over another Chio payload shape.
-- Every artifact this crate produces records `canonical_source:
-  EquivalenceShim`; `CanonicalSource::CanonicalBytes` is defined for
-  canonical-bytes-newtype interop but nothing in this crate constructs it.
+`OtelIngest::ingest_line` deserializes the flattened `OtelReceiptFrame` shape.
+`ingest_frame` requires `schema_version = otlp.grpc.trace.v1` and validates
+receipt, trace, and span IDs before updating its graph. Those IDs must be
+nonempty, unpadded, and free of control characters. Optional strings receive
+no equivalent validation. `parent_span_id` is accepted without projecting
+an edge. Unknown JSON fields are tolerated.
+
+OTEL tool and capability nodes are `Asserted`. A local receipt correlation
+changes the receipt node ID to `rcpt:<correlation>` and marks its node and edge
+`Observed`. The implementation trusts the presence of that string; it performs
+no local-store join. Without correlation, receipt IDs use `rcpt:otel:<id>`.
+Deduplication keeps the first node ID and first `(from, to, kind)` edge;
+later metadata or evidence changes do not update the retained entry.
+
+`ingest_corpus` validates all rows before constructing a graph. It rejects
+empty or padded receipt IDs and present optional projection strings.
+Its default evidence is `Observed`. For a parent edge, a lineage statement
+must match parent and child IDs, carry `Verified` evidence, and pass
+`verify_signature` to upgrade the edge. The statement's embedded signer is
+used without a trusted signer allowlist, and endpoint receipt signatures are
+outside this path. Invalid statements leave the edge `Observed`.
+A verified Finding-memory relation points from dependent write to delivery.
+
+`ActiveDefenseReceiptIngest` requires a nonempty trusted signer set. Its batch
+path checks signer membership, signature, content-addressed receipt ID,
+action hash, typed body, and exact envelope/metadata bindings. Conflicting
+logical evidence IDs reject the batch. All receipts verify before projection.
+Causal edges reference logical evidence IDs and preserve prior/trigger source
+tables as separate edge keys. Referenced parents absent from the batch become
+`Observed` placeholders, while their `ReceiptLineageParent` edges are labeled
+`Verified`. This label authenticates the child's signed parent reference;
+the absent parent's receipt has not been verified. Consumers must resolve
+and verify that parent before applying protocol receipt-lineage guarantees.
+Recorded active-defense times are milliseconds; other ingest paths copy
+supplied timestamps without normalizing their units.
+
+## Trust and invariants
+
+`forward` and `reverse` visit existing seeds using a visited set, making cycles
+finite. Default bounds are depth 20 and 10,000 visited nodes. Reaching a bound
+marks both `QueryResult.truncated` and the returned graph. The row check occurs
+after adding a node, so even a zero row limit can return a seed. Edges have no
+independent cap and can reference nodes beyond the returned subgraph.
+`finding_memory_dependents` filters for typed `Verified` Finding edges;
+it relies on the input graph's evidence labels.
+
+`diff` compares `(from, to, kind)` keys and evidence classes. Node metadata,
+timestamps, tenant fields, and labels are outside the comparison.
+`frontier_bytes` sorts node IDs and edge-key tuples and serializes them with
+the graph schema. Evidence and metadata are outside the digest and signature.
+The artifact records `CanonicalSource::EquivalenceShim`; construction does
+not use `CanonicalBytes`. This is a structural projection commitment.
+
+`pin_frontier` always produces an unsigned state, including when a signer
+hint is supplied. `pin_frontier_signed` verifies an externally supplied
+signature against a trusted key over domain-prefixed frontier bytes.
+`verify_frontier_signature` recomputes the digest and verifies that message.
+Algorithm labels are required to be nonempty and whitespace-free; they are
+not checked against the signature backend. Frontier artifact counts and
+other descriptive fields are outside the signature checks.
+`AnchoredFrontier::is_signed` always returns false because it has no trusted
+key context. Consumers use `is_signed_by` or `verify_frontier_signature`.
 
 ## Dependencies
 
-Internal: `chio-core-types` supplies
-`capability::governance::ProvenanceEvidenceClass` (checked on a signed
-lineage statement before an edge upgrades to `Verified`) and
-`receipt::lineage::ReceiptLineageStatement` (used by
-`ingest_replay_corpus`), plus `crypto::{PublicKey, Signature}` (used by
-`anchor`). No dependency is aliased. External: `serde`/`serde_json` for the
-graph and artifact types, `thiserror` for the error enums. No async runtime;
-nothing in `src/` performs file or network I/O.
+`chio-core-types` supplies native receipt verification, typed active-defense
+bodies, signed lineage statements, and public-key/signature types.
+`serde` and `serde_json` serialize graph projections and parse frame/body
+inputs; `thiserror` defines ingest and anchor errors. There is no async runtime
+or direct SQLite dependency. Persistent traversal is owned by
+[chio-store-sqlite](../../platform/chio-store-sqlite/README.md).
 
-`chio-store-sqlite`'s `lineage_cte.rs` documents itself as mirroring this
-crate's `DEFAULT_DEPTH_LIMIT` and graph shape for its recursive-CTE
-persistent backing, but there is no `Cargo.toml` dependency edge between the
-two crates in either direction; the two stay in sync by convention, not by
-the compiler.
+## Verification
+
+Unit tests exercise ingest schema and ID rejection, deduplication, signed
+statement bindings, query cycles and truncation, typed Finding dependencies,
+diff ordering, SHA-256 vectors, and malformed/wrong-key frontier signatures.
+Integration files `anchor_pinning.rs`, `guard_version_diff.rs`, and
+`active_defense_receipts.rs` exercise public APIs, including response causal
+chains and coincident prior/trigger references.
+
+Run `cargo test -p chio-lineage` for these checks. The schema test checks
+selected marker fields and a Finding edge enum value in the artifact.
+It does not validate every generated graph against the full JSON Schema.
+
+See the [README](README.md) and
+[protocol receipt contract](../../../spec/PROTOCOL.md#6-receipt-contract).

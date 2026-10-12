@@ -1,81 +1,69 @@
 # chio-metrics-spec
 
-Authoritative, workspace-wide registry of Prometheus metric names for Chio's
-SRE surfaces. Every emitted metric name is declared here first as a
-`MetricDescriptor`, then consumed by other crates as a constant instead of an
-inlined string literal, so a metric-taxonomy change goes through one
-reviewable place: this crate's `REGISTRY` and its golden `metrics.snapshot`.
-
-The crate has no dependencies, internal or external, beyond `std`, so any
-crate in the workspace, including WASM guest code and edge transports, can
-depend on it without growing its build graph.
-
-## Responsibilities
-
-- Declare each Chio metric name as a `pub const &str` and its shape (kind,
-  help text, labels, histogram buckets) as a `MetricDescriptor` entry in the
-  sorted, deduplicated `REGISTRY` slice (57 descriptors).
-- Validate descriptor shape fail-closed: Prometheus-safe metric and label
-  names, no duplicate labels per descriptor, histogram buckets present,
-  finite, and strictly increasing, and non-histogram kinds carrying no
-  buckets.
-- Render a deterministic text snapshot of `REGISTRY` so a taxonomy change
-  shows up as a reviewable diff against `metrics.snapshot` and fails CI
-  otherwise.
-- Provide `runtime`: process-global counter/gauge/histogram storage that
-  renders its `# HELP`/`# TYPE` header straight from the registry
-  descriptor, so a family's exposed metadata cannot drift from its
-  declaration.
-
-## Public API
-
-- `MetricKind`, `MetricDescriptor`, `MetricValidationError` - the descriptor
-  model.
-- `describe!` - builds a `MetricDescriptor` from a name constant plus literal
-  help/kind/labels/buckets; used to build `REGISTRY`.
-- `REGISTRY` - the sorted slice of every registered descriptor.
-- `descriptor_for`, `is_registered_metric` - registry lookup.
-- `validate_metric_descriptor`, `validate_registry` - shape validation.
-- `is_prometheus_metric_name`, `is_prometheus_label_name` - name predicates
-  (labels reject the `__` reserved prefix).
-- `registry_snapshot` - deterministic `name|kind|labels|buckets|help` dump,
-  one line per descriptor, checked against `metrics.snapshot`.
-- `CHIO_*` constants - one per registered metric name.
-- `*_BUCKETS_SECONDS` constants - 10 named histogram bucket-bound arrays for
-  consumers that register their own storage against this crate's shape
-  instead of using `runtime`.
-- `runtime::{LabeledCounter, LabeledGauge, LabeledHistogram}` - process-global
-  emission primitives keyed by an ordered label tuple.
-- `runtime::families` - the static instances for the guard, OTEL-drop,
-  receipt-watchdog, signing-queue, and alert-pack families.
-- `runtime::{render_guard_families, render_otel_drop_families,
-  render_receipt_watchdog_gauges, render_alert_pack_families,
-  compose_metrics_body, preregister_known_label_sets}`.
+`chio-metrics-spec` defines Chio's Prometheus metric names, kinds, labels, and
+histogram buckets. Its registry and snapshot make descriptor changes
+reviewable. A separate public `runtime` module stores and renders samples for
+selected families; serving applications own endpoints and instrumentation.
 
 ## Usage
 
-```rust
-use chio_metrics_spec::{is_registered_metric, CHIO_GUARD_EVALUATIONS_TOTAL};
-use chio_metrics_spec::runtime::families::GUARD_VERDICT;
+Create a local counter using its registered descriptor and render one sample:
 
-assert!(is_registered_metric(CHIO_GUARD_EVALUATIONS_TOTAL));
-GUARD_VERDICT.incr(&["policy-guard", "allow"]);
+```rust
+use chio_metrics_spec::{descriptor_for, CHIO_SOC_EXPORT_TOTAL};
+use chio_metrics_spec::runtime::LabeledCounter;
+
+let descriptor = descriptor_for(CHIO_SOC_EXPORT_TOTAL)
+    .ok_or("missing SOC export descriptor")?;
+let counter = LabeledCounter::new(descriptor.name, descriptor.labels);
+counter.preregister(&["offline", "ok"]);
+counter.incr(&["offline", "ok"]);
+let mut output = String::new();
+counter.render(&mut output);
+assert!(output.contains("# TYPE chio_soc_export_total counter"));
+assert!(output.contains("exporter=\"offline\",outcome=\"ok\"} 1"));
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## Testing
+The example uses only `std` and local state. `runtime::families` provides
+shared statics for guards, OTEL drops, receipt watchdogs, signing queues, and
+alerting. A registry entry alone creates no sample or active producer.
 
-`cargo test -p chio-metrics-spec`
+## Guarantees
 
-Changing a descriptor's name, kind, labels, buckets, or help text changes
-`registry_snapshot()`'s output and must be reflected in `metrics.snapshot`, or
-the golden snapshot test fails.
+- `validate_metric_descriptor` checks metric and label syntax, duplicate
+  labels, bucket presence and kind, and finite, strictly increasing histogram
+  bounds. Label names reject the reserved `__` prefix.
+- `validate_registry` also checks sorted, unique metric names.
+  `registry_snapshot` serializes descriptor shape and help text; a unit test
+  compares it exactly with `metrics.snapshot`.
+- `LabeledCounter`, `LabeledGauge`, and `LabeledHistogram` drop updates with a
+  label-value arity mismatch or poisoned cell-map lock. Constructors accept
+  arbitrary names and label definitions; callers must align them with the
+  registry's kind and labels.
+- Renderers escape backslash, quote, and newline in label values. Histogram
+  bucket labels preserve the registry's original strings, including `1.0`.
+- `preregister` seeds zero-valued series without resetting existing values.
+  `preregister_known_label_sets` seeds selected fixed domains; configured
+  exporter and route domains need separate registration.
 
-## See also
+## Status
 
-- `chio-kernel` - renders the guard, OTEL-drop, and receipt-watchdog families
-  and the signing-queue-block counter at its `/metrics` endpoint.
-- `chio-wasm-guards` - producer for the guard-family runtime statics.
-- `chio-wall`, `chio-api-protect`, `chio-control-plane`, `chio-mcp-remote` -
-  render the alert pack at their own `/metrics` endpoints.
-- `chio-conformance` - runs the production emission path per edge and fails
-  if a registered name is declared but never actually emitted.
+Implemented registry validation, process-local storage, and Prometheus text
+rendering with snapshot and runtime regression tests. The crate has no Cargo
+features or dependencies and is marked `publish = false`. Runtime APIs are
+always available. Applications control label cardinality, acceptable histogram
+observations, collection, and scrape availability.
+
+For new metric families, add a name constant and sorted `REGISTRY` descriptor,
+update the snapshot, then wire the producer and renderer in their owning
+surface. Descriptor registration does not establish deployment coverage.
+
+## Related
+
+- [Architecture](ARCHITECTURE.md)
+- [Protocol trust boundaries](../../../spec/PROTOCOL.md#3-components-and-trust-boundaries)
+- [WASM guards](../../guards/chio-wasm-guards/README.md)
+- [SIEM export](../chio-siem/README.md)
+
+License: [Apache-2.0](../../../LICENSE).
