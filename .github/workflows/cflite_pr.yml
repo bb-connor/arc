@@ -166,6 +166,11 @@ jobs:
       - name: Fail if no targets fired (changed-target mode)
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count == '0'
         run: |
+          if ! grep -E '\.rs$' changed.txt \
+            | grep -vqE '(^|/)(tests|benches|examples)/|_tests(\.rs$|/)|(^|/)tests\.rs$'; then
+            echo "no production Rust source changed; nothing to fuzz"
+            exit 0
+          fi
           echo "changed-target sampling found no mapped fuzz target for this diff" >&2
           echo "changed files:" >&2
           sed 's/^/  /' changed.txt >&2
