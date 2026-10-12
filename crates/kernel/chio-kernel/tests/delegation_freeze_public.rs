@@ -251,7 +251,7 @@ fn public_tool_invocation_preserves_the_bound_delegation_ban_after_exact_binding
     ));
     let request = ToolCallRequest {
         request_id: "public-bound-delegation-tool".into(),
-        agent_id: token.subject.to_hex().into(),
+        agent_id: token.subject.to_hex(),
         capability: token,
         tool_name: "echo".into(),
         server_id: SERVER.into(),
