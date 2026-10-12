@@ -13,13 +13,12 @@ use chio_attest_buyer_core::disclosure::ChioDisclosurePolicy;
 use chio_attest_buyer_core::error::ChioPackageError;
 use chio_attest_buyer_core::issuer::TrustedBbsIssuer;
 use chio_attest_buyer_core::revocation::{
-    ChioRevocationCheckpoint, ChioRevocationMaterial, SignedChioRevocationCheckpoint,
-    CHIO_FEDERATION_REVOCATION_CHECKPOINT_SCHEMA_V1,
+    ChioRevocationCheckpoint, SignedChioRevocationCheckpoint, REVOCATION_CHECKPOINT_SCHEMA,
 };
 use chio_attest_buyer_core::trust_bundle::{
     ChioAuthorityStatus, ChioTrustedActionClass, ChioTrustedGovernanceAuthority,
     ChioTrustedLeaseAuthority, ChioTrustedWorkflowIntersection, ChioVerifierTrustBundle,
-    ChioVerifierTrustBundleDocument, CHIO_FEDERATION_VERIFIER_TRUST_BUNDLE_SCHEMA,
+    ChioVerifierTrustBundleDocument, VERIFIER_TRUST_BUNDLE_SCHEMA,
     WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID, WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID,
 };
 use chio_core_types::canonical::canonical_json_bytes;
@@ -693,7 +692,7 @@ pub fn publish_revocation_checkpoint(
         &profile.revocation_authority.authority_id,
     )?;
     let body = ChioRevocationCheckpoint {
-        schema: CHIO_FEDERATION_REVOCATION_CHECKPOINT_SCHEMA_V1.to_string(),
+        schema: REVOCATION_CHECKPOINT_SCHEMA.to_string(),
         checkpoint_id: request.checkpoint_id.clone(),
         issued_at_unix_ms: request.issued_at_unix_ms,
         expires_at_unix_ms: request.expires_at_unix_ms,
@@ -719,7 +718,7 @@ pub fn assemble_verifier_trust_bundle(
         sha256: workflow_intersection_sha256,
     };
     let document = ChioVerifierTrustBundleDocument {
-        schema: CHIO_FEDERATION_VERIFIER_TRUST_BUNDLE_SCHEMA.to_string(),
+        schema: VERIFIER_TRUST_BUNDLE_SCHEMA.to_string(),
         trusted_bbs_issuers: profile.trusted_bbs_issuers.clone(),
         peers: peer_pins.peers.clone(),
         vendors: peer_pins.vendors.clone(),
@@ -728,8 +727,8 @@ pub fn assemble_verifier_trust_bundle(
         runtime_policy_issuer_public_keys: profile.runtime_policy_issuer_public_keys.clone(),
         lease_authorities: profile.lease_authorities.clone(),
         governance_authorities: profile.governance_authorities.clone(),
-        disclosure_policy: Some(disclosure_policy),
-        revocation: ChioRevocationMaterial::Checkpoint(Box::new(checkpoint)),
+        disclosure_policy,
+        revocation: checkpoint,
     };
     ChioVerifierTrustBundle::from_document(document.clone())
         .map_err(|error| ChioAuthorityError::TrustBundle(error.to_string()))?;

@@ -236,7 +236,7 @@ impl SqlitePheromoneRelayStore {
                 sender_kernel_id TEXT NOT NULL,
                 recipient_kernel_id TEXT NOT NULL,
                 treaty_id TEXT NOT NULL,
-                queued_at_unix_ms INTEGER NOT NULL DEFAULT 0,
+                queued_at_unix_ms INTEGER NOT NULL,
                 status TEXT NOT NULL,
                 attempts INTEGER NOT NULL,
                 next_attempt_unix_ms INTEGER NOT NULL,
@@ -287,8 +287,6 @@ impl SqlitePheromoneRelayStore {
             );
             "#,
         )?;
-        ensure_outbox_queued_column(&conn)?;
-        ensure_inbox_reservation_committed_column(&conn)?;
         // Reclaim ONLY provably-pre-commit reservations at open (`committed = 0`).
         //
         // A won reservation is the sole guard that makes concurrent delivery of the
@@ -1015,45 +1013,6 @@ pub(crate) fn parse_cursor(cursor: &str) -> Result<u64, PheromoneRelayError> {
     cursor
         .parse::<u64>()
         .map_err(|_| PheromoneRelayError::CatchupDenied("catch-up cursor is invalid".to_string()))
-}
-
-pub(crate) fn ensure_outbox_queued_column(conn: &Connection) -> Result<(), PheromoneRelayError> {
-    let mut stmt = conn.prepare("PRAGMA table_info(chio_pheromone_relay_outbox)")?;
-    let columns = stmt.query_map([], |row| row.get::<_, String>(1))?;
-    for column in columns {
-        if column? == "queued_at_unix_ms" {
-            return Ok(());
-        }
-    }
-    conn.execute(
-        "ALTER TABLE chio_pheromone_relay_outbox ADD COLUMN queued_at_unix_ms INTEGER NOT NULL DEFAULT 0",
-        [],
-    )?;
-    Ok(())
-}
-
-/// Additive migration for the reservation `committed` marker (crash-recovery guard).
-///
-/// A store created before this column existed has reservations with no commit marker.
-/// Backfilling them to `committed = 0` (the ADD COLUMN default) is the fail-closed
-/// choice: a pre-existing reservation predates the commit-marker protocol, so its
-/// receive either never committed or was recorded long ago, and clearing it at open
-/// (as before) is correct. New reservations set the marker explicitly at commit time.
-pub(crate) fn ensure_inbox_reservation_committed_column(
-    conn: &Connection,
-) -> Result<(), PheromoneRelayError> {
-    let mut stmt = conn.prepare("PRAGMA table_info(chio_pheromone_relay_inbox_reservations)")?;
-    let columns = stmt.query_map([], |row| row.get::<_, String>(1))?;
-    for column in columns {
-        if column? == "committed" {
-            return Ok(());
-        }
-    }
-    conn.execute(
-        "ALTER TABLE chio_pheromone_relay_inbox_reservations ADD COLUMN committed INTEGER NOT NULL DEFAULT 0",
-        [],
-    )?;
-    Ok(())
 }
 
 #[cfg(test)]

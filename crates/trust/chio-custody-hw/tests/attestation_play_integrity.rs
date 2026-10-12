@@ -2,7 +2,7 @@ use std::error::Error;
 
 use base64ct::{Base64UrlUnpadded, Encoding};
 use chio_custody_hw::attestation::google_root::{
-    play_integrity_encoding_key, play_integrity_jwks_json, play_integrity_root_sha256_hex,
+    play_integrity_encoding_key, play_integrity_pinned_jwks_json, play_integrity_root_sha256_hex,
     GOOGLE_PLAY_INTEGRITY_ISSUER, GOOGLE_PLAY_INTEGRITY_ROOT_KID,
 };
 use chio_custody_hw::{
@@ -50,7 +50,7 @@ fn play_integrity_verifier_accepts_signed_fixture() -> Result<(), Box<dyn Error>
         expected_nonce: NONCE,
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })?;
 
@@ -77,7 +77,7 @@ fn play_integrity_verifier_rejects_nonce_replay() -> Result<(), Box<dyn Error>> 
         expected_nonce: "other-nonce",
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })
     .err()
@@ -99,7 +99,7 @@ fn play_integrity_verifier_rejects_unrecognized_app() -> Result<(), Box<dyn Erro
         expected_nonce: NONCE,
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })
     .err()
@@ -289,7 +289,7 @@ fn play_integrity_verifier_rejects_expired_token_fail_closed() -> Result<(), Box
         expected_nonce: NONCE,
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })
     .err()
@@ -314,7 +314,7 @@ fn play_integrity_verifier_rejects_wrong_issuer() -> Result<(), Box<dyn Error>> 
         expected_nonce: NONCE,
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })
     .err()
@@ -343,7 +343,7 @@ fn play_integrity_verifier_accepts_future_exp() -> Result<(), Box<dyn Error>> {
         expected_nonce: NONCE,
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })?;
     assert_eq!(verified.nonce, NONCE);
@@ -358,7 +358,7 @@ fn play_integrity_verifier_rejects_wrong_audience() -> Result<(), Box<dyn Error>
         expected_nonce: NONCE,
         expected_package_name: PACKAGE,
         expected_audience: "other-audience",
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })
     .err()
@@ -438,7 +438,7 @@ fn play_integrity_verifier_rejects_symmetric_alg_downgrade() -> Result<(), Box<d
         expected_nonce: NONCE,
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })
     .err()

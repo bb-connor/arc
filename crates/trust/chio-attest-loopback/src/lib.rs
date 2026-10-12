@@ -25,8 +25,7 @@ pub use chio_attest_buyer_core::report::{
     report_json, verifier_report_from_json, verify_package, VerifierReport, VERIFIER_REPORT_SCHEMA,
 };
 pub use chio_attest_buyer_core::revocation::{
-    ChioRevocationCheckpoint, ChioRevocationMaterial, SignedChioRevocationCheckpoint,
-    REVOCATION_CHECKPOINT_SCHEMA,
+    ChioRevocationCheckpoint, SignedChioRevocationCheckpoint, REVOCATION_CHECKPOINT_SCHEMA,
 };
 pub use chio_attest_buyer_core::trust_bundle::{
     verifier_trust_bundle_from_json, verifier_trust_bundle_json, ChioActionClassKind,

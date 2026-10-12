@@ -7,7 +7,7 @@ use sigstore::bundle::Bundle;
 
 use crate::AttestError;
 
-use super::compat;
+use super::material;
 use super::policy::IssuerOnlyPolicy;
 
 /// Drive the async `sigstore-rs` bundle verifier from a synchronous
@@ -47,12 +47,12 @@ pub(super) fn run_async_bundle_verify(
 }
 
 pub(super) fn bundle_leaf_certificate_der(bundle: &Bundle) -> Result<Vec<u8>, AttestError> {
-    compat::leaf_der(bundle)
+    material::leaf_der(bundle)
         .ok_or_else(|| AttestError::Malformed("bundle has no leaf certificate".into()))
 }
 
 pub(super) fn bundle_rekor_metadata(bundle: &Bundle) -> (u64, SystemTime) {
-    let (index, integrated) = compat::rekor_metadata(bundle).unwrap_or((0, 0));
+    let (index, integrated) = material::rekor_metadata(bundle).unwrap_or((0, 0));
     let signed_at = if integrated > 0 {
         UNIX_EPOCH + Duration::from_secs(integrated as u64)
     } else {
