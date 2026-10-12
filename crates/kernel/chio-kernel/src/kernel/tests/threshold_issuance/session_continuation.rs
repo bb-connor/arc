@@ -365,17 +365,22 @@ fn draining_session_cannot_resume_threshold_wait() -> TestResult {
 fn resumed_session_revalidates_revoked_capability() -> TestResult {
     let mut fixture = Fixture::new()?;
     let (context, proposal) = pending_session(&fixture)?;
-    fixture.approve(proposal)?;
+    fixture.approve(proposal.clone())?;
     fixture
         .kernel
         .revoke_capability(&fixture.request.capability.id)?;
-    let response = session_tool_call(
-        fixture
-            .kernel
-            .evaluate_session_operation(&context, &operation(&fixture.request))?,
-    )
-    .ok_or("denial response missing")?;
-    assert_eq!(response.verdict, Verdict::Deny);
+    let receipts = fixture.kernel.receipt_log().len();
+    let error = fixture
+        .kernel
+        .evaluate_session_operation(&context, &operation(&fixture.request))
+        .expect_err("revoked capability cannot terminalize the pending approval");
+    assert!(
+        matches!(error, KernelError::DurableAdmission(ref reason)
+        if reason == "request identity is already owned by a durable operation"),
+        "{error:?}"
+    );
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
+    fixture.assert_pending_unchanged(&proposal)?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }

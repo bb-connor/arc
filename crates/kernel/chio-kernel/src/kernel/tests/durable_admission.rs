@@ -1,9 +1,9 @@
 use super::*;
 
-#[path = "durable_admission/configuration.rs"]
-mod configuration;
 #[path = "durable_admission/cleanup_fault_ownership.rs"]
 mod cleanup_fault_ownership;
+#[path = "durable_admission/configuration.rs"]
+mod configuration;
 #[path = "durable_admission/cumulative_budget.rs"]
 mod cumulative_budget;
 #[path = "durable_admission/output_finalization.rs"]

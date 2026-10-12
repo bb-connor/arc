@@ -293,10 +293,19 @@ fn retained_federation_context_does_not_bypass_public_replay_revocation() -> Tes
     fixture
         .kernel
         .revoke_capability(&fixture.request.capability.id)?;
-    let response = fixture
+    let original = fixture.store.operation();
+    let receipts = fixture.kernel.receipt_log().len();
+    let error = fixture
         .kernel
-        .evaluate_tool_call_blocking(&fixture.request)?;
-    assert_eq!(response.verdict, Verdict::Deny);
+        .evaluate_tool_call_blocking(&fixture.request)
+        .expect_err("revoked replay must not release output or create a terminal");
+    assert!(
+        matches!(error, KernelError::DurableAdmission(ref reason)
+        if reason == "request identity is already owned by a durable operation"),
+        "{error:?}"
+    );
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
+    assert_eq!(fixture.store.operation(), original);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     assert_eq!(
         fixture.store.operation().state(),
