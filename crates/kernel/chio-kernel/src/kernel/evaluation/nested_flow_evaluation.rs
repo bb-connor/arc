@@ -1452,7 +1452,7 @@ impl ChioKernel {
                         budget_mutation: &budget_mutation,
                         payment_authorization: payment_authorization.as_ref(),
                         durable_operation: None,
-                        runtime_admission_metadata: runtime_admission_metadata,
+                        runtime_admission_metadata,
                         verified_payee_binding: verified_governed_payee_binding.as_ref(),
                         budget_lease_acquired,
                     },

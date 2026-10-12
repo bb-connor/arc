@@ -66,7 +66,7 @@ impl ChioKernel {
             oracle_evidence: None,
             attempted_cost: None,
         };
-        if let Some(progress) = fault_progress.as_deref_mut() {
+        if let Some(progress) = fault_progress {
             progress.observe_economics(Some(&serde_json::json!({ "financial": financial })));
         }
         let limited_output = self.apply_stream_limits(output, elapsed)?;
@@ -526,7 +526,7 @@ impl ChioKernel {
             attempted_cost: None,
         };
 
-        if let Some(progress) = fault_progress.as_deref_mut() {
+        if let Some(progress) = fault_progress {
             progress.observe_economics(Some(&serde_json::json!({ "financial": financial_meta })));
         }
         let limited_output = self.apply_stream_limits(output, elapsed)?;
