@@ -444,7 +444,7 @@ fn a_panicking_child_client_retains_its_original_attempt() {
         .begin_session_request(&parent, OperationKind::ToolCall, true)
         .unwrap();
     kernel
-        .mark_session_request_dispatch_started(Some(&session_id), &parent.request_id)
+        .mark_session_request_dispatch_started(Some(&session_id), parent.request_id.as_str())
         .unwrap();
     let actions = Arc::new(AtomicU64::new(0));
     let mut client = PanickingRootsClient(Arc::clone(&actions));
