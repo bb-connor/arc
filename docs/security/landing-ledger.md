@@ -7,6 +7,32 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Release and nightly dependency repair qualified locally (October 12 UTC)
+
+The [repair audit](audits/release-drogon-ci-repair-20261012.json) binds reviewed
+source `de664c85ee` to both omitted Drogon callers. The strict consumer contract
+fails on each original workflow and passes after provisioning the existing
+pinned dependencies. The full local C++ and HTTP smoke passes with signed
+allow/deny receipts and authority-permission controls.
+
+The first smoke correctly refused the group-writable `/home/connor/lanes`
+ancestor. A cold rebuild was aborted and retained separately. The successful
+run uses the supported private artifact path; custody checks and shared
+workspace permissions remain unchanged. Local aarch64 evidence does not
+establish hosted x86_64 or complete release qualification.
+
+The prospective composition with #1201 and the auditor repair passes the
+owning workflow contracts and 17 release-source controls. The live tag-release
+CLI, accidentally invoked without its required tag environment, refused;
+that invocation is retained as unqualified, not a passing static check.
+The exact repair is assigned to #1202's replacement batch after #1201 lands.
+No third PR is needed. There are still **2,029 requirements**; actual main
+integration, fresh hosted acceptance and the separate formal residuals remain.
+
+Duplicate main CI run `38183162158` was cancelled to free runners for #1201.
+The identical-tree original source run and #1201's run continue. Cancelled
+jobs and their rejecting aggregates remain incomplete acceptance evidence.
+
 ## Post-merge CI triage and sequential landing (October 12 UTC)
 
 The [terminal CI triage](audits/postmerge-ci-triage-20261012.json) adds the

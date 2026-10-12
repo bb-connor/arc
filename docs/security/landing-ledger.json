@@ -41,7 +41,7 @@
     "trusted-v3-definitions": 1195,
     "ci-speed-pheromone": 1201,
     "security-auditor": 1202,
-    "release-ci-repair": null
+    "release-ci-repair": 1202
   },
   "sources": [
     {
@@ -2160,6 +2160,15 @@
         "postmerge-20261012:RELEASE-DROGON"
       ],
       "evidence_requirement_ids": []
+    },
+    {
+      "path": "docs/security/audits/release-drogon-ci-repair-20261012.json",
+      "commit": "f36f4ed07b74036dc24fbdd7a4a8634feb5c3ea7",
+      "sha256": "12d41496862285cc20d9b93c121d1c5aec3e7ebdf1b392c886cf683a382669f7",
+      "requirement_ids": [],
+      "evidence_requirement_ids": [
+        "postmerge-20261012:RELEASE-DROGON"
+      ]
     }
   ],
   "pull_requests": [
@@ -8722,25 +8731,40 @@
         "path": "docs/security/audits/postmerge-ci-triage-20261012.json",
         "checkpoint": "19f992dfb839b8c5382a2fcddfcf90fce14e4dd3"
       },
-      "disposition": "confirmed-repair-assigned",
-      "source_repair": null,
+      "disposition": "source-reviewed-prospective-composition-qualified",
+      "source_repair": {
+        "checkpoint": "de664c85ee1b1918bfb72b7aca28fd78cfeb0e79",
+        "commits": [
+          "de664c85ee1b1918bfb72b7aca28fd78cfeb0e79"
+        ],
+        "files": [
+          ".github/workflows/nightly.yml",
+          ".github/workflows/release-qualification.yml",
+          "scripts/tests/check-drogon-consumer-gate.test.sh"
+        ]
+      },
       "verification_evidence": [
         {
           "path": "docs/security/audits/postmerge-ci-triage-20261012.json",
           "sha256": "16113d0870b535f98ebaa6f323eb948c68d9219a39378f4367f2bf8d401db08d",
           "scope": "Retained failed job, first missing dependency, exact main source, assigned repair and separate operational prerequisites. No repair or full qualification is claimed."
+        },
+        {
+          "path": "docs/security/audits/release-drogon-ci-repair-20261012.json",
+          "sha256": "12d41496862285cc20d9b93c121d1c5aec3e7ebdf1b392c886cf683a382669f7",
+          "scope": "Reviewed immutable three-file repair, genuine Original, failed/aborted/green local campaigns, prospective integration contracts and remaining actual-base/hosted acceptance."
         }
       ],
       "remaining_acceptance": [
-        "Reproduce the missing dependency against main28d; install pinned dependencies and run the real Drogon smoke locally.",
-        "Run the owning workflow contract and review the exact provisioning diff.",
-        "Land through the bounded queue after an exact-head qualification; classify any later release-lane failure separately."
+        "Integrate actual #1201 main landing into the auditor candidate, then integrate this released source and review the final composition.",
+        "Publish one bounded #1202 replacement; require exact-head hosted landing checks and classify every additional failure.",
+        "Full release qualification remains open, including the separately diagnosed Aeneas snapshot drift. No proof normalization or acceptance waiver is included."
       ],
       "landing_unit": "release-ci-repair",
-      "landing_pr": null,
+      "landing_pr": 1202,
       "main_ancestry_verified": false,
       "review_scope": "now",
-      "work_status": "confirmed-repair-assigned",
+      "work_status": "source-reviewed-prospective-composition-qualified",
       "owner": "Claude implementation, Root integration",
       "merged": false,
       "full_qualified": false
@@ -132698,24 +132722,39 @@
       "label": "RELEASE-DROGON",
       "scope": "now",
       "landing_unit": "release-ci-repair",
-      "landing_pr": null,
-      "current_state": "confirmed-repair-assigned",
-      "source_repair": null,
+      "landing_pr": 1202,
+      "current_state": "source-reviewed-prospective-composition-qualified",
+      "source_repair": {
+        "checkpoint": "de664c85ee1b1918bfb72b7aca28fd78cfeb0e79",
+        "commits": [
+          "de664c85ee1b1918bfb72b7aca28fd78cfeb0e79"
+        ],
+        "files": [
+          ".github/workflows/nightly.yml",
+          ".github/workflows/release-qualification.yml",
+          "scripts/tests/check-drogon-consumer-gate.test.sh"
+        ]
+      },
       "verification_evidence": [
         {
           "path": "docs/security/audits/postmerge-ci-triage-20261012.json",
           "sha256": "16113d0870b535f98ebaa6f323eb948c68d9219a39378f4367f2bf8d401db08d",
           "scope": "Retained failed job, first missing dependency, exact main source, assigned repair and separate operational prerequisites. No repair or full qualification is claimed."
+        },
+        {
+          "path": "docs/security/audits/release-drogon-ci-repair-20261012.json",
+          "sha256": "12d41496862285cc20d9b93c121d1c5aec3e7ebdf1b392c886cf683a382669f7",
+          "scope": "Reviewed immutable three-file repair, genuine Original, failed/aborted/green local campaigns, prospective integration contracts and remaining actual-base/hosted acceptance."
         }
       ],
       "remaining_acceptance": [
-        "Reproduce the missing dependency against main28d; install pinned dependencies and run the real Drogon smoke locally.",
-        "Run the owning workflow contract and review the exact provisioning diff.",
-        "Land through the bounded queue after an exact-head qualification; classify any later release-lane failure separately."
+        "Integrate actual #1201 main landing into the auditor candidate, then integrate this released source and review the final composition.",
+        "Publish one bounded #1202 replacement; require exact-head hosted landing checks and classify every additional failure.",
+        "Full release qualification remains open, including the separately diagnosed Aeneas snapshot drift. No proof normalization or acceptance waiver is included."
       ],
-      "observed_source_head": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+      "observed_source_head": "de664c85ee1b1918bfb72b7aca28fd78cfeb0e79",
       "source_integrated": false,
-      "source_reviewed": false,
+      "source_reviewed": true,
       "published": false,
       "merged": false,
       "full_qualified": false
@@ -134289,5 +134328,14 @@
     "ci_speed_pr": 1201,
     "ci_speed_fixture_groups": "both-hosted-success",
     "scope": "Required Rust checks and exact-head landing remain pending; five observed main failures retain separate dispositions. No operational configuration or proof campaign performed."
+  },
+  "release_drogon_repair_20261012": {
+    "path": "docs/security/audits/release-drogon-ci-repair-20261012.json",
+    "sha256": "12d41496862285cc20d9b93c121d1c5aec3e7ebdf1b392c886cf683a382669f7",
+    "source_commit": "de664c85ee1b1918bfb72b7aca28fd78cfeb0e79",
+    "prospective_composition": "9c2cd17a2e0115d989b3ac4c99ae2517018e65df",
+    "landing_pr": 1202,
+    "status": "source-reviewed-prospective-composition-qualified",
+    "scope": "Actual main integration and exact-head hosted checks pending; local release tag gate deliberately not qualified. Main duplicate CI cancellation retained, not success."
   }
 }

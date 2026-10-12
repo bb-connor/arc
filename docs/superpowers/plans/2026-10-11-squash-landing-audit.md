@@ -48,3 +48,23 @@ The PR is draft while #1201 establishes the next base. The cancelled `61b28ca217
 run remains cancelled acceptance evidence. Integrating the actual new main and
 qualifying a fresh head are still required; implementation completion does not
 mean hosted qualification or trusted-definition activation.
+
+## Task 2: Compose the reviewed CI repair batch
+
+Scope extension: Root and Claude agreed to include the three-file release and
+nightly Drogon provisioning repair in #1202. It is independent of the auditor
+logic and avoids a third PR and a known stale-base qualification round.
+
+**Files:** `.github/workflows/release-qualification.yml`,
+`.github/workflows/nightly.yml`,
+`scripts/tests/check-drogon-consumer-gate.test.sh`, and the landing evidence.
+
+- [x] Retain the genuine Original failures for both omitted callers.
+- [x] Review exact source `de664c85ee`, bound to the passing full local smoke.
+- [x] Test the prospective composition with #1201 and the auditor changes.
+- [x] Record failed, aborted and passing campaigns separately in the ledger.
+- [ ] Integrate #1201's actual main landing, then the released repair, into
+  the auditor branch. Verify the final composition and update #1202's scope.
+- [ ] Publish the replacement and obtain fresh exact-head hosted qualification
+  and review. Preserve the four-check landing bar and separate operational
+  prerequisites; do not activate trusted definitions or alter proof policy.
