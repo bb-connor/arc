@@ -2,6 +2,9 @@
 
 use serde_json::{Map, Value};
 
+use crate::admission_operation::AuthenticatedRequestNamespace;
+use crate::receipt_support::merge_metadata_objects;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum IdentityDisposition {
     /// No persisted operation, retained custody or executed effect binds the id.
@@ -55,7 +58,17 @@ impl RefusalReceiptMetadata {
         }
     }
 
-    pub(in crate::kernel) fn into_signed_metadata(self) -> Option<Value> {
-        with_identity_disposition(self.metadata, self.disposition)
+    pub(in crate::kernel) fn into_signed_metadata(
+        self,
+        namespace: &AuthenticatedRequestNamespace,
+    ) -> Option<Value> {
+        merge_metadata_objects(
+            with_identity_disposition(self.metadata, self.disposition),
+            Some(serde_json::json!({
+                "receipt_context": {
+                    "request_namespace_digest": namespace.digest().as_str(),
+                }
+            })),
+        )
     }
 }

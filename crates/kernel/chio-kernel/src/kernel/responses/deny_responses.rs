@@ -1,5 +1,4 @@
 use super::*;
-use crate::kernel::receipt_identity::{with_identity_disposition, IdentityDisposition};
 
 impl ChioKernel {
     pub(crate) fn build_monetary_deny_response_with_metadata(
@@ -17,7 +16,8 @@ impl ChioKernel {
         });
 
         if let Some(mg) = monetary_grant {
-            let extra_metadata = extra_metadata.into_signed_metadata();
+            let extra_metadata = extra_metadata
+                .into_signed_metadata(&self.authenticated_receipt_namespace(&request.request_id)?);
             let grant = mg.grant;
             let currency = grant
                 .max_cost_per_invocation
@@ -202,7 +202,8 @@ impl ChioKernel {
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         record_mode: ReceiptRecordMode,
     ) -> Result<ToolCallResponse, KernelError> {
-        let extra_metadata = extra_metadata.into_signed_metadata();
+        let extra_metadata = extra_metadata
+            .into_signed_metadata(&self.authenticated_receipt_namespace(&request.request_id)?);
         let financial_metadata =
             Self::pre_execution_financial_metadata(charge, committed_cost_after_release, cap)?;
         let deny_extra_metadata =
@@ -267,7 +268,8 @@ impl ChioKernel {
         guard: &str,
     ) -> Result<ToolCallResponse, KernelError> {
         let extra_metadata =
-            with_identity_disposition(extra_metadata, IdentityDisposition::Reusable);
+            RefusalReceiptMetadata::new(extra_metadata, IdentityDisposition::Reusable)
+                .into_signed_metadata(&self.authenticated_receipt_namespace(&request.request_id)?);
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -571,7 +573,8 @@ impl ChioKernel {
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         record_mode: ReceiptRecordMode,
     ) -> Result<PreparedResponse, KernelError> {
-        let extra_metadata = extra_metadata.into_signed_metadata();
+        let extra_metadata = extra_metadata
+            .into_signed_metadata(&self.authenticated_receipt_namespace(&request.request_id)?);
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
