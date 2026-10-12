@@ -214,14 +214,16 @@ fn receipt_append_timeout_releases_write_lock_within_budget() {
         started.elapsed() < Duration::from_secs(1),
         "receipt append timeout did not return near its configured budget"
     );
+    let Err(KernelError::ReceiptAppendOutcomeUnknown { receipt_id, source }) = first_result else {
+        panic!("timed-out append must retain its unresolved receipt identity");
+    };
+    assert_eq!(receipt_id, first_id);
     assert!(matches!(
-        first_result,
-        Err(KernelError::ReceiptPersistence(
-            ReceiptStoreError::Timeout {
-                timeout_ms: MIN_RECEIPT_APPEND_BUDGET_MS,
-                ..
-            }
-        ))
+        *source,
+        KernelError::ReceiptPersistence(ReceiptStoreError::Timeout {
+            timeout_ms: MIN_RECEIPT_APPEND_BUDGET_MS,
+            ..
+        })
     ));
     assert!(matches!(
         second_rx.recv_timeout(Duration::from_secs(1)),

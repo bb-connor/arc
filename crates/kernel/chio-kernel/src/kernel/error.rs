@@ -91,6 +91,29 @@ impl std::fmt::Display for HotPathStage {
     }
 }
 
+/// Delivery work performed after a receipt is committed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReceiptDeliveryStep {
+    Trace,
+    Settlement,
+    Federation,
+    Provenance,
+    ExecutionNonce,
+}
+
+impl std::fmt::Display for ReceiptDeliveryStep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Trace => "trace",
+            Self::Settlement => "settlement",
+            Self::Federation => "federation",
+            Self::Provenance => "provenance",
+            Self::ExecutionNonce => "execution_nonce",
+        })
+    }
+}
+
 /// Direction of a wall-clock anomaly detected by a replay store.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -271,6 +294,24 @@ pub enum KernelError {
 
     #[error("receipt persistence failed: {0}")]
     ReceiptPersistence(#[from] ReceiptStoreError),
+
+    /// The append entered the store, which may commit after returning an error.
+    /// Reconcile this exact identity before considering replacement evidence.
+    #[error("receipt append outcome unknown for {receipt_id}: {source}")]
+    ReceiptAppendOutcomeUnknown {
+        receipt_id: String,
+        #[source]
+        source: Box<KernelError>,
+    },
+
+    /// The receipt stands even though its subsequent delivery step failed.
+    #[error("delivery failed after receipt {receipt_id} at {step}: {source}")]
+    DeliveryFailedAfterReceipt {
+        receipt_id: String,
+        step: ReceiptDeliveryStep,
+        #[source]
+        source: Box<KernelError>,
+    },
 
     #[error("revocation store error: {0}")]
     RevocationStore(#[from] RevocationStoreError),
@@ -693,6 +734,16 @@ impl KernelError {
                 "CHIO-KERNEL-RECEIPT-PERSISTENCE",
                 serde_json::json!({ "source": error.to_string() }),
                 "Check the configured receipt store connectivity, permissions, and schema health before retrying.",
+            ),
+            Self::ReceiptAppendOutcomeUnknown { receipt_id, source } => self.report_with_context(
+                "CHIO-KERNEL-RECEIPT-APPEND-OUTCOME-UNKNOWN",
+                serde_json::json!({ "receipt_id": receipt_id, "source": source.to_string() }),
+                "Drain the receipt writer and authenticate this receipt's retained record before considering replacement evidence.",
+            ),
+            Self::DeliveryFailedAfterReceipt { receipt_id, step, source } => self.report_with_context(
+                "CHIO-KERNEL-DELIVERY-FAILED-AFTER-RECEIPT",
+                serde_json::json!({ "receipt_id": receipt_id, "step": step, "source": source.to_string() }),
+                "Reconcile delivery against the committed receipt. Do not repeat the tool call or append a replacement terminal receipt.",
             ),
             Self::RevocationStore(error) => self.report_with_context(
                 "CHIO-KERNEL-REVOCATION-STORE",
