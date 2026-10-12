@@ -7,6 +7,22 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Auditor replacement composed on landed main (October 12 UTC)
+
+PR #1201 landed as squash `659283481e` at 14:19:10Z.
+Build and lint, Workspace tests, MSRV, Cargo Vet and Cargo Deny passed on
+source `c94c8a1d9f`. Cognition first failed the pre-existing 100 ms recovery
+lease fixture and its second attempt was cancelled. The aggregate had not
+passed at merge. This records the landing without claiming full qualification.
+The deterministic fixture repair is a separate small PR owned by Claude.
+
+PR #1202 now incorporates that actual main, including the landed crate docs,
+and the reviewed `de664c85ee` release/nightly Drogon repair. The scoped source
+contracts pass locally; fresh hosted acceptance remains pending. Trusted
+authorization, definition activation, committed Linux evidence, open proofs,
+and cold-state readiness remain separate obligations. No repository settings
+or authorization were changed by this composition.
+
 ## F060 reconciled with its newer landed repair (October 12 UTC)
 
 The original F060 argument-tripwire finding is addressed by the newer

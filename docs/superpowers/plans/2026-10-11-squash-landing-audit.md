@@ -44,7 +44,7 @@ fields. `protected_parents` becomes the actual verified vector; add
   from CI speed. Hosted qualification remains a separate acceptance step.
 
 Publication checkpoint: source and local qualification are complete in PR #1202.
-The PR is draft while #1201 establishes the next base. The cancelled `61b28ca217`
+The replacement is now composed on actual main `659283481e`. The cancelled `61b28ca217`
 run remains cancelled acceptance evidence. Integrating the actual new main and
 qualifying a fresh head are still required; implementation completion does not
 mean hosted qualification or trusted-definition activation.
@@ -63,7 +63,7 @@ logic and avoids a third PR and a known stale-base qualification round.
 - [x] Review exact source `de664c85ee`, bound to the passing full local smoke.
 - [x] Test the prospective composition with #1201 and the auditor changes.
 - [x] Record failed, aborted and passing campaigns separately in the ledger.
-- [ ] Integrate #1201's actual main landing, then the released repair, into
+- [x] Integrate #1201's actual main landing, then the released repair, into
   the auditor branch. Verify the final composition and update #1202's scope.
 - [ ] Publish the replacement and obtain fresh exact-head hosted qualification
   and review. Preserve the four-check landing bar and separate operational
