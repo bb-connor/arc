@@ -1,5 +1,5 @@
 use chio_settle::channel::SIGNED_CHANNEL_RELEASE_AUTHORIZATION_DIGEST_DOMAIN;
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::economic_continuity::{
@@ -25,7 +25,7 @@ use rusqlite::{
 use serde::{Deserialize, Serialize};
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 
 mod persistence;
 mod qualification;
@@ -811,7 +811,7 @@ impl SqliteChannelReleasePublisherStore {
             .ok_or_else(|| invalid("committed channel release record disappeared"))
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, ChannelReleasePublisherError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, ChannelReleasePublisherError> {
         self.connection
             .lock()
             .map_err(|fenced| ChannelReleasePublisherError::Unavailable(fenced.to_string()))

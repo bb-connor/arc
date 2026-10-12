@@ -16,7 +16,7 @@ mod participant_source;
 mod scoped_sql;
 mod transaction;
 use crate::encrypted_blob::SqliteEncryptedBlobStore;
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::hashing::sha256;
 use chio_core::receipt::body::ChioReceipt;
@@ -136,7 +136,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 #[cfg(unix)]
 use std::path::PathBuf;
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 use std::time::Duration;
 use transaction::{trusted_time_in_transaction, SecurityStateWriteTransaction};
 
@@ -392,7 +392,7 @@ impl SqliteSecurityStateStore {
         self.validate_security_state_lifecycle_owner_proof(proof)
     }
 
-    fn connection(&self) -> PortResult<MutexGuard<'_, Connection>> {
+    fn connection(&self) -> PortResult<StoreGuard<'_>> {
         let connection = self
             .connection
             .lock()

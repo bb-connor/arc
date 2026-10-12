@@ -9,6 +9,12 @@ pub(in crate::admission_operation_store) fn sql() -> &'static str {
 }
 
 fn catalog(connection: &Connection) -> Result<Vec<Entry>, AdmissionOperationStoreError> {
+    crate::catalog_memo::read(connection, "checkpoint", sqlite_error, || {
+        scan_catalog(connection)
+    })
+}
+
+fn scan_catalog(connection: &Connection) -> Result<Vec<Entry>, AdmissionOperationStoreError> {
     let (count, bytes): (i64, i64) = connection.query_row(
         &format!("SELECT COUNT(*), COALESCE(SUM(length(CAST(name AS BLOB)) + length(CAST(tbl_name AS BLOB)) + COALESCE(length(CAST(sql AS BLOB)),0)),0) FROM sqlite_schema WHERE {NAMESPACE}"),
         [], |row| Ok((row.get(0)?,row.get(1)?)),

@@ -302,7 +302,7 @@ impl SqliteBudgetStore {
         i64::try_from(reading.unix_millis().as_secs()).map_err(|_| ClockError::Overflow.into())
     }
 
-    pub(super) fn connection(&self) -> Result<MutexGuard<'_, Connection>, BudgetStoreError> {
+    pub(super) fn connection(&self) -> Result<StoreGuard<'_>, BudgetStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| BudgetStoreError::Invariant(fenced.to_string()))

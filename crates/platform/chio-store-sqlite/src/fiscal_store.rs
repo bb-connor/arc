@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::{sha256_hex, Keypair, StoreMutationFence};
@@ -17,6 +17,7 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBe
 use serde::Serialize;
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
+use crate::store_connection::StoreGuard;
 
 const FISCAL_STORE_SCHEMA_KEY: &str = "fiscal";
 pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
@@ -173,7 +174,7 @@ impl SqliteFiscalStore {
         }
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, FiscalStoreError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, FiscalStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| FiscalStoreError::Unavailable(fenced.to_string()))

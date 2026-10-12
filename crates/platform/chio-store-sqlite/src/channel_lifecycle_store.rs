@@ -1,4 +1,4 @@
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::economic_continuity::{
@@ -26,7 +26,7 @@ use rusqlite::{
 use serde::Serialize;
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 use crate::{
     EconomicOperationStageContext, EconomicStateCacheError, EconomicStateStageDescriptor,
     EconomicStateStageRecord, EconomicStateStageStatus,
@@ -929,7 +929,7 @@ impl SqliteChannelLifecycleStore {
         ))
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, ChannelLifecycleStoreError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, ChannelLifecycleStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| ChannelLifecycleStoreError::Unavailable(fenced.to_string()))

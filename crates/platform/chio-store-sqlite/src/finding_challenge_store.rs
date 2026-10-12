@@ -76,7 +76,7 @@
 mod input_validation;
 use input_validation::*;
 
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::PublicKey;
@@ -97,7 +97,10 @@ use crate::finding_purchase_store::{
     outstanding_exposure_total_tx, FindingPurchaseStoreError,
 };
 use crate::serving_owner::SqliteServingOwner;
-use crate::{admission_operation_store::verify_active_owner, store_connection::StoreConnection};
+use crate::{
+    admission_operation_store::verify_active_owner,
+    store_connection::{StoreConnection, StoreGuard},
+};
 
 mod submission_retention;
 pub use submission_retention::*;
@@ -659,7 +662,7 @@ impl SqliteFindingChallengeStore {
         self.serving_owner.fence.clone()
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingChallengeStoreError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, FindingChallengeStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| FindingChallengeStoreError::Unavailable(fenced.to_string()))

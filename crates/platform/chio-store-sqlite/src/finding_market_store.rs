@@ -24,7 +24,10 @@
 use crate::finding_purchase_store::sales_blocked_tx;
 use crate::finding_status_store::{status_for_purchase_tx, FindingStatusDecision};
 use crate::serving_owner::SqliteServingOwner;
-use crate::{admission_operation_store::verify_active_owner, store_connection::StoreConnection};
+use crate::{
+    admission_operation_store::verify_active_owner,
+    store_connection::{StoreConnection, StoreGuard},
+};
 use chio_core::capability::scope::MonetaryAmount;
 use chio_core::sha256_hex;
 use chio_finding::{
@@ -33,7 +36,7 @@ use chio_finding::{
 };
 use chio_kernel::admission_operation::AdmissionOperationStoreError;
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 use thiserror::Error;
 
 #[path = "finding_market_participation.rs"]
@@ -325,7 +328,7 @@ impl SqliteFindingMarketStore {
         }
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingMarketStoreError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, FindingMarketStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| FindingMarketStoreError::Unavailable(fenced.to_string()))

@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::path::{Component, Path, PathBuf};
-use std::sync::MutexGuard;
 
 use chio_core::{canonical_json_bytes, sha256, Keypair, PublicKey, Signature};
 use chio_security_types::ports::{Digest32, PortError, PortResult, RecordId};
@@ -18,7 +17,7 @@ use rusqlite::{
 };
 use thiserror::Error;
 
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 
 const TABLE_NAME: &str = "enterprise_migration_transitions";
 const NO_UPDATE_TRIGGER_NAME: &str = "enterprise_migration_transitions_no_update";
@@ -263,7 +262,7 @@ impl SqliteEnterpriseMigrationStateStore {
         Ok(store)
     }
 
-    fn connection(&self) -> PortResult<MutexGuard<'_, Connection>> {
+    fn connection(&self) -> PortResult<StoreGuard<'_>> {
         self.verify_file_identity()
             .map_err(|_| PortError::integrity_failure())?;
         let connection = self
