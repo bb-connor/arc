@@ -4760,7 +4760,7 @@ files = ["crates/economy/chio-appraisal/src/types.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.runtime-policy.v3"
+value = "chio.runtime-policy.v1"
 files = ["crates/platform/chio-control-plane/src/policy/util.rs"]
 first_seen = "de519d7776"
 
