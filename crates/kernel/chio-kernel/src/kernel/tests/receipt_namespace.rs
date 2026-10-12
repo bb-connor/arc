@@ -34,8 +34,10 @@ fn identical_request_ids_do_not_merge_authenticated_namespaces() {
 #[test]
 fn namespace_is_stable_across_requests_for_the_same_authority() {
     let config = make_config();
-    let first = make_kernel(config.clone());
-    let second = make_kernel(config);
+    let mut second_config = make_config();
+    second_config.keypair = config.keypair.clone();
+    let first = make_kernel(config);
+    let second = make_kernel(second_config);
     assert_eq!(
         first
             .receipt_request_namespace_digest("first-request")

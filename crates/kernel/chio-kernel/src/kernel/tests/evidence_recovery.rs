@@ -87,7 +87,8 @@ impl ReceiptStore for RecoverableStore {
                     entry_seq: 1,
                     receipt_id: receipt.id.clone(),
                     receipt_sha256: chio_core::crypto::sha256_hex(
-                        &chio_core::canonical::canonical_json_bytes(&receipt)?,
+                        &chio_core::canonical::canonical_json_bytes(&receipt)
+                            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?,
                     ),
                     kernel_key: receipt.kernel_key,
                 })
