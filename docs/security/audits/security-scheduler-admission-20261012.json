@@ -1,0 +1,81 @@
+{
+  "schema": "chio.security.local-repair-qualification.v1",
+  "requirements": [
+    "F045",
+    "F007/T12"
+  ],
+  "base": "bd65e562737023bcf25b1335d5bce00566558bd4",
+  "preserved_producers": [
+    "37b1a7e5193e44637f87d1e9f20cf147c280bf08",
+    "6f4c0ade1e6223af026d0b4ebafdbc29317ecbc3"
+  ],
+  "current_original": "5f371a7da211437880a3f58a33f241a88ed3a8fa",
+  "original_kind": "F045 tests plus a behavior-preserving private admission seam and T12 regression tests",
+  "status": "locally_qualified_independently_reviewed_private",
+  "source_patch_sha256": "3def265accc1ba5d52bd01ae803916eb365c2369813cf23cdcf99de40bcf4358",
+  "rust_source_sha256": {
+    "crates/platform/chio-control-plane/src/security/active_defense_host_tests.rs": "65696527640927dee00663933871874128d1058b818f0374c50aea0164381c31",
+    "crates/platform/chio-control-plane/src/security/active_defense_host_tests/producer_tenant.rs": "cc610adeb493a3d892d82d8fe1dac11b7caadc3a30074936460a1b8fcee17e46",
+    "crates/platform/chio-control-plane/src/security/orchestration.rs": "ec208759a9e3bfb1a79aef55b33f33c78fac3baedbc30d5b97c08b15e6f9e278",
+    "crates/platform/chio-control-plane/src/security/orchestration/planning_recovery_tests.rs": "f3e345bcf1f7d0912835bcab7ee9de51658767b37965fd3562819d2bca5f3608"
+  },
+  "evidence_archive": "/home/connor/lanes/pr1160-root-evidence/security-scheduler-admission-20261012",
+  "archive_manifest_sha256": "5c8752ee83682e07f8286337f67cafb5793c4d1153abb80652dc79ffc0faaf31",
+  "results": {
+    "genuine_current_originals": {
+      "passed": 5,
+      "failed": 6
+    },
+    "focused_before_lint_amendment": {
+      "passed": 11,
+      "failed": 0
+    },
+    "owning_host_orchestration_worker_simulation": {
+      "passed": 143,
+      "failed": 0,
+      "scope": "Before test-only type alias; every production byte unchanged"
+    },
+    "focused_final": {
+      "passed": 11,
+      "failed": 0
+    },
+    "strict_clippy": "pass_all_targets",
+    "static": [
+      "format",
+      "rust_hygiene",
+      "negative_assertions",
+      "security_ci_contract"
+    ]
+  },
+  "retained_unsuccessful_attempts": [
+    "Original nocapture parser missed interleaved failure markers. Exact six-name final failure inventory, assertions, counts and stable source were independently verified without rerunning or replacing the original result.",
+    "Initial strict Clippy refused a preserved test tuple signature. A private RecoveryFailureCase alias repaired it; no allow or ratchet waiver."
+  ],
+  "review": {
+    "reviewer": "Claude",
+    "decision": "approve",
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "original_patch": "6501108a17e9669b8e27fe43bd04bae60d18cd5cef43d88a16942d37bf859010",
+    "amendment": "Test-only alias independently acknowledged; production unchanged",
+    "ordering": "Mailbox append order and patch hashes; original future-dated headings preserved without treating them as trusted observation times"
+  },
+  "design": [
+    "Both trusted producer classes must match the scheduler tenant before service publication.",
+    "Only TerminalSchedulerCleanupPending admits new durable response work despite an unsuccessful recovery tick; its original error keeps readiness closed.",
+    "All other recovery errors and all shutdown outcomes stop before admission. Runtime publication, coordinator readiness and bounded pass limits remain unchanged.",
+    "The admission interface is private; ingress and planning retain their existing ordering and independent execution before error propagation."
+  ],
+  "accepted_limits": [
+    "A simultaneous admission error is logged while cleanup pending remains the health error. A later clean scheduler tick surfaces a persistent admission error; readiness stays closed throughout.",
+    "Startup retries call the pass, which returns immediately while runtime admission is unpublished."
+  ],
+  "remaining_acceptance": [
+    "Compose in dependency order after the active two-PR queue advances; renew on actual main.",
+    "Exact-head hosted required checks and current landing review. No publication or production activation established here."
+  ],
+  "authority_changes": false,
+  "formal_campaigns": false,
+  "ratchet_waivers": false
+}
