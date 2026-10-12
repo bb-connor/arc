@@ -9,6 +9,7 @@ unwinding_checks = [
   "public_sign_receipt_accepts_matching_content_hash",
   "verify_family_binding_preservation",
   "verify_oracle_inclusion_walk_parity",
+  "verify_revocation_snapshot_timestamp_freshness",
 ]
 cover_required = [
   "public_sign_receipt_rejects_kernel_key_mismatch_before_signing",
@@ -16,6 +17,7 @@ cover_required = [
   "public_sign_receipt_refuses_content_hash_mismatch",
   "public_sign_receipt_accepts_matching_content_hash",
   "verify_family_binding_preservation",
+  "verify_revocation_snapshot_timestamp_freshness",
 ]
 
 # Bound the full key comparison while retaining the harness recursion bound.
@@ -51,6 +53,7 @@ harness_groups = [
   "verify recursive delegation no widening",
   "verify delegation receipt canonical-bytes determinism",
   "verify revocation snapshot refusal and retry stability",
+  "verify production snapshot timestamp freshness",
   "verify inclusion step production-extraction equivalence",
   "verify relying-party inclusion walk soundness under ASSUME-SHA256",
   "verify delivery-contract settlement admission soundness",
@@ -67,6 +70,7 @@ covered_symbols = [
   "chio_kernel_core::formal_core::optional_u32_cap_is_subset",
   "chio_kernel_core::formal_core::revocation_snapshot_denies",
   "chio_kernel_core::formal_core::revocation_lookup_denies",
+  "chio_kernel_core::revocation_view::RevocationSnapshot::verify_freshness",
   "chio_kernel_core::formal_core::monetary_cap_is_subset_by_parts",
   "chio_kernel_core::formal_core::budget_commit",
   "chio_kernel_core::formal_core::composite_quota_authorize",
@@ -126,6 +130,7 @@ harnesses = [
   "verify_delegate_no_widen",
   "verify_delegation_receipt_canonical",
   "verify_revocation_view_freshness",
+  "verify_revocation_snapshot_timestamp_freshness",
   "verify_inclusion_step_equivalence",
   "verify_oracle_inclusion_walk_parity",
   "public_delivery_contract_allow_implies_digest_match",

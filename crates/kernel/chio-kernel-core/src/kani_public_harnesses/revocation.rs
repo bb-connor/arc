@@ -9,8 +9,8 @@ use crate::{
 };
 
 /// Production freshness arithmetic over the full three-u64 input domain.
-#[kani::proof]
-pub fn verify_revocation_snapshot_timestamp_freshness() {
+/// Returns a joint witness from additional concrete production boundary calls.
+pub(super) fn verify_revocation_snapshot_timestamp_freshness() -> bool {
     let issued_at_unix_ms = kani::any::<u64>();
     let now_unix_ms = kani::any::<u64>();
     let max_staleness_ms = kani::any::<u64>();
@@ -33,48 +33,30 @@ pub fn verify_revocation_snapshot_timestamp_freshness() {
     };
     assert_eq!(actual, expected);
 
-    kani::cover!(actual.is_ok(), "fresh snapshot accepted");
-    kani::cover!(
-        actual == Err(RevocationSnapshotFreshnessError::Future),
-        "future snapshot refused"
-    );
-    kani::cover!(
-        actual == Err(RevocationSnapshotFreshnessError::Stale),
-        "stale snapshot refused"
-    );
-    kani::cover!(
-        issued <= now && now - issued == maximum_age && actual.is_ok(),
-        "exact age threshold accepted"
-    );
-    kani::cover!(
-        issued_at_unix_ms == 0 && now_unix_ms == 0 && max_staleness_ms == 0 && actual.is_ok(),
-        "zero time and zero maximum accepted"
-    );
-    kani::cover!(
-        issued_at_unix_ms == u64::MAX
-            && now_unix_ms == u64::MAX
-            && max_staleness_ms == 0
-            && actual.is_ok(),
-        "maximum timestamp with zero age accepted"
-    );
-    kani::cover!(
-        issued_at_unix_ms == 0
-            && now_unix_ms == u64::MAX
-            && max_staleness_ms == u64::MAX
-            && actual.is_ok(),
-        "maximum possible age accepted at its threshold"
-    );
-    kani::cover!(
-        max_staleness_ms == u64::MAX && actual == Err(RevocationSnapshotFreshnessError::Future),
-        "maximum age does not admit future issuance"
-    );
-    kani::cover!(
-        issued_at_unix_ms == 0
-            && now_unix_ms == u64::MAX
-            && max_staleness_ms == u64::MAX - 1
-            && actual == Err(RevocationSnapshotFreshnessError::Stale),
-        "maximum age exceeds the next-lower threshold"
-    );
+    // Evaluate every boundary call before joining their results. This witness
+    // supplements the unrestricted assertion above; it does not bound inputs.
+    let mut boundary = RevocationSnapshot::empty();
+    let zero = boundary.verify_freshness(0, 0);
+    let maximum_age = boundary.verify_freshness(u64::MAX, u64::MAX);
+    let maximum_age_stale = boundary.verify_freshness(u64::MAX, u64::MAX - 1);
+    boundary.issued_at_unix_ms = 10;
+    let fresh = boundary.verify_freshness(12, 5);
+    let threshold = boundary.verify_freshness(12, 2);
+    let stale = boundary.verify_freshness(13, 2);
+    let future = boundary.verify_freshness(9, 0);
+    boundary.issued_at_unix_ms = u64::MAX;
+    let maximum_timestamp = boundary.verify_freshness(u64::MAX, 0);
+    let future_with_maximum_age = boundary.verify_freshness(u64::MAX - 1, u64::MAX);
+
+    zero.is_ok()
+        && maximum_age.is_ok()
+        && maximum_age_stale == Err(RevocationSnapshotFreshnessError::Stale)
+        && fresh.is_ok()
+        && threshold.is_ok()
+        && stale == Err(RevocationSnapshotFreshnessError::Stale)
+        && future == Err(RevocationSnapshotFreshnessError::Future)
+        && maximum_timestamp.is_ok()
+        && future_with_maximum_age == Err(RevocationSnapshotFreshnessError::Future)
 }
 
 fn symbolic_revocation_snapshot(epoch: u64) -> RevocationSnapshot {

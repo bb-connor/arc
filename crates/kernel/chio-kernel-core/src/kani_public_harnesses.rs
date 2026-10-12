@@ -1611,6 +1611,18 @@ pub fn verify_revocation_view_freshness() {
     assert_eq!(retry, denied);
 }
 
+/// The child module checks all u64 inputs and calls the production boundaries.
+#[cfg(feature = "revocation-view")]
+#[kani::proof]
+pub fn verify_revocation_snapshot_timestamp_freshness() {
+    let boundary_witness = revocation::verify_revocation_snapshot_timestamp_freshness();
+    assert!(boundary_witness);
+    kani::cover!(
+        boundary_witness,
+        "verify_revocation_snapshot_timestamp_freshness"
+    );
+}
+
 #[kani::proof]
 pub fn verify_inclusion_step_equivalence() {
     let index = u64::from(kani::any::<u8>());

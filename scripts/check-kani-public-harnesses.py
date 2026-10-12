@@ -35,6 +35,7 @@ PROTOCOL_HARNESSES = (
 )
 REACHABLE_HARNESSES = (
     "verify_family_binding_preservation",
+    "verify_revocation_snapshot_timestamp_freshness",
     "public_sign_receipt_rejects_kernel_key_mismatch_before_signing",
     "public_sign_receipt_accepts_matching_kernel_key",
     "public_sign_receipt_refuses_content_hash_mismatch",
