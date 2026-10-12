@@ -51,9 +51,9 @@ impl TestTree {
         write_executable(&helper);
         write_executable(&target);
         std::fs::create_dir(&workdir).test_unwrap();
-        std::fs::write(&runtime, b"runtime").test_unwrap();
-        std::fs::write(&readable, b"readable").test_unwrap();
-        std::fs::write(&forbidden, b"forbidden").test_unwrap();
+        write_data_file(&runtime, b"runtime");
+        write_data_file(&readable, b"readable");
+        write_data_file(&forbidden, b"forbidden");
         Self {
             root,
             helper,
@@ -105,6 +105,11 @@ impl Drop for TestTree {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.root);
     }
+}
+
+fn write_data_file(path: &Path, content: &[u8]) {
+    std::fs::write(path, content).test_unwrap();
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o644)).test_unwrap();
 }
 
 fn write_executable(path: &Path) {
@@ -880,7 +885,7 @@ fn executable_runtime_file_gets_exact_execute_read_grant() {
 fn arbitrary_secret_runtime_file_requires_exact_signed_read_authority() {
     let tree = TestTree::new();
     let secret = tree.root.join("operator-secret.data");
-    std::fs::write(&secret, b"must-not-enter-cage").test_unwrap();
+    write_data_file(&secret, b"must-not-enter-cage");
     let keypair = Keypair::from_seed(&[48; 32]);
     let signed = signed_manifest(
         &keypair,
@@ -1202,7 +1207,7 @@ fn overlapping_read_grants_retain_each_path_once_and_reject_hardlink_aliases() {
         .map(|index| directory.join(format!("module-{index:02}")))
         .collect();
     for file in &files {
-        std::fs::write(file, b"module bytes").test_unwrap();
+        write_data_file(file, b"module bytes");
     }
     let paths: BTreeSet<_> = std::iter::once(directory.clone())
         .chain(files.iter().cloned())
