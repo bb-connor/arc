@@ -85,12 +85,11 @@ fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
         matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
         "unexpected durable URL elicitation result: {result:?}"
     );
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    let retained = assert_original_unknown_incident(&store, &request);
+    assert!(
+        kernel.receipt_log().is_empty(),
+        "the original incident is the sole terminal"
     );
-    assert!(!kernel.receipt_log().receipts().is_empty());
-    let retained = store.operation();
     for time in [0, (1_u64 << 53)] {
         assert!(
             crate::admission_operation::AdmissionReceiptMetadataV1::retained_unknown_dispatch(
@@ -217,10 +216,10 @@ fn dpop_profile_removal_distinguishes_selected_authority_from_configuration() {
             kernel.evaluate_tool_call_blocking(&request),
             Err(KernelError::UrlElicitationsRequired { .. })
         ));
-        let retained = store.operation();
-        assert_eq!(
-            retained.state(),
-            AdmissionOperationState::OutcomeUnknownAfterDispatch
+        let retained = assert_original_unknown_incident(&store, &request);
+        assert!(
+            kernel.receipt_log().is_empty(),
+            "DPoP profile removal cannot create a competing terminal"
         );
         let claim = store.state.lock().expect("state").claim.clone();
         assert_eq!(retained.dpop_replay_ledger_digest().is_some(), selected);
@@ -283,15 +282,24 @@ fn durable_server_url_elicitation_finalizes_the_pool_claim() {
         matches!(error, Err(KernelError::UrlElicitationsRequired { .. })),
         "unexpected durable URL elicitation result: {error:?}"
     );
-    let terminal = store.operation();
-    assert_eq!(
-        terminal.state(),
-        AdmissionOperationState::OutcomeUnknownAfterDispatch
-    );
+    let terminal = assert_original_unknown_incident(&store, &request);
     assert!(ledger
         .list_claimed_admission_operations(None, 10)
         .expect("read finalized pool claims")
         .is_empty());
+    assert_eq!(
+        ledger.unknown_dispatch_finalizations(),
+        vec![terminal.binding().operation_id().as_str().to_owned()]
+    );
+    let replay = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("retained incident replay refusal");
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert_eq!(
+        store.operation(),
+        terminal,
+        "pool replay retains the exact original incident"
+    );
     assert_eq!(
         ledger.unknown_dispatch_finalizations(),
         vec![terminal.binding().operation_id().as_str().to_owned()]
@@ -455,11 +463,20 @@ fn nested_durable_url_elicitation_terminalizes_as_outcome_unknown() {
         matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
         "unexpected nested durable URL elicitation result: {result:?}"
     );
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    let retained = assert_original_unknown_incident(&store, &request);
+    assert!(
+        kernel.receipt_log().is_empty(),
+        "the original nested saga incident is the sole terminal"
     );
-    assert!(!kernel.receipt_log().receipts().is_empty());
+    let replay = kernel
+        .evaluate_tool_call_with_nested_flow_client(&parent_context, &request, &mut client, None)
+        .expect("retained nested incident replay refusal");
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert_eq!(
+        store.operation(),
+        retained,
+        "nested replay preserves the exact incident"
+    );
 }
 
 #[test]

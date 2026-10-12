@@ -10,7 +10,11 @@ mod output_finalization;
 mod pre_dispatch;
 #[path = "durable_admission/recovery.rs"]
 mod recovery;
+
+#[path = "durable_admission/unknown_incident_assertions.rs"]
+mod unknown_incident_assertions;
 use receipt_projection::AdmissionReceiptProjectionStore;
+use unknown_incident_assertions::assert_original_unknown_incident;
 
 #[path = "durable_admission/authority_profile.rs"]
 mod authority_profile;
