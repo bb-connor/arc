@@ -58,6 +58,11 @@ impl TestAdmissionOperationStore {
         let Some(existing) = state.operation.as_ref() else {
             state.operation = Some(operation.clone());
             state.retained_request = Some(request.clone());
+            if self.lose_next_begin_ack.swap(false, Ordering::SeqCst) {
+                return Err(AdmissionOperationStoreError::OutcomeUnknown(
+                    "injected begin acknowledgement loss".into(),
+                ));
+            }
             return Ok(AdmissionBeginResult::Created(operation.clone()));
         };
         Ok(match existing.classify_replay(operation) {
@@ -710,6 +715,11 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         let mut state = self.state.lock().expect("test admission state lock");
         let Some(existing) = state.operation.as_ref() else {
             state.operation = Some(operation.clone());
+            if self.lose_next_begin_ack.swap(false, Ordering::SeqCst) {
+                return Err(AdmissionOperationStoreError::OutcomeUnknown(
+                    "injected begin acknowledgement loss".into(),
+                ));
+            }
             return Ok(AdmissionBeginResult::Created(operation.clone()));
         };
         Ok(match existing.classify_replay(operation) {

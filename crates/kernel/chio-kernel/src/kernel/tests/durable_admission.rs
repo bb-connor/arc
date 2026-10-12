@@ -32,6 +32,8 @@ mod dpop_acquisition;
 mod federation_context;
 #[path = "durable_admission/governed_acquisition.rs"]
 mod governed_acquisition;
+#[path = "durable_admission/identity_disposition.rs"]
+mod identity_disposition;
 #[path = "durable_admission/monetary.rs"]
 mod monetary;
 #[path = "durable_admission/native_acquisition.rs"]
@@ -86,6 +88,7 @@ pub(super) struct TestAdmissionOperationStore {
     approval_recovery: governed_acquisition::TestApproval,
     runtime_recovery: runtime_participant::TestRuntimeRecovery,
     pub(super) fence: std::sync::Mutex<StoreMutationFence>,
+    lose_next_begin_ack: std::sync::atomic::AtomicBool,
     fail_next_outcome_write: std::sync::atomic::AtomicBool,
     fail_next_evaluation_begin: std::sync::atomic::AtomicBool,
     fail_next_evaluation_stage: std::sync::atomic::AtomicBool,
@@ -112,6 +115,7 @@ impl TestAdmissionOperationStore {
             approval_recovery: governed_acquisition::TestApproval::default(),
             runtime_recovery: runtime_participant::TestRuntimeRecovery::default(),
             fence: std::sync::Mutex::new(fence),
+            lose_next_begin_ack: std::sync::atomic::AtomicBool::new(false),
             fail_next_outcome_write: std::sync::atomic::AtomicBool::new(false),
             fail_next_evaluation_begin: std::sync::atomic::AtomicBool::new(false),
             fail_next_evaluation_stage: std::sync::atomic::AtomicBool::new(false),
