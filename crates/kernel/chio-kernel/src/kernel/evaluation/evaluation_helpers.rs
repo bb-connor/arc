@@ -910,6 +910,10 @@ impl ChioKernel {
                 {
                     Ok(signed) => PreflightNonceSource::Durable(signed),
                     Err(error) => {
+                        if !error.durable_commit_outcome_is_unknown() {
+                            return Err(error);
+                        }
+
                         let reason = error.to_string();
                         warn!(
                             request_id = %request.request_id,

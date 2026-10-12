@@ -9,3 +9,18 @@ pub(crate) struct AdmissionStartFailure {
     /// A live operation cannot produce a new terminal refusal.
     pub(in crate::kernel) receipt_disposition: Option<IdentityDisposition>,
 }
+
+impl KernelError {
+    pub(in crate::kernel) fn durable_commit_outcome_is_unknown(&self) -> bool {
+        matches!(
+            self,
+            Self::AdmissionRecovery(failure)
+                if matches!(
+                    failure.as_ref(),
+                    crate::admission_operation::AdmissionRecoveryError::Store(
+                        crate::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(_)
+                    )
+                )
+        )
+    }
+}

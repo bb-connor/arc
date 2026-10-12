@@ -5,6 +5,8 @@ use serde_json::{Map, Value};
 use crate::admission_operation::RequestNamespaceDigest;
 use crate::receipt_support::merge_metadata_objects;
 
+use super::{ChioKernel, KernelError};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum IdentityDisposition {
     /// No persisted operation, retained custody or executed effect binds the id.
@@ -77,5 +79,19 @@ impl RefusalReceiptMetadata {
             with_identity_disposition(self.metadata, self.disposition),
             Some(serde_json::json!({ "receipt_context": context })),
         )
+    }
+}
+
+impl ChioKernel {
+    pub(in crate::kernel) fn prepare_refusal_receipt_metadata(
+        &self,
+        request_id: &str,
+        metadata: RefusalReceiptMetadata,
+    ) -> Result<Option<Value>, KernelError> {
+        let namespace = self.authenticated_receipt_namespace(request_id)?;
+        if metadata.disposition == IdentityDisposition::Reusable {
+            self.require_unoccupied_receipt_identity(request_id, &namespace)?;
+        }
+        Ok(metadata.into_signed_metadata(namespace.digest()))
     }
 }

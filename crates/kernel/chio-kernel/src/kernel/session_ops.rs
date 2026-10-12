@@ -311,18 +311,20 @@ impl ChioKernel {
             action,
             content_hash: receipt_content.content_hash,
             canonical_content: receipt_content.canonical_content,
-            metadata: RefusalReceiptMetadata::new(
-                merge_metadata_objects(
-                    Some(serde_json::json!({
-                        "resource": {
-                            "uri": &operation.uri,
-                        }
-                    })),
-                    receipt_attribution_metadata(&operation.capability, None)?,
+            metadata: self.prepare_refusal_receipt_metadata(
+                request_id,
+                RefusalReceiptMetadata::new(
+                    merge_metadata_objects(
+                        Some(serde_json::json!({
+                            "resource": {
+                                "uri": &operation.uri,
+                            }
+                        })),
+                        receipt_attribution_metadata(&operation.capability, None)?,
+                    ),
+                    IdentityDisposition::Reusable,
                 ),
-                IdentityDisposition::Reusable,
-            )
-            .into_signed_metadata(self.authenticated_receipt_namespace(request_id)?.digest()),
+            )?,
             timestamp: self.read_authority_time()?.as_secs(),
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,

@@ -16,10 +16,8 @@ impl ChioKernel {
         });
 
         if let Some(mg) = monetary_grant {
-            let extra_metadata = extra_metadata.into_signed_metadata(
-                self.authenticated_receipt_namespace(&request.request_id)?
-                    .digest(),
-            );
+            let extra_metadata =
+                self.prepare_refusal_receipt_metadata(&request.request_id, extra_metadata)?;
             let grant = mg.grant;
             let currency = grant
                 .max_cost_per_invocation
@@ -204,10 +202,8 @@ impl ChioKernel {
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         record_mode: ReceiptRecordMode,
     ) -> Result<ToolCallResponse, KernelError> {
-        let extra_metadata = extra_metadata.into_signed_metadata(
-            self.authenticated_receipt_namespace(&request.request_id)?
-                .digest(),
-        );
+        let extra_metadata =
+            self.prepare_refusal_receipt_metadata(&request.request_id, extra_metadata)?;
         let financial_metadata =
             Self::pre_execution_financial_metadata(charge, committed_cost_after_release, cap)?;
         let deny_extra_metadata =
@@ -271,12 +267,10 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         guard: &str,
     ) -> Result<ToolCallResponse, KernelError> {
-        let extra_metadata =
-            RefusalReceiptMetadata::new(extra_metadata, IdentityDisposition::Reusable)
-                .into_signed_metadata(
-                    self.authenticated_receipt_namespace(&request.request_id)?
-                        .digest(),
-                );
+        let extra_metadata = self.prepare_refusal_receipt_metadata(
+            &request.request_id,
+            RefusalReceiptMetadata::new(extra_metadata, IdentityDisposition::Reusable),
+        )?;
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -580,10 +574,8 @@ impl ChioKernel {
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         record_mode: ReceiptRecordMode,
     ) -> Result<PreparedResponse, KernelError> {
-        let extra_metadata = extra_metadata.into_signed_metadata(
-            self.authenticated_receipt_namespace(&request.request_id)?
-                .digest(),
-        );
+        let extra_metadata =
+            self.prepare_refusal_receipt_metadata(&request.request_id, extra_metadata)?;
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 

@@ -38,10 +38,8 @@ impl ChioKernel {
         extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<PreparedResponse, KernelError> {
-        let extra_metadata = extra_metadata.into_signed_metadata(
-            self.authenticated_receipt_namespace(&request.request_id)?
-                .digest(),
-        );
+        let extra_metadata =
+            self.prepare_refusal_receipt_metadata(&request.request_id, extra_metadata)?;
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -109,10 +107,8 @@ impl ChioKernel {
         extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<PreparedResponse, KernelError> {
-        let extra_metadata = extra_metadata.into_signed_metadata(
-            self.authenticated_receipt_namespace(&request.request_id)?
-                .digest(),
-        );
+        let extra_metadata =
+            self.prepare_refusal_receipt_metadata(&request.request_id, extra_metadata)?;
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(output.as_ref(), None)?;
 

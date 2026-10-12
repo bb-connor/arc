@@ -1052,16 +1052,7 @@ impl ChioKernel {
             }))
         })();
         result.map_err(|error| {
-            if matches!(
-                &error,
-                KernelError::AdmissionRecovery(failure)
-                    if matches!(
-                        failure.as_ref(),
-                        crate::admission_operation::AdmissionRecoveryError::Store(
-                            crate::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(_)
-                        )
-                    )
-            ) {
+            if error.durable_commit_outcome_is_unknown() {
                 receipt_disposition = Some(IdentityDisposition::Retained);
             }
             AdmissionStartFailure {

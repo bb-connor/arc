@@ -3,6 +3,32 @@
 use super::*;
 
 impl ChioKernel {
+    pub(in crate::kernel) fn require_unoccupied_receipt_identity(
+        &self,
+        request_id: &str,
+        namespace: &AuthenticatedRequestNamespace,
+    ) -> Result<(), KernelError> {
+        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
+            return Ok(());
+        };
+        let key = crate::admission_operation::AdmissionReplayKey {
+            request_namespace_digest: namespace.digest().clone(),
+            request_id: AdmissionIdentifier::try_new("request_id", request_id)?,
+        };
+        let _mutation_guard = runtime.lock_mutations()?;
+        if runtime
+            .store
+            .load_by_replay_key(&key)
+            .map_err(durable_store_error)?
+            .is_some()
+        {
+            return Err(KernelError::DurableAdmission(
+                "request identity is already owned by a durable operation".into(),
+            ));
+        }
+        Ok(())
+    }
+
     pub(in crate::kernel) fn authenticated_receipt_namespace(
         &self,
         request_id: &str,

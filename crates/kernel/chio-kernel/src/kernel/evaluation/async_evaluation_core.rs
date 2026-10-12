@@ -1291,6 +1291,10 @@ impl ChioKernel {
         }
         if let Some(admission) = durable_admission.as_mut() {
             if let Err(error) = self.mark_durable_capture_pending(admission, now_unix_ms) {
+                if !error.durable_commit_outcome_is_unknown() {
+                    return Err(error);
+                }
+
                 let reason = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable capture boundary could not be confirmed");
                 return self.build_deny_response_with_metadata(
