@@ -17,7 +17,7 @@ otel = ["chio-kernel/otel"]
 
 [dependencies]
 async-trait = { workspace = true }
-chio-core = { package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-cross-protocol = { workspace = true }
 chio-kernel = { workspace = true }
 chio-security-types = { workspace = true, features = ["std"] }
