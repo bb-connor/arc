@@ -95,32 +95,16 @@ impl ChioKernel {
         let operation_bytes = canonical_json_bytes(operation).map_err(encode_error)?;
         let context_bytes = canonical_json_bytes(context).map_err(encode_error)?;
         let capability_bytes = canonical_json_bytes(&operation.capability).map_err(encode_error)?;
-        let (kind, decision, receipt_kind, boundary_class, observation_outcome, trust_level) =
-            match report {
-                SessionReport::AuthorizationConflict(reason) => (
-                    "authorization_conflict",
-                    Some(Decision::Deny {
-                        reason: reason.into(),
-                        guard: "session_authorization".into(),
-                    }),
-                    ReceiptKind::MediatedDecision,
-                    BoundaryClass::Prevent,
-                    None,
-                    TrustLevel::Mediated,
-                ),
-                SessionReport::EvaluationFailure => (
-                    "evaluation_failure_reported",
-                    None,
-                    ReceiptKind::TraceObservation,
-                    BoundaryClass::DetectOnly,
-                    Some(ObservationOutcome::Observed),
-                    // The signed report is verified, not an execution outcome.
-                    TrustLevel::Verified,
-                ),
-            };
+        let (kind, reason) = match report {
+            SessionReport::AuthorizationConflict(reason) => {
+                ("authorization_conflict", Some(reason))
+            }
+            SessionReport::EvaluationFailure => ("evaluation_failure_reported", None),
+        };
         let event = serde_json::json!({
             "schema": "chio.session.report.v1",
             "kind": kind,
+            "reason": reason,
             "session_id": snapshot.session_id,
             "agent_id": snapshot.agent_id,
             "session_anchor_id": snapshot.session_anchor.id(),
@@ -142,10 +126,10 @@ impl ChioKernel {
             tool_server: operation.server_id.clone(),
             tool_name: operation.tool_name.clone(),
             action,
-            decision,
-            receipt_kind,
-            boundary_class,
-            observation_outcome,
+            decision: None,
+            receipt_kind: ReceiptKind::TraceObservation,
+            boundary_class: BoundaryClass::DetectOnly,
+            observation_outcome: Some(ObservationOutcome::Observed),
             tool_origin: ToolOrigin::ChioInternal,
             redaction_mode: RedactionMode::None,
             actor_chain: Vec::new(),
@@ -153,7 +137,7 @@ impl ChioKernel {
             policy_hash: self.config.policy_hash.clone(),
             evidence: Vec::new(),
             metadata: Some(serde_json::json!({"session_report": event})),
-            trust_level,
+            trust_level: TrustLevel::Verified,
             tenant_id: extract_tenant_id_from_auth_context(&snapshot.auth_context),
             kernel_key: authority.public_key(),
             bbs_projection_version: None,
