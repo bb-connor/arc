@@ -97,7 +97,7 @@ struct DurableDelivery<'a> {
 struct PostEffectError {
     step: &'static str,
     code: String,
-    source: KernelError,
+    source: Box<KernelError>,
 }
 
 impl PostEffectError {
@@ -105,7 +105,7 @@ impl PostEffectError {
         Self {
             step,
             code: error.report().code,
-            source: error,
+            source: Box::new(error),
         }
     }
 }
@@ -309,6 +309,7 @@ impl<'a> PostEffectObligation<'a> {
 
     fn fail(mut self, error: PostEffectError, original: Option<UnknownAppend>) -> Discharged<'a> {
         let PostEffectError { step, code, source } = error;
+        let source = *source;
         if original.is_some() {
             self.submitted.clone_from(&original);
         }
@@ -420,7 +421,7 @@ impl<'a> PostEffectObligation<'a> {
                     Err(failed) => {
                         return failed
                             .obligation
-                            .buffer(failed.original, Some(failed.error.source))
+                            .buffer(failed.original, Some(*failed.error.source))
                     }
                 }
             }
