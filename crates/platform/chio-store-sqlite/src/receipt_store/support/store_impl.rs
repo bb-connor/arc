@@ -706,6 +706,13 @@ impl ReceiptStore for SqliteReceiptStore {
             .transpose()
     }
 
+    fn load_retained_child_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ChildRequestReceipt>, ReceiptStoreError> {
+        self.with_retained_snapshot(|snapshot| snapshot.child_receipt(receipt_id))
+    }
+
     fn append_chio_receipt_canonical(
         &self,
         _receipt: &ChioReceipt,

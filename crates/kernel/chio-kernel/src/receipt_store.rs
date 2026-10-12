@@ -604,6 +604,22 @@ pub trait ReceiptStore: Send + Sync {
     ) -> Result<Option<ChildRequestReceipt>, ReceiptStoreError> {
         Ok(None)
     }
+    /// Load a child receipt from the store's complete authenticated retained
+    /// history, including any archive. This privileged kernel provenance read
+    /// requires an authenticated service principal in remote implementations.
+    ///
+    /// `Ok(None)` means absence in the verified snapshot. Stores without this
+    /// complete-history capability must return `Unsupported`, rather than
+    /// treating an evicted or archived receipt as absent. Snapshot absence does
+    /// not settle a writer job that can still commit after an append timeout.
+    fn load_retained_child_receipt(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<Option<ChildRequestReceipt>, ReceiptStoreError> {
+        Err(ReceiptStoreError::Unsupported(
+            "complete retained child receipt lookup".to_string(),
+        ))
+    }
     fn append_chio_receipt_canonical(
         &self,
         receipt: &ChioReceipt,
@@ -1497,6 +1513,14 @@ mod tests {
         ) -> Result<(), ReceiptStoreError> {
             Ok(())
         }
+    }
+
+    #[test]
+    fn retained_child_lookup_is_unsupported_for_append_only_stores() {
+        assert!(matches!(
+            AppendOnlyStore.load_retained_child_receipt("unknown-child"),
+            Err(ReceiptStoreError::Unsupported(_))
+        ));
     }
 
     struct CountingAppendStore {
