@@ -56,7 +56,7 @@ impl ChioKernel {
     /// recovery baseline consumes the authority clock, so a clock fault cannot
     /// discard the signed outcome of a tool that already ran without one; with
     /// one, the fault withholds the output as an unavailable status.
-    pub(super) fn revalidate_ordinary_recovery_status(
+    pub(in crate::kernel) fn revalidate_ordinary_recovery_status(
         &self,
         matched_grant_index: usize,
         request: &ToolCallRequest,
@@ -352,7 +352,7 @@ impl ChioKernel {
         )
     }
 
-    pub(super) fn with_pre_invocation_guard_evidence<T>(
+    pub(in crate::kernel) fn with_pre_invocation_guard_evidence<T>(
         &self,
         evidence: &[chio_core::receipt::metadata::GuardEvidence],
         build: impl FnOnce() -> Result<T, KernelError>,

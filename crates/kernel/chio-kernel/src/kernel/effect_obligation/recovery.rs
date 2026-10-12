@@ -395,7 +395,7 @@ impl EvidenceRecoveryResources {
                     self.signer.as_ref(),
                     ReceiptSigningHandle::from_content_preimage(fault.canonical_content.clone()),
                 )
-                .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?
+                .map_err(|error| KernelError::ReceiptSigningFailed(format!("{error:?}")))?
             }
         };
         if receipt.kernel_key != *self.signing_identity.public_key()
