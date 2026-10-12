@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use chio_core::crypto::{sha256_hex, SigningBackend};
 use chio_core::receipt::signing::ReceiptSigningHandle;
+use chio_core::PublicKey;
 use chio_security_types::clock::Clock;
 use tokio::sync::OwnedSemaphorePermit;
 
@@ -16,7 +17,6 @@ use crate::kernel::{ChildReceiptLog, ReceiptLog, RuntimeTraceEvent, RuntimeTrace
 use crate::receipt_store::{PendingSettlementObservation, ReceiptStore};
 use crate::{
     ChildRequestReceipt, ChildRequestReceiptBody, ChioReceipt, ChioReceiptBody, KernelError,
-    PublicKey,
 };
 
 const RETRY_MIN: Duration = Duration::from_millis(20);
