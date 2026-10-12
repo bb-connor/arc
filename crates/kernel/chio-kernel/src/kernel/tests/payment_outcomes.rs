@@ -239,6 +239,14 @@ impl Fixture {
     }
 
     async fn evaluate(&self, nested: bool) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_with_metadata(nested, None).await
+    }
+
+    async fn evaluate_with_metadata(
+        &self,
+        nested: bool,
+        metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
         async {
             if nested {
                 let session = self.kernel.open_session(
@@ -255,11 +263,13 @@ impl Fixture {
                         &context,
                         &self.request,
                         &mut NoopNestedFlowClient,
-                        None,
+                        metadata,
                     )
                     .await
             } else {
-                self.kernel.evaluate_tool_call(&self.request).await
+                self.kernel
+                    .evaluate_tool_call_with_metadata(&self.request, metadata)
+                    .await
             }
         }
         .with_subscriber(self.audit.clone())
@@ -533,4 +543,39 @@ async fn settled_capture_allows_once_without_release() -> TestResult {
         assert_eq!(financial(&response)["settlement_status"], "settled");
     }
     Ok(())
+}
+
+async fn assert_non_object_metadata_is_rejected_before_custody(nested: bool) -> TestResult {
+    for metadata in [
+        serde_json::Value::Null,
+        serde_json::json!(false),
+        serde_json::json!(7),
+        serde_json::json!("caller scalar"),
+        serde_json::json!([]),
+    ] {
+        let fixture = Fixture::new(
+            CaptureOutcome::Error(ErrorKind::RailError),
+            ReleaseOutcome::Status(RailSettlementStatus::Released),
+        )?;
+        let result = fixture.evaluate_with_metadata(nested, Some(metadata)).await;
+        assert!(
+            matches!(result, Err(KernelError::InvalidReceiptMetadata(_))),
+            "non-object metadata must be refused before it can suppress financial evidence"
+        );
+        assert_eq!(fixture.counters.authorizations.load(Ordering::SeqCst), 0);
+        assert_eq!(fixture.counters.invocations.load(Ordering::SeqCst), 0);
+        assert_eq!(fixture.counters.captures.load(Ordering::SeqCst), 0);
+        assert_eq!(fixture.counters.releases.load(Ordering::SeqCst), 0);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn non_object_metadata_is_rejected_before_async_payment_custody() -> TestResult {
+    assert_non_object_metadata_is_rejected_before_custody(false).await
+}
+
+#[tokio::test]
+async fn non_object_metadata_is_rejected_before_nested_payment_custody() -> TestResult {
+    assert_non_object_metadata_is_rejected_before_custody(true).await
 }
