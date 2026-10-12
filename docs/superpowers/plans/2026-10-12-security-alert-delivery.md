@@ -109,3 +109,11 @@ remain in the audit evidence. No baseline or ratchet was relaxed.
 See `docs/security/audits/security-alert-delivery-20261012.json` for source
 hashes, retained Originals and local evidence. Hosted qualification, landing
 and production SIEM acceptance remain separate requirements.
+
+## Actual-main composition
+
+The F041 source composes directly onto main after #1201; its earlier SDK and
+wire ancestors are separate work. The relocated `load_due` reader inventory
+is carried with this wave, so its trust-boundary gate stays accurate. The
+private qualification above remains historical. Focused tests and strict
+Clippy are renewed on this composition before publication.
