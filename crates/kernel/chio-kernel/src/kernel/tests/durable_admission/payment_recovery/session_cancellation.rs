@@ -88,7 +88,8 @@ struct Run {
     store: Arc<TestAdmissionOperationStore>,
     calls: Arc<RailCalls>,
     invocations: Arc<AtomicU64>,
-    response: ToolCallResponse,
+    response: Result<ToolCallResponse, KernelError>,
+    receipts: ReceiptLog,
 }
 
 /// Evaluates one paid call that the session owns. The control denies in the
@@ -148,9 +149,9 @@ fn run(
         ),
     };
     let response = match outcome {
-        Outcome::Denied => evaluate()?,
-        Outcome::HostCancelled => std::thread::scope(|scope| -> TestResult<ToolCallResponse> {
-            let evaluation = scope.spawn(|| evaluate().map_err(|error| error.to_string()));
+        Outcome::Denied => evaluate(),
+        Outcome::HostCancelled => std::thread::scope(|scope| -> TestResult<_> {
+            let evaluation = scope.spawn(evaluate);
             entered.recv_timeout(HOLD_TIMEOUT)?;
             let parked = store
                 .payment_journal()
@@ -160,7 +161,7 @@ fn run(
             release.send(())?;
             let response = evaluation
                 .join()
-                .map_err(|_| "evaluation thread panicked")??;
+                .map_err(|_| "evaluation thread panicked")?;
             assert_eq!(
                 parked,
                 Some((authorized, Some("original-payment-authorization".into())))
@@ -175,6 +176,7 @@ fn run(
         calls,
         invocations,
         response,
+        receipts: kernel.receipt_log(),
     })
 }
 
@@ -210,12 +212,20 @@ fn cleanup_state(run: &Run) -> TestResult<serde_json::Value> {
             serde_json::json!([transaction, units, currency, reference])
         })
         .collect::<Vec<_>>();
-    let mut metadata = run.response.receipt.metadata.clone().ok_or("metadata")?;
-    metadata
-        .as_object_mut()
-        .ok_or("metadata object")?
-        .remove("chio_receipt_signing_nonce")
-        .ok_or("signing nonce")?;
+    let metadata = run
+        .response
+        .as_ref()
+        .ok()
+        .map(|response| -> TestResult<serde_json::Value> {
+            let mut metadata = response.receipt.metadata.clone().ok_or("metadata")?;
+            metadata
+                .as_object_mut()
+                .ok_or("metadata object")?
+                .remove("chio_receipt_signing_nonce")
+                .ok_or("signing nonce")?;
+            Ok(metadata)
+        })
+        .transpose()?;
     let state = serde_json::json!({
         "journal": {
             "state": format!("{:?}", journal.state),
@@ -325,7 +335,10 @@ fn cancel_against_denial(
     ));
     let control = format!("{control}{cleanup}");
     assert_signed(
-        &denied.response,
+        denied
+            .response
+            .as_ref()
+            .map_err(|error| error.to_string())?,
         Decision::Deny {
             reason: control.clone(),
             guard: "kernel".into(),
@@ -335,7 +348,10 @@ fn cancel_against_denial(
     )?;
     let cancellation = format!("{HOST_CANCELLATION}{cleanup}");
     assert_signed(
-        &cancelled.response,
+        cancelled
+            .response
+            .as_ref()
+            .map_err(|error| error.to_string())?,
         Decision::Cancelled {
             reason: cancellation.clone(),
         },
@@ -515,14 +531,13 @@ fn host_cancel_after_prepayment_signs_cancelled_with_refunded_payment() -> TestR
 }
 
 #[test]
-fn host_cancel_with_unconfirmed_release_signs_cancelled_and_keeps_denial_state() -> TestResult {
+fn cleanup_fault_unconfirmed_release_preserves_the_original_owner() -> TestResult {
     for entry in [Entry::Session, Entry::Nested] {
-        let (_, state) = cancel_against_denial(
-            &format!("session-cancel-unconfirmed-{entry:?}"),
-            false,
-            true,
-            entry,
-        )?;
+        let name = format!("session-cancel-unconfirmed-{entry:?}");
+        let denied = run(&name, false, true, entry, Outcome::Denied)?;
+        let cancelled = run(&name, false, true, entry, Outcome::HostCancelled)?;
+        let state = cleanup_state(&cancelled)?;
+        assert_eq!(state, cleanup_state(&denied)?, "{entry:?}");
         assert_eq!(
             state["journal"],
             serde_json::json!({
@@ -567,25 +582,24 @@ fn host_cancel_with_unconfirmed_release_signs_cancelled_and_keeps_denial_state()
             })
         );
         assert_eq!(state["invocations"], 0);
-        assert_eq!(
-            state["receipt_metadata"]["chio_runtime"],
-            retained_credentials(None)
-        );
-        assert_eq!(
-            state["receipt_metadata"]["financial"],
-            serde_json::json!({
-                "payment_authorization_may_be_retained": true,
-                "payment_reference": "original-payment-authorization",
-                "payment_unwind_attempt_reference": "<operation>",
-                "payment_unwind_unconfirmed": true,
-            })
-        );
-        let budget = &state["receipt_metadata"]["budget_authority"];
-        assert_eq!(budget["pre_dispatch_cleanup_unconfirmed"], true);
-        assert_eq!(budget["admission_release_unconfirmed"], true);
-        assert_eq!(budget["admission_may_be_retained"], true);
-        assert_eq!(budget["cleanup_mutation_kind"], "charge");
-        assert_eq!(budget["cleanup_hold_id"], "<hold>");
+        for run in [&denied, &cancelled] {
+            let error = run
+                .response
+                .as_ref()
+                .expect_err("unconfirmed cleanup must not take the live owner's terminal");
+            assert!(
+                matches!(error, KernelError::Internal(reason)
+                if reason == "payment unwind acknowledgement was not confirmed"),
+                "{error:?}"
+            );
+            assert!(
+                run.receipts.is_empty(),
+                "the original operation owns its terminal"
+            );
+            assert!(run.store.operation().dispatch_commit().is_none());
+            assert!(run.store.operation().terminal_replay().is_none());
+        }
+        assert!(state["receipt_metadata"].is_null());
     }
     Ok(())
 }
