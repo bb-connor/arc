@@ -61,12 +61,21 @@ fn aggregate_invocation_budget_exhausts_across_grants_atomically(
         first_response.reason
     );
 
-    let original = ordinary_operation::from_signed_response(
-        &operations,
-        &authority.mutation_fence(),
-        &first,
-        &first_response,
+    assert!(first_response.receipt.verify_signature()?);
+    let metadata: AdmissionReceiptMetadataV1 = serde_json::from_value(
+        first_response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get(ADMISSION_RECEIPT_METADATA_KEY))
+            .cloned()
+            .ok_or("first admission metadata missing")?,
     )?;
+    let original = operations
+        .load_by_operation_id(&metadata.operation_id)?
+        .ok_or("first completed admission missing")?;
+    assert_eq!(original.state(), AdmissionOperationState::Completed);
+    assert_eq!(original.binding().request_id().as_str(), first.request_id);
     let mut second = first.clone();
     second.request_id = "aggregate-second".to_string();
     second.tool_name = "mutate-alt".to_string();
