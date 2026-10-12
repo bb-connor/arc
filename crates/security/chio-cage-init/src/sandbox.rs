@@ -5,6 +5,7 @@ use super::{
 };
 
 pub(super) fn reset_signal_state() -> Result<(), BootstrapFault> {
+    reset_ignored_signal_dispositions()?;
     // SAFETY: sigset_t is an all-integer C structure valid when zeroed before
     // sigemptyset initializes it.
     let mut set = unsafe { std::mem::zeroed::<libc::sigset_t>() };
@@ -17,6 +18,39 @@ pub(super) fn reset_signal_state() -> Result<(), BootstrapFault> {
             CageEnforcementFailureCode::StatusProtocolViolation,
             "signal_mask",
         ));
+    }
+    Ok(())
+}
+
+/// Exec resets caught signals to their default but keeps ignored ones. Every
+/// signal this helper ignores, including the SIGPIPE the Rust runtime ignores
+/// at startup and any ignore inherited from the host, returns to its default
+/// before the target runs. Signals the C library reserves are refused by
+/// sigaction and are never ignored here.
+fn reset_ignored_signal_dispositions() -> Result<(), BootstrapFault> {
+    for signal in 1..=64 {
+        if signal == libc::SIGKILL || signal == libc::SIGSTOP {
+            continue;
+        }
+        // SAFETY: sigaction is a plain C structure; all-zero is a valid value.
+        let mut current = unsafe { std::mem::zeroed::<libc::sigaction>() };
+        // SAFETY: a null new action only queries; current is writable.
+        if unsafe { libc::sigaction(signal, std::ptr::null(), &mut current) } != 0 {
+            continue;
+        }
+        if current.sa_sigaction != libc::SIG_IGN {
+            continue;
+        }
+        // SAFETY: sigaction is a plain C structure; all-zero is a valid value.
+        let mut default = unsafe { std::mem::zeroed::<libc::sigaction>() };
+        default.sa_sigaction = libc::SIG_DFL;
+        // SAFETY: default is initialized and the old action is not requested.
+        if unsafe { libc::sigaction(signal, &default, std::ptr::null_mut()) } != 0 {
+            return Err(BootstrapFault::new(
+                CageEnforcementFailureCode::StatusProtocolViolation,
+                "signal_disposition",
+            ));
+        }
     }
     Ok(())
 }
