@@ -147,6 +147,16 @@ fn exercise_cumulative_approval(
         "{:?}",
         pending.reason
     );
+    assert!(pending.receipt.verify_signature()?);
+    assert_eq!(
+        pending
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/identity_disposition")),
+        None,
+        "approval-required is not a terminal refusal",
+    );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     let proposal: ThresholdApprovalProposal = match pending.output {
         Some(ToolCallOutput::Value(value)) => {

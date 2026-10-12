@@ -765,5 +765,17 @@ fn a_missing_nested_session_root_compensates_the_durable_admission() {
         store.operation().state(),
         AdmissionOperationState::CompensatedBeforeDispatch
     );
+    assert!(response.receipt.verify_signature().unwrap());
+    let metadata = response.receipt.metadata.as_ref().unwrap();
+    assert_eq!(
+        metadata
+            .pointer("/chio_runtime/identity_disposition")
+            .and_then(serde_json::Value::as_str),
+        Some("terminal"),
+    );
+    assert!(metadata
+        .pointer("/receipt_context/request_namespace_digest")
+        .and_then(serde_json::Value::as_str)
+        .is_some_and(|value| !value.is_empty()));
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
