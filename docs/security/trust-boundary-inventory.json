@@ -16521,7 +16521,7 @@
     "crates/economy/chio-settle/src/config.rs::from_path::from_wire#1::decode_signed",
     "crates/economy/chio-settle/src/input.rs::canonical::from_wire#1::decode_canonical",
     "crates/economy/chio-settle/src/input.rs::external_canonical::from_wire#1::canonicalize+decode_signed",
-    "crates/guards/chio-data-guards/src/structured_classification.rs::from_payload::from_wire#1::decode_signed",
+    "crates/guards/chio-data-guards/src/structured_classification.rs::from_payload::from_wire#1::decode_document",
     "crates/guards/chio-external-guards/src/external/input.rs::arguments::from_wire#1::decode_signed",
     "crates/guards/chio-external-guards/src/external/input.rs::response::from_wire#1::decode_external",
     "crates/guards/chio-guard-registry/src/input.rs::external::from_wire#1::decode_external",
