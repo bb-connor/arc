@@ -1,0 +1,163 @@
+{
+  "schema": "chio.release-drogon-ci-repair.v1",
+  "observed_utc": "2026-10-12T01:41:26.545897+00:00",
+  "requirement_id": "postmerge-20261012:RELEASE-DROGON",
+  "producer_commit": "de664c85ee1b1918bfb72b7aca28fd78cfeb0e79",
+  "producer_base": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+  "reviewed_diff_sha256": "95725677532569fd9c7aa418464b745e100efc47defe0b0e187690aa5cfc18d9",
+  "files": [
+    ".github/workflows/nightly.yml",
+    ".github/workflows/release-qualification.yml",
+    "scripts/tests/check-drogon-consumer-gate.test.sh"
+  ],
+  "change": "Provision the existing pinned Drogon dependencies in both omitted strict SDK parity callers. Preserve all SDK commands, dependency refusal, trigger/permission contracts and nightly RUSTFLAGS.",
+  "hosted_original": {
+    "run": 38183161833,
+    "job": 114599827936,
+    "first_error": "Drogon::Drogon was not found",
+    "log_sha256": "d6ad28bbe5e52bad10d1b1cde156c549b16107994343050fd090e436647d6afb"
+  },
+  "local_original": "Extended owning contract fails against unchanged28d for each missing caller. It succeeds with both provisioning steps. No workload is skipped.",
+  "campaigns": [
+    {
+      "name": "run01",
+      "status": "failed",
+      "scope": "Full owning smoke reached authority startup and refused unsafe ancestor /home/connor/lanes(mode775). This is a correct custody refusal; the shared parent was not changed."
+    },
+    {
+      "name": "run02",
+      "status": "aborted",
+      "scope": "Cold rebuild without the prior wrapper stopped by exact process IDs. No smoke pass. Retained independent Original/static controls remain separate."
+    },
+    {
+      "name": "run03",
+      "status": "passed",
+      "environment": "LocalLinuxaarch64, umask022, same build wrapper and target asrun01, private CHIO_DROGON_ARTIFACT_ROOT under protected cache ancestry.",
+      "log_sha256": "3d26261addc3bc2bb8f8c5e09898654ed3f1f3c7f12b9b83b8a8274616c96bc4",
+      "coverage": [
+        "Pinned dependency bootstrap",
+        "Drogon and example C++ contract tests",
+        "Authority issuance/token permissions and unsafe existing-parent refusal",
+        "Real HTTP allow/deny smoke and signed receipts"
+      ],
+      "source_binding": "Before and after working diff hashes equal the reviewed committed diff. The producing checkout was based on28d with the three candidate files modified; final commit retains those exact bytes."
+    }
+  ],
+  "independent_review": {
+    "reviewer": "Root",
+    "result": "approve",
+    "scope": "Exact3-file reviewed diff95725677 and source/positive/refusal evidence. Claude released the clean producer commit at2026-10-12T01:37:02Z."
+  },
+  "prospective_composition": {
+    "observed_utc": "2026-10-12T01:39:09.835235+00:00",
+    "preflight_head": "9c2cd17a2e0115d989b3ac4c99ae2517018e65df",
+    "tree": "a8f6e6cf36830302ebe14cbf35bf9f6b60d4c2d0",
+    "producer": "de664c85ee1b1918bfb72b7aca28fd78cfeb0e79",
+    "producer_files_equal": true,
+    "results": [
+      {
+        "name": "drogon-contract",
+        "command": [
+          "bash",
+          "scripts/tests/check-drogon-consumer-gate.test.sh"
+        ],
+        "exit": 0,
+        "log_sha256": "5d4406fc11cdd58641991b76947fd7ec81c2944f90327cc965e7ba91623b2bc0"
+      },
+      {
+        "name": "security-contract",
+        "command": [
+          "python3",
+          "scripts/check-security-ci-contract.py"
+        ],
+        "exit": 0,
+        "log_sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+      },
+      {
+        "name": "actions",
+        "command": [
+          "python3",
+          "scripts/check-actions-workflow-syntax.py",
+          "--actionlint",
+          "/tmp/chio-task4d-actionlint.oWO7ms/actionlint",
+          ".github/workflows/nightly.yml",
+          ".github/workflows/release-qualification.yml"
+        ],
+        "exit": 0,
+        "log_sha256": "06351bb1acef27920fa6d11806450c26a3b16b10326d27f3e9db2e17e13ba2b0"
+      },
+      {
+        "name": "release-source",
+        "command": [
+          "python3",
+          "scripts/check-release-source-gates.py"
+        ],
+        "exit": 1,
+        "log_sha256": "c016de0ae69c59ae1b42f792a9286359d429acd7faa019f7a7f6607dcd57ecc8"
+      },
+      {
+        "name": "release-source-controls",
+        "command": [
+          "python3",
+          "scripts/tests/check-release-source-gates.test.py"
+        ],
+        "exit": 0,
+        "log_sha256": "57c970dce65991c37a8d789cabeb72559c6cd5a30ef9aeac82ba1e4432ab96f3"
+      },
+      {
+        "name": "formal-tools",
+        "command": [
+          "bash",
+          "scripts/tests/release-qualification-formal-tools.test.sh"
+        ],
+        "exit": 0,
+        "log_sha256": "2c8a5100bc7eb824f6a3b86318eb1fef53f6e4ea5f0e56b7064c8ad432c067e7"
+      },
+      {
+        "name": "formal-wiring",
+        "command": [
+          "bash",
+          "scripts/tests/formal-workflow-wiring.test.sh"
+        ],
+        "exit": 0,
+        "log_sha256": "ef4928c704e54506c3368bde07c627c61597511a2b83830e5342685da386652f"
+      },
+      {
+        "name": "release-assurance",
+        "command": [
+          "bash",
+          "scripts/tests/ci-release-assurance.test.sh"
+        ],
+        "exit": 0,
+        "log_sha256": "a0cd8909eb60259cd18410bc80511911d706c3a512d4a13a2f33d525da4d71b7"
+      }
+    ],
+    "scope": "Prospective composition only. Actual1201 landing base and new1202 candidate still pending.",
+    "local_release_invocation": {
+      "result": "refused-not-applicable",
+      "exit": 1,
+      "reason": "Invoked the live tag release CLI without GITHUB_SHA; first required environment lookup raisesKeyError before API calls. Source unchanged; the17 owning offline controls passed. This is not a local static gate or release acceptance."
+    }
+  },
+  "evidence_archive": {
+    "path": "/home/connor/lanes/pr1160-root-evidence/release-drogon-de664c85ee-20261012",
+    "manifest_sha256": "f055160b0f3b36ec6718671e07c57bbc5e12da720270ff4d78d93ea650fb69ec"
+  },
+  "main_ci_duplicate": {
+    "run": 38183162158,
+    "status": "cancelled",
+    "source_tree": "9000ce6bb655ebb9be185190cad8ac4ecb53949d",
+    "retained_source_run": 38177003267,
+    "retained_landing_run": 38186776842,
+    "scope": "Cancel duplicate main tree to free hosted runners; retain cancellation and aggregate failures. Neither sourcePR nor landingPR run was cancelled.",
+    "manifest_sha256": "ad0410a194767b43f6db60498144507b1bbf42188e8d9d333c9cf7e49f91a20b"
+  },
+  "landing_pr": 1202,
+  "status": "source-reviewed-prospective-composition-qualified",
+  "remaining_acceptance": [
+    "Integrate actual #1201 main landing into the auditor candidate, then integrate this released source and review the final composition.",
+    "Publish one bounded #1202 replacement; require exact-head hosted landing checks and classify every additional failure.",
+    "Full release qualification remains open, including the separately diagnosed Aeneas snapshot drift. No proof normalization or acceptance waiver is included."
+  ],
+  "limits": "No productionRust change. Local smoke is not hosted x86_64 qualification or release activation. Repository variables, trusted definitions and Pages settings remain unchanged."
+}
