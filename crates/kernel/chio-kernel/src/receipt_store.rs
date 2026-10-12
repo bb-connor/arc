@@ -1499,6 +1499,14 @@ mod tests {
         }
     }
 
+    #[test]
+    fn retained_child_lookup_is_unsupported_for_append_only_stores() {
+        assert!(matches!(
+            AppendOnlyStore.load_retained_child_receipt("unknown-child"),
+            Err(ReceiptStoreError::Unsupported(_))
+        ));
+    }
+
     struct CountingAppendStore {
         append_calls: AtomicUsize,
     }
