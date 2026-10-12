@@ -245,16 +245,10 @@ struct EvaluateRequest {
     trusted_issuers: Vec<String>,
     #[serde(default)]
     metadata: Option<serde_json::Value>,
-    // `scope` and `arguments` are accepted by the wire protocol so future
-    // policy checks can inspect them. Marked `allow(dead_code)` so their
-    // presence in the schema is enforced by serde without triggering a
-    // compiler warning in the current evaluator.
     #[serde(default)]
     #[allow(dead_code)]
     scope: Option<String>,
     #[serde(default)]
-    #[allow(dead_code)]
-    #[serde(alias = "parameters")]
     arguments: Option<serde_json::Value>,
 }
 
@@ -861,7 +855,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn request_hydration_accepts_header_capability_and_parameters_alias() {
+    async fn request_hydration_accepts_header_capability_and_arguments() {
         let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let capability = CapabilityToken::sign(
@@ -894,7 +888,7 @@ mod tests {
         let mut request: EvaluateRequest = serde_json::from_value(serde_json::json!({
             "tool_server": "srv",
             "tool_name": "tool",
-            "parameters": { "q": "hello" }
+            "arguments": { "q": "hello" }
         }))
         .unwrap();
         let mut headers = hyper::HeaderMap::new();

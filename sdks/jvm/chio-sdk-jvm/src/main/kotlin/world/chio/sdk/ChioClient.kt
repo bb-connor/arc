@@ -250,9 +250,6 @@ class ChioClient
             return parser.treeToValue(node, VerifyReceiptResponse::class.java)
         }
 
-        /** Short-name alias for callers that already use Chio as the package context. */
-        fun verifyReceipt(receipt: HttpReceipt): VerifyReceiptResponse = verifyHttpReceipt(receipt)
-
         /**
          * Pure client-side Merkle chain walk. Mirrors verify_receipt_chain;
          * byte-identical hashes via CanonicalJson.
