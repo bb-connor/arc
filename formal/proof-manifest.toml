@@ -1406,9 +1406,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/delivery_preparation.rs"
 rust_symbols = ["ChioKernel::wait_for_tool_dispatch_readiness"]
-normalized_sha256 = "e26b60769e4ec300b088e6d9851ba4814b9d65720f77b3b7b679a2b40ec136bc"
+normalized_sha256 = "83783a1b2d494a1b0d992cb394deb2c20a1cee46328cc84a19bdd0a4828e91c5"
 symbol_sha256 = [
-  { symbol = "ChioKernel::wait_for_tool_dispatch_readiness", sha256 = "4b681140d56c7fbad1769ddb0c706c002f2e9723253cf8e6e780fbc1d04b9875" },
+  { symbol = "ChioKernel::wait_for_tool_dispatch_readiness", sha256 = "e1329745546dd95d311b1279b05cd918b6e279cf274d4f27f643e1600aa641a6" },
 ]
 
 [[mirror]]
@@ -1428,9 +1428,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/delivery_preparation.rs"
 rust_symbols = ["ChioKernel::wait_for_tool_dispatch_readiness"]
-normalized_sha256 = "e26b60769e4ec300b088e6d9851ba4814b9d65720f77b3b7b679a2b40ec136bc"
+normalized_sha256 = "83783a1b2d494a1b0d992cb394deb2c20a1cee46328cc84a19bdd0a4828e91c5"
 symbol_sha256 = [
-  { symbol = "ChioKernel::wait_for_tool_dispatch_readiness", sha256 = "4b681140d56c7fbad1769ddb0c706c002f2e9723253cf8e6e780fbc1d04b9875" },
+  { symbol = "ChioKernel::wait_for_tool_dispatch_readiness", sha256 = "e1329745546dd95d311b1279b05cd918b6e279cf274d4f27f643e1600aa641a6" },
 ]
 
 [[mirror]]
