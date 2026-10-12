@@ -34,12 +34,6 @@ public class ChioMiddlewareOptions
     public int TimeoutSeconds { get; set; } = 5;
 
     /// <summary>
-    /// Reserved no-op option. The middleware always denies when the sidecar is
-    /// unreachable.
-    /// </summary>
-    public string OnSidecarError { get; set; } = "deny";
-
-    /// <summary>
     /// Custom identity extractor. Defaults to header-based extraction.
     /// </summary>
     public IdentityExtractorDelegate? IdentityExtractor { get; set; }

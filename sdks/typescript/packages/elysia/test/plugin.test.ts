@@ -133,26 +133,6 @@ describe("chio elysia plugin", () => {
     expect(body.error).toBe("chio_sidecar_unreachable");
   });
 
-  it("fails closed when reserved onSidecarError is allow", async () => {
-    const app = new Elysia()
-      .use(
-        chio({
-          sidecarUrl: "http://127.0.0.1:1", // Unreachable
-          onSidecarError: "allow",
-          timeoutMs: 500,
-        }),
-      )
-      .get("/test", () => ({ data: "reached handler" }));
-
-    const response = await app.handle(
-      new Request("http://localhost/test", { method: "GET" }),
-    );
-
-    expect(response.status).toBe(502);
-    const body = await response.json();
-    expect(body.error).toBe("chio_sidecar_unreachable");
-  });
-
   it("skip patterns with regex work", async () => {
     const app = new Elysia()
       .use(

@@ -280,11 +280,9 @@ describe("chioTool: shape and type preservation", () => {
       execute: async () => "ok",
       scope: { toolServer: "s", toolName: "t" },
       clientOptions: { fetch },
-      onSidecarError: "deny",
     });
     expect("scope" in wrapped).toBe(false);
     expect("clientOptions" in wrapped).toBe(false);
-    expect("onSidecarError" in wrapped).toBe(false);
   });
 });
 
@@ -956,29 +954,7 @@ describe("chioTool: deny path throws ChioToolError", () => {
     });
   });
 
-  it("fails closed even when reserved onSidecarError=allow is configured", async () => {
-    const { fetch } = throwingFetch(new Error("connect ECONNREFUSED"));
-    let called = false;
-    const wrapped = chioTool({
-      verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({}),
-      execute: async () => {
-        called = true;
-        return "ran";
-      },
-      scope: { toolServer: "s", toolName: "t" },
-      clientOptions: { fetch },
-      onSidecarError: "allow",
-    });
-
-    await expect(wrapped.execute!({})).rejects.toMatchObject({
-      name: "ChioToolError",
-      verdict: "sidecar_unreachable",
-    });
-    expect(called).toBe(false);
-  });
-
-  it("keeps sidecar control responses blocking even when onSidecarError=allow", async () => {
+  it("keeps sidecar control responses blocking", async () => {
     const { fetch } = fakeFetch([{ error: "approval required", status: 409 }]);
     let called = false;
     const wrapped = chioTool({
@@ -990,7 +966,6 @@ describe("chioTool: deny path throws ChioToolError", () => {
       },
       scope: { toolServer: "s", toolName: "t" },
       clientOptions: { fetch },
-      onSidecarError: "allow",
     });
 
     await expect(wrapped.execute!({})).rejects.toMatchObject({

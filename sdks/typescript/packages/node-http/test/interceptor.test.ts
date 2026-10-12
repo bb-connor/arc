@@ -284,7 +284,6 @@ describe("resolveConfig", () => {
   it("applies defaults when no config provided", () => {
     const resolved = resolveConfig({});
 
-    expect(resolved.onSidecarError).toBe("deny");
     expect(resolved.timeoutMs).toBe(5000);
     expect(resolved.forwardHeaders).toEqual([
       "content-type",
@@ -303,11 +302,6 @@ describe("resolveConfig", () => {
       "content-type",
       "content-length",
     ]);
-  });
-
-  it("coerces fail-open sidecar errors to fail-closed", () => {
-    const resolved = resolveConfig({ onSidecarError: "allow" });
-    expect(resolved.onSidecarError).toBe("deny");
   });
 
   it("returns a fresh default forwarded header list", () => {
@@ -626,10 +620,9 @@ describe("request body preservation", () => {
     }
   });
 
-  it("fails closed for Node sidecar errors even when fail-open is requested", async () => {
+  it("fails closed for Node sidecar errors", async () => {
     const resolved = resolveConfig({
       sidecarUrl: "http://127.0.0.1:1",
-      onSidecarError: "allow",
       timeoutMs: 200,
     });
 
@@ -678,10 +671,9 @@ describe("request body preservation", () => {
     }
   });
 
-  it("fails closed for Web sidecar errors even when fail-open is requested", async () => {
+  it("fails closed for Web sidecar errors", async () => {
     const resolved = resolveConfig({
       sidecarUrl: "http://127.0.0.1:1",
-      onSidecarError: "allow",
       timeoutMs: 200,
     });
 

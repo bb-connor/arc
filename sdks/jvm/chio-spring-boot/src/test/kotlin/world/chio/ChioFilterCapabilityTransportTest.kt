@@ -103,13 +103,12 @@ class ChioFilterCapabilityTransportTest {
     }
 
     @Test
-    fun `reserved fail-open setting still fails closed`() {
+    fun `unreachable sidecar fails closed`() {
         val filter =
             ChioFilter(
                 ChioFilterConfig(
                     sidecarUrl = "http://127.0.0.1:1",
                     timeoutSeconds = 1,
-                    onSidecarError = "allow",
                 ),
             )
         val request =

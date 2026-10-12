@@ -116,7 +116,7 @@ public class ChioMiddlewareCapabilityTests
     }
 
     [Fact]
-    public async Task LegacyFailOpenSettingStillFailsClosed()
+    public async Task UnreachableSidecarFailsClosed()
     {
         var nextCalled = false;
         var middleware = new ChioProtectMiddleware(
@@ -129,7 +129,6 @@ public class ChioMiddlewareCapabilityTests
             options: Options.Create(new ChioMiddlewareOptions
             {
                 SidecarUrl = "http://127.0.0.1:1",
-                OnSidecarError = "allow",
                 TimeoutSeconds = 1,
             }),
             logger: NullLogger<ChioProtectMiddleware>.Instance

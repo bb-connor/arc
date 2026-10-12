@@ -150,7 +150,6 @@ export interface ResolvedConfig {
   sidecarUrl: string;
   identityExtractor: IdentityExtractor;
   routePatternResolver: RoutePatternResolver;
-  onSidecarError: "deny" | "allow";
   timeoutMs: number;
   forwardHeaders: string[];
   client: ChioSidecarClient;
@@ -163,7 +162,6 @@ export function resolveConfig(config: ChioConfig): ResolvedConfig {
     sidecarUrl: config.sidecarUrl ?? process.env["CHIO_SIDECAR_URL"] ?? "http://127.0.0.1:9090",
     identityExtractor: config.identityExtractor ?? defaultIdentityExtractor,
     routePatternResolver: config.routePatternResolver ?? defaultRoutePatternResolver,
-    onSidecarError: "deny",
     timeoutMs: config.timeoutMs ?? 5000,
     forwardHeaders: [...(config.forwardHeaders ?? defaultForwardHeaders)],
     client,
