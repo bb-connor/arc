@@ -17,3 +17,19 @@ without loading private signing custody just to verify receipts.
 
 No changes to unrelated reputation consumers, receipt scoring, authority
 activation, signing custody or repository settings are included.
+
+## Reproduction and review scope
+
+Original `3d58fded9a` fails the three expected-safe assertions: recovered
+receipts contribute zero, displaced custody contributes reputation, and a
+zero-threshold reputation policy accepts without an authority. The policy with
+no reputation requirement passes. Each receipt first passes a direct scoring
+control under its own explicitly trusted signer. The earlier future-clock
+fixture failure and quota-scoring false positive are retained separately.
+
+The repair follows the existing current-trust reputation contract. Rotation
+keeps verification-only issuers through their configured deadline; recovery,
+revocation and retirement remove their authority. A rotation/revocation control
+checks this behavior. Counting receipts after issuer retirement would require a
+separate timestamp-aware historical trust contract; archived keys must not be
+added to the current trust set without that check.

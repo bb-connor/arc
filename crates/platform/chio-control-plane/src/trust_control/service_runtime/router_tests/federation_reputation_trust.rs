@@ -266,3 +266,39 @@ fn federation_without_reputation_keeps_authority_optional() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn federation_reputation_preserves_rotation_grace_and_excludes_revoked_keys() -> TestResult {
+    let now = now_unix_secs()?;
+    let _clock = chio_test_support::clock::scope_unix_secs(now);
+    let mut fixture = Fixture::recovered(now)?;
+    let authority_path = fixture._directory.path().join("recovered.sqlite3");
+    fixture.state.config.authority_db_path = Some(authority_path.clone());
+    let subject = fixture.history(&fixture.admitted)?;
+    let authority = SqliteCapabilityAuthority::open_with_clock(
+        &authority_path,
+        Arc::clone(&fixture.state.finding_challenge_clock),
+    )?;
+    let rotated = authority.rotate_with_verification_deadline(now + 3_600)?;
+    assert_ne!(rotated.public_key, fixture.admitted.public_key());
+    assert!(rotated
+        .trusted_public_keys
+        .contains(&fixture.admitted.public_key()));
+    let response = fixture.evaluate(subject.clone())?;
+    assert!(
+        response.accepted,
+        "rotation dropped valid history: {response:?}"
+    );
+
+    let revoked = authority.revoke_issuer(&fixture.admitted.public_key())?;
+    assert!(!revoked
+        .trusted_public_keys
+        .contains(&fixture.admitted.public_key()));
+    let response = fixture.evaluate(subject)?;
+    assert!(
+        !response.accepted,
+        "revoked key still contributed: {response:?}"
+    );
+    assert_eq!(response.observed_reputation_score, Some(0.0));
+    Ok(())
+}
