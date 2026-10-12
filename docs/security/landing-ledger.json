@@ -134518,7 +134518,149 @@
         "Finish F077 protected merge/App/ruleset evidence, current independent review, default/PQ/platform/cold/trusted/hosted checks and protected landing."
       ]
     },
-    "incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY": {"state":"hosted-native-trajectory-passed-successor-pending","source_checkpoint":"34443073624f6ee016d1c2599faeb2aefbb3a1cb","audit_checkpoint":"ebdf52364cbafed33bd04e17c25be57ab055755b","audit_path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","source_repair":{"commits":["dab61de13859d8396b50e76a4c492d064b06ba60","5ec396fd53bb451ff46c974154abaec5ed06b57b"],"observed_source_head":"5a56b7a17f9fb38374b3bfca8adee8add47d87da","observed_source_tree":"dba774b474df8e1a5d6ae27966c33d7188305b03","application":"diagnostic and bounded journal source integrated; actual native acceptance open","basis":"Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.","scope":"Complete actual enforcing eight-receipt native trajectory, unchanged10000ms fence, current image, costs and custody. Only a reachable confirmed refusal/cost defect justifies another producer. No new one was established by this ledger pass.","checkpoint_cadence":{"producer":"c63163a322ee6d2547c03ef4f13cf4d62fa96bf1","commits":["0ca1e3fb3177d6e404b670d3f42294b9c238c133","2a771bba409274e683e7a9262b43eea00d6e2889"],"files":["crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/participant_history_cadence.rs","crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/cadence.rs","crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/retention.rs","docs/security/native-security-journal-checkpoints.md"],"file_sha256":{"crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/participant_history_cadence.rs":"0c069e7a5cc45c8582c2084e9d5c69b19283f0dcff4e8bdf1f67cb191e7d6325","crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/cadence.rs":"22be18e77a57015bb95563207461d87351bc06cf3e86ff12e25841996da00350","crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/retention.rs":"6c4974a9d910f8d523ccfe37f7a7b464cc6d8024f9a7b0efa2f13b9802833315","docs/security/native-security-journal-checkpoints.md":"26d265d9afff154d80b4c9212e579d1e3204d24c0cd7b431ed904e8fb3273b3b"}}},"focused_green":false,"qualified":false,"merged":false,"previous_state":"native-failure-confirmed-cause-unidentified-diagnostic-proposal-pending","previous_checkpoint_state":"deadline-exhaustion-strong-causal-inference-exact-fixed-diagnostic-and-performance-repair-pending","full_qualified":false,"owning_pending":true,"native_pending":false,"trusted_pending":true,"hosted_pending":true,"source_integrated":true,"verification_evidence":[{"path":"docs/security/audits/repair-batch-local-checkpoint-20261008.json","sha256":"6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9","scope":"Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."},{"path":"docs/security/audits/native-checkpoint-cadence-composition-20261011.json","sha256":"e5cf713adcebf2fdd8d10cc2d547dd2774f1de467c1aa5236ed993fc5752e942","scope":"Independent source and prose approval; exact producer renewal and composed runtime acceptance pending."},{"path":"docs/security/audits/native-recovery-hosted-20261011.json","checkpoint":"e733217ed2ac62a0091a9d8184d286f01d7e8ba7","sha256":"6cedc79e9871321a62c79f36c0566a870c58d678b733f90a37c2682b79eaf565","scope":"Published36d enforcing native baseline/known/unknown and operator scenarios pass; Root independently verifies33 receipts. Original failures, cold/archive/capacity, full successor and trusted authorization boundaries remain."}],"remaining_acceptance":["Retain explicitly pinned Original/GREEN evidence and pass final composed control-plane/store owning and strict gates.","Qualify archive/open-time and cold-state capacity separately.","Pass four required checks on the exact published successor; classify other failures, answer reviews and obtain Connor merge go-ahead.","This source-specific native fixture pass does not qualify latency percentiles, broader load/concurrency, cold-state activation or final replacement source; renew the final hosted candidate and retain previous failures."],"current_source_reconciliation_20261008":{"audit_path":"docs/security/audits/current-source-reconciliation-20261008.json","audit_sha256":"23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4","source_checkpoint":"5a56b7a17f9fb38374b3bfca8adee8add47d87da","evidence_scope":"Private fixed-stage diagnostics and N16 bounded-history GREEN preserved. Separate preparation helper owns current trace.","source_is_not_full_qualification":true},"source_repair_previous_observation_20261008":{"commits":["dab61de13859d8396b50e76a4c492d064b06ba60"],"observed_source":"34443073624f6ee016d1c2599faeb2aefbb3a1cb","scope":"Source integration; exact runtime campaigns below retain their own source SHAs and limited acceptance."},"current_state":"hosted-native-trajectory-passed-successor-pending","observed_source_head":"36d77fe276cbe3b2b14440e8197004ffc0accbca","published":true,"published_source_head":"36d77fe276cbe3b2b14440e8197004ffc0accbca","native_fixture_passed":true,"native_evidence_head":"36d77fe276cbe3b2b14440e8197004ffc0accbca","native_evidence_job":114440578983},
+    "incoming-pr1160-review-20261008:native:MINISW-NATIVE-DENY": {
+      "state": "native-x86-source-pinned-passed-current-candidate-pending",
+      "source_checkpoint": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
+      "audit_checkpoint": "ebdf52364cbafed33bd04e17c25be57ab055755b",
+      "audit_path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
+      "source_repair": {
+        "commits": [
+          "dab61de13859d8396b50e76a4c492d064b06ba60",
+          "5ec396fd53bb451ff46c974154abaec5ed06b57b"
+        ],
+        "observed_source_head": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "observed_source_tree": "dba774b474df8e1a5d6ae27966c33d7188305b03",
+        "application": "diagnostic and bounded journal source integrated; source-pinned x86 native trajectories passed; successor and broader acceptance remain open",
+        "basis": "Accepted owner/source/evidence mapping from the sealed finite reconciliation; exact commit ancestry and explicit patch aliases checked. No whole requirement acceptance inferred from containment.",
+        "scope": "Complete actual enforcing eight-receipt native trajectory, unchanged10000ms fence, current image, costs and custody. Only a reachable confirmed refusal/cost defect justifies another producer. No new one was established by this ledger pass.",
+        "checkpoint_cadence": {
+          "producer": "c63163a322ee6d2547c03ef4f13cf4d62fa96bf1",
+          "commits": [
+            "0ca1e3fb3177d6e404b670d3f42294b9c238c133",
+            "2a771bba409274e683e7a9262b43eea00d6e2889"
+          ],
+          "files": [
+            "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/participant_history_cadence.rs",
+            "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/cadence.rs",
+            "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/retention.rs",
+            "docs/security/native-security-journal-checkpoints.md"
+          ],
+          "file_sha256": {
+            "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/participant_history_cadence.rs": "0c069e7a5cc45c8582c2084e9d5c69b19283f0dcff4e8bdf1f67cb191e7d6325",
+            "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/cadence.rs": "22be18e77a57015bb95563207461d87351bc06cf3e86ff12e25841996da00350",
+            "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/retention.rs": "6c4974a9d910f8d523ccfe37f7a7b464cc6d8024f9a7b0efa2f13b9802833315",
+            "docs/security/native-security-journal-checkpoints.md": "26d265d9afff154d80b4c9212e579d1e3204d24c0cd7b431ed904e8fb3273b3b"
+          }
+        }
+      },
+      "focused_green": false,
+      "qualified": false,
+      "merged": false,
+      "previous_state": "native-failure-confirmed-cause-unidentified-diagnostic-proposal-pending",
+      "previous_checkpoint_state": "deadline-exhaustion-strong-causal-inference-exact-fixed-diagnostic-and-performance-repair-pending",
+      "full_qualified": false,
+      "owning_pending": true,
+      "native_pending": false,
+      "trusted_pending": true,
+      "hosted_pending": true,
+      "source_integrated": true,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/repair-batch-local-checkpoint-20261008.json",
+          "sha256": "6e3781eb1b9e8eeb56f7d31ad10ef2cb9bd609bf7013c1477e998326a16a21b9",
+          "scope": "Per-campaign source/binary/log receipts, preserving failing Original/setup/fixture records separately. Current whole-candidate acceptance remains open."
+        },
+        {
+          "path": "docs/security/audits/native-checkpoint-cadence-composition-20261011.json",
+          "sha256": "e5cf713adcebf2fdd8d10cc2d547dd2774f1de467c1aa5236ed993fc5752e942",
+          "scope": "Independent source and prose approval; exact producer renewal and composed runtime acceptance pending."
+        },
+        {
+          "path": "docs/security/audits/native-recovery-hosted-20261011.json",
+          "checkpoint": "e733217ed2ac62a0091a9d8184d286f01d7e8ba7",
+          "sha256": "6cedc79e9871321a62c79f36c0566a870c58d678b733f90a37c2682b79eaf565",
+          "scope": "Published36d enforcing native baseline/known/unknown and operator scenarios pass; Root independently verifies33 receipts. Original failures, cold/archive/capacity, full successor and trusted authorization boundaries remain."
+        },
+        {
+          "path": "/home/connor/lanes/claude-pr1160-evidence/minisw-x86/66f976ab27f2bae9136e84ae013b0184fd4f5237/SHA256SUMS",
+          "checkpoint": "66f976ab27f2bae9136e84ae013b0184fd4f5237",
+          "sha256": "dbba940791c5c21e374d54cb9e48b5b9ea83d2b68170474606218f4d7391bfb4",
+          "scope": "Three source-pinned local native/operator passes, unchanged 10000 ms fence and 10-second operator timeout; 148 retained evidence checksums independently verified. Invalid fixture runs and previous native/hosted evidence remain preserved."
+        }
+      ],
+      "remaining_acceptance": [
+        "Retain explicitly pinned Original/GREEN evidence and pass final composed control-plane/store owning and strict gates.",
+        "Qualify archive/open-time and cold-state capacity separately.",
+        "Pass four required checks on the exact published successor; classify other failures, answer reviews and obtain Connor merge go-ahead.",
+        "This source-specific native fixture pass does not qualify latency percentiles, broader load/concurrency, cold-state activation or final replacement source; renew the final hosted candidate and retain previous failures."
+      ],
+      "current_source_reconciliation_20261008": {
+        "audit_path": "docs/security/audits/current-source-reconciliation-20261008.json",
+        "audit_sha256": "23f73f936683a43044eb210850f80b83eb7d9853abdeb43f797c9619bbc674c4",
+        "source_checkpoint": "5a56b7a17f9fb38374b3bfca8adee8add47d87da",
+        "evidence_scope": "Private fixed-stage diagnostics and N16 bounded-history GREEN preserved. Separate preparation helper owns current trace.",
+        "source_is_not_full_qualification": true
+      },
+      "source_repair_previous_observation_20261008": {
+        "commits": [
+          "dab61de13859d8396b50e76a4c492d064b06ba60"
+        ],
+        "observed_source": "34443073624f6ee016d1c2599faeb2aefbb3a1cb",
+        "scope": "Source integration; exact runtime campaigns below retain their own source SHAs and limited acceptance."
+      },
+      "current_state": "native-x86-source-pinned-passed-current-candidate-pending",
+      "observed_source_head": "66f976ab27f2bae9136e84ae013b0184fd4f5237",
+      "published": true,
+      "published_source_head": "66f976ab27f2bae9136e84ae013b0184fd4f5237",
+      "native_fixture_passed": true,
+      "native_evidence_head": "66f976ab27f2bae9136e84ae013b0184fd4f5237",
+      "historical_native_observation_20261011": {
+        "state": "hosted-native-trajectory-passed-successor-pending",
+        "current_state": "hosted-native-trajectory-passed-successor-pending",
+        "observed_source_head": "36d77fe276cbe3b2b14440e8197004ffc0accbca",
+        "published": true,
+        "published_source_head": "36d77fe276cbe3b2b14440e8197004ffc0accbca",
+        "native_fixture_passed": true,
+        "native_evidence_head": "36d77fe276cbe3b2b14440e8197004ffc0accbca",
+        "native_evidence_job": 114440578983,
+        "source_repair_application": "diagnostic and bounded journal source integrated; actual native acceptance open"
+      },
+      "native_evidence_tree": "43a4905da92dbbda2efc2a5b7e0e1a9555314402",
+      "native_capture_20261012": {
+        "platform": "local Linux/x86_64 OCI host (16 vCPU)",
+        "binary_sha256": "d93ee975373423d1f063797d866adf5be022a4574386738618e186226cdb289c",
+        "worker_image": "sha256:352727b7c283f56aca948e033a71faed515d96a25b1532bfa48b83846d249e47",
+        "fence_ttl_ms": 10000,
+        "fence_source_path": "crates/security/chio-secret-broker/src/process_boundary_tests/consumer_services.rs",
+        "fence_source_sha256": "5eac6dc3ab8750fda5744899f89c2fa4c85dbdc6c73c9abbbb16b0ea3690aed2",
+        "operator_timeout_seconds": 10,
+        "accepted_runs": [
+          "run1",
+          "run2",
+          "run3"
+        ],
+        "qualify_native_exit_codes": [
+          0,
+          0,
+          0
+        ],
+        "qualify_operator_exit_codes": [
+          0,
+          0,
+          0
+        ],
+        "scenario_scope": "Each run: baseline one attempt, eight verified receipts and completed replay; known recovery three attempts and eight verified receipts; unknown recovery two attempts, stopped unknown outcome and zero command effects; operator eight verified receipts, three successful provider calls, completed replay, configuration-change refusal and provider-error refusal.",
+        "evidence_path": "/home/connor/lanes/claude-pr1160-evidence/minisw-x86/66f976ab27f2bae9136e84ae013b0184fd4f5237",
+        "sha256sums_sha256": "dbba940791c5c21e374d54cb9e48b5b9ea83d2b68170474606218f4d7391bfb4",
+        "verified_checksum_entries": 148,
+        "invalid_fixture_runs_preserved": [
+          "invalid-anchor-removed-run1",
+          "invalid-anchor-removed-run2"
+        ],
+        "invalid_fixture_scope": "Earlier capture invalidated by logind RemoveIPC deleting the /dev/shm fixture anchor; both labelled run directories retain native/operator exit one and are excluded from the three accepted runs.",
+        "acceptance_boundary": "Source-pinned local native fixture evidence only. No exact-current, hosted, latency/percentile, broader load/concurrency, cold-state or whole-qualification acceptance. Concurrent cargo builds were observed during runs two and three."
+      }
+    },
     "incoming-pr1160-review-20261008:native:BROKER-SELECT": {
   "state": "source-integrated-selector-controls4-and-private3-green-full-owning-pending",
   "source_checkpoint": "ef23fba41cd3d0d8743621ee989d9bc9f5b74903",
