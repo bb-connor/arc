@@ -24,7 +24,7 @@ This repairs the last read-only dispatch check. It is not a same-writer closure 
 
 - Original `e0f694afcc`: two unchanged-authority controls passed; six late active, unavailable or malformed authority cases failed after one actual tool invocation.
 - Repair `06721c1db2`: all eight focused tests passed across 64 ordinary/nested, direct/pipeline and Ready/delayed cells. The full owning integration suite passed 93 tests.
-- The first strict run rejected an ambiguous test `RequestId` glob import. `0541a42da7` makes session imports explicit. Actual-main composition `6e265388eb` includes the prepayment custody repair and the new repository rules; its focused tests and strict lint remain pending.
+- The first strict run rejected an ambiguous test `RequestId` glob import. `0541a42da7` makes session imports explicit. Actual-main composition includes the prepayment custody repair and the new repository rules; final focused tests and strict lint pass as recorded below.
 - Claude reviews the 28-line production delta. No proof, same-writer linearization or closure/drain acceptance is implied.
 
 ## Delegation admission
@@ -37,4 +37,4 @@ The public non-tool validator admits issuer-signed delegated resource capabiliti
 - The tool invocation ban remains in force. No new capability minting interface is added.
 - Freeze-window replay after lift remains open because the authority has no retained interval history. Current presentation checks do not prove when an offline signature was created.
 
-Public Original `87238093c2` (unchanged delegation admission plus `fe2704734e` tests) passed three positive controls and failed four refusal controls: frozen subscription, frozen parent registration, missing authority and configured authority without signed binding. `6a01f759dd` implements the common admission check. `e65aeb0917` adds the public tool-ban control; `8fddc6c502` asserts the exact public error boundary. All eight public tests pass at `8fddc6c502`; combined strict qualification remains pending.
+Public Original `87238093c2` (unchanged delegation admission plus `fe2704734e` tests) passed three positive controls and failed four refusal controls: frozen subscription, frozen parent registration, missing authority and configured authority without signed binding. `6a01f759dd` implements the common admission check. `e65aeb0917` adds the public tool-ban control; `8fddc6c502` asserts the exact public error boundary. All eight public tests and all eight overlay tests pass at `8fddc6c502`. Strict Clippy for both owning crates passes at `f3f1800dae` after removing one redundant test conversion. Escape-hatch, clock and Rust-file hygiene checks pass. The reviewed delegation admission anchor is renewed; all 256 source mirrors and generated proof coverage pass. These checks record source review and do not prove freeze-window or closure properties.

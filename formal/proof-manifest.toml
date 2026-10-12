@@ -748,10 +748,10 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/validation.rs"
 rust_symbols = ["ChioKernel::check_revocation", "ChioKernel::validate_delegation_admission"]
-normalized_sha256 = "ba133f955cd96e9bc7454b3be0da769925e1486d33afc844c6bbdd84081aa7eb"
+normalized_sha256 = "38259d4731863b0b01b89054fc9715092c6f7b542d716dd5ba3ebae1e6b48f1f"
 symbol_sha256 = [
   { symbol = "ChioKernel::check_revocation", sha256 = "bc9a6778cb8139e7d2eadf47eac6b018426d27c8735931e0121b8bb316f4631f" },
-  { symbol = "ChioKernel::validate_delegation_admission", sha256 = "546e898f485369c2ae7e3194d6fcb5c1ab05d5e3918d4e235668a07ec4ac8fd2" },
+  { symbol = "ChioKernel::validate_delegation_admission", sha256 = "85c20f77af5d4ee2730f33310978dd780a20ad6eed96bd0a432fd932bf765fe6" },
 ]
 
 [[mirror]]
