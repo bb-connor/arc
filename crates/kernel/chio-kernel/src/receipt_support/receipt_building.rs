@@ -66,6 +66,7 @@ fn child_receipt_metadata(outcome_payload: &serde_json::Value) -> Option<serde_j
                 "message_truncated",
                 "encoding_error_code",
                 "original_payload_omitted",
+                "execution_outcome",
             ] {
                 if let Some(value) = outcome_payload.get(key) {
                     metadata.insert(key.into(), value.clone());

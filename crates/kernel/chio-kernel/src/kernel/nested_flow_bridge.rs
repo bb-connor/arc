@@ -21,6 +21,26 @@ pub(super) struct SessionNestedFlowBridge<'a, C> {
 }
 
 impl<C> SessionNestedFlowBridge<'_, C> {
+    fn retain_child_attempt(
+        &mut self,
+        context: &OperationContext,
+        operation_kind: OperationKind,
+    ) -> Result<usize, KernelError> {
+        let body = prepare_child_request_receipt(
+            self.policy_hash,
+            self.kernel_keypair.public_key(),
+            context,
+            operation_kind,
+            OperationTerminalState::Incomplete {
+                reason: "child interaction ended before its outcome was recorded".into(),
+            },
+            serde_json::json!({ "outcome": "unknown", "execution_outcome": "unknown" }),
+        )?;
+        let index = self.child_receipts.len();
+        self.child_receipts
+            .push(super::effect_obligation::recovery::PendingChildReceipt::Unsigned(body));
+        Ok(index)
+    }
     fn reserve_child_receipt(
         &mut self,
         request_id: &RequestId,
@@ -110,6 +130,7 @@ impl<C> SessionNestedFlowBridge<'_, C> {
 
     fn complete_child_request_with_receipt<T: serde::Serialize>(
         &mut self,
+        index: usize,
         child_context: &OperationContext,
         operation_kind: OperationKind,
         result: &Result<T, KernelError>,
@@ -151,9 +172,21 @@ impl<C> SessionNestedFlowBridge<'_, C> {
                 )?
             }
         };
-        let index = self.child_receipts.len();
-        self.child_receipts
-            .push(super::effect_obligation::recovery::PendingChildReceipt::Unsigned(body));
+        let Some(super::effect_obligation::recovery::PendingChildReceipt::Unsigned(original)) =
+            self.child_receipts.get(index)
+        else {
+            return Err(KernelError::Internal(
+                "child attempt lost its reserved evidence owner".into(),
+            ));
+        };
+        let body = ChildRequestReceiptBody {
+            id: original.id.clone(),
+            ..body
+        };
+        let pending = self.child_receipts.get_mut(index).ok_or_else(|| {
+            KernelError::Internal("child attempt lost its reserved evidence position".into())
+        })?;
+        *pending = super::effect_obligation::recovery::PendingChildReceipt::Unsigned(body);
         complete_session_request_with_terminal_state_in_sessions(
             self.sessions,
             &child_context.session_id,
@@ -224,6 +257,8 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
             false,
         )?;
 
+        let evidence_index = self.retain_child_attempt(&child_context, OperationKind::ListRoots)?;
+
         let result = (|| {
             let session = session_from_map(self.sessions, &child_context.session_id)?;
             session.validate_context(&child_context)?;
@@ -248,6 +283,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
                 .request_cancellation(&child_context.request_id)?;
         }
         self.complete_child_request_with_receipt(
+            evidence_index,
             &child_context,
             OperationKind::ListRoots,
             &result,
@@ -273,6 +309,9 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
             true,
         )?;
 
+        let evidence_index =
+            self.retain_child_attempt(&child_context, OperationKind::CreateMessage)?;
+
         let result = (|| {
             validate_sampling_request_in_sessions(
                 self.sessions,
@@ -293,6 +332,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
                 .request_cancellation(&child_context.request_id)?;
         }
         self.complete_child_request_with_receipt(
+            evidence_index,
             &child_context,
             OperationKind::CreateMessage,
             &result,
@@ -318,6 +358,9 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
             true,
         )?;
 
+        let evidence_index =
+            self.retain_child_attempt(&child_context, OperationKind::CreateElicitation)?;
+
         let result = (|| {
             validate_elicitation_request_in_sessions(
                 self.sessions,
@@ -337,6 +380,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
                 .request_cancellation(&child_context.request_id)?;
         }
         self.complete_child_request_with_receipt(
+            evidence_index,
             &child_context,
             OperationKind::CreateElicitation,
             &result,
