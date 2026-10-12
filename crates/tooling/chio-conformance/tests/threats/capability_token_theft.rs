@@ -12,22 +12,22 @@
 // third sanity arm pins the round-trip so an over-rejecting deny
 // path cannot silently classify all tokens as stolen.
 //
-// The Lane B1 single-entry verifier (`verify_capability_full`, sibling
-// of `verify_capability_with_floor` and shared canonical-JSON pre-image
-// logic via `CapabilityToken::verify_signature_with_floor`) ensures
-// every kernel/verifier caller now routes capability admission through
-// one fail-closed surface; this conformance test pins that surface.
+// The single-entry verifier (`verify_capability_full`, sibling of
+// `verify_capability_with_floor`, sharing the canonical-JSON pre-image
+// logic via `CapabilityToken::verify_signature_with_floor`) routes every
+// kernel and verifier capability admission through one fail-closed
+// surface; this conformance test pins that surface.
 //
 // Sub-vectors:
 //
-// 1. ScopeSuperset (R2 attack class). An attacker who obtained a
+// 1. ScopeSuperset. An attacker who obtained a
 //    signed token mutates `scope` to expand authority beyond what the
 //    issuer signed. The canonical-JSON signing pre-image now differs
 //    and `CapabilityToken::verify_signature_with_floor` fails the
 //    Ed25519 signature check; production returns
 //    `CapabilityError::InvalidSignature`.
 //
-// 2. PartialSignature (R2 attack class). An attacker re-targets a
+// 2. PartialSignature. An attacker re-targets a
 //    detached signature: they take a token signed by one issuer and
 //    swap the `issuer` key field to point at a different (untrusted)
 //    public key while keeping the original signature bytes. Production
@@ -47,25 +47,6 @@
 //     (`verify_capability_with_floor`).
 //   `crates/core/chio-core-types/src/capability/token.rs`
 //     (`CapabilityToken::sign`, `verify_signature_with_floor`).
-//
-// Revert-to-prove-it-fails recipe:
-// In `crates/kernel/chio-kernel-core/src/capability_verify.rs`, locate the
-// `if !trusted_issuers.contains(&token.issuer) { return
-// Err(CapabilityError::UntrustedIssuer); }` guard inside
-// `verify_capability_with_floor` (around line 158). Delete the guard
-// (or replace `return Err(...)` with a no-op). Re-run
-// `cargo test -p chio-conformance --test threats -- capability_token_theft`
-// and the
-// `assert!(matches!(err, CapabilityError::UntrustedIssuer))`
-// arm in `partial_signature_retargeted_issuer_rejected` MUST then
-// fail because production now admits tokens whose issuer is not in
-// the trust set. Likewise, deleting the canonical-JSON signature
-// check in `CapabilityToken::verify_signature_with_floor` breaks the
-// `InvalidSignature` arm in `scope_superset_after_sign_rejected`.
-//
-// Targeted mutation recipe: replace
-// `CapabilityToken::verify_signature_with_floor` with `Ok(true)`. The widened
-// scope is then accepted, and the ScopeSuperset deny-arm assertion MUST fail.
 
 use chio_core::capability::{
     crypto_floor::CapabilityCryptoFloor,

@@ -15,14 +15,6 @@
 // (`WeightsError::CardMismatch`), and `LoadedWeightsUnavailable`
 // (`WeightsError::SchemaRejected`). The two failure-path arms are the
 // production deny branches that catch a spoofed weights hash.
-//
-// Revert-to-prove-it-fails recipe: flip the equality check inside
-// `evaluate_weights_binding` in
-// `crates/kernel/chio-kernel/src/weights_binding.rs` (change `!=` to
-// `==` or short-circuit to `Ok(())`). The matching control and
-// spoofed-digest deny-arm assertions below fail because the production
-// binding no longer distinguishes a matching loaded digest from a
-// mismatched one.
 
 use chio_core::{loaded_weights_hash_of, LoadedWeights, LoadedWeightsUnavailable};
 use chio_kernel::weights_binding::evaluate_weights_binding_with_loaded_hash;

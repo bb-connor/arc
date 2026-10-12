@@ -3,11 +3,10 @@
 
 A schema or domain identifier such as `chio.receipt.v1` is the name a reader
 uses to decide whether it understands a payload. The constants that carry them
-are typed by hand, hundreds of them, and a bump from `.v1` to `.v2` compiles
-cleanly in the producer and is caught only where a test happens to hardcode the
-old literal. The caller-return-context bump from v4 to v6 was found that way,
-by two round-trip tests that pinned the literal; most identifiers here have no
-such test, so a bump to them would be caught by nothing.
+are typed by hand, hundreds of them, and a version bump compiles cleanly in the
+producer and is caught only where a test happens to hardcode the old literal.
+Most identifiers have no such test, so a bump to them would be caught by
+nothing.
 
 `spec/wire-schemas.lock` is a snapshot of every hand-written identifier
 constant under `crates/`: the value, the production files that declare it and

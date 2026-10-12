@@ -5929,7 +5929,7 @@ assert_auditor_transport_rejected(
 
 # P4 currency is the ordered parents and sealed tree, while M_ci authenticates
 # the exact CI attempt. Restore neither a captured-SHA selector nor an incomplete
-# PR census. Denials remain E-scoped when positive currency no longer holds.
+# PR census. Denials remain E-scoped when positive currency does not hold.
 for label, workflow, step, old, new, error in (
     (
         "CI selection re-requires the captured merge SHA",

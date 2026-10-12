@@ -1284,9 +1284,8 @@ async fn iroh_transport_lane_and_outbox_families_emit() -> Result<(), Box<dyn Er
 /// Rule-referenced families with no emitter anywhere in the tree, exempt from
 /// the emission gate with a documented reason. `chio_sidecar_requests_total` is
 /// referenced by the sidecar burn-rate recording rules and the
-/// `ChioSidecarMetricsMissing` alert but has no producer in the codebase; it is
-/// a pre-existing gap (wiring the sidecar request counter is deferred). The gate
-/// still asserts the family has a registry descriptor.
+/// `ChioSidecarMetricsMissing` alert but has no producer in the codebase; the
+/// sidecar request counter is not wired. The gate still asserts the family has a registry descriptor.
 const GATE_EXEMPT_UNPRODUCED: &[&str] = &["chio_sidecar_requests_total"];
 
 /// Emission gate: every metric name referenced by the shipped alert or recording
@@ -1411,7 +1410,7 @@ fn drive_and_render(name: &str) -> Result<Option<String>, Box<dyn Error>> {
     Ok(Some(out))
 }
 
-/// Drive the pre-existing infra families through the same production entry
+/// Drive the infra families through the same production entry
 /// points the dedicated per-edge tests use, returning None only for a name with
 /// no driver here.
 fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {

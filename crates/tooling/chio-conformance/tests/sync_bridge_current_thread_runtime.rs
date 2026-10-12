@@ -7,8 +7,8 @@
 //!
 //! This fixture asserts the typed error surfaces from a real
 //! current-thread Tokio runtime calling `evaluate_tool_call_blocking`.
-//! No mocks of the unit under test: we drive the production
-//! `ChioKernel::evaluate_tool_call_blocking` directly, with a real
+//! No mocks of the unit under test: the production
+//! `ChioKernel::evaluate_tool_call_blocking` is driven directly, with a real
 //! `ToolServerConnection` registered. The current-thread runtime is
 //! the production failure mode for any host that links Tokio with
 //! `flavor = "current_thread"` (e.g. some axum / tonic test harnesses).

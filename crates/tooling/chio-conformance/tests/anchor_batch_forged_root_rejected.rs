@@ -49,7 +49,7 @@ fn anchor_batch_with_forged_tree_root_is_rejected_by_verifier() {
 
     // Forge: substitute a hash that is plausibly shaped (32 bytes,
     // sha256 output) but does NOT match the real Merkle root over
-    // the leaves. We also mutate the witness root so the
+    // the leaves. The witness root is mutated too, so the
     // tree_root/witness label invariant is preserved (otherwise the
     // verifier's witness-binding check fires first and the test does
     // not exercise the real Merkle-recompute path).

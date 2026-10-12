@@ -3,17 +3,6 @@
 //! Coverage strategy: instantiate the in-tree `AgentVelocityGuard` with a
 //! one-request per-agent ceiling and assert a repeated request for the same
 //! agent denies while a different agent has an independent bucket.
-//!
-//! Revert-to-prove-it-fails recipe: flip the per-agent ceiling
-//! `Ok(Verdict::Deny)` to `Ok(Verdict::Allow)` inside
-//! `crates/guards/chio-guards/src/agent_velocity.rs`. The deny-arm assertion
-//! below fails when the production guard stops denying the second
-//! request.
-//!
-//! Targeted mutation recipe: replace `TokenBucket::can_consume` with `true`.
-//! The exhausted same-agent bucket then admits the repeated request, and its
-//! deny assertion MUST fail. The first request and other-agent controls MUST
-//! remain admitted.
 
 use chio_core::capability::{
     scope::ChioScope,

@@ -19,7 +19,7 @@ use crate::document::DocumentLanguage;
 
 /// Build an `lsp_types::Diagnostic` with a `urn:chio:error:*` code in
 /// the `code` field. The location is given as a (line, column) pair
-/// because the YAML parser surfaces 1-based locations; we convert here
+/// because the YAML parser surfaces 1-based locations; they are converted
 /// to LSP 0-based positions and zero-width ranges so the editor can
 /// place a squiggle on the offending token.
 pub fn diagnostic_with_urn(

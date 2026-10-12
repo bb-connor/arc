@@ -4,7 +4,7 @@
 //! Cross-language verdict-matrix activation gate.
 //!
 //! This integration test runs the cross-language diff oracle on the
-//! drivers we have available natively (the in-process Rust kernel and
+//! drivers available natively (the in-process Rust kernel and
 //! the WASM browser kernel via its native non-wasm test path), asserts
 //! tuple equality across drivers, and surfaces any divergence as a
 //! test failure. It runs as part of the chio-conformance test suite, so
@@ -128,8 +128,8 @@ fn collect_wasm_browser_report(scenarios: &[VerdictScenario]) -> DriverReport {
     // The browser kernel exposes `evaluate_pure`, which has a real
     // capability-subset semantic but no revocation store, execution
     // nonce store, or guard pipeline. The native (non-wasm32) cargo
-    // test surface reuses the same logic so we can diff against the
-    // Rust kernel without spinning up Chrome.
+    // test surface reuses the same logic, so the diff against the
+    // Rust kernel needs no Chrome.
     let mut tuples: BTreeMap<String, VerdictTuple> = BTreeMap::new();
     for scenario in scenarios {
         if scenario.script.operation != "tool.call" {
@@ -315,7 +315,7 @@ fn rust_kernel_satisfies_required_driver_contract() {
     let expected = expected_tuple_map(&scenarios);
 
     // The manifest pins `rust-kernel` as the only required driver. If
-    // we omit it from the report, the cross-language oracle must
+    // the report omits it, the cross-language oracle must
     // surface one divergence per scenario for the missing required
     // driver. This proves the manifest gate is wired correctly.
     let report = CrossLanguageReport::new();
