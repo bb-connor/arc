@@ -14,6 +14,13 @@ enum PriorVoluntaryRetraction {
     Published,
 }
 
+/// Which intent the fenced anchor evidence intent commits to.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AnchorCommitment {
+    SellerImpairIntent,
+    EnforcementId,
+}
+
 /// One liability head driven to `finalizing` with its seller-impairment
 /// intent fenced, paired with the enforcement the settlement choke point
 /// verifies. The head carries exactly the allocation and vault the
@@ -54,6 +61,17 @@ fn finalizing_liability_before_root_binding() -> Result<FinalizingLiability, Any
         false,
         PriorVoluntaryRetraction::None,
         false,
+        AnchorCommitment::SellerImpairIntent,
+    )
+}
+
+fn finalizing_liability_with_enforcement_bound_anchor() -> Result<FinalizingLiability, AnyError> {
+    finalizing_liability_with_options(
+        EnforcementRoot::Confirmed,
+        true,
+        PriorVoluntaryRetraction::None,
+        true,
+        AnchorCommitment::EnforcementId,
     )
 }
 
@@ -61,7 +79,13 @@ fn finalizing_liability_with(
     root: EnforcementRoot,
     anchor_fenced: bool,
 ) -> Result<FinalizingLiability, AnyError> {
-    finalizing_liability_with_options(root, anchor_fenced, PriorVoluntaryRetraction::None, true)
+    finalizing_liability_with_options(
+        root,
+        anchor_fenced,
+        PriorVoluntaryRetraction::None,
+        true,
+        AnchorCommitment::SellerImpairIntent,
+    )
 }
 
 fn finalizing_liability_with_prior_retraction(
@@ -69,7 +93,13 @@ fn finalizing_liability_with_prior_retraction(
     anchor_fenced: bool,
     prior_retraction: PriorVoluntaryRetraction,
 ) -> Result<FinalizingLiability, AnyError> {
-    finalizing_liability_with_options(root, anchor_fenced, prior_retraction, true)
+    finalizing_liability_with_options(
+        root,
+        anchor_fenced,
+        prior_retraction,
+        true,
+        AnchorCommitment::SellerImpairIntent,
+    )
 }
 
 fn finalizing_liability_with_options(
@@ -77,6 +107,7 @@ fn finalizing_liability_with_options(
     anchor_fenced: bool,
     prior_retraction: PriorVoluntaryRetraction,
     prepare_root: bool,
+    anchor_commitment: AnchorCommitment,
 ) -> Result<FinalizingLiability, AnyError> {
     let deployment = deployment()?;
     let coordinator = deployment.coordinator(FindingDisputeLockDisposition::Forfeited)?;
@@ -292,9 +323,13 @@ fn finalizing_liability_with_options(
         &anchor,
     )?;
     let anchor_key = derive_anchor_evidence_intent_key(&prepared.evidence_hash);
+    let anchor_intent_id = match anchor_commitment {
+        AnchorCommitment::SellerImpairIntent => intent_key.clone(),
+        AnchorCommitment::EnforcementId => enforcement.body.enforcement_id.clone(),
+    };
     let anchor_commitment = anchor_evidence_intent_commitment(
         &liability_key,
-        &intent_key,
+        &anchor_intent_id,
         &penalty_envelope_sha256,
         &prepared.merkle_root,
     );

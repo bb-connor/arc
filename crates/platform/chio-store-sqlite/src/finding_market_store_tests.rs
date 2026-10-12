@@ -1700,116 +1700,6 @@ fn expired_prepared_activation_releases_collateral_and_retains_fee_credit() {
 }
 
 #[test]
-fn schema_v2_upgrade_adds_expired_activation_recovery_without_replaying_admissions() {
-    let temp = tempfile::tempdir().expect("tempdir");
-    secure_temp_directory(temp.path());
-    let database = temp.path().join("authority.db");
-    let lock_root = temp.path().join("locks");
-    fs::create_dir(&lock_root).expect("create lock root");
-    secure_temp_directory(&lock_root);
-    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision authority");
-    let admission_id = {
-        let authority =
-            crate::test_authority::open_serving(&database, &lock_root).expect("open authority");
-        let store = authority.finding_market_store();
-        let finding_id = hex64('c');
-        let artifact = publish_finding(
-            &store,
-            &finding_id,
-            "regression/schema-v2",
-            &hex64('d'),
-            1_700_000_000,
-            1_900_000_000,
-        );
-        let backing = backing_body(&finding_id, "vault:schema-v2");
-        let backing_envelope = envelope_string(&backing, &keypair(21));
-        let backing_sha256 = chio_core::sha256_hex(backing_envelope.as_bytes());
-        store
-            .register_allocation(&backing_envelope, &backing, NOW)
-            .expect("register schema fixture allocation");
-        let admission = admission_body(
-            &finding_id,
-            &chio_core::sha256_hex(artifact.as_bytes()),
-            &backing,
-            &backing_sha256,
-        );
-        let envelope = envelope_string(&admission, &keypair(31));
-        store
-            .prepare_listing_activation_without_status_for_test(&envelope, &admission, NOW)
-            .expect("prepare schema fixture activation");
-        for terminal in &admission.fee_terminals {
-            let key = finding_fee_idempotency_key(
-                &terminal.fee_schedule_envelope_sha256,
-                &terminal.event,
-                &admission.finding_id,
-                &admission.listing_id,
-            );
-            store
-                .mark_fee_reconciled(
-                    &key,
-                    &terminal.observation_sha256,
-                    &terminal.amount,
-                    &terminal.rail_destination,
-                )
-                .expect("reconcile schema fixture fee");
-        }
-        store
-            .activate_listing(&envelope, &admission, NOW)
-            .expect("activate schema fixture");
-        admission.admission_id
-    };
-
-    let connection = rusqlite::Connection::open(&database).expect("open raw schema fixture");
-    connection
-        .execute_batch(
-            r#"
-            DROP TABLE finding_expired_activation_attempts;
-            DROP TRIGGER collateral_allocations_lifecycle;
-            CREATE TRIGGER collateral_allocations_lifecycle
-            BEFORE UPDATE OF state ON collateral_allocations
-            WHEN NOT (
-                OLD.state = 'live'
-                AND NEW.state IN ('consumed', 'expired', 'released')
-            )
-            BEGIN
-                SELECT RAISE(ABORT, 'collateral allocation leaves live exactly once');
-            END;
-            "#,
-        )
-        .expect("restore prior schema shape");
-    crate::stamp_schema_version(&connection, FINDING_MARKET_SCHEMA_KEY, 2)
-        .expect("stamp prior market schema");
-    drop(connection);
-
-    let authority = crate::test_authority::open_serving(&database, &lock_root)
-        .expect("upgrade prior schema revision");
-    let store = authority.finding_market_store();
-    assert_eq!(
-        store
-            .get_activation_attempt(&admission_id)
-            .expect("read upgraded activation")
-            .expect("upgraded activation exists")
-            .state,
-        FindingActivationAttemptState::Activated
-    );
-    let connection = store.connection().expect("read upgraded schema");
-    let marker_table: bool = connection
-        .query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1 FROM sqlite_schema
-                WHERE type = 'table'
-                  AND name = 'finding_expired_activation_attempts'
-            )
-            "#,
-            [],
-            |row| row.get(0),
-        )
-        .expect("query upgraded marker table");
-    assert!(marker_table);
-}
-
-#[test]
 fn begin_fee_intent_outcome_discriminates_fresh_pending_and_reconciled() {
     let fixture = fixture();
     let finding_id = hex64('a');
@@ -1979,3 +1869,42 @@ mod companion;
 #[path = "finding_market_store_tests/connection_recovery.rs"]
 #[cfg(unix)]
 mod connection_recovery;
+
+#[test]
+fn finding_market_schema_other_than_current_is_refused() {
+    for version in [0, 3] {
+        let mut connection = rusqlite::Connection::open_in_memory().expect("open");
+        initialize_finding_market_schema(&mut connection).expect("initialize");
+        crate::stamp_schema_version(&connection, FINDING_MARKET_SCHEMA_KEY, version)
+            .expect("stage schema version");
+        let expected = format!(
+            "database schema version {version} is not the current schema version 1; refusing to open"
+        );
+        assert!(matches!(
+            initialize_finding_market_schema(&mut connection),
+            Err(FindingMarketStoreError::Invariant(message)) if message == expected
+        ));
+    }
+}
+
+#[test]
+fn current_stamp_over_a_retired_market_shape_is_refused() {
+    let mut connection = rusqlite::Connection::open_in_memory().expect("open");
+    initialize_finding_market_schema(&mut connection).expect("initialize");
+    connection
+        .execute_batch("DROP INDEX findings_topic;")
+        .expect("drop index");
+    assert!(matches!(
+        initialize_finding_market_schema(&mut connection),
+        Err(FindingMarketStoreError::Invariant(message))
+            if message == "finding market schema differs from the canonical definition"
+    ));
+    let restored: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_schema WHERE name = 'findings_topic'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count");
+    assert_eq!(restored, 0, "a refused store is not repaired");
+}

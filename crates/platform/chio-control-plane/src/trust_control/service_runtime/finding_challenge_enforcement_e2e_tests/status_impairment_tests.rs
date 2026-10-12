@@ -47,6 +47,29 @@ fn finding_challenge_a_confirmed_impairment_settles_without_dispatching_again() 
     Ok(())
 }
 #[test]
+fn finding_challenge_refuses_an_enforcement_bound_anchor_intent() -> TestResult {
+    let case = finalizing_liability_with_enforcement_bound_anchor()?;
+
+    let refused = case
+        .finalize_observing(
+            &ScriptedObservations::qualified(),
+            &MiningPublisher::new(),
+            fixture_commit_time(SETTLEMENT_NOW),
+        )?
+        .expect_err("an anchor intent bound to the enforcement id cannot settle");
+    assert!(
+        matches!(
+            &refused,
+            ChallengeCoordinatorError::ChallengeStore(message)
+                if message == "finding challenge conflict: conflicting effect intent under an existing intent key"
+        ),
+        "unexpected refusal: {refused:?}"
+    );
+    assert_eq!(case.head()?.state, FindingLiabilityState::Finalizing);
+    Ok(())
+}
+
+#[test]
 fn finding_challenge_confirmed_recovery_reobserves_transaction_finality() -> TestResult {
     let case = finalizing_liability()?;
     case.confirm_impairment(SETTLEMENT_NOW)?;

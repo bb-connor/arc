@@ -304,22 +304,6 @@ pub(crate) enum FindingOperatorCommands {
         profile: PathBuf,
     },
 
-    /// Restore missing signed challenge filings in an offline operator database.
-    RepairChallengeRetention {
-        /// Existing operator SQLite database. Stop every operator process first.
-        #[arg(long)]
-        database: PathBuf,
-        /// Strict canonical repair bundle containing exact signed envelopes.
-        #[arg(long)]
-        bundle: PathBuf,
-        /// New private file receiving the canonical signed repair receipt.
-        #[arg(long)]
-        receipt: PathBuf,
-        /// Environment variable containing the repair authority's hex seed.
-        #[arg(long)]
-        receipt_signing_seed_env: String,
-    },
-
     /// Validate a hosted profile, its referenced files, and secret references.
     ValidateHosted {
         /// Strict canonical hosted operator profile.
