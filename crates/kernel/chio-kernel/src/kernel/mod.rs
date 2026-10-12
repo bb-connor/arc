@@ -35,6 +35,7 @@ mod kernel_scopes;
 mod kernel_struct;
 mod nonce_admission;
 mod output_guard;
+mod receipt_identity;
 mod rejection_metadata;
 mod security_dispatch;
 mod security_runtime;
@@ -154,7 +155,7 @@ const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
 const PROTOCOL_REFUSAL_METADATA_KEY: &str = "protocol_refusal";
 const RUNTIME_ADMISSION_METADATA_KEY: &str = "chio_runtime";
 
-const RESERVED_RECEIPT_METADATA_KEYS: [&str; 9] = [
+const RESERVED_RECEIPT_METADATA_KEYS: [&str; 10] = [
     MANIFEST_SECURITY_METADATA_KEY,
     PROTOCOL_ADMISSION_METADATA_KEY,
     BUDGET_AUTHORITY_METADATA_KEY,
@@ -164,6 +165,7 @@ const RESERVED_RECEIPT_METADATA_KEYS: [&str; 9] = [
     CALLER_DELIVERY_METADATA_KEY,
     PROTOCOL_REFUSAL_METADATA_KEY,
     RUNTIME_ADMISSION_METADATA_KEY,
+    "receipt_context",
 ];
 
 fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {

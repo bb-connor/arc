@@ -3,6 +3,7 @@
 use super::evaluation_helpers::PreDispatchCleanupDeny;
 use super::*;
 use crate::kernel::credential_reservation::DispatchCredentialReservation;
+use crate::kernel::receipt_identity::{with_identity_disposition, IdentityDisposition};
 
 impl ChioKernel {
     /// A rejected security or local-freeze decision never authorizes a tool
@@ -58,10 +59,13 @@ impl ChioKernel {
                         denial.reason,
                         denial.timestamp,
                         Some(denial.matched_grant_index),
-                        self.ambiguous_dispatch_receipt_metadata(
-                            denial.budget_mutation,
-                            denial.payment_authorization,
-                            denial.runtime_admission_metadata,
+                        with_identity_disposition(
+                            self.ambiguous_dispatch_receipt_metadata(
+                                denial.budget_mutation,
+                                denial.payment_authorization,
+                                denial.runtime_admission_metadata,
+                            ),
+                            IdentityDisposition::Retained,
                         ),
                         denial.verified_payee_binding,
                     )

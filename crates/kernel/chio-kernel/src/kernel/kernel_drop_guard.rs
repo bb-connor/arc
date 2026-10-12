@@ -1,3 +1,4 @@
+use crate::kernel::receipt_identity::{with_identity_disposition, IdentityDisposition};
 use chio_core::receipt::metadata::GuardEvidence;
 use chio_log_redact::redacted;
 use tracing::warn;
@@ -499,10 +500,13 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // the executed-or-not side effect. Clock, construction or append failure
         // emits an audit fault and may leave no signed parent receipt. When
         // published, receipt metadata identifies the retained reservations.
-        let receipt_metadata = self.kernel.ambiguous_dispatch_receipt_metadata(
-            self.budget_mutation,
-            self.payment_authorization,
-            self.receipt_context.extra_metadata.clone(),
+        let receipt_metadata = with_identity_disposition(
+            self.kernel.ambiguous_dispatch_receipt_metadata(
+                self.budget_mutation,
+                self.payment_authorization,
+                self.receipt_context.extra_metadata.clone(),
+            ),
+            IdentityDisposition::Terminal,
         );
 
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
