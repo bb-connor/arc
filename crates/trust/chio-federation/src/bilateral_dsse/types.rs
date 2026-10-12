@@ -32,8 +32,7 @@ pub(super) const PAE_PREFIX: &str = "DSSEv1";
 /// Out-of-band profile identifier for the Chio bilateral DSSE signature-slice.
 ///
 /// Standard DSSE envelopes do not carry a top-level `schema` member. This
-/// value is retained only for callers that need an out-of-band profile label;
-/// emitters and verifiers must rely on `payloadType`, the in-toto Statement
+/// value is an out-of-band profile label only; emitters and verifiers must rely on `payloadType`, the in-toto Statement
 /// `_type`, and `predicateType` on the signed payload.
 pub const BILATERAL_DSSE_ENVELOPE_SCHEMA: &str = PREDICATE_TYPE_BILATERAL;
 
@@ -120,7 +119,7 @@ pub struct KernelIdentity {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct BilateralPredicate {
-    /// Internal schema discriminator for the compatibility signature-slice profile.
+    /// Internal schema discriminator for the signature-slice profile.
     ///
     /// Strict Chio predicates omit this field because the signed
     /// `predicateType` is the verifier-facing schema discriminator.
@@ -140,11 +139,10 @@ pub struct BilateralPredicate {
     /// was canonicalised (Unix milliseconds).
     pub timestamp_unix_ms: u64,
     /// SHA-256 over canonical tool arguments. Required by the strict
-    /// Chio profile and intentionally omitted from the compatibility
-    /// signature-slice profile.
+    /// Chio profile and omitted from the signature-slice profile.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_args_hash: Option<HashRecord>,
-    /// Canonical-JSON of the underlying `ChioReceipt`. This is a compatibility
+    /// Canonical-JSON of the underlying `ChioReceipt`. This is a
     /// signature-slice helper field and must be absent from strict Chio
     /// predicates.
     #[serde(default, skip_serializing_if = "Option::is_none")]

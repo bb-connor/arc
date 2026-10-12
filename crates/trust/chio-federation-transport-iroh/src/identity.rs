@@ -15,7 +15,7 @@
 //! because that type binds `(kernel_id, passport public_key, https:// endpoint)`
 //! and has neither an iroh `EndpointId` field nor a per-entry
 //! passport-over-transport endorsement (ADR-0014 "Existing Transport Versus
-//! Iroh"). Option B (ADAPTER-SPEC section 5) requires both.
+//! Iroh"). The split-key binding (ADAPTER-SPEC section 5) requires both.
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -100,7 +100,7 @@ pub fn revocation_signer_endorsement_preimage(
     buf
 }
 
-/// A single Option B binding: a long-term passport key cross-linked to a
+/// A single split-key binding: a long-term passport key cross-linked to a
 /// rotatable ed25519 transport `EndpointId` by a passport-signed endorsement.
 ///
 /// (ADAPTER-SPEC section 5: "the passport signing key stays the long-term
@@ -113,8 +113,8 @@ pub struct TransportDirectoryEntry {
     /// Operator identity string (`did:chio:...`) at the federation layer.
     pub kernel_id: String,
     /// Long-term operator passport key (any [`chio_core_types::SigningAlgorithm`]).
-    /// Retained as the algorithm-agnostic auth key; NOT collapsed into the
-    /// transport key (Option B is mandatory for non-Ed25519 passports).
+    /// The algorithm-agnostic auth key; NOT collapsed into the transport key,
+    /// which a non-Ed25519 passport cannot be.
     pub passport_public_key: PublicKey,
     /// Rotatable ed25519 transport `EndpointId` that iroh dials and authenticates.
     pub transport_endpoint_id: EndpointId,
@@ -537,7 +537,7 @@ impl TransportDirectoryBundleDocument {
     /// [`VerifiedDirectory`] the admission gate is constructed from.
     ///
     /// Checks, in order, all fail-closed (mirrors
-    /// `PeerDirectoryBundleDocument::verify` plus the Option B endorsements):
+    /// `PeerDirectoryBundleDocument::verify` plus the passport endorsements):
     /// 1. schema pins,
     /// 2. rollback gate: `version` strictly above the floor AND
     ///    `previous_version_sha256` chains onto the expected predecessor,
@@ -1292,7 +1292,7 @@ mod tests {
 
     #[test]
     fn transport_key_rotation_end_to_end() {
-        // Option B's premise: the passport is the long-term operator identity,
+        // Split-key premise: the passport is the long-term operator identity,
         // and the ed25519 transport EndpointId rotates INDEPENDENTLY of it. Alice
         // keeps the same passport (seed 1) across the rotation and swaps her
         // transport endpoint from E_old to E_new.

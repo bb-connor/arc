@@ -224,7 +224,7 @@ fn inbox_nonce(batch_bytes: &[u8]) -> String {
 ///   provably-pre-commit rows); a redelivery then loses the reservation and takes the
 ///   fail-closed loser path instead of re-receiving.
 /// - On a recorded durable verdict the caller [`release`](Self::release)s
-///   explicitly: the verdict now short-circuits redelivery at `lookup_inbox_report`
+///   explicitly: the verdict short-circuits redelivery at `lookup_inbox_report`
 ///   BEFORE the reservation is consulted, so the row is redundant and releasing it
 ///   bounds reservation-table growth.
 struct InboxSlotGuard {
@@ -419,8 +419,7 @@ impl PheromoneBatchHandler {
     }
 
     /// Override the default accept-hardening bounds (per-phase timeouts + the
-    /// in-flight concurrency cap). The [`Default`] preserves the historical
-    /// (generous) behavior; the wiring can tighten or loosen it in one place.
+    /// in-flight concurrency cap). The [`Default`] is generous; the wiring can tighten or loosen it in one place.
     #[must_use]
     pub fn with_accept_limits(mut self, config: AcceptLimitConfig) -> Self {
         self.limiter = AcceptLimiter::new(config);
@@ -584,7 +583,7 @@ impl PheromoneBatchHandler {
                         // per-frame verifier's gossiping_peer_kernel_id == authenticated_sender
                         // binding: a wrong sender could POISON this batch hash with a rejected
                         // verdict before the real sender arrives, or RECEIVE an accepted verdict
-                        // for another sender's batch. The runtime-store lookup is now itself
+                        // for another sender's batch. The runtime-store lookup is itself
                         // sender-scoped at the query level, so it returns THIS sender's row (or
                         // None); the `.filter` re-checks the deserialized sender as
                         // belt-and-suspenders. Any non-matching (or absent) report falls through
@@ -703,7 +702,7 @@ impl PheromoneBatchHandler {
                             // may belong to a DIFFERENT authenticated sender. Adopting it would
                             // attribute another sender's verdict to OUR (authenticated_sender,
                             // nonce), bypassing the per-frame gossiping_peer_kernel_id ==
-                            // authenticated_sender binding. The runtime-store lookup is now itself
+                            // authenticated_sender binding. The runtime-store lookup is itself
                             // sender-scoped at the query level; the `.filter` re-checks the
                             // deserialized sender as belt-and-suspenders. A wrong-sender (or
                             // absent) report denies here so the peer retries and the durable inbox
@@ -894,8 +893,8 @@ pub async fn deliver_batch_over_iroh(
 /// Client-side slowloris defense (mirrors the accept-side [`AcceptLimiter`]):
 /// every peer-dependent await (connect, open, write, and the report read) is
 /// bounded by the corresponding [`AcceptLimitConfig`] phase timeout. A recipient
-/// that connects but never returns the report frame no longer hangs the caller
-/// forever; the dial fails closed (`accept_timeout`) and the durable outbox lease
+/// that connects but never returns the report frame cannot hang the caller; the
+/// dial fails closed (`accept_timeout`) and the durable outbox lease
 /// retries or dead-letters normally, so one stalled peer cannot block the
 /// sequential drain of later batches.
 pub async fn deliver_batch_over_iroh_with_limits(

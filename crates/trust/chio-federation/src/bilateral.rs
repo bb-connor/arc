@@ -4,17 +4,17 @@
 //! both kernels need to sign the same receipt so that either org can
 //! independently verify the chain. This module defines the wire-level
 //! [`CoSigningRequest`] / [`CoSigningResponse`] envelope, the
-//! [`DualSignedReceipt`] compatibility artifact (which carries both
+//! [`DualSignedReceipt`] detached-signature artifact (which carries both
 //! signatures side-by-side without mutating the core `ChioReceipt` body), and a
 //! [`BilateralCoSigningProtocol`] trait that the kernel calls after it
 //! signs a receipt locally.
 //!
-//! The canonical verification API for new bilateral artifacts is
+//! The canonical bilateral verification API is
 //! [`crate::bilateral_verifier::verify_bilateral_cosign_invocation`] over a
 //! [`crate::bilateral_dsse::DsseEnvelope`]. `DualSignedReceipt::verify*`
-//! remains a compatibility adapter for the older detached-signature
-//! envelope only; it is not a DSSE verifier and must not be used as the
-//! authorization or audit verifier for the signature-slice profile.
+//! verifies the detached-signature envelope only; it is not a DSSE verifier
+//! and must not be used as the authorization or audit verifier for the
+//! signature-slice profile.
 //!
 //! ## Design notes
 //!
@@ -573,15 +573,14 @@ fn co_sign_with_origin_inner(
 }
 
 /// **Verifiers seeking DSSE signature-slice coverage MUST verify
-/// [`Self::dsse_envelope`].** The compatibility `DualSignedReceipt` is a
-/// compatibility-only adapter that shares zero signed bytes with the DSSE
-/// PAE preimage and is therefore not a DSSE artifact; see
+/// [`Self::dsse_envelope`].** The detached-signature `DualSignedReceipt`
+/// shares zero signed bytes with the DSSE PAE preimage and is therefore not a DSSE artifact; see
 /// `crate::bilateral_dsse` module docs. Neither artifact is a strict
 /// Chio bilateral invocation predicate.
 #[derive(Debug, Clone)]
 pub struct BilateralCoSignArtifacts {
-    /// Compatibility artifact for callers that still consume the
-    /// `CoSigningBody` preimage. New verifier paths must use `dsse_envelope`.
+    /// Detached-signature artifact over the `CoSigningBody` preimage.
+    /// Verifier paths must use `dsse_envelope`.
     pub dual_signed_receipt: DualSignedReceipt,
     /// Canonical bilateral verification artifact for this crate's
     /// signature-slice profile.
@@ -697,7 +696,7 @@ pub enum BilateralInvocationError {
 }
 
 /// 1. Drives the local fixture signing path to produce the
-///    [`BilateralCoSignArtifacts`] (compatibility [`DualSignedReceipt`] +
+///    [`BilateralCoSignArtifacts`] (detached [`DualSignedReceipt`] +
 ///    DSSE signature-slice envelope) but layered with the
 ///    [`crate::bilateral_dsse::BilateralPredicateExtensions`] (lease ref,
 ///    policy summary, etc.) the verifier needs.
