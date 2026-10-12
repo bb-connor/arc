@@ -162,8 +162,14 @@ async fn cleanup_fault_observation_preserves_the_original_terminal_owner() {
     );
     let receipts = kernel.receipt_log();
     assert_eq!(receipts.len(), 2);
-    assert_eq!(receipts.get(0).expect("retained observation"), report);
-    assert_eq!(receipts.get(1).expect("actual terminal"), &response.receipt);
+    assert_eq!(
+        serde_json::to_value(receipts.get(0).expect("retained observation")).unwrap(),
+        serde_json::to_value(report).unwrap(),
+    );
+    assert_eq!(
+        serde_json::to_value(receipts.get(1).expect("actual terminal")).unwrap(),
+        serde_json::to_value(&response.receipt).unwrap(),
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
