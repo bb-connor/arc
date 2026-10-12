@@ -35,12 +35,15 @@ capacity release. No timeout, domain, assertion or unwinding waiver is allowed.
 ## Harnesses and enrollment
 
 - [ ] Add `verify_revocation_snapshot_timestamp_freshness` in
-  `crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs`. Use unrestricted
+  `crates/kernel/chio-kernel-core/src/kani_public_harnesses/revocation.rs`, loaded
+  through `mod revocation` and `#[path]` in `kani_public_harnesses.rs` under the
+  existing `revocation-view` feature. Use unrestricted
   symbolic `u64` timestamps and maximum age; compare the real production result
   to an independent `u128` arithmetic specification. Cover all outcomes and
   zero, equality and maximum boundaries.
 - [ ] Add `verify_revocation_view_epoch_install_sequential`, calling the real
-  ArcSwap-backed store. From the empty sentinel, seed a positive symbolic epoch
+  ArcSwap-backed store from the same child module. From the empty sentinel, seed
+  a positive symbolic epoch
   and exercise two unrestricted candidate epochs. Verify exact refusal and Arc
   preservation for equal/older candidates, exact prior Arc on success, candidate
   payload installation, duplicate refusal, and stability of a retained old Arc.
@@ -50,6 +53,13 @@ capacity release. No timeout, domain, assertion or unwinding waiver is allowed.
   production symbols, checked unwinding and the existing 1800-second cap. Review
   `formal/MAPPING.md` and `formal/proof-manifest.toml`, preserving the existing
   `abstraction_anchor` relationship, then regenerate coverage.
+  Enrollment must account for child-module source discovery and qualified
+  harness names; a passing parent-only source scan does not enroll these proofs.
+
+Source review split the new harnesses into a child module to retain the existing
+2000-line production-file cap. The inherited boolean harness stays in its
+original module. Enrollment remains deferred until direct-store feasibility is
+verified; source preparation does not update any proof result.
 
 ## Acceptance after capacity release
 
@@ -68,3 +78,23 @@ capacity release. No timeout, domain, assertion or unwinding waiver is allowed.
 
 Preparation alone closes no proof obligation. If the accepted requirement needs
 concurrent installation proof, that remains open after sequential qualification.
+
+## Qualified commands after capacity release
+
+The child-module harness names are:
+
+- `kani_public_harnesses::revocation::verify_revocation_view_epoch_install_sequential`
+- `kani_public_harnesses::revocation::verify_revocation_snapshot_timestamp_freshness`
+
+Try installation first, retaining checked unwinding and reachable covers:
+
+```bash
+revocation_harness=kani_public_harnesses::revocation::verify_revocation_view_epoch_install_sequential
+timeout 1800s bash scripts/run-kani-with-cover.sh "$revocation_harness" -- \
+  cargo kani -p chio-kernel-core --features kani --lib \
+  --harness "$revocation_harness" --exact --default-unwind 8
+```
+
+For the freshness harness, use the same command with
+`revocation_harness=kani_public_harnesses::revocation::verify_revocation_snapshot_timestamp_freshness`.
+These commands are pending; run neither before the shared capacity release.
