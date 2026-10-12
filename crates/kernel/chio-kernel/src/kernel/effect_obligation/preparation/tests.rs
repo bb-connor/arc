@@ -226,7 +226,7 @@ fn post_effect_ownership_has_no_copy_or_plain_result_escape() {
         fn marker() {}
     }
     impl<T: ?Sized> AmbiguousIfClone<()> for T {}
-    impl<T: ?Sized + Clone> AmbiguousIfClone<u8> for T {}
+    impl<T: Clone> AmbiguousIfClone<u8> for T {}
     trait AmbiguousIfDefault<A> {
         fn marker() {}
     }
