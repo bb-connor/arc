@@ -180,3 +180,9 @@ Durable admission must return a typed failure carrying the disposition selected 
 Original controls use the actual ordinary and nested entrypoints: expired signed capabilities must produce Reusable with no invocation; a missing session root after durable admission must produce Terminal after compensation. Keep healthy Allow and approval-required controls, and the existing CommitUnconfirmed Retained control. Approval-required is a distinct response state even when its signed wire decision is Deny.
 
 No caller gains retry authority from a Terminal or Retained response. The remaining recovery-driver and historical model limitations remain open.
+
+## Producer validation checkpoint
+
+- Original `8bedb91905`: early-refusal controls pass twice and fail twice (ordinary missing Reusable; nested loses the benign metadata field before reaching its disposition assertion). The persisted-compensation control fails on missing Terminal. The approval-required control passes without a disposition.
+- Original `8f3aa7d058`: both durable Begin controls fail on the intended signed metadata assertions. An acknowledgement lost after storing the row lacks Retained; a conflicting request lacks Terminal. The conflict preserves its live original owner, unchanged operation and zero dispatch count. Earlier conflict-fixture attempts allowed startup recovery to compensate the owner and do not establish the disposition defect.
+- `11aa111f7b` composes the typed refusal producers and explicit Begin phase errors. Library compilation passed; focused runtime tests and the actual SQLite mutual-refusal test are pending. The direct durable terminal builder and its replay metadata validation are under separate review before final qualification.
