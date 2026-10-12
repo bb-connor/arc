@@ -33,9 +33,10 @@ assert_eq!(tier_from_deltas(&deltas), ReputationTier::Tier3);
   kernel keys, canonical receipt id, signature, and action hash.
 - `ReputationConfig::default` admits no receipt signer. Missing incident input
   and absent evidence remain explicit unknown metrics where applicable.
-- `compose_deltas` takes the maximum supplied feed delta. `tier_from_deltas`
-  requires score >= 0.90, minimum delta >= 0.80, and two distinct feed ids for
-  tier 3; repeated observations from one feed cannot satisfy that gate.
+- For values produced by `ScoreDelta::from_value`, `compose_deltas` returns
+  their maximum. `tier_from_deltas` requires score >= 0.90, minimum delta >= 0.80,
+  and two distinct feed ids for tier 3; repeated observations from one feed
+  cannot satisfy that gate.
 - `build_imported_reputation_signal` applies local issuer/signer, freshness,
   proof-requirement, and attenuation policy to caller-resolved evidence shares.
   Consumers choose how scorecards, import results, and tiers apply.
