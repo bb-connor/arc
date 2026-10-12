@@ -462,6 +462,8 @@ fn authenticated_sender_key(auth_context: &SessionAuthContext) -> Option<&Public
 #[derive(Serialize)]
 struct RemoteSessionResumeIntegrityEnvelope<'a> {
     schema: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    subscriptions: Option<&'a [PersistedSubscription]>,
     session_id: &'a str,
     agent_id: &'a str,
     auth_context: &'a SessionAuthContext,
@@ -821,8 +823,16 @@ fn compute_resume_record_integrity_tag(
     key: &RemoteSessionHmacKey,
     record: &RemoteSessionResumeRecord,
 ) -> Result<String, CliError> {
+    let (schema, subscriptions) = match record.resume_integrity.envelope {
+        RemoteSessionEnvelope::V2 => ("chio.remote-mcp.resume-record-integrity.v2", None),
+        RemoteSessionEnvelope::V3 => (
+            "chio.remote-mcp.resume-record-integrity.v3",
+            Some(record.subscriptions.as_slice()),
+        ),
+    };
     let envelope = RemoteSessionResumeIntegrityEnvelope {
-        schema: "chio.remote-mcp.resume-record-integrity.v2",
+        schema,
+        subscriptions,
         session_id: &record.session_id,
         agent_id: &record.agent_id,
         auth_context: &record.auth_context,
@@ -855,6 +865,12 @@ fn validate_resume_record_integrity_with_keyring(
     if record.resume_generation == 0 {
         return Err(CliError::cli_other_error(format!(
             "stored MCP session {} has an invalid zero resume generation",
+            record.session_id
+        )));
+    }
+    if record.resume_integrity.envelope.is_v2() && !record.subscriptions.is_empty() {
+        return Err(CliError::cli_other_error(format!(
+            "stored MCP session {} carries subscriptions its v2 envelope does not authenticate",
             record.session_id
         )));
     }
@@ -899,6 +915,35 @@ impl RemoteSessionHmacKeyring {
             key_id: self.current.key_id.clone(),
             key_version: self.current.version,
             tag: String::new(),
+            envelope: RemoteSessionEnvelope::V2,
+        }
+    }
+}
+
+/// The resume-record envelope a session signs with. It only ever rises: a
+/// session that has signed or loaded `v3` never signs `v2` again.
+#[derive(Debug)]
+struct ResumeEnvelopeRatchet(AtomicBool);
+
+impl ResumeEnvelopeRatchet {
+    fn new(floor: RemoteSessionEnvelope) -> Self {
+        Self(AtomicBool::new(floor == RemoteSessionEnvelope::V3))
+    }
+
+    fn raise(&self, envelope: RemoteSessionEnvelope) {
+        if envelope == RemoteSessionEnvelope::V3 {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    fn select(&self, subscriptions: &[PersistedSubscription]) -> RemoteSessionEnvelope {
+        if !subscriptions.is_empty() {
+            self.raise(RemoteSessionEnvelope::V3);
+        }
+        if self.0.load(Ordering::SeqCst) {
+            RemoteSessionEnvelope::V3
+        } else {
+            RemoteSessionEnvelope::V2
         }
     }
 }
