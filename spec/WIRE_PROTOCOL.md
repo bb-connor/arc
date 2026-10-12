@@ -292,6 +292,11 @@ Rules:
 - Requests against `draining`, `deleted`, `expired`, or `closed` sessions
   **MUST** not silently resume prior state.
 - Clients encountering those terminal states **MUST** re-run initialization.
+- A dispatched request whose terminal response does not arrive within the
+  deployment's request response deadline receives a JSON-RPC error (`-32603`)
+  stating that its effect is uncertain, and its session closes. Requests
+  queued behind it on that session fail without dispatch. Clients **MUST NOT**
+  treat that error as proof that the effect did not occur.
 
 ### 3.4 Version Negotiation
 
