@@ -301,22 +301,6 @@ impl SqlitePheromoneRuntimeStore {
             CREATE INDEX IF NOT EXISTS idx_chio_pheromone_replay_expiry
                 ON chio_pheromone_replay_nonces(expires_at_unix_ms);
 
-            CREATE TABLE IF NOT EXISTS chio_pheromone_pair_counts (
-                kernel_id TEXT NOT NULL,
-                passport_key_hash TEXT NOT NULL,
-                subject_class TEXT NOT NULL,
-                treaty_id TEXT NOT NULL,
-                count INTEGER NOT NULL,
-                PRIMARY KEY (kernel_id, passport_key_hash, subject_class, treaty_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_pheromone_passport_caps (
-                kernel_id TEXT NOT NULL,
-                subject_class TEXT NOT NULL,
-                passport_key_hash TEXT NOT NULL,
-                PRIMARY KEY (kernel_id, subject_class, passport_key_hash)
-            );
-
             CREATE TABLE IF NOT EXISTS chio_pheromone_scarcity_buckets (
                 reputation_epoch INTEGER NOT NULL,
                 window_id TEXT NOT NULL,
@@ -353,7 +337,7 @@ impl SqlitePheromoneRuntimeStore {
                 )
             );
 
-            CREATE TABLE IF NOT EXISTS chio_pheromone_passport_caps_v2 (
+            CREATE TABLE IF NOT EXISTS chio_pheromone_passport_caps (
                 reputation_epoch INTEGER NOT NULL,
                 window_id TEXT NOT NULL,
                 treaty_id TEXT NOT NULL,
@@ -591,7 +575,7 @@ fn admit_deposit_scoped_tx(
         }
         tx.execute(
             r#"
-            INSERT INTO chio_pheromone_passport_caps_v2
+            INSERT INTO chio_pheromone_passport_caps
                 (reputation_epoch, window_id, treaty_id, subject_class_namespace,
                  subject_class, kernel_id, passport_key_hash)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
@@ -945,7 +929,7 @@ fn passport_seen(
     Ok(tx
         .query_row(
             r#"
-            SELECT 1 FROM chio_pheromone_passport_caps_v2
+            SELECT 1 FROM chio_pheromone_passport_caps
             WHERE reputation_epoch = ?1 AND window_id = ?2 AND treaty_id = ?3
               AND subject_class_namespace = ?4 AND subject_class = ?5
               AND kernel_id = ?6 AND passport_key_hash = ?7
@@ -972,7 +956,7 @@ fn passport_count(
 ) -> Result<u64, PheromoneRuntimeError> {
     let count = tx.query_row(
         r#"
-        SELECT COUNT(*) FROM chio_pheromone_passport_caps_v2
+        SELECT COUNT(*) FROM chio_pheromone_passport_caps
         WHERE reputation_epoch = ?1 AND window_id = ?2 AND treaty_id = ?3
           AND subject_class_namespace = ?4 AND subject_class = ?5 AND kernel_id = ?6
         "#,
