@@ -43,7 +43,7 @@ package and provide a fresh audience, challenge, purpose, and time window.
   invocation verification, and the context-bound BBS disclosure contract.
 - `ChioVerifierTrustBundle::from_document` requires nonempty trust families,
   explicit active authority lifecycles, disclosure policy, and a signed
-  revocation checkpoint. Historical unsigned epoch input is rejected.
+  revocation checkpoint.
 - `verify_package_report` retains successful checks before a failure and
   records hashes of the package, trust document, and context when available.
 - JSON readers apply a 16 MiB original-input bound and signed decoding.

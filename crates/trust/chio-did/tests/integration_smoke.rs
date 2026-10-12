@@ -1,5 +1,5 @@
 use chio_core_types::Keypair;
-use chio_did::{resolve_did_arc, DidChio, DidService, ResolveOptions, RECEIPT_LOG_SERVICE_TYPE};
+use chio_did::{resolve_did_chio, DidChio, DidService, ResolveOptions, RECEIPT_LOG_SERVICE_TYPE};
 
 #[test]
 fn did_chio_resolves_with_public_service_metadata() -> Result<(), Box<dyn std::error::Error>> {
@@ -10,7 +10,7 @@ fn did_chio_resolves_with_public_service_metadata() -> Result<(), Box<dyn std::e
         "https://trust.example.com/v1/receipts",
     )?);
 
-    let document = resolve_did_arc(&did.to_string(), &options)?;
+    let document = resolve_did_chio(&did.to_string(), &options)?;
 
     assert_eq!(document.id, did.to_string());
     assert_eq!(document.service[0].service_type, RECEIPT_LOG_SERVICE_TYPE);

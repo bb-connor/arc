@@ -383,12 +383,14 @@ impl SqlitePheromoneRuntimeStore {
                 report_sha256 TEXT PRIMARY KEY,
                 received_at_unix_ms INTEGER NOT NULL,
                 json TEXT NOT NULL,
-                batch_sha256 TEXT,
-                sender_kernel_id TEXT
+                batch_sha256 TEXT NOT NULL,
+                sender_kernel_id TEXT NOT NULL
             );
+
+            CREATE INDEX IF NOT EXISTS idx_receive_reports_batch_sender
+                ON chio_pheromone_receive_reports (batch_sha256, sender_kernel_id);
             "#,
         )?;
-        ensure_receive_report_recovery_columns(&conn)?;
         Ok(())
     }
 
@@ -877,46 +879,6 @@ impl PheromoneRuntimeStore for SqlitePheromoneRuntimeStore {
         }
         Ok(reports)
     }
-}
-
-/// Additive migration: the recovery columns + index for verdict recovery.
-/// `batch_sha256` keys the recovery lookup; `sender_kernel_id` SCOPES it to the
-/// authenticated sender, so a lookup for a batch that several senders recorded reports
-/// for (for example a wrong-sender replay that recorded a rejected verdict alongside the
-/// correct sender's crash-recovery report) returns the CORRECT sender's row rather than
-/// an arbitrary one. Existing rows keep NULL columns and are not recoverable-by-batch
-/// (acceptable: only reports written after the migration need recovery). Idempotent.
-pub(crate) fn ensure_receive_report_recovery_columns(
-    conn: &rusqlite::Connection,
-) -> Result<(), PheromoneRuntimeError> {
-    let mut existing_columns = std::collections::HashSet::new();
-    let mut stmt = conn.prepare("PRAGMA table_info(chio_pheromone_receive_reports)")?;
-    let mut rows = stmt.query([])?;
-    while let Some(row) = rows.next()? {
-        let name: String = row.get(1)?;
-        existing_columns.insert(name);
-    }
-    drop(rows);
-    drop(stmt);
-    if !existing_columns.contains("batch_sha256") {
-        conn.execute(
-            "ALTER TABLE chio_pheromone_receive_reports ADD COLUMN batch_sha256 TEXT",
-            [],
-        )?;
-    }
-    if !existing_columns.contains("sender_kernel_id") {
-        conn.execute(
-            "ALTER TABLE chio_pheromone_receive_reports ADD COLUMN sender_kernel_id TEXT",
-            [],
-        )?;
-    }
-    // Composite index so the sender-scoped recovery lookup is a single index probe.
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_receive_reports_batch_sender \
-         ON chio_pheromone_receive_reports (batch_sha256, sender_kernel_id)",
-        [],
-    )?;
-    Ok(())
 }
 
 fn scarcity_bucket_count(

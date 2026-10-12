@@ -17,7 +17,7 @@ whether missing independent transparency verification is acceptable.
 | --- | --- |
 | `sigstore/core` | Embedded Fulcio roots and synchronous trait implementation |
 | `sigstore/identity`, `validators`, `parse` | SAN/issuer, chain, signature, certificate parsing |
-| `sigstore/bundle_verify`, `compat`, `policy` | Async bridge, bundle metadata, issuer policy |
+| `sigstore/bundle_verify`, `material`, `policy` | Async bridge, bundle metadata, issuer policy |
 | `policy`, `policy_loader` | Tenant TOML validation, canonical signing, freshness |
 | `quote` | TEE families, TCB status, 64-byte report-data binding |
 | `tdx`, `sev_snp`, `nitro`, `tee_signature` | Optional quote parsing, collateral checks, ECDSA |
