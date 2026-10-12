@@ -5,7 +5,7 @@
   "reference_tag": "archive/security-roadmap-pre-landing-20261004",
   "main_snapshot": "f5566d9a765c21cb36652a99c79de64968a656bf",
   "semantics": "Source claims are historical unless separately qualified. Coverage is bookkeeping, not proof of security. Null repair or PR means not established or not yet assigned; it never means complete.",
-  "active_landing_prs": [],
+  "active_landing_prs": [1201],
   "waiting_foundation_pr": null,
   "landing_units": {
     "dependencies": 1168,
@@ -35,7 +35,9 @@
     "settlement-approval": 956,
     "trusted-definitions-update": 1175,
     "trusted-runtime-definitions": 1176,
-    "trusted-v3-definitions": 1195
+    "trusted-v3-definitions": 1195,
+    "ci-speed-pheromone": 1201,
+    "security-auditor": null
   },
   "sources": [
     {
@@ -2134,8 +2136,19 @@
 {"path":"docs/security/audits/workspace-ci-fixture-followup-20261011.json","commit":"37c7dabda0323cc60da94ea26347c92c8edea2e4","sha256":"750541c7fb0aa96381369b1bdaffc3183a8b23f1efc78b2b5ccd9a56c5eb8931","requirement_ids":[],"evidence_requirement_ids":["incoming-pr1160-ci-extraction-20261011:CI-WORKSPACE-EXTRACTION"]},
 {"path":"docs/security/audits/trust-census-repair-20261011.json","commit":"b9bddc3fac01c96c2084aaf558939f89bf9a386f","sha256":"4240063cbd6df92033b81c5ce16b430f9d35e2e5d671d3169938d28bc829cc52","requirement_ids":[],"evidence_requirement_ids":["incoming-pr1160-hosted-20261011:CI-TRUST-CENSUS"]},
 {"path":"docs/security/audits/mcp-terminal-handoff-20261011.json","commit":"6fd7f515e56877d1f636c731e79947debe2d728a","sha256":"3fcb19d2cef53c213aa020b3d7dd87cd08267a009128a9528d1ced18c4ede9ef","requirement_ids":[],"evidence_requirement_ids":["incoming-pr1160-hosted-20261011:CI-MCP-TERMINAL-HANDOFF"]},
-{"path":"docs/security/audits/cognition-ci-extraction-20261011.json","commit":"d04fc3f6297a9d7259b41588a62829a43a2fe571","sha256":"7a6bc2d5788a9b20d6dc47c888374485ee237bcf5163893f820a99e4eb70c519","requirement_ids":[],"evidence_requirement_ids":["incoming-pr1160-hosted-20261011:CI-COGNITION-EXTRACTION"]}
-],
+{"path":"docs/security/audits/cognition-ci-extraction-20261011.json","commit":"d04fc3f6297a9d7259b41588a62829a43a2fe571","sha256":"7a6bc2d5788a9b20d6dc47c888374485ee237bcf5163893f820a99e4eb70c519","requirement_ids":[],"evidence_requirement_ids":["incoming-pr1160-hosted-20261011:CI-COGNITION-EXTRACTION"]},
+    {
+      "path": "docs/security/audits/landing-auditor-repair-20261012.json",
+      "commit": "d3e96abb60c61b8af0a99b993ef6494625c26e7c",
+      "sha256": "98ae6faf82d3bcd31a8b1e560becc1c41db98d3fdc32e83a83c5bfde52047be7",
+      "requirement_ids": [
+        "postmerge-20261012:LANDING-AUDITOR-REST",
+        "postmerge-20261012:LANDING-AUDITOR-SQUASH",
+        "postmerge-20261012:PHEROMONE-CI-SETUP"
+      ],
+      "evidence_requirement_ids": []
+    }
+  ],
   "pull_requests": [
     {
       "number": 1173,
@@ -8554,8 +8567,139 @@
 {"id":"incoming-pr1160-ci-extraction-20261011:CI-FIPS-FORWARDING-INVENTORY","label":"CI-FIPS-FORWARDING-INVENTORY","priority":"P2","classification":"ci-qualification-repair","requirement":"Enroll the unreadable current signing key forwarding test in the exact FIPS inventory, retaining the owning whole-job contract.","source":{"path":"docs/security/audits/workspace-ci-extraction-20261011.json","checkpoint":"1e7fcd515f9bd053bbe2dfa8c98a1e59aa2101fc"},"disposition":"source-qualified-reviewed-hosted-pending","source_repair":{"checkpoint":"021a5b8b0d1dbb2fa69c47c7ab3115cd4b87d630","commits":["021a5b8b0d1dbb2fa69c47c7ab3115cd4b87d630"],"files":[".github/workflows/chio-tee-fips.yml","scripts/check-security-ci-contract.py"]},"verification_evidence":[{"path":"docs/security/audits/workspace-ci-extraction-20261011.json","sha256":"7f037de1a448f1be719ddb579b9256198db58c8ee2d9082b2afc43e11e8eb401","scope":"Thirteen affected commands on98a0, focused two-line FIPS delta qualification on021a, exact independent source reviews, unchanged scope and retained failure evidence."}],"remaining_acceptance":["Complete the parallel exact-inventory sweep before one replacement publication.","Require four exact-head green checks, classify all other failures, answer review and obtain explicit user merge go-ahead."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"source-qualified-reviewed-hosted-pending","owner":"Root","merged":false,"full_qualified":false},
 {"id":"incoming-pr1160-hosted-20261011:CI-TRUST-CENSUS","label":"CI-TRUST-CENSUS","priority":"P2","classification":"ci-qualification-repair","requirement":"Retain the checkpoint keyframe/delta input-reader trace and renew its exact census without retiring existing reader coverage or semantic debt.","source":{"path":"docs/security/audits/trust-census-repair-20261011.json","checkpoint":"b9bddc3fac01c96c2084aaf558939f89bf9a386f"},"disposition":"source-qualified-reviewed-hosted-pending","source_repair":{"checkpoint":"0f2aa61e41849cac82050b4357d745dfef9c1e90","commits":["0f2aa61e41849cac82050b4357d745dfef9c1e90"],"files":["crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs","docs/security/trust-boundary-inventory.json"]},"verification_evidence":[{"path":"docs/security/audits/trust-census-repair-20261011.json","sha256":"4240063cbd6df92033b81c5ce16b430f9d35e2e5d671d3169938d28bc829cc52","scope":"Genuine hosted/local census failures; explicit module imports preserve the reader chain; checker,63calibration,fmt,strictstore and metadata generator pass. No runtime behavior or debt waiver."}],"remaining_acceptance":["Integrate the independently reviewed MCP terminal-publication repair and all genuine current CI failures in one replacement batch.","Collect four required results, publish once, require four green exact-head checks, classify every other failure, close open source blockers and answer review.","Keep trusted setup, unproved proof obligations and product activation acceptance distinct from foundation landing."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"source-qualified-reviewed-hosted-pending","owner":"Root","merged":false,"full_qualified":false},
 {"id":"incoming-pr1160-hosted-20261011:CI-MCP-TERMINAL-HANDOFF","label":"CI-MCP-TERMINAL-HANDOFF","priority":"P2","classification":"hosted-runtime-repair","requirement":"Keep terminalizing MCP sessions continuously visible without reviving authority or overwriting finalized diagnostics.","source":{"path":"docs/security/audits/mcp-terminal-handoff-20261011.json","checkpoint":"6fd7f515e56877d1f636c731e79947debe2d728a"},"disposition":"source-qualified-reviewed-hosted-pending","source_repair":{"checkpoint":"7d08ffffc4c6e0e3ec1cc8770015fd8267d65cd0","commits":["fc56ad254e2aa1260658dbec9b78365826c3a9fa","f04e7a20928850432775f1084eabb2db23aa0bb3","7d08ffffc4c6e0e3ec1cc8770015fd8267d65cd0"],"files":["crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs","crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs","crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/ledger.rs","crates/protocol/chio-mcp-remote/src/remote_mcp/session_worker.rs","crates/protocol/chio-mcp-remote/src/remote_mcp/tests/clock_custody.rs"]},"verification_evidence":[{"path":"docs/security/audits/mcp-terminal-handoff-20261011.json","sha256":"3fcb19d2cef53c213aa020b3d7dd87cd08267a009128a9528d1ced18c4ede9ef","scope":"Genuine hosted404 and five Original failures; overwritten-record Original;198 composed owner tests and strict all-targets pass, final producer equality and independent review; static metadata gates pass."}],"remaining_acceptance":["Publish the locally qualified replacement under the owner-directed early-publication ruling; predecessor Workspace/MSRV may remain incomplete.","Require four green exact-head checks, the x86 enforcing MCP job, classified other failures, no open source blockers and answered review threads before landing.","Keep trusted setup, unproved proof obligations and operational/product acceptance distinct from foundation landing."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"source-qualified-reviewed-hosted-pending","owner":"Root (Claude producer)","merged":false,"full_qualified":false},
-{"id":"incoming-pr1160-hosted-20261011:CI-COGNITION-EXTRACTION","label":"CI-COGNITION-EXTRACTION","priority":"P2","classification":"ci-scheduling-repair","requirement":"Remove the long promoted-default suite from serial Build/lint without changing its coverage or allowing the required aggregate to bypass it.","source":{"path":"docs/security/audits/cognition-ci-extraction-20261011.json","checkpoint":"d04fc3f6297a9d7259b41588a62829a43a2fe571"},"disposition":"source-qualified-reviewed-hosted-pending","source_repair":{"checkpoint":"326d10e667a4aea50617d1cc5c469836bbd3ff27","commits":["326d10e667a4aea50617d1cc5c469836bbd3ff27"],"producer":"7d168f63a7c9167f6ca6c1fd49f63995ec55a644","files":[".github/workflows/ci.yml","scripts/check-security-ci-contract.py","scripts/tests/check-security-ci-contract.test.py","scripts/tests/check-workspace-ci-extraction.test.py"]},"verification_evidence":[{"path":"docs/security/audits/cognition-ci-extraction-20261011.json","sha256":"7a6bc2d5788a9b20d6dc47c888374485ee237bcf5163893f820a99e4eb70c519","scope":"Original structural refusal; unchanged suite and48othersteps/11otherjobs;216 real Bash cases;13affectedcontract commands pass with exact input/AST equivalence and independent review. No hosted runtime or timing pass claim."}],"remaining_acceptance":["Publish the reviewed replacement, then require exact-head successful three aggregate children and Build/lint/test, MSRV, Cargo Vet and Cargo Deny.","Require successor x86 enforcing MCP evidence, classify other failures and answer reviews before the exact-head landing handshake.","Keep stale trusted setup, missing committed Linux evidence variable, open attestation/weights proofs and operational acceptance disclosed."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"source-qualified-reviewed-hosted-pending","owner":"Root (Claude/C7 producer)","merged":false,"full_qualified":false}
-],
+{"id":"incoming-pr1160-hosted-20261011:CI-COGNITION-EXTRACTION","label":"CI-COGNITION-EXTRACTION","priority":"P2","classification":"ci-scheduling-repair","requirement":"Remove the long promoted-default suite from serial Build/lint without changing its coverage or allowing the required aggregate to bypass it.","source":{"path":"docs/security/audits/cognition-ci-extraction-20261011.json","checkpoint":"d04fc3f6297a9d7259b41588a62829a43a2fe571"},"disposition":"source-qualified-reviewed-hosted-pending","source_repair":{"checkpoint":"326d10e667a4aea50617d1cc5c469836bbd3ff27","commits":["326d10e667a4aea50617d1cc5c469836bbd3ff27"],"producer":"7d168f63a7c9167f6ca6c1fd49f63995ec55a644","files":[".github/workflows/ci.yml","scripts/check-security-ci-contract.py","scripts/tests/check-security-ci-contract.test.py","scripts/tests/check-workspace-ci-extraction.test.py"]},"verification_evidence":[{"path":"docs/security/audits/cognition-ci-extraction-20261011.json","sha256":"7a6bc2d5788a9b20d6dc47c888374485ee237bcf5163893f820a99e4eb70c519","scope":"Original structural refusal; unchanged suite and48othersteps/11otherjobs;216 real Bash cases;13affectedcontract commands pass with exact input/AST equivalence and independent review. No hosted runtime or timing pass claim."}],"remaining_acceptance":["Publish the reviewed replacement, then require exact-head successful three aggregate children and Build/lint/test, MSRV, Cargo Vet and Cargo Deny.","Require successor x86 enforcing MCP evidence, classify other failures and answer reviews before the exact-head landing handshake.","Keep stale trusted setup, missing committed Linux evidence variable, open attestation/weights proofs and operational acceptance disclosed."],"landing_unit":"foundation","landing_pr":1160,"main_ancestry_verified":false,"review_scope":"now","work_status":"source-qualified-reviewed-hosted-pending","owner":"Root (Claude/C7 producer)","merged":false,"full_qualified":false},
+    {
+      "id": "postmerge-20261012:LANDING-AUDITOR-REST",
+      "label": "LANDING-AUDITOR-REST",
+      "priority": "P1",
+      "classification": "ci-contract-repair",
+      "requirement": "Restore authenticated merge attribution on the supported GitHub REST contract without tolerating a missing merge identity.",
+      "source": {
+        "path": "docs/security/audits/landing-auditor-repair-20261012.json",
+        "checkpoint": "d3e96abb60c61b8af0a99b993ef6494625c26e7c"
+      },
+      "disposition": "source-qualified-reviewed-publication-pending",
+      "source_repair": {
+        "checkpoint": "8324a2a704a26089763ffc9031515ff14f69ab5f",
+        "commits": [
+          "8324a2a704a26089763ffc9031515ff14f69ab5f"
+        ],
+        "files": [
+          "scripts/audit-security-merge-qualification.py",
+          "scripts/tests/trusted-ci-landing-regressions.test.py",
+          "scripts/check-security-ci-contract.py"
+        ]
+      },
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/landing-auditor-repair-20261012.json",
+          "sha256": "98ae6faf82d3bcd31a8b1e560becc1c41db98d3fdc32e83a83c5bfde52047be7",
+          "scope": "Exact source, original refusals, passing local campaigns and independent review are itemized in the audit. Hosted acceptance and operational activation remain separate."
+        }
+      ],
+      "remaining_acceptance": [
+        "Publish the reviewed auditor candidate in its separate PR, then obtain exact-head hosted qualification.",
+        "Trusted definition publication and any authorization rotation require their separate reviewed operational decision; no settings change is included.",
+        "Preserve #1160 as historically unqualified at merge. Supporting its shape cannot make incomplete CI history pass."
+      ],
+      "landing_unit": "security-auditor",
+      "landing_pr": null,
+      "main_ancestry_verified": false,
+      "review_scope": "now",
+      "work_status": "source-qualified-reviewed-publication-pending",
+      "owner": "Root (Claude independent review)",
+      "merged": false,
+      "full_qualified": false
+    },
+    {
+      "id": "postmerge-20261012:LANDING-AUDITOR-SQUASH",
+      "label": "LANDING-AUDITOR-SQUASH",
+      "priority": "P1",
+      "classification": "ci-contract-repair",
+      "requirement": "Authenticate a one-parent squash against the exact source, immutable qualified base and tested tree while retaining every CI and authority requirement.",
+      "source": {
+        "path": "docs/security/audits/landing-auditor-repair-20261012.json",
+        "checkpoint": "d3e96abb60c61b8af0a99b993ef6494625c26e7c"
+      },
+      "disposition": "source-qualified-reviewed-publication-pending",
+      "source_repair": {
+        "checkpoint": "8324a2a704a26089763ffc9031515ff14f69ab5f",
+        "commits": [
+          "8324a2a704a26089763ffc9031515ff14f69ab5f"
+        ],
+        "files": [
+          "scripts/audit-security-merge-qualification.py",
+          "scripts/tests/trusted-ci-landing-regressions.test.py",
+          "scripts/check-security-ci-contract.py",
+          "docs/security/committed-linux-evidence.md"
+        ]
+      },
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/landing-auditor-repair-20261012.json",
+          "sha256": "98ae6faf82d3bcd31a8b1e560becc1c41db98d3fdc32e83a83c5bfde52047be7",
+          "scope": "Exact source, original refusals, passing local campaigns and independent review are itemized in the audit. Hosted acceptance and operational activation remain separate."
+        }
+      ],
+      "remaining_acceptance": [
+        "Publish the reviewed auditor candidate in its separate PR, then obtain exact-head hosted qualification.",
+        "Trusted definition publication and any authorization rotation require their separate reviewed operational decision; no settings change is included.",
+        "Preserve #1160 as historically unqualified at merge. Supporting its shape cannot make incomplete CI history pass."
+      ],
+      "landing_unit": "security-auditor",
+      "landing_pr": null,
+      "main_ancestry_verified": false,
+      "review_scope": "now",
+      "work_status": "source-qualified-reviewed-publication-pending",
+      "owner": "Root (Claude independent review)",
+      "merged": false,
+      "full_qualified": false
+    },
+    {
+      "id": "postmerge-20261012:PHEROMONE-CI-SETUP",
+      "label": "PHEROMONE-CI-SETUP",
+      "priority": "P2",
+      "classification": "ci-contract-repair",
+      "requirement": "Reduce fifteen repeated pheromone CI setup jobs to two groups without losing commands, setup contracts, trigger paths or subsequent failure reporting.",
+      "source": {
+        "path": "docs/security/audits/landing-auditor-repair-20261012.json",
+        "checkpoint": "d3e96abb60c61b8af0a99b993ef6494625c26e7c"
+      },
+      "disposition": "published-hosted-pending",
+      "source_repair": {
+        "checkpoint": "a2734def20c38f3cc6a02cec35dda64e99bbc5d3",
+        "commits": [
+          "a2734def20c38f3cc6a02cec35dda64e99bbc5d3"
+        ],
+        "files": [
+          ".github/workflows/chio-pheromone-pinned.yml",
+          ".github/workflows/chio-pheromone-composite.yml",
+          ".github/workflows/ci.yml",
+          "scripts/check-pheromone-ci.py",
+          "scripts/tests/check-pheromone-ci.test.py"
+        ]
+      },
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/landing-auditor-repair-20261012.json",
+          "sha256": "98ae6faf82d3bcd31a8b1e560becc1c41db98d3fdc32e83a83c5bfde52047be7",
+          "scope": "Exact source, original refusals, passing local campaigns and independent review are itemized in the audit. Hosted acceptance and operational activation remain separate."
+        }
+      ],
+      "remaining_acceptance": [
+        "Require exact-head successful hosted four-required-check qualification and classify every additional failure.",
+        "Measure hosted timing separately; local aarch64 timing does not establish x86_64 savings."
+      ],
+      "landing_unit": "ci-speed-pheromone",
+      "landing_pr": 1201,
+      "main_ancestry_verified": false,
+      "review_scope": "now",
+      "work_status": "published-hosted-pending",
+      "owner": "Root (Claude independent review)",
+      "merged": false,
+      "full_qualified": false
+    }
+  ],
   "incoming_review_execution": {
     "snapshot_date": "2026-10-06",
     "review_source": "5696c4cf04a1a8368ef36dd51618ea1bd5f7fbfc",
@@ -132379,8 +132523,121 @@
 "incoming-pr1160-ci-extraction-20261011:CI-FIPS-FORWARDING-INVENTORY":{"requirement_id":"incoming-pr1160-ci-extraction-20261011:CI-FIPS-FORWARDING-INVENTORY","label":"CI-FIPS-FORWARDING-INVENTORY","scope":"now","landing_unit":"foundation","landing_pr":1160,"current_state":"source-qualified-reviewed-hosted-pending","source_repair":{"checkpoint":"021a5b8b0d1dbb2fa69c47c7ab3115cd4b87d630","commits":["021a5b8b0d1dbb2fa69c47c7ab3115cd4b87d630"],"files":[".github/workflows/chio-tee-fips.yml","scripts/check-security-ci-contract.py"]},"verification_evidence":[{"path":"docs/security/audits/workspace-ci-extraction-20261011.json","sha256":"7f037de1a448f1be719ddb579b9256198db58c8ee2d9082b2afc43e11e8eb401","scope":"Thirteen affected commands on98a0, focused two-line FIPS delta qualification on021a, exact independent source reviews, unchanged scope and retained failure evidence."}],"remaining_acceptance":["Complete the parallel exact-inventory sweep before one replacement publication.","Require four exact-head green checks, classify all other failures, answer review and obtain explicit user merge go-ahead."],"observed_source_head":"021a5b8b0d1dbb2fa69c47c7ab3115cd4b87d630","source_integrated":true,"source_reviewed":true,"published":false,"merged":false,"full_qualified":false},
 "incoming-pr1160-hosted-20261011:CI-TRUST-CENSUS":{"requirement_id":"incoming-pr1160-hosted-20261011:CI-TRUST-CENSUS","label":"CI-TRUST-CENSUS","scope":"now","landing_unit":"foundation","landing_pr":1160,"current_state":"source-qualified-reviewed-hosted-pending","source_repair":{"checkpoint":"0f2aa61e41849cac82050b4357d745dfef9c1e90","commits":["0f2aa61e41849cac82050b4357d745dfef9c1e90"],"files":["crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs","docs/security/trust-boundary-inventory.json"]},"verification_evidence":[{"path":"docs/security/audits/trust-census-repair-20261011.json","sha256":"4240063cbd6df92033b81c5ce16b430f9d35e2e5d671d3169938d28bc829cc52","scope":"Genuine hosted/local census failures; explicit module imports preserve the reader chain; checker,63calibration,fmt,strictstore and metadata generator pass. No runtime behavior or debt waiver."}],"remaining_acceptance":["Require successor x86 enforcing MCP evidence, classify other failures and answer reviews before the exact-head landing handshake.","Keep stale trusted setup, missing committed Linux evidence variable, open attestation/weights proofs and operational acceptance disclosed.","Exact-head four required contexts remain mandatory; predecessor cancelled jobs remain incomplete."],"observed_source_head":"7d08ffffc4c6e0e3ec1cc8770015fd8267d65cd0","source_integrated":true,"source_reviewed":true,"published":true,"merged":false,"full_qualified":false,"published_head":"66dc1bf22df3ff6d06557fa028c8e46c59c4a934"},
 "incoming-pr1160-hosted-20261011:CI-MCP-TERMINAL-HANDOFF":{"requirement_id":"incoming-pr1160-hosted-20261011:CI-MCP-TERMINAL-HANDOFF","label":"CI-MCP-TERMINAL-HANDOFF","scope":"now","landing_unit":"foundation","landing_pr":1160,"current_state":"source-qualified-reviewed-hosted-pending","source_repair":{"checkpoint":"7d08ffffc4c6e0e3ec1cc8770015fd8267d65cd0","commits":["fc56ad254e2aa1260658dbec9b78365826c3a9fa","f04e7a20928850432775f1084eabb2db23aa0bb3","7d08ffffc4c6e0e3ec1cc8770015fd8267d65cd0"],"files":["crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs","crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs","crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/ledger.rs","crates/protocol/chio-mcp-remote/src/remote_mcp/session_worker.rs","crates/protocol/chio-mcp-remote/src/remote_mcp/tests/clock_custody.rs"]},"verification_evidence":[{"path":"docs/security/audits/mcp-terminal-handoff-20261011.json","sha256":"3fcb19d2cef53c213aa020b3d7dd87cd08267a009128a9528d1ced18c4ede9ef","scope":"Genuine hosted404 and five Original failures; overwritten-record Original;198 composed owner tests and strict all-targets pass, final producer equality and independent review; static metadata gates pass."}],"remaining_acceptance":["Require successor x86 enforcing MCP evidence, classify other failures and answer reviews before the exact-head landing handshake.","Keep stale trusted setup, missing committed Linux evidence variable, open attestation/weights proofs and operational acceptance disclosed.","Exact-head four required contexts remain mandatory; predecessor cancelled jobs remain incomplete."],"observed_source_head":"7d08ffffc4c6e0e3ec1cc8770015fd8267d65cd0","source_integrated":true,"source_reviewed":true,"published":true,"merged":false,"full_qualified":false,"published_head":"66dc1bf22df3ff6d06557fa028c8e46c59c4a934"},
-"incoming-pr1160-hosted-20261011:CI-COGNITION-EXTRACTION":{"requirement_id":"incoming-pr1160-hosted-20261011:CI-COGNITION-EXTRACTION","label":"CI-COGNITION-EXTRACTION","scope":"now","landing_unit":"foundation","landing_pr":1160,"current_state":"source-qualified-reviewed-hosted-pending","source_repair":{"checkpoint":"326d10e667a4aea50617d1cc5c469836bbd3ff27","commits":["326d10e667a4aea50617d1cc5c469836bbd3ff27"],"producer":"7d168f63a7c9167f6ca6c1fd49f63995ec55a644","files":[".github/workflows/ci.yml","scripts/check-security-ci-contract.py","scripts/tests/check-security-ci-contract.test.py","scripts/tests/check-workspace-ci-extraction.test.py"]},"verification_evidence":[{"path":"docs/security/audits/cognition-ci-extraction-20261011.json","sha256":"7a6bc2d5788a9b20d6dc47c888374485ee237bcf5163893f820a99e4eb70c519","scope":"Original structural refusal; unchanged suite and48othersteps/11otherjobs;216 real Bash cases;13affectedcontract commands pass with exact input/AST equivalence and independent review. No hosted runtime or timing pass claim."}],"remaining_acceptance":["Publish the reviewed replacement, then require exact-head successful three aggregate children and Build/lint/test, MSRV, Cargo Vet and Cargo Deny.","Require successor x86 enforcing MCP evidence, classify other failures and answer reviews before the exact-head landing handshake.","Keep stale trusted setup, missing committed Linux evidence variable, open attestation/weights proofs and operational acceptance disclosed."],"observed_source_head":"326d10e667a4aea50617d1cc5c469836bbd3ff27","source_integrated":true,"source_reviewed":true,"published":false,"merged":false,"full_qualified":false}
-},
+"incoming-pr1160-hosted-20261011:CI-COGNITION-EXTRACTION":{"requirement_id":"incoming-pr1160-hosted-20261011:CI-COGNITION-EXTRACTION","label":"CI-COGNITION-EXTRACTION","scope":"now","landing_unit":"foundation","landing_pr":1160,"current_state":"source-qualified-reviewed-hosted-pending","source_repair":{"checkpoint":"326d10e667a4aea50617d1cc5c469836bbd3ff27","commits":["326d10e667a4aea50617d1cc5c469836bbd3ff27"],"producer":"7d168f63a7c9167f6ca6c1fd49f63995ec55a644","files":[".github/workflows/ci.yml","scripts/check-security-ci-contract.py","scripts/tests/check-security-ci-contract.test.py","scripts/tests/check-workspace-ci-extraction.test.py"]},"verification_evidence":[{"path":"docs/security/audits/cognition-ci-extraction-20261011.json","sha256":"7a6bc2d5788a9b20d6dc47c888374485ee237bcf5163893f820a99e4eb70c519","scope":"Original structural refusal; unchanged suite and48othersteps/11otherjobs;216 real Bash cases;13affectedcontract commands pass with exact input/AST equivalence and independent review. No hosted runtime or timing pass claim."}],"remaining_acceptance":["Publish the reviewed replacement, then require exact-head successful three aggregate children and Build/lint/test, MSRV, Cargo Vet and Cargo Deny.","Require successor x86 enforcing MCP evidence, classify other failures and answer reviews before the exact-head landing handshake.","Keep stale trusted setup, missing committed Linux evidence variable, open attestation/weights proofs and operational acceptance disclosed."],"observed_source_head":"326d10e667a4aea50617d1cc5c469836bbd3ff27","source_integrated":true,"source_reviewed":true,"published":false,"merged":false,"full_qualified":false},
+    "postmerge-20261012:LANDING-AUDITOR-REST": {
+      "requirement_id": "postmerge-20261012:LANDING-AUDITOR-REST",
+      "label": "LANDING-AUDITOR-REST",
+      "scope": "now",
+      "landing_unit": "security-auditor",
+      "landing_pr": null,
+      "current_state": "source-qualified-reviewed-publication-pending",
+      "source_repair": {
+        "checkpoint": "8324a2a704a26089763ffc9031515ff14f69ab5f",
+        "commits": [
+          "8324a2a704a26089763ffc9031515ff14f69ab5f"
+        ],
+        "files": [
+          "scripts/audit-security-merge-qualification.py",
+          "scripts/tests/trusted-ci-landing-regressions.test.py",
+          "scripts/check-security-ci-contract.py"
+        ]
+      },
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/landing-auditor-repair-20261012.json",
+          "sha256": "98ae6faf82d3bcd31a8b1e560becc1c41db98d3fdc32e83a83c5bfde52047be7",
+          "scope": "Exact source, original refusals, passing local campaigns and independent review are itemized in the audit. Hosted acceptance and operational activation remain separate."
+        }
+      ],
+      "remaining_acceptance": [
+        "Publish the reviewed auditor candidate in its separate PR, then obtain exact-head hosted qualification.",
+        "Trusted definition publication and any authorization rotation require their separate reviewed operational decision; no settings change is included.",
+        "Preserve #1160 as historically unqualified at merge. Supporting its shape cannot make incomplete CI history pass."
+      ],
+      "observed_source_head": "8324a2a704a26089763ffc9031515ff14f69ab5f",
+      "source_integrated": true,
+      "source_reviewed": true,
+      "published": false,
+      "merged": false,
+      "full_qualified": false
+    },
+    "postmerge-20261012:LANDING-AUDITOR-SQUASH": {
+      "requirement_id": "postmerge-20261012:LANDING-AUDITOR-SQUASH",
+      "label": "LANDING-AUDITOR-SQUASH",
+      "scope": "now",
+      "landing_unit": "security-auditor",
+      "landing_pr": null,
+      "current_state": "source-qualified-reviewed-publication-pending",
+      "source_repair": {
+        "checkpoint": "8324a2a704a26089763ffc9031515ff14f69ab5f",
+        "commits": [
+          "8324a2a704a26089763ffc9031515ff14f69ab5f"
+        ],
+        "files": [
+          "scripts/audit-security-merge-qualification.py",
+          "scripts/tests/trusted-ci-landing-regressions.test.py",
+          "scripts/check-security-ci-contract.py",
+          "docs/security/committed-linux-evidence.md"
+        ]
+      },
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/landing-auditor-repair-20261012.json",
+          "sha256": "98ae6faf82d3bcd31a8b1e560becc1c41db98d3fdc32e83a83c5bfde52047be7",
+          "scope": "Exact source, original refusals, passing local campaigns and independent review are itemized in the audit. Hosted acceptance and operational activation remain separate."
+        }
+      ],
+      "remaining_acceptance": [
+        "Publish the reviewed auditor candidate in its separate PR, then obtain exact-head hosted qualification.",
+        "Trusted definition publication and any authorization rotation require their separate reviewed operational decision; no settings change is included.",
+        "Preserve #1160 as historically unqualified at merge. Supporting its shape cannot make incomplete CI history pass."
+      ],
+      "observed_source_head": "8324a2a704a26089763ffc9031515ff14f69ab5f",
+      "source_integrated": true,
+      "source_reviewed": true,
+      "published": false,
+      "merged": false,
+      "full_qualified": false
+    },
+    "postmerge-20261012:PHEROMONE-CI-SETUP": {
+      "requirement_id": "postmerge-20261012:PHEROMONE-CI-SETUP",
+      "label": "PHEROMONE-CI-SETUP",
+      "scope": "now",
+      "landing_unit": "ci-speed-pheromone",
+      "landing_pr": 1201,
+      "current_state": "published-hosted-pending",
+      "source_repair": {
+        "checkpoint": "a2734def20c38f3cc6a02cec35dda64e99bbc5d3",
+        "commits": [
+          "a2734def20c38f3cc6a02cec35dda64e99bbc5d3"
+        ],
+        "files": [
+          ".github/workflows/chio-pheromone-pinned.yml",
+          ".github/workflows/chio-pheromone-composite.yml",
+          ".github/workflows/ci.yml",
+          "scripts/check-pheromone-ci.py",
+          "scripts/tests/check-pheromone-ci.test.py"
+        ]
+      },
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/landing-auditor-repair-20261012.json",
+          "sha256": "98ae6faf82d3bcd31a8b1e560becc1c41db98d3fdc32e83a83c5bfde52047be7",
+          "scope": "Exact source, original refusals, passing local campaigns and independent review are itemized in the audit. Hosted acceptance and operational activation remain separate."
+        }
+      ],
+      "remaining_acceptance": [
+        "Require exact-head successful hosted four-required-check qualification and classify every additional failure.",
+        "Measure hosted timing separately; local aarch64 timing does not establish x86_64 savings."
+      ],
+      "observed_source_head": "a2734def20c38f3cc6a02cec35dda64e99bbc5d3",
+      "source_integrated": true,
+      "source_reviewed": true,
+      "published": true,
+      "merged": false,
+      "full_qualified": false
+    }
+  },
   "current_view_refresh_488_observations_20261007": {
     "at": "2026-10-07T02:40:40.721349+00:00",
     "source_basis": {
@@ -133929,5 +134186,15 @@
       1160
     ],
     "merged_false_scope": "Existing per-requirement merged:false values retain their recorded acceptance boundary; they do not assert that the foundation PR is still open. No requirement closure is inferred from the squash merge."
+  },
+  "postmerge_auditor_and_ci_20261012": {
+    "path": "docs/security/audits/landing-auditor-repair-20261012.json",
+    "sha256": "98ae6faf82d3bcd31a8b1e560becc1c41db98d3fdc32e83a83c5bfde52047be7",
+    "source_commit": "8324a2a704a26089763ffc9031515ff14f69ab5f",
+    "requirement_count": 2028,
+    "ci_speed_pr": 1201,
+    "auditor_branch": "fix/security-landing-auditor",
+    "auditor_pr": null,
+    "scope": "Publication-time source checkpoint; the auditor PR number is assigned when this committed candidate is published. Historical landing and acceptance records are preserved."
   }
 }

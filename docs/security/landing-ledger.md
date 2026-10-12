@@ -1,11 +1,35 @@
 # Security and process landing ledger
 
-The first checkpoint below is the latest landing observation. For each requirement,
+The first checkpoints below record the latest source and landing observations. For each requirement,
 use `current_requirement_states` in the [canonical JSON ledger](landing-ledger.json),
 with its stated source and acceptance boundary. The remaining dated sections
 preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
+
+## Auditor repair and CI speed publication (October 12 UTC)
+
+The ledger now records **2,028 requirements**. All previous 2,025 requirements
+and current-state records remain unchanged; three new rows account for the
+REST compatibility repair, authenticated squash support and CI setup reduction.
+The [repair evidence](audits/landing-auditor-repair-20261012.json) binds exact
+commits, original failures, local results, independent reviews and retained logs.
+
+CI speed PR [#1201](https://github.com/bb-connor/arc/pull/1201), head
+`a2734def20c38f3cc6a02cec35dda64e99bbc5d3`, preserves fifteen fixture commands
+in two setup groups. All fifteen facets and both npm installations passed locally.
+Its starting staged diff exactly matches the committed candidate. Hosted checks
+and timing remain pending; local aarch64 results do not establish x86_64 savings.
+
+Auditor source `8324a2a704a26089763ffc9031515ff14f69ab5f` includes the compatible
+REST pin and strict one-parent squash support alongside the existing two-parent
+model. All 109 owning tests, sixteen focused tests, the complete security-contract
+mutation suite and final document controls passed. Claude reviewed the design,
+source and operator guide. Publication uses the separate
+`fix/security-landing-auditor` branch; its PR number is assigned when this
+committed checkpoint is published. These two candidates are the active landing
+wave. Trusted-definition deployment remains a separate operational decision.
+Neither repair changes #1160's historical incomplete qualification at merge.
 
 ## Foundation merged with qualification incomplete (October 11 UTC)
 
