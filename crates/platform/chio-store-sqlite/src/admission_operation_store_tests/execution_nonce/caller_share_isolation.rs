@@ -129,18 +129,19 @@ fn an_unverifiable_operation_under_one_parent_does_not_deny_another_parents_snap
         assert_eq!(shares[0].parent_id(), &parent(id));
         assert_eq!(shares[0].operation_id(), operation_id);
     }
-    fixture.store.connection()?.execute(
+    let changed = fixture.store.connection()?.execute(
         "UPDATE admission_operations SET operation_json = X'7b', version = version + 1 WHERE operation_id = ?1",
         [first_id.as_str()],
     )?;
+    assert_eq!(changed, 1, "exactly parent A's operation must be corrupted");
     assert!(fixture
         .store
         .load_caller_budget_shares(&parent(PARENT_A), 16, &fixture.fence, now_ms())
         .is_err());
-    let shares =
-        fixture
-            .store
-            .load_caller_budget_shares(&parent(PARENT_B), 16, &fixture.fence, now_ms())?;
+    let shares = fixture
+        .store
+        .load_caller_budget_shares(&parent(PARENT_B), 16, &fixture.fence, now_ms())
+        .map_err(|error| format!("B snapshot after A corruption: {error}"))?;
     assert_eq!(shares.len(), 1);
     assert_eq!(shares[0].parent_id(), &parent(PARENT_B));
     assert_eq!(shares[0].operation_id(), second_id);

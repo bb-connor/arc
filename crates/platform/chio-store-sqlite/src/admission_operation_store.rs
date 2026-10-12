@@ -1251,7 +1251,20 @@ fn read_raw_row(row: &Row<'_>) -> rusqlite::Result<RawOperationRow> {
     })
 }
 
+#[cfg(test)]
+thread_local! {
+    static DECODED_OPERATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Admission operation rows this thread has decoded and checked.
+#[cfg(test)]
+fn decoded_operations() -> usize {
+    DECODED_OPERATIONS.with(std::cell::Cell::get)
+}
+
 fn decode_row(raw: RawOperationRow) -> Result<StoredOperation, AdmissionOperationStoreError> {
+    #[cfg(test)]
+    DECODED_OPERATIONS.with(|count| count.set(count.get() + 1));
     if raw.operation_json.is_empty() || raw.operation_json.len() > MAX_PERSISTED_OPERATION_BYTES {
         return Err(invariant("persisted admission operation size is invalid"));
     }
