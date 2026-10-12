@@ -470,8 +470,15 @@ distinct; any other run without a proven same-repository identity leaves the
 landing unverified. Only then does a run title select the positive source. The
 audit reads the singleton dedicated App-and-name qualification on `E`, authenticates
 its strict v3 `I` and recomputed `K`, and binds the exact CI and finalizer attempts.
-The retained protected merge's ordered parents and tree must equal `I.base_sha`,
-`E` and `I.merge_tree_sha`; historical `M_ci` must retain those parents and tree.
+The protected landing `L` selects exactly one model by its actual parent count.
+A two-parent merge must have ordered parents `[I.base_sha, E]`. A one-parent
+squash must have parent `[I.base_sha]`, differ from `E`, and have exactly the
+same tree as the authenticated commit `E`. In that case the comparison
+`I.base_sha...E` must be strictly ahead, with zero commits behind and merge base
+exactly `I.base_sha`. Every other parent shape is refused, with no fallback.
+Both models require the sealed tree `I.merge_tree_sha`; historical `M_ci` must
+have ordered parents `[I.base_sha, E]` and that same tree. The mutable post-merge
+PR base, commit message and commit author cannot replace the recorded binding.
 It verifies the four original CI checks plus the Actions aggregate through the
 exact source attempt's jobs: job name, run/head, successful
 completion, repository-bound check URL, original check ID/name/head, Actions App
@@ -484,8 +491,9 @@ and duplicate-aware JSON tuple must match `M_ci`, N, base, E, tree and exact CI
 attempt. The auditor relies on the App-authenticated historical finalizer's
 signature verification and does not repeat Sigstore verification. Its authority
 stability re-list includes only the dedicated check; unrelated checks and commit
-statuses cannot supply or revoke authority. It then proves the actual main
-merge has ordered parents `<base>, E` and the sealed tree `T`. It requires identical
+statuses cannot supply or revoke authority. It proves that the protected landing
+is retained on main at both the initial and final audit boundaries, and reports
+the actual parent vector and landing model. It requires identical
 `ci.yml` blobs at S, E and the retained landing L. It does not expect
 mirror checks on the new main merge commit, and an ordinary Actions aggregate
 named `Security contract` cannot substitute for dedicated-App authority. The
@@ -495,7 +503,9 @@ external evidence. Manual audit dispatch requires an explicit merged PR number.
 
 The associated-PR signal `commits/L/pulls` must contain the audited PR and no
 other PR recorded as merged by L. The output labels this attribution as observed,
-not enforcement. An unavailable or expired retained artifact yields `unverified`.
+not enforcement. The auditor pins REST `2022-11-28`, whose PR objects retain
+`merge_commit_sha`; REST `2026-03-10` removed that attribution field. An unavailable
+or expired retained artifact yields `unverified`.
 
 The 2026-10-08 scratch Actions transport observations refused X on M and accepted
 X on E. They do not qualify the dedicated App Y or the proposed ruleset. Y on E
@@ -508,9 +518,11 @@ The last observed production ruleset (`main-required-checks`, ID `22033486`,
 2026-10-06) required the four ordinary CI contexts, used non-strict status checks,
 and had no linear-history requirement or bypass actors. The repository permitted
 merge, squash and rebase. Refresh this external state before acting. The payload
-below is the proposed strict authority ruleset, not a claim of current activation.
-It allows only a merge commit and omits linear history so exact `E` and both
-histories remain reachable. Independent exact-source review is still a separate
+below is the earlier proposed strict authority ruleset, not a claim of current
+activation. Its merge-only policy predates the approved squash audit model and
+does not enable squash landings. It remains a separate adoption proposal; the
+auditor repair does not install or change it. That proposal omits linear history
+so exact `E` and both histories remain reachable. Independent exact-source review is still a separate
 landing requirement; the payload does not assert that CODEOWNERS approval is
 currently enforced.
 

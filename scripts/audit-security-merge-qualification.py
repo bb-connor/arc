@@ -353,10 +353,26 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
     merged_at = timestamp(pr.get("merged_at"))
     protected_commit = api.get(f"git/commits/{protected}")
     parents = protected_commit.get("parents")
-    require(isinstance(parents, list) and len(parents) == 2 and parents[1].get("sha") == evidence,
-            "protected landing did not retain exact E as its second parent")
-    base, tree = sha(parents[0].get("sha")), sha(protected_commit.get("tree", {}).get("sha"))
+    require(isinstance(parents, list) and len(parents) in {1, 2}
+            and all(isinstance(parent, dict) for parent in parents),
+            "protected landing must have one or two commit parents")
+    parent_shas = [sha(parent.get("sha")) for parent in parents]
+    base, tree = parent_shas[0], sha(protected_commit.get("tree", {}).get("sha"))
     require(protected_commit.get("sha") == protected, "protected commit identity mismatch")
+    if len(parent_shas) == 2:
+        landing_method = "merge"
+        require(parent_shas[1] == evidence,
+                "protected landing did not retain exact E as its second parent")
+    else:
+        landing_method = "squash"
+        require(protected != evidence, "squash landing must be distinct from E")
+        source_commit = api.get(f"git/commits/{evidence}")
+        require(source_commit.get("sha") == evidence, "squash source commit identity mismatch")
+        require(source_commit.get("tree", {}).get("sha") == tree, "squash tree differs from exact E")
+        source_ancestry = api.get(f"compare/{base}...{evidence}")
+        require(source_ancestry.get("status") == "ahead" and source_ancestry.get("behind_by") == 0
+                and source_ancestry.get("merge_base_commit", {}).get("sha") == base,
+                "squash E is not strictly ahead of retained base B")
     main = api.get("git/ref/heads/main")
     require(main.get("ref") == "refs/heads/main" and main.get("object", {}).get("type") == "commit",
             "invalid protected main ref")
@@ -594,7 +610,8 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
             and final_reachable.get("merge_base_commit", {}).get("sha") == protected,
             "protected merge was withdrawn from main at the final audit boundary")
     return {"status": "verified", "repository": repository, "qualification": qualification,
-            "protected_merge_commit_sha": protected, "protected_parents": [base, evidence],
+            "protected_merge_commit_sha": protected, "protected_parents": parent_shas,
+            "landing_method": landing_method,
             "protected_tree_sha": tree, "auditor_definition_sha": definition, "observed_main_sha": final_main_sha,
             "landing_attribution": f"observed commits/{protected}/pulls signal; not enforcement"}
 
@@ -621,10 +638,11 @@ def main() -> int:
     markdown = "## Protected landing qualification audit\n\n"
     if result["status"] == "verified":
         qualification = result["qualification"]
+        parents = ", ".join(f"`{parent}`" for parent in result["protected_parents"])
         markdown += (f"Verified recorded qualification `{qualification['identity_digest']}` on evidence head "
                      f"`{qualification['evidence_sha']}` for PR {qualification['pr_number']}.\n\n"
-                     f"Main retained merge `{result['protected_merge_commit_sha']}` with ordered parents "
-                     f"`{qualification['base_sha']}`, `{qualification['evidence_sha']}` and the qualified tree.\n\n"
+                     f"Main retained {result['landing_method']} `{result['protected_merge_commit_sha']}` "
+                     f"with ordered parents {parents} and the qualified tree.\n\n"
                      f"Authorized source: `{qualification['authorized_source_sha']}`. The dedicated authority check and five original CI checks passed.\n\n"
                      f"Landing attribution: {result['landing_attribution']}.\n")
     else:

@@ -322,7 +322,7 @@ else: print(json.dumps(result))
 '''
 
 
-def run_audit(data: dict[str, dict]) -> tuple[subprocess.CompletedProcess, dict, str]:
+def run_audit(data: dict[str, dict], *, include_markdown: bool = False) -> tuple[subprocess.CompletedProcess, dict, str]:
     audit = workflow("admin-override-audit.yml")["jobs"]["audit"]
     body = next(step["run"] for step in audit["steps"] if "run" in step)
     with tempfile.TemporaryDirectory(prefix="chio-landing-audit-") as raw:
@@ -352,8 +352,8 @@ def run_audit(data: dict[str, dict]) -> tuple[subprocess.CompletedProcess, dict,
                                 text=True, capture_output=True, check=False, timeout=30)
         output = directory / "audit.json"
         report = json.loads(output.read_text()) if output.exists() else {}
-        comments = directory / "comment.md"
-        return result, report, comments.read_text() if comments.exists() else ""
+        rendered = directory / ("audit.md" if include_markdown else "comment.md")
+        return result, report, rendered.read_text() if rendered.exists() else ""
 
 
 class AuditPullRequestApiVersionTests(unittest.TestCase):
@@ -384,6 +384,170 @@ class AuditPullRequestApiVersionTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(report["status"], "unverified")
         self.assertEqual(report["error"], "invalid commit or blob SHA")
+
+
+def squash_snapshot() -> dict:
+    data = snapshot()
+    prefix = f"repos/{REPOSITORY}"
+    data[f"{prefix}/git/commits/{PROTECTED}"]["parents"] = [{"sha": BASE}]
+    data[f"{prefix}/git/commits/{EVIDENCE}"] = {"sha": EVIDENCE, "tree": {"sha": TREE}}
+    data[f"{prefix}/compare/{BASE}...{EVIDENCE}"] = {
+        "status": "ahead", "behind_by": 0, "merge_base_commit": {"sha": BASE},
+    }
+    return data
+
+
+class SquashQualificationAuditTests(unittest.TestCase):
+    def assert_refused(self, data: dict, reason: str) -> None:
+        result, report, _ = run_audit(data)
+        self.assertNotEqual(result.returncode, 0, report)
+        self.assertEqual(report.get("status"), "unverified", report)
+        self.assertEqual(report.get("error"), reason, report)
+
+    def test_qualified_squash_preserves_exact_source_and_tested_tree(self) -> None:
+        result, report, markdown = run_audit(squash_snapshot(), include_markdown=True)
+        self.assertEqual(result.returncode, 0, report)
+        self.assertEqual(report["status"], "verified")
+        self.assertEqual(report["landing_method"], "squash")
+        self.assertEqual(report["protected_parents"], [BASE])
+        self.assertEqual(report["protected_tree_sha"], TREE)
+        self.assertIn(f"Main retained squash `{PROTECTED}`", markdown)
+        self.assertIn(f"with ordered parents `{BASE}` and the qualified tree", markdown)
+
+    def test_two_parent_landing_retains_its_ordered_source_parent(self) -> None:
+        result, report, markdown = run_audit(snapshot(), include_markdown=True)
+        self.assertEqual(result.returncode, 0, report)
+        self.assertEqual(report["landing_method"], "merge")
+        self.assertEqual(report["protected_parents"], [BASE, EVIDENCE])
+        self.assertIn(f"with ordered parents `{BASE}`, `{EVIDENCE}`", markdown)
+
+    def test_unknown_parent_shapes_cannot_select_a_landing_model(self) -> None:
+        for parents in (None, [], {}, [None], [{"sha": BASE}] * 3):
+            with self.subTest(parents=parents):
+                data = squash_snapshot()
+                data[f"repos/{REPOSITORY}/git/commits/{PROTECTED}"]["parents"] = parents
+                self.assert_refused(data, "protected landing must have one or two commit parents")
+
+    def test_two_parent_landing_cannot_fall_back_to_squash(self) -> None:
+        data = squash_snapshot()
+        data[f"repos/{REPOSITORY}/git/commits/{PROTECTED}"]["parents"].append({"sha": SOURCE})
+        self.assert_refused(data, "protected landing did not retain exact E as its second parent")
+
+    def test_squash_requires_the_exact_source_identity_and_tree(self) -> None:
+        for field, value, reason in (
+            ("sha", SOURCE, "squash source commit identity mismatch"),
+            ("tree", {"sha": SOURCE}, "squash tree differs from exact E"),
+            ("tree", {}, "squash tree differs from exact E"),
+        ):
+            with self.subTest(field=field, value=value):
+                data = squash_snapshot()
+                data[f"repos/{REPOSITORY}/git/commits/{EVIDENCE}"][field] = value
+                self.assert_refused(data, reason)
+
+    def test_unmodified_source_commit_is_not_a_squash(self) -> None:
+        data = squash_snapshot()
+        data[f"repos/{REPOSITORY}/pulls/{PR}"]["head"]["sha"] = PROTECTED
+        self.assert_refused(data, "squash landing must be distinct from E")
+
+    def test_squash_source_must_retain_the_current_landing_base(self) -> None:
+        for update in ({"status": "behind"}, {"status": "diverged"}, {"status": "identical"},
+                       {"behind_by": 1}, {"merge_base_commit": {"sha": SOURCE}}):
+            with self.subTest(update=update):
+                data = squash_snapshot()
+                data[f"repos/{REPOSITORY}/compare/{BASE}...{EVIDENCE}"].update(update)
+                self.assert_refused(data, "squash E is not strictly ahead of retained base B")
+
+    def test_moved_base_cannot_replace_the_recorded_qualified_base(self) -> None:
+        data = squash_snapshot()
+        prefix = f"repos/{REPOSITORY}"
+        new_base = "1" * 40
+        data[f"{prefix}/git/commits/{PROTECTED}"]["parents"] = [{"sha": new_base}]
+        data[f"{prefix}/compare/{new_base}...{EVIDENCE}"] = {
+            "status": "ahead", "behind_by": 0, "merge_base_commit": {"sha": new_base},
+        }
+        # Even a matching mutable PR base cannot replace the App's recorded B.
+        data[f"{prefix}/pulls/{PR}"]["base"]["sha"] = new_base
+        self.assert_refused(data, "candidate identity does not match the retained protected landing")
+
+    def test_mutable_pr_base_is_not_required_for_historical_squash_identity(self) -> None:
+        data = squash_snapshot()
+        data[f"repos/{REPOSITORY}/pulls/{PR}"]["base"]["sha"] = "1" * 40
+        result, report, _ = run_audit(data)
+        self.assertEqual(result.returncode, 0, report)
+        self.assertEqual(report["qualification"]["base_sha"], BASE)
+
+    def test_same_source_tree_does_not_replace_the_authenticated_test_merge(self) -> None:
+        for change in ("tree", "parents"):
+            with self.subTest(change=change):
+                data = squash_snapshot()
+                tested = data[f"repos/{REPOSITORY}/git/commits/{MERGE}"]
+                tested[change] = {"sha": SOURCE} if change == "tree" else [{"sha": SOURCE}, {"sha": EVIDENCE}]
+                self.assert_refused(data, "qualified test merge parents/tree do not match retained protected landing")
+
+    def test_source_and_squash_tree_agreement_does_not_replace_qualified_tree(self) -> None:
+        data = squash_snapshot()
+        for commit in (EVIDENCE, PROTECTED):
+            data[f"repos/{REPOSITORY}/git/commits/{commit}"]["tree"]["sha"] = SOURCE
+        self.assert_refused(data, "candidate identity does not match the retained protected landing")
+
+    def test_squash_cannot_belong_to_a_same_tree_sibling(self) -> None:
+        data = squash_snapshot()
+        data[f"repos/{REPOSITORY}/commits/{PROTECTED}/pulls"][0]["number"] = OTHER_PR
+        self.assert_refused(data, "observed protected landing attribution does not uniquely identify the audited PR")
+
+    def test_unmerged_or_changed_pr_cannot_qualify_squash(self) -> None:
+        prefix = f"repos/{REPOSITORY}/pulls/{PR}"
+        data = squash_snapshot()
+        data[prefix]["merged"] = False
+        self.assert_refused(data, "audit requires the explicit merged pull request")
+        for change in ("head", "merge_commit_sha", "merged_at"):
+            with self.subTest(change=change):
+                data = squash_snapshot()
+                before = data[prefix]
+                after = copy.deepcopy(before)
+                if change == "head":
+                    after["head"]["sha"] = SOURCE
+                else:
+                    after[change] = SOURCE if change == "merge_commit_sha" else "2026-10-06T00:11:00Z"
+                data[prefix] = {"__sequence": [before, after]}
+                self.assert_refused(data, "merged PR identity changed during audit")
+
+    def test_squash_must_remain_on_main_at_both_boundaries(self) -> None:
+        prefix = f"repos/{REPOSITORY}"
+        for boundary in ("initial", "final"):
+            with self.subTest(boundary=boundary):
+                data = squash_snapshot()
+                before = data[f"{prefix}/git/ref/heads/main"]
+                after = copy.deepcopy(before)
+                after["object"]["sha"] = SOURCE
+                data[f"{prefix}/git/ref/heads/main"] = (
+                    after if boundary == "initial" else {"__sequence": [before, after]})
+                data[f"{prefix}/compare/{PROTECTED}...{SOURCE}"] = {
+                    "status": "diverged", "behind_by": 1, "merge_base_commit": {"sha": BASE},
+                }
+                reason = ("protected merge is not retained on main" if boundary == "initial"
+                          else "protected merge was withdrawn from main at the final audit boundary")
+                self.assert_refused(data, reason)
+
+    def test_squash_cannot_qualify_incomplete_or_failed_ci(self) -> None:
+        for update in ({"status": "in_progress", "conclusion": None}, {"conclusion": "failure"}):
+            with self.subTest(update=update):
+                data = squash_snapshot()
+                data[f"repos/{REPOSITORY}/actions/runs/{CI_RUN}/attempts/1"].update(update)
+                self.assert_refused(data, "CI history for the evidence head contains an incomplete or unsuccessful attempt")
+
+    def test_squash_requires_authority_before_landing(self) -> None:
+        for late in (False, True):
+            with self.subTest(late=late):
+                data = squash_snapshot()
+                checks = data[f"repos/{REPOSITORY}/commits/{EVIDENCE}/check-runs"]
+                if late:
+                    checks["check_runs"][0]["completed_at"] = "2026-10-06T00:11:00Z"
+                    reason = "authority was published after the protected merge"
+                else:
+                    checks.update(total_count=0, check_runs=[])
+                    reason = "missing or duplicate dedicated authority namespace on E"
+                self.assert_refused(data, reason)
 
 
 class RecordedQualificationAuditTests(unittest.TestCase):
