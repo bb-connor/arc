@@ -57,11 +57,11 @@ fn page(
     })?)
 }
 
-/// Counts SQLite virtual-machine steps on the store connection for one page.
-fn counted_page(
+/// Counts SQLite virtual-machine steps on the store connection for one query.
+fn count_sql_steps<T>(
     fixture: &Fixture,
-    now: u64,
-) -> AnchoredTestResult<(AdmissionRecoveryPageV1, usize)> {
+    query: impl FnOnce() -> AnchoredTestResult<T>,
+) -> AnchoredTestResult<(T, usize)> {
     let steps = Arc::new(AtomicUsize::new(0));
     let counter = Arc::clone(&steps);
     fixture.store.connection()?.progress_handler(
@@ -71,7 +71,7 @@ fn counted_page(
             false
         }),
     )?;
-    let result = page(fixture, now, 16, None);
+    let result = query();
     fixture
         .store
         .connection()?
@@ -93,13 +93,13 @@ fn recovery_page_work_does_not_grow_with_retained_terminal_history() -> Anchored
     fixture.store.begin(&due, &fixture.fence, at)?;
     let now = at + 10_000;
 
-    let (before, before_steps) = counted_page(&fixture, now)?;
+    let (before, before_steps) = count_sql_steps(&fixture, || page(&fixture, now, 16, None))?;
     assert_eq!(before.operations, vec![due.clone()]);
     assert_eq!(before.scanned_candidates, 1);
     assert_eq!(before.next_cursor, None);
 
     retain_terminal_history(&fixture, "bound", TERMINAL_HISTORY, at + 100)?;
-    let (after, after_steps) = counted_page(&fixture, now)?;
+    let (after, after_steps) = count_sql_steps(&fixture, || page(&fixture, now, 16, None))?;
     assert_eq!(after.operations, vec![due]);
     assert_eq!(after.scanned_candidates, 1);
     assert_eq!(after.next_cursor, None);
@@ -194,6 +194,71 @@ fn recovery_sweep_returns_each_due_operation_once_across_terminal_history() -> A
         scanned,
         due.len() + 1,
         "only live or quarantined operations occupy recovery candidates"
+    );
+    Ok(())
+}
+
+#[test]
+fn legacy_tail_probe_does_not_walk_retained_terminal_history() -> AnchoredTestResult {
+    let at = 1_800_000_500_000;
+    let _clock = chio_test_support::clock::scope_unix_secs(at / 1_000);
+    let fixture = fixture();
+    let mut candidates = (0..256 + TERMINAL_HISTORY)
+        .map(|index| {
+            let request = format!("legacy-tail-request-{index:03}");
+            let capability = format!("legacy-tail-capability-{index:03}");
+            let operation = prepared_operation(
+                &fixture.fence,
+                AdmissionOperationKind::ToolDispatch,
+                &request,
+                &capability,
+            );
+            (operation, request, capability)
+        })
+        .collect::<Vec<_>>();
+    candidates.sort_by(|left, right| {
+        left.0
+            .binding()
+            .operation_id()
+            .cmp(right.0.binding().operation_id())
+    });
+    let (dormant, terminal_tail) = candidates.split_at(256);
+    for (operation, _, _) in dormant {
+        fixture.store.begin(operation, &fixture.fence, at)?;
+        let (_, status) = defer(&fixture, operation, at)?;
+        assert!(status.deferral.retry_not_before_unix_ms > at + 2_000);
+    }
+    let (before, before_steps) = count_sql_steps(&fixture, || {
+        Ok(fixture.store.list_recoverable(at + 2_000, 1)?)
+    })?;
+    assert!(before.is_empty());
+
+    for (index, (expected, request, capability)) in terminal_tail.iter().enumerate() {
+        let operation = finalizing_tool_operation(&fixture, request, capability, at);
+        assert_eq!(
+            operation.binding().operation_id(),
+            expected.binding().operation_id()
+        );
+        let projection = unknown_projection(
+            &fixture,
+            &operation,
+            &format!("legacy-tail-incident-{index}"),
+            'c',
+            at + 20,
+        );
+        assert!(fixture
+            .store
+            .commit_terminal_projection(&projection)?
+            .state
+            .is_terminal());
+    }
+    let (after, after_steps) = count_sql_steps(&fixture, || {
+        Ok(fixture.store.list_recoverable(at + 2_000, 1)?)
+    })?;
+    assert!(after.is_empty());
+    assert!(
+        after_steps.saturating_sub(before_steps) < TERMINAL_HISTORY,
+        "legacy tail visited terminal rows: {before_steps} SQLite steps before, {after_steps} after"
     );
     Ok(())
 }
