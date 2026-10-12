@@ -1,4 +1,4 @@
-# Overlay dispatch revalidation
+# Delegation freeze and overlay dispatch revalidation
 
 > Use superpowers:executing-plans and test-driven-development. Root integrates and pushes; Claude reviews and merges.
 
@@ -26,3 +26,15 @@ This repairs the last read-only dispatch check. It is not a same-writer closure 
 - Repair `06721c1db2`: all eight focused tests passed across 64 ordinary/nested, direct/pipeline and Ready/delayed cells. The full owning integration suite passed 93 tests.
 - The first strict run rejected an ambiguous test `RequestId` glob import. `0541a42da7` makes session imports explicit. Actual-main composition `6e265388eb` includes the prepayment custody repair and the new repository rules; its focused tests and strict lint remain pending.
 - Claude reviews the 28-line production delta. No proof, same-writer linearization or closure/drain acceptance is implied.
+
+## Delegation admission
+
+The public non-tool validator admits issuer-signed delegated resource capabilities. Tool invocation independently refuses security-bound delegation. Freeze enforcement therefore belongs after signature, ancestry and attenuation validation in the common delegation-admission path.
+
+- With a configured freeze authority, every delegated token must carry signed tenant and lineage fields. Query `Delegate` with the final link's parent capability id; authority refusal denies admission.
+- A bound delegation without a freeze authority denies admission.
+- A standalone kernel without a freeze authority continues to admit its current unbound local capabilities. Issued roots are not delegation operations.
+- The tool invocation ban remains in force. No new capability minting interface is added.
+- Freeze-window replay after lift remains open because the authority has no retained interval history. Current presentation checks do not prove when an offline signature was created.
+
+Public Original `87238093c2` (unchanged delegation admission plus `fe2704734e` tests) passed three positive controls and failed four refusal controls: frozen subscription, frozen parent registration, missing authority and configured authority without signed binding. `6a01f759dd` implements the common admission check. `e65aeb0917` adds the exact public tool-ban control. Final combined candidate `8503a2e5f4` is under focused and strict qualification.
