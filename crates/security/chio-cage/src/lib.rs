@@ -26,6 +26,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #[cfg(all(feature = "enforcement-mutants", not(debug_assertions)))]
 compile_error!("enforcement-mutants is a test-only feature and cannot be built for release");
+mod confinement;
 mod launch;
 #[cfg(target_os = "linux")]
 mod linux;
@@ -1607,6 +1608,8 @@ pub use chio_cage_plan::NONO_PATCH_VERSION;
 pub use chio_cage_plan::PINNED_SECCOMPILER_VERSION;
 
 pub use chio_cage_plan::CageEnforcementState;
+pub use chio_cage_plan::{ConfinementBackendKind, ConfinementDisclosure, UnconfinedReason};
+pub use confinement::{render_tool_confinement, NATIVE_LAUNCH_METADATA_KEY};
 
 pub use chio_cage_plan::CageEnforcementFailureCode;
 

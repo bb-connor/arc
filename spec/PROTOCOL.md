@@ -1493,6 +1493,21 @@ Subject and issuer attribution, streamed-output chunk metadata, and
 portable-trust and federation provenance are additive extensions layered over
 the same object.
 
+A tool call dispatched to a tool server launched under the Linux cage carries
+`native_launch = { receipt_id, receipt_sha256 }`. The kernel binds it from the
+transport's persisted cage enforcement receipt after delivery preparation shows
+the server is still running, for an invocation-owned connection and for a
+long-lived adapted server alike. Dispatch is refused when that enforcement
+receipt is not `fully_enforced`, and denied when host attribution carries a
+different `native_launch`. A verifier renders a receipt as confined by Chio only
+when the receipt verifies under a pinned kernel key and the referenced cage
+receipt has the named id, hashes to `receipt_sha256` over canonical JSON,
+verifies under a pinned launch signer, names the same tool server, and records
+state `fully_enforced`. Every other receipt, including one whose reference does
+not verify, renders as not confined by Chio, with the reason taken from
+`tool_origin`: `chio_internal` is an in-process tool, `caller_executed` is
+caller-executed, and both `host_executed_*` origins are host-executed.
+
 Durable tool calls carry an `admission_operation` block whose schema is
 `chio.admission-receipt.v1`. It binds the signed receipt to the admission
 operation and request namespace, terminal projection and dispatch state,
