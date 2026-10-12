@@ -40,5 +40,11 @@ fields. `protected_parents` becomes the actual verified vector; add
 - [x] Renew the auditor digest; run the complete owning audit suite and security
   contract controls, then inspect exact results.
 - [x] Obtain independent source and operator-document review.
-- [ ] Commit the qualified repair and publish with the API repair, separately
+- [x] Commit the qualified repair and publish with the API repair, separately
   from CI speed. Hosted qualification remains a separate acceptance step.
+
+Publication checkpoint: source and local qualification are complete in PR #1202.
+The PR is draft while #1201 establishes the next base. The cancelled `61b28ca217`
+run remains cancelled acceptance evidence. Integrating the actual new main and
+qualifying a fresh head are still required; implementation completion does not
+mean hosted qualification or trusted-definition activation.

@@ -5,7 +5,10 @@
   "reference_tag": "archive/security-roadmap-pre-landing-20261004",
   "main_snapshot": "f5566d9a765c21cb36652a99c79de64968a656bf",
   "semantics": "Source claims are historical unless separately qualified. Coverage is bookkeeping, not proof of security. Null repair or PR means not established or not yet assigned; it never means complete.",
-  "active_landing_prs": [1201],
+  "active_landing_prs": [
+    1201,
+    1202
+  ],
   "waiting_foundation_pr": null,
   "landing_units": {
     "dependencies": 1168,
@@ -37,7 +40,8 @@
     "trusted-runtime-definitions": 1176,
     "trusted-v3-definitions": 1195,
     "ci-speed-pheromone": 1201,
-    "security-auditor": null
+    "security-auditor": 1202,
+    "release-ci-repair": null
   },
   "sources": [
     {
@@ -2145,6 +2149,15 @@
         "postmerge-20261012:LANDING-AUDITOR-REST",
         "postmerge-20261012:LANDING-AUDITOR-SQUASH",
         "postmerge-20261012:PHEROMONE-CI-SETUP"
+      ],
+      "evidence_requirement_ids": []
+    },
+    {
+      "path": "docs/security/audits/postmerge-ci-triage-20261012.json",
+      "commit": "19f992dfb839b8c5382a2fcddfcf90fce14e4dd3",
+      "sha256": "16113d0870b535f98ebaa6f323eb948c68d9219a39378f4367f2bf8d401db08d",
+      "requirement_ids": [
+        "postmerge-20261012:RELEASE-DROGON"
       ],
       "evidence_requirement_ids": []
     }
@@ -8578,7 +8591,7 @@
         "path": "docs/security/audits/landing-auditor-repair-20261012.json",
         "checkpoint": "d3e96abb60c61b8af0a99b993ef6494625c26e7c"
       },
-      "disposition": "source-qualified-reviewed-publication-pending",
+      "disposition": "reviewed-draft-standby",
       "source_repair": {
         "checkpoint": "8324a2a704a26089763ffc9031515ff14f69ab5f",
         "commits": [
@@ -8598,15 +8611,15 @@
         }
       ],
       "remaining_acceptance": [
-        "Publish the reviewed auditor candidate in its separate PR, then obtain exact-head hosted qualification.",
+        "Integrate the actual #1201 landing base, independently review the composition and qualify a new exact head. Cancelled head61b28 remains cancelled and is not rerun.",
         "Trusted definition publication and any authorization rotation require their separate reviewed operational decision; no settings change is included.",
         "Preserve #1160 as historically unqualified at merge. Supporting its shape cannot make incomplete CI history pass."
       ],
       "landing_unit": "security-auditor",
-      "landing_pr": null,
+      "landing_pr": 1202,
       "main_ancestry_verified": false,
       "review_scope": "now",
-      "work_status": "source-qualified-reviewed-publication-pending",
+      "work_status": "reviewed-draft-standby",
       "owner": "Root (Claude independent review)",
       "merged": false,
       "full_qualified": false
@@ -8621,7 +8634,7 @@
         "path": "docs/security/audits/landing-auditor-repair-20261012.json",
         "checkpoint": "d3e96abb60c61b8af0a99b993ef6494625c26e7c"
       },
-      "disposition": "source-qualified-reviewed-publication-pending",
+      "disposition": "reviewed-draft-standby",
       "source_repair": {
         "checkpoint": "8324a2a704a26089763ffc9031515ff14f69ab5f",
         "commits": [
@@ -8642,15 +8655,15 @@
         }
       ],
       "remaining_acceptance": [
-        "Publish the reviewed auditor candidate in its separate PR, then obtain exact-head hosted qualification.",
+        "Integrate the actual #1201 landing base, independently review the composition and qualify a new exact head. Cancelled head61b28 remains cancelled and is not rerun.",
         "Trusted definition publication and any authorization rotation require their separate reviewed operational decision; no settings change is included.",
         "Preserve #1160 as historically unqualified at merge. Supporting its shape cannot make incomplete CI history pass."
       ],
       "landing_unit": "security-auditor",
-      "landing_pr": null,
+      "landing_pr": 1202,
       "main_ancestry_verified": false,
       "review_scope": "now",
-      "work_status": "source-qualified-reviewed-publication-pending",
+      "work_status": "reviewed-draft-standby",
       "owner": "Root (Claude independent review)",
       "merged": false,
       "full_qualified": false
@@ -8696,6 +8709,39 @@
       "review_scope": "now",
       "work_status": "published-hosted-pending",
       "owner": "Root (Claude independent review)",
+      "merged": false,
+      "full_qualified": false
+    },
+    {
+      "id": "postmerge-20261012:RELEASE-DROGON",
+      "label": "RELEASE-DROGON",
+      "priority": "P2",
+      "classification": "release-ci-provisioning-regression",
+      "requirement": "Provision the pinned Drogon fixture dependencies before the strict release SDK parity gate; retain all SDK workloads and fail-closed dependency checks.",
+      "source": {
+        "path": "docs/security/audits/postmerge-ci-triage-20261012.json",
+        "checkpoint": "19f992dfb839b8c5382a2fcddfcf90fce14e4dd3"
+      },
+      "disposition": "confirmed-repair-assigned",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/postmerge-ci-triage-20261012.json",
+          "sha256": "16113d0870b535f98ebaa6f323eb948c68d9219a39378f4367f2bf8d401db08d",
+          "scope": "Retained failed job, first missing dependency, exact main source, assigned repair and separate operational prerequisites. No repair or full qualification is claimed."
+        }
+      ],
+      "remaining_acceptance": [
+        "Reproduce the missing dependency against main28d; install pinned dependencies and run the real Drogon smoke locally.",
+        "Run the owning workflow contract and review the exact provisioning diff.",
+        "Land through the bounded queue after an exact-head qualification; classify any later release-lane failure separately."
+      ],
+      "landing_unit": "release-ci-repair",
+      "landing_pr": null,
+      "main_ancestry_verified": false,
+      "review_scope": "now",
+      "work_status": "confirmed-repair-assigned",
+      "owner": "Claude implementation, Root integration",
       "merged": false,
       "full_qualified": false
     }
@@ -132529,8 +132575,8 @@
       "label": "LANDING-AUDITOR-REST",
       "scope": "now",
       "landing_unit": "security-auditor",
-      "landing_pr": null,
-      "current_state": "source-qualified-reviewed-publication-pending",
+      "landing_pr": 1202,
+      "current_state": "reviewed-draft-standby",
       "source_repair": {
         "checkpoint": "8324a2a704a26089763ffc9031515ff14f69ab5f",
         "commits": [
@@ -132547,17 +132593,22 @@
           "path": "docs/security/audits/landing-auditor-repair-20261012.json",
           "sha256": "98ae6faf82d3bcd31a8b1e560becc1c41db98d3fdc32e83a83c5bfde52047be7",
           "scope": "Exact source, original refusals, passing local campaigns and independent review are itemized in the audit. Hosted acceptance and operational activation remain separate."
+        },
+        {
+          "path": "docs/security/audits/postmerge-ci-triage-20261012.json",
+          "sha256": "16113d0870b535f98ebaa6f323eb948c68d9219a39378f4367f2bf8d401db08d",
+          "scope": "Retained failed job, first missing dependency, exact main source, assigned repair and separate operational prerequisites. No repair or full qualification is claimed."
         }
       ],
       "remaining_acceptance": [
-        "Publish the reviewed auditor candidate in its separate PR, then obtain exact-head hosted qualification.",
+        "Integrate the actual #1201 landing base, independently review the composition and qualify a new exact head. Cancelled head61b28 remains cancelled and is not rerun.",
         "Trusted definition publication and any authorization rotation require their separate reviewed operational decision; no settings change is included.",
         "Preserve #1160 as historically unqualified at merge. Supporting its shape cannot make incomplete CI history pass."
       ],
       "observed_source_head": "8324a2a704a26089763ffc9031515ff14f69ab5f",
       "source_integrated": true,
       "source_reviewed": true,
-      "published": false,
+      "published": true,
       "merged": false,
       "full_qualified": false
     },
@@ -132566,8 +132617,8 @@
       "label": "LANDING-AUDITOR-SQUASH",
       "scope": "now",
       "landing_unit": "security-auditor",
-      "landing_pr": null,
-      "current_state": "source-qualified-reviewed-publication-pending",
+      "landing_pr": 1202,
+      "current_state": "reviewed-draft-standby",
       "source_repair": {
         "checkpoint": "8324a2a704a26089763ffc9031515ff14f69ab5f",
         "commits": [
@@ -132585,17 +132636,22 @@
           "path": "docs/security/audits/landing-auditor-repair-20261012.json",
           "sha256": "98ae6faf82d3bcd31a8b1e560becc1c41db98d3fdc32e83a83c5bfde52047be7",
           "scope": "Exact source, original refusals, passing local campaigns and independent review are itemized in the audit. Hosted acceptance and operational activation remain separate."
+        },
+        {
+          "path": "docs/security/audits/postmerge-ci-triage-20261012.json",
+          "sha256": "16113d0870b535f98ebaa6f323eb948c68d9219a39378f4367f2bf8d401db08d",
+          "scope": "Retained failed job, first missing dependency, exact main source, assigned repair and separate operational prerequisites. No repair or full qualification is claimed."
         }
       ],
       "remaining_acceptance": [
-        "Publish the reviewed auditor candidate in its separate PR, then obtain exact-head hosted qualification.",
+        "Integrate the actual #1201 landing base, independently review the composition and qualify a new exact head. Cancelled head61b28 remains cancelled and is not rerun.",
         "Trusted definition publication and any authorization rotation require their separate reviewed operational decision; no settings change is included.",
         "Preserve #1160 as historically unqualified at merge. Supporting its shape cannot make incomplete CI history pass."
       ],
       "observed_source_head": "8324a2a704a26089763ffc9031515ff14f69ab5f",
       "source_integrated": true,
       "source_reviewed": true,
-      "published": false,
+      "published": true,
       "merged": false,
       "full_qualified": false
     },
@@ -132634,6 +132690,33 @@
       "source_integrated": true,
       "source_reviewed": true,
       "published": true,
+      "merged": false,
+      "full_qualified": false
+    },
+    "postmerge-20261012:RELEASE-DROGON": {
+      "requirement_id": "postmerge-20261012:RELEASE-DROGON",
+      "label": "RELEASE-DROGON",
+      "scope": "now",
+      "landing_unit": "release-ci-repair",
+      "landing_pr": null,
+      "current_state": "confirmed-repair-assigned",
+      "source_repair": null,
+      "verification_evidence": [
+        {
+          "path": "docs/security/audits/postmerge-ci-triage-20261012.json",
+          "sha256": "16113d0870b535f98ebaa6f323eb948c68d9219a39378f4367f2bf8d401db08d",
+          "scope": "Retained failed job, first missing dependency, exact main source, assigned repair and separate operational prerequisites. No repair or full qualification is claimed."
+        }
+      ],
+      "remaining_acceptance": [
+        "Reproduce the missing dependency against main28d; install pinned dependencies and run the real Drogon smoke locally.",
+        "Run the owning workflow contract and review the exact provisioning diff.",
+        "Land through the bounded queue after an exact-head qualification; classify any later release-lane failure separately."
+      ],
+      "observed_source_head": "28d826e3e6b73af22388fc4eb117b3d8184ba5cf",
+      "source_integrated": false,
+      "source_reviewed": false,
+      "published": false,
       "merged": false,
       "full_qualified": false
     }
@@ -134196,5 +134279,15 @@
     "auditor_branch": "fix/security-landing-auditor",
     "auditor_pr": null,
     "scope": "Publication-time source checkpoint; the auditor PR number is assigned when this committed candidate is published. Historical landing and acceptance records are preserved."
+  },
+  "postmerge_ci_triage_20261012": {
+    "path": "docs/security/audits/postmerge-ci-triage-20261012.json",
+    "sha256": "16113d0870b535f98ebaa6f323eb948c68d9219a39378f4367f2bf8d401db08d",
+    "requirement_count": 2029,
+    "auditor_pr": 1202,
+    "auditor_state": "reviewed-draft-standby",
+    "ci_speed_pr": 1201,
+    "ci_speed_fixture_groups": "both-hosted-success",
+    "scope": "Required Rust checks and exact-head landing remain pending; five observed main failures retain separate dispositions. No operational configuration or proof campaign performed."
   }
 }

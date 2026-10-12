@@ -7,6 +7,35 @@ preserve execution history, including their original counts and headings that
 say "current". Those labels describe the time of capture; they do not override
 a later requirement state or establish current candidate qualification.
 
+## Post-merge CI triage and sequential landing (October 12 UTC)
+
+The [terminal CI triage](audits/postmerge-ci-triage-20261012.json) adds the
+release Drogon provisioning regression, for **2,029 requirements**. The original
+2,025 requirement records and their scoped acceptance states are unchanged.
+The release workflow now invokes a strict Drogon gate without installing its
+pinned dependencies. Claude owns the isolated repair; Root owns integration.
+It remains open until the actual smoke, workflow controls and landing pass.
+
+Both pheromone groups in [#1201](https://github.com/bb-connor/arc/pull/1201)
+passed on `a2734def20`: eleven pinned facets in 10m38s and four composite facets
+in 10m22s. Every facet step succeeded. Those durations are observed hosted job
+times, not a controlled savings estimate. Required Rust qualification remains
+separate and pending at this checkpoint.
+
+The reviewed auditor repair is draft [#1202](https://github.com/bb-connor/arc/pull/1202).
+Its `61b28ca217` CI was deliberately cancelled because the candidate must first
+incorporate #1201's actual landing base. Eight automatic runs remain cancelled;
+one metadata run succeeded. That head will not be rerun or described as qualified.
+The next candidate needs an actual-main integration, composition review and
+fresh exact-head checks. These two PRs are the bounded landing wave.
+
+The main release failure also prevented later formal-report production and
+promotion evidence. An older Aeneas snapshot-drift report needs its own exact
+diagnosis before a repair claim. Pages deployment remains unavailable with a
+404 configuration error. The revocation listener rejects an empty committed-
+evidence value before mutation. These are retained unresolved dispositions;
+no repository settings, trusted authorization or proof policies were changed.
+
 ## Auditor repair and CI speed publication (October 12 UTC)
 
 The ledger now records **2,028 requirements**. All previous 2,025 requirements
