@@ -26,7 +26,7 @@ fn hosted_roots_wait_refuses_notification_accumulation_without_tool_calls() {
     struct SessionRescue<'a>(&'a support::TestServer, &'a str);
     impl Drop for SessionRescue<'_> {
         fn drop(&mut self) {
-            let _response = self.0.post_admin_session_shutdown(self.1);
+            let _ = self.0.try_post_admin_session_shutdown(self.1);
         }
     }
     let _rescue = SessionRescue(&server, &session_id);
