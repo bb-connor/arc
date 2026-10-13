@@ -162,8 +162,7 @@ pub struct SqliteGovernedApprovalReplayStore {
 
 const GOVERNED_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const GOVERNED_APPROVAL_STORE_SCHEMA_KEY: &str = "governed_approval_replay";
-const GOVERNED_APPROVAL_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
-    &["chio_governed_approval_replay_entries"];
+const GOVERNED_APPROVAL_STORE_ANCHOR_TABLES: &[&str] = &["chio_governed_approval_replay_entries"];
 
 impl SqliteGovernedApprovalReplayStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, SqliteGovernedApprovalReplayStoreError> {
@@ -246,11 +245,11 @@ impl SqliteGovernedApprovalReplayStore {
             return Ok(());
         }
         snapshot.commit()?;
-        crate::check_schema_version(
+        crate::check_current_schema(
             &conn,
             GOVERNED_APPROVAL_STORE_SCHEMA_KEY,
             GOVERNED_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
-            GOVERNED_APPROVAL_STORE_LEGACY_ANCHOR_TABLES,
+            GOVERNED_APPROVAL_STORE_ANCHOR_TABLES,
         )
         .map_err(|error| SqliteGovernedApprovalReplayStoreError::storage(error.to_string()))?;
         conn.execute_batch(
@@ -261,48 +260,11 @@ impl SqliteGovernedApprovalReplayStore {
             "#,
         )?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        // A sealed source is read-only. Validate it before any migration,
-        // clock advance, capacity change, or attempt to repair missing objects.
+        // A sealed source is read-only. Validate it before any clock advance,
+        // capacity change, or attempt to repair missing objects.
         if self.load_replay_source_seal_tx(&tx)?.is_some() {
             tx.commit()?;
             return Ok(());
-        }
-        let entries_exist = tx.query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1
-                FROM sqlite_master
-                WHERE type = 'table'
-                  AND name = 'chio_governed_approval_replay_entries'
-            )
-            "#,
-            [],
-            |row| row.get::<_, bool>(0),
-        )?;
-        let has_subject_id = if entries_exist {
-            let mut statement =
-                tx.prepare("PRAGMA table_info(chio_governed_approval_replay_entries)")?;
-            let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-            let mut found = false;
-            for column in columns {
-                if column? == "subject_id" {
-                    found = true;
-                    break;
-                }
-            }
-            found
-        } else {
-            false
-        };
-        if entries_exist && !has_subject_id {
-            tx.execute(
-                "ALTER TABLE chio_governed_approval_replay_entries RENAME TO chio_governed_approval_replay_entries_legacy_subjectless",
-                [],
-            )?;
-            tx.execute(
-                "DROP INDEX IF EXISTS idx_chio_governed_approval_replay_expiry",
-                [],
-            )?;
         }
         tx.execute_batch(
             r#"
@@ -330,25 +292,6 @@ impl SqliteGovernedApprovalReplayStore {
             );
             "#,
         )?;
-        let has_pruned_through = {
-            let mut statement =
-                tx.prepare("PRAGMA table_info(chio_governed_approval_replay_clock)")?;
-            let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-            let mut found = false;
-            for column in columns {
-                if column? == "pruned_through" {
-                    found = true;
-                    break;
-                }
-            }
-            found
-        };
-        if !has_pruned_through {
-            tx.execute(
-                "ALTER TABLE chio_governed_approval_replay_clock ADD COLUMN pruned_through INTEGER NOT NULL DEFAULT -9223372036854775808",
-                [],
-            )?;
-        }
         let capacity = i64::try_from(self.capacity).map_err(|_| {
             SqliteGovernedApprovalReplayStoreError::storage(
                 "governed approval replay capacity exceeds SQLite integer range",
@@ -358,26 +301,6 @@ impl SqliteGovernedApprovalReplayStore {
             "INSERT INTO chio_governed_approval_replay_limits (singleton, capacity) VALUES (1, ?1) ON CONFLICT(singleton) DO NOTHING",
             params![capacity],
         )?;
-        if entries_exist && !has_subject_id {
-            tx.execute(
-                r#"
-                INSERT INTO chio_governed_approval_replay_entries (
-                    subject_id,
-                    request_id,
-                    intent_hash,
-                    expires_at,
-                    dispatch_reservation_id
-                )
-                SELECT ?1, request_id, intent_hash, expires_at, dispatch_reservation_id
-                FROM chio_governed_approval_replay_entries_legacy_subjectless
-                "#,
-                params![LEGACY_UNSCOPED_SUBJECT_ID],
-            )?;
-            tx.execute(
-                "DROP TABLE chio_governed_approval_replay_entries_legacy_subjectless",
-                [],
-            )?;
-        }
         tx.execute(
             r#"
             INSERT INTO chio_governed_approval_replay_clock (
@@ -1322,9 +1245,8 @@ mod tests {
     }
 
     #[test]
-    fn legacy_subjectless_marker_blocks_all_subjects_until_expiry() {
-        let path = unique_db_path("chio-approval-replay-legacy-subjectless");
-        let expires_at = now_secs().saturating_add(60);
+    fn unstamped_replay_database_is_refused_without_adoption() {
+        let path = unique_db_path("chio-approval-replay-unstamped");
         {
             let connection = Connection::open(&path).unwrap();
             connection
@@ -1340,39 +1262,39 @@ mod tests {
                     "#,
                 )
                 .unwrap();
-            connection
-                .execute(
-                    r#"
-                    INSERT INTO chio_governed_approval_replay_entries (
-                        request_id,
-                        intent_hash,
-                        expires_at,
-                        dispatch_reservation_id
-                    ) VALUES ('request', 'intent', ?1, NULL)
-                    "#,
-                    params![expires_at],
-                )
+        }
+        let error = match SqliteGovernedApprovalReplayStore::open(&path) {
+            Ok(_) => panic!("an unstamped replay database opened"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("is not a Chio store"), "{error}");
+        let connection = Connection::open(&path).unwrap();
+        let app_id: i32 = connection
+            .query_row("PRAGMA application_id", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(app_id, 0);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn obsolete_replay_schema_is_refused() {
+        let path = unique_db_path("chio-approval-replay-obsolete");
+        drop(SqliteGovernedApprovalReplayStore::open(&path).unwrap());
+        {
+            let connection = Connection::open(&path).unwrap();
+            crate::stamp_schema_version(&connection, GOVERNED_APPROVAL_STORE_SCHEMA_KEY, 0)
                 .unwrap();
         }
-        let store = SqliteGovernedApprovalReplayStore::open(&path).unwrap();
-        assert!(!store
-            .reserve_for_dispatch(
-                "subject-a",
-                "request",
-                "intent",
-                u64::try_from(expires_at).unwrap(),
-                "owner-a",
-            )
-            .unwrap());
-        assert!(!store
-            .reserve_for_dispatch(
-                "subject-b",
-                "request",
-                "intent",
-                u64::try_from(expires_at).unwrap(),
-                "owner-b",
-            )
-            .unwrap());
+        let error = match SqliteGovernedApprovalReplayStore::open(&path) {
+            Ok(_) => panic!("an obsolete replay schema opened"),
+            Err(error) => error,
+        };
+        assert!(
+            error.to_string().contains(
+                "database schema version 0 is not the current schema version 1; refusing to open"
+            ),
+            "{error}"
+        );
         let _ = fs::remove_file(path);
     }
 

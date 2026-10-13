@@ -633,160 +633,25 @@ fn committed_view_match_binds_all_channel_heads_by_resource_identity() -> TestRe
 }
 
 #[test]
-fn version_one_cache_migrates_descriptor_identity_without_rewriting_stages() -> TestResult {
+fn obsolete_cache_schema_is_refused_without_rewriting() -> TestResult {
     let mut connection = Connection::open_in_memory()?;
-    connection.execute_batch(
-        r#"
-        CREATE TABLE economic_state_stages (
-            batch_id TEXT PRIMARY KEY,
-            checkpoint_sequence INTEGER NOT NULL,
-            checkpoint_digest TEXT NOT NULL,
-            base_view_json BLOB NOT NULL,
-            batch_json BLOB NOT NULL,
-            committed_view_json BLOB,
-            operation_binding_json BLOB,
-            status TEXT NOT NULL,
-            reason TEXT,
-            stage_version INTEGER NOT NULL,
-            snapshot_digest TEXT NOT NULL,
-            created_at_unix_ms INTEGER NOT NULL,
-            updated_at_unix_ms INTEGER NOT NULL
-        );
-        CREATE TABLE economic_state_stage_heads (
-            batch_id TEXT NOT NULL,
-            resource_key_digest TEXT NOT NULL,
-            resource_key_json BLOB NOT NULL,
-            head_digest TEXT NOT NULL,
-            head_json BLOB NOT NULL
-        );
-        CREATE TABLE economic_state_heads (
-            resource_key_digest TEXT PRIMARY KEY,
-            resource_key_json BLOB NOT NULL,
-            head_digest TEXT NOT NULL,
-            head_json BLOB NOT NULL,
-            checkpoint_sequence INTEGER NOT NULL,
-            checkpoint_digest TEXT NOT NULL,
-            source_batch_id TEXT NOT NULL
-        );
-        CREATE TABLE economic_state_stage_commits (
-            batch_id TEXT NOT NULL,
-            stage_version INTEGER NOT NULL,
-            status TEXT NOT NULL,
-            snapshot_digest TEXT NOT NULL,
-            previous_commit_digest TEXT NOT NULL,
-            commit_digest TEXT NOT NULL,
-            store_uuid TEXT NOT NULL,
-            store_lease_id TEXT NOT NULL,
-            store_owner_epoch INTEGER NOT NULL,
-            recorded_at_unix_ms INTEGER NOT NULL
-        );
-        CREATE TRIGGER economic_state_stage_identity_immutable
-        BEFORE UPDATE OF batch_id, checkpoint_sequence, checkpoint_digest,
-            base_view_json, batch_json, operation_binding_json, created_at_unix_ms
-        ON economic_state_stages
-        BEGIN
-            SELECT RAISE(ABORT, 'economic stage identity is immutable');
-        END;
-        "#,
-    )?;
-    crate::check_schema_version(
-        &connection,
-        ECONOMIC_STATE_CACHE_SCHEMA_KEY,
-        1,
-        ECONOMIC_STATE_CACHE_SCHEMA_ANCHORS,
-    )?;
-    crate::stamp_schema_version(&connection, ECONOMIC_STATE_CACHE_SCHEMA_KEY, 1)?;
-
-    let (advance, _) = verified_advance()?;
-    let mut legacy_stage = EconomicStateStageRecord {
-        base_view: advance.current().view().clone(),
-        batch: advance.batch().clone(),
-        committed_view: None,
-        operation_binding: None,
-        descriptor: None,
-        status: EconomicStateStageStatus::DbStaged,
-        reason: None,
-        version: 1,
-        created_at_unix_ms: 1_000,
-        updated_at_unix_ms: 1_000,
-        snapshot_digest: String::new(),
-    };
-    legacy_stage.snapshot_digest = stage_snapshot_digest(&legacy_stage, &[])?;
-    connection.execute(
-        r#"
-        INSERT INTO economic_state_stages (
-            batch_id, checkpoint_sequence, checkpoint_digest,
-            base_view_json, batch_json, committed_view_json,
-            operation_binding_json, status, reason, stage_version,
-            snapshot_digest, created_at_unix_ms, updated_at_unix_ms
-        ) VALUES (?1, ?2, ?3, ?4, ?5, NULL, NULL, 'db_staged', NULL, 1, ?6, 1000, 1000)
-        "#,
-        rusqlite::params![
-            &legacy_stage.batch.batch_id,
-            i64::try_from(legacy_stage.batch.checkpoint_sequence)?,
-            &legacy_stage.batch.checkpoint_digest,
-            canonical_json_bytes(&legacy_stage.base_view)?,
-            legacy_stage.batch.canonical_bytes()?,
-            &legacy_stage.snapshot_digest,
-        ],
-    )?;
-    connection.execute(
-        r#"
-        INSERT INTO economic_state_stage_commits (
-            batch_id, stage_version, status, snapshot_digest,
-            previous_commit_digest, commit_digest, store_uuid,
-            store_lease_id, store_owner_epoch, recorded_at_unix_ms
-        ) VALUES (?1, 1, 'db_staged', ?2, ?3, ?4, 'store-1', 'lease-1', 1, 1000)
-        "#,
-        rusqlite::params![
-            &legacy_stage.batch.batch_id,
-            &legacy_stage.snapshot_digest,
-            GENESIS_STAGE_COMMIT_DIGEST,
-            digest("legacy-stage-commit"),
-        ],
-    )?;
-
     initialize_economic_state_cache_schema(&mut connection)?;
-
-    let columns = connection
-        .prepare("SELECT name FROM pragma_table_info('economic_state_stages') ORDER BY cid")?
-        .query_map([], |row| row.get::<_, String>(0))?
-        .collect::<Result<Vec<_>, _>>()?;
-    for expected in [
-        "descriptor_kind",
-        "descriptor_key",
-        "descriptor_digest",
-        "descriptor_json",
-    ] {
-        assert!(columns.iter().any(|column| column == expected));
-    }
+    crate::stamp_schema_version(&connection, ECONOMIC_STATE_CACHE_SCHEMA_KEY, 0)?;
+    let error = initialize_economic_state_cache_schema(&mut connection)
+        .err()
+        .ok_or("an obsolete economic cache schema opened")?;
+    assert!(
+        error.to_string().contains(
+            "database schema version 0 is not the current schema version 1; refusing to open"
+        ),
+        "{error}"
+    );
     let version: i32 = connection.query_row(
         "SELECT version FROM chio_store_schema_versions WHERE store_key = ?1",
         [ECONOMIC_STATE_CACHE_SCHEMA_KEY],
         |row| row.get(0),
     )?;
-    assert_eq!(version, ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION);
-    let transaction = connection.transaction()?;
-    let migrated = load_stage_tx(&transaction, &legacy_stage.batch.batch_id)?
-        .ok_or("migrated stage is missing")?;
-    assert_eq!(migrated, legacy_stage);
-    transaction.commit()?;
-
-    connection.execute_batch("DROP INDEX economic_state_stages_descriptor_identity")?;
-    crate::stamp_schema_version(&connection, ECONOMIC_STATE_CACHE_SCHEMA_KEY, 2)?;
-    initialize_economic_state_cache_schema(&mut connection)?;
-    let descriptor_index: bool = connection.query_row(
-        r#"
-        SELECT EXISTS(
-            SELECT 1 FROM sqlite_schema
-            WHERE type = 'index'
-              AND name = 'economic_state_stages_descriptor_identity'
-        )
-        "#,
-        [],
-        |row| row.get(0),
-    )?;
-    assert!(descriptor_index);
+    assert_eq!(version, 0);
     Ok(())
 }
 
