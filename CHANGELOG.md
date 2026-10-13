@@ -12,12 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > `main`. They are deprecated. The first release built from current `main` will
 > be a signed `0.2.0-alpha.N` preview.
 
-The first public baseline, version 0.1.0, is in preparation and has not yet
-been tagged or released. It establishes the wire protocol, the policy and
-guard runtime, the receipt and attestation pipeline, the federation and
-settlement layers, and the multi-language SDK surface, together with the
-supply-chain, fuzzing, and formal-verification apparatus that gate every
-change. The entries below track changes accumulating toward that baseline.
+The entries below track changes accumulating toward that first `0.2.0-alpha.N`
+preview. It establishes the wire protocol, the policy and guard runtime, the
+receipt and attestation pipeline, federation, optional payment-rail modules,
+and the multi-language SDK surface, together with the supply-chain, fuzzing,
+and formal-verification apparatus that gate every change.
 
 ### Added
 

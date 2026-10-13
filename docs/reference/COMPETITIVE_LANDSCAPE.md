@@ -482,8 +482,8 @@ outside the root import surface or contain `sorry` placeholders.
   timestamp monotonicity helpers define the bounded structural contract for a
   presented chain.
 
-No other agent protocol ships this exact mix of differential tests, signed
-receipt evidence, qualification lanes, and optional formal artifacts. Chio's
+Chio ships differential tests, signed receipt evidence, qualification lanes,
+and optional formal artifacts together. Chio's
 bounded release should be compared on that executable evidence boundary rather
 than on proof branding alone.
 
@@ -526,10 +526,15 @@ The competitive landscape splits into three silos:
 3. **Identity standards** (AIMS, UCAN, SPIFFE) define who agents are but not
    what scoped authority they hold or how to attest their actions.
 
-Chio is the only protocol where a single token simultaneously expresses
-identity (subject-bound Ed25519 key), authorization (scoped tool grants with
-argument constraints), economic limits (invocation budgets), and produces
-cryptographic proof (signed receipts in a Merkle log) for every decision.
+Chio's cross-organization case is the one this comparison weighs most:
+separately operated owners who each admit an agent at their own door, grants
+that only narrow as they are delegated, evidence the counterparty verifies
+offline, and work that keeps a durable identity. Within that case, one Chio
+token expresses identity (subject-bound Ed25519 key), authorization (scoped
+tool grants with argument constraints) and economic limits (invocation
+budgets), and the kernel produces cryptographic proof (signed receipts in a
+Merkle log) for every decision it mediates. The comparison table above shows
+how each other stack covers these properties.
 
 ### 8.2 The missing authorization layer between "user approves" and "payment executes"
 

@@ -23,9 +23,7 @@ Output is one `RULE: path: message` line per violation. Exit 0 when clean,
 
 `--scope program` checks the native host program set and UNIFIED_ROADMAP.md.
 It checks links, copy, case references and applicable budgets, not milestone
-or dependency semantics. `--scope public` checks only the public copy, which carries a
-known baseline until the roadmap's positioning items land (see
-scripts/tests/check-native-host-docs.test.sh). The default scope is both.
+or dependency semantics. `--scope public` checks only the public copy. The default scope is both.
 """
 from __future__ import annotations
 

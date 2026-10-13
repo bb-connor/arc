@@ -2,7 +2,7 @@
 
 ## What is Chio?
 
-Chio is a protocol for secure, attested tool access in AI agent systems. It replaces ad-hoc MCP-style wiring with a ground-up design built on capability-based security, cryptographic attestation, and privilege separation. The kernel mediates every tool call: capabilities are time-bounded and verifiable, guards evaluate input and output before anything crosses a trust boundary, and every decision is signed into an append-only receipt log. Policy and guards ship as first-class native components (`chio-policy`, `chio-guards`, `chio-data-guards`, `chio-external-guards`, `chio-wasm-guards`); no external policy engine is required.
+Chio is a Rust kernel for agentic operating systems that cooperate across organizational boundaries, coordinate work, and share resources. Each separately operated owner admits agents at its own door: grants only narrow as they are delegated, work keeps a durable identity, and the counterparty verifies the evidence offline. Chio is a userspace authority and work-state kernel built on capability-based security, cryptographic attestation, and privilege separation; isolation comes from the host. The kernel mediates every tool call routed through it: capabilities are time-bounded and verifiable, guards evaluate input and output before anything crosses a trust boundary, and every kernel decision is signed into an append-only receipt log. Policy and guards ship as first-class native components (`chio-policy`, `chio-guards`, `chio-data-guards`, `chio-external-guards`, `chio-wasm-guards`); no external policy engine is required.
 
 ## Five Components
 
@@ -10,7 +10,7 @@ Chio is a protocol for secure, attested tool access in AI agent systems. It repl
 2. **Runtime Kernel** - trusted mediator (TCB) that validates capabilities, runs the guard pipeline, and signs receipts.
 3. **Tool Servers** - sandboxed processes implementing tools, isolated from each other and from the agent.
 4. **Capability Authority** - issues, scopes, and revokes time-bounded capability tokens.
-5. **Receipt Log** - append-only Merkle-committed log of signed attestations over every decision and tool call.
+5. **Receipt Log** - append-only Merkle-committed log of signed attestations over every kernel decision and every tool call the kernel mediates.
 
 ## Crate Map
 

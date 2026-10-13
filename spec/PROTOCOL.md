@@ -1,8 +1,12 @@
 # Chio Protocol
 
-**Version:** 1.0
-**Date:** 2026-04-14
-**Status:** Current bounded Chio release profile
+**Version:** 1.0 preview (pre-release; not a stable or released protocol version)
+**Date:** 2026-10-13
+**Status:** Pre-release preview profile. The wire contract may change until the
+preview contract is frozen with its schemas and test vectors. Whether the
+preview keeps the 1.0.0 number in `spec/schemas/VERSION` with a preview label
+or is renumbered to 0.x is open decision D20 in the
+[unified roadmap](../docs/operations/UNIFIED_ROADMAP.md#8-owner-decision-register).
 
 Chio is pre-release. This document describes the current v1 protocol profile.
 Earlier internal draft versions have been folded into this v1 contract rather

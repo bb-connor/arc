@@ -1,5 +1,12 @@
 # Chio: Vision and Strategic Narrative
 
+> **Historical document.** This narrative predates the north star the program
+> owner approved on 2026-10-08 and is kept as a record only. Its framing, market
+> sizing, payment and settlement claims, and uniqueness claims are superseded and
+> must not be quoted as current positioning. The current positioning is
+> [NORTH-STAR-FLOWS section 1](../superpowers/specs/2026-10-07-desktop-integration/NORTH-STAR-FLOWS.md#1-north-star-and-vocabulary)
+> and [unified roadmap section 9](../operations/UNIFIED_ROADMAP.md#9-positioning).
+
 This document is strategic narrative, not the authoritative claim gate. The
 current authoritative technical claim is the universal control-plane thesis
 on the qualified authoritative surfaces, and the repo also qualifies a

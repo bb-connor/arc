@@ -3,25 +3,12 @@
 #
 # Fixture cases build a minimal repository layout in a temporary directory and
 # assert each rule's exit code and message. The final case runs the
-# retired-phrases rule against this repository's public copy and compares the
-# result with the recorded baseline below. The baseline is expected to shrink
-# as the positioning items UR-U3.1 to UR-U3.3 land; UR-U3.6 empties it and turns
-# the rule on in CI. A violation outside the baseline fails this test.
+# retired-phrases and em-dash rules against this repository's public copy,
+# which must be clean.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CHECKER="$REPO_ROOT/scripts/check-native-host-docs.py"
-
-# Public-copy violations on main before the positioning items land.
-# Each entry carries its occurrence count, so an added occurrence of a known
-# phrase in a known file is a new violation.
-PUBLIC_COPY_BASELINE=(
-  "retired-phrases: README.md: contains 'The kernel your agents answer to' (count 1)"
-  "retired-phrases: README.md: contains 'Agents that pay each other' (count 1)"
-  "retired-phrases: docs/assets/subhead-mobile.svg: contains 'Agents that pay each other' (count 2)"
-  "retired-phrases: docs/assets/subhead.svg: contains 'Agents that pay each other' (count 2)"
-  "retired-phrases: docs/reference/COMPETITIVE_LANDSCAPE.md: contains 'only protocol' (count 1)"
-)
 
 work="$(mktemp -d -t chio-native-host-docs-XXXXXX)"
 trap 'rm -rf "$work"' EXIT
@@ -395,20 +382,14 @@ new_fixture missing-budget-doc
 rm "$fixture/docs/superpowers/plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md"
 expect "missing budgeted document" 1 "budgets: docs/superpowers/plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md: omarchy plan file missing" -- --rule budgets
 
-# Repository baseline: every public-copy violation must be in the baseline.
+# Repository public copy: no retired phrase and no em dash.
 public_code=0
 public_out="$(python3 -I "$CHECKER" --scope public --rule retired-phrases --rule em-dash 2>/dev/null)" || public_code=$?
-[[ "$public_code" == 0 || "$public_code" == 1 ]] || fail "public copy: checker exited $public_code"
-while IFS= read -r line; do
-  [[ -n "$line" ]] || continue
-  known=0
-  for entry in "${PUBLIC_COPY_BASELINE[@]}"; do
-    [[ "$line" == "$entry" ]] && known=1
-  done
-  [[ "$known" == 1 ]] || fail "public copy: new violation outside the baseline: $line"
-done <<<"$public_out"
-remaining="$(grep -c . <<<"$public_out" || true)"
-printf 'ok: public copy within baseline (%s of %s baseline violations remain)\n' "$remaining" "${#PUBLIC_COPY_BASELINE[@]}"
+if [[ "$public_code" == 0 && -z "$public_out" ]]; then
+  printf 'ok: public copy is clean\n'
+else
+  fail "public copy: checker exited $public_code; output: $public_out"
+fi
 
 if [[ "$failures" -gt 0 ]]; then
   printf '%s check(s) failed\n' "$failures" >&2
