@@ -17,8 +17,8 @@ use chio_kernel::admission_operation::{
     AdmissionRecoveryDeferralWrite, AdmissionRecoveryLease, AdmissionRecoveryPageQuery,
     AdmissionRecoveryPageV1, AdmissionRecoveryPortError, AdmissionRecoveryStatusV1,
     AdmissionReplayKey, AdmissionTerminal, AdmissionTerminalProjection,
-    QualifiedAdmissionOperationStore, SignedAdmissionTerminalProjectionV1, StoreMutationFence,
-    UntrustedAdmissionRecoveryClaim,
+    QualifiedAdmissionOperationStore, RetainedToolAdmissionRequestV1,
+    SignedAdmissionTerminalProjectionV1, StoreMutationFence, UntrustedAdmissionRecoveryClaim,
 };
 use chio_kernel::budget_store::{
     BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest, BudgetGuaranteeLevel,
@@ -162,7 +162,19 @@ impl std::fmt::Display for RemoteAdmissionError {
 impl AdmissionOperationStore for RemoteAdmissionAuthority {
     fn begin(
         &self,
+        _operation: &AdmissionOperationV1,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionBeginResult, AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Invariant(
+            "remote admission requires original tool request material".to_owned(),
+        ))
+    }
+
+    fn begin_with_retained_tool_request(
+        &self,
         operation: &AdmissionOperationV1,
+        request: &RetainedToolAdmissionRequestV1,
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionBeginResult, AdmissionOperationStoreError> {
@@ -171,6 +183,7 @@ impl AdmissionOperationStore for RemoteAdmissionAuthority {
                 AdmissionAuthorityAction::Begin,
                 &AdmissionBeginWire {
                     operation: operation.to_persisted(),
+                    retained_request: STANDARD.encode(request.canonical_bytes()),
                     fence: fence.clone(),
                     trusted_now_unix_ms,
                 },
@@ -193,6 +206,45 @@ impl AdmissionOperationStore for RemoteAdmissionAuthority {
                 existing_operation_id,
             }),
         }
+    }
+
+    /// The authority reads the operation and its original bytes in one fenced,
+    /// trusted-time-checked snapshot. The client re-decodes the canonical bytes
+    /// and requires them to bind the returned operation of the requested id.
+    fn load_retained_tool_request(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>,
+        AdmissionOperationStoreError,
+    > {
+        let retained: Option<RetainedToolRequestWire> = self
+            .call(
+                AdmissionAuthorityAction::LoadRetainedToolRequest,
+                &RetainedToolRequestQueryWire {
+                    operation_id: operation_id.clone(),
+                    fence: fence.clone(),
+                    trusted_now_unix_ms,
+                },
+            )
+            .map_err(operation_error)?;
+        let Some(retained) = retained else {
+            return Ok(None);
+        };
+        let operation = AdmissionOperationV1::from_persisted(retained.operation)?;
+        if operation.binding().operation_id() != operation_id {
+            return Err(AdmissionOperationStoreError::Invariant(
+                "admission authority returned a different operation".to_owned(),
+            ));
+        }
+        let bytes = STANDARD
+            .decode(retained.retained_request)
+            .map_err(|error| AdmissionOperationStoreError::Invariant(error.to_string()))?;
+        let request = RetainedToolAdmissionRequestV1::from_canonical_bytes(&bytes)?;
+        request.validate_binding(operation.binding())?;
+        Ok(Some((operation, request)))
     }
 
     fn load_by_operation_id(

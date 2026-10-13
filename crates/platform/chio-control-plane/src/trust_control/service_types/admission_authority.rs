@@ -33,6 +33,7 @@ pub(crate) enum AdmissionAuthorityAction {
     Status,
     LoadBudgetHold,
     Begin,
+    LoadRetainedToolRequest,
     LoadByOperationId,
     LoadByReplayKey,
     CompareAndSwap,
@@ -186,8 +187,26 @@ pub(crate) struct AdmissionAuthorityStatusWire {
 #[serde(deny_unknown_fields)]
 pub(crate) struct AdmissionBeginWire {
     pub(crate) operation: PersistedAdmissionOperationV1,
+    /// Base64 of the canonical `RetainedToolAdmissionRequestV1` bytes.
+    pub(crate) retained_request: String,
     pub(crate) fence: StoreMutationFence,
     pub(crate) trusted_now_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RetainedToolRequestQueryWire {
+    pub(crate) operation_id: AdmissionOperationId,
+    pub(crate) fence: StoreMutationFence,
+    pub(crate) trusted_now_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RetainedToolRequestWire {
+    pub(crate) operation: PersistedAdmissionOperationV1,
+    /// Base64 of the canonical `RetainedToolAdmissionRequestV1` bytes.
+    pub(crate) retained_request: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

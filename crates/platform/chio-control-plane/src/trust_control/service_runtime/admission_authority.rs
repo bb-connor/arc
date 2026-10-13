@@ -3,7 +3,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chio_kernel::admission_operation::{
     AdmissionBeginResult, AdmissionCommandResult, AdmissionOperationCommand,
     AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
-    QualifiedAdmissionOperationStoreExt, StoreMutationFence,
+    QualifiedAdmissionOperationStoreExt, RetainedToolAdmissionRequestV1, StoreMutationFence,
 };
 use chio_kernel::budget_store::{
     BudgetAuthorizeHoldDecision, BudgetCaptureInvocationRequest, BudgetEventAuthority,
@@ -138,8 +138,14 @@ fn handle_action(
             let request: AdmissionBeginWire = decode(payload)?;
             let operation = AdmissionOperationV1::from_persisted(request.operation)
                 .map_err(invalid_operation)?;
+            let retained = decode_retained_request(&request.retained_request)?;
             let result = operations
-                .begin(&operation, &request.fence, request.trusted_now_unix_ms)
+                .begin_with_retained_tool_request(
+                    &operation,
+                    &retained,
+                    &request.fence,
+                    request.trusted_now_unix_ms,
+                )
                 .map_err(operation_store_error)?;
             let result = match result {
                 AdmissionBeginResult::Created(operation) => AdmissionBeginResultWire::Created {
@@ -159,6 +165,21 @@ fn handle_action(
                 },
             };
             encode(&result)
+        }
+        AdmissionAuthorityAction::LoadRetainedToolRequest => {
+            let request: RetainedToolRequestQueryWire = decode(payload)?;
+            let value = operations
+                .load_retained_tool_request(
+                    &request.operation_id,
+                    &request.fence,
+                    request.trusted_now_unix_ms,
+                )
+                .map_err(operation_store_error)?
+                .map(|(operation, retained)| RetainedToolRequestWire {
+                    operation: operation.to_persisted(),
+                    retained_request: STANDARD.encode(retained.canonical_bytes()),
+                });
+            encode(&value)
         }
         AdmissionAuthorityAction::LoadByOperationId => {
             let request: OperationIdWire = decode(payload)?;
@@ -792,6 +813,16 @@ fn structured_authorization_response(
         usage,
     )
     .map_err(invalid_request)
+}
+
+fn decode_retained_request(
+    encoded: &str,
+) -> Result<RetainedToolAdmissionRequestV1, AdmissionAuthorityWireError> {
+    let bytes = STANDARD
+        .decode(encoded)
+        .map_err(|error| invalid_request(error.to_string()))?;
+    RetainedToolAdmissionRequestV1::from_canonical_bytes(&bytes)
+        .map_err(|error| invalid_request(error.to_string()))
 }
 
 fn invalid_request(message: impl Into<String>) -> AdmissionAuthorityWireError {
