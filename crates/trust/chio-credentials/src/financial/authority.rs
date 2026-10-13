@@ -4,8 +4,6 @@ pub const FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1: &str = "chio.financial.cr
 pub const FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1: &str =
     "chio.financial.cross-issuer-entry-activation-decision.v1";
 pub const FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1: &str = "chio.financial.cross-issuer-migration.v1";
-pub const FINANCIAL_LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V1: &str =
-    "chio.financial.legacy-credential-issuance-anchor.v1";
 pub const FINANCIAL_ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V1: &str = "chio.financial.cross-issuer.lifecycle-checkpoint.v1";
 pub const FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1: &str = "chio.financial.cross-issuer.lifecycle-result.v1";
 pub const FINANCIAL_ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V1: &str =
@@ -16,8 +14,6 @@ pub const FINANCIAL_LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V1: &str =
 const FINANCIAL_POLICY_DIGEST_DOMAIN: &[u8] = b"chio.fincred.verifier-policy-digest.v1\0";
 const ENTRY_ACTIVATION_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.entry-activation-digest.v1\0";
 const CROSS_ISSUER_MIGRATION_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.migration-digest.v1\0";
-const LEGACY_ISSUANCE_ANCHOR_DIGEST_DOMAIN: &[u8] =
-    b"chio.financial.legacy-credential.issuance-anchor-digest.v1\0";
 const LIFECYCLE_RESULT_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.lifecycle-result-digest.v1\0";
 const LIFECYCLE_CHECKPOINT_DIGEST_DOMAIN: &[u8] =
     b"chio.financial.cross-issuer.lifecycle-checkpoint-digest.v1\0";

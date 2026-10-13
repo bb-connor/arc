@@ -1305,11 +1305,6 @@ files = ["crates/trust/chio-credentials/src/lib.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.cross-issuer-trust-pack.v1"
-files = ["crates/trust/chio-credentials/src/lib.rs"]
-first_seen = "11e573d2d7"
-
-[[schema]]
 value = "chio.cross-protocol-cap.v1"
 files = ["crates/protocol/chio-cross-protocol/src/capability_bridge.rs"]
 first_seen = "11e573d2d7"
@@ -1861,11 +1856,6 @@ first_seen = "51e46336b1"
 
 [[schema]]
 value = "chio.financial.cross-issuer.lifecycle-result.v1"
-files = ["crates/trust/chio-credentials/src/financial/authority.rs"]
-first_seen = "51e46336b1"
-
-[[schema]]
-value = "chio.financial.legacy-credential-issuance-anchor.v1"
 files = ["crates/trust/chio-credentials/src/financial/authority.rs"]
 first_seen = "51e46336b1"
 

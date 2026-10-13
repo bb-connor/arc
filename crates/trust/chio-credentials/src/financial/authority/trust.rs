@@ -50,7 +50,6 @@ impl_trust_status!(
     LifecycleResolverTrustKeyV2,
     LifecycleGenerationAnchorTrustKeyV2,
     LifecycleHighWaterTrustKeyV2,
-    LegacyIssuanceAnchorAuthorityTrustKeyV2,
 );
 
 pub(in crate::financial_authority) fn validate_epoch(

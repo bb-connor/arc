@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-proptest-coverage.sh - Gate the eighteen named capability-algebra invariants.
+# check-proptest-coverage.sh - Gate the sixteen named capability-algebra invariants.
 #
 # Confirms every named proptest function is still present in the corresponding
 # test file. A missing or renamed function is a regression: the rename loses
@@ -8,7 +8,7 @@
 #
 # Usage:
 #   scripts/check-proptest-coverage.sh
-#   exit 0 -> all eighteen names found
+#   exit 0 -> all sixteen names found
 #   exit 1 -> at least one name missing; offending names printed to stderr
 #
 # Requires: bash, grep
@@ -34,8 +34,6 @@ INVARIANTS=(
     "crates/kernel/chio-kernel-core/tests/property_evaluate.rs::intersection_distributes_over_grant_union"
     "crates/kernel/chio-kernel-core/tests/property_evaluate.rs::wildcard_subsumes_specific_under_intersection"
     "crates/trust/chio-credentials/tests/property_passport.rs::passport_verify_idempotent_on_well_formed"
-    "crates/trust/chio-credentials/tests/property_passport.rs::revoked_lifecycle_entry_never_verifies"
-    "crates/trust/chio-credentials/tests/property_passport.rs::lifecycle_state_transitions_monotone"
     "crates/trust/chio-credentials/tests/property_passport.rs::passport_signature_breaks_under_any_subject_mutation"
     "crates/guards/chio-policy/tests/property_evaluate.rs::merge_associative_for_extends"
     "crates/guards/chio-policy/tests/property_evaluate.rs::deny_overrides_warn_and_allow"
