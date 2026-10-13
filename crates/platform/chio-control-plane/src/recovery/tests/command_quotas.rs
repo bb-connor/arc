@@ -50,10 +50,7 @@ impl QuotaTestDiagnostics {
         if self.reported.replace(true) {
             return;
         }
-        let wall = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()
-            .and_then(|elapsed| u64::try_from(elapsed.as_millis()).ok());
+        let wall = Some(chio_test_support::clock::unix_millis());
         let durable = fixture.map(|fixture| -> TestResult<serde_json::Value> {
             let connection = rusqlite::Connection::open_with_flags(
                 fixture.path.join("admission.db"),
@@ -1166,11 +1163,7 @@ fn wait_for_provider_lookup_spacing(
         |row| row.get(0),
     )?;
     let observed = u64::try_from(observed)?;
-    let now = u64::try_from(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_millis(),
-    )?;
+    let now = chio_test_support::clock::unix_millis();
     let elapsed = now
         .checked_sub(observed)
         .ok_or("provider test wall time precedes its durable lookup event")?;

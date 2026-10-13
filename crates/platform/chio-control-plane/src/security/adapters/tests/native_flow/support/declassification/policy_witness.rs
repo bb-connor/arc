@@ -298,7 +298,7 @@ fn compensated_native_denial_timestamp_uses_confirmed_projection_time() -> TestR
             let unix_millis = self
                 .now_unix_ms()
                 .map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
-            let monotonic = chio_security_types::clock::SystemClock.read()?.monotonic();
+            let monotonic = chio_test_support::clock::clock().read()?.monotonic();
             Ok(chio_security_types::clock::ClockReading::new(
                 chio_security_types::clock::UnixMillis::new(unix_millis),
                 monotonic,

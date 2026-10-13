@@ -69,12 +69,7 @@ pub(super) fn now_ms() -> PortResult<u64> {
             .and_then(|seconds| seconds.checked_mul(1_000))
             .ok_or_else(PortError::unavailable);
     }
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|_| PortError::unavailable())?
-        .as_millis()
-        .try_into()
-        .map_err(|_| PortError::unavailable())
+    Ok(chio_test_support::clock::unix_millis())
 }
 
 thread_local! {
@@ -324,7 +319,7 @@ pub(super) fn fixture_reading(
 ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError> {
     let unix_millis =
         unix_millis.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
-    let monotonic = <chio_security_types::clock::SystemClock as chio_security_types::clock::Clock>::read(&chio_security_types::clock::SystemClock)?.monotonic();
+    let monotonic = chio_test_support::clock::clock().read()?.monotonic();
     Ok(chio_security_types::clock::ClockReading::new(
         chio_security_types::clock::UnixMillis::new(unix_millis),
         monotonic,
