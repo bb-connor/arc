@@ -22,7 +22,7 @@ pub(super) fn configuration(
     let keys = parse(value, paging)?;
     let config = SiemConfig {
         db_path: receipt_db.to_path_buf(),
-        cursor_db_path: Some(cursor_db.to_path_buf()),
+        cursor_db_path: cursor_db.to_path_buf(),
         trusted_kernel_keys: keys.iter().map(PublicKey::to_hex).collect(),
         ..SiemConfig::default()
     };
@@ -172,10 +172,7 @@ mod tests {
             BTreeSet::from([key.to_hex(), rotated.to_hex()])
         );
         assert_eq!(config.db_path, Path::new("unused-receipts.db"));
-        assert_eq!(
-            config.cursor_db_path.as_deref(),
-            Some(Path::new("unused-cursor.db"))
-        );
+        assert_eq!(config.cursor_db_path, Path::new("unused-cursor.db"));
     }
 
     #[test]
