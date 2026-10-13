@@ -328,7 +328,7 @@ fn direct_retention(retention: Retention) -> CaptureResult {
     assert_capture_replay(
         case.kernel
             .evaluate_tool_call_blocking_with_security_context(&case.request, &case.context),
-        already_compensated,
+        already_compensated.then_some(&denied),
         replay_reason,
     )?;
     if already_compensated {

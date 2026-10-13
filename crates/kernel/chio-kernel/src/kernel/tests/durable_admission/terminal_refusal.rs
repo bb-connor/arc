@@ -236,7 +236,7 @@ fn terminal_refusal_replay_requires_its_canonical_receipt() -> TestResult {
 fn committed_operation(
     kernel: &ChioKernel,
     request: &ToolCallRequest,
-) -> Result<AdmissionOperationV1, KernelError> {
+) -> Result<AdmissionOperationV1, Box<dyn std::error::Error>> {
     let matching = resolve_required_matching_grants(
         &request.capability,
         &request.tool_name,
