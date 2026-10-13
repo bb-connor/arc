@@ -32,9 +32,8 @@ external subjects, checks protocol/version rules, and re-verifies referenced
 receipt signatures and action bindings.
 
 `agent_web_passport_scope_sha256` canonically binds signed root scope while
-excluding graph digest and signature to avoid circular envelope bindings. V1
-envelope compatibility follows its legacy bindings; v2 adds passport-scope
-binding. Read-only verification returns a report; consuming variants commit
+excluding graph digest and signature to avoid circular envelope bindings.
+Every envelope carries that passport-scope binding. Read-only verification returns a report; consuming variants commit
 the pending webhook batch after every check passes.
 
 ## Trust and invariants
