@@ -174,7 +174,7 @@ mod tests {
         drop(db);
 
         // DDL must roll back when the caller cannot open the retained authority.
-        assert!(Store::open(&path, "foreign-authority", "key").is_err());
+        assert!(Store::open(&path, "foreign-authority", "key", chio_test_support::clock::clock()).is_err());
         let db = rusqlite::Connection::open(&path)?;
         assert!(!db.query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='process_recovery_calls')",
@@ -183,7 +183,7 @@ mod tests {
         )?);
         drop(db);
 
-        let mut store = Store::open(&path, "authority", "key")?;
+        let mut store = Store::open(&path, "authority", "key", chio_test_support::clock::clock())?;
         assert_eq!(store.namespace, "original-namespace");
         let legacy: (String, String, String, i64) = store.connection.query_row(
             "SELECT p.capability,p.limits,c.request_hash,p.tree_calls FROM processes p JOIN process_calls c ON c.process_id=p.id WHERE c.operation_key='original-call'", [],
@@ -226,7 +226,7 @@ mod tests {
             .execute("DELETE FROM process_recovery_calls", [])
             .is_err());
         drop(store);
-        let mut reopened = Store::open(&path, "authority", "key")?;
+        let mut reopened = Store::open(&path, "authority", "key", chio_test_support::clock::clock())?;
         reopened.verify_recovery_reservation(&reservation)?;
         assert_eq!(reopened.namespace, "original-namespace");
         assert_eq!(reopened.process("root")?.tree_calls, 2);

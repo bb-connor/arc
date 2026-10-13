@@ -35,7 +35,7 @@ impl ChioKernel {
     ) -> Result<Option<OriginalProcessNonceContext>, KernelError> {
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let selector = AdmissionIdentifier::try_new("request_id", request.request_id.clone())?;
         let Some((operation, original)) = runtime
             .store

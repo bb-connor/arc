@@ -17,7 +17,7 @@ async fn held_job(
 ) -> TestResult<(oneshot::Sender<()>, Reply)> {
     let (release, pending) = oneshot::channel();
     let (entered, started) = oneshot::channel();
-    let response = executor.try_submit(principal.to_owned(), None, async move {
+    let response = executor.try_submit(principal.to_owned(), async move {
         let _ = entered.send(());
         pending
             .await
@@ -65,7 +65,7 @@ async fn reserved_native_saturation_keeps_four_command_jobs_available() -> TestR
     for principal in ["checked:first", "checked:second"] {
         finality_jobs.push(held_job(&finality, principal).await?);
     }
-    let refused_finality = finality.try_submit("checked:third".into(), None, async { Ok(()) });
+    let refused_finality = finality.try_submit("checked:third".into(), async { Ok(()) });
     let mut command_jobs = Vec::new();
     for principal in [
         "checked:first",
@@ -75,7 +75,7 @@ async fn reserved_native_saturation_keeps_four_command_jobs_available() -> TestR
     ] {
         command_jobs.push(held_job(&commands, principal).await?);
     }
-    let refused_command = commands.try_submit("checked:third".into(), None, async { Ok(()) });
+    let refused_command = commands.try_submit("checked:third".into(), async { Ok(()) });
     // The six admitted jobs have all started and remain pending in distinct
     // native domains. Neither caller nor global/principal capacity is shared.
     assert_eq!(finality.capacity.available_permits(), 0);
@@ -100,13 +100,13 @@ async fn duplicate_finality_principal_preserves_another_principals_slot() -> Tes
     let executor = pool(ExecutionDomain::ProviderFinality).await?;
     let first = held_job(&executor, "checked:first").await?;
     let (release_duplicate, duplicate_pending) = oneshot::channel();
-    let duplicate = executor.try_submit("checked:first".into(), None, async move {
+    let duplicate = executor.try_submit("checked:first".into(), async move {
         duplicate_pending
             .await
             .map_err(|_| RecoveryRuntimeError::Unavailable)?;
         Ok(())
     });
-    let other = executor.try_submit("checked:other".into(), None, async { Ok(73) });
+    let other = executor.try_submit("checked:other".into(), async { Ok(73) });
     drop(release_duplicate);
     drain(vec![first]).await?;
     let duplicate_refused = matches!(duplicate, Err(RecoveryRuntimeError::Unavailable));
@@ -132,7 +132,7 @@ async fn saturated_finality_refusals_do_not_retain_idle_principals() -> TestResu
     let second = held_job(&executor, "checked:second").await?;
     for index in 0..64 {
         assert!(matches!(
-            executor.try_submit(format!("checked:refused:{index}"), None, async { Ok(()) }),
+            executor.try_submit(format!("checked:refused:{index}"), async { Ok(()) }),
             Err(RecoveryRuntimeError::Unavailable),
         ));
     }
@@ -161,7 +161,7 @@ async fn disconnected_finality_jobs_drain_after_executor_shutdown() -> TestResul
         let (release, pending) = oneshot::channel();
         let (entered, started) = oneshot::channel();
         let completed = completed.clone();
-        let response = executor.try_submit(principal.into(), None, async move {
+        let response = executor.try_submit(principal.into(), async move {
             let _ = entered.send(());
             pending
                 .await
@@ -218,7 +218,7 @@ async fn disconnected_finality_jobs_drain_after_executor_shutdown() -> TestResul
 async fn contained_finality_panic_preserves_the_remaining_worker_capacity() -> TestResult {
     let executor = pool(ExecutionDomain::ProviderFinality).await?;
     let held = held_job(&executor, "checked:held").await?;
-    let panicked = executor.try_submit::<()>("checked:panicked".into(), None, async {
+    let panicked = executor.try_submit::<()>("checked:panicked".into(), async {
         panic!("controlled native finality panic");
     })?;
     assert_eq!(
@@ -236,7 +236,7 @@ async fn contained_finality_panic_preserves_the_remaining_worker_capacity() -> T
         }
     })
     .await?;
-    let replacement = executor.try_submit("checked:panicked".into(), None, async { Ok(19) })?;
+    let replacement = executor.try_submit("checked:panicked".into(), async { Ok(19) })?;
     assert_eq!(
         tokio::time::timeout(Duration::from_secs(2), replacement).await???,
         19

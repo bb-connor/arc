@@ -124,7 +124,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         if scope.authority_domain.as_str() != fence.store_uuid {
             return Err(refused("retired Proposal observer changed authority"));
         }

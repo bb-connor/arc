@@ -67,7 +67,7 @@ struct LaunchCustody<'a> {
 impl Drop for LaunchCustody<'_> {
     fn drop(&mut self) {
         if self.armed {
-            if let Ok(time) = now() {
+            if let Ok(time) = now(&self.runtime.kernel) {
                 let _ = self.runtime.store.quarantine_confined_child(
                     self.actor,
                     self.request,
@@ -138,7 +138,7 @@ impl NativeConfinedRuntime {
         )?;
         let profile = self
             .store
-            .knowledge_installation(&actor, &self.fence, now()?)
+            .knowledge_installation(&actor, &self.fence, now(&self.kernel)?)
             .map_err(refused)?;
         diagnostic_phase!(
             ParentContext,
@@ -150,7 +150,7 @@ impl NativeConfinedRuntime {
         let reserved = diagnostic_phase!(
             LaunchReservation,
             self.store
-                .confined_launch_reservation(&actor, request, &self.fence, now()?)
+                .confined_launch_reservation(&actor, request, &self.fence, now(&self.kernel)?)
                 .map_err(refused)
         )?;
         diagnostic_phase!(
@@ -166,7 +166,7 @@ impl NativeConfinedRuntime {
         }
         let prepared = chio_cage::prepare_launch(compiled).map_err(refused)?;
         self.store
-            .prepare_confined_launch(&actor, request, &prepared, &self.fence, now()?)
+            .prepare_confined_launch(&actor, request, &prepared, &self.fence, now(&self.kernel)?)
             .map_err(refused)?;
         let mut custody = LaunchCustody {
             runtime: self,
@@ -180,14 +180,14 @@ impl NativeConfinedRuntime {
                 .map_err(refused)?;
         let reservation = self
             .store
-            .record_confined_enforcement(&actor, request, &child, &self.fence, now()?)
+            .record_confined_enforcement(&actor, request, &child, &self.fence, now(&self.kernel)?)
             .map_err(refused)?;
         self.cutpoint(ConfinedCutpoint::Enforced)?;
         let left = reservation
             .boundary
             .deadline_unix_ms
             .get()
-            .checked_sub(now()?)
+            .checked_sub(now(&self.kernel)?)
             .filter(|v| *v > 0)
             .ok_or_else(|| refused("execution deadline"))?;
         let deadline = Instant::now()
@@ -222,7 +222,7 @@ impl NativeConfinedRuntime {
         let inventory = diagnostic_phase!(
             InputInventory,
             self.store
-                .confined_input_inventory(&actor, request, &self.fence, now()?)
+                .confined_input_inventory(&actor, request, &self.fence, now(&self.kernel)?)
                 .map_err(refused)
         )?;
         let mut input = Vec::new();
@@ -246,7 +246,7 @@ impl NativeConfinedRuntime {
         diagnostic_phase!(
             InputAdmission,
             self.store
-                .admit_confined_input(&actor, request, &packet, &self.fence, now()?)
+                .admit_confined_input(&actor, request, &packet, &self.fence, now(&self.kernel)?)
                 .map_err(refused)
         )?;
         self.cutpoint(ConfinedCutpoint::ObservationCommitted)?;
@@ -319,7 +319,7 @@ impl ConfinedExecution {
                     &actor,
                     &self.request,
                     &self.runtime.fence,
-                    now()?,
+                    now(&self.runtime.kernel)?,
                 )
                 .map_err(refused)
         )?;
@@ -348,7 +348,7 @@ impl ConfinedExecution {
                     &actor,
                     &self.request,
                     &self.runtime.fence,
-                    now()?,
+                    now(&self.runtime.kernel)?,
                 )
                 .map_err(refused)
         )?;
@@ -369,7 +369,7 @@ impl ConfinedExecution {
                         &actor,
                         &self.request,
                         &self.runtime.fence,
-                        now()?,
+                        now(&self.runtime.kernel)?,
                     )
                     .map_err(refused)
             )?;
@@ -383,7 +383,7 @@ impl ConfinedExecution {
                             &self.request,
                             &exit,
                             &self.runtime.fence,
-                            now()?
+                            now(&self.runtime.kernel)?
                         )
                         .map_err(refused)
                 )?;
@@ -413,7 +413,7 @@ impl ConfinedExecution {
                     &seal,
                     &bytes,
                     &self.runtime.fence,
-                    now()?,
+                    now(&self.runtime.kernel)?,
                 )
                 .map_err(refused)
         )?;
@@ -437,7 +437,7 @@ impl Drop for ConfinedExecution {
         if let (Ok(actor), Ok(time)) = (
             self.runtime
                 .actor(&self.launch_capability, RecoveryPermission::ConfinedLaunch),
-            now(),
+            now(&self.runtime.kernel),
         ) {
             let _ = self.runtime.store.quarantine_confined_child(
                 &actor,

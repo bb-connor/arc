@@ -138,10 +138,7 @@ async fn extended_validity_setup_with_capture_checkpoint(
         .and_then(|seconds| seconds.checked_sub(10))
         .ok_or("setup validity late clock")?;
     let prepared = {
-        let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-            late_seconds,
-            std::iter::empty::<String>(),
-        );
+        let _clock = chio_test_support::clock::scope_unix_secs(late_seconds);
         let workflow = Box::pin(materialize_selected_setup(&f, &create))
             .await
             .map_err(|error| format!("setup validity phase=late action and approval: {error}"))?;
@@ -219,10 +216,7 @@ async fn setup_selected_command_before_initial_expiry_still_dispatches_once() ->
     let state = Box::pin(extended_validity_setup()).await?;
     let f = &state.fixture;
     let valid_seconds = state.prepared.probe.expires_at_unix_ms.get() / 1_000 - 1;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        valid_seconds,
-        std::iter::empty::<String>(),
-    );
+    let _clock = chio_test_support::clock::scope_unix_secs(valid_seconds);
     let calls = f.f.process.process("root")?.tree_calls;
     let result =
         f.f.runtime
@@ -246,10 +240,7 @@ async fn setup_expired_selected_command_refuses_without_an_effect_or_charge() ->
     let state = Box::pin(extended_validity_setup()).await?;
     let f = &state.fixture;
     let expired_seconds = state.prepared.probe.expires_at_unix_ms.get() / 1_000 + 1;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        expired_seconds,
-        std::iter::empty::<String>(),
-    );
+    let _clock = chio_test_support::clock::scope_unix_secs(expired_seconds);
     let actor = f.f.kernel.authenticate_recovery_actor(
         f.f.runtime.scope(),
         &f.f.control,
@@ -353,10 +344,7 @@ async fn capture_at_selected_setup_window(window: SetupCaptureWindow) -> TestRes
         f.f.path.join("setup-capture-selected-seconds"),
         capture_seconds.to_string(),
     )?;
-    let _entry_clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        entry_seconds,
-        std::iter::empty::<String>(),
-    );
+    let _entry_clock = chio_test_support::clock::scope_unix_secs(entry_seconds);
     let before =
         f.f.record(&state.prepared.probe.benign_workflow)
             .map_err(|error| format!("setup capture phase=live retained workflow: {error}"))?;
@@ -427,10 +415,7 @@ async fn capture_at_selected_setup_window(window: SetupCaptureWindow) -> TestRes
     // The real capture checkpoint may commit at its selected later time. All
     // subsequent metadata and custody reads use that time, never an earlier
     // restored entry sample that would violate the native monotone clock.
-    let _capture_clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        inspect_seconds,
-        std::iter::empty::<String>(),
-    );
+    let _capture_clock = chio_test_support::clock::scope_unix_secs(inspect_seconds);
     let after_calls = f
         .f
         .process

@@ -74,7 +74,7 @@ pub(in crate::admission_operation_store) fn prepare_native_initial_finishing_pla
             "initial native financing changed its actual owner cut",
         ));
     }
-    let now = observed_time(tx, custody.trusted_now_unix_ms)?;
+    let now = observed_time(tx, custody.trusted_now_unix_ms, owner)?;
     verify_participant_recovery_tx(tx, owner, custody.operation, custody.lease, now)?;
     ensure_no_reserved_terminal_stage(tx, custody.operation.binding().operation_id())?;
     let original = retained_request::load_retained_request_tx(tx, custody.operation)?
@@ -84,8 +84,7 @@ pub(in crate::admission_operation_store) fn prepare_native_initial_finishing_pla
     original.validate_native_security_authority(custody.binding)?;
     original.validate_native_security_context(custody.context)?;
     original.validate_bounded_native_materializer()?;
-    if original.authority_profile().is_none()
-        || custody.operation.binding().kind() != AdmissionOperationKind::ToolDispatch
+    if custody.operation.binding().kind() != AdmissionOperationKind::ToolDispatch
         || custody.operation.dispatch_commit().is_some()
         || custody.operation.budget_hold_id().is_some()
     {
@@ -271,7 +270,7 @@ impl NativeToolOutcomeSourcePlan for VerifiedNativeInitialFinishingPlan<'_, '_> 
                 "initial native financing changed its exact physical cut",
             ));
         }
-        let now = observed_time(tx, self.custody.trusted_now_unix_ms)?;
+        let now = observed_time(tx, self.custody.trusted_now_unix_ms, owner)?;
         verify_participant_recovery_tx(tx, owner, self.custody.operation, self.custody.lease, now)?;
         ensure_no_reserved_terminal_stage(tx, self.custody.operation.binding().operation_id())?;
         let original = retained_request::load_retained_request_tx(tx, self.custody.operation)?

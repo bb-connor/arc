@@ -138,7 +138,7 @@ impl ChioKernel {
         }
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(observed_at_unix_ms);
+        let now = runtime.refresh_trusted_time(observed_at_unix_ms)?;
         let loaded = super::native_acquisition::store_call(|| {
             runtime.store.load_retained_tool_request(
                 admission.operation().binding().operation_id(),

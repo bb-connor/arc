@@ -25,7 +25,7 @@ lineage = []
 cognition-market-test-support = []
 # Native fault and modeled predecessor fixtures for cross-crate admission tests.
 # Default-off; no arbitrary SQL or fault controls are exposed in production.
-admission-test-support = ["chio-semantic-contracts/admission-test-support"]
+admission-test-support = ["chio-semantic-contracts/admission-test-support", "dep:chio-test-support"]
 # Exposes the standalone security admission operation store to tests and
 # benches. Default-off; production builds neither compile nor export it.
 security-admission-test-support = []
@@ -38,6 +38,8 @@ chaos-test-hooks = []
 # standalone `chio-fuzz` workspace at `../../../fuzz`.
 fuzz = []
 [dependencies]
+# Scoped fixture clock for admission-test-support fault hooks only.
+chio-test-support = { workspace = true, optional = true }
 chio-cage = { workspace = true }
 chio-semantic-contracts = { path = "../../security/chio-semantic-contracts", features = ["std"] }
 chacha20poly1305 = { workspace = true }

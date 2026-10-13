@@ -9,15 +9,13 @@ pub(super) fn checked_principal(
     kernel: &ChioKernel,
     scope: &RecoveryScopeV1,
     capability: &CapabilityToken,
-    fixed_time: Option<u64>,
 ) -> Result<String, RecoveryRuntimeError> {
-    let now = match fixed_time {
-        Some(now) => now,
-        None => std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|_| RecoveryRuntimeError::AuthorityDenied)?
-            .as_secs(),
-    };
+    let now = kernel
+        .authority_clock()
+        .unix_millis()
+        .map_err(|_| RecoveryRuntimeError::AuthorityDenied)?
+        .get()
+        / 1000;
     // This check selects bounded fairness data. Full actor, profile,
     // revocation and native checks remain in each owning native phase.
     if !kernel.capability_issuer_is_trusted(&capability.issuer)
@@ -36,23 +34,21 @@ pub(super) fn checked_principal(
 
 pub(super) async fn execute<T: Send + 'static>(
     principal: String,
-    fixed_time: Option<u64>,
     work: impl Future<Output = Result<T, RecoveryRuntimeError>> + Send + 'static,
 ) -> Result<T, RecoveryRuntimeError> {
     let reply = crate::recovery::command_executor::CommandExecutor::shared()
         .await?
-        .try_submit(principal, fixed_time, work)?;
+        .try_submit(principal, work)?;
     reply.await.map_err(|_| RecoveryRuntimeError::Unavailable)?
 }
 
 pub(super) async fn execute_settlement<T: Send + 'static>(
     principal: String,
-    fixed_time: Option<u64>,
     work: impl Future<Output = Result<T, RecoveryRuntimeError>> + Send + 'static,
 ) -> Result<T, RecoveryRuntimeError> {
     let reply = crate::recovery::command_executor::CommandExecutor::shared_provider_finality()
         .await?
-        .try_submit(principal, fixed_time, work)?;
+        .try_submit(principal, work)?;
     reply.await.map_err(|_| RecoveryRuntimeError::Unavailable)?
 }
 
@@ -80,7 +76,7 @@ mod tests {
         ] {
             let (release, pending) = oneshot::channel();
             let (entered, started) = oneshot::channel();
-            replies.push(commands.try_submit(key.to_owned(), None, async move {
+            replies.push(commands.try_submit(key.to_owned(), async move {
                 let _ = entered.send(());
                 pending
                     .await
@@ -90,10 +86,10 @@ mod tests {
             releases.push(release);
             tokio::time::timeout(Duration::from_secs(2), started).await??;
         }
-        let excess = commands.try_submit("data-domain-excess".to_owned(), None, async { Ok(()) });
+        let excess = commands.try_submit("data-domain-excess".to_owned(), async { Ok(()) });
         let result = tokio::time::timeout(
             Duration::from_secs(2),
-            execute_settlement("data-finality-domain".to_owned(), None, async { Ok(79) }),
+            execute_settlement("data-finality-domain".to_owned(), async { Ok(79) }),
         )
         .await;
         for release in releases {

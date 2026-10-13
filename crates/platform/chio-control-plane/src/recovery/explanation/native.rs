@@ -28,7 +28,7 @@ impl RecoveryRuntime {
             RecoveryPermission::Inspect,
         )?;
         let view = artifact.view.clone();
-        service.retain_native_graph(workflow, artifact, crate::recovery::materialize::now()?)?;
+        service.retain_native_graph(workflow, artifact, crate::recovery::materialize::now(&self.kernel)?)?;
         Ok(view)
     }
 
@@ -61,7 +61,7 @@ impl RecoveryRuntime {
         service.retain_native_graph(
             workflow,
             artifact.clone(),
-            crate::recovery::materialize::now()?,
+            crate::recovery::materialize::now(&self.kernel)?,
         )?;
         Ok(artifact)
     }
@@ -81,7 +81,7 @@ impl RecoveryRuntime {
             workflow,
             reference,
             service,
-            crate::recovery::materialize::now,
+            || crate::recovery::materialize::now(&self.kernel),
         )
     }
 
@@ -216,7 +216,7 @@ impl RecoveryRuntime {
         self.validate_protected_mediation()?;
         let recipient = ActorId::new(actor.principal().as_str())
             .map_err(|_| RecoveryRuntimeError::UnsupportedProfile)?;
-        let now = crate::recovery::materialize::now()?;
+        let now = crate::recovery::materialize::now(&self.kernel)?;
         // Charge before loading an object; hidden membership cannot reset quota.
         service.admit(&recipient, now)?;
         let denied = |_| RecoveryRuntimeError::AuthorityDenied;
@@ -530,7 +530,7 @@ impl RecoveryRuntime {
                     basis,
                     integrity: ExplanationIntegrity::NativeOwned,
                 })
-            || crate::recovery::materialize::now()? >= artifact.view.body().expires_at_unix_ms.get()
+            || crate::recovery::materialize::now(&self.kernel)? >= artifact.view.body().expires_at_unix_ms.get()
         {
             return Err(RecoveryRuntimeError::AuthorityDenied);
         }

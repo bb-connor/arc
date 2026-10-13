@@ -1515,10 +1515,7 @@ fn checkpoint_retirement_after_owner_ends(expired: bool) -> TestResult {
     let _clock = if expired {
         assert!(f.f.control.expires_at > after_expiry);
         assert!(reader.expires_at > after_expiry);
-        Some(chio_kernel::scope_fixed_runtime_for_current_thread(
-            after_expiry,
-            [],
-        ))
+        Some(chio_test_support::clock::scope_unix_secs(after_expiry))
     } else {
         assert!(f.f.process.cancel(f.profile.scope.process_id.as_str())? > 0);
         None

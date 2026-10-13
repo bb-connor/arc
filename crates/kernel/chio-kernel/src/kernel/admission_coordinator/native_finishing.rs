@@ -70,7 +70,7 @@ impl ChioKernel {
         }
         let runtime = self.durable_runtime()?;
         let guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(requested_now);
+        let now = runtime.refresh_trusted_time(requested_now)?;
         let (current, physical_original) = store_call(|| {
             runtime.store.load_retained_tool_request(
                 admission.operation.binding().operation_id(),
@@ -183,7 +183,7 @@ impl DurableAdmissionRuntime {
         provider: &dyn crate::native_finishing::NativeProcessCurrentWriteProvider,
     ) -> Result<(), KernelError> {
         let _guard = self.lock_mutations()?;
-        let now = self.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = self.refresh_trusted_time(0)?;
         let issuer = crate::native_finishing::NativeProcessBankProofIssuer::in_configured_writer(
             self.store.as_ref(),
             &self.fence,

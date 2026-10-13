@@ -368,7 +368,7 @@ fn mutate_with_purpose<T>(
 ) -> Result<T, AdmissionOperationStoreError> {
     let mut connection = store.connection()?;
     let tx = store.begin_write(&mut connection, Some(fence))?;
-    let now = schema::authority_validation_time(&tx, now)?;
+    let now = schema::authority_validation_time(&tx, now, &store.serving_owner)?;
     let recovery = protected::deployment_tx(&tx, actor.scope())?;
     super::recovery_runtime::verify_actor(&tx, actor, &recovery, now)?;
     match purpose {
@@ -382,7 +382,7 @@ fn mutate_with_purpose<T>(
     let profile = installation(&tx, actor.scope())?;
     validate_installation(&tx, &recovery, &profile)?;
     let (tx, result) = apply(tx, &profile, now)?;
-    let later = schema::authority_validation_time(&tx, now)?;
+    let later = schema::authority_validation_time(&tx, now, &store.serving_owner)?;
     super::recovery_runtime::verify_actor(&tx, actor, &recovery, later)?;
     store.commit_write(tx)?;
     store.sync_after_write(&connection)?;
@@ -401,7 +401,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         if expected.scope.authority_domain.as_str() != fence.store_uuid {
             return Err(refused("knowledge installation authority"));
         }
@@ -426,7 +426,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         if reference.scope.authority_domain.as_str() != fence.store_uuid {
             return Err(refused("reference owner authority"));
         }
@@ -583,7 +583,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let deployment = protected::deployment_tx(&tx, scope)?;
         let result = {
             let current = security_participant_state::knowledge::CurrentNativeInfluenceAuthority::authenticate(

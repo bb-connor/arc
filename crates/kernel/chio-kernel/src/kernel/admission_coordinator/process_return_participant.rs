@@ -70,7 +70,7 @@ impl ChioKernel {
     ) -> Result<FundedProcessReturnEnrollment, KernelError> {
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         FundedProcessReturnEnrollment::from_original_native_source(
             &OriginalStorePort {
                 store: runtime.store.as_ref(),
@@ -87,7 +87,7 @@ impl ChioKernel {
     ) -> Result<FundedProcessOriginalNonce, KernelError> {
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         FundedProcessOriginalNonce::from_original_native_source(
             &OriginalStorePort {
                 store: runtime.store.as_ref(),
@@ -104,7 +104,7 @@ impl ChioKernel {
     ) -> Result<FundedProcessNativeReturn, KernelError> {
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         FundedProcessNativeReturn::from_original_native_source(
             &OriginalStorePort {
                 store: runtime.store.as_ref(),
@@ -124,7 +124,7 @@ impl ChioKernel {
     ) -> Result<ReconciledProcessNativeReturn, KernelError> {
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         ReconciledProcessNativeReturn::from_original_native_source(
             &OriginalStorePort {
                 store: runtime.store.as_ref(),

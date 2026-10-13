@@ -47,7 +47,7 @@ impl NativeKnowledgeRuntime {
         let profile = self.current(&actor)?;
         let references = self
             .store
-            .artifact_transfer_inventory(&actor, &reference, &self.fence, now()?)
+            .artifact_transfer_inventory(&actor, &reference, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         let mut records = Vec::with_capacity(references.len());
         let mut total = 0_u64;
@@ -152,7 +152,7 @@ impl NativeKnowledgeRuntime {
         }
         let digest = self
             .store
-            .retain_import_manifest(&actor, &archive.manifest, &self.fence, now()?)
+            .retain_import_manifest(&actor, &archive.manifest, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         let mut mapping = Vec::<(ArtifactVersionRefV1, ArtifactVersionRefV1)>::new();
         for (index, (original, raw)) in archive
@@ -196,7 +196,7 @@ impl NativeKnowledgeRuntime {
             };
             let imported = self.publish(capability, &input, raw, None)?;
             self.store
-                .retain_import_mapping(&actor, digest, &origin, &imported, &self.fence, now()?)
+                .retain_import_mapping(&actor, digest, &origin, &imported, &self.fence, now(&self.kernel)?)
                 .map_err(unavailable)?;
             mapping.push((origin, imported));
         }
@@ -221,7 +221,7 @@ impl NativeKnowledgeRuntime {
         let profile = self.current(&actor)?;
         let reservation = self
             .store
-            .reserve_artifact(&actor, input, &self.fence, now()?)
+            .reserve_artifact(&actor, input, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         let body = certificate.body();
         if certificate.authority_key() != &profile.certificate_root

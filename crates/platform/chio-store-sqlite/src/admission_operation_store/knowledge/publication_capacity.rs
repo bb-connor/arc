@@ -511,7 +511,7 @@ impl SqliteAdmissionOperationStore {
         }
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let deployment = protected::deployment_tx(&tx, actor.scope())?;
         super::super::recovery_runtime::verify_actor(&tx, actor, &deployment, now)?;
         let profile = installation(&tx, actor.scope())?;
@@ -522,7 +522,7 @@ impl SqliteAdmissionOperationStore {
             &source(&tx, &profile.native_authority, &profile.producer_context)?,
         )?;
         let count = current_capacity(&tx, actor.scope())?.0.live()?;
-        let later = schema::authority_validation_time(&tx, now)?;
+        let later = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         super::super::recovery_runtime::verify_actor(&tx, actor, &deployment, later)?;
         tx.rollback().map_err(sqlite_error)?;
         Ok(count)

@@ -153,9 +153,9 @@ async fn recovery_owed_hold_preserves_exhausted_native_128_and_original_custody(
     // A genuine current capture is advanced only by the existing protected
     // Native writer. This models exhausted legacy-compatible allowance bytes;
     // it is not a claim that a predecessor public route generated 128 writes.
-    let authority = SqliteAuthorityStore::open_serving(
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
         directory.path().join("admission.db"),
-        directory.path().join("locks"),
+        directory.path().join("locks"), chio_test_support::clock::clock(),
     )?;
     authority
         .admission_operation_store()

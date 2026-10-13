@@ -8,7 +8,6 @@ use chio_manifest::{
     sign_manifest, AuthoritativeToolPolicy, RuntimeToolTopology, ToolAnnotations, ToolDefinition,
     ToolFlowDeclaration, ToolManifest, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
 };
-use chio_security_kernel::SecurityClock;
 use chio_security_types::flow::Compartment;
 use chio_security_types::ports::{
     ClassificationPort, ClassificationRequest, ClassificationResult, ClassifierId,
@@ -32,7 +31,7 @@ pub(super) fn open_kernel(
             "fcbe38632417bb5b875d49a3c02270633917c6093fd01ebb59ff6416e37afe0c",
         )?);
     }
-    let mut kernel = ChioKernel::new(KernelConfig {
+    let mut kernel = ChioKernel::new_with_clock(KernelConfig {
         ca_public_keys,
         keypair: signer.clone(),
         max_delegation_depth: 5,
@@ -49,7 +48,7 @@ pub(super) fn open_kernel(
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    }, chio_test_support::clock::clock());
     let receipts = SqliteReceiptStore::open(directory.join("receipts.db"))?;
     receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
     kernel.set_receipt_store_handle(Arc::new(receipts))?;
@@ -66,7 +65,7 @@ pub(super) fn open_kernel(
 
 pub(super) fn now_ms() -> PortResult<u64> {
     if SYNCHRONOUS_FIXTURE_CLOCK.with(std::cell::Cell::get) {
-        return chio_kernel::fixed_runtime_unix_secs_for_current_thread()
+        return chio_test_support::clock::scoped_unix_secs()
             .and_then(|seconds| seconds.checked_mul(1_000))
             .ok_or_else(PortError::unavailable);
     }
@@ -87,7 +86,7 @@ thread_local! {
 /// not select or reset receipt IDs. Ordinary fixtures retain wall-clock time.
 pub(super) struct SynchronousFixtureClockScope {
     previous_opt_in: bool,
-    _kernel_clock: chio_kernel::FixedRuntimeClockScope,
+    _kernel_clock: chio_test_support::clock::ClockScope,
 }
 
 impl Drop for SynchronousFixtureClockScope {
@@ -97,7 +96,7 @@ impl Drop for SynchronousFixtureClockScope {
 }
 
 pub(super) fn scope_synchronous_fixture_clock(seconds: u64) -> SynchronousFixtureClockScope {
-    let kernel_clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(seconds);
+    let kernel_clock = chio_test_support::clock::scope_unix_secs(seconds);
     SynchronousFixtureClockScope {
         previous_opt_in: SYNCHRONOUS_FIXTURE_CLOCK.with(|enabled| enabled.replace(true)),
         _kernel_clock: kernel_clock,
@@ -106,11 +105,11 @@ pub(super) fn scope_synchronous_fixture_clock(seconds: u64) -> SynchronousFixtur
 
 #[test]
 fn synchronous_fixture_clock_is_thread_local_and_restores_nested_scopes() -> TestResult {
-    let prior_clock = chio_kernel::fixed_runtime_unix_secs_for_current_thread();
+    let prior_clock = chio_test_support::clock::scoped_unix_secs();
     assert!(!SYNCHRONOUS_FIXTURE_CLOCK.with(std::cell::Cell::get));
     let before = now_ms()?;
     {
-        let _kernel_only = chio_kernel::scope_fixed_runtime_clock_for_current_thread(7);
+        let _kernel_only = chio_test_support::clock::scope_unix_secs(7);
         assert!(now_ms()? >= before, "ordinary fixture time does not opt in");
     }
     {
@@ -125,7 +124,7 @@ fn synchronous_fixture_clock_is_thread_local_and_restores_nested_scopes() -> Tes
         let isolated = std::thread::spawn(|| {
             assert!(!SYNCHRONOUS_FIXTURE_CLOCK.with(std::cell::Cell::get));
             assert_eq!(
-                chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
+                chio_test_support::clock::scoped_unix_secs(),
                 None
             );
             now_ms()
@@ -136,7 +135,7 @@ fn synchronous_fixture_clock_is_thread_local_and_restores_nested_scopes() -> Tes
     }
     assert!(!SYNCHRONOUS_FIXTURE_CLOCK.with(std::cell::Cell::get));
     assert_eq!(
-        chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
+        chio_test_support::clock::scoped_unix_secs(),
         prior_clock
     );
     assert!(now_ms()? >= before);
@@ -145,7 +144,7 @@ fn synchronous_fixture_clock_is_thread_local_and_restores_nested_scopes() -> Tes
 
 #[test]
 fn synchronous_fixture_clock_restores_opt_in_and_kernel_time_after_unwind() -> TestResult {
-    let prior_clock = chio_kernel::fixed_runtime_unix_secs_for_current_thread();
+    let prior_clock = chio_test_support::clock::scoped_unix_secs();
     let outer = scope_synchronous_fixture_clock(33);
     let unwound = std::panic::catch_unwind(|| {
         let _inner = scope_synchronous_fixture_clock(44);
@@ -155,7 +154,7 @@ fn synchronous_fixture_clock_restores_opt_in_and_kernel_time_after_unwind() -> T
     assert!(unwound.is_err());
     assert_eq!(now_ms()?, 33_000);
     assert_eq!(
-        chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
+        chio_test_support::clock::scoped_unix_secs(),
         Some(33)
     );
     drop(outer);
@@ -166,7 +165,7 @@ fn synchronous_fixture_clock_restores_opt_in_and_kernel_time_after_unwind() -> T
     assert!(unwound.is_err());
     assert!(!SYNCHRONOUS_FIXTURE_CLOCK.with(std::cell::Cell::get));
     assert_eq!(
-        chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
+        chio_test_support::clock::scoped_unix_secs(),
         prior_clock
     );
     Ok(())
@@ -177,8 +176,8 @@ pub(super) struct Clock {
     pub mode: AtomicUsize,
 }
 
-impl SecurityClock for Clock {
-    fn now_unix_ms(&self) -> PortResult<u64> {
+impl Clock {
+    pub(super) fn now_unix_ms(&self) -> PortResult<u64> {
         match self.mode.load(Ordering::SeqCst) {
             0 => now_ms(),
             1 => Ok(0),
@@ -186,6 +185,15 @@ impl SecurityClock for Clock {
             3 => panic!("native policy clock panic"),
             _ => Err(PortError::unavailable()),
         }
+    }
+}
+
+impl chio_security_types::clock::Clock for Clock {
+    fn read(
+        &self,
+    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+    {
+        fixture_reading(self.now_unix_ms())
     }
 }
 
@@ -300,21 +308,25 @@ pub(super) fn category_labels() -> CategoryLabelMap {
 
 /// Only the extended setup-validity fixture follows the fixed owning clock.
 /// The ordinary fixture keeps its real-time clock and 600-second capability.
-pub(super) fn fixture_native_clock(path: &std::path::Path) -> Arc<dyn SecurityClock> {
-    struct OwningRuntimeClock;
-    impl SecurityClock for OwningRuntimeClock {
-        fn now_unix_ms(&self) -> PortResult<u64> {
-            if let Some(seconds) = chio_kernel::fixed_runtime_unix_secs_for_current_thread() {
-                return seconds
-                    .checked_mul(1_000)
-                    .ok_or_else(PortError::unavailable);
-            }
-            now_ms()
-        }
-    }
+pub(super) fn fixture_native_clock(
+    path: &std::path::Path,
+) -> Arc<dyn chio_security_types::clock::Clock> {
     if path.join("extended-setup-validity").exists() {
-        Arc::new(OwningRuntimeClock)
+        chio_test_support::clock::clock()
     } else {
         Arc::new(Clock::default())
     }
+}
+
+/// A fixture reading at an explicit wall time with a real monotonic instant.
+pub(super) fn fixture_reading(
+    unix_millis: PortResult<u64>,
+) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError> {
+    let unix_millis =
+        unix_millis.map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+    let monotonic = <chio_security_types::clock::SystemClock as chio_security_types::clock::Clock>::read(&chio_security_types::clock::SystemClock)?.monotonic();
+    Ok(chio_security_types::clock::ClockReading::new(
+        chio_security_types::clock::UnixMillis::new(unix_millis),
+        monotonic,
+    ))
 }

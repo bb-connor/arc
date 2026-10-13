@@ -38,7 +38,6 @@ impl ChioKernel {
         if operation.state() != AdmissionOperationState::Finalizing
             || operation.dispatch_commit().is_none()
             || operation.native_dispatch_ledger_digest().is_none()
-            || original.authority_profile().is_none()
             || input.raw.caller_delivery_evidence().is_some()
             || !input
                 .raw
@@ -66,7 +65,7 @@ impl ChioKernel {
 
         let runtime = self.durable_runtime()?;
         let guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let operation_id = operation.binding().operation_id();
         let (physical, retained) = store_call(|| {
             runtime

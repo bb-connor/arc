@@ -35,7 +35,7 @@ impl ChioKernel {
             .historical_release(
                 admission.operation.binding().operation_id(),
                 &runtime.fence,
-                runtime.refresh_trusted_time(current_unix_timestamp_ms()),
+                runtime.refresh_trusted_time(0)?,
             )
             .map_err(durable_store_error)?
             .ok_or_else(|| {

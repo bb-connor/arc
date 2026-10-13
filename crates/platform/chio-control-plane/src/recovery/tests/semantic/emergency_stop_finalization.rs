@@ -132,9 +132,9 @@ async fn verify_known_recorded_return_restoration(require_stop: bool) -> TestRes
     let original_raw;
     let original_ledger;
     {
-        let authority = SqliteAuthorityStore::open_serving(
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
             directory.path().join("admission.db"),
-            directory.path().join("locks"),
+            directory.path().join("locks"), chio_test_support::clock::clock(),
         )?;
         let store = authority.admission_operation_store();
         let (operation, retained) = store

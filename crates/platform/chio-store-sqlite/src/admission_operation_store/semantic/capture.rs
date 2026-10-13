@@ -696,7 +696,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let captured: Option<NativeSemanticCaptureRecordV1> = load(
             &tx,
             &capture_key(operation.binding().operation_id().as_str()),
@@ -782,7 +782,7 @@ impl SqliteAdmissionOperationStore {
         {
             return Err(refused("dispatch caller"));
         }
-        let now = schema::observe_authority_time(&tx)?;
+        let now = schema::observe_authority_time(&tx, &self.serving_owner)?;
         let installed = installation(&tx, &record.invocation.action.scope)?;
         if stopped(&tx, &record.invocation.action.scope)?
             || installed.compile()?.digest() != record.invocation.action.registry
@@ -815,6 +815,7 @@ impl SqliteAdmissionOperationStore {
             &tx,
             &stored.operation,
             now,
+            &self.serving_owner,
         )?;
         materialization::verify_dispatch_prerequisites(&tx, &record, now)?;
         if current_annotation_answers_required(&record.native_authority)? {
@@ -843,7 +844,7 @@ impl SqliteAdmissionOperationStore {
             "command",
             &record.operation_id,
         )?;
-        let final_now = schema::observe_authority_time(&tx)?;
+        let final_now = schema::observe_authority_time(&tx, &self.serving_owner)?;
         if final_now >= record.valid_until_unix_ms.get()
             || final_now / 1000 >= capability.expires_at
         {
@@ -853,6 +854,7 @@ impl SqliteAdmissionOperationStore {
             &tx,
             &stored.operation,
             final_now,
+            &self.serving_owner,
         )?;
         self.commit_write(tx)?;
         self.sync_after_write(&connection)?;

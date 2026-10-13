@@ -42,7 +42,7 @@ impl<'tx, 'conn> ProductReclamationWriter<'tx, 'conn> {
         {
             return Err(AdmissionOperationStoreError::RecoveryAuthorityDenied);
         }
-        let now = schema::observe_authority_time(tx)?;
+        let now = schema::observe_authority_time(tx, self.serving_owner)?;
         if now < self.observed_at {
             return Err(refused("proposal reclamation clock changed"));
         }

@@ -134,7 +134,7 @@ fn public_checkpoint_projection_refuses_a_forged_predecessor_over_retained_close
         .with_store(|store| store.require_raw_knowledge())
         .is_err());
     let retained = forge_raw_predecessor_without_changing_custody(&fixture)?;
-    assert!(Store::open(&fixture.path, &fixture.authority, &fixture.kernel_key).is_err());
+    assert!(Store::open(&fixture.path, &fixture.authority, &fixture.kernel_key, chio_test_support::clock::clock()).is_err());
     assert!(role
         .verify_for(&unused.reservation, &fixture.authority)
         .is_err());
@@ -179,7 +179,7 @@ fn knowledge_activation_refuses_inconsistent_retained_custody_before_any_header_
     assert_eq!(catalog_snapshot(&fixture)?, catalog);
     assert_eq!(retained_checkpoint(&fixture)?, checkpoint);
     let retained = forge_raw_predecessor_without_changing_custody(&fixture)?;
-    assert!(Store::open(&fixture.path, &fixture.authority, &fixture.kernel_key).is_err());
+    assert!(Store::open(&fixture.path, &fixture.authority, &fixture.kernel_key, chio_test_support::clock::clock()).is_err());
     assert!(role
         .verify_for(&unused.reservation, &fixture.authority)
         .is_err());

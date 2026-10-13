@@ -30,14 +30,14 @@ async fn lookup_clock_rollback_cannot_spend_another_attempt() -> TestResult {
         RecoveryPermission::Settle,
     )?;
     let selected = selected_time()?;
-    let clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(selected);
+    let clock = chio_test_support::clock::scope_unix_secs(selected);
     let first = fixture
         .kernel
         .reserve_recovery_provider_lookup(&actor, &workflow)?;
     assert_eq!(first.workflow().provider_lookups.get(), 1);
     let retained = workflow_bytes(&fixture, &workflow)?;
     drop(clock);
-    let clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(
+    let clock = chio_test_support::clock::scope_unix_secs(
         selected.checked_sub(1).ok_or("fixture clock underflow")?,
     );
     assert!(fixture
@@ -49,10 +49,10 @@ async fn lookup_clock_rollback_cannot_spend_another_attempt() -> TestResult {
     drop(clock);
     // The refusal itself used the regressed clock. Restore its prior trusted
     // time before asking a separate authenticated reader to verify custody.
-    let clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(selected);
+    let clock = chio_test_support::clock::scope_unix_secs(selected);
     assert_eq!(native_original(&fixture, &workflow)?, original);
     drop(clock);
-    let _clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(
+    let _clock = chio_test_support::clock::scope_unix_secs(
         selected.checked_add(1).ok_or("fixture clock overflow")?,
     );
     let spaced = fixture
@@ -73,7 +73,7 @@ async fn lookup_spacing_does_not_extend_expired_control() -> TestResult {
         &fixture.control,
         RecoveryPermission::Settle,
     )?;
-    let clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(selected_time()?);
+    let clock = chio_test_support::clock::scope_unix_secs(selected_time()?);
     let first = fixture
         .kernel
         .reserve_recovery_provider_lookup(&actor, &workflow)?;
@@ -81,7 +81,7 @@ async fn lookup_spacing_does_not_extend_expired_control() -> TestResult {
     let retained = workflow_bytes(&fixture, &workflow)?;
     let expiry = fixture.control.expires_at;
     drop(clock);
-    let _clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(expiry);
+    let _clock = chio_test_support::clock::scope_unix_secs(expiry);
     assert!(fixture
         .kernel
         .reserve_recovery_provider_lookup(&actor, &workflow)
@@ -115,7 +115,7 @@ async fn lookup_spacing_survives_serving_owner_restart() -> TestResult {
     )?;
     let original_epoch = fixture.authority.mutation_fence().owner_epoch;
     let selected = selected_time()?;
-    let clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(selected);
+    let clock = chio_test_support::clock::scope_unix_secs(selected);
     let first = fixture
         .kernel
         .reserve_recovery_provider_lookup(&actor, &workflow)?;
@@ -139,7 +139,7 @@ async fn lookup_spacing_survives_serving_owner_restart() -> TestResult {
     assert_eq!(native_original(&reopened, &workflow)?, original);
     assert_eq!(external_count(&reopened.path)?, 1);
     drop(clock);
-    let _clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(
+    let _clock = chio_test_support::clock::scope_unix_secs(
         selected.checked_add(1).ok_or("fixture clock overflow")?,
     );
     let spaced = reopened

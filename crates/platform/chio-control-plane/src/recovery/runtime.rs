@@ -184,20 +184,19 @@ impl RecoveryRuntime {
                 + 'a,
         >,
     > {
-        let fixed_time = chio_kernel::fixed_runtime_unix_secs_for_current_thread();
         Box::pin(async move {
             let wire = chio_core_types::canonical_json_bytes(command)
                 .map_err(|_| RecoveryRuntimeError::InvalidCommand)?;
             let _: RecoveryCommandV1 =
                 decode_contract(&wire).map_err(|_| RecoveryRuntimeError::InvalidCommand)?;
             let principal =
-                native_work::checked_principal(&self.kernel, &self.scope, capability, fixed_time)?;
+                native_work::checked_principal(&self.kernel, &self.scope, capability)?;
             let runtime = self.clone();
             let capability = capability.clone();
             let command = command.clone();
             let work =
                 async move { Box::pin(runtime.execute_command_inner(&capability, &command)).await };
-            native_work::execute(principal, fixed_time, work).await
+            native_work::execute(principal, work).await
         })
     }
     async fn execute_command_inner(
@@ -414,13 +413,12 @@ impl RecoveryRuntime {
         workflow: &WorkflowId,
         connector: &super::PinnedSupportIssueConnector,
     ) -> Result<RecoveryCommandResponseV1, RecoveryRuntimeError> {
-        let fixed_time = chio_kernel::fixed_runtime_unix_secs_for_current_thread();
         let principal =
-            native_work::checked_principal(&self.kernel, &self.scope, capability, fixed_time)?;
+            native_work::checked_principal(&self.kernel, &self.scope, capability)?;
         let kernel = self.kernel.clone();
         let scope = self.scope.clone();
         let authentication_capability = capability.clone();
-        let actor = native_work::execute_settlement(principal.clone(), fixed_time, async move {
+        let actor = native_work::execute_settlement(principal.clone(), async move {
             kernel
                 .authenticate_recovery_actor(
                     &scope,
@@ -432,6 +430,7 @@ impl RecoveryRuntime {
         .await?;
         let observation_owner = connector
             .prepare_observation(
+                self.kernel.authority_clock(),
                 capability
                     .expires_at
                     .checked_mul(1000)
@@ -441,7 +440,7 @@ impl RecoveryRuntime {
         let kernel = self.kernel.clone();
         let selected_workflow = workflow.clone();
         let request_budget = observation_owner.request_budget();
-        let lookup = native_work::execute_settlement(principal.clone(), fixed_time, async move {
+        let lookup = native_work::execute_settlement(principal.clone(), async move {
             kernel
                 .reserve_recovery_provider_lookup_with_budget(
                     &actor,
@@ -458,7 +457,7 @@ impl RecoveryRuntime {
         let runtime = self.clone();
         let settlement_capability = capability.clone();
         let selected_workflow = workflow.clone();
-        native_work::execute_settlement(principal, fixed_time, async move {
+        native_work::execute_settlement(principal, async move {
             let current = runtime
                 .kernel
                 .authenticate_recovery_actor(

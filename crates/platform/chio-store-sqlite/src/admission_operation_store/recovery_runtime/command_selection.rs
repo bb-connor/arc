@@ -315,7 +315,7 @@ impl SqliteAdmissionOperationStore {
                 Some(fence),
             )?;
             let read_now =
-                crate::admission_operation_store::schema::authority_validation_time(&read, now)?;
+                crate::admission_operation_store::schema::authority_validation_time(&read, now, &self.serving_owner)?;
             let deployment = deployment_tx(&read, actor.scope())?;
             crate::admission_operation_store::recovery_runtime::verify_actor(
                 &read,
@@ -344,7 +344,7 @@ impl SqliteAdmissionOperationStore {
             crate::admission_operation_store::recovery_runtime::resources::check(&connection, intake)?;
             let tx = self.begin_write(&mut connection, Some(fence))?;
             let now =
-                crate::admission_operation_store::schema::authority_validation_time(&tx, now)?;
+                crate::admission_operation_store::schema::authority_validation_time(&tx, now, &self.serving_owner)?;
             let deployment = deployment_tx(&tx, actor.scope())?;
             crate::admission_operation_store::recovery_runtime::verify_actor(&tx, actor, &deployment, now)?;
             let response = commands::apply(

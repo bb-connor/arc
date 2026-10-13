@@ -16,7 +16,7 @@ impl SqliteAdmissionOperationStore {
         }
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let deployment = protected::deployment_tx(&tx, actor.scope())?;
         super::super::super::recovery_runtime::verify_actor(&tx, actor, &deployment, now)?;
         let profile = installation(&tx, actor.scope())?;
@@ -39,7 +39,7 @@ impl SqliteAdmissionOperationStore {
             let record = artifact(&tx, reference)?;
             traversal::ensure_audience(&tx, actor, &record.metadata.label)?;
         }
-        let later = schema::authority_validation_time(&tx, now)?;
+        let later = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         super::super::super::recovery_runtime::verify_actor(&tx, actor, &deployment, later)?;
         tx.rollback().map_err(sqlite_error)?;
         Ok(reference)

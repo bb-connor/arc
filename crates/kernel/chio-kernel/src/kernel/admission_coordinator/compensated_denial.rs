@@ -30,7 +30,7 @@ impl ChioKernel {
             return Ok(None);
         };
         let runtime = self.durable_runtime()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let (operation, original) = native_acquisition::store_call(|| {
             runtime.store.load_retained_tool_request(
                 original_operation.binding().operation_id(),

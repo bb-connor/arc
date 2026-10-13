@@ -133,7 +133,7 @@ async fn saturated_submission_closes_native_admission_before_dispatch() -> TestR
     }
     let database = directory.path().join("admission.db");
     SqliteAuthorityStore::provision(&database, &locks)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(&database, &locks, chio_test_support::clock::clock())?;
     let ca = Keypair::from_seed(&[182; 32]);
     let agent = Keypair::from_seed(&[183; 32]);
     let (mut kernel, _) = bootstrap::open_kernel(directory.path(), &authority, &ca)?;
@@ -302,7 +302,7 @@ async fn repeated_lookup_is_spaced_by_durable_original_observation() -> TestResu
     // transactions and immutable event timestamps use this same clock; disk
     // latency cannot turn an immediate logical attempt into a spaced one.
     let selected = now_ms()?.checked_add(999).ok_or("fixture clock overflow")? / 1000;
-    let clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(selected);
+    let clock = chio_test_support::clock::scope_unix_secs(selected);
     let first = fixture
         .kernel
         .reserve_recovery_provider_lookup(&actor, &workflow)?;
@@ -324,7 +324,7 @@ async fn repeated_lookup_is_spaced_by_durable_original_observation() -> TestResu
     );
     assert_eq!(fixture.record(&workflow)?.provider_lookups.get(), 1);
     drop(clock);
-    let _clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(
+    let _clock = chio_test_support::clock::scope_unix_secs(
         selected.checked_add(1).ok_or("fixture clock overflow")?,
     );
     let spaced = fixture
@@ -400,7 +400,7 @@ async fn native_lookup_writer_checks_the_configured_budget_without_renewing_auth
         10,
     )?;
     let selected = now_ms()?.checked_add(999).ok_or("fixture clock overflow")? / 1000;
-    let _clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(selected);
+    let _clock = chio_test_support::clock::scope_unix_secs(selected);
     let actor = fixture.kernel.authenticate_recovery_actor(
         fixture.runtime.scope(),
         &capability,

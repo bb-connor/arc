@@ -12,6 +12,7 @@ use chio_kernel::{
 use chio_security_types::recovery::ProtectedText;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use chio_security_types::clock::Clock;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -37,10 +38,18 @@ pub struct PinnedSupportIssueConnector {
     request_timeout: Duration,
 }
 
+fn authority_now(clock: &dyn Clock) -> Result<u64, KernelError> {
+    clock
+        .unix_millis()
+        .map(|now| now.get())
+        .map_err(|_| refused())
+}
+
 /// Local readiness has no provider authority. Its owned slot remains live
 /// while the native owner selects and consumes one original-only observation.
 pub(super) struct PreparedProviderObservation<'a> {
     connector: &'a PinnedSupportIssueConnector,
+    clock: Arc<dyn Clock>,
     _permit: OwnedSemaphorePermit,
     expires_at_unix_ms: u64,
     budget: RecoveryProviderLookupBudget,
@@ -61,12 +70,15 @@ impl PreparedProviderObservation<'_> {
         }
         let PreparedProviderObservation {
             connector,
+            clock,
             _permit,
             expires_at_unix_ms,
             ..
         } = self;
         let deadline = expires_at_unix_ms.min(lookup.expires_at_unix_ms());
-        let result = connector.observe_reserved(lookup, deadline).await;
+        let result = connector
+            .observe_reserved(clock.as_ref(), lookup, deadline)
+            .await;
         drop(_permit);
         result
     }
@@ -156,9 +168,10 @@ impl PinnedSupportIssueConnector {
     }
     pub(super) fn prepare_observation(
         &self,
+        clock: Arc<dyn Clock>,
         expires_at_unix_ms: u64,
     ) -> Result<PreparedProviderObservation<'_>, KernelError> {
-        let now = super::materialize::now().map_err(|_| refused())?;
+        let now = authority_now(clock.as_ref())?;
         let budget = RecoveryProviderLookupBudget::from_duration(self.request_timeout)?;
         let required = budget.request_millis();
         if expires_at_unix_ms
@@ -174,6 +187,7 @@ impl PinnedSupportIssueConnector {
             .map_err(|_| refused())?;
         Ok(PreparedProviderObservation {
             connector: self,
+            clock,
             _permit: permit,
             expires_at_unix_ms,
             budget,
@@ -209,14 +223,16 @@ impl PinnedSupportIssueConnector {
     /// credential. The original agent's grant and spending budget are irrelevant.
     pub async fn observe_original(
         &self,
+        clock: Arc<dyn Clock>,
         lookup: RecoveryProviderLookup,
     ) -> Result<SignedRecoveryProviderFinalityV1, KernelError> {
-        self.prepare_observation(lookup.expires_at_unix_ms())?
+        self.prepare_observation(clock, lookup.expires_at_unix_ms())?
             .observe(lookup)
             .await
     }
     async fn observe_reserved(
         &self,
+        clock: &dyn Clock,
         lookup: RecoveryProviderLookup,
         expires_at_unix_ms: u64,
     ) -> Result<SignedRecoveryProviderFinalityV1, KernelError> {
@@ -232,7 +248,7 @@ impl PinnedSupportIssueConnector {
                     .get()
                     .min(current.max_response_bytes.get())
             || lookup.workflow().provider_lookups.get() == 0
-            || super::materialize::now().map_err(|_| refused())? >= expires_at_unix_ms
+            || authority_now(clock)? >= expires_at_unix_ms
         {
             return Err(refused());
         }
@@ -250,7 +266,7 @@ impl PinnedSupportIssueConnector {
             .build()
             .map_err(|_| refused())?;
         let remaining = expires_at_unix_ms
-            .checked_sub(super::materialize::now().map_err(|_| refused())?)
+            .checked_sub(authority_now(clock)?)
             .filter(|remaining| *remaining != 0)
             .ok_or_else(refused)?;
         let response = tokio::time::timeout(
@@ -259,7 +275,7 @@ impl PinnedSupportIssueConnector {
         )
         .await
         .map_err(|_| refused())??;
-        if super::materialize::now().map_err(|_| refused())? >= expires_at_unix_ms {
+        if authority_now(clock)? >= expires_at_unix_ms {
             return Err(refused());
         }
         // Canonical closed provider evidence is verified by the native authority

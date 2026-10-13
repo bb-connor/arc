@@ -17,7 +17,7 @@ impl ChioKernel {
                 &admission.operation,
                 request,
                 &runtime.fence,
-                current_unix_timestamp_ms(),
+                runtime.refresh_trusted_time(0)?,
             )
             .map_err(durable_store_error)?
         {

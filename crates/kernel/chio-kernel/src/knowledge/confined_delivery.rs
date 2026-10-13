@@ -25,7 +25,7 @@ impl DurableKnowledgeEnforcement {
             .verify_confined_return_delivery(
                 input,
                 &self.fence,
-                crate::kernel::current_unix_timestamp_ms(),
+                self.authority_now()?,
             )
             .map_err(|_| refused())?;
         if boundary.scope != scope || boundary.request != request {

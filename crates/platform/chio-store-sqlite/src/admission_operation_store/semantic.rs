@@ -419,7 +419,7 @@ impl SqliteAdmissionOperationStore {
         {
             return Err(refused("resolver"));
         }
-        let now = schema::observe_authority_time(&tx)?;
+        let now = schema::observe_authority_time(&tx, &self.serving_owner)?;
         if body.observed_at_unix_ms.get() > now || body.valid_until_unix_ms.get() <= now {
             return Err(refused("time"));
         }

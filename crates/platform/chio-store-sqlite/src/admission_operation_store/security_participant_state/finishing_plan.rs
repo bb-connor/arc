@@ -120,7 +120,7 @@ pub(in crate::admission_operation_store) fn prepare_native_finishing_plan<'sourc
             "native finishing plan is not fresh capture custody",
         ));
     }
-    let now = observed_time(tx, custody.trusted_now_unix_ms)?;
+    let now = observed_time(tx, custody.trusted_now_unix_ms, owner)?;
     verify_participant_recovery_tx(tx, owner, operation, custody.lease, now)?;
     ensure_no_reserved_terminal_stage(tx, operation.binding().operation_id())?;
     let original = retained_request::load_retained_request_tx(tx, operation)?
@@ -129,11 +129,6 @@ pub(in crate::admission_operation_store) fn prepare_native_finishing_plan<'sourc
     original.validate_request_material(custody.request)?;
     original.validate_native_security_authority(custody.binding)?;
     original.validate_native_security_context(custody.security_context)?;
-    if original.authority_profile().is_none() {
-        return Err(invalid(
-            "native finishing plan has no original authority profile",
-        ));
-    }
     let profile = original
         .native_output_retention()
         .ok_or_else(|| invalid("native finishing plan has no original output profile"))?;
@@ -229,7 +224,7 @@ impl VerifiedNativeFinishingPlan<'_, '_> {
                 "native finishing plan changed its exact source cut",
             ));
         }
-        let now = observed_time(tx, self.custody.trusted_now_unix_ms)?;
+        let now = observed_time(tx, self.custody.trusted_now_unix_ms, owner)?;
         verify_participant_recovery_tx(tx, owner, self.custody.operation, self.custody.lease, now)?;
         let original = retained_request::load_retained_request_tx(tx, self.custody.operation)?
             .ok_or_else(|| invalid("native finishing original disappeared"))?;

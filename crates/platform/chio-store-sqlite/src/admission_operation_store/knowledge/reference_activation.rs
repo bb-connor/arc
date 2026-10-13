@@ -51,6 +51,7 @@ pub(in crate::admission_operation_store) struct VerifiedKnowledgeReferenceRebuil
     'conn,
 > {
     transaction: &'tx Transaction<'conn>,
+    owner: &'tx SqliteServingOwner,
     actor: &'tx AuthenticatedRecoveryActor,
     installation: NativeKnowledgeInstallationV1,
     reference: ArtifactVersionRefV1,
@@ -62,6 +63,7 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRebuildAuthority<'tx, 'conn> {
     /// Only the same-scope retained Admin writer can call this constructor.
     pub(super) fn new(
         tx: &'tx Transaction<'conn>,
+        owner: &'tx SqliteServingOwner,
         actor: &'tx AuthenticatedRecoveryActor,
         profile: &NativeKnowledgeInstallationV1,
         reference: &ArtifactVersionRefV1,
@@ -69,6 +71,7 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRebuildAuthority<'tx, 'conn> {
         let (_, publication, pointer) = retained_reference_artifact(tx, reference)?;
         let proof = Self {
             transaction: tx,
+            owner,
             actor,
             installation: profile.clone(),
             reference: reference.clone(),
@@ -96,7 +99,7 @@ impl<'tx, 'conn> VerifiedKnowledgeReferenceRebuildAuthority<'tx, 'conn> {
         }
         // A complete census can be slow. Recheck actual trusted authority time
         // after that work rather than reusing the time at its first admission.
-        let now = schema::observe_authority_time(tx)?;
+        let now = schema::observe_authority_time(tx, self.owner)?;
         let deployment = protected::deployment_tx(tx, self.actor.scope())?;
         super::super::recovery_runtime::verify_actor(tx, self.actor, &deployment, now)?;
         let profile = installation(tx, self.actor.scope())?;

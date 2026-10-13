@@ -230,7 +230,6 @@ impl CommandExecutor {
     pub(super) fn try_submit<T: Send + 'static>(
         &self,
         principal: String,
-        fixed_time: Option<u64>,
         future: impl Future<Output = Result<T, RecoveryRuntimeError>> + Send + 'static,
     ) -> Result<oneshot::Receiver<Result<T, RecoveryRuntimeError>>, RecoveryRuntimeError> {
         if self.state.borrow().failed {
@@ -278,7 +277,6 @@ impl CommandExecutor {
         // runtime frames. Large native command futures stay on the heap.
         let future = Box::pin(future);
         let work = Box::new(move |runtime: &Runtime, permit: PrincipalPermit| {
-            let _clock = fixed_time.map(chio_kernel::scope_fixed_runtime_clock_for_current_thread);
             let result = catch_unwind(AssertUnwindSafe(|| runtime.block_on(future)))
                 .unwrap_or(Err(RecoveryRuntimeError::Unavailable));
             // Completion and unwind retain this exact permit. Release it before

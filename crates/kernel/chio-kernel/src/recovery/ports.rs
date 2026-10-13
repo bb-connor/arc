@@ -289,7 +289,7 @@ impl crate::ChioKernel {
         capability: &CapabilityToken,
         permission: RecoveryPermission,
     ) -> Result<AuthenticatedRecoveryActor, crate::KernelError> {
-        let now = crate::kernel::current_unix_timestamp_ms();
+        let now = self.trusted_now_millis()?.get();
         self.verify_capability_full_pre_admit_typed(capability, None, now / 1000)
             .map_err(|error| error.recovery_error())?;
         // This bounded control profile has its own durable command/lookup

@@ -90,9 +90,9 @@ async fn native_recorded_semantic_return_settles_after_selection_rotation_withou
     {
         // Opening the serving Store does not run the Kernel's finalizer. Inspect
         // genuine retained custody, then rotate only semantic selection.
-        let authority = SqliteAuthorityStore::open_serving(
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
             directory.path().join("admission.db"),
-            directory.path().join("locks"),
+            directory.path().join("locks"), chio_test_support::clock::clock(),
         )?;
         let store = authority.admission_operation_store();
         let (operation, retained) = store

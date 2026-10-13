@@ -44,7 +44,7 @@ impl NativeKnowledgeRuntime {
         let actor = self.actor(capability, RecoveryPermission::KnowledgeAdmin)?;
         self.current_retained(&actor)?;
         self.store
-            .retire_checkpoint_revision(&actor, checkpoint, revision, &self.fence, now()?)
+            .retire_checkpoint_revision(&actor, checkpoint, revision, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)
     }
 
@@ -68,7 +68,7 @@ impl NativeKnowledgeRuntime {
                     model_contexts: models,
                 },
                 &self.fence,
-                now()?,
+                now(&self.kernel)?,
             )
             .map_err(unavailable)
     }
@@ -96,7 +96,7 @@ impl NativeKnowledgeRuntime {
             self,
             CheckpointLookup,
             self.store
-                .read_labeled_checkpoint(&actor, id, revision, &self.fence, now()?)
+                .read_labeled_checkpoint(&actor, id, revision, &self.fence, now(&self.kernel)?)
                 .map_err(unavailable)
         )?;
         let selection = checkpoint_restore_phase!(
@@ -214,7 +214,7 @@ impl NativeKnowledgeRuntime {
                         installation_generation: profile.generation,
                     },
                     &self.fence,
-                    now()?,
+                    now(&self.kernel)?,
                 )
                 .map_err(unavailable)
         )?;
@@ -238,7 +238,7 @@ impl NativeKnowledgeRuntime {
                     &intent,
                     false,
                     &self.fence,
-                    now()?
+                    now(&self.kernel)?
                 )
                 .map_err(unavailable)
         )?;
@@ -259,7 +259,7 @@ impl NativeKnowledgeRuntime {
                     &intent,
                     delivered,
                     &self.fence,
-                    now()?,
+                    now(&self.kernel)?,
                 )
                 .map_err(unavailable)
         )?;

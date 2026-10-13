@@ -43,7 +43,7 @@ impl ChioKernel {
             return Ok(None);
         };
         let operation = &admission.operation;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let now = runtime.refresh_trusted_time(0)?;
         let Some(record) = port
             .historical_release(operation.binding().operation_id(), &runtime.fence, now)
             .map_err(durable_store_error)?

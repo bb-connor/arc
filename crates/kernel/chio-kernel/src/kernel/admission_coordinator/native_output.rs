@@ -409,7 +409,7 @@ impl ChioKernel {
                 let _guard = runtime.lock_mutations()?;
                 authority.read_optional_history(
                     runtime,
-                    runtime.refresh_trusted_time(current_unix_timestamp_ms()),
+                    runtime.refresh_trusted_time(0)?,
                 )?
             };
             let label = if let Some(prior) = prior {

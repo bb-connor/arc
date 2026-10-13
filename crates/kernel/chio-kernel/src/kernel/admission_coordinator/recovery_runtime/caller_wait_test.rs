@@ -10,7 +10,7 @@ impl ChioKernel {
         id: &AdmissionOperationId,
     ) -> Result<AdmissionOperationState, KernelError> {
         let runtime = self.durable_runtime()?;
-        let now = runtime.refresh_trusted_time(0);
+        let now = runtime.refresh_trusted_time(0)?;
         let _owner = runtime
             .mutation_sequencer
             .try_own_operation(id)?
@@ -27,10 +27,7 @@ impl ChioKernel {
                 .is_none_or(|attempt| !attempt.is_native_caller_report())
             || operation.native_dispatch_ledger_digest().is_none()
             || operation.caller_dispatch_context_digest().is_none()
-            || original
-                .authority_profile()
-                .and_then(|profile| profile.caller_executor())
-                .is_none()
+            || original.authority_profile().caller_executor().is_none()
             || runtime
                 .store
                 .load_execution_nonce_reservation(id, &runtime.fence, now)
@@ -47,7 +44,7 @@ impl ChioKernel {
         self.reconcile_scoped_dispatch_committed_original(&operation, now)?;
         let (actual, retained) = runtime
             .store
-            .load_retained_tool_request(id, &runtime.fence, runtime.refresh_trusted_time(now))
+            .load_retained_tool_request(id, &runtime.fence, runtime.refresh_trusted_time(now)?)
             .map_err(durable_store_error)?
             .ok_or_else(unsupported)?;
         if actual.binding() != operation.binding()

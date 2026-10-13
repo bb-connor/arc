@@ -2950,6 +2950,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "zeroize",
 ]
 
 [[package]]
@@ -2974,7 +2975,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "zeroize",
 ]
 
 [[package]]
@@ -4775,6 +4775,7 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "chio-security-types",
+ "chio-sqlite-file-identity",
  "chio-store-sqlite",
  "chio-test-support",
  "hex",

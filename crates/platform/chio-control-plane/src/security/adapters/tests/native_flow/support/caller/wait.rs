@@ -85,10 +85,10 @@ fn exercise_scoped_wait(expire: bool) -> TestResult {
         .max(u64::try_from(nonce.expires_at())?);
     let expired_now = until.checked_add(1).ok_or("caller expiry overflow")?;
     let _clock =
-        expire.then(|| chio_kernel::scope_fixed_runtime_clock_for_current_thread(expired_now));
+        expire.then(|| chio_test_support::clock::scope_unix_secs(expired_now));
     if expire {
         assert_eq!(
-            chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
+            chio_test_support::clock::scoped_unix_secs(),
             Some(expired_now)
         );
         assert!(expired_now > fixture.request.capability.expires_at);

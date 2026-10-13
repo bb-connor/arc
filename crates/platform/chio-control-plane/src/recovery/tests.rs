@@ -161,7 +161,7 @@ impl RecoveryFixture {
         if !database.exists() {
             SqliteAuthorityStore::provision(&database, &locks)?;
         }
-        let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(&database, &locks, chio_test_support::clock::clock())?;
         let ca = Keypair::from_seed(
             if path.join("legacy-near-capacity").exists()
                 && path.join("current-recovery-receipt-signer").exists()
@@ -2095,7 +2095,7 @@ async fn recovery_expired_initiating_authority_cannot_renew_pending_work() -> Te
     let before = f.record(&id)?;
     let action = chio_core::canonical_json_bytes(&before.action)?;
     let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(f.seed.capability.expires_at + 1, []);
+        chio_test_support::clock::scope_unix_secs(f.seed.capability.expires_at + 1);
     let current = &f.control;
     let resume = f.command(
         "expired-original",

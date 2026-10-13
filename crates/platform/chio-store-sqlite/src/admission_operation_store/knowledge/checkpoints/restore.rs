@@ -303,7 +303,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let deployment = protected::deployment_tx(&tx, actor.scope())?;
         super::super::super::recovery_runtime::verify_actor(&tx, actor, &deployment, now)?;
         let current = installation(&tx, actor.scope())?;
@@ -336,7 +336,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let deployment = protected::deployment_tx(&tx, actor.scope())?;
         super::super::super::recovery_runtime::verify_actor(&tx, actor, &deployment, now)?;
         let current = installation(&tx, actor.scope())?;
@@ -523,7 +523,13 @@ impl SqliteAdmissionOperationStore {
                 installation_generation,
             };
             let source = AuthenticatedCheckpointRestoreEncodingSource::admission(
-                &tx, actor, profile, now, &key, &record,
+                &tx,
+                &self.serving_owner,
+                actor,
+                profile,
+                now,
+                &key,
+                &record,
             )?;
             let prepared = super::super::encoding::write::VerifiedKnowledgeEncodingWrite::restore(
                 source,
@@ -597,6 +603,7 @@ impl SqliteAdmissionOperationStore {
                 record.intent.state = next;
                 let source = AuthenticatedCheckpointRestoreEncodingSource::acknowledgement(
                     &tx,
+                    &self.serving_owner,
                     actor,
                     profile,
                     trusted_now,

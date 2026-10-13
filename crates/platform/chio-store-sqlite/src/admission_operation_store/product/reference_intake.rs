@@ -207,7 +207,7 @@ impl<'tx, 'conn> VerifiedProductReferenceIntake<'tx, 'conn> {
         if protected::encode(&current)? != protected::encode(self.writer.profile)? {
             return Err(refused("product intake native deployment changed"));
         }
-        let now = schema::observe_authority_time(tx)?;
+        let now = schema::observe_authority_time(tx, self.writer.serving_owner)?;
         super::super::recovery_runtime::verify_actor(tx, self.writer.actor, &current, now)?;
         require_finite_intake_audience(self.writer.actor, &current)?;
         match &self.candidate {

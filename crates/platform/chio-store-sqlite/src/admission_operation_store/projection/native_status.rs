@@ -168,7 +168,7 @@ fn load_status_identity(
     now: u64,
 ) -> Result<StatusIdentity, AdmissionOperationStoreError> {
     verify_active_owner(tx, owner, Some(&owner.fence))?;
-    super::super::schema::authority_validation_time(tx, now)?;
+    super::super::schema::authority_validation_time(tx, now, owner)?;
     let stored = load_by_operation_id_tx(tx, operation_id)?
         .ok_or_else(|| invariant("native status operation absent"))?;
     stored.verify_decision_time(now)?;

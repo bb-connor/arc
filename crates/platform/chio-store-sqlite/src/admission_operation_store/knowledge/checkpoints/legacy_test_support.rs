@@ -23,7 +23,7 @@ impl SqliteAdmissionOperationStore {
         }
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let deployment = protected::deployment_tx(&tx, actor.scope())?;
         super::super::super::recovery_runtime::verify_actor(&tx, actor, &deployment, now)?;
         security_participant_state::verify_recovery_initialization(&tx, &profile.native_authority)?;
@@ -174,7 +174,7 @@ impl SqliteAdmissionOperationStore {
             save(&tx, &self.serving_owner, actor.scope(), &key, &checkpoint)?;
             checkpoints.push(checkpoint);
         }
-        let later = schema::authority_validation_time(&tx, now)?;
+        let later = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         super::super::super::recovery_runtime::verify_actor(&tx, actor, &deployment, later)?;
         self.commit_write(tx)?;
         self.sync_after_write(&connection)?;

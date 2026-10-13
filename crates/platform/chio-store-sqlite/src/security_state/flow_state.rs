@@ -40,8 +40,10 @@ use generations::{
     invalidate_related_flow_contexts, next_flow_generation, store_context_generation,
 };
 pub(crate) use input_join::{resolve_native_input_join, resolve_native_label_join};
+#[cfg(test)]
+use labels::isolation_epoch_exists;
 use labels::{
-    load_context_generation, load_lineage_label, load_principal_label, load_scoped_flow_snapshot,
+    load_context_generation, load_lineage_label, load_observed_flow_snapshot, load_principal_label, load_scoped_flow_snapshot,
     load_session_label, session_membership_exists, store_lineage_label, store_principal_label,
     store_session_label,
 };

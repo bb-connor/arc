@@ -1475,7 +1475,7 @@ fn load_by_operation_id_tx(
 }
 
 fn load_by_operation_id_tx_with_history(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     operation_id: &AdmissionOperationId,
     history: &CheckedHistoryScope<'_>,
 ) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
@@ -1489,7 +1489,7 @@ struct StoredOperationWithTerminalReceipt {
 }
 
 fn load_by_operation_id_tx_with_history_and_terminal_receipt(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
     operation_id: &AdmissionOperationId,
     history: &CheckedHistoryScope<'_>,
 ) -> Result<Option<StoredOperationWithTerminalReceipt>, AdmissionOperationStoreError> {

@@ -129,7 +129,7 @@ impl SqliteAdmissionOperationStore {
                         .iter()
                         .all(|fact| authority.facts.as_slice().contains(fact))
             });
-        let now = schema::observe_authority_time(&tx)?;
+        let now = schema::observe_authority_time(&tx, &self.serving_owner)?;
         if !selected || body.issued_at_unix_ms.get() > now || body.valid_until_unix_ms.get() <= now
         {
             return Err(refused("annotation authority or time"));

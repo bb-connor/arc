@@ -25,7 +25,7 @@ impl SqliteAdmissionOperationStore {
                 "missing-link fixture requires untouched native ownership",
             ));
         }
-        let encoded = match begin_prepared_operation_tx(&tx, operation, fence, now)? {
+        let encoded = match begin_prepared_operation_tx(&tx, operation, fence, now, &self.serving_owner)? {
             PreparedAdmissionBeginTxResult::Created { encoded } => encoded,
             _ => {
                 return Err(invariant(

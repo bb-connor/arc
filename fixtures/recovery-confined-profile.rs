@@ -21,11 +21,11 @@ pub fn contracts() -> Result<Vec<(&'static str, serde_json::Value)>, Box<dyn std
     let m = knowledge::metadata()?;
     let reference = artifact_version_reference(&m)?;
     let execution = ConfinedExecutionProfileV1 {
-        manifest: CanonicalPayloadDigest::from_bytes([1; 32]),
-        profile: CanonicalPayloadDigest::from_bytes([2; 32]),
-        configuration: CanonicalPayloadDigest::from_bytes([3; 32]),
-        helper: CanonicalPayloadDigest::from_bytes([4; 32]),
-        image: CanonicalPayloadDigest::from_bytes([5; 32]),
+        manifest: CageMeasurementDigest::from_bytes([1; 32]),
+        profile: CageMeasurementDigest::from_bytes([2; 32]),
+        configuration: CageMeasurementDigest::from_bytes([3; 32]),
+        helper: CageMeasurementDigest::from_bytes([4; 32]),
+        image: CageMeasurementDigest::from_bytes([5; 32]),
         provider: ConfinedProviderV1::Disabled,
     };
     let contract = ReturnContractV1 {
@@ -49,11 +49,11 @@ pub fn contracts() -> Result<Vec<(&'static str, serde_json::Value)>, Box<dyn std
         boundary: EvidenceRef::new("fixture-boundary")?,
         request: RequestId::new("fixture-spawn")?,
         scope: m.scope.clone(),
-        parent_capability: CapabilityBodyDigest::from_bytes([7; 32]),
+        parent_capability: ConfinedCapabilityDigest::from_bytes([7; 32]),
         parent: parent.clone(),
         child: ProcessId::new("fixture-child")?,
         child_principal: PrincipalId::new("fixture-child-principal")?,
-        child_capability: CapabilityBodyDigest::from_bytes([8; 32]),
+        child_capability: ConfinedCapabilityDigest::from_bytes([8; 32]),
         ancestry: NonEmptyBoundedList::new(vec![m.scope.process_id.clone()])?,
         lineage: IsolationLineageId::new("fixture-confined-lineage")?,
         isolation_epoch: ProtectedText::new("fixture-host-epoch")?,

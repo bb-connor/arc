@@ -64,7 +64,7 @@ pub(super) fn prepare_raw_custody_write_liability<'source, 'database>(
         return Err(AdmissionOperationStoreError::Fenced);
     }
     stored.verify_decision_time(request.trusted_now_unix_ms)?;
-    let validation_time = schema::authority_validation_time(tx, request.trusted_now_unix_ms)?;
+    let validation_time = schema::authority_validation_time(tx, request.trusted_now_unix_ms, owner)?;
     if validation_time >= request.claim.expires_at_unix_ms {
         return Err(AdmissionOperationError::LeaseExpired.into());
     }

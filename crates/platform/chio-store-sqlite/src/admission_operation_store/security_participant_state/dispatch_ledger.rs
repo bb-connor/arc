@@ -17,6 +17,7 @@ pub(in crate::admission_operation_store) fn verify_semantic_dispatch_policy(
     tx: &Transaction<'_>,
     operation: &AdmissionOperationV1,
     now: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<(), AdmissionOperationStoreError> {
     if operation.native_dispatch_ledger_digest().is_none() {
         return Err(invalid("semantic dispatch lacks physical capture ledger"));
@@ -26,8 +27,8 @@ pub(in crate::admission_operation_store) fn verify_semantic_dispatch_policy(
         .ok_or_else(|| invalid("semantic dispatch lost native ledger"))?;
     let (_, policy) = policy::decode(&canonical_json_bytes(&record.policy).map_err(invalid)?)?;
     policy.validate_current(tx, now)?;
-    governed_approval_claim::verify_fresh_approval_tx(tx, operation, now)?;
-    dpop_claim::verify_fresh_dpop_tx(tx, operation, now)
+    governed_approval_claim::verify_fresh_approval_tx(tx, operation, now, owner)?;
+    dpop_claim::verify_fresh_dpop_tx(tx, operation, now, owner)
 }
 mod record;
 mod return_binding;

@@ -253,6 +253,7 @@ fn error_class<E: 'static>(error: &E) -> &'static str {
             ProcessError::Json(_) => "process_json",
             ProcessError::Core(error) => core_error_class(error),
             ProcessError::Kernel(error) => kernel_error_class(error),
+            ProcessError::Preparation(_) => "process_preparation",
         };
     }
     "other_operation_error"
@@ -345,6 +346,22 @@ fn kernel_error_class(error: &KernelError) -> &'static str {
             chio_kernel::HotPathStage::ReceiptAppend => "hot_path_deadline_receipt_append",
         },
         KernelError::ReceiptWriterUnavailable(_) => "receipt_writer_unavailable",
+        KernelError::UntrustedInput(_) => "untrusted_input",
+        KernelError::RevocationSnapshotFuture => "revocation_snapshot_future",
+        KernelError::RevocationSnapshotStale => "revocation_snapshot_stale",
+        KernelError::GovernedApprovalLifetimeExceeded => "governed_approval_lifetime_exceeded",
+        KernelError::ResponseDispatchRejected(_) => "response_dispatch_rejected",
+        KernelError::ReceiptVerificationFailed(_) => "receipt_verification_failed",
+        KernelError::ReceiptAppendOutcomeUnknown { .. } => "receipt_append_outcome_unknown",
+        KernelError::DeliveryFailedAfterReceipt { .. } => "delivery_failed_after_receipt",
+        KernelError::AdmissionRecovery(_) => "admission_recovery",
+        KernelError::ExecutionNonce(_) => "execution_nonce",
+        KernelError::ExecutionNonceCapacity => "execution_nonce_capacity",
+        KernelError::CredentialReservationCleanup { .. } => "credential_reservation_cleanup",
+        KernelError::Clock(_) => "clock",
+        KernelError::FinancialBudgetExceeded { .. } => "financial_budget_exceeded",
+        KernelError::ApprovalReplay(_) => "approval_replay",
+        KernelError::Dpop(_) => "dpop",
     }
 }
 
@@ -403,6 +420,10 @@ fn receipt_error_class(error: &chio_kernel::ReceiptStoreError) -> &'static str {
             "receipt_store_retention_tenant_scope_unsupported"
         }
         ReceiptStoreError::WriterDead { .. } => "receipt_store_writer_dead",
+        ReceiptStoreError::Clock(_) => "receipt_store_clock",
+        ReceiptStoreError::UntrustedInput(_) => "receipt_store_untrusted_input",
+        ReceiptStoreError::ReadAuthorization(_) => "receipt_store_read_authorization",
+        ReceiptStoreError::QuerySnapshot(_) => "receipt_store_query_snapshot",
     }
 }
 
@@ -414,6 +435,7 @@ fn revocation_error_class(error: &chio_kernel::RevocationStoreError) -> &'static
         RevocationStoreError::Sync(_) => "revocation_store_sync",
         RevocationStoreError::OutcomeUnknown(_) => "revocation_store_outcome_unknown",
         RevocationStoreError::Fenced { .. } => "revocation_store_fenced",
+        RevocationStoreError::Clock(_) => "revocation_store_clock",
     }
 }
 
@@ -426,6 +448,7 @@ fn budget_error_class(error: &chio_kernel::BudgetStoreError) -> &'static str {
         BudgetStoreError::Fenced { .. } => "budget_store_fenced",
         BudgetStoreError::Invariant(_) => "budget_store_invariant",
         BudgetStoreError::OutcomeUnknown(_) => "budget_store_outcome_unknown",
+        BudgetStoreError::Clock(_) => "budget_store_clock",
     }
 }
 
@@ -452,6 +475,8 @@ fn session_error_class(error: &chio_kernel::SessionError) -> &'static str {
         SessionError::ParentRequestAnchorMismatch { .. } => {
             "session_parent_request_anchor_mismatch"
         }
+        SessionError::Clock(_) => "session_clock",
+        SessionError::AuthEpochExhausted { .. } => "session_auth_epoch_exhausted",
     }
 }
 
@@ -475,6 +500,7 @@ fn core_error_class(error: &chio_core_types::Error) -> &'static str {
         Error::MerkleProofFailed => "core_merkle_proof_failed",
         Error::EmptyTree => "core_empty_tree",
         Error::InvalidProofIndex { .. } => "core_invalid_proof_index",
+        Error::UntrustedInput(_) => "core_untrusted_input",
     }
 }
 

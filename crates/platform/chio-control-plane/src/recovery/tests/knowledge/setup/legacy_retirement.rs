@@ -294,15 +294,12 @@ fn setup_genuine_legacy_completion_retires_without_renewing_old_process_credenti
     let validation_ms = validation_secs
         .checked_mul(1_000)
         .ok_or("validation clock overflow")?;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        validation_secs,
-        std::iter::empty::<String>(),
-    );
+    let _clock = chio_test_support::clock::scope_unix_secs(validation_secs);
     assert!(original.capability.is_expired_at(validation_secs));
     let old_process_bytes = std::fs::read(path.join("process.db"))?;
     let old_credential_bytes = std::fs::read(path.join("fixture.json"))?;
     let authority =
-        SqliteAuthorityStore::open_serving(path.join("admission.db"), path.join("locks")).map_err(
+        SqliteAuthorityStore::open_serving_with_clock(path.join("admission.db"), path.join("locks"), chio_test_support::clock::clock()).map_err(
             |error| format!("legacy retirement phase=current native serving open: {error}"),
         )?;
     let store = authority.admission_operation_store();

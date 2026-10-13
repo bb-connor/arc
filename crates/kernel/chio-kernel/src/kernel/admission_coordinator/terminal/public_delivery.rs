@@ -30,7 +30,7 @@ impl ChioKernel {
                 &admission.operation,
                 request,
                 &runtime.fence,
-                runtime.refresh_trusted_time(current_unix_timestamp_ms()),
+                runtime.refresh_trusted_time(0)?,
             )
             .map_err(durable_store_error)?;
         if disposition == Some(chio_security_types::semantic::SemanticOutputDispositionV1::Withhold)

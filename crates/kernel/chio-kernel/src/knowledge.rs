@@ -18,8 +18,15 @@ pub use confined_delivery::VerifiedConfinedReturnDelivery;
 pub struct DurableKnowledgeEnforcement {
     pub(crate) store: std::sync::Arc<dyn crate::admission_operation::AdmissionOperationStore>,
     pub(crate) fence: crate::admission_operation::StoreMutationFence,
+    pub(crate) clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
 }
 impl DurableKnowledgeEnforcement {
+    fn authority_now(&self) -> Result<u64, crate::KernelError> {
+        self.clock
+            .unix_millis()
+            .map(|now| now.get())
+            .map_err(|_| crate::KernelError::DurableAdmission("authority clock unavailable".into()))
+    }
     /// A fresh native verifier call grants no public candidate, evidence or
     /// process write permit. Implementations without it refuse by default.
     pub fn verify_confined_return_candidate(
@@ -32,7 +39,7 @@ impl DurableKnowledgeEnforcement {
             .verify_confined_return_candidate(
                 input,
                 &self.fence,
-                crate::kernel::current_unix_timestamp_ms(),
+                self.authority_now()?,
             )
             .map_err(|_| {
                 crate::KernelError::DurableAdmission("confined candidate unavailable".into())
@@ -66,7 +73,7 @@ impl DurableKnowledgeEnforcement {
             .verify_confined_process_attachment(
                 input,
                 &self.fence,
-                crate::kernel::current_unix_timestamp_ms(),
+                self.authority_now()?,
             )
             .map_err(|_| {
                 crate::KernelError::DurableAdmission("confined attachment unavailable".into())
@@ -86,7 +93,7 @@ impl DurableKnowledgeEnforcement {
                 process,
                 lineage,
                 &self.fence,
-                crate::kernel::current_unix_timestamp_ms(),
+                self.authority_now()?,
             )
             .map_err(|_| {
                 crate::KernelError::DurableAdmission("confined context unavailable".into())
@@ -97,7 +104,7 @@ impl DurableKnowledgeEnforcement {
             .durable_knowledge_enforced(
                 runtime,
                 &self.fence,
-                crate::kernel::current_unix_timestamp_ms(),
+                self.authority_now()?,
             )
             .map_err(|_| {
                 crate::KernelError::DurableAdmission("durable knowledge unavailable".into())

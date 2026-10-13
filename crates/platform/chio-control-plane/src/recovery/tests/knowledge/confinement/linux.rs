@@ -680,7 +680,7 @@ fn linux_original_return_acknowledgement_survives_expiry_without_launch_authorit
     sink.deliver(&admission.admitted, b"true")?;
     let after_expiry =
         (f.profile.contract.expires_at_unix_ms.get() / 1000).max(capability.expires_at) + 1;
-    let _clock = chio_kernel::scope_fixed_runtime_clock_for_current_thread(after_expiry);
+    let _clock = chio_test_support::clock::scope_unix_secs(after_expiry);
     store.acknowledge_confined_return(
         &actor,
         &request,
@@ -760,7 +760,7 @@ fn linux_post_delivery_fault_preserves_possible_delivery_before_acknowledgement(
     let mut foreign = fence.clone();
     foreign.store_uuid = uuid::Uuid::new_v4().to_string();
     let error = error
-        .reconcile(&store, &foreign)
+        .reconcile(&f.knowledge.f.kernel, &store, &foreign)
         .err()
         .ok_or("foreign serving fence accepted pending outcome")?;
     assert!(error
@@ -785,7 +785,7 @@ fn linux_post_delivery_fault_preserves_possible_delivery_before_acknowledgement(
         .f
         .kernel
         .revoke_capability(&f.knowledge.f.control.id)?;
-    let acknowledged = error.reconcile(&store, &fence)?;
+    let acknowledged = error.reconcile(&f.knowledge.f.kernel, &store, &fence)?;
     assert_eq!(
         acknowledged.admitted.state,
         ArtifactDeliveryStateV1::Delivered

@@ -7,9 +7,9 @@ async fn captured_at_native_ceiling() -> TestResult<(tempfile::TempDir, Recovery
     let original = retained_workflow(directory.path())?;
     let native_before = native_original_bytes(directory.path(), &original)?;
     let return_before = captured_return_bytes(directory.path(), &original)?;
-    let authority = SqliteAuthorityStore::open_serving(
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
         directory.path().join("admission.db"),
-        directory.path().join("locks"),
+        directory.path().join("locks"), chio_test_support::clock::clock(),
     )?;
     authority
         .admission_operation_store()

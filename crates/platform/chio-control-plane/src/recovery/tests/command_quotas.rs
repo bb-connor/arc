@@ -82,10 +82,9 @@ impl QuotaTestDiagnostics {
             .as_ref()
             .and_then(|refusal| refusal.clock_regression)
             .map(
-                |(observed, high_water, recovery_high_water, fixed_runtime)| {
+                |(observed, high_water, recovery_high_water)| {
                     serde_json::json!({
                         "observed_unix_ms": observed,
-                        "fixed_runtime_unix_s_at_refusal": fixed_runtime,
                         "trusted_high_water_unix_ms": high_water,
                         "max_recovery_observed_unix_ms": recovery_high_water,
                     })
@@ -98,7 +97,6 @@ impl QuotaTestDiagnostics {
                 "elapsed_ms": self.started.elapsed().as_millis(),
                 "error": self.observer.error_text(error),
                 "wall_sampled_after_refusal_unix_ms": wall,
-                "fixed_runtime_unix_s": chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
                 "durable_snapshot_after_refusal": durable,
                 "original_typed_store_refusal": refusal.as_ref().and_then(|refusal| refusal.command_refusal.as_ref()),
                 "original_issuance_store_refusal": refusal.as_ref().and_then(|refusal| refusal.issuance_refusal.as_ref()),
@@ -115,7 +113,7 @@ pub(super) fn require_live_quota_capability(
     label: &str,
     capability: &CapabilityToken,
 ) -> TestResult {
-    let current = match chio_kernel::fixed_runtime_unix_secs_for_current_thread() {
+    let current = match chio_test_support::clock::scoped_unix_secs() {
         Some(fixed) => fixed,
         None => now_ms()? / 1000,
     };

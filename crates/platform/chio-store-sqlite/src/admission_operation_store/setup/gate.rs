@@ -21,9 +21,10 @@ pub(in crate::admission_operation_store) fn require_ready(
 pub(in crate::admission_operation_store) fn require_command(
     tx: &Transaction<'_>,
     actor: &AuthenticatedRecoveryActor,
-    fence: &StoreMutationFence,
+    owner: &SqliteServingOwner,
     command: &RecoveryCommandV1,
 ) -> Result<(), AdmissionOperationStoreError> {
+    let fence = &owner.fence;
     let scope = actor.scope();
     let body = &command.command;
     if matches!(
@@ -58,7 +59,7 @@ pub(in crate::admission_operation_store) fn require_command(
         return Ok(());
     }
     current(tx, &value)?;
-    pending_window(&value, fence, schema::observe_authority_time(tx)?)?;
+    pending_window(&value, fence, schema::observe_authority_time(tx, owner)?)?;
     let id = match body {
         RecoveryCommandBodyV1::CreateWorkflow {
             creation_key,
@@ -78,7 +79,7 @@ pub(in crate::admission_operation_store) fn require_command(
                 tx,
                 &seed,
                 &recovery,
-                schema::observe_authority_time(tx)?,
+                schema::observe_authority_time(tx, owner)?,
             )
             .map_err(original_custody_error)?;
             if CanonicalPayloadDigest::from_bytes(digest(

@@ -278,7 +278,7 @@ fn compensated_native_denial_timestamp_uses_confirmed_projection_time() -> TestR
         before: std::sync::atomic::AtomicU64,
         after: std::sync::atomic::AtomicU64,
     }
-    impl chio_security_kernel::SecurityClock for PausedClock {
+    impl PausedClock {
         fn now_unix_ms(&self) -> chio_security_types::ports::PortResult<u64> {
             if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
                 self.before.store(now_ms()?, Ordering::SeqCst);
@@ -288,6 +288,21 @@ fn compensated_native_denial_timestamp_uses_confirmed_projection_time() -> TestR
                 self.after.store(now_ms()?, Ordering::SeqCst);
             }
             now_ms()
+        }
+    }
+    impl chio_security_types::clock::Clock for PausedClock {
+        fn read(
+            &self,
+        ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+        {
+            let unix_millis = self
+                .now_unix_ms()
+                .map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+            let monotonic = chio_security_types::clock::SystemClock.read()?.monotonic();
+            Ok(chio_security_types::clock::ClockReading::new(
+                chio_security_types::clock::UnixMillis::new(unix_millis),
+                monotonic,
+            ))
         }
     }
     let (mut fixture, issuer) = profile(false, 300)?;

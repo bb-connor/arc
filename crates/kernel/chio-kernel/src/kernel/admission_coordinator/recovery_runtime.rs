@@ -50,7 +50,7 @@ impl ChioKernel {
         {
             return Ok(None);
         }
-        let now = runtime.refresh_trusted_time(0);
+        let now = runtime.refresh_trusted_time(0)?;
         self.load_durable_nonce_issuance(&operation, now)?
             .map(|issuance| {
                 if !self.durable_nonce_issuance_is_live(&operation, now)? {
@@ -184,7 +184,7 @@ impl ChioKernel {
         }
         let custody = self.load_recovery_request_custody(actor, workflow)?;
         let retained_request = self
-            .load_original_request_for_finalization(&operation, runtime.refresh_trusted_time(0))?
+            .load_original_request_for_finalization(&operation, runtime.refresh_trusted_time(0)?)?
             .ok_or_else(unsupported)?;
         let admission = DurableToolAdmission {
             operation,
@@ -256,7 +256,7 @@ impl ChioKernel {
         else {
             return Ok(());
         };
-        let now = runtime.refresh_trusted_time(0);
+        let now = runtime.refresh_trusted_time(0)?;
         if self.quarantine_unavailable_recovery(&operation, now)? {
             return Ok(());
         }
@@ -343,7 +343,7 @@ impl ChioKernel {
     ) -> Result<(&dyn RecoveryAuthorityPort, &DurableAdmissionRuntime, u64), KernelError> {
         let runtime = self.durable_runtime()?;
         let port = runtime.store.recovery_authority().ok_or_else(unsupported)?;
-        Ok((port, runtime, runtime.refresh_trusted_time(0)))
+        Ok((port, runtime, runtime.refresh_trusted_time(0)?))
     }
     pub fn recovery_deployment(
         &self,
@@ -706,7 +706,7 @@ impl ChioKernel {
         port.captured_deployment(
             operation.binding().operation_id(),
             &runtime.fence,
-            runtime.refresh_trusted_time(0),
+            runtime.refresh_trusted_time(0)?,
         )
         .map_err(durable_store_error)
     }
@@ -956,7 +956,7 @@ impl ChioKernel {
         let Some(port) = runtime.store.recovery_authority() else {
             return Ok(None);
         };
-        port.verification_context(operation, &runtime.fence, runtime.refresh_trusted_time(0))
+        port.verification_context(operation, &runtime.fence, runtime.refresh_trusted_time(0)?)
             .map_err(durable_store_error)
     }
 }
@@ -969,6 +969,7 @@ impl ChioKernel {
         Ok(crate::knowledge::DurableKnowledgeEnforcement {
             store: runtime.store.clone(),
             fence: runtime.fence.clone(),
+            clock: self.authority_clock(),
         })
     }
     pub fn durable_knowledge_enforced(&self, runtime_id: &str) -> Result<bool, crate::KernelError> {

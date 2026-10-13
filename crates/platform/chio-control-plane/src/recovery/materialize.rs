@@ -15,19 +15,12 @@ fn hash<T: serde::Serialize>(
 ) -> Result<[u8; 32], RecoveryRuntimeError> {
     recovery_digest(domain, value).map_err(|_| RecoveryRuntimeError::InvalidCommand)
 }
-pub(super) fn now() -> Result<u64, RecoveryRuntimeError> {
-    if let Some(seconds) = chio_kernel::fixed_runtime_unix_secs_for_current_thread() {
-        return seconds
-            .checked_mul(1000)
-            .ok_or(RecoveryRuntimeError::Unavailable);
-    }
-    u64::try_from(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|_| RecoveryRuntimeError::Unavailable)?
-            .as_millis(),
-    )
-    .map_err(|_| RecoveryRuntimeError::Unavailable)
+pub(super) fn now(kernel: &chio_kernel::ChioKernel) -> Result<u64, RecoveryRuntimeError> {
+    kernel
+        .authority_clock()
+        .unix_millis()
+        .map(|now| now.get())
+        .map_err(|_| RecoveryRuntimeError::Unavailable)
 }
 pub(super) fn operation_key(id: &ContinuationId) -> String {
     format!("recovery:{}", id.as_str())
@@ -113,7 +106,7 @@ impl RecoveryRuntime {
             .recovery_review_projection()
             .canonical_semantics()
             .map_err(|_| RecoveryRuntimeError::InvalidCommand)?;
-        let ceiling = now()?
+        let ceiling = now(&self.kernel)?
             .checked_add(MAX_RECOVERY_REVIEW_MS)
             .ok_or(RecoveryRuntimeError::Unavailable)?
             .min(
@@ -339,7 +332,7 @@ impl RecoveryRuntime {
             purpose: action.authorization_requirements.purpose.clone(),
             obligations: action.authorization_requirements.obligations.clone(),
             reviewer: actor.principal().clone(),
-            issued_at_unix_ms: SafeInteger::new(now()?)
+            issued_at_unix_ms: SafeInteger::new(now(&self.kernel)?)
                 .map_err(|_| RecoveryRuntimeError::InvalidCommand)?,
             expires_at_unix_ms: action.authorization_requirements.validity_ceiling_unix_ms,
         };
@@ -415,11 +408,11 @@ impl RecoveryRuntime {
                     action.basis,
                     &approval.coverage,
                     &assignments,
-                    now()?,
+                    now(&self.kernel)?,
                 )
                 .map_err(|_| RecoveryRuntimeError::AuthorityDenied)?;
                 let context = profile.security_context.as_v1();
-                let issued = now()? / 1000;
+                let issued = now(&self.kernel)? / 1000;
                 let mut expires = issued
                     .checked_add(MAX_RECOVERY_GRANT_SECONDS)
                     .ok_or(RecoveryRuntimeError::InvalidCommand)?

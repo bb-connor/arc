@@ -42,7 +42,7 @@ fn open_captured_kernel_only(
     assert!(path.join("legacy-near-capacity").exists());
     assert!(path.join("current-recovery-receipt-signer").exists());
     let authority =
-        SqliteAuthorityStore::open_serving(path.join("admission.db"), path.join("locks"))?;
+        SqliteAuthorityStore::open_serving_with_clock(path.join("admission.db"), path.join("locks"), chio_test_support::clock::clock())?;
     let current_key = Keypair::from_seed(&[207; 32]);
     let (mut kernel, effects) = open_kernel(path, &authority, &current_key)?;
     kernel.register_tool_server(Box::new(PersistentEffectServer::new(

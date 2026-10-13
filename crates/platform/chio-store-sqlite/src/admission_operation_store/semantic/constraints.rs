@@ -18,7 +18,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let profile = protected::deployment_tx(&tx, actor.scope())?;
         super::super::recovery_runtime::verify_actor(&tx, actor, &profile, now)?;
         let id = AdmissionOperationId::from_persisted(operation.as_str()).map_err(refused)?;
@@ -86,7 +86,7 @@ impl SqliteAdmissionOperationStore {
         if canonical_json_bytes(&constraints).map_err(refused)?.len() > MAX_RECOVERY_WIRE_BYTES {
             return Err(refused("semantic constraint response bound"));
         }
-        let later = schema::authority_validation_time(&tx, now)?;
+        let later = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         super::super::recovery_runtime::verify_actor(&tx, actor, &profile, later)?;
         tx.commit().map_err(sqlite_error)?;
         Ok(constraints)

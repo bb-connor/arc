@@ -503,7 +503,7 @@ impl AcquiredNativeSecurityEgress<'_> {
         let lease = prepared
             .kernel
             .claim_admission_recovery(&prepared.operation, now)?;
-        let now = runtime.refresh_trusted_time(now);
+        let now = runtime.refresh_trusted_time(now)?;
         require_deadline(self.history.acquisition.fence.expires_at_unix_ms, now)?;
         Ok((lease, now))
     }
@@ -517,7 +517,7 @@ impl AcquiredNativeSecurityEgress<'_> {
         let prepared = &self.prepared;
         let runtime = prepared.kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
-        let current = runtime.refresh_trusted_time(now);
+        let current = runtime.refresh_trusted_time(now)?;
         require_deadline(self.history.acquisition.fence.expires_at_unix_ms, current)?;
         // The physical transaction rechecks this original lease, observation,
         // signed grant and deadline. Preparation never renews those bindings.
@@ -528,7 +528,7 @@ impl AcquiredNativeSecurityEgress<'_> {
         };
         #[cfg(feature = "admission-test-support")]
         commit_observer::observe(&runtime.fence.store_uuid, now)?;
-        let submitted_at = runtime.refresh_trusted_time(current);
+        let submitted_at = runtime.refresh_trusted_time(current)?;
         require_deadline(command.fence.expires_at_unix_ms, submitted_at)?;
         let input = prepared.command_context(lease, submitted_at);
         let acknowledged = store_call(|| match consumption {
@@ -541,7 +541,7 @@ impl AcquiredNativeSecurityEgress<'_> {
                 .store
                 .commit_native_security_egress(&input, &command),
         });
-        let completed_at = runtime.refresh_trusted_time(submitted_at);
+        let completed_at = runtime.refresh_trusted_time(submitted_at)?;
         let history = prepared.read_history(runtime, completed_at);
         let committed = acknowledged?;
         let history = history?;

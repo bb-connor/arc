@@ -163,10 +163,10 @@ impl SqliteAdmissionOperationStore {
         let tx = self.begin_write(&mut connection, Some(lease.store_fence()))?;
         // A first commitment constructs its event in this writer. Preparation
         // is a lower bound, never a renewal of its original expiring authority.
-        let decision_at = if matches!(command, NativeEgressCommand::Acquire(_)) {
+        let decision_at = if !matches!(command, NativeEgressCommand::Commit(_)) {
             decision_at
         } else {
-            physical_commit_time(&tx, decision_at)?
+            physical_commit_time(&tx, decision_at, &self.serving_owner)?
         };
         super::super::observed_time(&tx, decision_at, &self.serving_owner)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
@@ -255,10 +255,10 @@ impl SqliteAdmissionOperationStore {
         let (mut current_rows, mut current_bytes) =
             super::super::history::ordered::latest_totals(&tx, &actual)?;
         let before = footprint(&tx)?;
-        let (command, decision_at) = if matches!(command, NativeEgressCommand::Acquire(_)) {
+        let (command, decision_at) = if !matches!(command, NativeEgressCommand::Commit(_)) {
             (command, decision_at)
         } else {
-            let event_at = physical_commit_time(&tx, decision_at)?;
+            let event_at = physical_commit_time(&tx, decision_at, &self.serving_owner)?;
             (command.at_event_time(event_at).map_err(invalid)?, event_at)
         };
         let observed_at = super::super::observed_time(&tx, decision_at, &self.serving_owner)?;
@@ -406,12 +406,13 @@ impl SqliteAdmissionOperationStore {
 fn physical_commit_time(
     tx: &Transaction<'_>,
     prepared_at: u64,
+    owner: &SqliteServingOwner,
 ) -> Result<u64, AdmissionOperationStoreError> {
-    let observed = super::super::super::schema::observe_authority_time(tx)?;
+    let observed = super::super::super::schema::observe_authority_time(tx, owner)?;
     if prepared_at > observed {
         // Preserve the existing future-clock bound. Only time spent waiting
         // before a new physical event is excluded from evidence skew.
-        super::super::super::schema::authority_validation_time(tx, prepared_at)?;
+        super::super::super::schema::authority_validation_time(tx, prepared_at, owner)?;
     }
     Ok(observed.max(prepared_at))
 }

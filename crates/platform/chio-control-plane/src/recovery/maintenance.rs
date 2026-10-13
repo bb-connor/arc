@@ -38,7 +38,7 @@ impl RecoveryMaintenanceRuntime {
         fence: StoreMutationFence,
     ) -> Result<Self, RecoveryRuntimeError> {
         let profile = store
-            .deployment(runtime.scope(), &fence, now()?)
+            .deployment(runtime.scope(), &fence, now(&runtime.kernel)?)
             .map_err(store_error)?;
         let selected = runtime
             .kernel
@@ -95,7 +95,7 @@ impl RecoveryMaintenanceRuntime {
                 command,
                 report,
                 &self.fence,
-                now()?,
+                now(&self.runtime.kernel)?,
             )
             .map_err(command_error)
     }
@@ -107,7 +107,7 @@ impl RecoveryMaintenanceRuntime {
         let actor = self.actor(capability, RecoveryPermission::Inspect)?;
         let reader = self.optional_reader(capability)?;
         self.store
-            .read_decision_report(&actor, reader.as_ref(), id, &self.fence, now()?)
+            .read_decision_report(&actor, reader.as_ref(), id, &self.fence, now(&self.runtime.kernel)?)
             .map_err(store_error)
     }
     pub fn propose(
@@ -121,7 +121,7 @@ impl RecoveryMaintenanceRuntime {
         let actor = self.actor(capability, RecoveryPermission::Maintain)?;
         let reader = self.actor(capability, RecoveryPermission::KnowledgeRead)?;
         self.store
-            .propose_policy_maintenance(&actor, &reader, proposal, &self.fence, now()?)
+            .propose_policy_maintenance(&actor, &reader, proposal, &self.fence, now(&self.runtime.kernel)?)
             .map_err(command_error)
     }
     pub fn policy_basis(
@@ -130,7 +130,7 @@ impl RecoveryMaintenanceRuntime {
     ) -> Result<NativeSemanticPolicyBasisV1, RecoveryRuntimeError> {
         let actor = self.actor(capability, RecoveryPermission::Maintain)?;
         self.store
-            .read_semantic_policy_basis(&actor, &self.fence, now()?)
+            .read_semantic_policy_basis(&actor, &self.fence, now(&self.runtime.kernel)?)
             .map_err(store_error)
     }
 }
@@ -145,11 +145,6 @@ fn command_error(error: RecoveryCommandPortError) -> RecoveryRuntimeError {
 fn store_error(error: AdmissionOperationStoreError) -> RecoveryRuntimeError {
     super::native_store_errors::store_error(error)
 }
-fn now() -> Result<u64, RecoveryRuntimeError> {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|_| RecoveryRuntimeError::Unavailable)?
-        .as_millis()
-        .try_into()
-        .map_err(|_| RecoveryRuntimeError::Unavailable)
+fn now(kernel: &chio_kernel::ChioKernel) -> Result<u64, RecoveryRuntimeError> {
+    super::materialize::now(kernel)
 }

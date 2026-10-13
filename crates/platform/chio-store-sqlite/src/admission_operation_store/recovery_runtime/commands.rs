@@ -178,7 +178,7 @@ pub(super) fn inspect_or_replay(
             selector(body)?.0,
         )?),
     };
-    super::super::setup::require_command(tx, actor, &owner.fence, command)?;
+    super::super::setup::require_command(tx, actor, owner, command)?;
     if let RecoveryCommandBodyV1::InspectWorkflow { workflow_id } = &command.command {
         let current = workflow_preview_tx(tx, actor, deployment, workflow_id)?;
         return Ok(Some(response(

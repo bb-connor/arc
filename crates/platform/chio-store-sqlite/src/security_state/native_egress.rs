@@ -83,34 +83,9 @@ impl NativeEgressCommand {
         let commitment = match &mut command {
             Self::Acquire(_) => return Err(PortError::invalid_data()),
             Self::Commit(commitment) => commitment,
-            Self::CommitDeclassified {
-                commitment,
-                consumption,
-                ..
-            } => {
-                if consumption.consumption.consumed_at_unix_ms != commitment.committed_at_unix_ms {
-                    return Err(PortError::invalid_data());
-                }
-                let body = decode_declassification_receipt(&consumption.receipt)
-                    .map_err(|()| PortError::invalid_data())?;
-                let ActiveDefenseReceiptBody::DeclassificationConsumption(mut body) = body else {
-                    return Err(PortError::invalid_data());
-                };
-                body.header.occurred_at_unix_ms = now;
-                let body = ActiveDefenseReceiptBody::DeclassificationConsumption(body);
-                body.validate().map_err(|_| PortError::invalid_data())?;
-                consumption.consumption.consumed_at_unix_ms = now;
-                consumption.receipt.occurred_at_unix_ms = now;
-                consumption.receipt.canonical_body = CanonicalBody::new(
-                    canonical_json_bytes(&body).map_err(|_| PortError::invalid_data())?,
-                )
-                .map_err(|_| PortError::invalid_data())?;
-                consumption.receipt.body_hash =
-                    body.body_digest().map_err(|_| PortError::invalid_data())?;
-                consumption.receipt.evidence_id =
-                    body.evidence_id().map_err(|_| PortError::invalid_data())?;
-                commitment
-            }
+            // A declassified commitment keeps the consumption time its
+            // custody preparation sampled; the store never restamps it.
+            Self::CommitDeclassified { .. } => return Err(PortError::invalid_data()),
         };
         if now < commitment.committed_at_unix_ms {
             return Err(PortError::invalid_data());
@@ -128,10 +103,8 @@ impl NativeEgressCommand {
             return Ok(true);
         }
         let now = match self {
-            Self::Acquire(_) => return Ok(false),
-            Self::Commit(commitment) | Self::CommitDeclassified { commitment, .. } => {
-                commitment.committed_at_unix_ms
-            }
+            Self::Acquire(_) | Self::CommitDeclassified { .. } => return Ok(false),
+            Self::Commit(commitment) => commitment.committed_at_unix_ms,
         };
         Ok(prepared.at_event_time(now)? == *self)
     }

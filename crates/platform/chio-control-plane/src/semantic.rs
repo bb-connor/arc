@@ -56,7 +56,7 @@ impl NativeSemanticRuntime {
             RecoveryPermission::Select,
         )?;
         self.store
-            .accept_semantic_plan(&actor, plan, &self.fence, now()?)
+            .accept_semantic_plan(&actor, plan, &self.fence, now(&self.kernel)?)
             .map_err(|_| refused())
     }
     /// Historical matched rules are advisory data. Their use still requires
@@ -72,7 +72,7 @@ impl NativeSemanticRuntime {
             RecoveryPermission::Maintain,
         )?;
         self.store
-            .read_semantic_constraints(&actor, operation, &self.fence, now()?)
+            .read_semantic_constraints(&actor, operation, &self.fence, now(&self.kernel)?)
             .map_err(|_| refused())
     }
     /// Build only the unsigned exact action. Endorsements and prerequisite
@@ -115,7 +115,7 @@ impl NativeSemanticRuntime {
         action.payload = semantic_content_digest(payload).map_err(|_| refused())?;
         let observed = self
             .store
-            .observe_knowledge_influence(&self.scope, &self.fence, now()?)
+            .observe_knowledge_influence(&self.scope, &self.fence, now(&self.kernel)?)
             .map_err(|_| refused())?;
         let influence = chio_semantic_contracts::semantic_observed_influence(
             action.influence,
@@ -141,7 +141,7 @@ impl NativeSemanticRuntime {
     ) -> Result<chio_security_types::InformationLabel, KernelError> {
         let installed = self
             .store
-            .read_semantic_installation(&self.scope, &self.fence, now()?)
+            .read_semantic_installation(&self.scope, &self.fence, now(&self.kernel)?)
             .map_err(|_| refused())?;
         let registry = chio_semantic_contracts::compile_semantic_registry(
             &installed.deployment,
@@ -213,11 +213,10 @@ impl NativeSemanticRuntime {
             .map_err(|_| refused())
     }
 }
-fn now() -> Result<u64, KernelError> {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|_| refused())?
-        .as_millis()
-        .try_into()
+fn now(kernel: &ChioKernel) -> Result<u64, KernelError> {
+    kernel
+        .authority_clock()
+        .unix_millis()
+        .map(|now| now.get())
         .map_err(|_| refused())
 }

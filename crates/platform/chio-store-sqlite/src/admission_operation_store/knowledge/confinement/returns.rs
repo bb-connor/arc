@@ -476,7 +476,7 @@ impl SqliteAdmissionOperationStore {
                 disclosure: disclosure_id,
                 endorsement: endorsement_id,
             };
-            let later = schema::authority_validation_time(&tx, now)?;
+            let later = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
             for signed in disclosure
                 .map(|s| s.body())
                 .into_iter()
@@ -507,7 +507,7 @@ impl SqliteAdmissionOperationStore {
         }
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         if actor.scope().authority_domain.as_str() != fence.store_uuid {
             return Err(refused("return acknowledgement authority"));
         }

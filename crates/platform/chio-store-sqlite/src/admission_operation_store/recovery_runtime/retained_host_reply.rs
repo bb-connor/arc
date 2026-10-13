@@ -269,7 +269,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let profile = deployment_tx(&tx, actor.scope())?;
         verify_actor(&tx, actor, &profile, now)?;
         let record: Box<RecoveryWorkflowRecordV1> = Box::new(

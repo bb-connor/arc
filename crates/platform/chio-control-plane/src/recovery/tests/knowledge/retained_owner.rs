@@ -240,7 +240,7 @@ fn artifacts_fresh_admin_can_collect_expired_owner_without_renewing_execution() 
     let expiry = f.f.seed.capability.expires_at;
     assert!(f.f.control.expires_at > expiry + 1);
     assert!(reader.expires_at > expiry + 1);
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expiry + 1, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(expiry + 1);
     assert!(f
         .f
         .kernel

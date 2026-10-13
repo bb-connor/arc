@@ -504,7 +504,7 @@ fn persist_record(
         return Err(invariant("recovery history exhausted"));
     }
     let digest = record_digest(key, scope, kind, version, payload, namespace, request)?;
-    let observed = super::super::schema::observe_authority_time(tx)?;
+    let observed = super::super::schema::observe_authority_time(tx, owner)?;
     let event = event_digest(sequence, key, version, &digest, &previous, observed)?;
     tx.execute("INSERT INTO main.admission_operation_recovery_events(sequence,record_key,record_version,record_digest,previous_digest,event_digest,observed_at) VALUES (?1,?2,?3,?4,?5,?6,?7)",params![i64::try_from(sequence).map_err(|_|invariant("recovery sequence exhausted"))?,key,i64::try_from(version).map_err(|_|invariant("recovery version exhausted"))?,digest,previous,event,i64::try_from(observed).map_err(|_|invariant("recovery time exhausted"))?]).map_err(sqlite_error)?;
     owner

@@ -96,7 +96,7 @@ impl RecoverySetupService {
                     process: &host.runtime.process,
                 },
                 &host.fence,
-                now()?,
+                now(&host.runtime.kernel)?,
             )
             .map_err(super::native_store_errors::store_error)?;
         let service = Self::new(
@@ -124,7 +124,7 @@ impl RecoverySetupService {
     ) -> Result<Self, RecoveryRuntimeError> {
         let knowledge = knowledge.ok_or(RecoveryRuntimeError::UncoveredMediation)?;
         let profile = store
-            .deployment(runtime.scope(), &fence, now()?)
+            .deployment(runtime.scope(), &fence, now(&runtime.kernel)?)
             .map_err(super::native_store_errors::store_error)?;
         let selected = runtime
             .kernel
@@ -145,7 +145,7 @@ impl RecoverySetupService {
                 &runtime.kernel.receipt_signing_public_key(),
                 &operator.public_key(),
                 &fence,
-                now()?,
+                now(&runtime.kernel)?,
             )
             .map_err(super::native_store_errors::store_error)?;
         if let Some(existing) = runtime.protected_mediator.get() {
@@ -173,7 +173,7 @@ impl RecoverySetupService {
     ) -> Result<AuthenticatedRecoveryActor, RecoveryRuntimeError> {
         let profile = self
             .store
-            .deployment(self.runtime.scope(), &self.fence, now()?)
+            .deployment(self.runtime.scope(), &self.fence, now(&self.runtime.kernel)?)
             .map_err(super::native_store_errors::store_error)?;
         self.knowledge
             .validate_setup_binding(self.runtime.scope(), &profile.native_authority)
@@ -221,7 +221,7 @@ impl RecoverySetupService {
         let actor = self.actor(capability)?;
         let preparation = self
             .store
-            .setup_preparation(&actor, &self.fence, now()?)
+            .setup_preparation(&actor, &self.fence, now(&self.runtime.kernel)?)
             .map_err(preparation_error)?;
         if let Some(probe) = preparation.signed_probe {
             return Ok(probe);
@@ -271,7 +271,7 @@ impl RecoverySetupService {
                     denied: &denied.receipt,
                 },
                 &self.fence,
-                now()?,
+                now(&self.runtime.kernel)?,
             )
             .map_err(super::native_store_errors::store_error)
     }
@@ -290,7 +290,7 @@ impl RecoverySetupService {
         let actor = self.actor(capability)?;
         let preparation = self
             .store
-            .setup_preparation(&actor, &self.fence, now()?)
+            .setup_preparation(&actor, &self.fence, now(&self.runtime.kernel)?)
             .map_err(preparation_error)?;
         if preparation.signed_probe.as_ref() != Some(probe) {
             return Err(RecoveryRuntimeError::AuthorityDenied);
@@ -306,7 +306,7 @@ impl RecoverySetupService {
             if report.body().current_serving_fence == current_fence {
                 return self
                     .store
-                    .accept_setup_report(&report, &self.fence, now()?)
+                    .accept_setup_report(&report, &self.fence, now(&self.runtime.kernel)?)
                     .map_err(super::native_store_errors::store_error);
             }
         }
@@ -318,11 +318,11 @@ impl RecoverySetupService {
             .receipt;
         let body = self
             .store
-            .prepare_setup_report(&actor, probe, &benign, &self.fence, now()?)
+            .prepare_setup_report(&actor, probe, &benign, &self.fence, now(&self.runtime.kernel)?)
             .map_err(super::native_store_errors::store_error)?;
         let signed = SignedRecoverySetupReportV1::sign(body, &self.operator).map_err(refused)?;
         self.store
-            .accept_setup_report(&signed, &self.fence, now()?)
+            .accept_setup_report(&signed, &self.fence, now(&self.runtime.kernel)?)
             .map_err(super::native_store_errors::store_error)
     }
 }
@@ -340,11 +340,6 @@ fn preparation_error(
 fn refused(_: impl core::fmt::Display) -> RecoveryRuntimeError {
     RecoveryRuntimeError::Unavailable
 }
-fn now() -> Result<u64, RecoveryRuntimeError> {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(refused)?
-        .as_millis()
-        .try_into()
-        .map_err(refused)
+fn now(kernel: &chio_kernel::ChioKernel) -> Result<u64, RecoveryRuntimeError> {
+    super::materialize::now(kernel)
 }

@@ -74,7 +74,7 @@ pub fn observe_recovery_quota_fixture_clock_work(
         connection: &tx,
         steps,
     };
-    let observed_at = super::super::schema::observe_authority_time(&tx);
+    let observed_at = super::super::schema::observe_authority_time(&tx, &store.serving_owner);
     let sampled_vm_steps = guard.steps.load(Ordering::Relaxed);
     drop(guard);
     tx.commit().map_err(sqlite_error)?;
@@ -619,7 +619,7 @@ pub fn retain_recovery_quota_fixture_legacy_inspections(
                     workflow_id: workflow.clone(),
                 },
             };
-            super::super::setup::require_command(tx, actor, &store.serving_owner.fence, &command)?;
+            super::super::setup::require_command(tx, actor, &store.serving_owner, &command)?;
             storage::save_legacy_inspection(tx, &store.serving_owner, actor, &record, &command_id)?;
         }
         restore_fixture_canonical_schema(tx)
@@ -773,7 +773,7 @@ pub struct RecoveryQuotaFixtureDiagnostic {
     pub command_refusal: Option<String>,
     pub issuance_refusal: Option<String>,
     pub native_capture_refusal: Option<String>,
-    pub clock_regression: Option<(u64, i64, i64, Option<u64>)>,
+    pub clock_regression: Option<(u64, i64, i64)>,
 }
 
 struct BoundedDiagnosticText {
@@ -893,12 +893,7 @@ pub(in crate::admission_operation_store) fn record_clock_regression(
     FIXTURE_DIAGNOSTIC.with(|slot| {
         if let Some(diagnostic) = slot.borrow_mut().as_mut() {
             diagnostic.clock_regression.get_or_insert_with(|| {
-                (
-                    observed,
-                    high_water,
-                    recovery_high_water,
-                    chio_kernel::fixed_runtime_unix_secs_for_current_thread(),
-                )
+                (observed, high_water, recovery_high_water)
             });
         }
     });
@@ -940,7 +935,6 @@ mod diagnostic_tests {
         let capture = AdmissionCaptureError::Invariant("x".repeat(4096));
         record_native_capture_refusal(&capture);
         record_native_capture_refusal(&AdmissionCaptureError::Fenced);
-        let fixed = chio_kernel::fixed_runtime_unix_secs_for_current_thread();
         record_clock_regression(10, 11, 12);
         record_clock_regression(20, 21, 22);
         let snapshot = observer
@@ -959,7 +953,7 @@ mod diagnostic_tests {
             snapshot.native_capture_refusal,
             Some(capture.to_string().chars().take(1024).collect())
         );
-        assert_eq!(snapshot.clock_regression, Some((10, 11, 12, fixed)));
+        assert_eq!(snapshot.clock_regression, Some((10, 11, 12)));
         observer.reset();
         let snapshot = observer
             .snapshot()

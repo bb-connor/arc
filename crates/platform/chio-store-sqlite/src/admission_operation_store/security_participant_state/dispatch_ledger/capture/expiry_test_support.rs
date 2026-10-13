@@ -236,7 +236,7 @@ pub(super) fn setup_clock_after_state_verification(
     setup_deadline: Option<u64>,
     sampled_at: u64,
     verify_other_deadlines: impl FnOnce(u64) -> Result<(), AdmissionOperationStoreError>,
-) -> Result<Option<chio_kernel::FixedRuntimeClockScope>, AdmissionOperationStoreError> {
+) -> Result<Option<chio_test_support::clock::ClockScope>, AdmissionOperationStoreError> {
     let installed: bool = tx
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_temp_schema
@@ -306,6 +306,6 @@ pub(super) fn setup_clock_after_state_verification(
         .write_all(format!("{sampled_at},{deadline},{expired_unix_ms}").as_bytes())
         .map_err(|_| invalid("setup final capture cutpoint observation incomplete"))?;
     Ok(Some(
-        chio_kernel::scope_fixed_runtime_clock_for_current_thread(expired_seconds),
+        chio_test_support::clock::scope_unix_secs(expired_seconds),
     ))
 }

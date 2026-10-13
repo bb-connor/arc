@@ -478,7 +478,7 @@ impl SqliteAdmissionOperationStore {
             return Err(refused("prerequisite root"));
         }
         producer_tx(&tx, &body.producer, &body.scope)?;
-        let now = schema::observe_authority_time(&tx)?;
+        let now = schema::observe_authority_time(&tx, &self.serving_owner)?;
         if body.issued_at_unix_ms.get() > now || now >= body.valid_until_unix_ms.get() {
             return Err(refused("prerequisite time"));
         }
@@ -528,7 +528,7 @@ impl SqliteAdmissionOperationStore {
             .checked_add(SafeInteger::new(1).map_err(refused)?)
             .map_err(refused)?;
         let revoked_at_unix_ms =
-            SafeInteger::new(schema::observe_authority_time(&tx)?).map_err(refused)?;
+            SafeInteger::new(schema::observe_authority_time(&tx, &self.serving_owner)?).map_err(refused)?;
         if previous
             .as_ref()
             .is_some_and(|state| state.revoked_at_unix_ms > revoked_at_unix_ms)
@@ -584,7 +584,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         super::super::recovery_runtime::require_intake_headroom(&connection)?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let profile = protected::deployment_tx(&tx, actor.scope())?;
         super::super::recovery_runtime::verify_actor(&tx, actor, &profile, now)?;
         let installed = installation(&tx, actor.scope())?;
@@ -697,7 +697,7 @@ impl SqliteAdmissionOperationStore {
         let is_revoked = load::<bool>(&tx, &format!("{key}:revoked"))?
             .ok_or_else(|| refused("prerequisite reinstatement disposition absent"))?;
         let current = load::<SignedSemanticPrerequisiteV1>(&tx, &key)?;
-        let later = schema::authority_validation_time(&tx, now)?;
+        let later = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         super::super::recovery_runtime::verify_actor(&tx, actor, &profile, later)?;
         if later >= body.valid_until_unix_ms.get() {
             return Err(refused("prerequisite reinstatement expired"));

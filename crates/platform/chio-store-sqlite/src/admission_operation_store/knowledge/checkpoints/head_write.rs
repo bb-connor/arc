@@ -9,6 +9,7 @@ const MAX_CHECKPOINT_HEAD_BYTES: usize = 4096;
 /// validation and immutable successor/latest writes in this transaction.
 pub(in crate::admission_operation_store) struct VerifiedCheckpointHeadWrite<'tx, 'conn> {
     transaction: &'tx Transaction<'conn>,
+    owner: &'tx SqliteServingOwner,
     actor: &'tx AuthenticatedRecoveryActor,
     profile: &'tx NativeKnowledgeInstallationV1,
     now: u64,
@@ -24,6 +25,7 @@ pub(in crate::admission_operation_store) struct VerifiedCheckpointHeadWrite<'tx,
 impl<'tx, 'conn> VerifiedCheckpointHeadWrite<'tx, 'conn> {
     pub(super) fn new(
         transaction: &'tx Transaction<'conn>,
+        owner: &'tx SqliteServingOwner,
         actor: &'tx AuthenticatedRecoveryActor,
         profile: &'tx NativeKnowledgeInstallationV1,
         now: u64,
@@ -57,6 +59,7 @@ impl<'tx, 'conn> VerifiedCheckpointHeadWrite<'tx, 'conn> {
         }
         let proof = Self {
             transaction,
+            owner,
             actor,
             profile,
             now,
@@ -79,7 +82,7 @@ impl<'tx, 'conn> VerifiedCheckpointHeadWrite<'tx, 'conn> {
         if !std::ptr::eq::<Connection>(Deref::deref(self.transaction), Deref::deref(transaction)) {
             return Err(refused("checkpoint head changed its physical writer"));
         }
-        let now = schema::authority_validation_time(transaction, self.now)?;
+        let now = schema::authority_validation_time(transaction, self.now, self.owner)?;
         let deployment = protected::deployment_tx(transaction, self.actor.scope())?;
         super::super::super::recovery_runtime::verify_actor(transaction, self.actor, &deployment, now)?;
         let current = installation(transaction, self.actor.scope())?;

@@ -272,7 +272,7 @@ fn charged_unused_reservation_closure_prevents_late_finalize_without_refunding_c
         sealed,
         "late participants cannot alter closed history or debit"
     );
-    let mut reopened = Store::open(&f.path, &f.authority, &f.kernel_key)?;
+    let mut reopened = Store::open(&f.path, &f.authority, &f.kernel_key, chio_test_support::clock::clock())?;
     assert!(reopened
         .finalize_recovery(&value.reservation, &value.request, &value.binding)
         .is_err());
@@ -300,8 +300,8 @@ fn charged_unused_reservation_closure_prevents_late_finalize_without_refunding_c
 fn unused_reservation_closure_committed_first_fences_a_separate_finalize_writer() -> TestResult {
     let f = Fixture::new()?;
     let value = f.reserve("close-before-concurrent-finalize")?;
-    let mut closer = Store::open(&f.path, &f.authority, &f.kernel_key)?;
-    let mut finalizer = Store::open(&f.path, &f.authority, &f.kernel_key)?;
+    let mut closer = Store::open(&f.path, &f.authority, &f.kernel_key, chio_test_support::clock::clock())?;
+    let mut finalizer = Store::open(&f.path, &f.authority, &f.kernel_key, chio_test_support::clock::clock())?;
     let barrier = Arc::new(Barrier::new(2));
     let close_barrier = barrier.clone();
     let (closed, finalized) = std::thread::scope(|scope| {
@@ -336,8 +336,8 @@ fn unused_reservation_closure_committed_first_fences_a_separate_finalize_writer(
 fn actual_finalization_committed_first_prevents_unused_reservation_closure() -> TestResult {
     let f = Fixture::new()?;
     let value = f.reserve("finalize-before-concurrent-close")?;
-    let mut finalizer = Store::open(&f.path, &f.authority, &f.kernel_key)?;
-    let mut closer = Store::open(&f.path, &f.authority, &f.kernel_key)?;
+    let mut finalizer = Store::open(&f.path, &f.authority, &f.kernel_key, chio_test_support::clock::clock())?;
+    let mut closer = Store::open(&f.path, &f.authority, &f.kernel_key, chio_test_support::clock::clock())?;
     let barrier = Arc::new(Barrier::new(2));
     let finalize_barrier = barrier.clone();
     let (finalized, closed) = std::thread::scope(|scope| {
@@ -471,7 +471,7 @@ fn a_version_six_label_without_closed_custody_cannot_open_or_authorize_provenanc
     let counterfeit = f.snapshot()?;
     assert_eq!(counterfeit.version, 6);
     assert!(counterfeit.closures.is_empty());
-    assert!(Store::open(&f.path, &f.authority, &f.kernel_key).is_err());
+    assert!(Store::open(&f.path, &f.authority, &f.kernel_key, chio_test_support::clock::clock()).is_err());
     assert!(f
         .runtime
         .original_snapshot
@@ -547,7 +547,7 @@ fn closed_reservation_cannot_be_represented_by_a_predecessor_journal_header() ->
         retained.version = predecessor;
         assert_eq!(f.snapshot()?, retained);
         assert!(
-            Store::open(&f.path, &f.authority, &f.kernel_key).is_err(),
+            Store::open(&f.path, &f.authority, &f.kernel_key, chio_test_support::clock::clock()).is_err(),
             "a populated closed cohort cannot open under predecessor {predecessor}"
         );
         assert!(
@@ -595,7 +595,7 @@ fn a_missing_closed_reservation_guard_is_refused_before_open_time_repair() -> Te
             "missing guard {guard} cannot retain a live closure role"
         );
         assert!(
-            Store::open(&f.path, &f.authority, &f.kernel_key).is_err(),
+            Store::open(&f.path, &f.authority, &f.kernel_key, chio_test_support::clock::clock()).is_err(),
             "open must refuse missing guard {guard} before repairing DDL"
         );
         let repaired: bool = f.runtime.with_store(|store| {
@@ -677,7 +677,7 @@ fn live_knowledge_reader_refuses_closed_custody_under_a_forged_predecessor_heade
     })?;
     retained.version = 5;
     assert_eq!(f.snapshot()?, retained);
-    assert!(Store::open(&f.path, &f.authority, &f.kernel_key).is_err());
+    assert!(Store::open(&f.path, &f.authority, &f.kernel_key, chio_test_support::clock::clock()).is_err());
     assert!(role.verify_for(&unused.reservation, &f.authority).is_err());
     let warm_usage = broker.storage_usage(&process);
     let warm_gate = f
@@ -742,7 +742,7 @@ fn live_participants_refuse_a_removed_closed_reservation_catalog_without_mutatio
     })?;
     retained.closures.clear();
     assert_eq!(f.snapshot()?, retained);
-    assert!(Store::open(&f.path, &f.authority, &f.kernel_key).is_err());
+    assert!(Store::open(&f.path, &f.authority, &f.kernel_key, chio_test_support::clock::clock()).is_err());
     assert!(role.verify_for(&unused.reservation, &f.authority).is_err());
     let late_finalize = f.finalize(&unused);
     let late_admit = f.runtime.with_store(|store| {

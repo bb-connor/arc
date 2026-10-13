@@ -859,7 +859,7 @@ impl ChioKernel {
                 matching_grants,
                 &post_return_plan.frozen_steps,
                 security_binding.as_ref(),
-                Some(profile),
+                profile,
                 native_output_retention,
             )
         })

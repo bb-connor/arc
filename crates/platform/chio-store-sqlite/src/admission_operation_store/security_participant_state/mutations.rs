@@ -265,7 +265,7 @@ impl SqliteAdmissionOperationStore {
                 input.key(),
             )
             .map_err(invalid)?;
-            let witnessed_at = observed_time(&tx, trusted_now_unix_ms)?;
+            let witnessed_at = observed_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
             let assessment = super::super::semantic::verify_input_tx(
                 &tx,
                 super::super::semantic::SemanticInputObservation {

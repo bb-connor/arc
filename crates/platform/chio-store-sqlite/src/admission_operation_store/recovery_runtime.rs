@@ -145,7 +145,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         resources::check(&connection, intake)?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let deployment = deployment_tx(&tx, actor.scope())?;
         verify_actor(&tx, actor, &deployment, now)?;
         let result = apply(&tx, &deployment, now)?;
@@ -373,7 +373,7 @@ impl RecoveryAuthorityPort for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let result = deployment_tx(&tx, scope)?;
         tx.commit().map_err(sqlite_error)?;
         Ok(result)
@@ -388,7 +388,7 @@ impl RecoveryAuthorityPort for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let deployment = deployment_tx(&tx, actor.scope())?;
         verify_actor(&tx, actor, &deployment, now)?;
         let record = workflow_preview_tx(&tx, actor, &deployment, workflow)?;
@@ -427,7 +427,7 @@ impl RecoveryAuthorityPort for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let deployment = deployment_tx(&tx, actor.scope())?;
         verify_actor(&tx, actor, &deployment, now)?;
         let selected = load_selected_workflow(&tx, actor, &deployment, selection)?;
@@ -589,7 +589,7 @@ impl RecoveryAuthorityPort for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let result = native::context(&tx, operation, now)?;
         tx.commit().map_err(sqlite_error)?;
         Ok(result)
@@ -603,7 +603,7 @@ impl RecoveryAuthorityPort for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let result = native::historical_release(&tx, operation, fence)?;
         tx.commit().map_err(sqlite_error)?;
         Ok(result)
@@ -617,7 +617,7 @@ impl RecoveryAuthorityPort for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let result = match native::captured_custody(&tx, operation, fence)? {
             Some((record, custody)) => Some(
                 if historical_holds::blocks_original_private_settlement(&tx, &record)? {
@@ -641,7 +641,7 @@ impl RecoveryAuthorityPort for SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         resources::check(&connection, false)?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         native::quarantine_historical(&tx, &self.serving_owner, operation, reason)?;
         self.commit_write(tx)?;
         self.sync_after_write(&connection)

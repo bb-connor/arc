@@ -258,7 +258,7 @@ async fn refuses_corrupt_retained_terminal(fault: TerminalFault) -> TestResult {
     drop(store);
     drop(fixture);
     eprintln!("reclamation integrity phase=actual cold integrity refusal");
-    match SqliteAuthorityStore::open_serving(path.join("admission.db"), path.join("locks")) {
+    match SqliteAuthorityStore::open_serving_with_clock(path.join("admission.db"), path.join("locks"), chio_test_support::clock::clock()) {
         Err(SqliteServingOwnerError::Invalid(_)) => {}
         Err(error) => {
             return Err(format!(

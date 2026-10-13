@@ -6,7 +6,6 @@ use std::{
     panic::{catch_unwind, AssertUnwindSafe},
     sync::{mpsc, Arc},
     thread,
-    time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::{oneshot, OwnedSemaphorePermit, Semaphore};
 
@@ -113,13 +112,13 @@ fn require_credential(
             chio_kernel::KernelError::RecoveryAuthorityDenied,
         ));
     }
-    let now = match chio_kernel::fixed_runtime_unix_secs_for_current_thread() {
-        Some(now) => now,
-        None => SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| RecoveryRuntimeError::Unavailable)?
-            .as_secs(),
-    };
+    let now = runtime
+        .kernel
+        .authority_clock()
+        .unix_millis()
+        .map_err(|_| RecoveryRuntimeError::Unavailable)?
+        .get()
+        / 1000;
     let verified = capability.verify_signature_at(now).map_err(|error| {
         let error = match error {
             chio_core_types::Error::InvalidSignature(_)

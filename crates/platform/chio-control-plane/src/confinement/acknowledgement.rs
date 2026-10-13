@@ -72,13 +72,14 @@ impl ConfinedDeliveryError {
     /// A refused write returns the same custody for a subsequent attempt.
     pub fn reconcile(
         mut self,
+        kernel: &ChioKernel,
         store: &SqliteAdmissionOperationStore,
         fence: &chio_kernel::admission_operation::StoreMutationFence,
     ) -> Result<ReturnAdmissionV1, Self> {
         let Some(pending) = &self.pending else {
             return Err(self);
         };
-        let at = match now() {
+        let at = match now(kernel) {
             Ok(at) => at,
             Err(error) => {
                 self.failure = error;

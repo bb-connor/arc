@@ -52,11 +52,12 @@ impl core::fmt::Debug for PreparedConfinedReturn {
 fn refused(_error: impl core::fmt::Display) -> KernelError {
     KernelError::DurableAdmission("confined return unavailable".into())
 }
-fn now() -> Result<u64, KernelError> {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+fn now(kernel: &ChioKernel) -> Result<u64, KernelError> {
+    kernel
+        .authority_clock()
+        .unix_millis()
+        .map(|now| now.get())
         .map_err(refused)
-        .and_then(|time| u64::try_from(time.as_millis()).map_err(refused))
 }
 impl NativeConfinedRuntime {
     pub fn new(
@@ -136,7 +137,7 @@ impl NativeConfinedRuntime {
                     observation,
                 },
                 &self.fence,
-                now()?,
+                now(&self.kernel)?,
             )
             .map_err(refused)?;
         self.cutpoint(ConfinedCutpoint::Reserved)?;
@@ -165,7 +166,7 @@ impl NativeConfinedRuntime {
     ) -> Result<ConfinedReturnEvidenceV1, KernelError> {
         let actor = self.actor(capability, RecoveryPermission::ConfinedReturn)?;
         self.store
-            .confined_return_evidence(&actor, request, &self.fence, now()?)
+            .confined_return_evidence(&actor, request, &self.fence, now(&self.kernel)?)
             .map_err(refused)
     }
     pub fn prepare_return(
@@ -176,7 +177,7 @@ impl NativeConfinedRuntime {
         let actor = self.actor(capability, RecoveryPermission::ConfinedReturn)?;
         let (seal, artifact) = self
             .store
-            .prepare_confined_return(&actor, request, &self.fence, now()?)
+            .prepare_confined_return(&actor, request, &self.fence, now(&self.kernel)?)
             .map_err(refused)?;
         let bytes = Zeroizing::new(self.broker.read_private(&seal)?);
         if knowledge_content_digest(&bytes) != seal.content
@@ -202,7 +203,7 @@ impl NativeConfinedRuntime {
         let actor = self.actor(capability, RecoveryPermission::ConfinedReturn)?;
         let profile = self
             .store
-            .knowledge_installation(&actor, &self.fence, now()?)
+            .knowledge_installation(&actor, &self.fence, now(&self.kernel)?)
             .map_err(refused)?;
         let recipient = profile
             .recipients
@@ -227,7 +228,7 @@ impl NativeConfinedRuntime {
                     endorsement,
                 },
                 &self.fence,
-                now()?,
+                now(&self.kernel)?,
             )
             .map_err(refused)?;
         if admission.artifact != prepared.artifact {
@@ -244,7 +245,7 @@ impl NativeConfinedRuntime {
                 &admission,
                 false,
                 &self.fence,
-                now()?,
+                now(&self.kernel)?,
             )
             .map_err(refused)?;
         self.broker.begin_confined_delivery(
@@ -266,7 +267,7 @@ impl NativeConfinedRuntime {
         if self.cutpoint(ConfinedCutpoint::DeliveryCompleted).is_err() {
             return Err(pending);
         }
-        let acknowledged = pending.reconcile(&self.store, &self.fence)?;
+        let acknowledged = pending.reconcile(&self.kernel, &self.store, &self.fence)?;
         if !delivered {
             return Err(refused("delivery uncertain").into());
         }
@@ -284,7 +285,7 @@ impl NativeConfinedRuntime {
         let actor = self.actor(capability, RecoveryPermission::ConfinedCancel)?;
         let accepted = self
             .store
-            .cancel_confined_child(&actor, request, &self.fence, now()?)
+            .cancel_confined_child(&actor, request, &self.fence, now(&self.kernel)?)
             .map_err(refused)?;
         match process.cancel(accepted.child().as_str()) {
             Ok(_)

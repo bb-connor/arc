@@ -22,10 +22,7 @@ async fn setup_expired_bound_probe_refuses_before_dispatch() -> TestResult {
     let prepared = store.setup_preparation(&actor, &fence, now_ms()?)?;
     let calls = f.f.process.process("root")?.tree_calls;
     let expired_secs = prepared.probe.expires_at_unix_ms.get() / 1_000 + 1;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        expired_secs,
-        std::iter::empty::<String>(),
-    );
+    let _clock = chio_test_support::clock::scope_unix_secs(expired_secs);
     assert!(
         matches!(
             store.setup_preparation(&actor, &fence, expired_secs * 1_000),
@@ -120,10 +117,7 @@ async fn attest_after_initial_probe_expiry(previously_qualified: bool) -> TestRe
         f.f.control.scope.clone(),
         1_200,
     )?;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        expired_secs,
-        std::iter::empty::<String>(),
-    );
+    let _clock = chio_test_support::clock::scope_unix_secs(expired_secs);
     let actor = f.f.kernel.authenticate_recovery_actor(
         f.f.runtime.scope(),
         &current_capability,

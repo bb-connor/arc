@@ -55,7 +55,7 @@ async fn rejected_principal_work_cannot_reserve_other_principal_capacity() -> Te
     for _ in 0..PER_PRINCIPAL {
         let (release, pending) = oneshot::channel();
         let started = started.clone();
-        accepted.push(executor.try_submit(principal.clone(), None, async move {
+        accepted.push(executor.try_submit(principal.clone(), async move {
             started
                 .send(())
                 .map_err(|_| RecoveryRuntimeError::Unavailable)?;
@@ -101,7 +101,7 @@ async fn rejected_principal_work_cannot_reserve_other_principal_capacity() -> Te
         let executor = executor.clone();
         let principal = principal.clone();
         rejected.push(thread::spawn(move || {
-            executor.try_submit(principal, None, async { Ok(()) })
+            executor.try_submit(principal, async { Ok(()) })
         }));
     }
     for _ in 0..(WORKERS - PER_PRINCIPAL) {
@@ -109,7 +109,7 @@ async fn rejected_principal_work_cannot_reserve_other_principal_capacity() -> Te
     }
     // The duplicate submissions are known principal refusals. They must not
     // prevent this distinct principal's real job from being admitted.
-    let other = executor.try_submit("checked-authority:other-subject".to_owned(), None, async {
+    let other = executor.try_submit("checked-authority:other-subject".to_owned(), async {
         Ok(())
     });
 
@@ -228,7 +228,7 @@ async fn large_owned_future_completes_on_default_worker_stack() -> TestResult {
     };
     let actual_future_bytes = std::mem::size_of_val(&future);
     assert!(actual_future_bytes >= INLINE_PHASE_BYTES);
-    let response = executor.try_submit("checked-authority:large-future".into(), None, future)?;
+    let response = executor.try_submit("checked-authority:large-future".into(), future)?;
     let worker = observed_started.recv_timeout(Duration::from_secs(2))?;
     assert!(worker.starts_with("chio-recovery-command-"));
     assert_eq!(completions.load(Ordering::SeqCst), 0);
@@ -260,7 +260,7 @@ async fn published_native_reply_releases_the_exact_principal_capacity() -> TestR
     let principal = "checked-authority:published-reply".to_owned();
     let (release, pending) = oneshot::channel();
     let (entered, started) = oneshot::channel();
-    let held = executor.try_submit(principal.clone(), None, async move {
+    let held = executor.try_submit(principal.clone(), async move {
         let _ = entered.send(());
         pending
             .await
@@ -279,7 +279,7 @@ async fn published_native_reply_releases_the_exact_principal_capacity() -> TestR
         let _ = published.send(());
         observer_gate.pause();
     }));
-    let completed = executor.try_submit(principal.clone(), None, async { Ok(47) })?;
+    let completed = executor.try_submit(principal.clone(), async { Ok(47) })?;
     // The owning future has completed, and its result was actually published.
     // Pause only after publication, so this premise has no scheduling race.
     observed_publication.recv_timeout(Duration::from_secs(2))?;
@@ -291,7 +291,7 @@ async fn published_native_reply_releases_the_exact_principal_capacity() -> TestR
         .reply_publication_observer
         .lock()
         .map_err(|_| "publication observer poisoned")? = None;
-    let next = executor.try_submit(principal, None, async { Ok(59) });
+    let next = executor.try_submit(principal, async { Ok(59) });
     let admitted = next.is_ok();
     gate.release();
     let _ = release.send(());

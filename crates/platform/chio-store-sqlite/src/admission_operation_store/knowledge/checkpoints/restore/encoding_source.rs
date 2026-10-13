@@ -15,6 +15,7 @@ pub(in crate::admission_operation_store) struct AuthenticatedCheckpointRestoreEn
     'conn,
 > {
     transaction: &'tx Transaction<'conn>,
+    owner: &'tx SqliteServingOwner,
     actor: &'tx AuthenticatedRecoveryActor,
     profile: &'tx NativeKnowledgeInstallationV1,
     now: u64,
@@ -28,6 +29,7 @@ pub(in crate::admission_operation_store) struct AuthenticatedCheckpointRestoreEn
 impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
     pub(super) fn admission(
         transaction: &'tx Transaction<'conn>,
+        owner: &'tx SqliteServingOwner,
         actor: &'tx AuthenticatedRecoveryActor,
         profile: &'tx NativeKnowledgeInstallationV1,
         now: u64,
@@ -40,6 +42,7 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
         )?;
         let source = Self {
             transaction,
+            owner,
             actor,
             profile,
             now,
@@ -55,6 +58,7 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
 
     pub(super) fn acknowledgement(
         transaction: &'tx Transaction<'conn>,
+        owner: &'tx SqliteServingOwner,
         actor: &'tx AuthenticatedRecoveryActor,
         profile: &'tx NativeKnowledgeInstallationV1,
         now: u64,
@@ -68,6 +72,7 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
         )?;
         let source = Self {
             transaction,
+            owner,
             actor,
             profile,
             now,
@@ -123,7 +128,7 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
         if !std::ptr::eq::<Connection>(Deref::deref(self.transaction), Deref::deref(transaction)) {
             return Err(refused("restore encoding changed its native transaction"));
         }
-        let now = schema::authority_validation_time(transaction, self.now)?;
+        let now = schema::authority_validation_time(transaction, self.now, self.owner)?;
         let deployment = protected::deployment_tx(transaction, self.actor.scope())?;
         super::super::super::super::recovery_runtime::verify_actor(
             transaction,

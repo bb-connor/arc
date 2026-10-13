@@ -13,6 +13,7 @@ pub(in crate::admission_operation_store) enum UnusedSetupReplacementReason {
 /// It cannot escape its writer, be cloned, or be decoded from wire data.
 pub(in crate::admission_operation_store) struct VerifiedUnusedSetupGeneration<'tx, 'conn> {
     transaction: &'tx Transaction<'conn>,
+    owner: &'tx SqliteServingOwner,
     record: RecoveryWorkflowRecordV1,
     selected_creation: CanonicalPayloadDigest,
     selection: protected::ProtectedSourceReference,
@@ -76,7 +77,7 @@ impl<'tx, 'conn> VerifiedUnusedSetupGeneration<'tx, 'conn> {
             return Err(refused("unused setup selection changed"));
         }
         let deployment = protected::deployment_tx(tx, &self.record.scope)?;
-        let now = schema::observe_authority_time(tx)?;
+        let now = schema::observe_authority_time(tx, self.owner)?;
         if now < self.sampled_at
             || protected::encode(&deployment)? != protected::encode(&self.deployment)?
             || super::service::unused_replacement_reason(
@@ -106,6 +107,7 @@ impl core::fmt::Debug for VerifiedUnusedSetupGeneration<'_, '_> {
 
 pub(super) fn verify_unused_generation<'tx, 'conn>(
     tx: &'tx Transaction<'conn>,
+    owner: &'tx SqliteServingOwner,
     selected: &Selection,
     deployment: &RecoveryDeploymentV1,
     fence: &StoreMutationFence,
@@ -132,6 +134,7 @@ pub(super) fn verify_unused_generation<'tx, 'conn>(
     let workflow_key = protected::workflow_key(&record.scope, &record.workflow_id)?;
     let witness = VerifiedUnusedSetupGeneration {
         transaction: tx,
+        owner,
         selected_creation: selected.creation,
         selection: protected::source_reference(tx, &selected_key)?,
         workflow: protected::source_reference(tx, &workflow_key)?,

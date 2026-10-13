@@ -246,7 +246,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         schema::verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let operation = load_operation_for_participant_tx(&tx, operation_id)?
             .ok_or_else(|| refused("retained semantic output operation absent"))?;
         let original = retained_request::load_retained_request_tx(&tx, &operation)?

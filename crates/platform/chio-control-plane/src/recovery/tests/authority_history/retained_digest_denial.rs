@@ -410,7 +410,7 @@ async fn consume_genuine_digest_capture(previously_held: bool) -> TestResult {
     let id = original.operation.binding().operation_id();
     let retained_hold = if previously_held {
         let authority =
-            SqliteAuthorityStore::open_serving(path.join("admission.db"), path.join("locks"))?;
+            SqliteAuthorityStore::open_serving_with_clock(path.join("admission.db"), path.join("locks"), chio_test_support::clock::clock())?;
         authority
             .admission_operation_store()
             .recovery_authority()
@@ -685,7 +685,7 @@ async fn recovery_current_signer_fixture_releases_its_owner_without_capture() ->
     digest_denial_stage("fresh-fixture-drop-complete");
     digest_denial_stage("fresh-next-owner-open-enter");
     let reopened =
-        SqliteAuthorityStore::open_serving(path.join("admission.db"), path.join("locks"))?;
+        SqliteAuthorityStore::open_serving_with_clock(path.join("admission.db"), path.join("locks"), chio_test_support::clock::clock())?;
     digest_denial_stage("fresh-next-owner-open-complete");
     assert_eq!(reopened.mutation_fence().store_uuid, first_fence.store_uuid);
     assert!(reopened.mutation_fence().owner_epoch > first_fence.owner_epoch);

@@ -29,6 +29,7 @@ use crate::error::{Error, Result};
 mod secret;
 #[path = "canonical/signed_json.rs"]
 mod signed_json;
+pub use signed_json::parse_signed_json;
 pub use secret::canonical_json_bytes_zeroizing;
 #[path = "canonical/untrusted.rs"]
 mod untrusted;

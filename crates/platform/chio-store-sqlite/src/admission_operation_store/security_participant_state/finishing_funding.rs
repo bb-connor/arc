@@ -31,7 +31,7 @@ impl SqliteAdmissionOperationStore {
             .serving_owner
             .prepare_native_source_transaction(&tx)
             .map_err(map_owner_error)?;
-        let now = observed_time(&tx, context.trusted_now_unix_ms)?;
+        let now = observed_time(&tx, context.trusted_now_unix_ms, &self.serving_owner)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, context.lease, now)?;
         ensure_no_reserved_terminal_stage(&tx, operation.binding().operation_id())?;
         let original = retained_request::load_retained_request_tx(&tx, operation)?
@@ -40,8 +40,7 @@ impl SqliteAdmissionOperationStore {
         original.validate_request_material(context.request)?;
         original.validate_native_security_authority(context.binding)?;
         original.validate_native_security_context(context.security_context)?;
-        if original.authority_profile().is_none()
-            || context.binding.store_uuid().as_str() != self.serving_owner.fence.store_uuid
+        if context.binding.store_uuid().as_str() != self.serving_owner.fence.store_uuid
         {
             return Err(invalid(
                 "native pre-authorization changed its original authority",

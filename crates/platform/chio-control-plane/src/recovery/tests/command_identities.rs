@@ -239,7 +239,7 @@ impl ReportControlWindow {
         &mut self,
         fixture: &RecoveryFixture,
     ) -> TestResult<AuthenticatedRecoveryActor> {
-        if chio_kernel::fixed_runtime_unix_secs_for_current_thread().is_some() {
+        if chio_test_support::clock::scoped_unix_secs().is_some() {
             return Err("Report control windows require the real runtime clock".into());
         }
         let current_seconds = now_ms()? / 1000;

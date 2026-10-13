@@ -348,7 +348,7 @@ impl RetainedToolAdmissionRequestV1 {
         matching_grants: &[MatchingGrant<'_>],
         post_return_steps: &[FrozenEvaluationStepV1],
         security_binding: Option<&AdmissionSecurityBindingV1>,
-        authority_profile: Option<&AdmissionAuthorityProfileV1>,
+        authority_profile: &AdmissionAuthorityProfileV1,
         native_output_retention: Option<&NativeOutputRetentionProfileV1>,
     ) -> Result<Self, AdmissionOperationStoreError> {
         let original_semantic = native_output_retention
@@ -629,7 +629,7 @@ impl RetainedToolAdmissionRequestV1 {
                 &self.matching_grants()?,
                 &self.wire.post_return_steps,
                 self.wire.security_binding.as_ref(),
-                self.wire.authority_profile.as_ref(),
+                Some(&self.wire.authority_profile),
                 self.wire.native_output_retention.as_ref(),
             )?;
             let expected = bind_original_semantics(&prior, semantic)?;

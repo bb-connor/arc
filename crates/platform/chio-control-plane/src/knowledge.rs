@@ -51,17 +51,12 @@ impl std::fmt::Debug for PreparedArtifactRead {
 fn unavailable(_error: impl std::fmt::Display) -> KernelError {
     KernelError::DurableAdmission("durable knowledge unavailable".into())
 }
-fn now() -> Result<u64, KernelError> {
-    #[cfg(test)]
-    if let Some(seconds) = chio_kernel::fixed_runtime_unix_secs_for_current_thread() {
-        return seconds
-            .checked_mul(1_000)
-            .ok_or_else(|| unavailable("selected clock overflow"));
-    }
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+fn now(kernel: &ChioKernel) -> Result<u64, KernelError> {
+    kernel
+        .authority_clock()
+        .unix_millis()
+        .map(|now| now.get())
         .map_err(unavailable)
-        .and_then(|time| u64::try_from(time.as_millis()).map_err(unavailable))
 }
 impl NativeKnowledgeRuntime {
     pub(crate) fn same_setup_mediator(&self, other: &Self) -> Result<bool, KernelError> {
@@ -84,7 +79,7 @@ impl NativeKnowledgeRuntime {
             &self.profile.producer_context,
         )?;
         self.store
-            .validate_current_knowledge_installation(&self.profile, &self.fence, now()?)
+            .validate_current_knowledge_installation(&self.profile, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)
     }
     pub fn new(
@@ -150,7 +145,7 @@ impl NativeKnowledgeRuntime {
             self,
             ProducerInstallationLookup,
             self.store
-                .knowledge_installation(actor, &self.fence, now()?)
+                .knowledge_installation(actor, &self.fence, now(&self.kernel)?)
                 .map_err(unavailable)
         )
     }
@@ -164,7 +159,7 @@ impl NativeKnowledgeRuntime {
         }
         let current = self
             .store
-            .retained_knowledge_installation(actor, &self.fence, now()?)
+            .retained_knowledge_installation(actor, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         self.broker
             .validate_retained_owner(&current.scope.process_id, &current.producer_context)?;
@@ -185,7 +180,7 @@ impl NativeKnowledgeRuntime {
         let actor = self.actor(capability, permission)?;
         self.current(&actor)?;
         self.store
-            .reserve_artifact(&actor, input, &self.fence, now()?)
+            .reserve_artifact(&actor, input, &self.fence, now(&self.kernel)?)
             .map(ArtifactPublicationViewV1::from)
             .map_err(unavailable)
     }
@@ -206,7 +201,7 @@ impl NativeKnowledgeRuntime {
         self.current(&actor)?;
         let record = self
             .store
-            .reserve_artifact(&actor, input, &self.fence, now()?)
+            .reserve_artifact(&actor, input, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         if matches!(
             record.state,
@@ -221,7 +216,7 @@ impl NativeKnowledgeRuntime {
                     Ok(bytes) => Zeroizing::new(bytes),
                     Err(_) => {
                         self.store
-                            .quarantine_artifact(&actor, input, &self.fence, now()?)
+                            .quarantine_artifact(&actor, input, &self.fence, now(&self.kernel)?)
                             .map_err(unavailable)?;
                         return Err(unavailable("existing object missing or corrupt"));
                     }
@@ -237,32 +232,32 @@ impl NativeKnowledgeRuntime {
         };
         self.cutpoint(KnowledgeCutpoint::BlobStaged)?;
         self.store
-            .stage_artifact(&actor, input, &seal, &self.fence, now()?)
+            .stage_artifact(&actor, input, &seal, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         self.cutpoint(KnowledgeCutpoint::StageRetained)?;
         self.store
-            .commit_artifact_metadata(&actor, input, certificate, &self.fence, now()?)
+            .commit_artifact_metadata(&actor, input, certificate, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         self.cutpoint(KnowledgeCutpoint::MetadataCommitted)?;
         let staged = match self.broker.read_private(&seal) {
             Ok(bytes) => Zeroizing::new(bytes),
             Err(_) => {
                 self.store
-                    .quarantine_artifact(&actor, input, &self.fence, now()?)
+                    .quarantine_artifact(&actor, input, &self.fence, now(&self.kernel)?)
                     .map_err(unavailable)?;
                 return Err(unavailable("sealed object missing"));
             }
         };
         if staged.as_slice() != bytes {
             self.store
-                .quarantine_artifact(&actor, input, &self.fence, now()?)
+                .quarantine_artifact(&actor, input, &self.fence, now(&self.kernel)?)
                 .map_err(unavailable)?;
             return Err(unavailable("sealed bytes differ"));
         }
         self.current(&actor)?;
         let reference = self
             .store
-            .finalize_artifact(&actor, input, &seal, &self.fence, now()?)
+            .finalize_artifact(&actor, input, &seal, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         self.cutpoint(KnowledgeCutpoint::AvailabilityCommitted)?;
         Ok(reference)
@@ -276,7 +271,7 @@ impl NativeKnowledgeRuntime {
         let actor = self.actor(capability, RecoveryPermission::KnowledgeRead)?;
         self.current(&actor)?;
         self.store
-            .issue_artifact_handle(&actor, reference, recipient, &self.fence, now()?)
+            .issue_artifact_handle(&actor, reference, recipient, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)
     }
     pub fn prepare_read(
@@ -288,7 +283,7 @@ impl NativeKnowledgeRuntime {
         let profile = self.current(&actor)?;
         let (record, recipient) = self
             .store
-            .prepare_artifact_read(&actor, handle, &self.fence, now()?)
+            .prepare_artifact_read(&actor, handle, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         self.broker
             .validate_process(&recipient.recipient.scope.process_id, &recipient.context)?;
@@ -304,7 +299,7 @@ impl NativeKnowledgeRuntime {
                         &actor,
                         &artifact_version_reference(&record.metadata).map_err(unavailable)?,
                         &self.fence,
-                        now()?,
+                        now(&self.kernel)?,
                     )
                     .map_err(unavailable)?;
                 return Err(unavailable("missing immutable object"));
@@ -354,19 +349,19 @@ impl NativeKnowledgeRuntime {
         // or withholds. Repeating the same request performs anchored readback.
         let intent = self
             .store
-            .admit_artifact_release(&actor, &prepared.handle, request, seal, &self.fence, now()?)
+            .admit_artifact_release(&actor, &prepared.handle, request, seal, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         self.cutpoint(KnowledgeCutpoint::ReleaseCommitted)?;
         self.cutpoint(KnowledgeCutpoint::BeforeDelivery)?;
         // Sink I/O may complete before the host can retain its acknowledgement.
         // Persist unknown delivery before crossing that independently owned boundary.
         self.store
-            .acknowledge_artifact_delivery(&actor, request, &intent, false, &self.fence, now()?)
+            .acknowledge_artifact_delivery(&actor, request, &intent, false, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         let delivered = sink.deliver(&intent, &prepared.bytes).is_ok();
         self.cutpoint(KnowledgeCutpoint::DeliveryCompleted)?;
         self.store
-            .acknowledge_artifact_delivery(&actor, request, &intent, delivered, &self.fence, now()?)
+            .acknowledge_artifact_delivery(&actor, request, &intent, delivered, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         if !delivered {
             return Err(unavailable("delivery uncertain"));
@@ -382,7 +377,7 @@ impl NativeKnowledgeRuntime {
         self.current_retained(&actor)?;
         let record = self
             .store
-            .artifact_publication_for_collection(&actor, input, &self.fence, now()?)
+            .artifact_publication_for_collection(&actor, input, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?;
         let orphan = record.seal.or_else(|| {
             self.broker
@@ -396,12 +391,12 @@ impl NativeKnowledgeRuntime {
         });
         if let Some(seal) = self
             .store
-            .abort_artifact_publication(&actor, input, orphan.as_ref(), &self.fence, now()?)
+            .abort_artifact_publication(&actor, input, orphan.as_ref(), &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?
         {
             self.broker.collect_private(&seal)?;
             self.store
-                .finish_artifact_collection(&actor, &seal, &self.fence, now()?)
+                .finish_artifact_collection(&actor, &seal, &self.fence, now(&self.kernel)?)
                 .map_err(unavailable)?;
         }
         Ok(())
@@ -415,14 +410,14 @@ impl NativeKnowledgeRuntime {
         self.current_retained(&actor)?;
         if let Some(seal) = self
             .store
-            .retire_artifact(&actor, reference, &self.fence, now()?)
+            .retire_artifact(&actor, reference, &self.fence, now(&self.kernel)?)
             .map_err(unavailable)?
         {
             self.cutpoint(KnowledgeCutpoint::CollectionRetired)?;
             self.broker.collect_private(&seal)?;
             self.cutpoint(KnowledgeCutpoint::BlobCollected)?;
             self.store
-                .finish_artifact_collection(&actor, &seal, &self.fence, now()?)
+                .finish_artifact_collection(&actor, &seal, &self.fence, now(&self.kernel)?)
                 .map_err(unavailable)?;
         }
         Ok(())

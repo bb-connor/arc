@@ -102,7 +102,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let result = installation(&tx, scope)?;
         tx.commit().map_err(sqlite_error)?;
         Ok(result)
@@ -191,7 +191,7 @@ impl SqliteAdmissionOperationStore {
         }
         require_affected_contracts(&proposal.proposal, &current, target)?;
         self.install_semantic_tx(&tx, target)?;
-        let now = schema::observe_authority_time(&tx)?;
+        let now = schema::observe_authority_time(&tx, &self.serving_owner)?;
         let receipt = NativePolicyChangeReceiptV1 {
             proposal_id: body.proposal_id.clone(),
             target_deployment: target_identity.deployment,

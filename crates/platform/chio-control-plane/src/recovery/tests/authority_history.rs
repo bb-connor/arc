@@ -119,7 +119,7 @@ pub(super) fn configure_fixture_history_hooks(
                 // This clock-only RAII guard preserves receipt IDs and spans
                 // BOTH genuine preparation and physical capture, then restores.
                 let _clock =
-                    selected_seconds.map(chio_kernel::scope_fixed_runtime_clock_for_current_thread);
+                    selected_seconds.map(chio_test_support::clock::scope_unix_secs);
                 let result = (|| -> Result<(), String> {
                     let egress = authority
                         .prepare_egress()
@@ -515,7 +515,7 @@ fn rotate_coverage(path: &Path, scope: &RecoveryScopeV1) -> TestResult {
 
 fn install_current_profile(path: &Path, profile: &RecoveryDeploymentV1) -> TestResult {
     let authority =
-        SqliteAuthorityStore::open_serving(path.join("admission.db"), path.join("locks"))?;
+        SqliteAuthorityStore::open_serving_with_clock(path.join("admission.db"), path.join("locks"), chio_test_support::clock::clock())?;
     authority
         .admission_operation_store()
         .configure_recovery_deployment(profile)?;
@@ -539,7 +539,7 @@ fn rotate_deployment(
     rotation: DeploymentRotation,
 ) -> TestResult {
     let authority =
-        SqliteAuthorityStore::open_serving(path.join("admission.db"), path.join("locks"))?;
+        SqliteAuthorityStore::open_serving_with_clock(path.join("admission.db"), path.join("locks"), chio_test_support::clock::clock())?;
     let store = authority.admission_operation_store();
     let mut profile = store.deployment(scope, &authority.mutation_fence(), now_ms()?)?;
     match rotation {
@@ -1135,9 +1135,9 @@ async fn recovery_native_rotation_rechecks_both_current_inherited_authorities() 
             DeploymentRotation::NativeAuthority,
         )?;
         let current_profile = {
-            let authority = SqliteAuthorityStore::open_serving(
+            let authority = SqliteAuthorityStore::open_serving_with_clock(
                 directory.path().join("admission.db"),
-                directory.path().join("locks"),
+                directory.path().join("locks"), chio_test_support::clock::clock(),
             )?;
             authority.admission_operation_store().deployment(
                 &original.scope,
@@ -1752,9 +1752,9 @@ async fn recovery_previously_held_signer_rotation_reaches_authenticated_withheld
     {
         // Reproduce the earlier qualified runtime's signer-only hold through
         // its owning fenced API, over this genuine immutable native capture.
-        let authority = SqliteAuthorityStore::open_serving(
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
             directory.path().join("admission.db"),
-            directory.path().join("locks"),
+            directory.path().join("locks"), chio_test_support::clock::clock(),
         )?;
         authority
             .admission_operation_store()
@@ -1920,9 +1920,9 @@ async fn recovery_rotated_signer_preserves_digest_denial_and_settles_known_priva
         let retained_hold = if previously_held {
             // The previous release wrote this hold through its owning fenced
             // authority. Preserve its immutable audit record during settlement.
-            let authority = SqliteAuthorityStore::open_serving(
+            let authority = SqliteAuthorityStore::open_serving_with_clock(
                 directory.path().join("admission.db"),
-                directory.path().join("locks"),
+                directory.path().join("locks"), chio_test_support::clock::clock(),
             )?;
             authority
                 .admission_operation_store()
@@ -2182,9 +2182,9 @@ async fn recovery_signer_rotation_rejects_corrupt_original_return_without_hold()
         let directory = Box::pin(crash_after_capture("return-recorded")).await?;
         let before = retained_workflow(directory.path())?;
         if fault == "held-hash-changed" {
-            let authority = SqliteAuthorityStore::open_serving(
+            let authority = SqliteAuthorityStore::open_serving_with_clock(
                 directory.path().join("admission.db"),
-                directory.path().join("locks"),
+                directory.path().join("locks"), chio_test_support::clock::clock(),
             )?;
             let id = chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
                 before

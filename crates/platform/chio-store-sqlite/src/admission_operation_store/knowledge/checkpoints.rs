@@ -175,6 +175,7 @@ impl SqliteAdmissionOperationStore {
             save(&tx, &self.serving_owner, actor.scope(), &key, &checkpoint)?;
             let head = VerifiedCheckpointHeadWrite::new(
                 &tx,
+                &self.serving_owner,
                 actor,
                 profile,
                 trusted_now,

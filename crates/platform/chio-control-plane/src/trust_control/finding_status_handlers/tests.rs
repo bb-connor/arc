@@ -185,7 +185,7 @@ fn provision_authority(
         fs::set_permissions(&lock_root, fs::Permissions::from_mode(0o700))?;
     }
     SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = Arc::new(SqliteAuthorityStore::open_serving(&database, &lock_root)?);
+    let authority = Arc::new(SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock())?);
     Ok((temp, authority))
 }
 

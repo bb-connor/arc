@@ -318,7 +318,7 @@ async fn ordinary_monetary_control_reaches_local_authorization_without_dispatch(
     }
     let database = path.join("admission.db");
     SqliteAuthorityStore::provision(&database, &locks)?;
-    let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(&database, &locks, chio_test_support::clock::clock())?;
     let issuer = Keypair::from_seed(&[140; 32]);
     let agent = Keypair::from_seed(&[141; 32]);
     let (mut kernel, effects) = open_kernel(path, &authority, &issuer)?;

@@ -157,7 +157,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         super::recovery_runtime::require_intake_headroom(&connection)?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let (_, _, _, root) = profile(&tx, scope, receipt_key)?;
         if &root != operator {
             return Err(AdmissionOperationStoreError::RecoveryAuthorityDenied);
@@ -240,7 +240,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        schema::authority_validation_time(&tx, now)?;
+        schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let deployment = protected::deployment_tx(&tx, scope)?;
         super::super::security_participant_state::verify_recovery_initialization(
             &tx,
@@ -265,7 +265,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let deployment = protected::deployment_tx(&tx, actor.scope())?;
         super::super::recovery_runtime::verify_actor(&tx, actor, &deployment, now)?;
         if actor.permission() != RecoveryPermission::Inspect {
@@ -407,7 +407,7 @@ impl SqliteAdmissionOperationStore {
         }
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
-        let now = schema::authority_validation_time(&tx, now)?;
+        let now = schema::authority_validation_time(&tx, now, &self.serving_owner)?;
         let mut value = load(&tx, &report.body().probe.scope)?
             .ok_or_else(|| refused("setup selection absent"))?;
         current(&tx, &value)?;
@@ -489,7 +489,7 @@ fn retire_for_replacement(
         && record.native_link.is_none()
     {
         let proof = super::unused_generation::verify_unused_generation(
-            tx, selected, deployment, fence, now,
+            tx, owner, selected, deployment, fence, now,
         )?;
         protected::retire_unused_setup_generation_with_origin(tx, owner, proof, now, origin)?;
     } else if !matches!(
