@@ -1,10 +1,11 @@
-//! Hosted-session scenarios that restart `chio mcp serve-http` between steps.
-//! Language peers cannot restart the server, so the runner drives these itself.
+//! Restart conformance uses bounded JSON and SSE response readers.
 
 use std::collections::BTreeMap;
+use std::io::Read;
 use std::net::SocketAddr;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
+use chio_core::canonical::UntrustedJsonText;
 use reqwest::blocking::{Client, Response};
 use reqwest::StatusCode;
 use serde_json::{json, Value};
@@ -20,6 +21,8 @@ const PROTOCOL_VERSION: &str = "2025-11-25";
 const SUBSCRIBED_URI: &str = "fixture://docs/alpha";
 const SUBSCRIPTION_SCENARIO: &str = "hosted-subscription-across-restart";
 const REPLAY_SCENARIO: &str = "hosted-replay-across-restart";
+const MAX_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// One server-sent event: its id, when present, and its JSON payload.
 struct SseEvent {
@@ -31,6 +34,7 @@ struct Probe {
     client: Client,
     endpoint: String,
     token: String,
+    timeout: Duration,
 }
 
 impl Probe {
@@ -38,6 +42,7 @@ impl Probe {
         let mut request = self
             .client
             .post(&self.endpoint)
+            .timeout(self.timeout)
             .bearer_auth(&self.token)
             .header("accept", "application/json, text/event-stream")
             .header("content-type", "application/json")
@@ -47,7 +52,7 @@ impl Probe {
                 .header("mcp-session-id", session)
                 .header("mcp-protocol-version", PROTOCOL_VERSION);
         }
-        request.send().map_err(|error| error.to_string())
+        request.send().map_err(request_error)
     }
 
     fn rpc(&self, session: &str, body: &Value) -> Result<Vec<SseEvent>, String> {
@@ -55,9 +60,7 @@ impl Probe {
         if response.status() != StatusCode::OK {
             return Err(format!("{} answered {}", body["method"], response.status()));
         }
-        Ok(parse_sse(
-            &response.text().map_err(|error| error.to_string())?,
-        ))
+        parse_sse(&read_response(response)?)
     }
 
     fn open_subscribed_session(&self) -> Result<String, String> {
@@ -68,13 +71,16 @@ impl Probe {
                 "capabilities": {},
                 "clientInfo": {"name": PEER_LABEL, "version": "0.1.0"}}}),
         )?;
+        if !response.status().is_success() {
+            return Err(format!("initialize answered {}", response.status()));
+        }
         let session = response
             .headers()
             .get("mcp-session-id")
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned)
             .ok_or("initialize returned no MCP-Session-Id")?;
-        response.text().map_err(|error| error.to_string())?;
+        validate_initialize(response)?;
         let initialized = self.post(
             Some(&session),
             &json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
@@ -99,8 +105,6 @@ impl Probe {
         Ok(session)
     }
 
-    /// Asks the fixture upstream to publish an update for the subscribed URI
-    /// and returns the `resources/updated` events the request stream carried.
     fn trigger_update(&self, session: &str, id: u64) -> Result<Vec<SseEvent>, String> {
         let events = self.rpc(
             session,
@@ -119,6 +123,7 @@ impl Probe {
     fn replay_status(&self, session: &str, cursor: &str) -> Result<StatusCode, String> {
         self.client
             .get(&self.endpoint)
+            .timeout(self.timeout)
             .bearer_auth(&self.token)
             .header("accept", "text/event-stream")
             .header("mcp-session-id", session)
@@ -126,27 +131,132 @@ impl Probe {
             .header("last-event-id", cursor)
             .send()
             .map(|response| response.status())
-            .map_err(|error| error.to_string())
+            .map_err(request_error)
     }
 }
 
-fn parse_sse(body: &str) -> Vec<SseEvent> {
-    body.split("\n\n")
-        .filter_map(|frame| {
-            let mut id = None;
-            let mut data = String::new();
-            for line in frame.lines() {
-                if let Some(value) = line.strip_prefix("id:") {
-                    id = Some(value.trim().to_owned());
-                } else if let Some(value) = line.strip_prefix("data:") {
-                    data.push_str(value.trim());
-                }
+fn validate_initialize(response: Response) -> Result<(), String> {
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(';').next())
+        .unwrap_or("")
+        .trim();
+    let is_sse = content_type.eq_ignore_ascii_case("text/event-stream");
+    let is_json = content_type.eq_ignore_ascii_case("application/json");
+    if !is_sse && !is_json {
+        return Err("initialize returned an unsupported content type".to_owned());
+    }
+    if is_sse && response.status() != StatusCode::OK {
+        return Err(format!("initialize answered {}", response.status()));
+    }
+    let body = read_response(response)?;
+    let messages = if is_sse {
+        parse_sse(&body)?
+            .into_iter()
+            .map(|event| event.message)
+            .collect::<Vec<_>>()
+    } else {
+        let text = UntrustedJsonText::from_wire(body.as_bytes(), MAX_RESPONSE_BYTES)
+            .map_err(|error| error.to_string())?;
+        vec![text.decode_document().map_err(|error| error.to_string())?]
+    };
+    let mut responses = messages
+        .iter()
+        .filter(|message| message["id"] == 1 && message.get("method").is_none());
+    let message = responses.next().ok_or("initialize did not succeed")?;
+    let result = &message["result"];
+    if responses.next().is_some()
+        || message["jsonrpc"] != "2.0"
+        || message.get("error").is_some()
+        || !result.is_object()
+        || result["protocolVersion"] != PROTOCOL_VERSION
+        || !result["capabilities"].is_object()
+        || !result["serverInfo"]["name"].is_string()
+        || !result["serverInfo"]["version"].is_string()
+    {
+        return Err("initialize did not succeed".to_owned());
+    }
+    Ok(())
+}
+
+fn request_error(error: reqwest::Error) -> String {
+    if error.is_timeout() {
+        "restart probe request timed out".to_owned()
+    } else {
+        error.to_string()
+    }
+}
+
+fn read_response(response: Response) -> Result<String, String> {
+    let mut bytes = Vec::new();
+    response
+        .take(MAX_RESPONSE_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| {
+            if error
+                .get_ref()
+                .and_then(|cause| cause.downcast_ref::<reqwest::Error>())
+                .is_some_and(reqwest::Error::is_timeout)
+            {
+                "restart probe response timed out".to_owned()
+            } else {
+                "restart probe response could not be read".to_owned()
             }
-            serde_json::from_str(&data)
-                .ok()
-                .map(|message| SseEvent { id, message })
-        })
-        .collect()
+        })?;
+    if bytes.len() > MAX_RESPONSE_BYTES {
+        return Err(format!(
+            "restart probe response exceeds {MAX_RESPONSE_BYTES} bytes"
+        ));
+    }
+    String::from_utf8(bytes).map_err(|_| "restart probe response is not UTF-8".to_owned())
+}
+
+fn parse_sse(body: &str) -> Result<Vec<SseEvent>, String> {
+    if body.len() > MAX_RESPONSE_BYTES {
+        return Err(format!(
+            "restart probe response exceeds {MAX_RESPONSE_BYTES} bytes"
+        ));
+    }
+    let body = body.strip_prefix('\u{feff}').unwrap_or(body);
+    let normalized = body.replace("\r\n", "\n").replace('\r', "\n");
+    let mut events = Vec::new();
+    let mut id = None;
+    let mut data = String::new();
+    for line in normalized.split_terminator('\n') {
+        if line.is_empty() {
+            let _ = data.pop();
+            if !data.is_empty() {
+                let text = UntrustedJsonText::from_wire(data.as_bytes(), MAX_RESPONSE_BYTES)
+                    .map_err(|error| error.to_string())?;
+                let message = text.decode_document().map_err(|error| error.to_string())?;
+                events.push(SseEvent {
+                    id: id.take(),
+                    message,
+                });
+            }
+            id = None;
+            data.clear();
+            continue;
+        }
+        let (field, value) = line.split_once(':').unwrap_or((line, ""));
+        let value = value.strip_prefix(' ').unwrap_or(value);
+        match field {
+            "id" if !value.contains('\0') => {
+                id = (!value.is_empty()).then(|| value.to_owned());
+            }
+            "data" => {
+                data.push_str(value);
+                data.push('\n');
+            }
+            _ => {}
+        }
+    }
+    if !data.strip_suffix('\n').unwrap_or(&data).is_empty() {
+        return Err("restart probe response ends inside an SSE event".to_owned());
+    }
+    Ok(events)
 }
 
 fn assertion(name: &str, outcome: Result<(), String>) -> AssertionResult {
@@ -196,9 +306,6 @@ fn scenario_result(
     }
 }
 
-/// Opens a subscribed session, records a notification cursor, restarts the
-/// server through `restart`, then checks that the stale cursor is refused and
-/// that the subscription still delivers updates.
 pub(super) fn run(
     options: &ConformanceRunOptions,
     listen: SocketAddr,
@@ -209,6 +316,7 @@ pub(super) fn run(
         client: Client::new(),
         endpoint: format!("http://{listen}/mcp"),
         token: options.auth_token.clone(),
+        timeout: REQUEST_TIMEOUT,
     };
     let before = probe.open_subscribed_session().and_then(|session| {
         let cursor = probe
@@ -262,21 +370,4 @@ pub(super) fn run(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::parse_sse;
-
-    #[test]
-    fn sse_frames_keep_their_ids_and_skip_priming_events() {
-        let events = parse_sse(
-            "id: s-1\nretry: 1000\ndata:\n\nid: s-2\ndata: {\"method\":\"notifications/resources/updated\"}\n\ndata: {\"id\":3,\"result\":{}}\n\n",
-        );
-        assert_eq!(events.len(), 2);
-        assert_eq!(events[0].id.as_deref(), Some("s-2"));
-        assert_eq!(
-            events[0].message["method"],
-            "notifications/resources/updated"
-        );
-        assert_eq!(events[1].id, None);
-        assert_eq!(events[1].message["id"], 3);
-    }
-}
+mod tests;
