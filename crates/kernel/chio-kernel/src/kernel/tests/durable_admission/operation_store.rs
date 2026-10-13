@@ -760,6 +760,14 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
                 "injected replay lookup failure".into(),
             ));
         }
+        if let Some(operation) = self
+            .replay_lookup_override
+            .lock()
+            .expect("test replay lookup override lock")
+            .take()
+        {
+            return Ok(Some(operation));
+        }
         Ok(self
             .state
             .lock()

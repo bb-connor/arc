@@ -233,3 +233,63 @@ fn completed_replay_rejects_failed_lookup_after_signer_rotation() -> TestResult 
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }
+
+#[test]
+fn completed_replay_rejects_another_operation_from_lookup() -> TestResult {
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("rotated-signer-selector");
+    let response = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(response.verdict, Verdict::Allow);
+    let original = store.operation();
+    let receipts_before = kernel.receipt_log().len();
+    let (other_kernel, other_request, other_store, other_invocations) =
+        durable_admission_fixture("rotated-signer-other-selector");
+    let other_response = other_kernel.evaluate_tool_call_blocking(&other_request)?;
+    assert_eq!(other_response.verdict, Verdict::Allow);
+    let other_operation = other_store.operation();
+    let other_receipts_before = other_kernel.receipt_log().len();
+    assert_ne!(original.replay_key(), other_operation.replay_key());
+    replace_receipt_authority(&mut kernel);
+    *store
+        .replay_lookup_override
+        .lock()
+        .map_err(|_| "replay lookup override lock")? = Some(other_operation.clone());
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .err()
+        .ok_or("another operation must refuse replay")?;
+    assert!(
+        matches!(
+            &error,
+            KernelError::DurableAdmission(reason)
+                if reason == "retained operation does not match its replay selector"
+        ),
+        "{error:?}"
+    );
+    assert!(store
+        .replay_lookup_override
+        .lock()
+        .map_err(|_| "replay lookup override lock")?
+        .is_none());
+    for (actual_store, expected_operation, expected_receipt) in [
+        (&store, &original, &response.receipt),
+        (&other_store, &other_operation, &other_response.receipt),
+    ] {
+        assert_eq!(&actual_store.operation(), expected_operation);
+        assert_same_receipt(
+            actual_store
+                .state
+                .lock()
+                .map_err(|_| "state lock")?
+                .receipt
+                .as_ref()
+                .ok_or("retained receipt")?,
+            expected_receipt,
+        );
+    }
+    assert_eq!(kernel.receipt_log().len(), receipts_before);
+    assert_eq!(other_kernel.receipt_log().len(), other_receipts_before);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(other_invocations.load(Ordering::SeqCst), 1);
+    Ok(())
+}

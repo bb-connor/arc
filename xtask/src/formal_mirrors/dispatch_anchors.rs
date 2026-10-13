@@ -1069,7 +1069,6 @@ const RUNTIME_OWNERSHIP_SOURCES: &[RequiredSource] = &[
             "RetainedToolAdmissionRequestV1",
             "RetainedRequestWire",
             "immutable_tool_request_hash",
-            "immutable_tool_request_hash_with_profile",
             "RetainedToolAdmissionRequestV1::from_admission",
             "RetainedToolAdmissionRequestV1::from_canonical_bytes",
             "RetainedToolAdmissionRequestV1::request_without_transient_credentials",
