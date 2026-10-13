@@ -5,6 +5,100 @@ use super::*;
 #[path = "tool_outcome_security_release_tests.rs"]
 mod tests;
 
+fn has_release_namespace(connection: &Connection) -> Result<bool, ToolOutcomeStoreError> {
+    connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE lower(name) GLOB 'tool_outcome_security_release*' OR lower(tbl_name) GLOB 'tool_outcome_security_release*')",
+        [], |row| row.get(0),
+    ).map_err(sqlite_error)
+}
+
+pub(super) fn verify_unstamped_source(
+    connection: &Connection,
+) -> Result<(), ToolOutcomeStoreError> {
+    let app_id: i32 = connection
+        .pragma_query_value(None, "application_id", |row| row.get(0))
+        .map_err(sqlite_error)?;
+    if app_id == 0 && has_release_namespace(connection)? {
+        return Err(invariant(
+            "unstamped security release source cannot be adopted",
+        ));
+    }
+    let version_namespace: Option<(String, String)> = connection
+        .query_row(
+            "SELECT type, name FROM sqlite_schema WHERE lower(name) = 'chio_store_schema_versions'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    if let Some((kind, name)) = version_namespace {
+        if kind != "table" || name != "chio_store_schema_versions" {
+            return Err(invariant(
+                "outcome schema-version namespace is not canonical",
+            ));
+        }
+        if app_id == 0 {
+            return Err(invariant(
+                "versioned outcome source has a damaged application identity",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn predecessor_schema(version: i32) -> String {
+    if version == 1 {
+        // Exact v1 trigger predicate from 1ba3d031ff^, before qualified payload
+        // rehydration was introduced. No other predecessor shape is accepted.
+        TOOL_OUTCOME_SCHEMA.replace(
+            "  OR (OLD.canonical_bytes IS NULL AND NEW.canonical_bytes IS NULL)\n  OR (OLD.canonical_bytes IS NOT NULL AND NEW.canonical_bytes IS NOT NULL)",
+            "  OR OLD.canonical_bytes IS NULL\n  OR NEW.canonical_bytes IS NOT NULL",
+        )
+    } else {
+        TOOL_OUTCOME_SCHEMA.to_owned()
+    }
+}
+
+pub(super) fn verify_pre_migration(
+    connection: &Connection,
+    on_disk: i32,
+) -> Result<(), ToolOutcomeStoreError> {
+    if has_release_namespace(connection)? {
+        return Err(invariant(
+            "pre-v3 outcome source contains unqualified security release records",
+        ));
+    }
+    let actual = tool_outcome_schema_catalog(connection)?;
+    if on_disk != 0 || !actual.is_empty() {
+        let mut matched = false;
+        for version in [1, 2] {
+            if on_disk != 0 && on_disk != version {
+                continue;
+            }
+            let expected = Connection::open_in_memory().map_err(sqlite_error)?;
+            expected
+                .execute_batch(&predecessor_schema(version))
+                .map_err(sqlite_error)?;
+            matched |= actual == tool_outcome_schema_catalog(&expected)?;
+        }
+        if !matched {
+            return Err(invariant(
+                "pre-v3 outcome schema is not the exact qualified predecessor",
+            ));
+        }
+        let future: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM tool_outcome_blobs WHERE canonical_bytes IS NOT NULL AND (json_extract(canonical_bytes, '$.schema') = 'chio.raw-invocation-outcome-with-security-release.v1' OR json_type(canonical_bytes, '$.security_release_required') IS NOT NULL))",
+            [], |row| row.get(0),
+        ).map_err(sqlite_error)?;
+        if future {
+            return Err(invariant(
+                "pre-v3 outcome source carries unqualified release requirements",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn participant_digest(record: &SecurityReleaseRecordV1) -> Result<String, ToolOutcomeStoreError> {
     #[derive(Serialize)]
     struct Commitment<'a> {
