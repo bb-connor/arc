@@ -197,7 +197,6 @@ pub struct FederationPeer {
     pub public_key: PublicKey,
     /// Cross-surface conformance tier that was signed into the peer's most
     /// recent accepted handshake.
-    #[serde(default)]
     pub conformance_tier: ConformanceTier,
     /// Unix seconds at which the peer was last pinned via a successful
     /// handshake.
@@ -206,9 +205,7 @@ pub struct FederationPeer {
     /// peer is treated as stale and MUST be re-handshaked before any
     /// federation-level operation is accepted against it.
     pub rotation_due: u64,
-    /// Peer-advertised protocol feature bitset. Missing on compatibility peers
-    /// defaults to current capability semantics without optional features.
-    #[serde(default)]
+    /// Peer-advertised protocol feature bitset.
     pub capabilities: CapabilityNegotiation,
     /// Optional signed ladder manifest reference accepted during handshake.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -232,9 +229,7 @@ pub struct HandshakeChallenge {
     pub remote_kernel_id: String,
     pub nonce: String,
     pub timestamp: u64,
-    #[serde(default, skip_serializing_if = "is_default_capability_negotiation")]
     pub capabilities: CapabilityNegotiation,
-    #[serde(default, skip_serializing_if = "is_default_conformance_tier")]
     pub conformance_tier: ConformanceTier,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ladder_manifest_ref: Option<LadderManifestRef>,
@@ -296,14 +291,6 @@ impl HandshakeChallenge {
         }
         canonical_json_bytes(self).map_err(|e| PeerHandshakeError::CanonicalJson(e.to_string()))
     }
-}
-
-fn is_default_capability_negotiation(capabilities: &CapabilityNegotiation) -> bool {
-    *capabilities == CapabilityNegotiation::v1_default()
-}
-
-fn is_default_conformance_tier(tier: &ConformanceTier) -> bool {
-    *tier == ConformanceTier::Bronze
 }
 
 /// Envelope one kernel sends to the other during a handshake.

@@ -288,7 +288,7 @@ fn stage2_allow_hybrid_accepts_both_classical_and_hybrid_bundles() {
     );
     assert!(verify_under_floor(&hybrid_bundle, CryptoFloor::AllowHybrid));
 
-    // Legacy bundle still accepted under allow_hybrid (allows_classical_only=true).
+    // The classical bundle is still accepted under allow_hybrid (allows_classical_only=true).
     let fixture = load_v318_fixture();
     assert!(verify_under_floor(&fixture, CryptoFloor::AllowHybrid));
 }

@@ -157,7 +157,7 @@ fn receipt_v1_runtime_package() -> (
 
     let mut trust_bundle_document =
         verifier_trust_bundle_document_for_package(&package).expect("trust bundle builds");
-    trust_bundle_document.disclosure_policy = Some(ChioDisclosurePolicy {
+    trust_bundle_document.disclosure_policy = ChioDisclosurePolicy {
         projection_version: PROJECTION_VERSION_RECEIPT_V1.to_string(),
         ciphersuite: BBS_CIPHERSUITE_SHA256.to_string(),
         message_count: 14,
@@ -167,7 +167,7 @@ fn receipt_v1_runtime_package() -> (
             "id".to_string(),
             "tool_name".to_string(),
         ],
-    });
+    };
     let trust_bundle = ChioVerifierTrustBundle::from_document(trust_bundle_document)
         .expect("receipt v1 trust bundle parses");
 

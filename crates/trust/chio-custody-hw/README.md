@@ -38,7 +38,7 @@ assert!(issuer.mint_capability(&verified, &request, now).is_err());
 ```
 
 Real assertion evidence comes from `PasskeyVerifier::verify_assertion` with
-server-owned authentication state. Use `with_durable_stores_handle` when
+server-owned authentication state. Use `with_durable_stores` when
 replay/revocation must survive restart and operator revocations share the cache.
 
 ## Features

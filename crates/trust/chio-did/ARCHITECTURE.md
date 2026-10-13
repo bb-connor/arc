@@ -4,8 +4,7 @@
 
 The crate owns canonical `did:chio` identifiers and deterministic DID document
 construction. Its public surface is `DidChio`, `DidDocument`, verification-method
-and service structs, `ResolveOptions`, and the resolver `resolve_did_arc`.
-The resolver's exported name retains the legacy project spelling.
+and service structs, `ResolveOptions`, and the resolver `resolve_did_chio`.
 
 An identifier binds an Ed25519 key representation to a DID string. A resolved
 document does not establish possession of its private key or admission to a
@@ -43,7 +42,6 @@ ordinals use one-based suffixes beginning with `-2`.
 
 Only the `did:chio` method is parsed here. P-256, P-384, hybrid keys, and other
 DID methods fail the `DidChio` constructor or parser.
-The protocol permits broader methods as compatibility inputs elsewhere.
 
 HTTPS validation proves URL scheme and syntax. It does not contact the endpoint,
 verify its owner, or bind the service to a signed document.

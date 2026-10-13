@@ -7,14 +7,6 @@ use crate::error::ChioPackageError;
 use crate::validation::{validate_sha256_hex, validate_trust_field};
 
 pub const REVOCATION_CHECKPOINT_SCHEMA: &str = "chio.federation.revocation-checkpoint.v1";
-pub const CHIO_FEDERATION_REVOCATION_CHECKPOINT_SCHEMA_V1: &str = REVOCATION_CHECKPOINT_SCHEMA;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ChioPinnedRevocationEpoch {
-    pub now_unix_ms: u64,
-    pub epoch_height: u64,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -28,13 +20,6 @@ pub struct ChioRevocationCheckpoint {
 }
 
 pub type SignedChioRevocationCheckpoint = SignedExportEnvelope<ChioRevocationCheckpoint>;
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum ChioRevocationMaterial {
-    Historical(ChioPinnedRevocationEpoch),
-    Checkpoint(Box<SignedChioRevocationCheckpoint>),
-}
 
 pub(crate) fn validate_revocation_checkpoint(
     checkpoint: &SignedChioRevocationCheckpoint,

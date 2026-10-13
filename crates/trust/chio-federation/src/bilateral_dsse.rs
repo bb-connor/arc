@@ -26,8 +26,7 @@
 //!
 //! This module emits both the DSSE signature-slice profile
 //! (`chio.bilateral-signature-slice.v1`) and the strict Chio bilateral
-//! invocation predicate (`chio.bilateral-cosign-invocation.v1`). The
-//! signature-slice profile stays available for compatibility; strict Chio
+//! invocation predicate (`chio.bilateral-cosign-invocation.v1`). Strict Chio
 //! conformance uses `chio.bilateral-cosign-invocation.v1` and does not
 //! carry the local `receipt_canonical_json` helper field.
 

@@ -11,14 +11,14 @@ no network request; the endpoint is metadata supplied by the caller.
 
 ```rust
 use chio_core_types::Keypair;
-use chio_did::{DidChio, DidService, ResolveOptions, resolve_did_arc};
+use chio_did::{DidChio, DidService, ResolveOptions, resolve_did_chio};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let did = DidChio::from_public_key(Keypair::from_seed(&[7; 32]).public_key())?;
     let options = ResolveOptions::default().with_service(
         DidService::receipt_log(&did, 0, "https://trust.example.com/receipts")?
     );
-    let document = resolve_did_arc(&did.to_string(), &options)?;
+    let document = resolve_did_chio(&did.to_string(), &options)?;
     assert_eq!(document.authentication, vec![did.verification_method_id()]);
     assert_eq!(document.service.len(), 1);
     Ok(())

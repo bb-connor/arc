@@ -34,7 +34,7 @@
 //! serves [`BlobsProtocol`] on an endpoint that also installs the
 //! [`DirectoryGate`](crate::admission::DirectoryGate) hooks, so an unadmitted
 //! follower is rejected at `after_handshake` before any blob byte transfers
-//! (ADAPTER-SPEC 6 item 1, validated by the PoC `three_way.rs`). As additional
+//! (ADAPTER-SPEC 6 item 1). As additional
 //! defense in depth, the follower only pulls from the endpoint that its pinned
 //! signer binding names, so it can never fetch roots from an impostor authority.
 //!
@@ -251,7 +251,7 @@ impl BlobCatchupClient {
     /// async fn rejected(endpoint: iroh::Endpoint) {
     ///     let free_standing = Arc::new(VerifiedSignerDirectory::default());
     ///     // Type error: `load` requires an `Arc<VerifiedDirectory>`, never an
-    ///     // `Arc<VerifiedSignerDirectory>`, so `from_bindings` can no longer be
+    ///     // `Arc<VerifiedSignerDirectory>`, so `from_bindings` cannot be
     ///     // the lane-e production entry point.
     ///     let _ = BlobCatchupClient::load("/tmp/blobs", endpoint, free_standing).await;
     /// }
@@ -345,7 +345,7 @@ impl BlobCatchupClient {
     /// every peer-dependent await - the per-blob `download` from the authority and the
     /// read-back - is bounded by the corresponding [`AcceptLimitConfig`] phase timeout.
     /// A stalled authority that accepts the pull but never serves (or completes) the
-    /// blob no longer hangs the follower's catch-up forever; the walk fails closed to
+    /// blob cannot hang the follower's catch-up; the walk fails closed to
     /// [`CatchupError::Blob`] and yields no partial history (all-or-nothing), exactly
     /// as any other blob-transport failure does.
     pub async fn fetch_range_with_limits(
@@ -453,8 +453,7 @@ impl BlobCatchupClient {
 /// the direct client lanes' `client_bounded` (revocation / bilateral) and the
 /// accept-side [`AcceptLimiter::bounded`](crate::lanes::limits::AcceptLimiter). On
 /// timeout this fails closed with [`CatchupError::Blob`] so a stalled authority that
-/// never serves (or completes) a blob can no longer hang the follower's catch-up
-/// forever. The inner transport `Result` flows through unchanged on success.
+/// never serves (or completes) a blob cannot hang the follower's catch-up. The inner transport `Result` flows through unchanged on success.
 async fn client_bounded<T, F>(
     limits: &AcceptLimitConfig,
     phase: AcceptPhase,
@@ -586,7 +585,7 @@ pub struct RevocationCatchupManifestEntry {
 /// `(signer_id, epoch, content-address)` list a follower feeds to
 /// [`BlobCatchupClient::fetch_from_manifest`], making the bulk blob path
 /// discoverable from the control exchange AND self-describing about its signer (the
-/// follower no longer needs the `signer_id` out of band). The manifest is bound to a
+/// follower needs no out-of-band `signer_id`). The manifest is bound to a
 /// SINGLE signer (`validate` rejects a mixed-signer manifest fail-closed). Integrity
 /// / authenticity are NOT asserted by the manifest: the follower still downloads each
 /// blob, BLAKE3-re-checks its address, and pinned-signer-verifies the root.

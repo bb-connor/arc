@@ -1,8 +1,7 @@
 //! Unproved SHA-256 noncollision research obligation.
 //!
-//! Preserved with its original symbolic domain and assertions. Strict runs
-//! timed out; no successful proof is claimed. This opt-in module is excluded
-//! from the production gate. See formal/rust-verification/crypto-proof-scope.toml.
+//! No successful proof is claimed. This opt-in module is excluded from the
+//! production gate. See formal/rust-verification/crypto-proof-scope.toml.
 
 use crate::card::weights_hash_of;
 
