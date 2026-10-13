@@ -101,10 +101,11 @@ mod tests {
 
     #[test]
     fn scenario_requires_steps() {
-        let error = match normalize_runtime_loopback_steps(scenario_with_run_id("runtime-loopback-1")) {
-            Ok(_) => panic!("accepted a scenario without steps"),
-            Err(error) => error,
-        };
+        let error =
+            match normalize_runtime_loopback_steps(scenario_with_run_id("runtime-loopback-1")) {
+                Ok(_) => panic!("accepted a scenario without steps"),
+                Err(error) => error,
+            };
         assert_eq!(
             error.to_string(),
             "Chio runtime loopback scenario requires at least one step"
@@ -125,7 +126,9 @@ mod tests {
             Err(error) => error,
         };
         assert!(
-            error.to_string().starts_with("unknown field `admissionProfile`"),
+            error
+                .to_string()
+                .starts_with("unknown field `admissionProfile`"),
             "{error}"
         );
     }
