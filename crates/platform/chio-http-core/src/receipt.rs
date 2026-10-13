@@ -5,8 +5,16 @@ use serde_json::{Map, Value};
 
 use chio_core_types::crypto::{Keypair, PublicKey, Signature};
 use chio_core_types::receipt::{
-    kinds::BoundaryClass, kinds::ObservationOutcome, kinds::ReceiptKind, kinds::RedactionMode,
-    kinds::ToolOrigin, kinds::TrustLevel, metadata::ActorRef, metadata::GuardEvidence,
+    body::{prepare_receipt_body_for_signing, ChioReceipt, ChioReceiptBody},
+    crypto_floor::ReceiptCryptoFloor,
+    kinds::BoundaryClass,
+    kinds::ObservationOutcome,
+    kinds::ReceiptKind,
+    kinds::RedactionMode,
+    kinds::ToolOrigin,
+    kinds::TrustLevel,
+    metadata::ActorRef,
+    metadata::GuardEvidence,
 };
 use chio_core_types::{canonical_json_bytes, sha256_hex};
 
@@ -95,8 +103,12 @@ pub struct HttpReceipt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capability_id: Option<String>,
 
-    /// Optional metadata for extensibility.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Metadata presence and value are signed, including explicit null.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_metadata",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub metadata: Option<serde_json::Value>,
 
     /// The kernel's public key (for verification without out-of-band lookup).
@@ -135,9 +147,20 @@ pub struct HttpReceiptBody {
     pub trust_level: TrustLevel,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capability_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_metadata",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub metadata: Option<serde_json::Value>,
     pub kernel_key: PublicKey,
+}
+
+fn deserialize_metadata<'de, D>(deserializer: D) -> Result<Option<Value>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Value::deserialize(deserializer).map(Some)
 }
 
 impl HttpReceiptBody {
@@ -268,16 +291,7 @@ impl HttpReceipt {
         self.verdict.is_denied()
     }
 
-    fn chio_receipt_body(
-        &self,
-    ) -> chio_core_types::Result<chio_core_types::receipt::body::ChioReceiptBody> {
-        // A durable receipt store verifies `ToolCallAction::verify_hash()` before
-        // accepting a receipt, so `parameter_hash` must be the canonical hash of
-        // the action parameters, not the HTTP body content hash. Deriving it from
-        // the parameters keeps the converted receipt verifiable end to end; a
-        // store that recomputes the hash then accepts the record instead of
-        // rejecting it. The HTTP body content hash stays bound to the receipt
-        // through the `content_hash` field below.
+    fn chio_receipt_body(&self) -> chio_core_types::Result<ChioReceiptBody> {
         let action = chio_core_types::receipt::decision::ToolCallAction::from_parameters(
             serde_json::json!({
                 "method": self.method.to_string(),
@@ -286,7 +300,7 @@ impl HttpReceipt {
             }),
         )?;
 
-        Ok(chio_core_types::receipt::body::ChioReceiptBody {
+        let mut chio_body = ChioReceiptBody {
             id: self.id.clone(),
             timestamp: self.timestamp,
             capability_id: self.capability_id.clone().unwrap_or_default(),
@@ -309,47 +323,54 @@ impl HttpReceipt {
             tenant_id: None,
             kernel_key: self.kernel_key.clone(),
             bbs_projection_version: None,
-        })
+        };
+        let mut metadata = match chio_body.metadata.take() {
+            Some(Value::Object(metadata)) => metadata,
+            Some(value) => Map::from_iter([("original_metadata".into(), value)]),
+            None => Map::new(),
+        };
+        metadata.insert("chio_http_receipt_v1".into(), serde_json::to_value(self)?);
+        chio_body.metadata = Some(Value::Object(metadata));
+        let canonical = canonical_json_bytes(&chio_body)?;
+        chio_body.content_hash = sha256_hex(&canonical);
+        Ok(chio_body)
     }
 
     /// Convert this HTTP receipt into a signed core ChioReceipt for unified storage.
     pub fn to_chio_receipt_with_keypair(
         &self,
         keypair: &Keypair,
-    ) -> chio_core_types::Result<chio_core_types::receipt::body::ChioReceipt> {
+    ) -> chio_core_types::Result<ChioReceipt> {
         if !self.verify_signature()? || keypair.public_key() != self.kernel_key {
             return Err(chio_core_types::Error::InvalidSignature(
                 "HTTP evidence projection requires an authentic receipt and its matching signer"
                     .into(),
             ));
         }
-        let mut chio_body = self.chio_receipt_body()?;
-        let mut metadata = match chio_body.metadata.take() {
-            Some(Value::Object(metadata)) => metadata,
-            Some(value) => Map::from_iter([("original_metadata".into(), value)]),
-            None => Map::new(),
-        };
-        // Retain the complete signed source, including caller/session identity,
-        // HTTP status and its original signature. A projection cannot silently
-        // discard fields that distinguish an observation from authorization.
-        metadata.insert("chio_http_receipt_v1".into(), serde_json::to_value(self)?);
-        chio_body.metadata = Some(Value::Object(metadata));
-        let canonical = canonical_json_bytes(&chio_body)?;
-        chio_body.content_hash = sha256_hex(&canonical);
-        chio_core_types::receipt::body::ChioReceipt::sign(chio_body, keypair)
+        ChioReceipt::sign(self.chio_receipt_body()?, keypair)
     }
 
-    /// Convert this HTTP receipt into a core ChioReceipt for unified storage.
-    ///
-    /// This method fails closed because a valid ChioReceipt signature cannot be
-    /// derived from an HttpReceipt without the kernel signing keypair.
-    pub fn to_chio_receipt(
+    /// Verify both signatures, signer equality, and the complete canonical projection.
+    /// Signer trust must be established separately.
+    pub fn verify_chio_receipt_projection(
         &self,
-    ) -> chio_core_types::Result<chio_core_types::receipt::body::ChioReceipt> {
-        Err(chio_core_types::Error::CanonicalJson(
-            "cannot convert HttpReceipt into signed ChioReceipt without the kernel keypair"
-                .to_string(),
-        ))
+        projected: &ChioReceipt,
+    ) -> chio_core_types::Result<bool> {
+        if self.kernel_key != projected.kernel_key || !self.verify_signature()? {
+            return Ok(false);
+        }
+        if !projected
+            .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+            .map_err(|error| {
+                chio_core_types::Error::InvalidSignature(format!(
+                    "HTTP evidence outer signature verification failed: {error}"
+                ))
+            })?
+        {
+            return Ok(false);
+        }
+        let expected = prepare_receipt_body_for_signing(self.chio_receipt_body()?)?;
+        Ok(canonical_json_bytes(&expected)? == canonical_json_bytes(&projected.body())?)
     }
 }
 
@@ -513,17 +534,6 @@ mod tests {
     }
 
     #[test]
-    fn to_chio_receipt_conversion() {
-        let kp = test_keypair();
-        let body = sample_body(&kp);
-        let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
-        let error = receipt.to_chio_receipt().test_unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("cannot convert HttpReceipt into signed ChioReceipt"));
-    }
-
-    #[test]
     fn receipt_with_evidence_entries() {
         let kp = test_keypair();
         let mut body = sample_body(&kp);
@@ -643,6 +653,45 @@ mod tests {
         assert_eq!(original, &serde_json::to_value(&receipt).test_unwrap());
         assert!(projected.verify_signature().test_unwrap());
         assert!(projected.action.verify_hash().test_unwrap());
+        assert!(receipt
+            .verify_chio_receipt_projection(&projected)
+            .test_unwrap());
+    }
+
+    #[test]
+    fn projection_verifier_rejects_outer_signature_substitution() {
+        let kp = test_keypair();
+        let receipt = HttpReceipt::sign(sample_body(&kp), &kp).test_unwrap();
+        let mut projected = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
+        let mut other_body = sample_body(&kp);
+        other_body.request_id = "other-request".into();
+        let other = HttpReceipt::sign(other_body, &kp).test_unwrap();
+        projected.signature = other
+            .to_chio_receipt_with_keypair(&kp)
+            .test_unwrap()
+            .signature;
+        assert!(matches!(
+            receipt.verify_chio_receipt_projection(&projected),
+            Ok(false)
+        ));
+    }
+
+    #[test]
+    fn projection_verifier_rejects_outer_algorithm_mismatch() {
+        let kp = test_keypair();
+        let receipt = HttpReceipt::sign(sample_body(&kp), &kp).test_unwrap();
+        let mut projected = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
+        projected.algorithm = Some(chio_core_types::crypto::SigningAlgorithm::P256);
+        let error = receipt
+            .verify_chio_receipt_projection(&projected)
+            .test_unwrap_err();
+        match error {
+            chio_core_types::Error::InvalidSignature(message) => assert_eq!(
+                message,
+                "HTTP evidence outer signature verification failed: receipt algorithm envelope field p256 disagrees with signature ed25519"
+            ),
+            other => panic!("expected signature refusal, received {other:?}"),
+        }
     }
 
     #[test]

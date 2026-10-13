@@ -347,13 +347,20 @@ evidence under an Ed25519 signature from the kernel.
 | `caller_identity_hash` | `string` | MUST | | Yes | SHA-256 hex hash of the caller identity |
 | `session_id` | `string` or `null` | MAY | `null` | Yes | Session ID the request belonged to |
 | `verdict` | `Verdict` | MUST | | Yes | The kernel's verdict |
+| `receipt_kind` | `ReceiptKind` | MUST | | Yes | `mediated_decision` or `advisory_evaluation` |
+| `boundary_class` | `BoundaryClass` | MUST | | Yes | `prevent` for a mediated decision; `advisory_only` for an observation |
+| `observation_outcome` | `ObservationOutcome` | MAY | absent | Yes | `observed` for an advisory observation; absent for a mediated decision |
+| `tool_origin` | `ToolOrigin` | MUST | | Yes | Effect execution origin |
+| `redaction_mode` | `RedactionMode` | MUST | | Yes | `none`, `summary`, or `redacted` |
+| `actor_chain` | `ActorRef[]` | MAY | `[]` | Yes | Actor attribution chain |
 | `evidence` | `GuardEvidence[]` | MAY | `[]` | Yes | Per-guard evidence collected during evaluation |
 | `response_status` | `integer` | MUST | | Yes | HTTP status Chio associated with the evaluation outcome at receipt-signing time. For deny receipts this is the concrete Chio error status; for allow receipts produced before proxy or app execution completes, it is evaluation-time status metadata rather than guaranteed downstream response evidence. |
 | `timestamp` | `integer` | MUST | | Yes | Unix timestamp (seconds) when the receipt was created |
 | `content_hash` | `string` | MUST | | Yes | SHA-256 hex hash binding the request content to this receipt |
 | `policy_hash` | `string` | MUST | | Yes | SHA-256 hex hash of the policy that was applied |
+| `trust_level` | `TrustLevel` | MUST | | Yes | `mediated` for a mediated decision; `advisory` for an observation |
 | `capability_id` | `string` or `null` | MAY | `null` | Yes | Capability ID that was exercised, if any |
-| `metadata` | `object` or `null` | MAY | `null` | Yes | Extensibility metadata |
+| `metadata` | JSON value | MAY | absent | Yes | Extensibility metadata |
 | `kernel_key` | `string` | MUST | | Yes | Kernel's Ed25519 public key (64-character hex) |
 | `signature` | `string` | MUST | | No | Ed25519 signature over canonical JSON of the body fields (128-character hex) |
 
@@ -363,21 +370,38 @@ To produce a signed receipt:
 
 1. Construct an `HttpReceiptBody` containing all fields from the table above
    **except** `signature`.
-2. Serialize the body to canonical JSON (RFC 8785).
-3. Sign the canonical bytes with the kernel's Ed25519 private key.
-4. Attach the resulting signature to the receipt.
+2. Validate the receipt's authority semantics. A mediated decision binds
+   `receipt_kind: mediated_decision`, `boundary_class: prevent`,
+   `trust_level: mediated`, and no observation outcome. An advisory observation
+   binds `receipt_kind: advisory_evaluation`, `boundary_class: advisory_only`,
+   `trust_level: advisory`, `observation_outcome: observed`,
+   `tool_origin: host_executed_unmediated`, and an `incomplete` verdict.
+3. Compute `id` as the lowercase SHA-256 hex digest of the canonical JSON body
+   with the `id` field omitted.
+4. Serialize the complete body, including its computed `id`, to canonical JSON
+   (RFC 8785).
+5. Sign the canonical bytes with the kernel's Ed25519 private key and attach
+   the resulting signature. The body's `kernel_key` MUST identify that signer.
 
 ### 4.3 Verification
 
 To verify a receipt:
 
 1. Extract the body (all fields except `signature`).
-2. Serialize the body to canonical JSON (RFC 8785).
-3. Verify the `signature` against the canonical bytes using the `kernel_key`
+2. Validate the authority semantics defined in Section 4.2.
+3. Recompute the content-addressed `id` and require equality with the supplied
+   identifier.
+4. Serialize the body to canonical JSON (RFC 8785).
+5. Verify the `signature` against the canonical bytes using the `kernel_key`
    embedded in the receipt.
 
-Implementations **SHOULD** verify the receipt signature before treating
-receipt content as authoritative.
+Metadata presence is signed: an omitted `metadata` field and an explicit JSON
+`null` are distinct. Decoding MUST preserve this distinction for ID and signature
+verification.
+
+Implementations **MUST** verify the receipt before treating its content as
+authoritative. Evidence consumers **MUST** establish signer trust through
+their verification policy. Advisory observations do not authorize effects.
 
 ### 4.4 Cryptographic Representations
 
@@ -388,27 +412,30 @@ receipt content as authoritative.
 
 ## 5. HttpReceipt to ChioReceipt Mapping
 
-The `to_chio_receipt()` conversion maps an HTTP-layer receipt into the core
-`ChioReceipt` type for unified storage and cross-surface querying.
+The `to_chio_receipt_with_keypair()` conversion maps an authenticated HTTP
+receipt into a separately signed `ChioReceipt` for unified storage and
+cross-surface querying. Both signatures MUST use the same kernel key.
 
 ### 5.1 Field Mapping
 
 | HttpReceipt field | ChioReceipt field | Transformation |
 | --- | --- | --- |
-| `id` | `id` | Copied directly |
+| `id` | `metadata.chio_receipt_signing_nonce` | Binds the HTTP receipt ID; the outer receipt has its own content-addressed `id` |
 | `timestamp` | `timestamp` | Copied directly |
 | `capability_id` | `capability_id` | Unwrapped; defaults to empty string if `null` |
 | (constant) | `tool_server` | Set to `"http"` |
 | `method` + `route_pattern` | `tool_name` | Formatted as `"{method} {route_pattern}"` (e.g., `"GET /pets/{petId}"`) |
 | `method`, `route_pattern`, `request_id` | `action.parameters` | JSON object: `{ "method": "<method>", "route": "<route_pattern>", "request_id": "<request_id>" }` |
-| `content_hash` | `action.parameter_hash` | Copied directly |
-| `verdict` | `decision` | Converted via `Verdict.to_decision()` (see below) |
-| `content_hash` | `content_hash` | Recomputed as SHA-256 of canonical JSON of `ChioReceiptBody` |
+| `method`, `route_pattern`, `request_id` | `action.parameter_hash` | SHA-256 of the canonical `action.parameters` object |
+| `verdict` | `decision` | Converted for mediated decisions; absent for advisory observations |
+| `receipt_kind`, `boundary_class`, `observation_outcome`, `tool_origin`, `redaction_mode`, `actor_chain`, `trust_level` | Corresponding fields | Copied directly |
+| `content_hash` | `content_hash` | Binds the complete projection using the construction in Section 5.3 |
 | `policy_hash` | `policy_hash` | Copied directly |
 | `evidence` | `evidence` | Copied directly (same `GuardEvidence` type) |
-| `metadata` | `metadata` | Copied directly |
+| `metadata` | `metadata` | Object entries are retained; other present values are wrapped under `original_metadata` |
+| Complete signed receipt | `metadata.chio_http_receipt_v1` | Retains every signed HTTP field and the HTTP signature |
 | `kernel_key` | `kernel_key` | Copied directly |
-| `signature` | `signature` | Copied directly (see limitation below) |
+| Matching signing key | `signature` | Signs the core receipt independently |
 
 ### 5.2 Verdict to Decision Mapping
 
@@ -419,21 +446,31 @@ The `to_chio_receipt()` conversion maps an HTTP-layer receipt into the core
 | `cancel { reason }` | `cancelled { reason }` |
 | `incomplete { reason }` | `incomplete { reason }` |
 
-### 5.3 Signature Limitation
+### 5.3 Projection Construction and Verification
 
-**Important:** The `signature` field is copied directly from the `HttpReceipt`
-to the `ChioReceipt`. It is **not** re-signed over the `ChioReceiptBody`. This
-means the `ChioReceipt.signature` was computed over the `HttpReceiptBody`
-canonical JSON, not the `ChioReceiptBody` canonical JSON.
+The producer constructs the mapped core body with the HTTP receipt's `id` and
+request `content_hash`. It inserts the complete signed HTTP receipt under
+`metadata.chio_http_receipt_v1`, hashes the canonical core body, and replaces
+the core `content_hash` with that digest. Core receipt signing then binds the
+HTTP `id` as `metadata.chio_receipt_signing_nonce`, computes the core receipt's
+content-addressed `id`, and signs the core body with the matching kernel key.
+The projected `tenant_id` and `bbs_projection_version` are absent.
 
-Consumers that verify `ChioReceipt` signatures from HTTP-origin receipts
-**MUST** be aware that standard `ChioReceipt` signature verification will fail
-for these converted receipts. The intended use is unified storage and querying,
-not independent cryptographic verification of the converted form.
+The top-level HTTP record and signing nonce use those exact values even when
+the source metadata contains the same keys. The complete source metadata
+remains bound inside the embedded HTTP receipt.
 
-In production deployments, the kernel **SHOULD** sign both `HttpReceipt` and
-`ChioReceipt` independently from the same evaluation, rather than relying on
-the conversion method.
+An evidence verifier **MUST** verify both signatures, require equal signer
+keys, and compare the complete canonical core body against this construction.
+The comparison includes the embedded source, action, authority semantics,
+metadata, content hash, signing nonce, and receipt ID. The verification policy
+MUST trust the outer signer.
+
+A core receipt with `tool_server: "http"` MUST carry the embedded HTTP record.
+Any receipt carrying `metadata.chio_http_receipt_v1` MUST satisfy the same
+projection contract. Missing or malformed evidence, invalid signatures,
+unknown embedded fields, and projection differences cause verification to
+fail.
 
 ## 6. Default Policy Semantics
 

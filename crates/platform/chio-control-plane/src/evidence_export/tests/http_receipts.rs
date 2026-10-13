@@ -218,6 +218,7 @@ fn package_rejects_unknown_embedded_http_fields() {
 #[test]
 fn package_preserves_signed_http_metadata() {
     for metadata in [
+        serde_json::Value::Null,
         serde_json::json!("source-metadata"),
         serde_json::json!({
             "chio_http_receipt_v1": {"source": "opaque"},

@@ -46,6 +46,7 @@ chio-external-guards = { workspace = true }
 chio-federation = { workspace = true }
 chio-fiscal = { workspace = true }
 chio-flow = { workspace = true }
+chio-http-core = { workspace = true }
 chio-http-serve = { workspace = true }
 # The market verifiers this crate installs are kernel seams that only
 # exist with the kernel's finding-market lane compiled in.
@@ -116,7 +117,6 @@ windows-sys = { version = "0.60.2", features = [
 ] }
 
 [dev-dependencies]
-chio-http-core = { workspace = true }
 tracing-subscriber = { workspace = true }
 chio-anchor = { workspace = true }
 chio-secret-broker = { workspace = true, features = ["kernel-admission"] }
