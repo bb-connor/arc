@@ -285,3 +285,68 @@ fn public_tool_invocation_preserves_the_bound_delegation_ban_after_exact_binding
     );
     Ok(())
 }
+
+#[test]
+fn child_rebound_to_a_sibling_lineage_of_a_frozen_parent_is_denied() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let parent = fixture.recorded_bound_root(FROZEN)?;
+    let token = fixture.delegated_from(&parent, "child-rebound-sibling", Some(SIBLING))?;
+    let session = fixture.open_for(&token)?;
+    fixture.install()?;
+    let result =
+        fixture
+            .kernel
+            .subscribe_session_resource(&session, &token, &token.subject.to_hex(), URI);
+    let expected = format!(
+        "delegated capability tenant and lineage binding differs from ancestor {}",
+        parent.id
+    );
+    assert!(
+        matches!(&result, Err(KernelError::CapabilityIssuanceDenied(reason)) if *reason == expected),
+        "a child cannot leave its frozen parent lineage: {result:?}"
+    );
+    assert!(!fixture
+        .kernel
+        .session_has_resource_subscription(&session, URI)?);
+    Ok(())
+}
+
+#[test]
+fn unbound_child_of_a_bound_parent_is_denied_without_an_authority() -> TestResult {
+    let fixture = Fixture::new()?;
+    let parent = fixture.recorded_bound_root(SIBLING)?;
+    let token = fixture.delegated_from(&parent, "child-unbound-under-bound", None)?;
+    let session = fixture.open_for(&token)?;
+    let result =
+        fixture
+            .kernel
+            .subscribe_session_resource(&session, &token, &token.subject.to_hex(), URI);
+    let expected = format!(
+        "delegated capability omits the tenant and lineage binding of ancestor {}",
+        parent.id
+    );
+    assert!(
+        matches!(&result, Err(KernelError::CapabilityIssuanceDenied(reason)) if *reason == expected),
+        "an unbound child cannot drop its parent binding: {result:?}"
+    );
+    assert!(!fixture
+        .kernel
+        .session_has_resource_subscription(&session, URI)?);
+    Ok(())
+}
+
+#[test]
+fn child_bound_to_its_parent_lineage_subscribes_under_an_authority() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let parent = fixture.recorded_bound_root(SIBLING)?;
+    let token = fixture.delegated_from(&parent, "child-same-lineage", Some(SIBLING))?;
+    let session = fixture.open_for(&token)?;
+    fixture.install()?;
+    fixture
+        .kernel
+        .subscribe_session_resource(&session, &token, &token.subject.to_hex(), URI)?;
+    assert!(fixture
+        .kernel
+        .session_has_resource_subscription(&session, URI)?);
+    Ok(())
+}

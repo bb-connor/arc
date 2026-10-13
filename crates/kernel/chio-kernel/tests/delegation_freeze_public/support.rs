@@ -171,15 +171,25 @@ impl Fixture {
     }
 
     pub fn delegated(&self, id: &str, lineage: Option<&str>) -> TestResult<CapabilityToken> {
+        self.delegated_from(&self.root, id, lineage)
+    }
+
+    /// The parent must share the root holder as its subject.
+    pub fn delegated_from(
+        &self,
+        parent: &CapabilityToken,
+        id: &str,
+        lineage: Option<&str>,
+    ) -> TestResult<CapabilityToken> {
         let child_holder = Keypair::generate();
         let link = DelegationLink::sign(
             DelegationLinkBody {
-                capability_id: self.root.id.clone(),
-                delegator: self.root.subject.clone(),
+                capability_id: parent.id.clone(),
+                delegator: parent.subject.clone(),
                 delegatee: child_holder.public_key(),
                 attenuations: Vec::new(),
-                timestamp: self.root.issued_at,
-                scope_hash: Some(scope_hash(&self.root.scope)?),
+                timestamp: parent.issued_at,
+                scope_hash: Some(scope_hash(&parent.scope)?),
                 aggregate_budget: None,
                 cumulative_approval: None,
             },
@@ -189,9 +199,9 @@ impl Fixture {
             id: id.into(),
             issuer: self.issuer.public_key(),
             subject: child_holder.public_key(),
-            scope: self.root.scope.clone(),
-            issued_at: self.root.issued_at,
-            expires_at: self.root.expires_at,
+            scope: parent.scope.clone(),
+            issued_at: parent.issued_at,
+            expires_at: parent.expires_at,
             delegation_chain: vec![link],
             aggregate_invocation_budget: None,
         };
@@ -203,7 +213,7 @@ impl Fixture {
             )?,
             None => CapabilityToken::sign(body, &self.issuer)?,
         };
-        assert!(token.verify_signature_at(self.root.issued_at)?);
+        assert!(token.verify_signature_at(parent.issued_at)?);
         Ok(token)
     }
 
@@ -215,6 +225,19 @@ impl Fixture {
             self.binding(&self.root.subject, FROZEN),
             &self.issuer,
         )?)
+    }
+
+    /// A bound root whose signed snapshot is retained as a delegation parent.
+    pub fn recorded_bound_root(&self, lineage: &str) -> TestResult<CapabilityToken> {
+        let mut body = self.root.body();
+        body.id = format!("root-bound-{lineage}");
+        let root = CapabilityToken::sign_with_security_binding(
+            body,
+            self.binding(&self.root.subject, lineage),
+            &self.issuer,
+        )?;
+        self.store.record_capability_snapshot(&root, None)?;
+        Ok(root)
     }
 
     pub fn install(&mut self) -> TestResult<Arc<FreezeAuthority>> {
