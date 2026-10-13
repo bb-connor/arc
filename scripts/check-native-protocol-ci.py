@@ -93,7 +93,7 @@ def validate_consumer(
 
 def validate(
     ci: dict, process: dict, action: dict, cpp: dict, postgres: dict, sdk: dict,
-    enterprise: dict,
+    enterprise: dict, release: dict,
 ) -> None:
     checks = (
         "python3 scripts/check-native-protocol-ci.py",
@@ -152,6 +152,7 @@ def validate(
         (sdk, "sdk-parity", "Run SDK parity"),
         (enterprise, "portable-contracts", "Native security conformance"),
         (enterprise, "active-defense-security", "Durable consumer boundaries"),
+        (release, "qualify", "SDK parity contract lane"),
     ):
         validate_consumer(workflow, job_id, consumer, {"name": FIXTURE_NAME, "uses": FIXTURE_ACTION})
     for workflow, job_id, step_name, profile in (
@@ -159,6 +160,7 @@ def validate(
         (postgres, "native", "Build the real gateway and kernel", " --profile docker-release"),
         (sdk, "sdk-parity", "Run SDK parity", ""),
         (enterprise, "portable-contracts", "Native security conformance", ""),
+        (release, "qualify", "SDK parity contract lane", ""),
     ):
         _, step = named_step(workflow["jobs"][job_id], step_name)
         require(
@@ -190,8 +192,9 @@ def main() -> None:
         yaml.safe_load((ROOT / ".github/workflows/postgres-job-swarm.yml").read_text()),
         yaml.safe_load((ROOT / ".github/workflows/sdk-parity.yml").read_text()),
         yaml.safe_load((ROOT / ".github/workflows/enterprise-hardening.yml").read_text()),
+        yaml.safe_load((ROOT / ".github/workflows/release-qualification.yml").read_text()),
     )
-    print("native protocol CI contract passed: workspace, process, C++, PostgreSQL, SDK parity and enterprise consumers")
+    print("native protocol CI contract passed: workspace, process, C++, PostgreSQL, SDK parity, enterprise and release qualification consumers")
 
 
 if __name__ == "__main__":

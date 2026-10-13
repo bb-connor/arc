@@ -219,8 +219,14 @@ jobs:
         with:
           packages: libssl-dev zlib1g-dev uuid-dev
 
+      - name: Qualify enforcing host and prepare native consumer fixture
+        uses: ./.github/actions/enforced-native-fixture
+
       - name: SDK parity contract lane
+        env:
+          TMPDIR: ${{ runner.temp }}
         run: |
+          cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement
           CMAKE_PREFIX_PATH="$(./scripts/setup-drogon-test-deps.sh)"
           export CMAKE_PREFIX_PATH
           ./scripts/check-sdk-parity.sh
