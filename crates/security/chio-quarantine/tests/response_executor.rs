@@ -6,7 +6,8 @@ mod rollback_budget;
 
 use chio_core_types::receipt::security::{ActiveDefenseEffectOutcome, ActiveDefenseReceiptBody};
 use chio_quarantine::{
-    build_response_plan, decode_response_record, ResponseExecutor, ResponseStateMachine,
+    build_response_plan, decode_response_record, ExecutorError, ResponseExecutor,
+    ResponseStateMachine,
 };
 use chio_security_types::ports::{
     response_affected_set_hash, ActionId, AlertDeliveryQuery, AlertDeliveryStatus,
@@ -14,7 +15,7 @@ use chio_security_types::ports::{
     BlastRadiusSeeds, BlastRadiusSnapshotMetadata, CanonicalBody, CreateOutcome, Digest32,
     EffectExecutionStatus, EffectOperation, EffectPort, EffectRequest, EffectResult,
     EffectResultQuery, IssuanceFreezeSpec, LeaseOwnerId, LineageId, OpaqueReceiptRef, PortError,
-    PortResult, ReceiptAppendRequest, RecordId, RecordIdSet, ResponseCasRequest,
+    PortErrorKind, PortResult, ReceiptAppendRequest, RecordId, RecordIdSet, ResponseCasRequest,
     ResponseEffectCasRequest, ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey,
     ResponsePlanRecord, ResponseReceiptCursor, ResponseReceiptCursorCasRequest,
     ResponseScheduledMutationCasRequest, ResponseSchedulerStore, ResponseStore, ScheduledWork,
@@ -1550,6 +1551,46 @@ fn executor_crash_stale_takeover_pending_apply_never_calls_effect_port() {
         ResponseState::Active
     );
     assert_eq!(harness.effects.mutation_counts(), (1, 0));
+}
+
+#[test]
+fn effect_journal_with_a_non_v1_schema_version_is_refused_without_calling_the_effect_port() {
+    for schema_version in [0_u8, 2, u8::MAX] {
+        let harness = Harness::new();
+        let executor = harness.executor();
+        let planned = create_plan(Arc::clone(&harness.store));
+        let first_work = work(&planned, 1, 900);
+        harness.store.install_work(first_work.clone());
+        harness
+            .receipts
+            .fail_once_on_effect_state("apply_requested");
+        assert!(matches!(
+            executor.execute(&planned, &first_work, 110),
+            Err(ExecutorError::Receipt(error)) if error.kind() == PortErrorKind::Unavailable
+        ));
+        assert_eq!(harness.effects.mutation_counts(), (0, 0));
+
+        harness
+            .store
+            .inner
+            .rewrite_effect_journals(|journal| {
+                journal["schema_version"] = serde_json::json!(schema_version);
+            })
+            .unwrap_or_else(|error| panic!("rewrite effect journal: {error}"));
+        let takeover_work = work(&planned, 2, 900);
+        harness.store.install_work(takeover_work.clone());
+        let pending = harness.load(&planned);
+        let error = match executor.execute(&pending, &takeover_work, 112) {
+            Err(error) => error,
+            Ok(_) => panic!("schema_version {schema_version} effect journal was accepted"),
+        };
+        assert!(
+            matches!(error, ExecutorError::InvalidEffectJournal),
+            "schema_version {schema_version}: {error:?}"
+        );
+        assert_eq!(error.to_string(), "response effect journal is invalid");
+        assert_eq!(harness.effects.mutation_counts(), (0, 0));
+    }
 }
 
 #[test]
