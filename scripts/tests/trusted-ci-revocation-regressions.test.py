@@ -77,7 +77,7 @@ MANUAL_OBSERVED = LISTENER_OBSERVED | {"merge_tree_sha": LANDING.TREE}
 def revocation_text(reason: str, observed: dict[str, str]) -> dict:
     """The tombstone text the revoker writes for E; each observation is empty when the binder did not observe it."""
     return {"authorized_source_sha": SOURCE, "evidence_sha": EVIDENCE, "observed": observed, "reason": reason,
-            "schema": "chio.security-check-revocation.v2", "security_definition_sha": DEFINITION}
+            "schema": "chio.security-check-revocation.v1", "security_definition_sha": DEFINITION}
 
 
 ORIGINAL_FAKE_GH, ORIGINAL_CHECK_STORE_CURL = LANDING.FAKE_GH, LANDING.CHECK_STORE_CURL
@@ -1070,7 +1070,7 @@ def e_placed_authority() -> dict:
             "identity": IDENTITY, "identity_digest": IDENTITY_DIGEST,
             "merge_observations": {"capture": LANDING.PRIOR_MERGE, "ci": MERGE}, "publication_binding_digest": "2" * 64,
             "required_check_run_ids": {"build": "501", "deny": "504", "msrv": "502", "vet": "503"},
-            "schema": "chio.security-check-authority.v3",
+            "schema": "chio.security-check-authority.v1",
             "source_ci": {"run_attempt": "1", "run_id": str(CI_RUN), "workflow_id": str(CI_WORKFLOW)}}
     return {"id": 605, "name": "Security contract", "head_sha": Y_HEAD, "external_id": AUTHORITY_EXTERNAL_ID,
             "status": "completed", "conclusion": "success", "app": dict(APP), "completed_at": "2026-10-06T00:06:00Z",

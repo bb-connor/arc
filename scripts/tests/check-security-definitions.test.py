@@ -291,7 +291,7 @@ class DefinitionTests(unittest.TestCase):
         names = labels or []
         return {
             "binding": {
-                "schema": "chio.security-check-publication.v2",
+                "schema": "chio.security-check-publication.v1",
                 "repository": "bb-connor/arc", "pr_number": "1160", "evidence_sha": EVIDENCE,
                 "authorized_source_sha": SOURCE, "security_definition_sha": DEFINITION,
                 "identity": copy.deepcopy(IDENTITY), "identity_digest": IDENTITY_DIGEST,
@@ -338,7 +338,7 @@ class DefinitionTests(unittest.TestCase):
                 "name": "Security contract", "head_sha": EVIDENCE, "external_id": EXTERNAL_ID,
                 "status": "completed", "conclusion": "success",
                 "text": {
-                    "schema": "chio.security-check-authority.v3", "identity": IDENTITY,
+                    "schema": "chio.security-check-authority.v1", "identity": IDENTITY,
                     "identity_digest": IDENTITY_DIGEST, "publication_binding_digest": binding_digest,
                     "merge_observations": {"capture": MERGE, "ci": MERGE},
                     "source_ci": {"workflow_id": "77", "run_id": "1", "run_attempt": "1"},
@@ -401,7 +401,7 @@ class DefinitionTests(unittest.TestCase):
             (("main_ref", "object", "sha"), OTHER),
             (("binding", "identity", "pr_number"), "2"),
             (("binding", "identity_digest"), "0" * 64),
-            (("binding", "schema"), "chio.security-check-publication.v1"),
+            (("binding", "schema"), "chio.security-check-revocation.v1"),
             (("binding", "ci", "required_check_run_ids", "build"), "invalid"),
             (("binding", "ci", "aggregate_check_run_id"), "0"),
             (("open_prs",), [{"number": 2, "head": {"sha": EVIDENCE}}]),

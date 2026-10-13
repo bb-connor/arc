@@ -1,5 +1,5 @@
 {
-  "schema": "chio.security-clock-inventory.v2",
+  "schema": "chio.security-clock-inventory.v1",
   "status": "Remaining ambient calls and independent ports, including test fixtures; migration is incomplete.",
   "sites": {
     "crates/guards/chio-guards/src/behavioral_profile.rs::default_now": 1,

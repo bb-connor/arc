@@ -351,7 +351,7 @@ def evidence_head_denial() -> dict:
     text = json.dumps({
         "authorized_source_sha": SOURCE, "evidence_sha": EVIDENCE,
         "observed": {"base_sha": BASE, "merge_commit_sha": MERGE, "merge_tree_sha": TREE, "pr_number": str(PR)},
-        "reason": "operator-security-revocation", "schema": "chio.security-check-revocation.v2",
+        "reason": "operator-security-revocation", "schema": "chio.security-check-revocation.v1",
         "security_definition_sha": DEFINITION,
     }, sort_keys=True, separators=(",", ":"))
     return {
@@ -677,7 +677,7 @@ C9_CAPTURE_MERGE, C9_CI_MERGE, C9_PUBLICATION_MERGE = (
 )
 C9_LANDING = "53cb59e39b46cca3889c4b866db266ba237b1949"
 BINDING_ARTIFACT_ID = 812
-LEGACY_REFUSAL = "legacy M-keyed authority is not a v3 qualification"
+MERGE_KEYED_REFUSAL = "merge-keyed authority external ID is refused"
 
 
 def candidate_identity(pr: int = PR, base: str = C9_BASE, evidence: str = C9_HEAD, tree: str = C9_TREE,
@@ -718,7 +718,7 @@ def v3_authority(identity: dict, archive: bytes, binding: bytes, *, recorded_ci:
     identity_digest = digest_of(identity) if digest is None else digest
     external_id = f"chio:v3:{identity['pr_number']}:{identity['evidence_sha']}:{identity_digest}"
     text = {
-        "schema": "chio.security-check-authority.v3", "identity": identity, "identity_digest": identity_digest,
+        "schema": "chio.security-check-authority.v1", "identity": identity, "identity_digest": identity_digest,
         "merge_observations": {"capture": C9_CAPTURE_MERGE, "ci": recorded_ci},
         "source_ci": {"run_attempt": "1", "run_id": str(CI_RUN), "workflow_id": str(CI_WORKFLOW)},
         "required_check_run_ids": {"build": "501", "deny": "504", "msrv": "502", "vet": "503"},
@@ -859,20 +859,31 @@ class CandidateIdentityAuditDesignControlTests(unittest.TestCase):
             with self.subTest(identity=label):
                 self.assert_unverified(v3_c9_landing(identity), IDENTITY_MISMATCH)
 
-    def test_legacy_external_id_on_the_evidence_head_is_not_a_v3_qualification(self) -> None:
+    def test_merge_keyed_external_id_on_the_evidence_head_is_refused(self) -> None:
         data = v3_c9_landing()
-        (legacy,) = copy.deepcopy(data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"]["check_runs"])
-        legacy["external_id"] = f"arc:{PR}:{C9_HEAD}:{C9_CAPTURE_MERGE}:{SOURCE}"
-        legacy["output"] = {"title": "Chio security authority",
-                            "summary": f"Dedicated chio-security-authority approval for {legacy['external_id']}.",
+        (merge_keyed,) = copy.deepcopy(data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"]["check_runs"])
+        merge_keyed["external_id"] = f"arc:{PR}:{C9_HEAD}:{C9_CAPTURE_MERGE}:{SOURCE}"
+        merge_keyed["output"] = {"title": "Chio security authority",
+                            "summary": f"Dedicated chio-security-authority approval for {merge_keyed['external_id']}.",
                             "text": json.dumps({
-                                "schema": "chio.security-check-authority.v2",
+                                "schema": "chio.security-check-authority.v1",
                                 "identity": {"pr_number": str(PR), "authorized_source_sha": SOURCE,
                                              "evidence_sha": C9_HEAD, "merge_commit_sha": C9_CAPTURE_MERGE},
                                 "source_ci": {"run_id": str(CI_RUN), "run_attempt": "1", "workflow_id": str(CI_WORKFLOW)},
                                 "publication_binding_digest": "2" * 64})}
-        data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"] = {"total_count": 1, "check_runs": [legacy]}
-        self.assert_unverified(data, LEGACY_REFUSAL)
+        data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"] = {"total_count": 1, "check_runs": [merge_keyed]}
+        self.assert_unverified(data, MERGE_KEYED_REFUSAL)
+
+    def test_merge_keyed_metadata_shape_under_the_current_schema_is_refused(self) -> None:
+        data = v3_c9_landing()
+        authority = data[f"{PREFIX}/commits/{C9_HEAD}/check-runs"]["check_runs"][0]
+        authority["output"]["text"] = json.dumps({
+            "schema": "chio.security-check-authority.v1",
+            "identity": {"pr_number": str(PR), "authorized_source_sha": SOURCE,
+                         "evidence_sha": C9_HEAD, "merge_commit_sha": C9_CAPTURE_MERGE},
+            "source_ci": {"run_id": str(CI_RUN), "run_attempt": "1", "workflow_id": str(CI_WORKFLOW)},
+            "publication_binding_digest": "2" * 64})
+        self.assert_unverified(data, "invalid authority metadata")
 
     def test_authority_only_on_a_test_merge_is_not_verified(self) -> None:
         data = v3_c9_landing()

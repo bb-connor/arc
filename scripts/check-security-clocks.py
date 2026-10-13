@@ -26,6 +26,7 @@ SCOPE_EVIDENCE_SHA256 = (
     "147bfd548e7b1a68e49a46f4f8fb62cd29c820eb3590b0270e57e63fb9dc4b5d"
 )
 INVENTORY = ROOT / "scripts/security-clock-inventory.json"
+INVENTORY_SCHEMA = "chio.security-clock-inventory.v1"
 FIXED_ROOTS = (
     "crates/security/",
     "crates/economy/chio-anchor/src/witness/rekor.rs",
@@ -246,6 +247,8 @@ def owner_fingerprint(source, owner):
 
 
 def allowed_sites(root, baseline):
+    if baseline.get("schema") != INVENTORY_SCHEMA:
+        raise ValueError(f"clock inventory schema must be {INVENTORY_SCHEMA}")
     evidence_bytes = (root / SCOPE_EVIDENCE).read_bytes()
     if hashlib.sha256(evidence_bytes).hexdigest() != SCOPE_EVIDENCE_SHA256:
         raise ValueError(

@@ -147,6 +147,21 @@ class ClockGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "absent from base source"):
             gate.allowed_sites(root, baseline)
 
+    def test_inventory_with_another_schema_is_rejected(self):
+        import json
+
+        baseline = json.loads(
+            (root / "scripts/security-clock-inventory.json").read_text()
+        )
+        for schema in (None, "chio.security-clock-inventory.v2"):
+            with self.subTest(schema=schema):
+                baseline["schema"] = schema
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "^clock inventory schema must be chio.security-clock-inventory.v1$",
+                ):
+                    gate.allowed_sites(root, baseline)
+
     def test_inventory_only_native_composition_promotion_is_rejected(self):
         import json
 

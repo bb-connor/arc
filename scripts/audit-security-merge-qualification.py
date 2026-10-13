@@ -216,7 +216,7 @@ def metadata(check: dict) -> dict:
     fields = {"schema", "identity", "identity_digest", "merge_observations", "source_ci",
               "required_check_run_ids", "aggregate_check_run_id", "ci_merge_binding", "publication_binding_digest"}
     require(isinstance(value, dict) and set(value) == fields
-            and value.get("schema") == "chio.security-check-authority.v3", "invalid v3 authority metadata")
+            and value.get("schema") == "chio.security-check-authority.v1", "invalid authority metadata")
     identity = value["identity"]
     require(isinstance(identity, dict) and set(identity) == {
                 "schema", "repository", "repository_id", "pr_number", "base_sha", "evidence_sha",
@@ -426,7 +426,7 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
     require(len(checks) == 1, "missing or duplicate dedicated authority namespace on E")
     authority = checks[0]
     require(not str(authority.get("external_id", "")).startswith("arc:"),
-            "legacy M-keyed authority is not a v3 qualification")
+            "merge-keyed authority external ID is refused")
     payload = metadata(authority)
     identity, identity_digest = payload["identity"], payload["identity_digest"]
     source, security_definition = sha(identity["authorized_source_sha"]), sha(identity["security_definition_sha"])

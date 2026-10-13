@@ -357,7 +357,7 @@ EXPECTED_ADVISORY_ENV = {'CARGO_INCREMENTAL': '0',
  'PROPTEST_CASES': '256',
  'CHIO_CI_RUSTFLAGS': '-D warnings -C link-arg=-Wl,--threads=1'}
 EXPECTED_ADVISORY_JOB_SHA256 = "a518a495aecb5d9eca47d6a5aaa3c3d978f524a5a020f312dbc8a0e24e399ff5"
-EXPECTED_LANDING_AUDITOR_SHA256 = "4c504e5faf84af85896283079f0f03f2a5fd7d4264668beb1dd914b6c9cd7d38"
+EXPECTED_LANDING_AUDITOR_SHA256 = "e2c1b0f43a62103f59529be980c7897d89bc81e31e288a71e21c8c95bb274056"
 EXPECTED_WORKFLOW_SYNTAX_CHECKER_SHA256 = "0c0d75a4c13910b4a74dc9f3b2861620f7eee3fb134931337601c171bff1afa5"
 EXPECTED_CI_PERMISSIONS = {"contents": "read"}
 EXPECTED_CONTROLLER_EVENTS = {
@@ -976,7 +976,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise Linux capture",
         "capture-linux-enforcement",
-    ): "ca9f8b3f60fd6f8b0bf92fce7d42e8c99b92137374932880b5687952aaee00e8",
+    ): "810d5fa8addb2d06e971d260da9e01f85222cd06e41f25b2d5a77f50d14702db",
     (
         "enterprise Linux capture",
         "dispatch-trusted-finalizer",
@@ -984,7 +984,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "validate-capture",
-    ): "b5d09e40df37acae0d3c18f42924d53af30caa28caffe70d1b0d72b03ad22965",
+    ): "e6b8a1814c4b628be7e70b6c082a9b987982d7c1dbdbdb563adb5e6ea7b42802",
     (
         "enterprise evidence finalizer",
         "sign-validated-capture",
@@ -992,19 +992,19 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "authorize-security-check-publication",
-    ): "2abc1d663a6aeb9097055502505d604f9779b9aaf2a400d2a1e80c913b2be28a",
+    ): "a2c56f4c6d661de5e886770291da732ca184ac2644e5e488b631c4ed1ce06dc4",
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "8fea072af16a817aa9908ec235e6aca6c52d5023fb416d271ce494d3ce4fc750",
+    ): "0bb276da9698eb296fc45ac9bd50cc8609864d411e7e518d0f60a4a08bdb0986",
     (
         "security contract revocation",
         "bind-revocation",
-    ): "e3fec7b0c8de003471d2e091442587d79ea506fb0949bf7c81e5c9781adcf546",
+    ): "159fc5bf022abd0144ca0e1c70584aa0946dfc5d6da241e811545eeda5e9865e",
     (
         "security contract revocation",
         "revoke-security-contract",
-    ): "59ff534df16f1fd76ffcff2f298d58399127a1212cc8272be065344d03763827",
+    ): "691d11bc04c77e927b9f43e4573f2267dda83976d00bd2a35a38a137b4adbd1a",
     (
         "enterprise-hardening",
         "committed-linux-evidence",
@@ -1890,7 +1890,7 @@ def validate_v3_landing_auditor(body: str) -> None:
     functions.update({f"GitHub.{node.name}": node for node in github.body if isinstance(node, ast.FunctionDef)})
     conditions = (
         ("metadata", 'set(value) == fields'),
-        ("metadata", 'value.get("schema") == "chio.security-check-authority.v3"'),
+        ("metadata", 'value.get("schema") == "chio.security-check-authority.v1"'),
         ("metadata", 'set(identity) == {"schema", "repository", "repository_id", "pr_number", "base_sha", "evidence_sha", "merge_tree_sha", "authorized_source_sha", "security_definition_sha"}'),
         ("metadata", 'item.isascii()'),
         ("metadata", 'digest(value["identity_digest"]) == hashlib.sha256(canonical).hexdigest()'),
@@ -1969,7 +1969,6 @@ def validate_v3_publisher(body: str) -> None:
     forbidden = (
         "commits/${MERGE_COMMIT_SHA}/check-runs", "arc:${PR_NUMBER}",
         '--arg head_sha "${MERGE_COMMIT_SHA}"',
-        'schema: "chio.security-check-authority.v2"',
     )
     identity_markers = (
         'test "$(jq -cS . <<< "${IDENTITY_JSON}")" = "${IDENTITY_JSON}"',
@@ -1981,7 +1980,7 @@ def validate_v3_publisher(body: str) -> None:
         '.identity.evidence_sha == .evidence_sha and .identity.merge_tree_sha == .merge_tree_sha',
         '.identity.authorized_source_sha == .authorized_source_sha',
         '.identity.security_definition_sha == .security_definition_sha',
-        'schema: "chio.security-check-authority.v3", identity, identity_digest',
+        'schema: "chio.security-check-authority.v1", identity, identity_digest',
         'required_check_run_ids: .ci.required_check_run_ids',
         'aggregate_check_run_id: .ci.aggregate_check_run_id',
         'artifact_digest: (.artifact_digest | sub("^sha256:"; "")), binding_sha256',
@@ -2361,7 +2360,7 @@ def validate_environment_provisioning_document(root: Path) -> None:
         'head_sha: E',
         'nine ASCII string fields:',
         '`K` is SHA-256 of its canonical sorted compact JSON.',
-        'external ID `chio:v3:deny:<E>` and `chio.security-check-revocation.v2` metadata.',
+        'external ID `chio:v3:deny:<E>` and `chio.security-check-revocation.v1` metadata.',
         'IDs must equal the sealed v3 IDs.',
         'API and ZIP reads stop at 16 MiB with a 30-second deadline;',
         'P5 denies authenticated E without main or live-merge predicates at any write\nboundary.',
@@ -7008,7 +7007,7 @@ def validate(root: Path) -> None:
                 '"merge_tree": os.environ["MERGE_TREE_SHA"]',
                 '"runner_environment": "github-hosted"',
                 '"runner_name": os.environ["RUNNER_NAME"]',
-                '"schema": "chio.enterprise-linux-capture.v2"',
+                '"schema": "chio.enterprise-linux-capture.v1"',
                 '"signed": False',
                 '"source_commit": os.environ["EVIDENCE_SOURCE_SHA"]',
                 '"security_definition_commit": os.environ["SECURITY_DEFINITION_SHA"]',
@@ -7378,7 +7377,7 @@ def validate(root: Path) -> None:
         (
             "if summary_bytes != canonical_summary:",
             "if sha_lines != expected_lines:",
-            'summary["schema"] != "chio.enterprise-linux-capture.v2"',
+            'summary["schema"] != "chio.enterprise-linux-capture.v1"',
             'summary["candidate_artifacts_executed"] is not True',
             'summary["signed"] is not False or summary["mode"] != "enforcement"',
             'summary["capture_actor"] != os.environ["EXPECTED_CAPTURE_ACTOR"]',
@@ -7933,7 +7932,7 @@ def validate(root: Path) -> None:
             "controller: {",
             "evidence_sha: $evidence_sha",
             "gate_result_digests: {",
-            'schema: "chio.security-check-publication.v2"',
+            'schema: "chio.security-check-publication.v1"',
             'schema: "chio.security-candidate-identity.v1"',
             'identity_digest: $identity_digest',
             'merge_observations: {capture: $merge_commit_sha, ci: $ci_merge_sha}',
@@ -8004,7 +8003,7 @@ def validate(root: Path) -> None:
             'publication_details_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${FINALIZER_RUN_ID}/attempts/${FINALIZER_RUN_ATTEMPT}"',
             'test "${canonical_binding}" = "${PUBLICATION_BINDING_JSON}"',
             'test "$(printf \'%s\' "${canonical_binding}" | sha256sum | cut -d\' \' -f1)" = "${PUBLICATION_BINDING_DIGEST}"',
-            'test "$(jq -r \'.schema\' <<< "${canonical_binding}")" = "chio.security-check-publication.v2"',
+            'test "$(jq -r \'.schema\' <<< "${canonical_binding}")" = "chio.security-check-publication.v1"',
             'test "$(jq -r \'.repository\' <<< "${canonical_binding}")" = "${GITHUB_REPOSITORY}"',
             'test "$(jq -r \'.pr_number\' <<< "${canonical_binding}")" = "${PR_NUMBER}"',
             'test "$(jq -r \'.evidence_sha\' <<< "${canonical_binding}")" = "${EVIDENCE_SHA}"',
@@ -8124,7 +8123,7 @@ def validate(root: Path) -> None:
             'reconcile_bad_ci\nif test "${bad_ci_observed}" = false; then',
             "publish_success_authority",
             "else\n  exit 1",
-            'schema: "chio.security-check-authority.v3"',
+            'schema: "chio.security-check-authority.v1"',
             '-H "Authorization: Bearer ${GH_TOKEN}"',
             'authority_created=false\nif test "${existing_authority_match_count}" = "1"; then',
             'commits/${EVIDENCE_SHA}/check-runs?app_id=${SECURITY_APP_ID}&check_name=Security%20contract&filter=all&per_page=100&page=${page}',
@@ -8311,7 +8310,7 @@ def validate(root: Path) -> None:
         or 'test "${retry_original_blob}" = "${retry_authorized_blob}"' not in retry_routine
         or 'for ((retry_attempt = 1; retry_attempt <= retry_maximum; retry_attempt++)); do' not in retry_routine
         or 'test "${retry_complete}" = true' not in retry_routine
-        or '.schema == "chio.security-check-authority.v3" and .identity == $identity' not in retry_routine
+        or '.schema == "chio.security-check-authority.v1" and .identity == $identity' not in retry_routine
         or '.source_ci == $source_ci' not in retry_routine
         or 'test "${authorizing_finalizer_id}" = "${FINALIZER_RUN_ID}"' not in retry_routine
         or 'require_authorizing_attempt "${retry_own_current}" 1' not in retry_routine
@@ -8836,7 +8835,7 @@ def validate(root: Path) -> None:
             'target_name="${check_name} / superseded ${check_run_id}"',
             'test "$(jq -r \'.name\' <<< "${updated}")" = "${target_name}"',
             'if test "${namespace_count}" = "0"; then',
-            'schema: "chio.security-check-revocation.v2"',
+            'schema: "chio.security-check-revocation.v1"',
             'conclusion: "failure"',
             'head_sha: $head_sha',
             'created="$(curl --proto \'=https\' --tlsv1.2 --fail --silent --show-error --request POST',

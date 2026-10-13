@@ -225,7 +225,7 @@ def snapshot() -> dict[str, dict]:
         "app": {"id": APP_ID, "slug": "chio-security-authority"},
         "details_url": f"https://github.com/{REPOSITORY}/actions/runs/{FINALIZER_RUN}/attempts/1",
         "completed_at": "2026-10-06T00:06:00Z",
-        "output": {"text": json.dumps({"schema": "chio.security-check-authority.v3", "identity": identity,
+        "output": {"text": json.dumps({"schema": "chio.security-check-authority.v1", "identity": identity,
                     "identity_digest": IDENTITY_DIGEST,
                     "merge_observations": {"capture": REGENERATED_MERGE, "ci": MERGE},
                     "source_ci": source_ci, "publication_binding_digest": "2" * 64,
@@ -1718,7 +1718,7 @@ def publication_binding(base: str = BASE, evidence: str = EVIDENCE, merge: str =
         "identity_digest": hashlib.sha256(identity_json.encode("ascii")).hexdigest(),
         "merge_tree_sha": tree, "pr_number": str(PR), "repository": REPOSITORY,
         "runner": {"arch": "X64", "labels_digest": "e" * 64, "name": "GitHub Actions 7", "os": "Linux"},
-        "schema": "chio.security-check-publication.v2", "security_definition_sha": DEFINITION,
+        "schema": "chio.security-check-publication.v1", "security_definition_sha": DEFINITION,
     }
     return json.dumps(binding, sort_keys=True, separators=(",", ":"))
 
@@ -1742,7 +1742,7 @@ def dedicated_failures_on_e(data: dict) -> list[dict]:
         try:
             text = json.loads(check["output"]["text"])
             if check.get("external_id") == f"chio:v3:deny:{EVIDENCE}":
-                valid = (text["schema"] == "chio.security-check-revocation.v2"
+                valid = (text["schema"] == "chio.security-check-revocation.v1"
                          and text["evidence_sha"] == EVIDENCE)
             else:
                 identity = text["identity"]
@@ -1753,7 +1753,7 @@ def dedicated_failures_on_e(data: dict) -> list[dict]:
                     continue
                 canonical = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("ascii")
                 digest = hashlib.sha256(canonical).hexdigest()
-                valid = (text["schema"] == "chio.security-check-authority.v3"
+                valid = (text["schema"] == "chio.security-check-authority.v1"
                          and text["identity_digest"] == digest
                          and check.get("external_id") == f"chio:v3:{identity['pr_number']}:{EVIDENCE}:{digest}")
             if valid:

@@ -273,8 +273,8 @@ The publisher and auditor independently recompute `K` and bind every identity
 field to the authorized candidate and retained landing. The captured and CI
 merge SHAs are separate `merge_observations`, rather than identity fields.
 
-The publication binding is `chio.security-check-publication.v2`. Its strict
-`chio.security-check-authority.v3` text carries `I`, `K`, both merge observations,
+The publication binding is `chio.security-check-publication.v1`. Its strict
+`chio.security-check-authority.v1` text carries `I`, `K`, both merge observations,
 the exact source CI attempt, four required original check IDs, the Actions
 aggregate ID, and the CI binding artifact ID and archive/body digests. IDs alone
 grant no authority: before every positive boundary the publisher re-reads the
@@ -378,7 +378,7 @@ commit `E`; N and M are recorded evidence. It mints the same
 Checks-write-only App token.
 It paginates the dedicated-App `Security contract` namespace on `E`. An
 absent eligible namespace receives an exact completed-failure tombstone with
-external ID `chio:v3:deny:<E>` and `chio.security-check-revocation.v2` metadata. Existing
+external ID `chio:v3:deny:<E>` and `chio.security-check-revocation.v1` metadata. Existing
 members are updated to `conclusion: failure` while preserving each external ID
 and source metadata. If duplicates exist, the oldest member remains under the
 protected name regardless of its candidate identity, and every other member

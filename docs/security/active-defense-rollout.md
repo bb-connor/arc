@@ -177,7 +177,7 @@ commit or a linear descendant whose commits change only the exact three-file
 committed evidence surface. The default-branch capture repeats those checks,
 then executes the exact merge on ephemeral GitHub-hosted Ubuntu 24.04 with
 persisted checkout credentials disabled and no repository secret. It emits
-canonical `chio.enterprise-linux-capture.v2` data and an exact checksum
+canonical `chio.enterprise-linux-capture.v1` data and an exact checksum
 manifest.
 
 After enforcement upload, a no-checkout capture job explicitly dispatches the
