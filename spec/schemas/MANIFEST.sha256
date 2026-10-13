@@ -1,4 +1,4 @@
-890b6fdef55c200c8b9c0a9ddfeb6ecad9f630f9c8392658a602c68bd100ca23  spec/schemas/MANIFEST.sha256
+67dfe470222d9e62b1cf41192cd04c8c802b6735a627e5ca968fd5085aaddfa7  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -365,8 +365,8 @@ bf066678f4f0ef31631c842086ed2569f063b75a8e8c493a3c77ead6cb20efd4  spec/schemas/c
 e8f2778d4f47b5da0d4a9ed05fb924fde328ef9984ab3a3f49ef26a52a0d9309  spec/schemas/chio-transaction/v1/verifier-report.schema.json
 d24ddeb9ab605a42e546b513bbae7af39e083f192e943c38d325ec517427d09b  spec/schemas/chio-transparency/v1/inclusion-proof.schema.json
 6de881446253c1b9a545f6495cebc42cfd1327d8a054465a8c47890d831069a3  spec/schemas/chio-transparency/v2/inclusion-proof.schema.json
-8b485355b169749a7b8feec37fdafe12677e32e48df707eb48431773184ce28a  spec/schemas/chio-trust/v1/financial-agent-passport-source-manifest.schema.json
-ceac442ed527d33b9d98b844c2ff4efbbb3a958cc906e2500c0498a8aaabeb5c  spec/schemas/chio-trust/v1/financial-agent-passport.schema.json
+eb5e58d341d16807c7755b4b127666ea3e7e18eaab7006ba05e6d9bd7fd079c8  spec/schemas/chio-trust/v1/financial-agent-passport-source-manifest.schema.json
+8c71aa9d8f5f8b55936ae0ce1804b0f17381319cb195fb72d246e6ced3b58143  spec/schemas/chio-trust/v1/financial-agent-passport.schema.json
 6864fb6e2ffadd43d25dc25a4a4bd92c7be351b77af820ee84c7c29f5855bd58  spec/schemas/chio-trust/v1/financial-credit-scorecard.schema.json
 9f2afe5b61891900413dd9067472ca02f4030afcb71302f2ef6c6caba0f2fc5a  spec/schemas/chio-trust/v1/financial-exposure-history.schema.json
 2d0c84baea1f8ee49ecc6d383485e01cf59eefce5cf0b04932ef8611a077d872  spec/schemas/chio-trust/v1/financial-loss-history.schema.json
@@ -377,7 +377,7 @@ ceac442ed527d33b9d98b844c2ff4efbbb3a958cc906e2500c0498a8aaabeb5c  spec/schemas/c
 8678619b1fdf256ce92809eeeb4009c7b7b236246146230f56d6419449756915  spec/schemas/chio-trust/v1/financial-source-completeness-attestation.schema.json
 9d64a2013143c5238b1c1999c911e6016890079483cf4bd0ffb7f764ee563c58  spec/schemas/chio-trust/v1/financial-source-member.schema.json
 a80dcbf85529967e111b684b494635dc8f0b74f2f156cbc22f8658803f6cfa5b  spec/schemas/chio-trust/v1/key-state.schema.json
-73e06f271dc0a1355ff2fd261e7c52fdb007c632d182a0157387ba6be5314893  spec/schemas/chio-trust/v1/presented-financial-agent-passport.schema.json
+14130da951602bb04a03b02d3da44189bfc2f9f4d4ddc3a84d695677340b68d0  spec/schemas/chio-trust/v1/presented-financial-agent-passport.schema.json
 2465d7ba11034ec21b4451f4e8dd137be0b3865eb50f7ea200c247ad56e47fc3  spec/schemas/chio-trust/v1/reputation-import-report.schema.json
 78ef587b5b79bd6b5117a88ef496e8e5ebb6044daf4ad1c1e5dec8551a8712c0  spec/schemas/chio-trust/v1/revocation-snapshot.schema.json
 82966a702b4e0f925b405af696fb75c97f15b0157398442e420349aa5a358f7e  spec/schemas/chio-trust/v1/scorecard-snapshot.schema.json
@@ -544,4 +544,4 @@ a89cebb22ad42d0353c5c0a2b35af56a2198a003b172e864741c5b9a878eaccc  spec/schemas/c
 f109672e496e5e3bb56c5a3d61ed882b922d8bbade45899975d1852921f7890e  spec/schemas/financial-credential-defs.v1.schema.json
 049d7788253b57ddf472ebed0e8e6cb1a26e2249e9645e9e18cfdc3606a2b669  spec/schemas/fiscal-defs.v1.schema.json
 216ca7d9c174f728a1931f84791858702bb365cb5f5acba24c5e936bc923955e  spec/schemas/policy/analysis-report.schema.json
-ebc6ab9e0bf6fa845d3678e06f5cbbef98f8d3602abb3c6ffa68798d1cfd201f  spec/schemas/registry.json
+8c156f96a1a5a247112384e09f328a713c3fae62ba913037bc897e07f7d07cf0  spec/schemas/registry.json

@@ -2920,11 +2920,11 @@
       "evidence": [
         {
           "kind": "rust_test",
-          "ref": "crates/trust/chio-credentials/tests/financial_passport_v2.rs::validated_v2_builder_binds_manifest_credentials_and_schema_first_admission"
+          "ref": "crates/trust/chio-credentials/tests/financial_agent_passport.rs::validated_builder_binds_manifest_credentials_and_schema_first_admission"
         },
         {
           "kind": "rust_test",
-          "ref": "crates/trust/chio-credentials/tests/financial_passport_v2.rs::manifest_present_passport_rejects_outer_metadata_tampering_and_addition"
+          "ref": "crates/trust/chio-credentials/tests/financial_agent_passport.rs::manifest_present_passport_rejects_outer_metadata_tampering_and_addition"
         },
         {
           "kind": "schema",
@@ -2939,7 +2939,7 @@
       "evidence": [
         {
           "kind": "rust_test",
-          "ref": "crates/trust/chio-credentials/tests/financial_passport_v2.rs::signed_v2_challenge_rejects_digest_signature_and_unknown_field_tampering"
+          "ref": "crates/trust/chio-credentials/tests/financial_agent_passport.rs::signed_challenge_rejects_digest_signature_and_unknown_field_tampering"
         },
         {
           "kind": "schema",

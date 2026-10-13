@@ -1860,7 +1860,7 @@ fn signed_input_rejects_duplicate_passport_and_nested_credential_members() {
     assert_ne!(duplicate_issuer, valid);
     for text in [duplicate_schema, duplicate_issuer] {
         assert!(matches!(
-            decode_agent_passport_v2(text.as_bytes()),
+            decode_financial_agent_passport(text.as_bytes()),
             Err(CredentialError::SignedJson(
                 chio_core::canonical::UntrustedJsonError::SignedInput(_)
             ))

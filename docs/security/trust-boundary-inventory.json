@@ -1605,7 +1605,7 @@
     "crates/trust/chio-attest-verify/src/bin/tuf-rebake.rs::tuf_root_version::from_wire",
     "crates/trust/chio-attest-verify/src/bin/tuf-rebake.rs::validate_sigstore_trusted_root::from_wire",
     "crates/trust/chio-attest-verify/src/sigstore/core.rs::verify_bundle::from_wire",
-    "crates/trust/chio-credentials/src/financial.rs::decode_agent_passport_v2::from_wire",
+    "crates/trust/chio-credentials/src/financial.rs::decode_financial_agent_passport::from_wire",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_wire",
     "crates/trust/chio-credentials/src/financial/validation.rs::validate_bundled_source_signers::from_wire",
     "crates/trust/chio-credentials/src/financial/validation.rs::validate_financial_source_disclosure::from_wire",
@@ -2460,7 +2460,7 @@
     "crates/security/chio-security-types/src/ports/identifiers.rs::fmt::custom_deserialize",
     "crates/security/chio-security-types/src/ports/identifiers.rs::fmt::custom_deserialize",
     "crates/trust/chio-credentials/src/artifact.rs::from::custom_deserialize",
-    "crates/trust/chio-credentials/src/financial.rs::decode_agent_passport_v2::from_value",
+    "crates/trust/chio-credentials/src/financial.rs::decode_financial_agent_passport::from_value",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_value",
     "crates/trust/chio-credentials/src/financial.rs::deserialize::from_value",
     "crates/trust/chio-credentials/src/financial.rs::from::custom_deserialize",
@@ -4967,7 +4967,7 @@
     "crates/security/chio-security-types/src/ports/identifiers.rs::fmt::custom_deserialize": "Reviewed existing borrowed-string visitors validate identifiers before owned allocation; constructors retain 256-byte, nonblank, unpadded and nonzero variant invariants across deserialize entry points.",
     "crates/trust/chio-credentials/src/artifact.rs::from::custom_deserialize": "Reviewed existing ReputationCredential custom Deserialize: deny-unknown-fields wire reconstruction creates an unverified credential, not proof of authority. Native JSON/JWT ingress is already bounded and duplicate-aware in financial.rs and jwt_decode.rs; verify_reputation_credential validates issuer proof separately. No redundant decoder introduced.",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/financial.rs::decode_agent_passport_v2::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
+    "crates/trust/chio-credentials/src/financial.rs::decode_financial_agent_passport::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/financial.rs::deserialize::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/financial.rs::from::custom_deserialize": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/financial/validation.rs::validate_bundled_source_signers::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
@@ -6592,7 +6592,7 @@
       "validate_bundled_source_signers::from_value"
     ],
     "crates/trust/chio-credentials/src/financial.rs": [
-      "decode_agent_passport_v2::from_value",
+      "decode_financial_agent_passport::from_value",
       "decode_financial_credential::from_value",
       "deserialize::from_value",
       "from::custom_deserialize"
@@ -10855,7 +10855,7 @@
       "contract": "Constrained original-byte input; residual decoder sites require individual raw_decoder_contracts.",
       "readers": [
         {
-          "reader": "decode_agent_passport_v2",
+          "reader": "decode_financial_agent_passport",
           "decoders": [
             "from_value"
           ],
@@ -16951,7 +16951,7 @@
     "crates/trust/chio-attest-verify/src/bin/tuf-rebake.rs::tuf_root_version::from_wire#1::decode_external",
     "crates/trust/chio-attest-verify/src/bin/tuf-rebake.rs::validate_sigstore_trusted_root::from_wire#1::decode_external",
     "crates/trust/chio-attest-verify/src/sigstore/core.rs::verify_bundle::from_wire#1::decode_external",
-    "crates/trust/chio-credentials/src/financial.rs::decode_agent_passport_v2::from_wire#1::decode_signed",
+    "crates/trust/chio-credentials/src/financial.rs::decode_financial_agent_passport::from_wire#1::decode_signed",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_wire#1::decode_signed",
     "crates/trust/chio-credentials/src/financial/validation.rs::validate_bundled_source_signers::from_wire#1::decode_canonical",
     "crates/trust/chio-credentials/src/financial/validation.rs::validate_financial_source_disclosure::from_wire#1::decode_canonical",
@@ -22079,7 +22079,7 @@
       "verify_bundle::original-json-reader::UntrustedJsonText"
     ],
     "crates/trust/chio-credentials/src/financial.rs": [
-      "decode_agent_passport_v2::original-json-reader::UntrustedJsonText",
+      "decode_financial_agent_passport::original-json-reader::UntrustedJsonText",
       "decode_financial_credential::original-json-reader::UntrustedJsonText"
     ],
     "crates/trust/chio-credentials/src/financial/validation.rs": [

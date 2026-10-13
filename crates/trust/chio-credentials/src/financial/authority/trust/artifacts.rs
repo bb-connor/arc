@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct EntryActivationDigestPreimageV2<'a> {
+struct EntryActivationDigestPreimage<'a> {
     schema: &'a str,
     pack_id: &'a str,
     verifier_id: &'a str,
@@ -12,7 +12,7 @@ struct EntryActivationDigestPreimageV2<'a> {
     source_passport_id: &'a str,
     source_manifest_digest: &'a str,
     presentation_digest: &'a str,
-    credential_bindings: &'a [EntryActivationCredentialBindingV2],
+    credential_bindings: &'a [EntryActivationCredentialBinding],
     issuer: &'a str,
     profile_family: &'a str,
     source_kind: CrossIssuerPortfolioEntryKind,
@@ -20,14 +20,14 @@ struct EntryActivationDigestPreimageV2<'a> {
     lifecycle_evidence_digest: &'a str,
     lifecycle_pin_digest: &'a str,
     migration_envelope_digests: &'a [String],
-    decision: EntryActivationDispositionV2,
+    decision: EntryActivationDisposition,
     reason: &'a str,
     decided_at: u64,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct MigrationDigestPreimageV2<'a> {
+struct MigrationDigestPreimage<'a> {
     schema: &'a str,
     migration_id: &'a str,
     attester_id: &'a str,
@@ -44,11 +44,11 @@ struct MigrationDigestPreimageV2<'a> {
     expires_at: Option<u64>,
 }
 
-pub fn sign_entry_activation_decision_v2(
+pub fn sign_entry_activation_decision(
     signer: &Keypair,
-    input: EntryActivationDecisionInputV2,
-) -> Result<SignedEntryActivationDecisionV2, CredentialError> {
-    let mut body = EntryActivationDecisionV2 {
+    input: EntryActivationDecisionInput,
+) -> Result<SignedEntryActivationDecision, CredentialError> {
+    let mut body = EntryActivationDecision {
         schema: FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1.to_string(),
         pack_id: input.pack_id,
         verifier_id: input.verifier_id,
@@ -73,14 +73,14 @@ pub fn sign_entry_activation_decision_v2(
     };
     normalize_activation_decision(&mut body)?;
     body.decision_digest = recompute_activation_decision_digest(&body)?;
-    Ok(SignedEntryActivationDecisionV2::sign(body, signer)?)
+    Ok(SignedEntryActivationDecision::sign(body, signer)?)
 }
 
-pub fn sign_cross_issuer_trust_pack_v2(
+pub fn sign_financial_cross_issuer_trust_pack(
     signer: &Keypair,
-    input: CrossIssuerTrustPackInputV2,
-) -> Result<SignedCrossIssuerTrustPackV2, CredentialError> {
-    let body = CrossIssuerTrustPackV2 {
+    input: FinancialCrossIssuerTrustPackInput,
+) -> Result<SignedFinancialCrossIssuerTrustPack, CredentialError> {
+    let body = FinancialCrossIssuerTrustPack {
         schema: FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1.to_string(),
         pack_id: input.pack_id,
         verifier_id: input.verifier_id,
@@ -92,12 +92,12 @@ pub fn sign_cross_issuer_trust_pack_v2(
         decisions: input.decisions,
     };
     validate_trust_pack_body(&body)?;
-    Ok(SignedCrossIssuerTrustPackV2::sign(body, signer)?)
+    Ok(SignedFinancialCrossIssuerTrustPack::sign(body, signer)?)
 }
 
-pub fn verify_signed_cross_issuer_trust_pack_v2(
-    pack: &SignedCrossIssuerTrustPackV2,
-    trust: &CrossIssuerTrustRegistryV2,
+pub fn verify_financial_cross_issuer_trust_pack(
+    pack: &SignedFinancialCrossIssuerTrustPack,
+    trust: &CrossIssuerTrustRegistry,
     now: u64,
 ) -> Result<(), CredentialError> {
     validate_trust_pack_body(&pack.body)?;
@@ -132,11 +132,11 @@ pub fn verify_signed_cross_issuer_trust_pack_v2(
     Ok(())
 }
 
-pub fn sign_cross_issuer_migration_v2(
+pub fn sign_financial_cross_issuer_migration(
     signer: &Keypair,
-    input: CrossIssuerMigrationInputV2,
-) -> Result<SignedCrossIssuerMigrationV2, CredentialError> {
-    let mut body = CrossIssuerMigrationV2 {
+    input: FinancialCrossIssuerMigrationInput,
+) -> Result<SignedFinancialCrossIssuerMigration, CredentialError> {
+    let mut body = FinancialCrossIssuerMigration {
         schema: FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1.to_string(),
         migration_id: input.migration_id,
         attester_id: input.attester_id,
@@ -155,12 +155,12 @@ pub fn sign_cross_issuer_migration_v2(
     };
     validate_migration_body(&mut body)?;
     body.migration_digest = recompute_migration_digest(&body)?;
-    Ok(SignedCrossIssuerMigrationV2::sign(body, signer)?)
+    Ok(SignedFinancialCrossIssuerMigration::sign(body, signer)?)
 }
 
-pub fn verify_cross_issuer_migration_v2(
-    migration: &SignedCrossIssuerMigrationV2,
-    trust: &CrossIssuerTrustRegistryV2,
+pub fn verify_financial_cross_issuer_migration(
+    migration: &SignedFinancialCrossIssuerMigration,
+    trust: &CrossIssuerTrustRegistry,
     now: u64,
 ) -> Result<(), CredentialError> {
     let mut body = migration.body.clone();
@@ -188,8 +188,8 @@ pub fn verify_cross_issuer_migration_v2(
 }
 
 fn verify_activation_decision_signature(
-    decision: &SignedEntryActivationDecisionV2,
-    trust: &CrossIssuerTrustRegistryV2,
+    decision: &SignedEntryActivationDecision,
+    trust: &CrossIssuerTrustRegistry,
     now: u64,
 ) -> Result<(), CredentialError> {
     let mut normalized = decision.body.clone();
@@ -215,7 +215,7 @@ fn verify_activation_decision_signature(
     Ok(())
 }
 
-fn validate_trust_pack_body(body: &CrossIssuerTrustPackV2) -> Result<(), CredentialError> {
+fn validate_trust_pack_body(body: &FinancialCrossIssuerTrustPack) -> Result<(), CredentialError> {
     if body.schema != FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1
         || body.created_at >= body.expires_at
         || body.decisions.is_empty()
@@ -253,7 +253,7 @@ fn validate_trust_pack_body(body: &CrossIssuerTrustPackV2) -> Result<(), Credent
 }
 
 fn normalize_activation_decision(
-    body: &mut EntryActivationDecisionV2,
+    body: &mut EntryActivationDecision,
 ) -> Result<(), CredentialError> {
     if body.schema != FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1 {
         return Err(authority_error("entry activation schema is invalid"));
@@ -306,7 +306,7 @@ fn normalize_activation_decision(
     Ok(())
 }
 
-fn validate_migration_body(body: &mut CrossIssuerMigrationV2) -> Result<(), CredentialError> {
+fn validate_migration_body(body: &mut FinancialCrossIssuerMigration) -> Result<(), CredentialError> {
     if body.schema != FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1 {
         return Err(authority_error("cross-issuer migration schema is invalid"));
     }
@@ -344,11 +344,11 @@ fn validate_migration_body(body: &mut CrossIssuerMigrationV2) -> Result<(), Cred
 }
 
 fn recompute_activation_decision_digest(
-    body: &EntryActivationDecisionV2,
+    body: &EntryActivationDecision,
 ) -> Result<String, CredentialError> {
     authority_digest(
         ENTRY_ACTIVATION_DIGEST_DOMAIN,
-        &EntryActivationDigestPreimageV2 {
+        &EntryActivationDigestPreimage {
             schema: &body.schema,
             pack_id: &body.pack_id,
             verifier_id: &body.verifier_id,
@@ -373,10 +373,10 @@ fn recompute_activation_decision_digest(
     )
 }
 
-fn recompute_migration_digest(body: &CrossIssuerMigrationV2) -> Result<String, CredentialError> {
+fn recompute_migration_digest(body: &FinancialCrossIssuerMigration) -> Result<String, CredentialError> {
     authority_digest(
         CROSS_ISSUER_MIGRATION_DIGEST_DOMAIN,
-        &MigrationDigestPreimageV2 {
+        &MigrationDigestPreimage {
             schema: &body.schema,
             migration_id: &body.migration_id,
             attester_id: &body.attester_id,

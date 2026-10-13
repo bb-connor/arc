@@ -1,17 +1,17 @@
 use super::*;
-use crate::financial_passport_v2::validate_presented_agent_passport_v2_authority_contract;
+use crate::financial_agent_passport::validate_presented_financial_agent_passport_authority_contract;
 
 const FINANCIAL_CREDENTIAL_BODY_DIGEST_DOMAIN: &[u8] = b"chio.fincred.verified-body-digest.v1\0";
 
-pub type FinancialCredentialTrustRegistry = CrossIssuerTrustRegistryV2;
+pub type FinancialCredentialTrustRegistry = CrossIssuerTrustRegistry;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ResolvedFinancialEvidenceV2 {
+pub struct ResolvedFinancialEvidence {
     source_evidence_class: chio_core::capability::governance::ProvenanceEvidenceClass,
     proof_digests: Vec<String>,
 }
 
-impl ResolvedFinancialEvidenceV2 {
+impl ResolvedFinancialEvidence {
     pub fn authenticated(
         source_evidence_class: chio_core::capability::governance::ProvenanceEvidenceClass,
         mut proof_digests: Vec<String>,
@@ -29,7 +29,7 @@ pub trait FinancialEvidenceSourceResolver {
         &self,
         credential: &FinancialCredentialEnvelope,
         now: u64,
-    ) -> Result<ResolvedFinancialEvidenceV2, CredentialError>;
+    ) -> Result<ResolvedFinancialEvidence, CredentialError>;
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -40,7 +40,7 @@ impl FinancialEvidenceSourceResolver for BundledFinancialEvidenceSourceResolver 
         &self,
         credential: &FinancialCredentialEnvelope,
         _now: u64,
-    ) -> Result<ResolvedFinancialEvidenceV2, CredentialError> {
+    ) -> Result<ResolvedFinancialEvidence, CredentialError> {
         if !matches!(
             &credential.evidence.source_disclosure,
             FinancialSourceDisclosureV1::Bundled { .. }
@@ -56,13 +56,13 @@ impl FinancialEvidenceSourceResolver for BundledFinancialEvidenceSourceResolver 
             .iter()
             .map(signed_envelope_digest)
             .collect::<Result<Vec<_>, _>>()?;
-        ResolvedFinancialEvidenceV2::authenticated(credential.source_evidence_class, proof_digests)
+        ResolvedFinancialEvidence::authenticated(credential.source_evidence_class, proof_digests)
     }
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn evaluate_financial_credentials(
-    presentation: &PresentedAgentPassportV2,
+    presentation: &PresentedFinancialAgentPassport,
     policy: &VerifiedFinancialVerifierPolicy,
     trust: &FinancialCredentialTrustRegistry,
     lifecycle_resolver: &dyn CrossIssuerLifecycleResolver,
@@ -82,7 +82,7 @@ pub fn evaluate_financial_credentials(
             "financial verifier policy is outside its configured validity",
         ));
     }
-    validate_presented_agent_passport_v2_authority_contract(presentation, now)?;
+    validate_presented_financial_agent_passport_authority_contract(presentation, now)?;
     let manifest = &presentation.source_manifest;
     let source_manifest_digest = sha256_hex(&canonical_json_bytes(manifest)?);
     let mut credentials = Vec::new();
@@ -99,10 +99,10 @@ pub fn evaluate_financial_credentials(
         .zip(&presentation.membership_proofs)
     {
         match credential {
-            PassportCredentialV2::Reputation(_) => {
+            FinancialPassportCredential::Reputation(_) => {
                 return Err(CredentialError::FinancialEvaluationRejectsReputationCredential);
             }
-            PassportCredentialV2::Financial(credential) => {
+            FinancialPassportCredential::Financial(credential) => {
                 let (issued_at, expires_at) = credential.validate_contract_shape()?;
                 if now < issued_at {
                     return Err(CredentialError::CredentialNotYetValid);
@@ -146,7 +146,7 @@ pub fn evaluate_financial_credentials(
                     FINANCIAL_CREDENTIAL_BODY_DIGEST_DOMAIN,
                     &credential.signing_body(),
                 )?;
-                credentials.push(VerifiedFinancialCredentialBindingV2 {
+                credentials.push(VerifiedFinancialCredentialBinding {
                     credential_id: credential.credential_id.clone(),
                     family: credential.family,
                     issuer: credential.issuer.clone(),
@@ -175,7 +175,7 @@ pub fn evaluate_financial_credentials(
             "financial evaluation contains duplicate credential IDs",
         ));
     }
-    let lifecycle = resolve_cross_issuer_lifecycle_v2(
+    let lifecycle = resolve_cross_issuer_lifecycle(
         &lifecycle_resolver_identity(trust)?,
         &manifest.body.issuer,
         &manifest.body.source_passport_id,
@@ -204,15 +204,15 @@ pub fn evaluate_financial_credentials(
     })
 }
 
-pub fn verify_entry_activation_decision_v2(
-    pack: &SignedCrossIssuerTrustPackV2,
-    decision: &SignedEntryActivationDecisionV2,
+pub fn verify_entry_activation_decision(
+    pack: &SignedFinancialCrossIssuerTrustPack,
+    decision: &SignedEntryActivationDecision,
     verified: &VerifiedFinancialCredentialSet,
-    trust: &CrossIssuerTrustRegistryV2,
-    migrations: &[SignedCrossIssuerMigrationV2],
+    trust: &CrossIssuerTrustRegistry,
+    migrations: &[SignedFinancialCrossIssuerMigration],
     now: u64,
 ) -> Result<(), CredentialError> {
-    verify_signed_cross_issuer_trust_pack_v2(pack, trust, now)?;
+    verify_financial_cross_issuer_trust_pack(pack, trust, now)?;
     if !pack
         .body
         .decisions
@@ -238,7 +238,7 @@ pub fn verify_entry_activation_decision_v2(
     let credential_bindings = verified
         .credentials
         .iter()
-        .map(|credential| EntryActivationCredentialBindingV2 {
+        .map(|credential| EntryActivationCredentialBinding {
             credential_id: credential.credential_id.clone(),
             family: credential.family,
             envelope_digest: credential.envelope_digest.clone(),
@@ -247,7 +247,7 @@ pub fn verify_entry_activation_decision_v2(
     let mut migration_digests = migrations
         .iter()
         .map(|migration| {
-            verify_cross_issuer_migration_v2(migration, trust, now)?;
+            verify_financial_cross_issuer_migration(migration, trust, now)?;
             signed_envelope_digest(migration)
         })
         .collect::<Result<Vec<_>, CredentialError>>()?;
@@ -273,7 +273,7 @@ pub fn verify_entry_activation_decision_v2(
         || body.certification_refs != metadata.certification_refs
         || body.lifecycle_evidence_digest != verified.lifecycle_result_digest
         || body.lifecycle_pin_digest != verified.lifecycle_checkpoint_pin_digest
-        || body.decision != EntryActivationDispositionV2::Activate
+        || body.decision != EntryActivationDisposition::Activate
     {
         return Err(authority_error(
             "entry activation decision does not match verified evidence",
@@ -305,7 +305,7 @@ pub fn verify_entry_activation_decision_v2(
 }
 
 fn lifecycle_resolver_identity(
-    trust: &CrossIssuerTrustRegistryV2,
+    trust: &CrossIssuerTrustRegistry,
 ) -> Result<String, CredentialError> {
     let identities = trust.lifecycle_resolver_identities();
     if identities.len() != 1 {
@@ -321,7 +321,7 @@ fn lifecycle_resolver_identity(
 
 fn evaluate_financial_thresholds(
     policy: &FinancialVerifierPolicyV1,
-    credentials: &[PassportCredentialV2],
+    credentials: &[FinancialPassportCredential],
 ) -> Result<(), CredentialError> {
     let mut saw_score = false;
     let mut saw_exposure = false;
@@ -329,7 +329,7 @@ fn evaluate_financial_thresholds(
     let mut saw_premium = false;
     let mut saw_loss = false;
     for credential in credentials {
-        let PassportCredentialV2::Financial(credential) = credential else {
+        let FinancialPassportCredential::Financial(credential) = credential else {
             continue;
         };
         match &credential.credential_subject {

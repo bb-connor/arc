@@ -2,30 +2,31 @@
 
 use chio_core::Keypair;
 use chio_credentials::{
-    build_agent_passport_v2, create_financial_verifier_policy_v1,
-    create_passport_presentation_challenge_v2, evaluate_financial_credentials,
-    inspect_agent_passport_v2, inspect_passport_presentation_challenge_v2,
-    inspect_passport_presentation_response_v2, inspect_passport_source_manifest_v2_signature,
-    inspect_presented_agent_passport_v2, issue_financial_credential,
-    issue_passport_source_manifest_v2, issue_reputation_credential,
-    respond_to_passport_presentation_challenge_v2, AgentPassportV2, AttestationWindow,
+    build_financial_agent_passport, create_financial_passport_presentation_challenge,
+    create_financial_verifier_policy_v1, evaluate_financial_credentials,
+    inspect_financial_agent_passport, inspect_financial_passport_presentation_challenge,
+    inspect_financial_passport_presentation_response,
+    inspect_financial_passport_source_manifest_signature,
+    inspect_presented_financial_agent_passport, issue_financial_credential,
+    issue_financial_passport_source_manifest, issue_reputation_credential,
+    respond_to_financial_passport_presentation_challenge, AttestationWindow,
     BundledFinancialEvidenceSourceResolver, ChioCredentialEvidence, CredentialError,
     CredentialProof, CreditScorecardConfidenceV1, CreditScorecardCredentialSubjectV1,
     CreditScorecardImportedSignalContextV1, CreditScorecardRiskBandV1,
     CrossIssuerLifecycleGenerationAnchor, CrossIssuerLifecycleHighWaterStore,
-    CrossIssuerLifecycleResolver, CrossIssuerTrustRegistryConfigV2, CrossIssuerTrustRegistryV2,
-    ExposureHistoryCredentialSubjectV1, ExposureHistoryPositionV1,
+    CrossIssuerLifecycleResolver, CrossIssuerTrustRegistry, CrossIssuerTrustRegistryConfig,
+    ExposureHistoryCredentialSubjectV1, ExposureHistoryPositionV1, FinancialAgentPassport,
     FinancialAuthorityAvailabilityError, FinancialCredentialEnvelope,
     FinancialCredentialEvidenceV1, FinancialCredentialFamilyV1, FinancialCredentialSubjectV1,
-    FinancialCredentialWindowV1, FinancialSourceDisclosureV1, FinancialVerifierPolicyActivationV1,
+    FinancialCredentialWindowV1, FinancialPassportCredential, FinancialPassportValidityWindow,
+    FinancialSourceDisclosureV1, FinancialVerifierPolicyActivationV1,
     FinancialVerifierPolicyInputV1, FinancialVerifierPolicyRegistry, FinancialVerifierThresholdsV1,
-    IssuerTrustKeyV2, LifecycleCheckpointPinCandidateV2, LossHistoryCredentialSubjectV1,
-    OfflinePassportPresentationChallengeUseStoreV2, PassportCredentialV2, PassportValidityWindowV2,
-    PremiumHistoryCredentialSubjectV1, SettlementReliabilityCredentialSubjectV1,
-    SignedCrossIssuerLifecycleResultV2, SignedIssuerLifecycleCheckpointV2,
-    SignedIssuerLifecycleGenerationPinV2, SignedLifecycleCheckpointPinV2,
-    SignedPassportPresentationChallengeV2, SignedPassportSourceManifestV2, TrustTier,
-    TrustedKeyStatusV2,
+    IssuerTrustKey, LifecycleCheckpointPinCandidate, LossHistoryCredentialSubjectV1,
+    OfflinePassportPresentationChallengeUseStore, PremiumHistoryCredentialSubjectV1,
+    SettlementReliabilityCredentialSubjectV1, SignedCrossIssuerLifecycleResult,
+    SignedFinancialPassportPresentationChallenge, SignedFinancialPassportSourceManifest,
+    SignedIssuerLifecycleCheckpoint, SignedIssuerLifecycleGenerationPin,
+    SignedLifecycleCheckpointPin, TrustTier, TrustedKeyStatus,
 };
 use chio_did::DidChio;
 use chio_reputation::{
@@ -37,8 +38,8 @@ use chio_reputation::{
 const ISSUED_AT: u64 = 1_710_000_000;
 const EXPIRES_AT: u64 = ISSUED_AT + 86_400;
 
-const fn validity(issued_at: u64, expires_at: u64) -> PassportValidityWindowV2 {
-    PassportValidityWindowV2 {
+const fn validity(issued_at: u64, expires_at: u64) -> FinancialPassportValidityWindow {
+    FinancialPassportValidityWindow {
         issued_at,
         expires_at,
     }
@@ -78,7 +79,7 @@ fn validate_schema(
     chio_spec_validate::validate_value(
         &path,
         &schema,
-        &std::path::PathBuf::from("<financial-passport-v2>"),
+        &std::path::PathBuf::from("<financial-agent-passport>"),
         &value,
     )?;
     Ok(())
@@ -138,7 +139,7 @@ fn scorecard(subject_key: &str) -> LocalReputationScorecard {
     }
 }
 
-fn reputation_credential(issuer: &Keypair, holder: &Keypair) -> PassportCredentialV2 {
+fn reputation_credential(issuer: &Keypair, holder: &Keypair) -> FinancialPassportCredential {
     reputation_credential_with_composite(issuer, holder, 0.82)
 }
 
@@ -146,10 +147,10 @@ fn reputation_credential_with_composite(
     issuer: &Keypair,
     holder: &Keypair,
     composite: f64,
-) -> PassportCredentialV2 {
+) -> FinancialPassportCredential {
     let mut scorecard = scorecard(&holder.public_key().to_hex());
     scorecard.composite_score = MetricValue::Known(composite);
-    PassportCredentialV2::Reputation(Box::new(
+    FinancialPassportCredential::Reputation(Box::new(
         issue_reputation_credential(
             issuer,
             scorecard,
@@ -343,7 +344,7 @@ fn manifest_caps_expiry_and_rejects_not_yet_valid_credentials() {
     let issuer = Keypair::from_seed(&[11; 32]);
     let holder = Keypair::from_seed(&[12; 32]);
     let credential = reputation_credential(&issuer, &holder);
-    let (manifest, _) = issue_passport_source_manifest_v2(
+    let (manifest, _) = issue_financial_passport_source_manifest(
         &issuer,
         &did(&holder),
         std::slice::from_ref(&credential),
@@ -353,11 +354,11 @@ fn manifest_caps_expiry_and_rejects_not_yet_valid_credentials() {
     .test_ok("issue source manifest");
     assert_eq!(manifest.body.expires_at, EXPIRES_AT);
     assert!(matches!(
-        inspect_passport_source_manifest_v2_signature(&manifest, EXPIRES_AT + 1),
+        inspect_financial_passport_source_manifest_signature(&manifest, EXPIRES_AT + 1),
         Err(CredentialError::CredentialExpired)
     ));
     assert!(matches!(
-        issue_passport_source_manifest_v2(
+        issue_financial_passport_source_manifest(
             &issuer,
             &did(&holder),
             &[credential],
@@ -369,11 +370,11 @@ fn manifest_caps_expiry_and_rejects_not_yet_valid_credentials() {
 }
 
 #[test]
-fn validated_v2_builder_binds_manifest_credentials_and_schema_first_admission() {
+fn validated_builder_binds_manifest_credentials_and_schema_first_admission() {
     let issuer = Keypair::from_seed(&[21; 32]);
     let holder = Keypair::from_seed(&[22; 32]);
     let credential = reputation_credential_with_composite(&issuer, &holder, 0.83);
-    let (passport, proofs) = build_agent_passport_v2(
+    let (passport, proofs) = build_financial_agent_passport(
         &issuer,
         did(&holder),
         vec![credential],
@@ -382,44 +383,44 @@ fn validated_v2_builder_binds_manifest_credentials_and_schema_first_admission() 
         validity(ISSUED_AT, EXPIRES_AT + 1_000),
         None,
     )
-    .test_ok("build bound v2 passport");
+    .test_ok("build bound financial passport");
     assert_eq!(passport.valid_until, "2024-03-10T16:00:00Z");
     assert_eq!(proofs.len(), 1);
     validate_schema("financial-agent-passport.schema.json", &passport)
-        .test_ok("validate v2 passport schema");
-    inspect_agent_passport_v2(&passport, ISSUED_AT + 1).test_ok("inspect bound passport");
+        .test_ok("validate financial passport schema");
+    inspect_financial_agent_passport(&passport, ISSUED_AT + 1).test_ok("inspect bound passport");
     let encoded = serde_json::to_value(&passport).test_ok("encode bound passport");
-    let decoded: AgentPassportV2 =
+    let decoded: FinancialAgentPassport =
         serde_json::from_value(encoded.clone()).test_ok("decode bound passport");
     assert_eq!(decoded, passport);
 
     let mut unknown_schema = passport.clone();
     unknown_schema.schema = "chio.agent-passport.v9".to_string();
     assert!(matches!(
-        inspect_agent_passport_v2(&unknown_schema, ISSUED_AT + 1),
-        Err(CredentialError::UnsupportedVersionedPassportSchema(schema))
+        inspect_financial_agent_passport(&unknown_schema, ISSUED_AT + 1),
+        Err(CredentialError::UnsupportedFinancialPassportSchema(schema))
             if schema == "chio.agent-passport.v9"
     ));
 
     let mut substituted = passport;
     substituted.credentials[0] = reputation_credential_with_composite(&issuer, &holder, 0.93);
-    assert!(inspect_agent_passport_v2(&substituted, ISSUED_AT + 1).is_err());
+    assert!(inspect_financial_agent_passport(&substituted, ISSUED_AT + 1).is_err());
 
     let mut without_manifest = encoded;
     if let Some(object) = without_manifest.as_object_mut() {
         object.remove("sourceManifest");
     }
-    assert!(serde_json::from_value::<AgentPassportV2>(without_manifest.clone()).is_err());
+    assert!(serde_json::from_value::<FinancialAgentPassport>(without_manifest.clone()).is_err());
     assert!(validate_schema("financial-agent-passport.schema.json", &without_manifest).is_err());
 }
 
 #[test]
-fn holder_signed_v2_response_is_exactly_selected_and_consumed_once() {
+fn holder_signed_response_is_exactly_selected_and_consumed_once() {
     let issuer = Keypair::from_seed(&[13; 32]);
     let holder = Keypair::from_seed(&[14; 32]);
     let verifier = Keypair::from_seed(&[25; 32]);
     let credential = reputation_credential(&issuer, &holder);
-    let (manifest, proofs) = issue_passport_source_manifest_v2(
+    let (manifest, proofs) = issue_financial_passport_source_manifest(
         &issuer,
         &did(&holder),
         std::slice::from_ref(&credential),
@@ -427,11 +428,11 @@ fn holder_signed_v2_response_is_exactly_selected_and_consumed_once() {
         EXPIRES_AT,
     )
     .test_ok("issue source manifest");
-    let selector = chio_credentials::PassportCredentialSelectorV2 {
+    let selector = chio_credentials::FinancialPassportCredentialSelector {
         family: proofs[0].leaf.family.clone(),
         credential_ref_digest: proofs[0].leaf.credential_ref_digest.clone(),
     };
-    let challenge = create_passport_presentation_challenge_v2(
+    let challenge = create_financial_passport_presentation_challenge(
         &verifier,
         1,
         "challenge-a",
@@ -441,7 +442,7 @@ fn holder_signed_v2_response_is_exactly_selected_and_consumed_once() {
         validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create challenge");
-    let response = respond_to_passport_presentation_challenge_v2(
+    let response = respond_to_financial_passport_presentation_challenge(
         &holder,
         manifest.clone(),
         vec![credential.clone()],
@@ -450,7 +451,7 @@ fn holder_signed_v2_response_is_exactly_selected_and_consumed_once() {
         ISSUED_AT + 1,
     )
     .test_ok("respond to challenge");
-    let changed_time_response = respond_to_passport_presentation_challenge_v2(
+    let changed_time_response = respond_to_financial_passport_presentation_challenge(
         &holder,
         manifest,
         vec![credential],
@@ -459,11 +460,16 @@ fn holder_signed_v2_response_is_exactly_selected_and_consumed_once() {
         ISSUED_AT + 2,
     )
     .test_ok("respond again to same challenge");
-    let mut uses = OfflinePassportPresentationChallengeUseStoreV2::default();
-    inspect_passport_presentation_response_v2(&response, &challenge, ISSUED_AT + 1, &mut uses)
-        .test_ok("inspect response");
+    let mut uses = OfflinePassportPresentationChallengeUseStore::default();
+    inspect_financial_passport_presentation_response(
+        &response,
+        &challenge,
+        ISSUED_AT + 1,
+        &mut uses,
+    )
+    .test_ok("inspect response");
     assert!(matches!(
-        inspect_passport_presentation_response_v2(
+        inspect_financial_passport_presentation_response(
             &changed_time_response,
             &challenge,
             ISSUED_AT + 2,
@@ -479,7 +485,7 @@ fn invalid_holder_signature_does_not_consume_the_challenge() {
     let holder = Keypair::from_seed(&[16; 32]);
     let verifier = Keypair::from_seed(&[26; 32]);
     let credential = reputation_credential(&issuer, &holder);
-    let (manifest, proofs) = issue_passport_source_manifest_v2(
+    let (manifest, proofs) = issue_financial_passport_source_manifest(
         &issuer,
         &did(&holder),
         std::slice::from_ref(&credential),
@@ -487,20 +493,20 @@ fn invalid_holder_signature_does_not_consume_the_challenge() {
         EXPIRES_AT,
     )
     .test_ok("issue source manifest");
-    let challenge = create_passport_presentation_challenge_v2(
+    let challenge = create_financial_passport_presentation_challenge(
         &verifier,
         1,
         "challenge-b",
         "nonce-b",
         manifest.body.source_passport_id.clone(),
-        vec![chio_credentials::PassportCredentialSelectorV2 {
+        vec![chio_credentials::FinancialPassportCredentialSelector {
             family: proofs[0].leaf.family.clone(),
             credential_ref_digest: proofs[0].leaf.credential_ref_digest.clone(),
         }],
         validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create challenge");
-    let response = respond_to_passport_presentation_challenge_v2(
+    let response = respond_to_financial_passport_presentation_challenge(
         &holder,
         manifest,
         vec![credential],
@@ -511,13 +517,23 @@ fn invalid_holder_signature_does_not_consume_the_challenge() {
     .test_ok("respond to challenge");
     let mut invalid = response.clone();
     invalid.proof.proof_value = "00".repeat(64);
-    let mut uses = OfflinePassportPresentationChallengeUseStoreV2::default();
+    let mut uses = OfflinePassportPresentationChallengeUseStore::default();
     assert!(matches!(
-        inspect_passport_presentation_response_v2(&invalid, &challenge, ISSUED_AT + 1, &mut uses,),
+        inspect_financial_passport_presentation_response(
+            &invalid,
+            &challenge,
+            ISSUED_AT + 1,
+            &mut uses,
+        ),
         Err(CredentialError::InvalidPresentationSignature)
     ));
-    inspect_passport_presentation_response_v2(&response, &challenge, ISSUED_AT + 1, &mut uses)
-        .test_ok("valid response after invalid response");
+    inspect_financial_passport_presentation_response(
+        &response,
+        &challenge,
+        ISSUED_AT + 1,
+        &mut uses,
+    )
+    .test_ok("valid response after invalid response");
 }
 
 #[test]
@@ -529,7 +545,7 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
         reputation_credential_with_composite(&issuer, &holder, 0.81),
         reputation_credential_with_composite(&issuer, &holder, 0.91),
     ];
-    let (manifest, proofs) = issue_passport_source_manifest_v2(
+    let (manifest, proofs) = issue_financial_passport_source_manifest(
         &issuer,
         &did(&holder),
         &credentials,
@@ -539,12 +555,14 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
     .test_ok("issue two-credential source manifest");
     let selectors = proofs
         .iter()
-        .map(|proof| chio_credentials::PassportCredentialSelectorV2 {
-            family: proof.leaf.family.clone(),
-            credential_ref_digest: proof.leaf.credential_ref_digest.clone(),
-        })
+        .map(
+            |proof| chio_credentials::FinancialPassportCredentialSelector {
+                family: proof.leaf.family.clone(),
+                credential_ref_digest: proof.leaf.credential_ref_digest.clone(),
+            },
+        )
         .collect::<Vec<_>>();
-    let exact = create_passport_presentation_challenge_v2(
+    let exact = create_financial_passport_presentation_challenge(
         &verifier,
         1,
         "challenge-exact",
@@ -556,7 +574,7 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
     .test_ok("create exact challenge");
 
     assert!(matches!(
-        respond_to_passport_presentation_challenge_v2(
+        respond_to_financial_passport_presentation_challenge(
             &holder,
             manifest.clone(),
             vec![credentials[0].clone()],
@@ -567,7 +585,7 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
         Err(CredentialError::PresentationSelectorMismatch)
     ));
 
-    let one_selector = create_passport_presentation_challenge_v2(
+    let one_selector = create_financial_passport_presentation_challenge(
         &verifier,
         1,
         "challenge-extra",
@@ -578,7 +596,7 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
     )
     .test_ok("create single-selector challenge");
     assert!(matches!(
-        respond_to_passport_presentation_challenge_v2(
+        respond_to_financial_passport_presentation_challenge(
             &holder,
             manifest.clone(),
             credentials.clone(),
@@ -591,7 +609,7 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
 
     let mut substituted_selectors = selectors;
     substituted_selectors[0].credential_ref_digest = "aa".repeat(32);
-    let substituted = create_passport_presentation_challenge_v2(
+    let substituted = create_financial_passport_presentation_challenge(
         &verifier,
         1,
         "challenge-substitution",
@@ -602,7 +620,7 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
     )
     .test_ok("create substituted challenge");
     assert!(matches!(
-        respond_to_passport_presentation_challenge_v2(
+        respond_to_financial_passport_presentation_challenge(
             &holder,
             manifest.clone(),
             credentials.clone(),
@@ -616,7 +634,7 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
     let mut mismatched_proofs = proofs;
     mismatched_proofs[0].leaf.credential_ref_digest = "bb".repeat(32);
     assert!(matches!(
-        respond_to_passport_presentation_challenge_v2(
+        respond_to_financial_passport_presentation_challenge(
             &holder,
             manifest,
             credentials,
@@ -629,12 +647,12 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
 }
 
 #[test]
-fn v2_passport_and_presentation_reject_unknown_fields() {
+fn financial_passport_and_presentation_reject_unknown_fields() {
     let holder = Keypair::from_seed(&[17; 32]);
     let issuer = Keypair::from_seed(&[18; 32]);
     let verifier = Keypair::from_seed(&[28; 32]);
     let credential = reputation_credential(&issuer, &holder);
-    let (passport, _) = build_agent_passport_v2(
+    let (passport, _) = build_financial_agent_passport(
         &issuer,
         did(&holder),
         vec![credential.clone()],
@@ -643,31 +661,33 @@ fn v2_passport_and_presentation_reject_unknown_fields() {
         validity(ISSUED_AT, EXPIRES_AT),
         None,
     )
-    .test_ok("build v2 passport");
+    .test_ok("build financial passport");
     validate_schema("financial-agent-passport.schema.json", &passport)
-        .test_ok("validate v2 passport schema");
-    let mut passport = serde_json::to_value(passport).test_ok("serialize v2 passport");
+        .test_ok("validate financial passport schema");
+    let mut passport = serde_json::to_value(passport).test_ok("serialize financial passport");
     passport["unknown"] = serde_json::json!(true);
     assert!(validate_schema("financial-agent-passport.schema.json", &passport).is_err());
-    assert!(serde_json::from_value::<chio_credentials::AgentPassportV2>(passport).is_err());
+    assert!(serde_json::from_value::<chio_credentials::FinancialAgentPassport>(passport).is_err());
 
     let mut credential_with_unknown =
         serde_json::to_value(&credential).test_ok("serialize credential carrier");
     credential_with_unknown["unknown"] = serde_json::json!(true);
     assert!(
-        serde_json::from_value::<chio_credentials::PassportCredentialV2>(credential_with_unknown)
-            .is_err()
+        serde_json::from_value::<chio_credentials::FinancialPassportCredential>(
+            credential_with_unknown
+        )
+        .is_err()
     );
     let mut nested_credential_with_unknown =
         serde_json::to_value(&credential).test_ok("serialize nested credential");
     nested_credential_with_unknown["credential"]["unknown"] = serde_json::json!(true);
     assert!(
-        serde_json::from_value::<chio_credentials::PassportCredentialV2>(
+        serde_json::from_value::<chio_credentials::FinancialPassportCredential>(
             nested_credential_with_unknown
         )
         .is_err()
     );
-    let (manifest, proofs) = issue_passport_source_manifest_v2(
+    let (manifest, proofs) = issue_financial_passport_source_manifest(
         &issuer,
         &did(&holder),
         std::slice::from_ref(&credential),
@@ -679,22 +699,23 @@ fn v2_passport_and_presentation_reject_unknown_fields() {
         serde_json::to_value(&manifest).test_ok("serialize source manifest envelope");
     manifest_with_unknown["unknown"] = serde_json::json!(true);
     assert!(
-        serde_json::from_value::<SignedPassportSourceManifestV2>(manifest_with_unknown).is_err()
+        serde_json::from_value::<SignedFinancialPassportSourceManifest>(manifest_with_unknown)
+            .is_err()
     );
-    let challenge = create_passport_presentation_challenge_v2(
+    let challenge = create_financial_passport_presentation_challenge(
         &verifier,
         1,
         "challenge-c",
         "nonce-c",
         manifest.body.source_passport_id.clone(),
-        vec![chio_credentials::PassportCredentialSelectorV2 {
+        vec![chio_credentials::FinancialPassportCredentialSelector {
             family: proofs[0].leaf.family.clone(),
             credential_ref_digest: proofs[0].leaf.credential_ref_digest.clone(),
         }],
         validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create challenge");
-    let response = respond_to_passport_presentation_challenge_v2(
+    let response = respond_to_financial_passport_presentation_challenge(
         &holder,
         manifest,
         vec![credential],
@@ -706,7 +727,7 @@ fn v2_passport_and_presentation_reject_unknown_fields() {
     let mut unknown_schema = response.presentation.clone();
     unknown_schema.schema = "chio.agent-passport.presentation.v9".to_string();
     assert!(matches!(
-        inspect_presented_agent_passport_v2(&unknown_schema, &challenge, ISSUED_AT + 1),
+        inspect_presented_financial_agent_passport(&unknown_schema, &challenge, ISSUED_AT + 1),
         Err(CredentialError::InvalidFinancialCredential(reason))
             if reason.contains("presented passport schema")
     ));
@@ -729,17 +750,18 @@ fn v2_passport_and_presentation_reject_unknown_fields() {
     )
     .is_err());
     assert!(
-        serde_json::from_value::<chio_credentials::PresentedAgentPassportV2>(presentation).is_err()
+        serde_json::from_value::<chio_credentials::PresentedFinancialAgentPassport>(presentation)
+            .is_err()
     );
 }
 
 #[test]
-fn signed_v2_challenge_rejects_digest_signature_and_unknown_field_tampering() {
+fn signed_challenge_rejects_digest_signature_and_unknown_field_tampering() {
     let issuer = Keypair::from_seed(&[41; 32]);
     let holder = Keypair::from_seed(&[42; 32]);
     let verifier = Keypair::from_seed(&[43; 32]);
     let credential = reputation_credential(&issuer, &holder);
-    let (manifest, proofs) = issue_passport_source_manifest_v2(
+    let (manifest, proofs) = issue_financial_passport_source_manifest(
         &issuer,
         &did(&holder),
         std::slice::from_ref(&credential),
@@ -747,20 +769,20 @@ fn signed_v2_challenge_rejects_digest_signature_and_unknown_field_tampering() {
         EXPIRES_AT,
     )
     .test_ok("issue source manifest");
-    let challenge = create_passport_presentation_challenge_v2(
+    let challenge = create_financial_passport_presentation_challenge(
         &verifier,
         7,
         "challenge-signed",
         "nonce-signed",
         manifest.body.source_passport_id.clone(),
-        vec![chio_credentials::PassportCredentialSelectorV2 {
+        vec![chio_credentials::FinancialPassportCredentialSelector {
             family: proofs[0].leaf.family.clone(),
             credential_ref_digest: proofs[0].leaf.credential_ref_digest.clone(),
         }],
         validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create signed challenge");
-    inspect_passport_presentation_challenge_v2(&challenge, ISSUED_AT + 1)
+    inspect_financial_passport_presentation_challenge(&challenge, ISSUED_AT + 1)
         .test_ok("inspect signed challenge");
     validate_schema(
         "financial-passport-presentation-challenge.schema.json",
@@ -771,7 +793,7 @@ fn signed_v2_challenge_rejects_digest_signature_and_unknown_field_tampering() {
     let mut wrong_digest = challenge.clone();
     wrong_digest.body.challenge_digest = "aa".repeat(32);
     assert!(matches!(
-        respond_to_passport_presentation_challenge_v2(
+        respond_to_financial_passport_presentation_challenge(
             &holder,
             manifest.clone(),
             vec![credential.clone()],
@@ -786,7 +808,7 @@ fn signed_v2_challenge_rejects_digest_signature_and_unknown_field_tampering() {
     wrong_signature.signature =
         chio_core::Signature::from_hex(&"00".repeat(64)).test_ok("parse invalid signature fixture");
     assert!(matches!(
-        respond_to_passport_presentation_challenge_v2(
+        respond_to_financial_passport_presentation_challenge(
             &holder,
             manifest,
             vec![credential],
@@ -801,11 +823,15 @@ fn signed_v2_challenge_rejects_digest_signature_and_unknown_field_tampering() {
         serde_json::to_value(&challenge).test_ok("serialize challenge envelope");
     unknown_envelope["unknown"] = serde_json::json!(true);
     assert!(
-        serde_json::from_value::<SignedPassportPresentationChallengeV2>(unknown_envelope).is_err()
+        serde_json::from_value::<SignedFinancialPassportPresentationChallenge>(unknown_envelope)
+            .is_err()
     );
     let mut unknown_body = serde_json::to_value(challenge).test_ok("serialize challenge body");
     unknown_body["body"]["unknown"] = serde_json::json!(true);
-    assert!(serde_json::from_value::<SignedPassportPresentationChallengeV2>(unknown_body).is_err());
+    assert!(
+        serde_json::from_value::<SignedFinancialPassportPresentationChallenge>(unknown_body)
+            .is_err()
+    );
 }
 
 #[test]
@@ -813,7 +839,7 @@ fn manifest_present_passport_rejects_outer_metadata_tampering_and_addition() {
     let issuer = Keypair::from_seed(&[44; 32]);
     let holder = Keypair::from_seed(&[45; 32]);
     let credential = reputation_credential(&issuer, &holder);
-    let (passport, _) = build_agent_passport_v2(
+    let (passport, _) = build_financial_agent_passport(
         &issuer,
         did(&holder),
         vec![credential],
@@ -826,7 +852,7 @@ fn manifest_present_passport_rejects_outer_metadata_tampering_and_addition() {
 
     let mut roots = passport.clone();
     roots.merkle_roots.push("added-root".to_string());
-    assert!(inspect_agent_passport_v2(&roots, ISSUED_AT + 1).is_err());
+    assert!(inspect_financial_agent_passport(&roots, ISSUED_AT + 1).is_err());
 
     let mut provenance = passport.clone();
     provenance.enterprise_identity_provenance.push(
@@ -848,11 +874,11 @@ fn manifest_present_passport_rejects_outer_metadata_tampering_and_addition() {
             trust_material_ref: None,
         },
     );
-    assert!(inspect_agent_passport_v2(&provenance, ISSUED_AT + 1).is_err());
+    assert!(inspect_financial_agent_passport(&provenance, ISSUED_AT + 1).is_err());
 
     let mut tier = passport;
     tier.trust_tier = Some(TrustTier::Verified);
-    assert!(inspect_agent_passport_v2(&tier, ISSUED_AT + 1).is_err());
+    assert!(inspect_financial_agent_passport(&tier, ISSUED_AT + 1).is_err());
 }
 
 struct UnavailableLifecycle;
@@ -863,7 +889,7 @@ impl CrossIssuerLifecycleResolver for UnavailableLifecycle {
         _resolver_identity: &str,
         _issuer_did: &str,
         _now: u64,
-    ) -> Result<SignedIssuerLifecycleCheckpointV2, FinancialAuthorityAvailabilityError> {
+    ) -> Result<SignedIssuerLifecycleCheckpoint, FinancialAuthorityAvailabilityError> {
         Err(FinancialAuthorityAvailabilityError::Unavailable)
     }
 
@@ -873,7 +899,7 @@ impl CrossIssuerLifecycleResolver for UnavailableLifecycle {
         _issuer_did: &str,
         _source_passport_id: &str,
         _now: u64,
-    ) -> Result<SignedCrossIssuerLifecycleResultV2, FinancialAuthorityAvailabilityError> {
+    ) -> Result<SignedCrossIssuerLifecycleResult, FinancialAuthorityAvailabilityError> {
         Err(FinancialAuthorityAvailabilityError::Unavailable)
     }
 }
@@ -881,8 +907,8 @@ impl CrossIssuerLifecycleResolver for UnavailableLifecycle {
 impl CrossIssuerLifecycleGenerationAnchor for UnavailableLifecycle {
     fn compare_and_swap(
         &self,
-        _checkpoint: &SignedIssuerLifecycleCheckpointV2,
-    ) -> Result<SignedIssuerLifecycleGenerationPinV2, FinancialAuthorityAvailabilityError> {
+        _checkpoint: &SignedIssuerLifecycleCheckpoint,
+    ) -> Result<SignedIssuerLifecycleGenerationPin, FinancialAuthorityAvailabilityError> {
         Err(FinancialAuthorityAvailabilityError::Unavailable)
     }
 }
@@ -890,8 +916,8 @@ impl CrossIssuerLifecycleGenerationAnchor for UnavailableLifecycle {
 impl CrossIssuerLifecycleHighWaterStore for UnavailableLifecycle {
     fn compare_and_swap(
         &self,
-        _candidate: &LifecycleCheckpointPinCandidateV2,
-    ) -> Result<SignedLifecycleCheckpointPinV2, FinancialAuthorityAvailabilityError> {
+        _candidate: &LifecycleCheckpointPinCandidate,
+    ) -> Result<SignedLifecycleCheckpointPin, FinancialAuthorityAvailabilityError> {
         Err(FinancialAuthorityAvailabilityError::Unavailable)
     }
 }
@@ -902,7 +928,7 @@ fn financial_evaluation_rejects_a_presented_reputation_credential() {
     let holder = Keypair::from_seed(&[42; 32]);
     let verifier = Keypair::from_seed(&[43; 32]);
     let credential = reputation_credential(&issuer, &holder);
-    let (manifest, proofs) = issue_passport_source_manifest_v2(
+    let (manifest, proofs) = issue_financial_passport_source_manifest(
         &issuer,
         &did(&holder),
         std::slice::from_ref(&credential),
@@ -910,20 +936,20 @@ fn financial_evaluation_rejects_a_presented_reputation_credential() {
         EXPIRES_AT,
     )
     .test_ok("issue source manifest");
-    let challenge = create_passport_presentation_challenge_v2(
+    let challenge = create_financial_passport_presentation_challenge(
         &verifier,
         1,
         "challenge-reputation",
         "nonce-reputation",
         manifest.body.source_passport_id.clone(),
-        vec![chio_credentials::PassportCredentialSelectorV2 {
+        vec![chio_credentials::FinancialPassportCredentialSelector {
             family: proofs[0].leaf.family.clone(),
             credential_ref_digest: proofs[0].leaf.credential_ref_digest.clone(),
         }],
         validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create challenge");
-    let response = respond_to_passport_presentation_challenge_v2(
+    let response = respond_to_financial_passport_presentation_challenge(
         &holder,
         manifest,
         vec![credential],
@@ -934,17 +960,17 @@ fn financial_evaluation_rejects_a_presented_reputation_credential() {
     .test_ok("respond to challenge");
 
     let issuer_did = did(&issuer);
-    let trust = CrossIssuerTrustRegistryV2::new(CrossIssuerTrustRegistryConfigV2 {
-        issuer_keys: vec![IssuerTrustKeyV2 {
+    let trust = CrossIssuerTrustRegistry::new(CrossIssuerTrustRegistryConfig {
+        issuer_keys: vec![IssuerTrustKey {
             issuer_did: issuer_did.clone(),
             verification_method: DidChio::from_public_key(issuer.public_key())
                 .test_ok("issuer DID")
                 .verification_method_id(),
             key_epoch: 1,
             public_key: issuer.public_key(),
-            status: TrustedKeyStatusV2::Active,
+            status: TrustedKeyStatus::Active,
         }],
-        ..CrossIssuerTrustRegistryConfigV2::default()
+        ..CrossIssuerTrustRegistryConfig::default()
     })
     .test_ok("build trust registry");
     let policy = create_financial_verifier_policy_v1(FinancialVerifierPolicyInputV1 {

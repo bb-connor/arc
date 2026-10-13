@@ -2239,13 +2239,13 @@
     },
     {
       "schema": "chio.financial-agent-passport.v1",
-      "artifactKind": "agent_passport_v2",
+      "artifactKind": "financial_agent_passport",
       "introducedBy": "financial-credentials-v1",
       "schemaFile": "spec/schemas/chio-trust/v1/financial-agent-passport.schema.json"
     },
     {
       "schema": "chio.financial-agent-passport.presentation.v1",
-      "artifactKind": "presented_agent_passport_v2",
+      "artifactKind": "presented_financial_agent_passport",
       "introducedBy": "financial-credentials-v1",
       "schemaFile": "spec/schemas/chio-trust/v1/presented-financial-agent-passport.schema.json"
     },
