@@ -67,6 +67,7 @@ fn export_receipts(
 ) -> ExporterManager {
     let runtime = tokio::runtime::Runtime::new().expect("build tokio runtime");
     runtime.block_on(async move {
+        let cursor_db_path = receipt_db_path.with_extension("cursor.sqlite3");
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db_path,
             poll_interval: Duration::from_millis(25),
@@ -77,7 +78,7 @@ fn export_receipts(
             rate_limit: None,
             trusted_kernel_keys: std::collections::BTreeSet::new(),
             read_context: chio_kernel::ReceiptReadContext::local_operator_admin_all(),
-            cursor_db_path: None,
+            cursor_db_path,
         })
         .expect("open ExporterManager");
         manager.add_exporter(Box::new(exporter));

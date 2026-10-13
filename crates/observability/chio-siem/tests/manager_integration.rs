@@ -265,6 +265,7 @@ fn manager_rejects_zero_batch_size() {
 
     let config = SiemConfig {
         db_path: db_path.clone(),
+        cursor_db_path: db_path.with_extension("cursor.sqlite3"),
         batch_size: 0,
         ..SiemConfig::default()
     };
@@ -306,7 +307,7 @@ async fn manager_cursor_advance_after_export() {
         rate_limit: None,
         trusted_kernel_keys: std::collections::BTreeSet::new(),
         read_context: chio_kernel::ReceiptReadContext::local_operator_admin_all(),
-        cursor_db_path: None,
+        cursor_db_path: db_path.with_extension("cursor.sqlite3"),
     };
 
     let mut manager = ExporterManager::new(config.clone()).expect("open ExporterManager");
@@ -332,8 +333,8 @@ async fn manager_cursor_advance_after_export() {
         "DLQ should be empty after successful export"
     );
 
-    // Second run: insert 3 more receipts; new ExporterManager starts from cursor=0
-    // so it will see all 8 receipts. This confirms idempotent re-export behavior.
+    // Second run: insert 3 more receipts; the new ExporterManager resumes at the
+    // persisted high-water mark and exports only the new receipts.
     let conn2 = Connection::open(&db_path).expect("reopen db");
     for i in 5..8usize {
         insert_receipt(&conn2, &make_receipt(&format!("mgr-rcpt-{i:04}")));
@@ -355,11 +356,10 @@ async fn manager_cursor_advance_after_export() {
 
     run_handle2.await.expect("second manager task completes");
 
-    // New manager re-exports from seq=0, so it will export all 8 receipts.
     assert_eq!(
         counter2.total(),
-        8,
-        "second run should export all 8 receipts (cursor resets on restart)"
+        3,
+        "second run resumes at the persisted cursor"
     );
 
     let _ = std::fs::remove_file(&db_path);
@@ -387,7 +387,7 @@ async fn manager_failure_isolation_dlq() {
         rate_limit: None,
         trusted_kernel_keys: std::collections::BTreeSet::new(),
         read_context: chio_kernel::ReceiptReadContext::local_operator_admin_all(),
-        cursor_db_path: None,
+        cursor_db_path: db_path.with_extension("cursor.sqlite3"),
     };
 
     let mut manager = ExporterManager::new(config).expect("open ExporterManager");
@@ -418,9 +418,10 @@ async fn manager_failure_isolation_dlq() {
     let _ = std::fs::remove_file(&db_path);
 }
 
-/// Cursor advances past DLQ'd events; subsequent successful exports only see new receipts.
+/// A failed exporter never acks, so a later exporter sharing the cursor store
+/// starts at the baseline and receives every receipt.
 #[tokio::test]
-async fn manager_cursor_advances_past_dlq() {
+async fn manager_failed_exporter_does_not_advance_shared_cursor() {
     let db_path = unique_db_path("cursor-past-dlq");
     let conn = create_db(&db_path);
 
@@ -428,13 +429,6 @@ async fn manager_cursor_advances_past_dlq() {
     for i in 0..5usize {
         insert_receipt(&conn, &make_receipt(&format!("mgr-dlq-rcpt-{i:04}")));
     }
-
-    // Strategy: two sequential ExporterManager instances.
-    // Instance 1: FailingExporter, run 1 cycle (5 receipts -> DLQ, cursor advances to 5).
-    // Instance 2: CountingExporter, cursor resets to 0 on new instance, exports all 8.
-    //
-    // This proves the key invariant: DLQ'd events do not block the export loop
-    // or corrupt the database, and subsequent runs succeed cleanly.
 
     drop(conn);
 
@@ -449,7 +443,7 @@ async fn manager_cursor_advances_past_dlq() {
         rate_limit: None,
         trusted_kernel_keys: std::collections::BTreeSet::new(),
         read_context: chio_kernel::ReceiptReadContext::local_operator_admin_all(),
-        cursor_db_path: None,
+        cursor_db_path: db_path.with_extension("cursor.sqlite3"),
     })
     .expect("open mgr1");
     mgr1.add_exporter(Box::new(FailingExporter));
@@ -484,7 +478,7 @@ async fn manager_cursor_advances_past_dlq() {
         rate_limit: None,
         trusted_kernel_keys: std::collections::BTreeSet::new(),
         read_context: chio_kernel::ReceiptReadContext::local_operator_admin_all(),
-        cursor_db_path: None,
+        cursor_db_path: db_path.with_extension("cursor.sqlite3"),
     })
     .expect("open mgr2");
     mgr2.add_exporter(Box::new(counter.clone()));
@@ -498,9 +492,6 @@ async fn manager_cursor_advances_past_dlq() {
     tx2.send(true).expect("cancel phase 2");
     h2.await.expect("phase 2 manager completes");
 
-    // Phase 2 manager starts from cursor=0 and exports all 8 receipts successfully.
-    // This proves that the DLQ'd phase 1 receipts did not corrupt the database,
-    // and that after cursor advancement, new receipts can be exported cleanly.
     assert_eq!(
         counter.total(),
         8,
@@ -532,7 +523,7 @@ async fn manager_retries_transient_failure_without_dlq() {
         rate_limit: None,
         trusted_kernel_keys: std::collections::BTreeSet::new(),
         read_context: chio_kernel::ReceiptReadContext::local_operator_admin_all(),
-        cursor_db_path: None,
+        cursor_db_path: db_path.with_extension("cursor.sqlite3"),
     })
     .expect("open ExporterManager");
     manager.add_exporter(Box::new(exporter.clone()));
@@ -593,7 +584,7 @@ async fn manager_rate_limits_bursts_without_silent_drop() {
         }),
         trusted_kernel_keys: std::collections::BTreeSet::new(),
         read_context: chio_kernel::ReceiptReadContext::local_operator_admin_all(),
-        cursor_db_path: None,
+        cursor_db_path: db_path.with_extension("cursor.sqlite3"),
     })
     .expect("open ExporterManager");
     manager.add_exporter(Box::new(exporter.clone()));

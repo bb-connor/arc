@@ -35,16 +35,19 @@ pub struct SiemConfig {
     pub base_backoff_ms: u64,     // default: 500 ms (doubles on each retry)
     pub dlq_capacity: usize,      // default: 1000 entries
     pub rate_limit: Option<RateLimitConfig>, // optional per-exporter batch throttle
+    pub trusted_kernel_keys: BTreeSet<String>, // kernel keys whose receipt signatures are accepted
+    pub read_context: ReceiptReadContext,      // must be the local operator admin-all boundary
+    pub cursor_db_path: PathBuf,  // SIEM-owned writable SQLite file for per-exporter progress
 }
 ```
 
-On each tick the manager opens a fresh read-only connection, queries `SELECT seq, raw_json FROM chio_tool_receipts WHERE seq > cursor ORDER BY seq ASC LIMIT batch_size`, parses receipts into `SiemEvent` values, and calls `export_batch` on each registered exporter. The cursor is advanced past the batch whether or not some events were DLQ'd.
+On each tick the manager reads from its read-only connection, queries `SELECT seq, raw_json FROM chio_tool_receipts WHERE seq > cursor ORDER BY seq ASC LIMIT batch_size`, parses receipts into `SiemEvent` values, and calls `export_batch` on each registered exporter. Each exporter's high-water mark advances only over events it accepted; the read cursor resumes at the slowest registered exporter, so a failed batch is redelivered (at-least-once).
 
 If `rate_limit` is set, each exporter gets its own token bucket keyed by
 exporter name. The manager waits for capacity before sending the next batch, so
 burst traffic is delayed rather than silently dropped.
 
-The cursor is in-memory only and resets to 0 on restart. Both Splunk HEC (timestamp dedup) and Elasticsearch (idempotent `_id` upsert) handle duplicate events safely.
+High-water marks persist in `cursor_db_path`, so a restart resumes where each exporter stopped. Redelivered events are duplicates; Splunk HEC (timestamp dedup) and Elasticsearch (idempotent `_id` upsert) handle them safely.
 
 Run the manager:
 
