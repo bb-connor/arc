@@ -1281,8 +1281,7 @@ pub struct AuthorityTrustedKeySnapshot {
     pub public_key_hex: String,
     pub generation: u64,
     pub activated_at: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub lifecycle: Option<lifecycle::AuthorityKeyLifecycle>,
+    pub lifecycle: lifecycle::AuthorityKeyLifecycle,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

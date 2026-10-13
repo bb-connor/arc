@@ -259,7 +259,7 @@ fn kg2_competing_lifecycle_imports_commit_one_complete_history() -> TestResult {
 }
 
 #[test]
-fn kg2_transition_without_lifecycle_operation_is_refused() -> TestResult {
+fn kg2_authority_wire_without_explicit_lifecycle_is_refused() -> TestResult {
     use chio_core::crypto::{sha256_hex, Keypair};
     use chio_kernel::authority::{
         lifecycle::{apply_lifecycle_change, AuthorityLifecycleChange},
@@ -306,6 +306,18 @@ fn kg2_transition_without_lifecycle_operation_is_refused() -> TestResult {
         .err()
         .ok_or("transition without a lifecycle operation decoded")?;
     assert_eq!(error.to_string(), "missing field `change`");
+    let mut key = serde_json::to_value(anchor.snapshot.trusted_keys.first().ok_or("no issuer")?)?;
+    key.as_object_mut()
+        .ok_or("trusted key is not an object")?
+        .remove("lifecycle");
+    let error = serde_json::from_value::<chio_kernel::AuthorityTrustedKeySnapshot>(key)
+        .err()
+        .ok_or("trusted key without a lifecycle decoded")?;
+    assert_eq!(error.to_string(), "missing field `lifecycle`");
+    let mut foreign = anchor.clone();
+    foreign.schema = "chio.authority-replication-anchor.v2".into();
+    assert!(matches!(foreign.validate(), Err(chio_kernel::AuthorityStoreError::Fence(message))
+        if message == "invalid replication anchor domain"));
     Ok(())
 }
 

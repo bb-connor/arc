@@ -29,18 +29,17 @@ pub(super) fn persist_trusted_key(
     public_key: &str,
     generation: u64,
     activated_at: u64,
+    lifecycle: &AuthorityKeyLifecycle,
 ) -> Result<PublicKey, AuthorityStoreError> {
     let key = PublicKey::from_hex(public_key.trim())?;
     connection.execute(
-        "INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at)
-         VALUES (?1, ?2, ?3)
-         ON CONFLICT(public_key_hex) DO UPDATE SET
-             generation = MAX(generation, excluded.generation),
-             activated_at = MIN(activated_at, excluded.activated_at)",
+        "INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at, lifecycle_json)
+         VALUES (?1, ?2, ?3, ?4)",
         params![
             key.to_hex(),
             authority_generation(generation)?,
-            authority_sqlite_integer(activated_at, "activation time")?
+            authority_sqlite_integer(activated_at, "activation time")?,
+            replication::encode_lifecycle(lifecycle)?
         ],
     )?;
     Ok(key)

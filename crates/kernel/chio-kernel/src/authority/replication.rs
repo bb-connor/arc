@@ -459,13 +459,6 @@ pub fn validate_state(state: &AuthoritySnapshot) -> Result<(), AuthorityStoreErr
     }) {
         return Err(refused("authority head missing from history"));
     }
-    if state.trusted_keys.iter().all(|key| key.lifecycle.is_none())
-        && !state.trusted_keys.last().is_some_and(|key| {
-            key.generation == state.generation && key.activated_at == state.rotated_at
-        })
-    {
-        return Err(refused("authority head does not match generation"));
-    }
     super::lifecycle::validate_lifecycle(state)
 }
 
