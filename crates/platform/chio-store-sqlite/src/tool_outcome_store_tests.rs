@@ -22,8 +22,6 @@ use tempfile::TempDir;
 use super::*;
 use crate::{SqliteAdmissionOperationStore, SqliteAuthorityStore};
 
-#[path = "tool_outcome_store_tests/physical_liability.rs"]
-mod physical_liability;
 
 #[path = "tool_outcome_store_tests/pure_finalization.rs"]
 mod pure_finalization;
@@ -1362,5 +1360,3 @@ fn secure_temp_directory(path: &std::path::Path) {
 #[cfg(unix)]
 mod connection_recovery;
 
-#[path = "tool_outcome_store_tests/raw_source_controls.rs"]
-mod raw_source_controls;

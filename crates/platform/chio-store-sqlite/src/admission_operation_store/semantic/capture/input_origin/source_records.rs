@@ -28,30 +28,6 @@ impl<T: Serialize + DeserializeOwned> SourceRecord<T> {
         })
     }
 
-    pub(super) fn validate_at_cut(
-        &self,
-        tx: &Connection,
-        key: &str,
-        scope: &RecoveryScopeV1,
-        kind: &str,
-        cut: u64,
-    ) -> Result<(), AdmissionOperationStoreError> {
-        if self.source.record_key() != key
-            || self.source.global_commit_sequence() > cut
-            || !protected::matches_historical_source_payload_at_cut(
-                tx,
-                &self.source,
-                key,
-                &scope_key(scope)?,
-                kind,
-                &protected::encode(&self.body)?,
-                cut,
-            )?
-        {
-            return Err(refused("semantic input historical selected source changed"));
-        }
-        Ok(())
-    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -135,43 +111,8 @@ impl AudienceSources {
             .map(|legacy| &legacy.body))
     }
 
-    pub(super) fn validate_at_cut(
-        &self,
-        tx: &Connection,
-        expected: &SemanticAudienceObservationV1,
-        cut: u64,
-    ) -> Result<(), AdmissionOperationStoreError> {
-        let (exact, legacy) = audience_keys(expected)?;
-        for (source, key) in [(&self.exact, &exact), (&self.legacy, &legacy)] {
-            if let Some(source) = source {
-                source.validate_at_cut(tx, key, &expected.scope, "command", cut)?;
-            } else {
-                require_absent_at_cut(tx, key, cut)?;
-            }
-        }
-        self.selected(expected)?;
-        Ok(())
-    }
 }
 
-pub(super) fn require_absent_at_cut(
-    tx: &Connection,
-    key: &str,
-    cut: u64,
-) -> Result<(), AdmissionOperationStoreError> {
-    let exists: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM authority_global_commits
-             WHERE projection_kind='recovery' AND projection_key=?1 AND commit_sequence<=?2)",
-            params![key, i64::try_from(cut).map_err(refused)?],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    if exists {
-        return Err(refused("semantic input historical source absence changed"));
-    }
-    Ok(())
-}
 
 pub(super) fn selected_annotations(
     tx: &Connection,

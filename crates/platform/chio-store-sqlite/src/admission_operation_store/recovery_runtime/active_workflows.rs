@@ -491,43 +491,7 @@ pub(super) fn retire_cancelled(
     persist_retirement(tx, owner, record, None).map(|_| ())
 }
 
-pub(super) fn require_live_allocation(
-    tx: &Connection,
-    record: &RecoveryWorkflowRecordV1,
-) -> Result<(), AdmissionOperationStoreError> {
-    let allocation = load_allocation(tx, &record.scope, &record.workflow_id)?
-        .ok_or_else(|| invariant("unused setup lacks an authentic live workflow allocation"))?;
-    if allocation.retirement.is_some() {
-        return Err(invariant("unused setup allocation was already retired"));
-    }
-    Ok(())
-}
 
-pub(super) fn require_no_future_retired_allocation(
-    tx: &Connection,
-    record: &RecoveryWorkflowRecordV1,
-) -> Result<(), AdmissionOperationStoreError> {
-    let allocation = load_allocation(tx, &record.scope, &record.workflow_id)?
-        .ok_or_else(|| invariant("original closure lost its retained workflow allocation"))?;
-    let retirement = allocation
-        .retirement
-        .ok_or_else(|| invariant("original closure retains an active workflow allocation"))?;
-    if retirement.workflow_version != record.revision
-        || retirement.captured_terminal.is_some()
-        || retirement.workflow_digest
-            != event(
-                tx,
-                &workflow_key(&record.scope, &record.workflow_id)?,
-                record.revision.get(),
-            )?
-            .1
-    {
-        return Err(invariant(
-            "original no-future retirement changed its physical closure source",
-        ));
-    }
-    Ok(())
-}
 
 fn require_terminal_retirement(
     tx: &Connection,

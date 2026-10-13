@@ -50,22 +50,11 @@ impl<'tx, 'conn> VerifiedKnowledgePublicationBaseline<'tx, 'conn> {
     pub(in crate::admission_operation_store) fn active_publications(&self) -> u64 {
         self.active_publications
     }
-    pub(in crate::admission_operation_store) fn remaining_forward_liability_by_state(
-        &self,
-    ) -> &PublicationForwardLiability {
-        &self.liability
-    }
     pub(in crate::admission_operation_store) fn global_cutoff(&self) -> &ReferenceCutoff {
         &self.cutoff
     }
     pub(in crate::admission_operation_store) fn census_digest(&self) -> CanonicalPayloadDigest {
         self.census
-    }
-    pub(in crate::admission_operation_store) fn scope(&self) -> &RecoveryScopeV1 {
-        &self.scope
-    }
-    pub(in crate::admission_operation_store) fn transaction(&self) -> &'tx Transaction<'conn> {
-        self.transaction
     }
 
     pub(in crate::admission_operation_store) fn verify(

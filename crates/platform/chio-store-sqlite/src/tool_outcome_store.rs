@@ -787,17 +787,7 @@ pub(crate) fn compiled_tool_outcome_schema() -> &'static str {
     TOOL_OUTCOME_SCHEMA
 }
 
-/// The actual producer's enforced complete canonical outcome record bound.
-/// This describes cost and grants no claim, mutation or financing authority.
-pub(crate) fn outcome_record_maximum_bytes() -> usize {
-    MAX_OUTCOME_RECORD_BYTES
-}
 
-/// The actual producer's enforced complete canonical evaluation record bound.
-/// Original producing profiles can select a smaller bound without changing it.
-pub(crate) fn evaluation_record_maximum_bytes() -> usize {
-    MAX_EVALUATION_RECORD_BYTES
-}
 
 pub(crate) fn initialize_tool_outcome_schema(
     connection: &mut Connection,

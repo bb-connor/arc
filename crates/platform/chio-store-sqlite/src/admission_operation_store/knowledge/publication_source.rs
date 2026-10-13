@@ -2,16 +2,6 @@
 use super::*;
 use std::ops::Deref;
 
-/// A source identity includes its process and original principal; the allocator
-/// account is separately derived from only its serving domain and tenant.
-#[derive(Serialize)]
-pub(in crate::admission_operation_store) struct KnowledgePublicationIdentity<'a> {
-    scope: &'a RecoveryScopeV1,
-    principal: &'a chio_security_types::PrincipalId,
-    publication: &'a CommandId,
-    artifact: &'a ArtifactId,
-    version: &'a ArtifactRevisionId,
-}
 
 /// Fresh data is bound to the actual writer, original actor and exact current
 /// installation. No deserialized payload can construct this intake witness.
@@ -109,36 +99,14 @@ impl<'tx, 'conn> VerifiedKnowledgePublicationIntake<'tx, 'conn> {
         Ok(())
     }
 
-    pub(in crate::admission_operation_store) fn transaction(&self) -> &'tx Transaction<'conn> {
-        self.transaction
-    }
     pub(in crate::admission_operation_store) fn scope(&self) -> &RecoveryScopeV1 {
         &self.record.metadata.scope
     }
     pub(in crate::admission_operation_store) fn source_key(&self) -> &str {
         &self.source_key
     }
-    pub(in crate::admission_operation_store) fn canonical_payload(&self) -> &[u8] {
-        &self.canonical_payload
-    }
     pub(in crate::admission_operation_store) fn record(&self) -> &NativeArtifactRecordV1 {
         &self.record
-    }
-    pub(in crate::admission_operation_store) fn publication_identity(
-        &self,
-    ) -> KnowledgePublicationIdentity<'_> {
-        KnowledgePublicationIdentity {
-            scope: &self.record.metadata.scope,
-            principal: self.actor.principal(),
-            publication: &self.record.input.publication,
-            artifact: &self.record.metadata.artifact,
-            version: &self.record.metadata.version,
-        }
-    }
-    pub(in crate::admission_operation_store) fn dependency_references(
-        &self,
-    ) -> &[ArtifactVersionRefV1] {
-        self.record.input.dependencies.as_slice()
     }
 }
 
@@ -274,23 +242,6 @@ impl<'tx, 'conn> VerifiedKnowledgePublicationProgress<'tx, 'conn> {
         Ok(())
     }
 
-    pub(in crate::admission_operation_store) fn transaction(&self) -> &'tx Transaction<'conn> {
-        self.transaction
-    }
-    pub(in crate::admission_operation_store) fn scope(&self) -> &RecoveryScopeV1 {
-        &self.record.metadata.scope
-    }
-    pub(in crate::admission_operation_store) fn previous(
-        &self,
-    ) -> &protected::ProtectedSourceReference {
-        &self.previous
-    }
-    pub(in crate::admission_operation_store) fn record(&self) -> &NativeArtifactRecordV1 {
-        &self.record
-    }
-    pub(in crate::admission_operation_store) fn canonical_payload(&self) -> &[u8] {
-        &self.canonical_payload
-    }
 }
 
 fn validate_publication_transition(

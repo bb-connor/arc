@@ -68,9 +68,6 @@ impl ModernPinSource {
     pub(super) fn active(&self) -> bool {
         self.active
     }
-    pub(super) fn source(&self) -> &protected::ProtectedSourceReference {
-        &self.source
-    }
 }
 
 pub(super) fn modern_reference_source(

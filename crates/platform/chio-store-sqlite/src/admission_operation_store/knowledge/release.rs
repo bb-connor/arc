@@ -97,31 +97,6 @@ fn selected<'a>(
         .ok_or_else(|| refused("recipient"))
 }
 
-pub(super) fn retained_archive_root(
-    tx: &Connection,
-    actor: &AuthenticatedRecoveryActor,
-    handle: &ArtifactHandleV1,
-    recipient: &ArtifactRecipientV1,
-) -> Result<ArtifactVersionRefV1, AdmissionOperationStoreError> {
-    if actor.permission() != RecoveryPermission::KnowledgeAdmin
-        || recipient.scope != *actor.scope()
-        || recipient.sink != ArtifactSinkV1::Archive
-        || recipient.clearance == InformationLabel::Top
-    {
-        return Err(refused("retained archive root authority"));
-    }
-    let retained: HandleRecord = load(tx, &handle_key(actor.scope(), &handle.handle)?)?
-        .ok_or_else(|| refused("retained archive root handle"))?;
-    if retained.handle != *handle
-        || retained.principal != *actor.principal()
-        || retained.artifact.scope != *actor.scope()
-        || retained.recipient != *recipient
-        || handle.recipient != recipient.recipient
-    {
-        return Err(refused("retained archive root binding"));
-    }
-    Ok(retained.artifact)
-}
 pub(super) fn authority_digest(
     actor: &AuthenticatedRecoveryActor,
 ) -> Result<ReleaseAuthorizationDigest, AdmissionOperationStoreError> {

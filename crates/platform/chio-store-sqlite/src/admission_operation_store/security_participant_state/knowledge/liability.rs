@@ -24,18 +24,6 @@ pub(in crate::admission_operation_store) enum NativeWriteTableData {
 }
 
 impl NativeWriteTableData {
-    pub(in crate::admission_operation_store) fn table_name(self) -> &'static str {
-        match self {
-            Self::FlowContexts => "security_participant_state_flow_contexts",
-            Self::FlowSequences => "security_participant_state_flow_sequences",
-            Self::IsolationEpochs => "security_participant_state_isolation_epochs",
-            Self::PrincipalLabels => "security_participant_state_principal_flow_state",
-            Self::LineageLabels => "security_participant_state_lineage_flow_state",
-            Self::SessionLabels => "security_participant_state_session_flow_state",
-            Self::SessionMemberships => "security_participant_state_session_memberships",
-            Self::FlowTransitions => "security_participant_state_transitions",
-        }
-    }
 
     fn from_source(table: &str) -> Result<Self, AdmissionOperationStoreError> {
         match table {
@@ -96,30 +84,6 @@ pub(in crate::admission_operation_store) struct NativeWriteShapeData {
 }
 
 impl NativeWriteShapeData {
-    pub(in crate::admission_operation_store) fn table(&self) -> NativeWriteTableData {
-        self.table
-    }
-    pub(in crate::admission_operation_store) fn primary_key(&self) -> &[(&'static str, String)] {
-        &self.primary_key
-    }
-    pub(in crate::admission_operation_store) fn existed(&self) -> bool {
-        self.existed
-    }
-    pub(in crate::admission_operation_store) fn generation_only(&self) -> bool {
-        self.generation_only
-    }
-    pub(in crate::admission_operation_store) fn before_record_bytes(&self) -> Option<u64> {
-        self.before_record_bytes
-    }
-    pub(in crate::admission_operation_store) fn maximum_after_record_bytes(&self) -> u64 {
-        self.maximum_after_record_bytes
-    }
-    pub(in crate::admission_operation_store) fn maximum_record_bytes(&self) -> u64 {
-        self.maximum_record_bytes
-    }
-    pub(in crate::admission_operation_store) fn source_mutations(&self) -> u64 {
-        self.source_mutations
-    }
 }
 
 /// This role is neither a phase reservation nor credit. It survives the move
@@ -356,33 +320,6 @@ impl VerifiedNativeKnowledgeJoinLiability<'_> {
         Ok(())
     }
 
-    pub(in crate::admission_operation_store) fn native_catalog_fingerprint(&self) -> &str {
-        &self.native_catalog_fingerprint
-    }
-    pub(in crate::admission_operation_store) fn native_write_shapes(
-        &self,
-    ) -> &[NativeWriteShapeData] {
-        &self.native_shapes
-    }
-    pub(in crate::admission_operation_store) fn protected_commands(
-        &self,
-    ) -> &[ProtectedCommandLiabilityPlan] {
-        &self.protected_commands
-    }
-    pub(in crate::admission_operation_store) fn protected_journal_rows(
-        &self,
-    ) -> &[(String, String, Vec<u8>)] {
-        &self.protected_rows
-    }
-    pub(in crate::admission_operation_store) fn journal_authority_id(&self) -> &str {
-        self.initialized.authority.as_str()
-    }
-    pub(in crate::admission_operation_store) fn journal_records(&self) -> u64 {
-        1
-    }
-    pub(in crate::admission_operation_store) fn journal_bytes(&self) -> u64 {
-        self.journal_bytes
-    }
 }
 
 pub(super) fn apply_totals(

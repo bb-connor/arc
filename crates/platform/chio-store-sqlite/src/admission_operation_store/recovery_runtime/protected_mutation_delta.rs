@@ -35,11 +35,5 @@ impl ProtectedMutationDelta {
         })
     }
 
-    pub(in crate::admission_operation_store) fn mutations(&self) -> u64 {
-        self.mutations
-    }
 
-    pub(in crate::admission_operation_store) fn encoded_bytes(&self) -> u64 {
-        self.encoded_bytes
-    }
 }

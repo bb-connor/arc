@@ -44,88 +44,11 @@ pub(super) fn initialize_committed_artifact_references(
     Ok(delta)
 }
 
-/// Fresh native storage administration authorizes a cold inventory rebuild.
-/// This does not retire a source, renew execution, or admit byte disclosure.
-pub(in crate::admission_operation_store) struct VerifiedKnowledgeReferenceRebuildAuthority<
-    'tx,
-    'conn,
-> {
-    transaction: &'tx Transaction<'conn>,
-    owner: &'tx SqliteServingOwner,
-    actor: &'tx AuthenticatedRecoveryActor,
-    installation: NativeKnowledgeInstallationV1,
-    reference: ArtifactVersionRefV1,
-    publication: protected::ProtectedSourceReference,
-    pointer: protected::ProtectedSourceReference,
-}
 
 impl<'tx, 'conn> VerifiedKnowledgeReferenceRebuildAuthority<'tx, 'conn> {
-    /// Only the same-scope retained Admin writer can call this constructor.
-    pub(super) fn new(
-        tx: &'tx Transaction<'conn>,
-        owner: &'tx SqliteServingOwner,
-        actor: &'tx AuthenticatedRecoveryActor,
-        profile: &NativeKnowledgeInstallationV1,
-        reference: &ArtifactVersionRefV1,
-    ) -> Result<Self, AdmissionOperationStoreError> {
-        let (_, publication, pointer) = retained_reference_artifact(tx, reference)?;
-        let proof = Self {
-            transaction: tx,
-            owner,
-            actor,
-            installation: profile.clone(),
-            reference: reference.clone(),
-            publication,
-            pointer,
-        };
-        proof.verify(tx)?;
-        Ok(proof)
-    }
 
-    pub(in crate::admission_operation_store) fn transaction(&self) -> &'tx Transaction<'conn> {
-        self.transaction
-    }
 
-    pub(in crate::admission_operation_store) fn reference(&self) -> &ArtifactVersionRefV1 {
-        &self.reference
-    }
 
-    pub(in crate::admission_operation_store) fn verify(
-        &self,
-        tx: &Transaction<'conn>,
-    ) -> Result<(), AdmissionOperationStoreError> {
-        if !std::ptr::eq::<Connection>(Deref::deref(self.transaction), Deref::deref(tx)) {
-            return Err(refused("reference rebuild changed physical writer"));
-        }
-        // A complete census can be slow. Recheck actual trusted authority time
-        // after that work rather than reusing the time at its first admission.
-        let now = schema::observe_authority_time(tx, self.owner)?;
-        let deployment = protected::deployment_tx(tx, self.actor.scope())?;
-        super::super::recovery_runtime::verify_actor(tx, self.actor, &deployment, now)?;
-        let profile = installation(tx, self.actor.scope())?;
-        validate_installation(tx, &deployment, &profile)?;
-        if self.actor.permission() != RecoveryPermission::KnowledgeAdmin
-            || self.reference.scope != *self.actor.scope()
-            || protected::encode(&profile)? != protected::encode(&self.installation)?
-        {
-            return Err(refused("reference rebuild lost fresh storage authority"));
-        }
-        protected::verify_source_reference(tx, &self.publication)?;
-        protected::verify_source_reference(tx, &self.pointer)?;
-        let (record, publication, pointer) = retained_reference_artifact(tx, &self.reference)?;
-        if SourceAnchor::capture(&publication) != SourceAnchor::capture(&self.publication)
-            || SourceAnchor::capture(&pointer) != SourceAnchor::capture(&self.pointer)
-        {
-            return Err(refused("reference rebuild changed its retained artifact"));
-        }
-        traversal::ensure_audience(tx, self.actor, &record.metadata.label)?;
-        traversal::ensure_audience(
-            tx,
-            self.actor,
-            &source(tx, &profile.native_authority, &profile.producer_context)?,
-        )?;
-        verify_reference_ready(tx, &self.reference.scope)
-    }
 }
 
 /// The enclosing owning read has already authenticated its serving transaction.

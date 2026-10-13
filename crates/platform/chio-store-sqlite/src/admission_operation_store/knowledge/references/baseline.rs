@@ -62,11 +62,6 @@ impl<'tx, 'conn> PreparedNewArtifactReferenceBaseline<'tx, 'conn> {
         self.source.reference()
     }
 
-    pub(in crate::admission_operation_store) fn owner_source(
-        &self,
-    ) -> &protected::ProtectedSourceReference {
-        self.source.source()
-    }
 
     pub(in crate::admission_operation_store) fn staged_update(&self) -> &StagedReferenceUpdate {
         &self.write
@@ -100,12 +95,6 @@ pub(in crate::admission_operation_store) struct ColdReferenceWriteFootprint {
 }
 
 impl ColdReferenceWriteFootprint {
-    pub(super) fn new(record_count: u64, encoded_bytes: u64) -> Self {
-        Self {
-            record_count,
-            encoded_bytes,
-        }
-    }
 
     pub(in crate::admission_operation_store) fn record_count(&self) -> u64 {
         self.record_count
@@ -163,17 +152,11 @@ impl<'tx, 'conn> PreparedColdReferenceBaseline<'tx, 'conn> {
         self.source.reference()
     }
 
-    pub(in crate::admission_operation_store) fn baseline_active_owners(&self) -> u64 {
-        self.source.baseline_active_count()
-    }
 
     pub(in crate::admission_operation_store) fn global_cutoff(&self) -> &ReferenceCutoff {
         self.source.cutoff()
     }
 
-    pub(in crate::admission_operation_store) fn census_digest(&self) -> CanonicalPayloadDigest {
-        self.source.census_digest()
-    }
 
     pub(in crate::admission_operation_store) fn cohort_digest(&self) -> CanonicalPayloadDigest {
         self.source.cohort_digest()
