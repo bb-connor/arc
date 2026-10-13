@@ -592,11 +592,7 @@ impl ChioKernel {
             body.clone(),
         )
         .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        Ok(VerifiedThresholdApprovalSet {
-            requirement,
-            body,
-            replay,
-        })
+        Ok(VerifiedThresholdApprovalSet { body, replay })
     }
 
     fn validate_metered_billing_context(
