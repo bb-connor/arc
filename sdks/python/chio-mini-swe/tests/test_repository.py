@@ -482,7 +482,7 @@ def broker_receipt(output, command, identifier):
         "status": 200,
         "headers": [],
         "body": list(json.dumps(output, ensure_ascii=False).encode()),
-        "evidence": {"schema": "chio.broker-execution-evidence.v2"},
+        "evidence": {"schema": "chio.broker-execution-evidence.v1"},
         "receiptReference": "fixture",
         "receipt": {},
     }

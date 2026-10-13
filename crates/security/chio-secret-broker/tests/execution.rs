@@ -166,7 +166,7 @@ fn capability_signature_rejects_each_bound_field_tamper() {
     let mutations = [
         (
             "/body/schema",
-            serde_json::json!("chio.broker-capability.v2"),
+            serde_json::json!("chio.broker-capability.tampered"),
         ),
         (
             "/body/issuer",

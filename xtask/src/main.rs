@@ -92,6 +92,7 @@ use clap::{CommandFactory, Parser};
 use cli::Cli;
 
 mod adapter_no_bypass;
+mod broker_receipt_vectors;
 mod cli;
 mod codegen;
 mod crate_paths;

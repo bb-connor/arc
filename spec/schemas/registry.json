@@ -2558,12 +2558,6 @@
       "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execute-response-v1.schema.json"
     },
     {
-      "schema": "chio.broker-execute-response.v2",
-      "artifactKind": "broker_execute_response",
-      "introducedBy": "enterprise-security-execution-v2",
-      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execute-response-v2.schema.json"
-    },
-    {
       "schema": "chio.broker-execute.v1",
       "artifactKind": "broker_execute_request",
       "introducedBy": "enterprise-security-execution-v1",
@@ -2574,12 +2568,6 @@
       "artifactKind": "broker_execution_evidence",
       "introducedBy": "enterprise-security-execution-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execution-evidence-v1.schema.json"
-    },
-    {
-      "schema": "chio.broker-execution-evidence.v2",
-      "artifactKind": "broker_execution_evidence",
-      "introducedBy": "enterprise-security-execution-v2",
-      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execution-evidence-v2.schema.json"
     },
     {
       "schema": "chio.broker-execution-failure-receipt.v1",
@@ -2594,13 +2582,6 @@
       "introducedBy": "enterprise-security-execution-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execution-receipt-envelope-v1.schema.json",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-execution-receipt-body-v1.schema.json"
-    },
-    {
-      "schema": "chio.broker-execution-receipt.v2",
-      "artifactKind": "broker_execution_receipt",
-      "introducedBy": "enterprise-security-execution-v2",
-      "schemaFile": "spec/schemas/chio-wire/v1/security/broker-execution-receipt-envelope-v2.schema.json",
-      "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/broker-execution-receipt-body-v2.schema.json"
     },
     {
       "schema": "chio.broker-prepare-dispatch-acknowledgement.v1",

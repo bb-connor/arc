@@ -89,26 +89,11 @@ fn daemon_runtime_config_is_closed_and_rejects_partial_authority_or_storage() {
     let valid = config(directory.path());
     valid.validate().test_expect("valid runtime config");
 
-    let mut legacy = valid.clone();
-    legacy.schema = "chio.secret-brokerd.runtime-config.v1".to_string();
-    legacy
+    let mut foreign_schema = valid.clone();
+    foreign_schema.schema = "chio.secret-brokerd.runtime-config.unknown".to_string();
+    foreign_schema
         .validate()
-        .test_expect_err("deadline-less v1 runtime config must be rejected");
-    let mut pre_governed_audit = valid.clone();
-    pre_governed_audit.schema = "chio.secret-brokerd.runtime-config.v2".to_string();
-    pre_governed_audit
-        .validate()
-        .test_expect_err("runner-unbound v2 runtime config must be rejected");
-    let mut in_process_only_audit = valid.clone();
-    in_process_only_audit.schema = "chio.secret-brokerd.runtime-config.v3".to_string();
-    in_process_only_audit
-        .validate()
-        .test_expect_err("socket-less v3 runtime config must be rejected");
-    let mut unanchored_migration = valid.clone();
-    unanchored_migration.schema = "chio.secret-brokerd.runtime-config.v4".to_string();
-    unanchored_migration
-        .validate()
-        .test_expect_err("migration-unbound v4 runtime config must be rejected");
+        .test_expect_err("a runtime config with another schema must be rejected");
 
     let mut missing_binding = valid.clone();
     missing_binding.enterprise_migration.minimum_heads.clear();

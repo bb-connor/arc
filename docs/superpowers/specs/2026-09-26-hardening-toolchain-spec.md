@@ -350,7 +350,7 @@ directories, and `spec/`, **308 are pinned somewhere and 280 are not; 68 of the
 unpinned are in the security TCB**, densest in `chio-kernel` (36),
 `chio-control-plane` (23) and `chio-keyring` (12), and including the entire
 secret-broker wire protocol (`chio.broker-execute.v1`, `chio.broker-capability.v1`,
-`chio.broker-execution-receipt.v2`), the key-log family, the cage envelopes and
+`chio.broker-execution-receipt.v1`), the key-log family, the cage envelopes and
 receipts, and `chio.dpop_proof.v2`. Separately, **55 schema values are declared in more than one file, 54 of them
 across crate boundaries** (38 as the same constant name copy-pasted, 17 under
 different names); `chio.receipt.v1` alone is declared in six files across five
