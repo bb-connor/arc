@@ -3,6 +3,7 @@
   "id": "cap-019dbd30-b48e-7883-9007-e234267815ce",
   "issued_at": 1776995579,
   "issuer": "fc7afde8300a7d3ad77055ced5c48e3673af91148df162227122958c88f76711",
+  "schema": "chio.capability.v1",
   "scope": {
     "grants": [
       {

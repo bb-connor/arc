@@ -7,11 +7,20 @@ from .json import canonicalize_json
 from .signing import verify_utf8_message_ed25519
 
 
+CAPABILITY_SCHEMA = "chio.capability.v1"
+
+
 def parse_capability_json(input_text: str) -> dict[str, Any]:
     parsed = parse_json_text(input_text)
     if not isinstance(parsed, dict):
         raise ChioInvariantError("json", "capability must be a JSON object")
+    _require_capability_schema(parsed)
     return parsed
+
+
+def _require_capability_schema(capability: dict[str, Any]) -> None:
+    if capability.get("schema") != CAPABILITY_SCHEMA:
+        raise ChioInvariantError("json", 'capability schema must be "chio.capability.v1"')
 
 
 def _capability_body(capability: dict[str, Any]) -> dict[str, Any]:
@@ -36,9 +45,10 @@ def _non_empty_list(value: Any) -> bool:
 
 
 def capability_signing_body(capability: dict[str, Any]) -> dict[str, Any]:
+    _require_capability_schema(capability)
     body = _capability_body(capability)
     signing_body = {
-        "schema": capability.get("schema", "chio.capability.v1"),
+        "schema": capability["schema"],
         **body,
     }
     if not _non_empty_list(signing_body.get("delegation_chain")):

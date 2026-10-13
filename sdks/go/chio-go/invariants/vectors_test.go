@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/backbay-labs/chio/sdks/go/chio-go/invariants"
@@ -388,5 +389,16 @@ func loadVectorFile(t *testing.T, path string, target any) {
 	decoder.UseNumber()
 	if err := decoder.Decode(target); err != nil {
 		t.Fatalf("failed to decode %s: %v", path, err)
+	}
+}
+
+func TestCapabilityWithoutV1SchemaIsRefused(t *testing.T) {
+	for _, payload := range []string{`{"id":"cap"}`, `{"id":"cap","schema":"chio.capability.v2"}`} {
+		if _, err := invariants.ParseCapabilityJSON(payload); err == nil || !strings.Contains(err.Error(), `capability schema must be "chio.capability.v1"`) {
+			t.Fatalf("expected schema refusal for %s, got %v", payload, err)
+		}
+	}
+	if _, err := invariants.CapabilitySigningBodyCanonicalJSON(map[string]any{"id": "cap"}); err == nil {
+		t.Fatalf("expected signing body refusal without schema")
 	}
 }

@@ -17,6 +17,7 @@
   "id": "cap-ioa-web3-procurement",
   "issued_at": 1776995579,
   "issuer": "5406d66264bd86152968b3f2530c6e48141c6f91015de1ef27ec41c93c06602c",
+  "schema": "chio.capability.v1",
   "scope": {
     "grants": [
       {

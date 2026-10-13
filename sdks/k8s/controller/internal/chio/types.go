@@ -59,7 +59,11 @@ type promptGrant struct {
 	Operations []string `json:"operations"`
 }
 
+// capabilitySchema is the only capability token schema the controller accepts.
+const capabilitySchema = "chio.capability.v1"
+
 type capabilityTokenWire struct {
+	Schema    string          `json:"schema"`
 	ID        string          `json:"id"`
 	Issuer    string          `json:"issuer"`
 	Subject   string          `json:"subject"`
@@ -81,6 +85,9 @@ func (c *CapabilityToken) UnmarshalJSON(data []byte) error {
 	}
 	if wire.ID == "" || wire.Issuer == "" || wire.Signature == "" {
 		return fmt.Errorf("decode capability token: missing required fields")
+	}
+	if wire.Schema != capabilitySchema {
+		return fmt.Errorf("decode capability token: schema must be %q", capabilitySchema)
 	}
 
 	c.ID = wire.ID
@@ -104,6 +111,7 @@ func (c CapabilityToken) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(capabilityTokenWire{
+		Schema:    capabilitySchema,
 		ID:        c.ID,
 		Issuer:    c.Issuer,
 		Subject:   c.Subject,

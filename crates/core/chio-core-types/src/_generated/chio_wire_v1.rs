@@ -1471,6 +1471,7 @@ pub mod agent_tool_call_request {
     ///        "id",
     ///        "issued_at",
     ///        "issuer",
+    ///        "schema",
     ///        "scope",
     ///        "signature",
     ///        "subject"
@@ -1631,7 +1632,6 @@ pub mod agent_tool_call_request {
     ///          "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///        },
     ///        "schema": {
-    ///          "default": "chio.capability.v1",
     ///          "type": "string",
     ///          "const": "chio.capability.v1"
     ///        },
@@ -2982,6 +2982,7 @@ pub mod agent_tool_call_request {
     ///    "id",
     ///    "issued_at",
     ///    "issuer",
+    ///    "schema",
     ///    "scope",
     ///    "signature",
     ///    "subject"
@@ -3142,7 +3143,6 @@ pub mod agent_tool_call_request {
     ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///    },
     ///    "schema": {
-    ///      "default": "chio.capability.v1",
     ///      "type": "string",
     ///      "const": "chio.capability.v1"
     ///    },
@@ -3199,7 +3199,6 @@ pub mod agent_tool_call_request {
         pub id: ChioCapabilityTokenId,
         pub issued_at: u64,
         pub issuer: ChioCapabilityTokenIssuer,
-        #[serde(default = "defaults::chio_capability_token_schema")]
         pub schema: ::std::string::String,
         pub scope: ChioScope,
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
@@ -12290,12 +12289,6 @@ pub mod agent_tool_call_request {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
-        }
-    }
-    /// Generation of default values for serde.
-    pub mod defaults {
-        pub(super) fn chio_capability_token_schema() -> ::std::string::String {
-            "chio.capability.v1".to_string()
         }
     }
 }
@@ -24605,6 +24598,7 @@ pub mod kernel_capability_list {
     ///    "id",
     ///    "issued_at",
     ///    "issuer",
+    ///    "schema",
     ///    "scope",
     ///    "signature",
     ///    "subject"
@@ -24765,7 +24759,6 @@ pub mod kernel_capability_list {
     ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///    },
     ///    "schema": {
-    ///      "default": "chio.capability.v1",
     ///      "type": "string",
     ///      "const": "chio.capability.v1"
     ///    },
@@ -24822,7 +24815,6 @@ pub mod kernel_capability_list {
         pub id: ChioCapabilityTokenId,
         pub issued_at: u64,
         pub issuer: ChioCapabilityTokenIssuer,
-        #[serde(default = "defaults::chio_capability_token_schema")]
         pub schema: ::std::string::String,
         pub scope: ChioScope,
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
@@ -25991,6 +25983,7 @@ pub mod kernel_capability_list {
     ///          "id",
     ///          "issued_at",
     ///          "issuer",
+    ///          "schema",
     ///          "scope",
     ///          "signature",
     ///          "subject"
@@ -26151,7 +26144,6 @@ pub mod kernel_capability_list {
     ///            "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///          },
     ///          "schema": {
-    ///            "default": "chio.capability.v1",
     ///            "type": "string",
     ///            "const": "chio.capability.v1"
     ///          },
@@ -28784,12 +28776,6 @@ pub mod kernel_capability_list {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
-        }
-    }
-    /// Generation of default values for serde.
-    pub mod defaults {
-        pub(super) fn chio_capability_token_schema() -> ::std::string::String {
-            "chio.capability.v1".to_string()
         }
     }
 }

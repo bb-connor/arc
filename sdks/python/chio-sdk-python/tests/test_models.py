@@ -665,6 +665,7 @@ class TestCapabilityToken:
     def test_time_validity(self) -> None:
         now = int(time.time())
         token = CapabilityToken(
+            schema="chio.capability.v1",
             id="tok-1",
             issuer="a" * 64,
             subject="b" * 64,
@@ -680,6 +681,7 @@ class TestCapabilityToken:
 
     def test_body_extraction(self) -> None:
         token = CapabilityToken(
+            schema="chio.capability.v1",
             id="tok-2",
             issuer="a" * 64,
             subject="b" * 64,
@@ -696,6 +698,7 @@ class TestCapabilityToken:
 
     def test_serde_roundtrip(self) -> None:
         token = CapabilityToken(
+            schema="chio.capability.v1",
             id="tok-3",
             issuer="a" * 64,
             subject="b" * 64,
@@ -1063,3 +1066,18 @@ class TestDelegationLink:
         )
         assert dl.delegator == "a" * 64
         assert len(dl.attenuations or []) == 0
+
+
+def test_capability_token_without_schema_is_refused() -> None:
+    with pytest.raises(ValidationError, match="schema"):
+        CapabilityToken.model_validate(
+            {
+                "id": "tok-no-schema",
+                "issuer": "a" * 64,
+                "subject": "b" * 64,
+                "scope": {},
+                "issued_at": 100,
+                "expires_at": 200,
+                "signature": "c" * 128,
+            }
+        )
