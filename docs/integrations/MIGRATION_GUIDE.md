@@ -27,7 +27,7 @@ The in-package guide covers:
    NOT) to migrate to `bind_and_redact`.
 4. **If your adapter has a local helper** -- the chio-prefect
    `_task_parameters` collapse onto `bind_and_redact` plus a thin
-   envelope shim is the canonical worked example. PR #679 carries
+   envelope builder is the canonical worked example. PR #679 carries
    the helper hardening + prefect canary collapse; the
    post-merge file is at
    `sdks/python/chio-prefect/src/chio_prefect/decorators.py`.

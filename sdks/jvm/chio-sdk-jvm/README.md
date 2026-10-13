@@ -81,8 +81,8 @@ try {
 `evaluateToolCall` returns only for authoritative mediated tool-call
 authorization receipts. With the current advisory-only sidecar route, it
 fails closed after integrity-checking the advisory receipt. The sidecar
-advisory routes
-`POST /v1/evaluate/advisory` and deprecated `POST /v1/evaluate` return
+advisory route
+`POST /v1/evaluate/advisory` returns
 `authorization: false`, `authorizationBasis: "advisory_only"`, and an
 advisory receipt.
 

@@ -119,8 +119,7 @@ provenance is treated as `asserted` until a trusted subsystem upgrades it.
 
 ### Sidecar evaluation boundary
 
-Do not use `POST /v1/evaluate` as execution authorization. It is a deprecated
-compatibility alias for `POST /v1/evaluate/advisory`; both return
+Do not use `POST /v1/evaluate/advisory` as execution authorization. It returns
 `authorization: false`, `authorizationBasis: "advisory_only"`, and an
 advisory receipt. Mediated evaluation uses kernel-backed routes such as
 `POST /chio/evaluate`. Mediated execution requires a mediated decision receipt,

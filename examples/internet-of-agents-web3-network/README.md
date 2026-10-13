@@ -124,7 +124,6 @@ internet_web3/chio.py        trust-control and Chio MCP HTTP clients
 internet_web3/chio_cli.py    Chio CLI backed passport, reputation, federation workflows
 internet_web3/clients.py     API sidecar and MCP edge adapters
 internet_web3/disputes.py    partial payment, refund, remediation, and dispute audit
-internet_web3/federation.py  legacy local federation dataclasses and helpers
 internet_web3/identity.py    SPIFFE, runtime appraisal, and degradation workflows
 internet_web3/marketplace.py RFQ selection, history, and x402 payment handshake
 internet_web3/observability.py trace, SIEM, and operations timeline artifacts

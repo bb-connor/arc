@@ -51,7 +51,7 @@ All Chio TypeScript SDKs communicate with the Chio Rust kernel through localhost
 
 Use the terms precisely:
 
-- **Advisory evaluation**: `POST /v1/evaluate/advisory` and deprecated `POST /v1/evaluate` return `authorization: false`, `authorizationBasis: "advisory_only"`, and an advisory receipt. This is observability, not execution approval.
+- **Advisory evaluation**: `POST /v1/evaluate/advisory` returns `authorization: false`, `authorizationBasis: "advisory_only"`, and an advisory receipt. This is observability, not execution approval.
 - **Mediated evaluation**: `POST /chio/evaluate` evaluates an HTTP request through the sidecar and returns an `EvaluateResponse`.
 - **Mediated execution**: a tool call is executed only after a mediated decision receipt authorizes it. SDKs reject advisory receipts for execution authorization.
 

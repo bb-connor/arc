@@ -19,8 +19,7 @@ introducing new compilation toolchains before the basic execution envelope
 is validated. We are not going to build two ecosystems.
 
 **WIT is the v2 target.** Once v1 validates latency, fuel, and memory on real
-workloads, define a WIT interface and migrate. Support both raw modules
-(legacy) and components (new) during transition.
+workloads, define a WIT interface and migrate; the component contract then replaces the raw module ABI.
 
 ### 2. State model: Pure stateless pre-dispatch guard
 

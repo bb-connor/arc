@@ -9,8 +9,8 @@
 This specification freezes the wire format for the chio-pheromone
 substrate. Cross-trust pheromone surfaces in `chio-federation`,
 `chio-market`, `chio-governance`, and `chio-workflow` ship against the v1 wire
-format defined here; post-v1 revisions remain backward-compatible per the
-additive rule in `PROTOCOL.md` section 2.
+format defined here; revisions follow the additive rule in `PROTOCOL.md`
+section 2.
 
 The crate boundary is a new `chio-pheromone` workspace member depending
 only on `chio-core-types` and `chio-credentials` (reputation is not a
