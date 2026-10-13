@@ -402,13 +402,27 @@ fn prepared_dispatch_operation_with_requirements(
     request_id: &str,
     requirements: AdmissionParticipantRequirements,
 ) -> AdmissionOperationV1 {
+    prepared_operation_with_requirements(
+        fence,
+        request_id,
+        AdmissionOperationKind::ToolDispatch,
+        requirements,
+    )
+}
+
+fn prepared_operation_with_requirements(
+    fence: &StoreMutationFence,
+    request_id: &str,
+    kind: AdmissionOperationKind,
+    requirements: AdmissionParticipantRequirements,
+) -> AdmissionOperationV1 {
     let namespace = AuthenticatedRequestNamespace::for_local_system(identifier(
         "coordinator_authority_id",
         "economic-recovery-test",
     ))
     .expect("namespace");
     let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
-        kind: AdmissionOperationKind::ToolDispatch,
+        kind,
         namespace,
         request_id: identifier("request_id", request_id),
         capability_id: identifier("capability_id", "economic-recovery-capability"),
@@ -1054,6 +1068,171 @@ fn operation_version_race_discards_unanchored_stage_without_cas() -> TestResult 
     assert!(matches!(outcome, EconomicRecoveryOutcome::Discarded(_)));
     assert_eq!(anchor.cas_calls.load(Ordering::SeqCst), 0);
     assert!(fixture.cache.load_finalized_head(&key())?.is_none());
+    Ok(())
+}
+
+#[test]
+fn economic_compensation_tool_requires_original_receipt_authority() -> TestResult {
+    assert_tool_compensation_requires_original_receipt_authority(3)
+}
+
+#[test]
+fn economic_compensation_tool_refuses_before_expired_lease_reclaim() -> TestResult {
+    assert_tool_compensation_requires_original_receipt_authority(1_003)
+}
+
+fn assert_tool_compensation_requires_original_receipt_authority(
+    compensate_offset_ms: u64,
+) -> TestResult {
+    let fixture = fixture();
+    let operation = prepared_dispatch_operation(&fixture.fence, "tool-compensation-receipt-owner");
+    let (now, _clock) = recovery_clock();
+    fixture.operations.begin(&operation, &fixture.fence, now)?;
+    let (advance, _) = stage_bounded_operation(
+        &fixture,
+        &operation,
+        &identifier("claimant_id", "stage-owner"),
+        now + 2,
+        now + 10_000,
+    )?;
+    let database = rusqlite::Connection::open_with_flags(
+        fixture._temp.path().join("authority.db"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    let history = || -> rusqlite::Result<(i64, i64, i64, i64)> {
+        database.query_row(
+            "SELECT (SELECT COUNT(*) FROM authority_global_commits),
+                    (SELECT COUNT(*) FROM admission_operation_commits),
+                    (SELECT COUNT(*) FROM admission_operation_terminal_projections),
+                    (SELECT COUNT(*) FROM admission_operation_terminal_records)",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+    };
+    let recovery_claim = || -> rusqlite::Result<Vec<rusqlite::types::Value>> {
+        database.query_row(
+            "SELECT recovery_claimant_id, recovery_coordinator_lease_id,
+                    recovery_coordinator_lease_epoch, recovery_claimed_version,
+                    recovery_expires_at_unix_ms, recovery_store_uuid,
+                    recovery_store_lease_id, recovery_store_owner_epoch,
+                    updated_at_unix_ms
+             FROM admission_operations WHERE operation_id = ?1",
+            [operation.binding().operation_id().as_str()],
+            |row| (0..9).map(|index| row.get(index)).collect(),
+        )
+    };
+    let anchor = Arc::new(FixtureAnchor::default());
+    lock(&anchor.reads).push_back(Ok(advance.current().clone()));
+    let recovery = recovery(&fixture, anchor.clone());
+    let operation_before = fixture
+        .operations
+        .load_by_operation_id(operation.binding().operation_id())?
+        .ok_or("staged operation disappeared")?;
+    let stage_before = fixture.cache.load_stage(&advance.batch().batch_id)?;
+    let recovery_claim_before = recovery_claim()?;
+    let history_before = history()?;
+    assert_eq!(
+        recovery_claim_before[4],
+        rusqlite::types::Value::Integer(i64::try_from(now + 1_002)?)
+    );
+
+    let result = recovery.compensate_unanchored_stage_before_dispatch(
+        &advance.batch().batch_id,
+        now + compensate_offset_ms,
+    );
+    let receipts = fixture.operations.list_admission_receipts_after(None, 16)?;
+
+    assert!(
+        matches!(
+            &result,
+            Err(EconomicStateRecoveryError::CompensationRejected(reason))
+                if reason == "tool dispatch compensation requires original receipt authority"
+        ),
+        "tool compensation without original receipt authority must refuse: {result:?}; receipts: {receipts:?}"
+    );
+    assert_eq!(
+        fixture
+            .operations
+            .load_by_operation_id(operation.binding().operation_id())?,
+        Some(operation_before)
+    );
+    assert_eq!(recovery_claim()?, recovery_claim_before);
+    assert_eq!(
+        fixture.cache.load_stage(&advance.batch().batch_id)?,
+        stage_before
+    );
+    assert_eq!(history()?, history_before);
+    assert!(receipts.is_empty());
+    assert_eq!(anchor.cas_calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn economic_compensation_active_response_retains_incident_replay() -> TestResult {
+    use chio_kernel::admission_operation::AdmissionTerminalReplay;
+
+    let fixture = fixture();
+    let operation = prepared_operation_with_requirements(
+        &fixture.fence,
+        "active-response-compensation",
+        AdmissionOperationKind::GovernedActiveResponse,
+        AdmissionParticipantRequirements {
+            approval: true,
+            ..AdmissionParticipantRequirements::NONE
+        },
+    );
+    let (now, _clock) = recovery_clock();
+    fixture.operations.begin(&operation, &fixture.fence, now)?;
+    let (advance, _) = stage_bounded_operation(
+        &fixture,
+        &operation,
+        &identifier("claimant_id", "stage-owner"),
+        now + 2,
+        now + 1_000,
+    )?;
+    let anchor = Arc::new(FixtureAnchor::default());
+    lock(&anchor.reads).push_back(Ok(advance.current().clone()));
+    let recovery = recovery(&fixture, anchor.clone());
+
+    let compensated =
+        recovery.compensate_unanchored_stage_before_dispatch(&advance.batch().batch_id, now + 3)?;
+
+    assert_eq!(
+        compensated.terminal().state,
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert!(matches!(
+        &compensated.terminal().replay,
+        AdmissionTerminalReplay::Incident { .. }
+    ));
+    assert_eq!(
+        compensated.stage().status(),
+        EconomicStateStageStatus::Discarded
+    );
+    let stored = fixture
+        .operations
+        .load_by_operation_id(operation.binding().operation_id())?
+        .ok_or("compensated operation disappeared")?;
+    assert_eq!(stored.version(), operation.version() + 1);
+    assert_eq!(
+        stored.terminal_replay(),
+        Some(&compensated.terminal().replay)
+    );
+    assert!(matches!(
+        recovery.recover_stage(&advance.batch().batch_id, now + 4)?,
+        EconomicRecoveryOutcome::Discarded(_)
+    ));
+    assert_eq!(
+        fixture
+            .operations
+            .load_by_operation_id(operation.binding().operation_id())?,
+        Some(stored)
+    );
+    assert!(fixture
+        .operations
+        .list_admission_receipts_after(None, 16)?
+        .is_empty());
+    assert_eq!(anchor.cas_calls.load(Ordering::SeqCst), 0);
     Ok(())
 }
 

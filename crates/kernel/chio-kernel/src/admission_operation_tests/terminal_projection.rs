@@ -1782,6 +1782,81 @@ fn refusal_receipt_qualification_rejects_foreign_or_success_evidence() {
 }
 
 #[test]
+fn pre_dispatch_incident_projection_rejects_tool_dispatch() {
+    let operation = prepared_refusal_operation("incident-only-tool-compensation");
+    let result =
+        verified_pre_dispatch_incident_projection(&operation, projection_context(&operation));
+
+    assert!(
+        matches!(
+            &result,
+            Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+        ),
+        "tool compensation requires a signed refusal receipt: {result:?}"
+    );
+}
+
+#[test]
+fn tool_compensation_rejects_public_incident_projection() -> Result<(), Box<dyn std::error::Error>>
+{
+    let operation = prepared_refusal_operation("public-incident-tool-compensation");
+    let context = projection_context(&operation);
+    let proof =
+        crate::tool_outcome::VerifiedPreDispatchNoEffect::from_qualified_operation_snapshot(
+            &operation, &context,
+        )?;
+    let incident = AdmissionIncident::from_verified(
+        &operation,
+        &context,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        identifier("incident_id", "tool-compensation-incident"),
+        digest("incident_digest", POLICY_HASH),
+    )?;
+    let projection = AdmissionTerminalProjection::CompensatedBeforeDispatch {
+        context,
+        proof: Box::new(proof),
+        evidence: Box::new(AdmissionReceiptOrIncident::Incident(Box::new(incident))),
+    };
+
+    assert_eq!(
+        operation.apply_terminal_projection(&projection, &full_projection_capabilities()),
+        Err(AdmissionOperationError::TerminalReplayMismatch)
+    );
+    Ok(())
+}
+
+#[test]
+fn tool_compensation_rejects_persisted_incident_replay() -> Result<(), Box<dyn std::error::Error>> {
+    let operation = prepared_refusal_operation("persisted-incident-tool-compensation");
+    let context = projection_context(&operation);
+    let kernel = Keypair::generate();
+    let receipt = verified_refusal_receipt(
+        &operation,
+        &context,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        &kernel,
+    );
+    let projection = verified_pre_dispatch_compensation_projection(&operation, context, receipt)?;
+    let terminal =
+        operation.apply_terminal_projection(&projection, &full_projection_capabilities())?;
+    assert!(matches!(
+        terminal.terminal_replay(),
+        Some(AdmissionTerminalReplay::Receipt { .. })
+    ));
+    let mut persisted = terminal.to_persisted();
+    persisted.terminal_replay = Some(AdmissionTerminalReplay::Incident {
+        incident_id: identifier("incident_id", "tool-compensation-incident"),
+        projection_digest: projection.projection_digest()?,
+    });
+
+    assert_eq!(
+        AdmissionOperationV1::from_persisted(persisted),
+        Err(AdmissionOperationError::TerminalReplayMismatch)
+    );
+    Ok(())
+}
+
+#[test]
 fn compensation_projection_rejects_a_receipt_from_another_operation() {
     let operation = prepared_refusal_operation("req-123");
     let context = projection_context(&operation);
