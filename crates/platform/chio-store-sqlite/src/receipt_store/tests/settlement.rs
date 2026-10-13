@@ -564,12 +564,12 @@ fn receipt_retention_preserves_active_settlement_attempts() -> Result<(), Box<dy
 }
 
 #[test]
-fn receipt_retention_supports_store_without_settlement_projection(
+fn receipt_retention_refuses_store_without_settlement_projection(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-settlement-retention-legacy");
-    let archive_path = unique_db_path("chio-settlement-retention-legacy-archive");
+    let path = unique_db_path("chio-settlement-retention-missing");
+    let archive_path = unique_db_path("chio-settlement-retention-missing-archive");
     let store = SqliteReceiptStore::open(&path)?;
-    let receipt = sample_receipt_with_id_and_timestamp("rcpt-settlement-retention-legacy", 1);
+    let receipt = sample_receipt_with_id_and_timestamp("rcpt-settlement-retention-missing", 1);
     store.append_chio_receipt_returning_seq(&receipt)?;
     store.create_next_receipt_checkpoint(1, &receipt_test_keypair())?;
     store.writer_handle().run_write(|connection| {
@@ -583,12 +583,21 @@ fn receipt_retention_supports_store_without_settlement_projection(
         ReceiptStore::atomic_receipt_projection(&reopened),
         chio_kernel::AtomicReceiptProjection::Unsupported
     );
-    assert_eq!(
-        reopened
-            .archive_receipts_before(2, archive_path.to_str().ok_or("invalid archive path")?,)?,
-        1
+    let error = reopened
+        .archive_receipts_before(2, archive_path.to_str().ok_or("invalid archive path")?)
+        .err()
+        .ok_or("rotation without the settle_attempts projection must fail closed")?;
+    assert!(
+        matches!(
+            &error,
+            ReceiptStoreError::Conflict(message) if message
+                == "receipt store has no settle_attempts projection; refusing to rotate \
+                    receipts whose settlement work cannot be proven resolved"
+        ),
+        "unexpected rotation error: {error:?}"
     );
-    assert!(reopened.load_chio_receipt(&receipt.id)?.is_none());
+    assert!(reopened.load_chio_receipt(&receipt.id)?.is_some());
+    assert_eq!(reopened.latest_committed_entry_seq()?, 1);
 
     drop(reopened);
     let _ = fs::remove_file(path);
