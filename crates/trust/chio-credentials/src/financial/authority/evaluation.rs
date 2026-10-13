@@ -1,4 +1,3 @@
-use super::trust::verify_legacy_credential_authority;
 use super::*;
 use crate::financial_passport_v2::validate_presented_agent_passport_v2_authority_contract;
 
@@ -66,60 +65,10 @@ pub fn evaluate_financial_credentials(
     presentation: &PresentedAgentPassportV2,
     policy: &VerifiedFinancialVerifierPolicy,
     trust: &FinancialCredentialTrustRegistry,
-    lifecycle: &dyn CrossIssuerLifecycleResolver,
-    lifecycle_generation: &dyn CrossIssuerLifecycleGenerationAnchor,
-    lifecycle_high_water: &dyn CrossIssuerLifecycleHighWaterStore,
-    sources: &dyn FinancialEvidenceSourceResolver,
-    clock: &dyn Clock,
-) -> Result<VerifiedFinancialCredentialSet, CredentialError> {
-    evaluate_financial_credentials_inner(
-        presentation,
-        policy,
-        trust,
-        lifecycle,
-        lifecycle_generation,
-        lifecycle_high_water,
-        sources,
-        None,
-        clock,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn evaluate_financial_credentials_with_legacy(
-    presentation: &PresentedAgentPassportV2,
-    policy: &VerifiedFinancialVerifierPolicy,
-    trust: &FinancialCredentialTrustRegistry,
-    lifecycle: &dyn CrossIssuerLifecycleResolver,
-    lifecycle_generation: &dyn CrossIssuerLifecycleGenerationAnchor,
-    lifecycle_high_water: &dyn CrossIssuerLifecycleHighWaterStore,
-    sources: &dyn FinancialEvidenceSourceResolver,
-    legacy_anchors: &dyn LegacyCredentialIssuanceAnchorResolver,
-    clock: &dyn Clock,
-) -> Result<VerifiedFinancialCredentialSet, CredentialError> {
-    evaluate_financial_credentials_inner(
-        presentation,
-        policy,
-        trust,
-        lifecycle,
-        lifecycle_generation,
-        lifecycle_high_water,
-        sources,
-        Some(legacy_anchors),
-        clock,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn evaluate_financial_credentials_inner(
-    presentation: &PresentedAgentPassportV2,
-    policy: &VerifiedFinancialVerifierPolicy,
-    trust: &FinancialCredentialTrustRegistry,
     lifecycle_resolver: &dyn CrossIssuerLifecycleResolver,
     lifecycle_generation: &dyn CrossIssuerLifecycleGenerationAnchor,
     lifecycle_high_water: &dyn CrossIssuerLifecycleHighWaterStore,
     sources: &dyn FinancialEvidenceSourceResolver,
-    legacy_anchors: Option<&dyn LegacyCredentialIssuanceAnchorResolver>,
     clock: &dyn Clock,
 ) -> Result<VerifiedFinancialCredentialSet, CredentialError> {
     let now = clock
@@ -150,13 +99,8 @@ fn evaluate_financial_credentials_inner(
         .zip(&presentation.membership_proofs)
     {
         match credential {
-            PassportCredentialV2::Reputation(credential) => {
-                let anchors = legacy_anchors.ok_or_else(|| {
-                    authority_error(
-                        "legacy reputation credentials require a trusted issuance anchor",
-                    )
-                })?;
-                verify_legacy_credential_authority(credential, trust, anchors, now)?;
+            PassportCredentialV2::Reputation(_) => {
+                return Err(CredentialError::FinancialEvaluationRejectsReputationCredential);
             }
             PassportCredentialV2::Financial(credential) => {
                 let (issued_at, expires_at) = credential.validate_contract_shape()?;
@@ -358,10 +302,6 @@ pub fn verify_entry_activation_decision_v2(
         ));
     }
     Ok(())
-}
-
-pub const fn reject_legacy_cross_issuer_v1_activation() -> Result<(), CredentialError> {
-    Err(CredentialError::UnsupportedLegacyCrossIssuerV1)
 }
 
 fn lifecycle_resolver_identity(

@@ -335,31 +335,6 @@ fn passport_verification_accepts_multi_issuer_bundle() {
 }
 
 #[test]
-fn legacy_cross_issuer_portfolio_evaluation_is_unsupported() {
-    let portfolio = CrossIssuerPortfolio {
-        schema: CROSS_ISSUER_PORTFOLIO_SCHEMA.to_string(),
-        portfolio_id: "legacy-portfolio".to_string(),
-        subject: "did:chio:legacy".to_string(),
-        entries: Vec::new(),
-        migrations: Vec::new(),
-    };
-    let trust_pack = create_signed_cross_issuer_trust_pack(
-        &Keypair::from_seed(&[9u8; 32]),
-        "legacy-pack",
-        "https://rp.example.com",
-        1_710_000_000,
-        1_710_086_400,
-        CrossIssuerTrustPackPolicy::default(),
-    )
-    .test_ok("legacy trust pack");
-
-    assert!(matches!(
-        evaluate_cross_issuer_portfolio(&portfolio, 1_710_000_200, &trust_pack),
-        Err(CredentialError::UnsupportedLegacyCrossIssuerV1)
-    ));
-}
-
-#[test]
 fn cross_issuer_portfolio_rejects_duplicate_migration_ids() {
     let migrated_passport = sample_passport(5, 1);
     let old_subject = migrated_passport.subject.clone();
@@ -423,42 +398,6 @@ fn cross_issuer_portfolio_rejects_duplicate_migration_ids() {
     assert!(matches!(
         error,
         CredentialError::InvalidCrossIssuerPortfolio(_)
-    ));
-}
-
-#[test]
-fn cross_issuer_trust_pack_rejects_tampered_signature_boundary() {
-    let signer = Keypair::from_seed(&[9u8; 32]);
-    let mut trust_pack = create_signed_cross_issuer_trust_pack(
-        &signer,
-        "pack-4",
-        "https://rp.example.com",
-        1_710_000_000,
-        1_710_086_400,
-        CrossIssuerTrustPackPolicy {
-            allowed_profile_families: [PASSPORT_SCHEMA.to_string()].into_iter().collect(),
-            ..CrossIssuerTrustPackPolicy::default()
-        },
-    )
-    .expect("trust pack");
-    trust_pack.body.verifier = "https://tampered.example.com".to_string();
-
-    let trust = CrossIssuerTrustRegistryV2::new(CrossIssuerTrustRegistryConfigV2 {
-        verifier_keys: vec![VerifierTrustKeyV2 {
-            verifier_id: "https://rp.example.com".to_string(),
-            signer_key_id: "legacy-verifier".to_string(),
-            signer_key_epoch: 1,
-            public_key: signer.public_key(),
-            status: TrustedKeyStatusV2::Active,
-        }],
-        ..CrossIssuerTrustRegistryConfigV2::default()
-    })
-    .test_ok("legacy verifier trust");
-    let error = verify_signed_cross_issuer_trust_pack(&trust_pack, 1_710_000_200, &trust)
-        .expect_err("tampered trust pack");
-    assert!(matches!(
-        error,
-        CredentialError::InvalidCrossIssuerTrustPack(_)
     ));
 }
 
@@ -1915,15 +1854,13 @@ fn non_revoked_lifecycle_record_projects_into_none() {
 fn signed_input_rejects_duplicate_passport_and_nested_credential_members() {
     let passport = sample_passport(21, 22);
     let valid = serde_json::to_string(&passport).unwrap();
-    let decoded = decode_versioned_agent_passport(valid.as_bytes()).unwrap();
-    assert!(matches!(decoded, VersionedAgentPassport::V1(_)));
     verify_agent_passport(&passport, 1_710_000_001).unwrap();
     let duplicate_schema = format!("{{\"schema\":\"invalid\",{}", &valid[1..]);
     let duplicate_issuer = valid.replacen("\"issuer\":", "\"issuer\":\"invalid\",\"issuer\":", 1);
     assert_ne!(duplicate_issuer, valid);
     for text in [duplicate_schema, duplicate_issuer] {
         assert!(matches!(
-            decode_versioned_agent_passport(text.as_bytes()),
+            decode_agent_passport_v2(text.as_bytes()),
             Err(CredentialError::SignedJson(
                 chio_core::canonical::UntrustedJsonError::SignedInput(_)
             ))

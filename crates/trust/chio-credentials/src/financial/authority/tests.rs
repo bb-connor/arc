@@ -678,11 +678,3 @@ fn migration_envelope_substitution_is_rejected() -> TestResult {
     ));
     Ok(())
 }
-
-#[test]
-fn v1_production_activation_is_unconditionally_unsupported() {
-    assert!(matches!(
-        reject_legacy_cross_issuer_v1_activation(),
-        Err(CredentialError::UnsupportedLegacyCrossIssuerV1)
-    ));
-}

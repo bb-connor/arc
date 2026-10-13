@@ -43,7 +43,6 @@ const PASSPORT_PRESENTATION_CHALLENGE_SCHEMA: &str =
     "chio.agent-passport-presentation-challenge.v1";
 const PASSPORT_PRESENTATION_RESPONSE_SCHEMA: &str = "chio.agent-passport-presentation-response.v1";
 const CROSS_ISSUER_PORTFOLIO_SCHEMA: &str = "chio.cross-issuer-portfolio.v1";
-const CROSS_ISSUER_TRUST_PACK_SCHEMA: &str = "chio.cross-issuer-trust-pack.v1";
 const CROSS_ISSUER_MIGRATION_SCHEMA: &str = "chio.cross-issuer-migration.v1";
 const PROOF_TYPE: &str = "Ed25519Signature2020";
 const PROOF_PURPOSE: &str = "assertionMethod";

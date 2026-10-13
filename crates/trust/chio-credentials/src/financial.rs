@@ -487,8 +487,7 @@ pub struct AgentPassportV2 {
     pub valid_until: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trust_tier: Option<TrustTier>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_manifest: Option<SignedPassportSourceManifestV2>,
+    pub source_manifest: SignedPassportSourceManifestV2,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -598,128 +597,16 @@ pub use financial_passport_v2::{
 mod financial_authority;
 pub use financial_authority::*;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum VersionedAgentPassport {
-    V1(AgentPassport),
-    V2(Box<AgentPassportV2>),
-}
-
-impl Serialize for VersionedAgentPassport {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Self::V1(passport) => passport.serialize(serializer),
-            Self::V2(passport) => passport.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for VersionedAgentPassport {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let value = serde_json::Value::deserialize(deserializer)?;
-        decode_versioned_agent_passport_value(value).map_err(serde::de::Error::custom)
-    }
-}
-
-pub fn decode_versioned_agent_passport(
-    bytes: &[u8],
-) -> Result<VersionedAgentPassport, CredentialError> {
-    let value = chio_core::canonical::UntrustedJsonText::from_wire(
+pub fn decode_agent_passport_v2(bytes: &[u8]) -> Result<AgentPassportV2, CredentialError> {
+    let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
         bytes,
         MAX_FINANCIAL_PRESENTATION_BYTES,
     )?
     .decode_signed()?;
-    decode_versioned_agent_passport_value(value)
-}
-
-fn decode_versioned_agent_passport_value(
-    value: serde_json::Value,
-) -> Result<VersionedAgentPassport, CredentialError> {
-    let schema = value
-        .as_object()
-        .and_then(|object| object.get("schema"))
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            CredentialError::InvalidVersionedPassport("passport schema is missing".to_string())
-        })?;
-    match schema {
-        PASSPORT_SCHEMA => serde_json::from_value(value)
-            .map(VersionedAgentPassport::V1)
-            .map_err(|error| CredentialError::InvalidVersionedPassport(error.to_string())),
-        FINANCIAL_AGENT_PASSPORT_SCHEMA_V1 => {
-            let passport = serde_json::from_value(value)
-                .map_err(|error| CredentialError::InvalidVersionedPassport(error.to_string()))?;
-            validate_agent_passport_v2_contract(&passport)
-                .map_err(|error| CredentialError::InvalidVersionedPassport(error.to_string()))?;
-            Ok(VersionedAgentPassport::V2(Box::new(passport)))
-        }
-        other => Err(CredentialError::UnsupportedVersionedPassportSchema(
-            other.to_string(),
-        )),
-    }
-}
-
-#[must_use]
-pub fn upgrade_v1_passport(passport: AgentPassport) -> AgentPassportV2 {
-    AgentPassportV2 {
-        schema: FINANCIAL_AGENT_PASSPORT_SCHEMA_V1.to_string(),
-        subject: passport.subject,
-        credentials: passport
-            .credentials
-            .into_iter()
-            .map(Box::new)
-            .map(PassportCredentialV2::Reputation)
-            .collect(),
-        merkle_roots: passport.merkle_roots,
-        enterprise_identity_provenance: passport.enterprise_identity_provenance,
-        issued_at: passport.issued_at,
-        valid_until: passport.valid_until,
-        trust_tier: passport.trust_tier,
-        source_manifest: None,
-    }
-}
-
-pub fn try_downgrade_v2_passport(
-    passport: AgentPassportV2,
-) -> Result<AgentPassport, CredentialError> {
-    if passport.schema != FINANCIAL_AGENT_PASSPORT_SCHEMA_V1 {
-        return Err(CredentialError::UnsupportedVersionedPassportSchema(
-            passport.schema,
-        ));
-    }
-    if passport.source_manifest.is_some()
-        || passport
-            .credentials
-            .iter()
-            .any(|credential| matches!(credential, PassportCredentialV2::Financial(_)))
-    {
-        return Err(CredentialError::PassportDowngradeWouldLoseData);
-    }
-    let credentials = passport
-        .credentials
-        .into_iter()
-        .map(|credential| match credential {
-            PassportCredentialV2::Reputation(credential) => Ok(*credential),
-            PassportCredentialV2::Financial(_) => {
-                Err(CredentialError::PassportDowngradeWouldLoseData)
-            }
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(AgentPassport {
-        schema: PASSPORT_SCHEMA.to_string(),
-        subject: passport.subject,
-        credentials,
-        merkle_roots: passport.merkle_roots,
-        enterprise_identity_provenance: passport.enterprise_identity_provenance,
-        issued_at: passport.issued_at,
-        valid_until: passport.valid_until,
-        trust_tier: passport.trust_tier,
-    })
+    let passport: AgentPassportV2 = serde_json::from_value(value)
+        .map_err(|error| invalid_financial_error(error.to_string()))?;
+    validate_agent_passport_v2_contract(&passport)?;
+    Ok(passport)
 }
 
 #[path = "financial/validation.rs"]

@@ -80,8 +80,9 @@ including adjacent or edge proofs; it cannot prove omitted off-index events.
 The bundled resolver supports bundled evidence; external lookup needs another
 `FinancialEvidenceSourceResolver` implementation.
 
-V1 cross-issuer portfolio integrity is implemented, but its activation evaluator
-returns `UnsupportedLegacyCrossIssuerV1`. Settlement-reliability credentials are
+Cross-issuer portfolios carry integrity only; activation goes through the
+financial trust pack. Financial evaluation rejects reputation credentials.
+Settlement-reliability credentials are
 rejected at financial schema preflight. V2 authority exposes explicit resolver,
 clock, and persistence interfaces instead of supplying deployment services.
 Whole-credential selection and JWT disclosures can reveal identifiers and

@@ -141,7 +141,7 @@ pub fn build_agent_passport_v2(
         issued_at: rfc3339_from_unix(validity.issued_at)?,
         valid_until: rfc3339_from_unix(source_manifest.body.expires_at)?,
         trust_tier,
-        source_manifest: Some(source_manifest),
+        source_manifest,
     };
     validate_agent_passport_v2_contract(&passport)?;
     Ok((passport, membership_proofs))
@@ -159,14 +159,11 @@ pub fn inspect_agent_passport_v2(
     if now >= valid_until {
         return Err(CredentialError::CredentialExpired);
     }
-    match passport.source_manifest.as_ref() {
-        Some(source_manifest) => validate_passport_source_manifest_credential_set(
-            source_manifest,
-            &passport.credentials,
-            now,
-        ),
-        None => verify_agent_passport(&legacy_passport_view(passport)?, now).map(|_| ()),
-    }
+    validate_passport_source_manifest_credential_set(
+        &passport.source_manifest,
+        &passport.credentials,
+        now,
+    )
 }
 
 pub fn inspect_passport_source_manifest_v2_signature(
@@ -233,52 +230,23 @@ pub(super) fn validate_agent_passport_v2_contract(
     for provenance in &passport.enterprise_identity_provenance {
         provenance.validate()?;
     }
-    match passport.source_manifest.as_ref() {
-        Some(source_manifest) => {
-            if source_manifest.body.subject != passport.subject
-                || source_manifest.body.issued_at != issued_at
-                || source_manifest.body.expires_at != valid_until
-                || source_manifest.body.merkle_roots != passport.merkle_roots
-                || source_manifest.body.enterprise_identity_provenance
-                    != passport.enterprise_identity_provenance
-                || source_manifest.body.trust_tier != passport.trust_tier
-            {
-                return invalid_financial("agent passport v2 source manifest binding is invalid");
-            }
-            validate_passport_source_manifest_credential_set(
-                source_manifest,
-                &passport.credentials,
-                issued_at,
-            )?;
-        }
-        None => {
-            verify_agent_passport(&legacy_passport_view(passport)?, issued_at)?;
-        }
+    let source_manifest = &passport.source_manifest;
+    if source_manifest.body.subject != passport.subject
+        || source_manifest.body.issued_at != issued_at
+        || source_manifest.body.expires_at != valid_until
+        || source_manifest.body.merkle_roots != passport.merkle_roots
+        || source_manifest.body.enterprise_identity_provenance
+            != passport.enterprise_identity_provenance
+        || source_manifest.body.trust_tier != passport.trust_tier
+    {
+        return invalid_financial("agent passport v2 source manifest binding is invalid");
     }
+    validate_passport_source_manifest_credential_set(
+        source_manifest,
+        &passport.credentials,
+        issued_at,
+    )?;
     Ok((issued_at, valid_until))
-}
-
-fn legacy_passport_view(passport: &AgentPassportV2) -> Result<AgentPassport, CredentialError> {
-    let credentials = passport
-        .credentials
-        .iter()
-        .map(|credential| match credential {
-            PassportCredentialV2::Reputation(credential) => Ok(credential.as_ref().clone()),
-            PassportCredentialV2::Financial(_) => {
-                invalid_financial("financial credentials require a signed source manifest")
-            }
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(AgentPassport {
-        schema: PASSPORT_SCHEMA.to_string(),
-        subject: passport.subject.clone(),
-        credentials,
-        merkle_roots: passport.merkle_roots.clone(),
-        enterprise_identity_provenance: passport.enterprise_identity_provenance.clone(),
-        issued_at: passport.issued_at.clone(),
-        valid_until: passport.valid_until.clone(),
-        trust_tier: passport.trust_tier,
-    })
 }
 
 fn validate_passport_source_manifest_credential_set(
