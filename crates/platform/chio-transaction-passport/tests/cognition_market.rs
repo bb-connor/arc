@@ -887,7 +887,7 @@ fn add_transparency_anchor(bundle: &mut QualifiedBundle) -> TestResult {
         sha256_hex(&checkpoint_key.public_key_bytes())
     );
     let inclusion = json!({
-        "schema": "chio.transparency.inclusion-proof.v2",
+        "schema": "chio.transparency.receipt-inclusion-proof.v1",
         "proof_id": "transparency-proof-cognition-market",
         "log_id": log_id,
         "artifact_ref": receipt_digest,
@@ -914,7 +914,7 @@ fn add_transparency_anchor(bundle: &mut QualifiedBundle) -> TestResult {
         .push(node(
             "transparency-inclusion-proof.json",
             "transparency-inclusion-proof",
-            "chio.transparency.inclusion-proof.v2",
+            "chio.transparency.receipt-inclusion-proof.v1",
             &inclusion_bytes,
         ));
     bundle.trust.trusted_checkpoint_signer_keys = vec![checkpoint_key.public_key()];

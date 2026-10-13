@@ -552,8 +552,9 @@ mod tests {
     }
 
     #[test]
-    fn transparency_v2_schema_accepts_supported_checkpoint_algorithms() {
-        let schema_path = workspace_schema_path("chio-transparency/v2/inclusion-proof.schema.json");
+    fn receipt_inclusion_proof_schema_accepts_supported_checkpoint_algorithms() {
+        let schema_path =
+            workspace_schema_path("chio-transparency/v1/receipt-inclusion-proof.schema.json");
         let schema = load_json(&schema_path)
             .unwrap_or_else(|error| panic!("load v2 transparency schema: {error}"));
         let algorithm_values = [
@@ -595,7 +596,7 @@ mod tests {
         for (kernel_key, signature) in algorithm_values {
             let log_id = format!("local-log-{}", "a".repeat(64));
             let document = json!({
-                "schema": "chio.transparency.inclusion-proof.v2",
+                "schema": "chio.transparency.receipt-inclusion-proof.v1",
                 "proof_id": "proof-1",
                 "log_id": log_id,
                 "artifact_ref": "1".repeat(64),
@@ -634,8 +635,9 @@ mod tests {
     }
 
     #[test]
-    fn transparency_v2_schema_rejects_mismatched_or_malformed_algorithm_envelopes() {
-        let schema_path = workspace_schema_path("chio-transparency/v2/inclusion-proof.schema.json");
+    fn receipt_inclusion_proof_schema_rejects_mismatched_or_malformed_algorithm_envelopes() {
+        let schema_path =
+            workspace_schema_path("chio-transparency/v1/receipt-inclusion-proof.schema.json");
         let schema = load_json(&schema_path)
             .unwrap_or_else(|error| panic!("load v2 transparency schema: {error}"));
         let invalid_pairs = [
@@ -660,7 +662,7 @@ mod tests {
         for (kernel_key, signature) in invalid_pairs {
             let log_id = format!("local-log-{}", "a".repeat(64));
             let document = json!({
-                "schema": "chio.transparency.inclusion-proof.v2",
+                "schema": "chio.transparency.receipt-inclusion-proof.v1",
                 "proof_id": "proof-1",
                 "log_id": log_id,
                 "artifact_ref": "1".repeat(64),
@@ -699,8 +701,9 @@ mod tests {
     }
 
     #[test]
-    fn transparency_v2_schema_enforces_checkpoint_version_chain_root_rules() {
-        let schema_path = workspace_schema_path("chio-transparency/v2/inclusion-proof.schema.json");
+    fn receipt_inclusion_proof_schema_enforces_checkpoint_version_chain_root_rules() {
+        let schema_path =
+            workspace_schema_path("chio-transparency/v1/receipt-inclusion-proof.schema.json");
         let schema = load_json(&schema_path)
             .unwrap_or_else(|error| panic!("load v2 transparency schema: {error}"));
         let invalid_documents = [
@@ -734,8 +737,9 @@ mod tests {
     }
 
     #[test]
-    fn transparency_v2_schema_rejects_noncanonical_checkpoint_hashes() {
-        let schema_path = workspace_schema_path("chio-transparency/v2/inclusion-proof.schema.json");
+    fn receipt_inclusion_proof_schema_rejects_noncanonical_checkpoint_hashes() {
+        let schema_path =
+            workspace_schema_path("chio-transparency/v1/receipt-inclusion-proof.schema.json");
         let schema = load_json(&schema_path)
             .unwrap_or_else(|error| panic!("load v2 transparency schema: {error}"));
         let canonical_chain_root = json!(format!("0x{}", "3".repeat(64)));
@@ -772,8 +776,9 @@ mod tests {
     }
 
     #[test]
-    fn transparency_v2_schema_requires_the_signer_derived_log_id_shape() {
-        let schema_path = workspace_schema_path("chio-transparency/v2/inclusion-proof.schema.json");
+    fn receipt_inclusion_proof_schema_requires_the_signer_derived_log_id_shape() {
+        let schema_path =
+            workspace_schema_path("chio-transparency/v1/receipt-inclusion-proof.schema.json");
         let schema = load_json(&schema_path)
             .unwrap_or_else(|error| panic!("load v2 transparency schema: {error}"));
         let mut document = transparency_document(
@@ -838,7 +843,7 @@ mod tests {
         }
         let log_id = format!("local-log-{}", "a".repeat(64));
         json!({
-            "schema": "chio.transparency.inclusion-proof.v2",
+            "schema": "chio.transparency.receipt-inclusion-proof.v1",
             "proof_id": "proof-1",
             "log_id": log_id,
             "artifact_ref": "1".repeat(64),

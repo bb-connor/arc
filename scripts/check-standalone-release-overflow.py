@@ -37,8 +37,6 @@ class ShippingProfile:
 SHIPPING_PROFILES = (
     ShippingProfile(ROOT / "sdks/lambda/chio-lambda-extension/Cargo.toml", "release",
                     "chio-lambda-extension", ROOT / "sdks/lambda/chio-lambda-extension"),
-    ShippingProfile(ROOT / "sdks/rust/chio-guard-sdk-compat/Cargo.toml", "release",
-                    "chio-guard-sdk-compat", ROOT / "sdks/rust/chio-guard-sdk-compat"),
     ShippingProfile(ROOT / "deploy/docker/chio-workspace/Cargo.toml", "docker-release",
                     "chio-cli", ROOT),
     ShippingProfile(ROOT / "Cargo.toml", "release", "chio-proof-room", ROOT),

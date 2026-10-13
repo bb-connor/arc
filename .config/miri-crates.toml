@@ -67,16 +67,16 @@ test = "linux::scan_bounds_tests::bounded_read_directory_keeps_sorted_descendant
 reason = "syscall: open with O_PATH is not supported by Miri"
 [[crate.skip]]
 test = "linux::scan_bounds_tests::directory_collection_accepts_exact_entry_and_name_byte_bounds"
-reason = "syscall: getdents64 is not implemented by Miri"
+reason = "syscall: getdents64 is not supported by Miri"
 [[crate.skip]]
 test = "linux::scan_bounds_tests::skipped_entries_share_one_read_budget_across_declared_roots"
 reason = "syscall: open with O_PATH is not supported by Miri"
 [[crate.skip]]
 test = "linux::scan_bounds_tests::vanished_entries_still_consume_the_directory_scan_budget"
-reason = "syscall: getdents64 is not implemented by Miri"
+reason = "syscall: getdents64 is not supported by Miri"
 [[crate.skip]]
 test = "linux::scan_bounds_tests::forbidden_directory_budget_counts_skipped_entries_across_roots"
-reason = "syscall: getdents64 is not implemented by Miri"
+reason = "syscall: getdents64 is not supported by Miri"
 
 [[crate]]
 name = "chio-keyring"

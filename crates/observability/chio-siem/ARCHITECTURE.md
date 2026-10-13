@@ -54,13 +54,13 @@ names. A successful count is interpreted as an accepted prefix; a short count
 leaves its tail unacknowledged in persistent cursor mode. `PartialFailure` errors
 retain the entire batch for retry, so previously accepted events can repeat.
 
-With `cursor_db_path`, acknowledged progress is stored under
+Acknowledged progress is stored at `cursor_db_path` under
 `Exporter::cursor_identity()`, and the read cursor follows the slowest registered
 identity. New identities start at zero. The trait default uses the bare exporter
 name; only the built-in webhook overrides it with a sanitized endpoint. Callers
 must distinguish multiple destinations that otherwise share the same identity.
-With no cursor database, polling advances past failures and restart begins at
-zero. Downstream duplicate handling remains specific to the collector.
+A failed batch never advances the cursor. Downstream duplicate handling remains
+specific to the collector.
 
 `CefExporter::export_batch` counts formatted lines without transmitting them.
 `OcsfExporter` similarly counts formatting when its endpoint is empty. These

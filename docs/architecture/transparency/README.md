@@ -210,7 +210,7 @@ The registered `chio.transparency.inclusion-proof.v1` remains the
 selective-disclosure format, whose subject-digest leaf and unprefixed node
 hashing are not RFC 6962 receipt-tree semantics. It remains preview-only.
 Checkpoint-anchored receipt proofs use
-`chio.transparency.inclusion-proof.v2`, whose schema requires the signed
+`chio.transparency.receipt-inclusion-proof.v1`, whose schema requires the signed
 checkpoint statement and whose leaf is the RFC 6962 hash of the receipt bytes.
 Web3 projections preserve the same rolling-reader boundary:
 `chio.anchor-inclusion-proof.v1` embeds only v1 checkpoint statements, while
