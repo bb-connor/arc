@@ -411,7 +411,7 @@ impl MercuryProofPackage {
                 "strategy_id does not match the signed receipt metadata summary".to_string(),
             ));
         }
-        let expected_package_id = derive_proof_package_id_for_schema(self)?;
+        let expected_package_id = derive_proof_package_id(self)?;
         if self.package_id != expected_package_id {
             return Err(MercuryContractError::Validation(
                 "package_id does not match the deterministic proof-package identity".to_string(),
