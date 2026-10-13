@@ -90,7 +90,7 @@ impl Guard for BehavioralSequenceGuard {
         // bounded `tool_sequence` tail. A predecessor invoked once and then
         // pushed out of the retained window is still known to have run, so a
         // workflow that runs setup once and then more than `journal_entry_cap`
-        // other calls is no longer falsely denied when a dependent tool needs
+        // other calls is not falsely denied when a dependent tool needs
         // that evicted predecessor. `tool_counts` cannot grow without bound: the
         // journal caps its distinct-key set fail-closed
         // (`journal_tool_counts_cap`). Legitimate registry-bounded predecessors

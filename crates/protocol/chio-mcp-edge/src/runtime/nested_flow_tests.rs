@@ -13,9 +13,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 const WALL_START: u64 = 1_700_000_000_000;
-// A finite producer is the independent stop for the original unbounded poll.
-// It replenishes during each append, so the old code cannot observe an empty
-// channel until it has consumed every command.
+// A finite producer bounds the poll independently. It replenishes during each
+// append, so an unbounded poll cannot observe an empty channel until it has
+// consumed every command.
 const PRODUCER_COMMANDS: usize = 64;
 
 struct PollClock(Mutex<ClockReading>);

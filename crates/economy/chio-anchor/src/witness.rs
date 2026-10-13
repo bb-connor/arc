@@ -698,11 +698,11 @@ mod tests {
         ));
     }
 
-    /// Regression: the body_hash bound by a receipt MUST be
+    /// The body_hash bound by a receipt MUST be
     /// identical between the Pending body and the same body once
     /// signed under WitnessState::Witnessed. If batch_body_hash
-    /// reads witness_state, the two values diverge and the receipt
-    /// no longer commits to the final signed batch.
+    /// read witness_state, the two values would diverge and the
+    /// receipt would not commit to the final signed batch.
     #[test]
     fn body_hash_is_stable_across_witness_state_transitions() {
         let kp = Keypair::generate();
@@ -758,7 +758,7 @@ mod tests {
         assert_ne!(original_hash, different_lane);
     }
 
-    /// Regression: a self-asserted Witnessed state must NOT
+    /// A self-asserted Witnessed state must NOT
     /// satisfy require_public_witness=true on its own. The verifier
     /// path requires a real client.verify_inclusion call.
     #[tokio::test]
@@ -814,7 +814,7 @@ mod tests {
         assert!(matches!(err, WitnessPolicyError::VerifierRejected(_)));
     }
 
-    /// Regression for Stale: a stale state with no prior
+    /// A stale state with no prior
     /// verified record must be rejected when require_public_witness.
     #[tokio::test]
     async fn require_public_witness_rejects_stale_without_prior_verification() {
@@ -874,7 +874,7 @@ mod tests {
         .expect("previously verified stale receipt is admissible");
     }
 
-    /// Regression: a Stale receipt id that an attacker
+    /// A Stale receipt id that an attacker
     /// has previously observed must NOT admit a different batch's
     /// content. The previously-verified set is keyed by recomputed
     /// batch_body_hash, so a fresh-content batch with the same
@@ -953,7 +953,7 @@ mod tests {
         ));
     }
 
-    /// Regression guard: stale admission uses the verifier-owned
+    /// Stale admission uses the verifier-owned
     /// `verified_at` cache timestamp, not the producer-signed
     /// `last_verified` value. A producer cannot refresh a stale cache
     /// by signing a fresh artifact timestamp.

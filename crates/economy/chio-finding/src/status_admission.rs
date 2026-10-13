@@ -1,9 +1,6 @@
 //! The one rule that decides whether a finding may open market state.
 //!
-//! The decision used to live inside the SQLite authority, mixed with that
-//! store's row loading, so any profile that later needed it would have
-//! reimplemented it. It lives here instead: a profile supplies the facts
-//! through [`FindingStatusSource`] and this module sequences the checks,
+//! A profile supplies the facts through [`FindingStatusSource`] and this module sequences the checks,
 //! keeping the market-visible legality in one place while each profile
 //! keeps the referential integrity of its own rows.
 //!

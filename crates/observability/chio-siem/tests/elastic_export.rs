@@ -408,10 +408,9 @@ fn elastic_new_accepts_https() {
     );
 }
 
-/// Regression for the case-sensitive scheme check that allowed `HTTP://`
-/// (uppercase) endpoints to bypass TLS enforcement. URL schemes are
-/// case-insensitive per RFC 3986, so any cased variant of `http` must be
-/// rejected. We exercise both `HTTP://` and `Http://`.
+/// URL schemes are case-insensitive per RFC 3986, so any cased variant of
+/// `http` (for example an uppercase `HTTP://` endpoint) must be rejected by TLS
+/// enforcement. We exercise both `HTTP://` and `Http://`.
 #[test]
 fn elastic_new_rejects_uppercase_and_mixed_case_http_scheme() {
     for plaintext in ["HTTP://es.example.com:9200", "Http://es.example.com:9200"] {

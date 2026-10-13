@@ -86,7 +86,7 @@ fn contains_result(value: &Value, expected: &Value) -> bool {
 fn check_lower(
     lower: impl Fn(ToolResult) -> Result<Value, Box<dyn std::error::Error>>,
 ) -> TestResult {
-    // serde_json is an actual producer of the previously rejected 21.0 spelling.
+    // serde_json is an actual producer of the 21.0 spelling.
     for number in [
         serde_json::json!(21.0),
         serde_json::json!(0.0),
