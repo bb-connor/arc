@@ -343,11 +343,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "durable admission operation regression suite with authoritative outcome binding coverage; capped to current size until split",
         max_lines=2_090,
     ),
-    "crates/kernel/chio-kernel/src/admission_operation/projection.rs": allow(
-        "2026-10-31",
-        "durable admission projection surface with current-status denial binding; capped to current size until split",
-        max_lines=2_014,
-    ),
     "crates/platform/chio-control-plane/src/trust_control/capital_and_liability/liability.rs": allow(
         "2026-11-30",
         "capital liability control surface; capped to current size until split",

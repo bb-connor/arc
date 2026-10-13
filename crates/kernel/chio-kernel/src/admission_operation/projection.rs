@@ -36,7 +36,7 @@ mod pre_dispatch_compensation;
 pub use pre_dispatch_compensation::*;
 mod outcome_unknown;
 pub use outcome_unknown::*;
-mod refusal_receipt;
+pub(super) mod refusal_receipt;
 use refusal_receipt::validate_refusal_receipt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1942,7 +1942,7 @@ impl AdmissionOperationV1 {
                 to: next_state,
             });
         }
-        validate_terminal_replay(self.binding.kind, next_state, Some(&replay))?;
+        refusal_receipt::validate_terminal_replay(self.binding.kind, next_state, Some(&replay))?;
         let mut updated = self.clone();
         updated.state = next_state;
         updated.dispatch_state = dispatch_state_for(self.binding.kind, next_state)?;
@@ -1958,61 +1958,6 @@ pub struct AdmissionTerminal {
     pub operation_id: AdmissionOperationId,
     pub state: AdmissionOperationState,
     pub replay: AdmissionTerminalReplay,
-}
-pub(super) fn validate_terminal_replay(
-    kind: AdmissionOperationKind,
-    state: AdmissionOperationState,
-    terminal_replay: Option<&AdmissionTerminalReplay>,
-) -> Result<(), AdmissionOperationError> {
-    let valid = match (kind, state, terminal_replay) {
-        (_, state, None) if !state.is_terminal() => true,
-        (
-            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
-            AdmissionOperationState::Completed,
-            Some(AdmissionTerminalReplay::Receipt { .. }),
-        ) => true,
-        (
-            AdmissionOperationKind::ToolDispatch,
-            AdmissionOperationState::CompensatedBeforeDispatch,
-            Some(AdmissionTerminalReplay::Receipt { .. }),
-        ) => true,
-        (
-            AdmissionOperationKind::GovernedActiveResponse,
-            AdmissionOperationState::CompensatedBeforeDispatch,
-            Some(
-                AdmissionTerminalReplay::Receipt { .. } | AdmissionTerminalReplay::Incident { .. },
-            ),
-        ) => true,
-        (
-            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
-            AdmissionOperationState::NotAcceptedAfterDispatchCommit,
-            Some(
-                AdmissionTerminalReplay::Receipt { .. } | AdmissionTerminalReplay::Incident { .. },
-            ),
-        ) => true,
-        (
-            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
-            AdmissionOperationState::OutcomeUnknownAfterDispatch,
-            Some(AdmissionTerminalReplay::Receipt { .. }),
-        ) => true,
-        (
-            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
-            AdmissionOperationState::DeniedAfterDelivery,
-            Some(AdmissionTerminalReplay::Receipt { .. }),
-        ) => true,
-        (
-            AdmissionOperationKind::GovernedEconomicMutation,
-            AdmissionOperationState::EconomicMutationApplied
-            | AdmissionOperationState::EconomicMutationNotApplied,
-            Some(AdmissionTerminalReplay::EconomicMutation { .. }),
-        ) => true,
-        _ => false,
-    };
-    if valid {
-        Ok(())
-    } else {
-        Err(AdmissionOperationError::TerminalReplayMismatch)
-    }
 }
 
 #[cfg(test)]

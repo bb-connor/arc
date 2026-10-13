@@ -53,3 +53,59 @@ pub(super) fn validate_refusal_receipt(
     }
     Ok(())
 }
+
+pub(in crate::admission_operation) fn validate_terminal_replay(
+    kind: AdmissionOperationKind,
+    state: AdmissionOperationState,
+    terminal_replay: Option<&AdmissionTerminalReplay>,
+) -> Result<(), AdmissionOperationError> {
+    let valid = match (kind, state, terminal_replay) {
+        (_, state, None) if !state.is_terminal() => true,
+        (
+            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
+            AdmissionOperationState::Completed,
+            Some(AdmissionTerminalReplay::Receipt { .. }),
+        ) => true,
+        (
+            AdmissionOperationKind::ToolDispatch,
+            AdmissionOperationState::CompensatedBeforeDispatch,
+            Some(AdmissionTerminalReplay::Receipt { .. }),
+        ) => true,
+        (
+            AdmissionOperationKind::GovernedActiveResponse,
+            AdmissionOperationState::CompensatedBeforeDispatch,
+            Some(
+                AdmissionTerminalReplay::Receipt { .. } | AdmissionTerminalReplay::Incident { .. },
+            ),
+        ) => true,
+        (
+            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
+            AdmissionOperationState::NotAcceptedAfterDispatchCommit,
+            Some(
+                AdmissionTerminalReplay::Receipt { .. } | AdmissionTerminalReplay::Incident { .. },
+            ),
+        ) => true,
+        (
+            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
+            AdmissionOperationState::OutcomeUnknownAfterDispatch,
+            Some(AdmissionTerminalReplay::Receipt { .. }),
+        ) => true,
+        (
+            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
+            AdmissionOperationState::DeniedAfterDelivery,
+            Some(AdmissionTerminalReplay::Receipt { .. }),
+        ) => true,
+        (
+            AdmissionOperationKind::GovernedEconomicMutation,
+            AdmissionOperationState::EconomicMutationApplied
+            | AdmissionOperationState::EconomicMutationNotApplied,
+            Some(AdmissionTerminalReplay::EconomicMutation { .. }),
+        ) => true,
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(AdmissionOperationError::TerminalReplayMismatch)
+    }
+}

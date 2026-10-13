@@ -34,6 +34,7 @@ mod sequencer;
 mod state;
 mod store;
 
+use projection::refusal_receipt::validate_terminal_replay;
 use state::*;
 
 pub use authority_profile::{AdmissionAuthorityProfileV1, AdmissionAuthoritySelectionV1};
