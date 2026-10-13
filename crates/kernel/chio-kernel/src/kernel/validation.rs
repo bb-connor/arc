@@ -808,7 +808,7 @@ impl ChioKernel {
             )?;
         }
 
-        Ok(())
+        self.validate_delegation_issuance_freeze(cap, &last_link.capability_id)
     }
 
     fn local_budget_event_authority(&self) -> BudgetEventAuthority {
