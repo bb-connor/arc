@@ -221,7 +221,6 @@ fn prepare_ordinary(
     })?;
     let inputs = &mut parts.inputs;
     // Ordinary value finalization keeps the admission-time receipt timestamp.
-    // Streams and durable returns obtain their required timing in timed_dispatch.
     let now = inputs.prepared.evaluation_timestamp;
     let metadata = merge_metadata_objects(
         inputs.metadata.clone(),
