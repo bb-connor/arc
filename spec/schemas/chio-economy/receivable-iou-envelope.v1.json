@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio-protocol.dev/schemas/chio-economy/credit-iou-envelope/v2",
+  "$id": "https://chio-protocol.dev/schemas/chio-economy/receivable-iou-envelope/v1",
   "title": "Signed Chio Credit IOU Envelope V2",
   "type": "object",
   "additionalProperties": false,

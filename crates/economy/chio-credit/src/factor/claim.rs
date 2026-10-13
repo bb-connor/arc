@@ -2,17 +2,16 @@ use std::collections::BTreeMap;
 
 use chio_core_types::receipt::body::ChioReceipt;
 
-use crate::iou_v2::{
-    verify_iou_envelope_v2, IouEnvelopeIssuerTrustV2, IouEnvelopeReceiptTrustV2,
-    IouEnvelopeV2Error, IouEnvelopeVerificationContextV2, SignedIouEnvelopeV2,
-    VerifiedIouEnvelopeV2,
-};
 use crate::obligation::{
     derive_obligation_payee_binding_digest, verify_credit_facility_bind, CreditAdmissionStore,
     CreditAdmissionStoreAdapter, CreditFacilityBindTrustV1,
     CreditFacilityBindVerificationContextV1, ObligationAtomV1, ObligationDispositionRecordV1,
     ObligationDispositionV1, ObligationSettlementLifecycleV1, ObligationSettlementStateV1,
     ObligationStatusProofTrustV1, VerifiedObligationStatusProofV1,
+};
+use crate::receivable_iou::{
+    verify_receivable_iou, ReceivableIouError, ReceivableIouIssuerTrust, ReceivableIouReceiptTrust,
+    ReceivableIouVerificationContext, SignedReceivableIou, VerifiedReceivableIou,
 };
 
 use super::*;
@@ -42,8 +41,8 @@ struct ClaimTrustConfigurationPreimageV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReceivableClaimTrustV1 {
     status_proof_trust_configuration_digest: String,
-    receipt_trust: IouEnvelopeReceiptTrustV2,
-    retained_iou_issuers: Vec<IouEnvelopeIssuerTrustV2>,
+    receipt_trust: ReceivableIouReceiptTrust,
+    retained_iou_issuers: Vec<ReceivableIouIssuerTrust>,
     retained_credit_facility_bind_trusts: Vec<CreditFacilityBindTrustV1>,
     configuration_digest: String,
 }
@@ -51,12 +50,12 @@ pub struct ReceivableClaimTrustV1 {
 impl ReceivableClaimTrustV1 {
     pub fn new<I, B>(
         status_proof_trust: &ObligationStatusProofTrustV1,
-        receipt_trust: IouEnvelopeReceiptTrustV2,
+        receipt_trust: ReceivableIouReceiptTrust,
         retained_iou_issuers: I,
         retained_credit_facility_bind_trusts: B,
     ) -> Result<Self, FactorError>
     where
-        I: IntoIterator<Item = IouEnvelopeIssuerTrustV2>,
+        I: IntoIterator<Item = ReceivableIouIssuerTrust>,
         B: IntoIterator<Item = CreditFacilityBindTrustV1>,
     {
         if receipt_trust.trusted_kernel_key_hexes().is_empty() {
@@ -143,7 +142,7 @@ impl ReceivableClaimTrustV1 {
     }
 
     #[must_use]
-    pub const fn receipt_trust(&self) -> &IouEnvelopeReceiptTrustV2 {
+    pub const fn receipt_trust(&self) -> &ReceivableIouReceiptTrust {
         &self.receipt_trust
     }
 
@@ -153,7 +152,7 @@ impl ReceivableClaimTrustV1 {
     }
 
     #[must_use]
-    pub fn retained_iou_issuers(&self) -> &[IouEnvelopeIssuerTrustV2] {
+    pub fn retained_iou_issuers(&self) -> &[ReceivableIouIssuerTrust] {
         &self.retained_iou_issuers
     }
 
@@ -167,7 +166,7 @@ impl ReceivableClaimTrustV1 {
         &self.configuration_digest
     }
 
-    fn issuer(&self, issuer_id: &str, issuer_key_epoch: u64) -> Option<&IouEnvelopeIssuerTrustV2> {
+    fn issuer(&self, issuer_id: &str, issuer_key_epoch: u64) -> Option<&ReceivableIouIssuerTrust> {
         self.retained_iou_issuers.iter().find(|issuer| {
             issuer.issuer_id() == issuer_id && issuer.issuer_key_epoch() == issuer_key_epoch
         })
@@ -175,7 +174,7 @@ impl ReceivableClaimTrustV1 {
 
     fn credit_facility_bind_trust(
         &self,
-        signed_iou: &SignedIouEnvelopeV2,
+        signed_iou: &SignedReceivableIou,
         trusted_at_unix_ms: u64,
     ) -> Result<&CreditFacilityBindTrustV1, FactorError> {
         let canonical_bind = signed_iou
@@ -217,7 +216,7 @@ pub struct ReceivableClaimVerificationV1<'a> {
 pub struct VerifiedReceivableClaimV1 {
     claim: ReceivableClaimV1,
     receipt: ChioReceipt,
-    iou: VerifiedIouEnvelopeV2,
+    iou: VerifiedReceivableIou,
     claim_digest: String,
     receipt_digest: String,
     iou_digest: String,
@@ -238,7 +237,7 @@ impl VerifiedReceivableClaimV1 {
     }
 
     #[must_use]
-    pub const fn iou(&self) -> &VerifiedIouEnvelopeV2 {
+    pub const fn iou(&self) -> &VerifiedReceivableIou {
         &self.iou
     }
 
@@ -359,7 +358,7 @@ pub fn verify_receivable_claim<S: CreditAdmissionStore>(
     claim.validate_against_atom(context.atom)?;
     let receipt: ChioReceipt = parse_canonical(canonical_receipt, "claim receipt")?;
     let signed_iou =
-        SignedIouEnvelopeV2::from_canonical_bytes(canonical_iou).map_err(map_iou_error)?;
+        SignedReceivableIou::from_canonical_bytes(canonical_iou).map_err(map_iou_error)?;
     let issuer = context
         .trust
         .issuer(
@@ -370,10 +369,10 @@ pub fn verify_receivable_claim<S: CreditAdmissionStore>(
     let credit_facility_bind_trust = context
         .trust
         .credit_facility_bind_trust(&signed_iou, context.atom.created_at_unix_ms())?;
-    let iou = verify_iou_envelope_v2(
+    let iou = verify_receivable_iou(
         canonical_iou,
         credit_admission_store,
-        &IouEnvelopeVerificationContextV2 {
+        &ReceivableIouVerificationContext {
             atom: context.atom,
             disposition: context.disposition,
             settlement_lifecycle: context.settlement_lifecycle,
@@ -443,20 +442,20 @@ fn validate_claim_causality(
     }
 }
 
-fn map_iou_error(error: IouEnvelopeV2Error) -> FactorError {
+fn map_iou_error(error: ReceivableIouError) -> FactorError {
     match error {
-        IouEnvelopeV2Error::Input(source) => FactorError::Input(source),
-        IouEnvelopeV2Error::ReceiptVerification
-        | IouEnvelopeV2Error::ReceiptSignerUntrusted
-        | IouEnvelopeV2Error::CreditAuthorityVerification
-        | IouEnvelopeV2Error::CreditAdmissionVerification
-        | IouEnvelopeV2Error::IssuerVerification => FactorError::AuthorityVerification,
-        IouEnvelopeV2Error::BindingMismatch(_) | IouEnvelopeV2Error::NotEligible(_) => {
+        ReceivableIouError::Input(source) => FactorError::Input(source),
+        ReceivableIouError::ReceiptVerification
+        | ReceivableIouError::ReceiptSignerUntrusted
+        | ReceivableIouError::CreditAuthorityVerification
+        | ReceivableIouError::CreditAdmissionVerification
+        | ReceivableIouError::IssuerVerification => FactorError::AuthorityVerification,
+        ReceivableIouError::BindingMismatch(_) | ReceivableIouError::NotEligible(_) => {
             FactorError::BindingMismatch
         }
-        IouEnvelopeV2Error::InvalidField(_)
-        | IouEnvelopeV2Error::Canonicalization(_)
-        | IouEnvelopeV2Error::Signing(_) => FactorError::Canonicalization(error.to_string()),
+        ReceivableIouError::InvalidField(_)
+        | ReceivableIouError::Canonicalization(_)
+        | ReceivableIouError::Signing(_) => FactorError::Canonicalization(error.to_string()),
     }
 }
 
