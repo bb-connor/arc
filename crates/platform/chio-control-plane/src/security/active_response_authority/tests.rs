@@ -311,9 +311,14 @@ fn authority_payloads_reject_unknown_fields_and_unbounded_rejection_codes() {
         "client": Keypair::from_seed(&[42; 32]).public_key(),
         "operation": { "operation": "health" }
     });
-    assert!(
-        serde_json::from_value::<ActiveResponseAuthorityRequestBody>(digestless_request).is_err()
-    );
+    let Err(error) =
+        serde_json::from_value::<ActiveResponseAuthorityRequestBody>(digestless_request)
+    else {
+        panic!("a request body without deployment and store digests must be refused");
+    };
+    assert!(error
+        .to_string()
+        .contains("missing field `deploymentDigest`"));
 }
 
 #[test]
