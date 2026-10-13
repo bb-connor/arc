@@ -359,6 +359,18 @@ class SourceGate(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.require()
 
+    def test_release_qualification_is_dispatched_and_gated_on_dispatch(self):
+        workflow = (ROOT / ".github/workflows/release-qualification.yml").read_text()
+        triggers = workflow.split("\non:\n", 1)[1].split("\n\n", 1)[0]
+        self.assertEqual(triggers, "  workflow_dispatch:")
+        self.assertNotIn("cancel-in-progress", workflow)
+        self.assertEqual(GATE.REQUIRED["release-qualification.yml"][0], "workflow_dispatch")
+        index = list(GATE.REQUIRED).index("release-qualification.yml")
+        run = self.responses[self.run_paths[index]]["workflow_runs"][0]
+        run["event"] = "push"
+        with self.assertRaisesRegex(ValueError, "release-qualification.yml"):
+            self.require()
+
     def test_incomplete_failed_or_cancelled_run_refuses(self):
         for status, conclusion in [
             ("in_progress", None),

@@ -24,7 +24,7 @@ REQUIRED = {
             "cargo-deny (supply-chain bans/advisories/licenses)",
         },
     ),
-    "release-qualification.yml": (None, {"Release qualification"}),
+    "release-qualification.yml": ("workflow_dispatch", {"Release qualification"}),
     "cve-monitor.yml": (None, {"cargo-audit and osv-scanner"}),
     "cargo-vet.yml": (None, {"cargo-vet (locked supply-chain audit)"}),
 }
