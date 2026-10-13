@@ -111,6 +111,19 @@ fn npm_package_identity_and_version_are_required() {
 }
 
 #[test]
+fn npm_metadata_with_duplicate_keys_is_rejected() {
+    let root = package_fixture();
+    let path = root.path().join("package.json");
+    let metadata = fs::read_to_string(&path).unwrap();
+    fs::write(
+        path,
+        format!("{{\"annotation\":0,\"annotation\":1,{}", &metadata[1..]),
+    )
+    .unwrap();
+    assert_rejected(root.path(), "npm runtime package metadata is invalid");
+}
+
+#[test]
 fn npm_executable_outside_the_package_bin_is_rejected() {
     let root = package_fixture();
     let executable = root.path().join("npm-cli.js");

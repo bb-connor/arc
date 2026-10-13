@@ -111,7 +111,9 @@ fn read_package_metadata<T: serde::de::DeserializeOwned>(
     if bytes.len() > MAX_NPM_METADATA_BYTES {
         return Err("npm runtime package metadata exceeds its size bound".to_owned());
     }
-    serde_json::from_slice(&bytes).map_err(|_| "npm runtime package metadata is invalid".to_owned())
+    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_NPM_METADATA_BYTES)
+        .and_then(|input| input.decode_document())
+        .map_err(|_| "npm runtime package metadata is invalid".to_owned())
 }
 
 fn valid_package_name(name: &str) -> bool {
