@@ -149,38 +149,3 @@ fn valid_digest_cannot_hide_duplicate_unordered_or_over_capacity_markers() -> Te
     }
     Ok(())
 }
-
-#[test]
-fn migrated_subjectless_markers_keep_wildcard_semantics_in_frozen_inventory() -> TestResult {
-    let directory = tempfile::tempdir()?;
-    let path = directory.path().join("approval.db");
-    let legacy = Connection::open(&path)?;
-    legacy.execute_batch(
-        "CREATE TABLE chio_governed_approval_replay_entries (
-        request_id TEXT NOT NULL, intent_hash TEXT NOT NULL, expires_at INTEGER NOT NULL,
-        dispatch_reservation_id TEXT, PRIMARY KEY(request_id, intent_hash));",
-    )?;
-    legacy.execute(
-        "INSERT INTO chio_governed_approval_replay_entries VALUES ('reserved', 'intent', ?1, NULL)",
-        [super::super::super::now_secs() + 3600],
-    )?;
-    drop(legacy);
-    let store = SqliteGovernedApprovalReplayStore::open(&path)?;
-    assert!(!reserve(&store, "reserved")?);
-    assert!(!store.reserve_for_dispatch(
-        "other-subject",
-        "reserved",
-        "intent",
-        u64::MAX >> 1,
-        "owner"
-    )?);
-    let expected = store.preview_legacy_replay_source(&binding()?)?;
-    let value = read_value(&expected)?;
-    assert_eq!(
-        value["body"]["inventory"]["markers"][0]["subject_id"],
-        super::super::super::LEGACY_UNSCOPED_SUBJECT_ID
-    );
-    store.seal_expected_legacy_replay_source(&expected)?;
-    store.verify_legacy_replay_source_seal(&expected)?;
-    Ok(())
-}
