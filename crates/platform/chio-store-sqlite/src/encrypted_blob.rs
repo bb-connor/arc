@@ -398,7 +398,9 @@ impl SqliteEncryptedBlobStore {
                     | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
             )
             .with_init(configure_blob_connection);
-        let pool = Pool::builder().max_size(8).build(manager)?;
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(8)
+            .build(manager)?;
         let store = Self {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
@@ -414,7 +416,9 @@ impl SqliteEncryptedBlobStore {
 
     pub fn open_in_memory_with_clock(clock: Arc<dyn Clock>) -> Result<Self, BlobStoreError> {
         let manager = SqliteConnectionManager::memory().with_init(configure_blob_connection);
-        let pool = Pool::builder().max_size(1).build(manager)?;
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(1)
+            .build(manager)?;
         let store = Self {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),

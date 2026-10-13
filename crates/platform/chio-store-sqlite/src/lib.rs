@@ -89,6 +89,7 @@ pub mod iou_store;
 #[cfg(feature = "lineage")]
 pub mod lineage_cte;
 pub mod memory_provenance_store;
+mod pool;
 mod read_companion;
 pub mod receipt_query;
 pub mod receipt_query_snapshot;

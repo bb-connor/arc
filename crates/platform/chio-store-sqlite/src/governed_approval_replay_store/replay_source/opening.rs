@@ -50,7 +50,7 @@ impl SqliteGovernedApprovalReplaySource {
                     | OpenFlags::SQLITE_OPEN_NO_MUTEX,
             )
             .with_init(configure_pooled_connection);
-        let pool = r2d2::Pool::builder()
+        let pool = crate::pool::sqlite_pool_builder()
             .max_size(1)
             .connection_timeout(Duration::from_secs(5))
             .build(manager)?;

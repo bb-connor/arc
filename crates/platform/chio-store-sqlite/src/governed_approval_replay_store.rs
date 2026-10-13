@@ -188,7 +188,9 @@ impl SqliteGovernedApprovalReplayStore {
             fs::create_dir_all(parent)?;
         }
         let manager = SqliteConnectionManager::file(path).with_init(configure_pooled_connection);
-        let pool = Pool::builder().max_size(8).build(manager)?;
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(8)
+            .build(manager)?;
         let store = Self {
             pool,
             path: Some(
@@ -220,7 +222,9 @@ impl SqliteGovernedApprovalReplayStore {
     ) -> Result<Self, SqliteGovernedApprovalReplayStoreError> {
         let clock = StableReplayClock::new(clock, MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64)?;
         let manager = SqliteConnectionManager::memory().with_init(configure_pooled_connection);
-        let pool = Pool::builder().max_size(1).build(manager)?;
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(1)
+            .build(manager)?;
         let store = Self {
             pool,
             path: None,
@@ -1131,7 +1135,10 @@ mod tests {
         let jumped = base.saturating_add(1_000);
         let manager = SqliteConnectionManager::file(&path).with_init(configure_pooled_connection);
         let advanced = SqliteGovernedApprovalReplayStore {
-            pool: Pool::builder().max_size(1).build(manager).unwrap(),
+            pool: crate::pool::sqlite_pool_builder()
+                .max_size(1)
+                .build(manager)
+                .unwrap(),
             path: Some(path.clone()),
             capacity: DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY,
             clock: StableReplayClock::new(

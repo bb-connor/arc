@@ -116,7 +116,7 @@ impl SqliteApprovalStore {
                 .map_err(|e| ApprovalStoreError::Backend(format!("create dir: {e}")))?;
         }
         let manager = SqliteConnectionManager::file(path);
-        let pool = Pool::builder()
+        let pool = crate::pool::sqlite_pool_builder()
             .max_size(8)
             .build(manager)
             .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;
@@ -128,7 +128,7 @@ impl SqliteApprovalStore {
     /// Open an in-memory store for tests.
     pub fn open_in_memory() -> Result<Self, ApprovalStoreError> {
         let manager = SqliteConnectionManager::memory();
-        let pool = Pool::builder()
+        let pool = crate::pool::sqlite_pool_builder()
             .max_size(1)
             .build(manager)
             .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;

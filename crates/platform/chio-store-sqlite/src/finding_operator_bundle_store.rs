@@ -269,7 +269,7 @@ impl SqliteFindingOperatorBundleStore {
                 .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
         }
         let manager = SqliteConnectionManager::file(path).with_init(configure_pooled_connection);
-        let pool = Pool::builder()
+        let pool = crate::pool::sqlite_pool_builder()
             .max_size(8)
             .build(manager)
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
@@ -289,7 +289,7 @@ impl SqliteFindingOperatorBundleStore {
         clock: Arc<dyn Clock>,
     ) -> Result<Self, FindingOperatorBundleStoreError> {
         let manager = SqliteConnectionManager::memory().with_init(configure_pooled_connection);
-        let pool = Pool::builder()
+        let pool = crate::pool::sqlite_pool_builder()
             .max_size(1)
             .build(manager)
             .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
