@@ -62,15 +62,20 @@ fn sqlite_nonce_preflight_retains_security_identity_across_restart() -> TestResu
         .ok_or("reloaded request")?;
     assert_eq!(reloaded.canonical_bytes(), retained.canonical_bytes());
     request.execution_nonce = Some(*preflight.execution_nonce.ok_or("nonce")?);
+    let conflict = format!("request id conflicts with retained operation {before}");
     for changed in [None, Some(context(&request, 2)?)] {
+        let receipts = runtime.kernel.receipt_log().len();
         let denied = match changed {
             Some(context) => runtime
                 .kernel
-                .evaluate_tool_call_blocking_with_security_context(&request, &context)?,
-            None => runtime.kernel.evaluate_tool_call_blocking(&request)?,
+                .evaluate_tool_call_blocking_with_security_context(&request, &context),
+            None => runtime.kernel.evaluate_tool_call_blocking(&request),
         };
-        assert_eq!(denied.verdict, Verdict::Deny, "{denied:?}");
-        assert!(denied.output.is_none());
+        assert!(
+            matches!(&denied, Err(chio_kernel::KernelError::DurableAdmission(reason)) if reason == &conflict),
+            "{denied:?}"
+        );
+        assert_eq!(runtime.kernel.receipt_log().len(), receipts);
         assert_eq!(assert_state(&fixture, &request, "prepared")?, before);
         assert_eq!(
             count_rows(&fixture, "admission_execution_nonce_reservations")?,
@@ -117,11 +122,16 @@ fn sqlite_ordinary_terminal_rejects_changed_security_identity_after_restart() ->
 
     let runtime = fixture.open()?;
     assert!(runtime.authority.mutation_fence().owner_epoch > epoch);
+    let receipts = runtime.kernel.receipt_log().len();
     let denied = runtime
         .kernel
-        .evaluate_tool_call_blocking_with_security_context(&request, &context(&request, 2)?)?;
-    assert_eq!(denied.verdict, Verdict::Deny, "{denied:?}");
-    assert!(denied.output.is_none());
+        .evaluate_tool_call_blocking_with_security_context(&request, &context(&request, 2)?);
+    let conflict = format!("request id conflicts with retained operation {operation_id}");
+    assert!(
+        matches!(&denied, Err(chio_kernel::KernelError::DurableAdmission(reason)) if reason == &conflict),
+        "{denied:?}"
+    );
+    assert_eq!(runtime.kernel.receipt_log().len(), receipts);
     assert_eq!(assert_state(&fixture, &request, "completed")?, operation_id);
     let replay = runtime
         .kernel
