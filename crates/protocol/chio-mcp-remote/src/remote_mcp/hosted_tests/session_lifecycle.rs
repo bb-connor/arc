@@ -208,16 +208,18 @@ fn hosted_mcp_sessions_initialize_resume_and_report_ready_state() {
 
 #[test]
 fn hosted_mcp_sessions_expire_under_ttl_and_cannot_be_reused() {
+    let clock = crate::tests::OffsetClock::new();
     let server = start_http_server_with_lifecycle_tuning(
         "test-token",
         LifecycleTuning {
-            idle_expiry_millis: Some(250),
-            drain_grace_millis: Some(250),
+            idle_expiry_millis: Some(60_000),
             reaper_interval_millis: Some(50),
+            clock: Some(clock.clone()),
             ..LifecycleTuning::default()
         },
     );
     let session = server.initialize_session();
+    clock.advance_millis(60_001);
 
     let expired = server.wait_for_session_state(&session.id, "expired");
     assert_eq!(

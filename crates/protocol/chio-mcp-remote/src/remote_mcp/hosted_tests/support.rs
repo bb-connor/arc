@@ -30,6 +30,7 @@ pub struct LifecycleTuning {
     pub idle_expiry_millis: Option<u64>,
     pub drain_grace_millis: Option<u64>,
     pub reaper_interval_millis: Option<u64>,
+    pub clock: Option<Arc<crate::tests::OffsetClock>>,
 }
 
 #[derive(Debug)]
@@ -713,6 +714,9 @@ fn spawn_static_bearer_server_thread(
     }
     if let Some(value) = tuning.reaper_interval_millis {
         lifecycle.reaper_interval_millis = value;
+    }
+    if let Some(clock) = tuning.clock {
+        config.clock = crate::RemoteClock::new(clock);
     }
     let session_db_path = tuning
         .session_db_path
