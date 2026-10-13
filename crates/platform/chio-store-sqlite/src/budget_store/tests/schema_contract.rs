@@ -330,3 +330,48 @@ pub(super) fn assert_stale_without_mutation(path: &std::path::Path, found: i32) 
     assert_eq!(snapshot(&connection)?, before);
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn budget_schema_provisioning_preserves_typed_stale_refusal() -> TestResult {
+    use std::error::Error;
+    use std::os::unix::fs::PermissionsExt;
+
+    for provisioned in [false, true] {
+        let (directory, path) = populated_database()?;
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        let lock_root = directory.path().join("locks");
+        std::fs::create_dir(&lock_root)?;
+        std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))?;
+        if provisioned {
+            crate::SqliteAuthorityStore::provision(&path, &lock_root)?;
+        }
+        let connection = Connection::open(&path)?;
+        crate::stamp_schema_version(&connection, "budget", 12)?;
+        let before = snapshot(&connection)?;
+        let error = crate::SqliteAuthorityStore::provision(&path, &lock_root)
+            .expect_err("a noncurrent budget stamp cannot be provisioned");
+        let source = error
+            .source()
+            .and_then(|error| error.downcast_ref::<BudgetStoreError>())
+            .ok_or("provisioning lost the typed budget error")?;
+        assert!(matches!(
+            source,
+            BudgetStoreError::StaleSchema {
+                found: 12,
+                current: 1
+            }
+        ));
+        assert_eq!(error.to_string(), "budget schema refused: database schema version 12 is not the current schema version 1; refusing to open");
+        assert!(matches!(
+            error,
+            crate::SqliteServingOwnerError::BudgetSchema(BudgetStoreError::StaleSchema {
+                found: 12,
+                current: 1
+            })
+        ));
+        assert_eq!(snapshot(&connection)?, before);
+    }
+    Ok(())
+}
