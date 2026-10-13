@@ -265,6 +265,11 @@ impl RetainedToolAdmissionRequestV1 {
         &self.wire.frozen_receipt_signing_identity
     }
 
+    /// Post-return evaluation steps frozen at admission.
+    pub(crate) fn post_return_steps(&self) -> &[FrozenEvaluationStepV1] {
+        &self.wire.post_return_steps
+    }
+
     /// Caller receipt metadata bound into the original admission. Every
     /// canonical refusal signed for this operation carries it unchanged.
     #[must_use]

@@ -351,6 +351,13 @@ impl ChioKernel {
             original
                 .validate_request_material(request)
                 .map_err(durable_store_error)?;
+            if self.durable_post_return_plan()?.frozen_steps.as_slice()
+                != original.post_return_steps()
+            {
+                return Err(KernelError::DurableAdmission(
+                    "post-return evaluation plan changed after admission".into(),
+                ));
+            }
             if original
                 .retained_matching_grant(matched_grant_index)
                 .is_some()
