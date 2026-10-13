@@ -9,8 +9,8 @@ It accepts a database URL environment-variable name, an absolute trusted CA
 path, and a connection acquisition timeout.
 There is no exported Rust library API or hosted operator profile input.
 
-The PostgreSQL store library owns role verification, migration locking,
-legacy-ledger conversion, and migration execution. The executable translates
+The PostgreSQL store library owns role verification, migration locking, and
+migration execution. The executable translates
 those failures into fixed process diagnostics.
 An operator owns certificate provisioning and database role creation.
 
@@ -34,8 +34,8 @@ The package declares no Cargo features.
 4. The store configuration receives the CA path, one connection, and the
    requested acquisition timeout.
 5. The migrator connects and checks its role before attempting schema changes.
-6. The store acquires an advisory migration lock, bridges a supported legacy
-   migration ledger, and runs the compile-time embedded SQLx migrator.
+6. The store acquires an advisory migration lock and runs the compile-time
+   embedded SQLx migrator.
 7. Unlocking is attempted after either success or failure. A migration or
    unlock error propagates to the executable's failing exit code.
 
@@ -55,8 +55,8 @@ The privilege boundary grants substantial schema authority. Supplying a
 runtime login or a PostgreSQL superuser does not satisfy the dedicated-role
 check. Role provisioning remains an administrative operation.
 
-The store's legacy bridge checks a contiguous ledger prefix against embedded
-versions, names, and SQL digests before importing it into SQLx bookkeeping.
+SQLx refuses a ledger whose applied versions or checksums differ from the
+embedded baseline.
 The binary signs no artifacts and produces no readiness assertion.
 Fixed error strings distinguish arguments, missing or invalid secrets,
 configuration, connection, and migration failures without printing the URL.

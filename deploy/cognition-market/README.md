@@ -80,12 +80,9 @@ buyer credentials. The canary authenticates as that second tenant and requires
 the first tenant's Finding lookup to return `404`, which exercises the backend
 tenant boundary rather than stopping at authentication.
 
-Migration `0016_authenticated_delivery_receipt.sql` intentionally refuses to
-upgrade a database that retains the legacy unsigned hosted delivery contract.
-Before deploying this revision, export and quarantine any legacy delivery
-events, projections, replication records, and rollback outbox entries through
-the approved retention procedure. Those records cannot be converted into
-kernel-authenticated receipts after issuance.
+The schema is a single baseline migration. A database whose SQLx ledger
+differs from it in version or checksum is refused with `MigrationDrift`;
+provision a fresh database instead of migrating an existing one.
 
 `CHIO_FINDING_NETWORK_CANARY_POOL` names the manifest, not an individual
 Finding. It is canonical JSON with schema
