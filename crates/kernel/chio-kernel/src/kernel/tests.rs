@@ -21,7 +21,6 @@ use crate::execution_nonce::{
     mint_execution_nonce, verify_execution_nonce, ExecutionNonceConfig, ExecutionNonceError,
     InMemoryExecutionNonceStore, NonceBinding,
 };
-use crate::governed_active_response::GovernedActiveResponseRequest;
 use crate::operator_report::ComplianceReport;
 use crate::receipt_store::{QualifiedAdmissionProjectionStore, ReceiptStore, ReceiptStoreError};
 use crate::threshold_approval::ThresholdApprovalRequirementResolver;

@@ -5005,10 +5005,6 @@
       "path": "crates/kernel/chio-kernel-core/src/passport_verify.rs"
     },
     {
-      "type": "VerifiedActiveResponseOperatorCapability",
-      "path": "crates/kernel/chio-kernel/src/governed_active_response.rs"
-    },
-    {
       "type": "ReceiptReadContext",
       "path": "crates/kernel/chio-kernel/src/receipt_query.rs"
     },
