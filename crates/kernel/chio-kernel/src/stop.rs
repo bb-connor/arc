@@ -22,11 +22,11 @@ use crate::admission_operation::AdmissionOperationStoreError;
 pub const STOP_EPOCH_SCHEMA: &str = "chio.stop-epoch.v1";
 pub const STOP_ZERO_DIGEST: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
-/// Upper bound on the canonical encoding of one record (S6).
+/// Upper bound on the canonical encoding of one record.
 pub const MAX_STOP_RECORD_BYTES: usize = 4 * 1024;
 /// Upper bound on operator reason text kept beside the chain.
 pub const MAX_STOP_REASON_BYTES: usize = 1024;
-/// Records one chain generation may hold (S6).
+/// Records one chain generation may hold.
 pub const STOP_CHAIN_GENERATION_BOUND: u64 = 65_536;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -91,7 +91,7 @@ impl StopEpochId {
 pub enum DecisionTime {
     /// Authority time observed inside the appending transaction.
     Observed(u64),
-    /// Authority time was unavailable. Valid for `Stop` only (S4).
+    /// Authority time was unavailable. Valid for `Stop` only.
     Unavailable,
 }
 
@@ -252,7 +252,7 @@ pub fn verify_stop_chain<'a>(
     Ok(head)
 }
 
-/// SHA-256 commitment to an operator reason under a fresh salt (S1).
+/// SHA-256 commitment to an operator reason under a fresh salt.
 #[must_use]
 pub fn stop_reason_commitment(salt: &[u8], reason: &str) -> String {
     let mut material = salt.to_vec();
@@ -287,7 +287,7 @@ fn require_digest(value: &str, label: &str) -> Result<(), StopChainError> {
 pub struct StopTransitionRequest {
     pub scope: StopScope,
     pub transition: StopTransition,
-    /// Required for `Resume`: the head the operator decided against (S31).
+    /// Required for `Resume`: the head the operator decided against.
     pub expected_epoch: Option<StopEpochId>,
     pub reason: String,
     pub authorizer: StopAuthorizer,
@@ -300,7 +300,7 @@ pub enum DurableStopError {
     /// A resume was decided against a head that has since moved.
     #[error("stop head moved")]
     HeadMoved { head: Option<StopEpochId> },
-    /// A resume needs authority time and none was available (S4).
+    /// A resume needs authority time and none was available.
     #[error("authority time is unavailable for a resume")]
     TimeUnavailable,
     #[error("stop chain is invalid: {0}")]
@@ -383,7 +383,7 @@ impl StopHeads {
         self.host_latched.load(Ordering::SeqCst) || self.snapshot.load().stopped()
     }
 
-    /// Engage the process-local host latch (S20). The latch is published
+    /// Engage the process-local host latch. The latch is published
     /// before the caller reads any clock.
     pub fn latch_host(&self, reason: &str) {
         self.host_latched_since.store(0, Ordering::SeqCst);
@@ -435,7 +435,7 @@ impl StopHeads {
     }
 }
 
-/// Readiness of a stop-bearing host (S10).
+/// Readiness of a stop-bearing host.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum StopReadiness {
@@ -473,7 +473,7 @@ pub struct StopStatus {
 #[serde(deny_unknown_fields)]
 pub struct StopRequestBody {
     pub reason: String,
-    /// Whether governed containment stays available while stopped (S12).
+    /// Whether governed containment stays available while stopped.
     #[serde(default = "allow_containment_by_default")]
     pub allow_containment: bool,
 }
@@ -486,7 +486,7 @@ fn allow_containment_by_default() -> bool {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResumeRequestBody {
-    /// The stopped head the operator decided to resume (S31).
+    /// The stopped head the operator decided to resume.
     pub expected_epoch: StopEpochId,
 }
 

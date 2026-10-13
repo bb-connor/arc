@@ -1,4 +1,4 @@
-//! The durable stop chain (`chio.stop-epoch.v1`, KSPEC-08 S1 to S3).
+//! The durable stop chain (`chio.stop-epoch.v1`).
 //!
 //! Each record is appended through the serving writer, covered by the global
 //! authority commit chain and anchored before the call returns. The record
