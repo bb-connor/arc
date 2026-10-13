@@ -6,6 +6,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "schema",
     "id",
     "issuer",
     "subject",
@@ -17,8 +18,7 @@
   "properties": {
     "schema": {
       "type": "string",
-      "const": "chio.capability.v1",
-      "default": "chio.capability.v1"
+      "const": "chio.capability.v1"
     },
     "id": {
       "type": "string",

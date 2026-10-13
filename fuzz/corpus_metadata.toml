@@ -300,7 +300,7 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "capability_receipt"
 path      = "fuzz/corpus/capability_receipt/binding-broken_delegation_chain_signature.json"
-sha256    = "c832a5d640631b09260f2e7f70b227e19df182af9e00cc2d5adb9b339529dac9"
+sha256    = "e5665b161a3c9f4f9698f44cd50f799aa77157de8eda10b810f450ef293eeb2e"
 source    = "hand_curated_coverage"
 
 [[seed]]
@@ -312,13 +312,13 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "capability_receipt"
 path      = "fuzz/corpus/capability_receipt/binding-expired_capability.json"
-sha256    = "eeac83237758eca92e6c040f00a4ede174052bcbacd9cb1db589dafffe86373c"
+sha256    = "7f787dc31fd9819afd4e855124a3ea7b4d02bc444f4ef5fd738cb06a81aa8a2c"
 source    = "hand_curated_coverage"
 
 [[seed]]
 target    = "capability_receipt"
 path      = "fuzz/corpus/capability_receipt/binding-not_yet_valid_capability.json"
-sha256    = "7938471428ea299e9603014ccaa014d846a1e0357dc494eaa247fd10eb885c32"
+sha256    = "212e8e241279a8fb2155ec20979469bdd085e0df9ed9155dd72d0388a5ca2cad"
 source    = "hand_curated_coverage"
 
 [[seed]]
@@ -330,7 +330,7 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "capability_receipt"
 path      = "fuzz/corpus/capability_receipt/binding-tampered_capability_signature.json"
-sha256    = "94b5d60463dcb1ab8ddecd6d11991acffd4e65b74f50ad5087468e9f088e9734"
+sha256    = "f79752b586646c1bc9d90d75cdb0956b9cc02f3fe0926e79988b84eedf96ff84"
 source    = "hand_curated_coverage"
 
 [[seed]]
@@ -342,7 +342,7 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "capability_receipt"
 path      = "fuzz/corpus/capability_receipt/binding-valid_delegated_capability.json"
-sha256    = "f9e33603de214264591ba4e1808d17692ded070a366f5cca68a81594469e3daf"
+sha256    = "442a855a224211bb26ed9de6b1f0203f19169f8cda9ae98d80120fa9a2a97070"
 source    = "hand_curated_coverage"
 
 [[seed]]

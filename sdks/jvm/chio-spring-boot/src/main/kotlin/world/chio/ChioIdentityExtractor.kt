@@ -7,6 +7,8 @@
 package world.chio
 
 import jakarta.servlet.http.HttpServletRequest
+import world.chio.sdk.AuthMethod
+import world.chio.sdk.CallerIdentity
 import world.chio.sdk.Hashing.sha256Hex
 
 /** Function type for extracting caller identity from a request. */

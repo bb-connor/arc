@@ -19,6 +19,7 @@
         "id": "cap-bindings-valid",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -59,6 +60,7 @@
         "id": "cap-bindings-expired",
         "issued_at": 1710000000,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -99,6 +101,7 @@
         "id": "cap-bindings-not-yet-valid",
         "issued_at": 1710000600,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -139,6 +142,7 @@
         "id": "cap-bindings-invalid-signature",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -187,6 +191,7 @@
         "id": "cap-bindings-broken-chain",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -226,6 +231,7 @@
         "id": "cap-bindings-direct",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -265,6 +271,7 @@
         "id": "cap-bindings-multi-tool",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -339,6 +346,7 @@
         "id": "cap-bindings-resources",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "resource_grants": [
             {
@@ -377,6 +385,7 @@
         "id": "cap-bindings-prompts",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "prompt_grants": [
             {
@@ -414,6 +423,7 @@
         "id": "cap-bindings-mixed",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -470,6 +480,7 @@
         "id": "cap-bindings-empty-constraints",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -502,6 +513,7 @@
         "id": "cap-bindings-cost-caps",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -582,6 +594,7 @@
         "id": "cap-bindings-depth4",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -658,6 +671,7 @@
         "id": "cap-bindings-depth5",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -705,6 +719,7 @@
         "id": "cap-bindings-edge-issued",
         "issued_at": 1710000400,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -744,6 +759,7 @@
         "id": "cap-bindings-edge-expires",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -784,6 +800,7 @@
         "id": "cap-bindings-complex-constraints",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -854,6 +871,7 @@
         "id": "cap-bindings-dual",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -893,6 +911,7 @@
         "id": "cap-bindings-tampered-subject",
         "issued_at": 1710000200,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {
@@ -932,6 +951,7 @@
         "id": "cap-bindings-edge-not-yet",
         "issued_at": 1710000401,
         "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "schema": "chio.capability.v1",
         "scope": {
           "grants": [
             {

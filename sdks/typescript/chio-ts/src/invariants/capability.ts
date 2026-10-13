@@ -14,8 +14,10 @@ export interface DelegationLink {
   signature: string;
 }
 
+export const CAPABILITY_SCHEMA = "chio.capability.v1";
+
 export interface CapabilityToken {
-  schema?: string;
+  schema: typeof CAPABILITY_SCHEMA;
   id: string;
   issuer: string;
   subject: string;
@@ -77,7 +79,14 @@ export function parseCapabilityJson(input: string): CapabilityToken {
   if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object") {
     throw new ChioInvariantError("json", "capability must be a JSON object");
   }
+  requireCapabilitySchema(parsed as CapabilityToken);
   return parsed as CapabilityToken;
+}
+
+function requireCapabilitySchema(capability: CapabilityToken): void {
+  if (capability.schema !== CAPABILITY_SCHEMA) {
+    throw new ChioInvariantError("json", `capability schema must be "${CAPABILITY_SCHEMA}"`);
+  }
 }
 
 function capabilityBody(capability: CapabilityToken): Omit<CapabilityToken, "signature"> {
@@ -86,7 +95,6 @@ function capabilityBody(capability: CapabilityToken): Omit<CapabilityToken, "sig
     attenuation_proof: _attenuationProof,
     budget_share_bps: _budgetShareBps,
     caveats: _caveats,
-    schema: _schema,
     scope_attenuations: _scopeAttenuations,
     signature: _signature,
     ...body
@@ -95,11 +103,9 @@ function capabilityBody(capability: CapabilityToken): Omit<CapabilityToken, "sig
 }
 
 export function capabilitySigningBody(capability: CapabilityToken): Record<string, unknown> {
+  requireCapabilitySchema(capability);
   const body = capabilityBody(capability);
-  const signingBody: Record<string, unknown> = {
-    schema: capability.schema ?? "chio.capability.v1",
-    ...body,
-  };
+  const signingBody: Record<string, unknown> = { ...body };
 
   if (!isNonEmptyArray(signingBody.delegation_chain)) {
     delete signingBody.delegation_chain;

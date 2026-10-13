@@ -8,7 +8,7 @@ import (
 )
 
 func TestCapabilityTokenUnmarshalJSON_PreservesCanonicalToken(t *testing.T) {
-	raw := `{"id":"cap-1","issuer":"issuer-1","subject":"subject-1","scope":{"grants":[{"server_id":"*","tool_name":"search","operations":["invoke"]}]},"issued_at":1713355200,"expires_at":1713358800,"signature":"sig-1"}`
+	raw := `{"schema":"chio.capability.v1","id":"cap-1","issuer":"issuer-1","subject":"subject-1","scope":{"grants":[{"server_id":"*","tool_name":"search","operations":["invoke"]}]},"issued_at":1713355200,"expires_at":1713358800,"signature":"sig-1"}`
 
 	var token CapabilityToken
 	if err := json.Unmarshal([]byte(raw), &token); err != nil {
@@ -60,6 +60,22 @@ func TestCapabilityTokenMarshalJSON_EmitsCanonicalShape(t *testing.T) {
 	}
 	if !strings.Contains(jsonText, `"issued_at":1713355200`) {
 		t.Fatalf("expected unix issued_at in %s", jsonText)
+	}
+	if !strings.Contains(jsonText, `"schema":"chio.capability.v1"`) {
+		t.Fatalf("expected capability schema in %s", jsonText)
+	}
+}
+
+func TestCapabilityTokenUnmarshalJSON_RejectsMissingOrForeignSchema(t *testing.T) {
+	for _, raw := range []string{
+		`{"id":"cap-1","issuer":"issuer-1","subject":"subject-1","scope":{},"issued_at":1,"expires_at":2,"signature":"sig-1"}`,
+		`{"schema":"chio.capability.v2","id":"cap-1","issuer":"issuer-1","subject":"subject-1","scope":{},"issued_at":1,"expires_at":2,"signature":"sig-1"}`,
+	} {
+		var token CapabilityToken
+		err := json.Unmarshal([]byte(raw), &token)
+		if err == nil || !strings.Contains(err.Error(), `schema must be "chio.capability.v1"`) {
+			t.Fatalf("expected schema refusal for %s, got %v", raw, err)
+		}
 	}
 }
 

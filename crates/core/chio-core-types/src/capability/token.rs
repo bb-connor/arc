@@ -35,13 +35,8 @@ use super::features::{self, CapabilityNegotiation};
 use super::scope::ChioScope;
 use super::validation::validate_budget_share_bps;
 
-/// Current capability-token schema. Chio is unreleased, so pre-release
-/// attenuation and delegation-binding fields are folded into this v1 shape.
+/// The capability-token schema.
 pub const CHIO_CAPABILITY_SCHEMA: &str = "chio.capability.v1";
-
-fn default_capability_schema() -> String {
-    CHIO_CAPABILITY_SCHEMA.to_string()
-}
 
 fn is_none_or_empty<T>(value: &Option<Vec<T>>) -> bool {
     value.as_ref().is_none_or(Vec::is_empty)
@@ -120,9 +115,7 @@ fn validate_cumulative_approval_projections(
 /// absent).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityToken {
-    /// Versioned signed-artifact schema. Wire schema identifier; tokens that
-    /// omit this field default to `chio.capability.v1`.
-    #[serde(default = "default_capability_schema")]
+    /// Versioned signed-artifact schema. Must equal `chio.capability.v1`.
     pub schema: String,
     /// Unique token ID (UUIDv7 recommended, used for revocation).
     pub id: String,

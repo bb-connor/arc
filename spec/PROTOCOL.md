@@ -278,14 +278,16 @@ this release.
 The shipped capability token is `CapabilityToken` from
 `crates/core/chio-core-types`.
 
-Capability tokens are schema-tagged signed artifacts. Newly issued tokens carry
-`schema: "chio.capability.v1"` in the schema-aware signing input. Load-time and
-verify-time paths reject any unknown capability schema.
+Capability tokens are schema-tagged signed artifacts. Every token carries the
+required member `schema: "chio.capability.v1"`, and the signing input includes
+it. A token without `schema` fails to decode. Load-time and verify-time paths
+reject any other capability schema.
 
 The v1 signed body is:
 
 | Field | Meaning |
 | --- | --- |
+| `schema` | Always `chio.capability.v1` |
 | `id` | Stable capability identifier used for revocation |
 | `issuer` | Algorithm-aware public key of the authority or delegating issuer |
 | `subject` | Algorithm-aware public key bound to the caller |

@@ -15,9 +15,9 @@ fn policy() -> ChioPolicy {
 }
 
 #[test]
-fn runtime_policy_v3_chio_yaml_hash_pins_complete_canonical_preimage() {
+fn runtime_policy_chio_yaml_hash_pins_complete_canonical_preimage() {
     let profile = chio_guards::default_runtime_guard_profile_identity().test_unwrap();
-    let bytes = format!("{{\"default_capabilities\":[],\"default_guard_profile\":\"{profile}\",\"format\":\"chio_yaml\",\"guards\":{GUARDS},\"kernel\":{KERNEL},\"schema\":\"chio.runtime-policy.v3\"}}").into_bytes();
+    let bytes = format!("{{\"default_capabilities\":[],\"default_guard_profile\":\"{profile}\",\"format\":\"chio_yaml\",\"guards\":{GUARDS},\"kernel\":{KERNEL},\"schema\":\"chio.runtime-policy.v1\"}}").into_bytes();
     let value: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
     assert_eq!(
         chio_core::canonical::canonical_json_bytes(&value).test_unwrap(),
@@ -25,14 +25,10 @@ fn runtime_policy_v3_chio_yaml_hash_pins_complete_canonical_preimage() {
     );
     let actual = runtime_hash_for_chio_yaml(&policy(), &[]).test_unwrap();
     assert_eq!(actual, sha256_hex(&bytes));
-    let previous = String::from_utf8(bytes)
-        .test_unwrap()
-        .replace("chio.runtime-policy.v3", "chio.runtime-policy.v2");
-    assert_ne!(actual, sha256_hex(previous.as_bytes()));
 }
 
 #[test]
-fn runtime_policy_v3_hushspec_hash_pins_approval_material_without_circular_hash() {
+fn runtime_policy_hushspec_hash_pins_approval_material_without_circular_hash() {
     let kernel = policy().kernel;
     let spec = chio_policy::HushSpec::parse("hushspec: '0.1.0'\n").test_unwrap();
     let profile = chio_guards::default_runtime_guard_profile_identity().test_unwrap();
@@ -50,7 +46,7 @@ fn runtime_policy_v3_hushspec_hash_pins_approval_material_without_circular_hash(
     .test_unwrap();
     let key_hex = key.to_hex();
     let eligible_digest = &approval.eligible_set_digest;
-    let bytes = format!("{{\"auxiliary_assets\":[],\"default_capabilities\":[],\"default_guard_profile\":\"{profile}\",\"format\":\"hushspec\",\"issuance_policy\":null,\"kernel\":{KERNEL},\"resolved_policy\":{{\"hushspec\":\"0.1.0\"}},\"runtime_assurance_policy\":null,\"schema\":\"chio.runtime-policy.v3\",\"threshold_approval\":{{\"directory_version\":\"directory-7\",\"eligible_approvers\":[{{\"identifier\":\"operator-a\",\"public_key\":\"{key_hex}\"}}],\"eligible_set_digest\":\"{eligible_digest}\",\"threshold\":1,\"timeout_seconds\":60}}}}").into_bytes();
+    let bytes = format!("{{\"auxiliary_assets\":[],\"default_capabilities\":[],\"default_guard_profile\":\"{profile}\",\"format\":\"hushspec\",\"issuance_policy\":null,\"kernel\":{KERNEL},\"resolved_policy\":{{\"hushspec\":\"0.1.0\"}},\"runtime_assurance_policy\":null,\"schema\":\"chio.runtime-policy.v1\",\"threshold_approval\":{{\"directory_version\":\"directory-7\",\"eligible_approvers\":[{{\"identifier\":\"operator-a\",\"public_key\":\"{key_hex}\"}}],\"eligible_set_digest\":\"{eligible_digest}\",\"threshold\":1,\"timeout_seconds\":60}}}}").into_bytes();
     let value: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
     assert_eq!(
         chio_core::canonical::canonical_json_bytes(&value).test_unwrap(),

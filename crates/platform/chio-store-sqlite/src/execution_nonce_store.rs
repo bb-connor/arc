@@ -218,7 +218,9 @@ impl SqliteExecutionNonceStore {
             fs::create_dir_all(&parent)?;
         }
         let manager = SqliteConnectionManager::file(path).with_init(configure_pooled_connection);
-        let pool = Pool::builder().max_size(8).build(manager)?;
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(8)
+            .build(manager)?;
         let store = Self {
             pool,
             capacity,
@@ -248,7 +250,9 @@ impl SqliteExecutionNonceStore {
         let clock = StableReplayClock::new(clock, MAX_EXECUTION_NONCE_CLOCK_SKEW_I64)?;
         Self::validate_capacity(capacity)?;
         let manager = SqliteConnectionManager::memory().with_init(configure_pooled_connection);
-        let pool = Pool::builder().max_size(1).build(manager)?;
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(1)
+            .build(manager)?;
         let store = Self {
             pool,
             capacity,
@@ -1265,7 +1269,10 @@ mod tests {
         let jumped = base.saturating_add(1_000);
         let manager = SqliteConnectionManager::file(&path).with_init(configure_pooled_connection);
         let advanced = SqliteExecutionNonceStore {
-            pool: Pool::builder().max_size(1).build(manager).unwrap(),
+            pool: crate::pool::sqlite_pool_builder()
+                .max_size(1)
+                .build(manager)
+                .unwrap(),
             capacity: DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
             clock: StableReplayClock::new(
                 Arc::new(chio_security_types::clock::FixedClock::new(jumped as u64)),
