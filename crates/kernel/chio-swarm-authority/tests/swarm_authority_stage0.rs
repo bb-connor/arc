@@ -35,6 +35,9 @@ mod live_admission;
 #[path = "swarm_authority_stage0/graph_bounds.rs"]
 mod graph_bounds;
 
+#[path = "swarm_authority_stage0/evolution.rs"]
+mod evolution;
+
 #[test]
 fn swarm_authority_stage0_verifies_valid_bundle() -> Result<(), Box<dyn Error>> {
     let bundle = sample_swarm_bundle()?;

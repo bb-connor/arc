@@ -40,7 +40,7 @@ separate operation.
 serialization. `manifest_sha256` hashes those bytes. Artifact digest strings
 are required fields; this contract has no artifact-file reader.
 
-`MercuryProofPackage::build` emits `chio.mercury.proof_package.v2`.
+`MercuryProofPackage::build` emits `chio.mercury.proof_package.v1`.
 `validate` also accepts legacy v1 identities and checks receipt summaries,
 workflow and action bindings, manifests, derived coverage, and package identity.
 Tool receipts must be mediated allow decisions with mediated trust targeting

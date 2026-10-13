@@ -480,27 +480,31 @@ async fn wait(
     timeout: Duration,
     resident_ceiling: Option<u64>,
 ) -> io::Result<Outcome> {
-    wait_bounded(spawned, input, timeout, resident_ceiling, None).await
+    wait_bounded(spawned, input, None, timeout, resident_ceiling, None).await
 }
 
 pub(super) async fn wait_bounded(
     spawned: Spawned,
     input: Vec<u8>,
+    release: Option<tokio::sync::oneshot::Receiver<()>>,
     timeout: Duration,
     resident_ceiling: Option<u64>,
     output_ceiling: Option<usize>,
 ) -> io::Result<Outcome> {
     let (mut outcome, diagnostics) =
-        observe(spawned, input, timeout, resident_ceiling, output_ceiling).await?;
+        observe(spawned, input, release, timeout, resident_ceiling, output_ceiling).await?;
     diagnostics.finish(&mut outcome).await?;
     Ok(outcome)
 }
 
 /// No diagnostic await follows observation of the execution status. The caller
 /// owns this outcome before it decides whether to collect or cancel diagnostics.
+/// With `release`, the bootstrap is written only after it fires; dropping its
+/// sender withholds the bootstrap and stops the child.
 pub(super) async fn observe(
     spawned: Spawned,
     input: Vec<u8>,
+    release: Option<tokio::sync::oneshot::Receiver<()>>,
     timeout: Duration,
     resident_ceiling: Option<u64>,
     output_ceiling: Option<usize>,
@@ -546,7 +550,14 @@ pub(super) async fn observe(
             .take()
             .ok_or_else(|| io::Error::other("missing stdin"))?,
     )?;
-    let bootstrap = async move { stdin.write_all(&input).await };
+    let bootstrap = async move {
+        if let Some(release) = release {
+            release
+                .await
+                .map_err(|_| io::Error::other("worker bootstrap withheld"))?;
+        }
+        stdin.write_all(&input).await
+    };
     tokio::pin!(bootstrap);
     let mut bootstrapped = false;
     let mut samples = tokio::time::interval(RESIDENT_SAMPLE_INTERVAL);

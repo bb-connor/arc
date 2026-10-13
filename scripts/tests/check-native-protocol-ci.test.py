@@ -27,6 +27,7 @@ LIVE = (
     yaml.safe_load((ROOT / ".github/workflows/postgres-job-swarm.yml").read_text()),
     yaml.safe_load((ROOT / ".github/workflows/sdk-parity.yml").read_text()),
     yaml.safe_load((ROOT / ".github/workflows/enterprise-hardening.yml").read_text()),
+    yaml.safe_load((ROOT / ".github/workflows/release-qualification.yml").read_text()),
 )
 CONSUMERS = (
     (0, "build-lint", "Protocol peer-negotiation gate"),
@@ -38,6 +39,7 @@ CONSUMERS = (
     (5, "sdk-parity", "Run SDK parity"),
     (6, "portable-contracts", "Native security conformance"),
     (6, "active-defense-security", "Durable consumer boundaries"),
+    (7, "qualify", "SDK parity contract lane"),
 )
 
 
@@ -149,6 +151,7 @@ class NativeProtocolCiTests(unittest.TestCase):
             (4, "native", "Build the real gateway and kernel"),
             (5, "sdk-parity", "Run SDK parity"),
             (6, "portable-contracts", "Native security conformance"),
+            (7, "qualify", "SDK parity contract lane"),
         ):
             with self.subTest(job=job_id):
                 changed = copy.deepcopy(LIVE)

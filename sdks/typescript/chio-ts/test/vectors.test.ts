@@ -8,7 +8,7 @@ import {
   ChioInvariantError,
   canonicalizeJson,
   canonicalizeJsonString,
-  capabilityBodyCanonicalJson,
+  capabilitySigningBodyCanonicalJson,
   parseCapabilityJson,
   parseReceiptJson,
   parseSignedManifestJson,
@@ -248,7 +248,7 @@ test("capability vectors match the TS capability helpers", async () => {
       id: string;
       verify_at: number;
       capability: unknown;
-      capability_body_canonical_json: string;
+      capability_signing_body_canonical_json: string;
       expected: unknown;
       max_delegation_depth?: number;
       expected_with_max_delegation_depth?: unknown;
@@ -258,8 +258,8 @@ test("capability vectors match the TS capability helpers", async () => {
   for (const vectorCase of fixture.cases) {
     const capability = parseCapabilityJson(JSON.stringify(vectorCase.capability));
     assert.equal(
-      capabilityBodyCanonicalJson(capability),
-      vectorCase.capability_body_canonical_json,
+      capabilitySigningBodyCanonicalJson(capability),
+      vectorCase.capability_signing_body_canonical_json,
       vectorCase.id,
     );
     assert.deepEqual(

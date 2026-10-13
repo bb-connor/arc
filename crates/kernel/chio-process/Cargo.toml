@@ -14,6 +14,7 @@ worker-server = ["dep:tokio", "dep:rand", "dep:hex", "dep:base64"]
 mailboxes = ["dep:async-trait", "dep:chio-manifest", "dep:tokio"]
 
 [dependencies]
+chio-cage-plan = { workspace = true }
 chio-core-types = { workspace = true }
 chio-kernel = { workspace = true }
 chio-security-types = { workspace = true }

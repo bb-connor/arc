@@ -119,7 +119,7 @@ EXPECTED_CARGO_MUTANTS_LOCK_SHA256 = (
     "0810d8fe5d67224340e560656f51619cf8f78925a4bfeedd2e5f22d199ac92a4"
 )
 EXPECTED_SECURITY_ENTRYPOINT_SHA256 = (
-    "8926c71c4387410f7513dd7093cec021ddc4c04fc0be855e96a203836b679ead"
+    "12534a5adc990e2517a0a7dfcb60f9b055b131cd292231411b40836c2b8fd303"
 )
 EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
     "93e552d424ec2c27d74ca3cbba0d269b5bb708d5035d6273d8409c4387b43a49"
@@ -132,10 +132,10 @@ EXPECTED_SECURITY_RUNNER_SHA256 = (
 )
 EXPECTED_SECURITY_AGGREGATOR_SHA256 = "7d752cd35b704dd2212fb317a8ec1a70df929df8e374bb9305b5e17313f1cc93"
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
-    "c6552d29a356e634f2856669ce29d753da5aad986ed76ffae18b2022a31187fd"
+    "763cb2065cb50d4a083f38bb6b86645ff28a6e323c31aed8daf77276eb7dc5b0"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_FUNCTION_GRAPH_SHA256 = (
-    "8266d915f0b54c1eafcdc9db2f31f65be217ed9de87e142c0d9df770570ccf4e"
+    "f415e7c9d5aa6f5f65011173ba4681fcb4464951d9b114e43ad27d6614cf23ac"
 )
 EXPECTED_TEMPORAL_GATE_SHA256 = (
     "f46d39d0265ed435c555fcdf5925a560f1ae1483a6bf4a69917553b7af08a101"
@@ -3691,7 +3691,7 @@ def validate_security_entrypoint(root: Path, source: str) -> None:
         or literal_top_level_assignment(tree, "VERIFIER_UID") != 65533
         or literal_top_level_assignment(tree, "VERIFIER_GID") != 65533
         or literal_top_level_assignment(tree, "TRUSTED_STATE_DIRECTORY_PREFIX")
-        != ".chio-security-adversarial-evidence.state.v2."
+        != ".chio-security-adversarial-evidence.state.v1."
         or literal_top_level_assignment(tree, "REFRESH_CONTRACT_SPINES")
         != (
             "audits",
@@ -5103,8 +5103,6 @@ def validate_security_adversarial_checker_boundary(source: str) -> None:
     if not expression_matches(assignment_node(artifact_function, "authority"), expected_authority):
         raise ContractError("verifier artifact authority chain changed")
     for required in (
-        "legacy = environment.get('CHIO_SECURITY_CANDIDATE_ARTIFACTS')",
-        "raise EvidenceError('candidate artifact authority is forbidden')",
         "relative.parts[1:] != ('verifier', 'artifacts')",
         "snapshots = {path: path.lstat() for path, _uid, _gid, _mode in authority}",
         "repeated = {path: path.lstat() for path, _uid, _gid, _mode in authority}",
@@ -5137,7 +5135,7 @@ def validate_security_adversarial_checker_boundary(source: str) -> None:
     )
     if (
         promotion_guard not in main_source
-        or "legacy --promote-outcome is forbidden in the enterprise boundary"
+        or "--promote-outcome is forbidden in the enterprise boundary"
         not in main_source
         or not (
             main_source.index(promotion_guard)
@@ -5145,7 +5143,7 @@ def validate_security_adversarial_checker_boundary(source: str) -> None:
             < main_source.index(load_binding)
         )
     ):
-        raise ContractError("enterprise legacy outcome promotion boundary changed")
+        raise ContractError("enterprise outcome promotion boundary changed")
     if (
         "refresh_campaign = args.refresh_outcome" not in main_source
         or refresh_listing not in main_source

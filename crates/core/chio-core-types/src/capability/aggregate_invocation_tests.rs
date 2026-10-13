@@ -751,7 +751,7 @@ fn aggregate_invocation_rejects_untrusted_leaf_and_final_subject_mismatch() -> T
 }
 
 #[test]
-fn aggregate_invocation_present_field_disables_legacy_body_fallback() -> TestResult {
+fn aggregate_invocation_plain_body_signature_is_refused() -> TestResult {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let mut body = token_body(

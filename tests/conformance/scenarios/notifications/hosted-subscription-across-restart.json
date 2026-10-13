@@ -1,0 +1,18 @@
+{
+  "id": "hosted-subscription-across-restart",
+  "title": "A hosted resource subscription keeps delivering updates after the server restarts",
+  "area": "notifications",
+  "category": "mcp-core",
+  "specVersions": ["2025-11-25"],
+  "transport": ["streamable-http"],
+  "peerRoles": ["client_to_chio_server"],
+  "deploymentModes": ["remote_http"],
+  "requiredCapabilities": {
+    "server": ["resources", "tools"],
+    "client": []
+  },
+  "tags": ["notifications", "restart"],
+  "expected": "pass",
+  "timeoutMs": 30000,
+  "notes": "Driven by the runner, which crashes and restarts chio mcp serve-http; language peers report it unsupported."
+}

@@ -366,7 +366,7 @@ This is #1174's bug-fix lane, promoted to a preview gate. It runs on post-#1160 
 - **KERN-3a: capability and process closure (gates G3).**
   - KDEF-D6 and KDEF-D5.
   - KSPEC-04 phases 1 and 2: subtree closure with the dispatch-commit fence, then ProcessTree closure.
-  - A new spec for process exit as an authority transition. `ProcessState` has no exit state today.
+  - [Process exit as an authority transition](../superpowers/specs/2026-10-13-process-exit-design.md) defines the proposed contract; implementation remains pending.
   - **Exit:** a suspension after admission denies at dispatch (KDEF-D6), a frozen lineage cannot mint delegates (KDEF-D5), closing one process subtree leaves its parent and siblings untouched, and an exited process can no longer be invoked. This exit is independently qualifiable and does not wait for WORK-W1 or KERN-3b.
 - **KERN-3b: graph and delegation closure (gates COMP-3 and G4).**
   - KSPEC-04 phase 3: graph tombstones at continuation consumption and extension, WORK-D1 DelegationRoot fences at subdivision/selection/sealing, and stranded-capacity accounting. Land after WORK-W1's qualified issuer, against its serving store in its canonical issuance transactions; retain closure generations and records in its migration/recovery inventory. This work belongs to the KERNEL and WORK owners, not a new Computer closure store.
@@ -375,6 +375,8 @@ This is #1174's bug-fix lane, promoted to a preview gate. It runs on post-#1160 
 - **KERN-4: the session door.** KSPEC-05 Part A (KDEF-D3, D4, N26), because doors serve over `chio mcp serve-http`.
   - KDEF-N30 is fixed on main by #1160 (`28d826e3e`): the GET stream subscribes before it snapshots the replay window.
   - KDEF-D3 changed shape on main: a lagged consumer, POST or initialize, now closes the session and reports an uncertain effect instead of hanging. What remains is the per-session POST lock: an SSE stream holds it until a terminal response, so an upstream that never answers still blocks later POSTs, with no request timeout. Part A re-checks D3 against that behaviour.
+  - Done on main: the POST-lock wedge is bounded by a per-request response deadline (#1238). KDEF-D4 restored sessions seed event ids above every earlier incarnation (#1246); A22 low-bit exhaustion is deferred. KDEF-N26 standard subscriptions persist in a signed resume record, are re-authorized at restore and stay authority-checked after activation (#1251, #1253, #1255, #1266, #1274).
+  - Open in Part A: the per-request response slots and session-side `finish_call` (A1-A4, section 4.2), the lag resync (A7-A11) and the retry rule (section 4.6).
   - **Exit:** Part A's acceptance cases pass on `chio mcp serve-http`: responses route without loss on live streams and eligible retries replay by request identity without redispatching the effect (with KSPEC-05 section 4.6's disconnect exceptions), a lagged consumer never hangs, a stale cursor after a restore is refused, and subscriptions survive restarts.
 - **KERN-5: isolation evidence.** KSPEC-07 steps 1 and 2, plus `AgentHostBwrap` and `Seatbelt` backend kinds, before any HOST-M2 isolation claim.
   - First amend KSPEC-07 to add those kinds. Its closed `ConfinementBackendKind` (`LinuxCage`, `FirecrackerGuest`, `ProcessContainer`) exists only in the spec text, not in code, and #1177's PROGRAM-MAP already asks for this one amendment.

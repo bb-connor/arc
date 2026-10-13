@@ -23,8 +23,8 @@ mod clock_custody;
 mod dpop_replay;
 #[path = "tests/protocol_refusal.rs"]
 mod protocol_refusal;
-#[path = "tests/resume_envelope.rs"]
-mod resume_envelope;
+#[path = "tests/resume_record.rs"]
+mod resume_record;
 #[path = "tests/session_recovery.rs"]
 mod session_recovery;
 #[path = "tests/session_runtime.rs"]
@@ -1032,15 +1032,9 @@ fn terminal_transition_deletes_active_state_and_retains_replay_fence() {
         terminal_at: 13,
         terminal_reason: None,
     };
-    let (tombstone, fence) = sign_terminal_session_records(
-        &keyring,
-        terminal_record,
-        TerminalReason::Deleted,
-        RemoteSessionEnvelope::V2,
-        2,
-        2,
-    )
-    .expect("sign terminal transition");
+    let (tombstone, fence) =
+        sign_terminal_session_records(&keyring, terminal_record, TerminalReason::Deleted, 2, 2)
+            .expect("sign terminal transition");
     persist_terminal_session_transition(&path, &tombstone, &fence, &keyring, session_now_millis())
         .expect("persist terminal transition");
 
@@ -1112,7 +1106,6 @@ fn restored_ready_session_preserves_lifecycle_and_requires_store_lease() {
         reaper_interval_millis: 100,
         tombstone_retention_millis: 10_000,
         request_response_timeout_millis: 10_000,
-        resume_envelope_floor: RemoteSessionEnvelope::V3,
     };
     let session = RemoteSession::new(RemoteSessionInit {
         clock: RemoteClock::new(Arc::new(

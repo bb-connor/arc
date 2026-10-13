@@ -464,14 +464,6 @@ impl DurableToolAdmission {
     }
 }
 
-#[derive(Serialize)]
-struct ImmutableActiveResponseAdmissionRequest<'a> {
-    schema: &'static str,
-    governed_intent: &'a chio_core::capability::governance::GovernedTransactionIntent,
-    federated_origin_kernel_id: &'a Option<String>,
-    governed_intent_hash: &'a str,
-}
-
 struct DurablePostReturnPlan {
     hook_identities: Vec<crate::post_invocation::PostInvocationHookIdentity>,
     frozen_steps: Vec<FrozenEvaluationStepV1>,
@@ -1120,109 +1112,6 @@ impl ChioKernel {
             hook.native_authority_binding()
         }))
         .map_err(|_| KernelError::DurableAdmission("native authority selection panicked".into()))?
-    }
-
-    pub(crate) fn begin_durable_active_response_admission(
-        &self,
-        request: &crate::governed_active_response::GovernedActiveResponseRequest,
-        governed_intent_hash: &str,
-        trusted_now_unix_ms: u64,
-    ) -> Result<(DurableToolAdmission, bool), KernelError> {
-        let runtime = self.durable_runtime()?;
-        if !runtime
-            .store
-            .admission_projection_capabilities()
-            .operation_terminal
-        {
-            return Err(KernelError::DurableAdmission(
-                "active-response admission store lacks atomic terminal projection support"
-                    .to_owned(),
-            ));
-        }
-        let immutable_request_hash = admission_digest(
-            "immutable_request_hash",
-            &ImmutableActiveResponseAdmissionRequest {
-                schema: "chio.governed-active-response-admission.v1",
-                governed_intent: &request.governed_intent,
-                federated_origin_kernel_id: &request.federated_origin_kernel_id,
-                governed_intent_hash,
-            },
-        )?;
-        let authorization_capability_hash = admission_digest(
-            "authorization_capability_hash",
-            &request.operator_capability,
-        )?;
-        let policy_hash = AdmissionDigest::try_new("policy_hash", self.config.policy_hash.clone())
-            .map_err(|_| {
-                KernelError::DurableAdmission(
-                    "durable admission requires a canonical SHA-256 policy hash".to_owned(),
-                )
-            })?;
-        let requirements = AdmissionParticipantRequirements {
-            approval: true,
-            ..AdmissionParticipantRequirements::NONE
-        };
-        let namespace = self.authenticated_receipt_namespace(&request.request_id)?;
-        let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
-            kind: AdmissionOperationKind::GovernedActiveResponse,
-            namespace,
-            request_id: AdmissionIdentifier::try_new("request_id", request.request_id.clone())?,
-            capability_id: AdmissionIdentifier::try_new(
-                "capability_id",
-                request.operator_capability.id.clone(),
-            )?,
-            authorization_capability_hash,
-            request_binding: AdmissionRequestBindingV1::new(immutable_request_hash, requirements)?,
-            policy_hash,
-            effect_class: SideEffectClass::SideEffecting,
-        })?;
-        let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
-        let (operation, created_by_this_attempt) = match runtime
-            .store
-            .begin(&prepared, &runtime.fence, trusted_now_unix_ms)
-            .map_err(durable_store_error)?
-        {
-            AdmissionBeginResult::Created(operation) => (operation, true),
-            AdmissionBeginResult::ExactReplay { operation, .. }
-                if matches!(
-                    operation.state(),
-                    AdmissionOperationState::Prepared
-                        | AdmissionOperationState::ApprovalReserved
-                        | AdmissionOperationState::ReadyToDispatch
-                        | AdmissionOperationState::DispatchCommitted
-                ) =>
-            {
-                (operation, false)
-            }
-            AdmissionBeginResult::ExactReplay { operation, .. } => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "active-response request replay is retained in state {:?}",
-                    operation.state()
-                )));
-            }
-            AdmissionBeginResult::Conflict {
-                existing_operation_id,
-            } => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "active-response request id conflicts with retained operation {}",
-                    existing_operation_id.as_str()
-                )));
-            }
-        };
-        Ok((
-            DurableToolAdmission {
-                _live_owner: None,
-                operation,
-                aggregate_quota: None,
-                supplemental_quota: None,
-                retained_request: None,
-                issued_nonce: None,
-                nonce_preflight: None,
-            },
-            created_by_this_attempt,
-        ))
     }
 
     fn durable_post_return_plan(&self) -> Result<DurablePostReturnPlan, KernelError> {

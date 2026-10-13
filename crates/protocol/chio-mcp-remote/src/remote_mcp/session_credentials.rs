@@ -55,8 +55,7 @@ pub(super) struct CredentialCall {
     response: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     delivery_ack: Option<DeliveryAcknowledgement>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    reservation_id: Option<String>,
+    reservation_id: String,
 }
 
 pub(super) enum CallReservation {
@@ -746,7 +745,7 @@ fn reserve_at(
         state: "pending".to_owned(),
         response: None,
         delivery_ack: None,
-        reservation_id: Some(URL_SAFE_NO_PAD.encode(Keypair::generate().seed_bytes())),
+        reservation_id: URL_SAFE_NO_PAD.encode(Keypair::generate().seed_bytes()),
     };
     write_call(&tx, keypair, &call)?;
     tx.commit().map_err(storage_error)?;

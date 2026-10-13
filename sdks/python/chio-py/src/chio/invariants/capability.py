@@ -31,10 +31,6 @@ def _delegation_link_body(link: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in link.items() if key != "signature"}
 
 
-def capability_body_canonical_json(capability: dict[str, Any]) -> str:
-    return canonicalize_json(_capability_body(capability))
-
-
 def _non_empty_list(value: Any) -> bool:
     return isinstance(value, list) and len(value) > 0
 

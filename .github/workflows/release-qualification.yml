@@ -2,12 +2,6 @@ name: Release Qualification
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-
-concurrency:
-  group: release-qualification-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -219,8 +213,14 @@ jobs:
         with:
           packages: libssl-dev zlib1g-dev uuid-dev
 
+      - name: Qualify enforcing host and prepare native consumer fixture
+        uses: ./.github/actions/enforced-native-fixture
+
       - name: SDK parity contract lane
+        env:
+          TMPDIR: ${{ runner.temp }}
         run: |
+          cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement
           CMAKE_PREFIX_PATH="$(./scripts/setup-drogon-test-deps.sh)"
           export CMAKE_PREFIX_PATH
           ./scripts/check-sdk-parity.sh

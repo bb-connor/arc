@@ -753,3 +753,142 @@ fn attachment_loss_stays_terminal_and_names_fixed_client_reason(
     }
     Ok(())
 }
+
+fn launch_records(
+    state: &std::path::Path,
+) -> Result<Vec<chio_process::ContainerLaunchRecord>, Box<dyn std::error::Error>> {
+    let host = super::super::super::state::Host::open(state, true)?;
+    let signer = host.authority.kernel_keypair().public_key();
+    let db = rusqlite::Connection::open(state.join("runner.db"))?;
+    let mut statement = db.prepare(
+        "SELECT record FROM run_container_launches WHERE process='root' ORDER BY attempt",
+    )?;
+    let mut records = Vec::new();
+    for row in statement.query_map([], |row| row.get::<_, String>(0))? {
+        let signed: chio_process::SignedContainerLaunchRecord = serde_json::from_str(&row?)?;
+        records.push(signed.verify(&signer)?.clone());
+    }
+    Ok(records)
+}
+
+#[test]
+fn confirmed_launch_is_signed_before_the_bootstrap_is_released(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let engine = EngineDouble::new(serde_json::json!({}))?;
+    let (state, plan) = engine.host()?;
+    super::super::run(&state, &plan)?;
+    assert!(engine.root.path().join("bootstrapped").exists());
+    let records = launch_records(&state)?;
+    assert_eq!(records.len(), 1);
+    let record = &records[0];
+    assert_eq!(record.state, CageEnforcementState::FullyEnforced);
+    assert_eq!(
+        (record.process_id.as_str(), record.attempt),
+        ("root", 1)
+    );
+    assert_eq!(record.container_id, "a".repeat(64));
+    assert_eq!(record.image_id, format!("sha256:{}", "1".repeat(64)));
+    assert_eq!(record.engine_identity, "test-engine");
+    assert_eq!(record.started_at.as_deref(), Some("2026-01-01T00:00:00Z"));
+    assert_eq!(
+        record.inspected_config_digest.as_deref(),
+        Some(record.profile_digest.as_str())
+    );
+    Ok(())
+}
+
+#[test]
+fn any_profile_deviation_is_rejected_before_start() -> Result<(), Box<dyn std::error::Error>> {
+    for drift in [
+        serde_json::json!({"CapDrop": []}),
+        serde_json::json!({"CapAdd": ["NET_ADMIN"]}),
+        serde_json::json!({"SecurityOpt": ["no-new-privileges:true", "seccomp=unconfined"]}),
+        serde_json::json!({"Privileged": true}),
+        serde_json::json!({"NetworkMode": "bridge"}),
+        serde_json::json!({"ReadonlyRootfs": false}),
+        serde_json::json!({"Binds": ["/:/host"]}),
+        serde_json::json!({"Mounts": []}),
+        serde_json::json!({"Tmpfs": {"/tmp": "rw,size=16m"}}),
+        serde_json::json!({"Memory": 0}),
+        serde_json::json!({"PidsLimit": null}),
+        serde_json::json!({"UsernsMode": "host"}),
+        serde_json::json!({"Ulimits": []}),
+        serde_json::json!({"Init": false}),
+    ] {
+        let engine = EngineDouble::new(serde_json::json!({"config_drift": drift}))?;
+        let (state, plan) = engine.host()?;
+        let failure = super::super::run(&state, &plan)
+            .err()
+            .ok_or("a deviating container must fail the run")?;
+        assert!(
+            failure
+                .to_string()
+                .contains("differs from the fixed worker profile"),
+            "{drift}: {failure}"
+        );
+        assert!(!engine.root.path().join("starts").exists(), "{drift}");
+        let records = launch_records(&state)?;
+        assert_eq!(records.len(), 1, "{drift}");
+        let record = &records[0];
+        assert_eq!(record.state, CageEnforcementState::Rejected, "{drift}");
+        assert_eq!(
+            record.failure_class,
+            Some(chio_process::ContainerLaunchFailure::ProfileMismatch),
+            "{drift}"
+        );
+        assert_ne!(
+            record.inspected_config_digest.as_deref(),
+            Some(record.profile_digest.as_str()),
+            "{drift}"
+        );
+        let db = rusqlite::Connection::open(state.join("runner.db"))?;
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM run_containers", [], |row| row
+                .get::<_, i64>(0))?,
+            0,
+            "{drift}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn unconfirmed_start_withholds_the_bootstrap() -> Result<(), Box<dyn std::error::Error>> {
+    for scenario in [
+        serde_json::json!({"exit_before_bootstrap": true}),
+        serde_json::json!({"config_drift_after_start": {"NetworkMode": "host"}}),
+    ] {
+        let engine = EngineDouble::new(scenario.clone())?;
+        let (state, plan) = engine.host()?;
+        assert!(super::super::run(&state, &plan).is_err(), "{scenario}");
+        assert_eq!(
+            std::fs::read_to_string(engine.root.path().join("starts"))?,
+            "1",
+            "{scenario}"
+        );
+        assert!(
+            !engine.root.path().join("bootstrapped").exists(),
+            "{scenario}"
+        );
+        let records = launch_records(&state)?;
+        assert_eq!(records.len(), 1, "{scenario}");
+        assert_eq!(
+            records[0].state,
+            CageEnforcementState::BootstrapFailed,
+            "{scenario}"
+        );
+        assert_eq!(
+            records[0].failure_class,
+            Some(chio_process::ContainerLaunchFailure::StartUnconfirmed),
+            "{scenario}"
+        );
+        let db = rusqlite::Connection::open(state.join("runner.db"))?;
+        assert_eq!(
+            db.query_row("SELECT COUNT(*) FROM run_containers", [], |row| row
+                .get::<_, i64>(0))?,
+            0,
+            "{scenario}"
+        );
+    }
+    Ok(())
+}

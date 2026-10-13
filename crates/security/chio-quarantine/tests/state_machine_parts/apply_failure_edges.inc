@@ -2,6 +2,19 @@
 fn authoritative_apply_failure_without_applied_effect_can_terminally_fail() {
     let (machine, planned) = machine_with_plan(1);
     let applying = enter_applying(&machine, &planned, 110);
+    let work = ScheduledWork {
+        tenant_id: applying.tenant_id.clone(),
+        action_id: applying.action_id.clone(),
+        lease_owner_id: LeaseOwnerId::new("worker-1")
+            .unwrap_or_else(|failure| panic!("invalid lease owner: {failure}")),
+        lease_expires_at_unix_ms: 500,
+        fencing_token: 1,
+    };
+    let store = Arc::new(TestResponseStore::with_work(Some(work.clone())));
+    store
+        .create(&applying)
+        .unwrap_or_else(|failure| panic!("applying record persistence failed: {failure}"));
+    let machine = ResponseStateMachine::new(store);
     let failed_effect_id = effect_id(&applying, 0);
     let requested = machine
         .record_effect(
@@ -17,8 +30,9 @@ fn authoritative_apply_failure_without_applied_effect_can_terminally_fail() {
     let failure_code = error("response.effect_rejected");
     let failed_transition_id = record("effect-rejected-transition");
     let rejected = machine
-        .record_effect_with_receipt(
+        .record_effect_with_receipt_scheduled(
             &requested,
+            &work,
             &EffectMutationRequest {
                 expected_generation: requested.generation,
                 effect_id: failed_effect_id.clone(),
@@ -29,7 +43,7 @@ fn authoritative_apply_failure_without_applied_effect_can_terminally_fail() {
             },
             &EffectReceiptContext {
                 effect_generation: 2,
-                scheduler_lease_owner_id: None,
+                scheduler_lease_owner_id: Some(work.lease_owner_id.clone()),
                 scheduler_fencing_token: 1,
                 effect_transition_id: Some(failed_transition_id.clone()),
                 prior_receipt_id: None,
@@ -37,8 +51,9 @@ fn authoritative_apply_failure_without_applied_effect_can_terminally_fail() {
         )
         .unwrap_or_else(|failure| panic!("effect failure persistence failed: {failure}"));
     assert!(matches!(
-        machine.transition(
+        machine.transition_scheduled(
             &rejected,
+            &work,
             &transition(rejected.generation, ResponseState::Failed, 122),
         ),
         Err(StateMachineError::InvalidFailureRecord)
@@ -51,7 +66,7 @@ fn authoritative_apply_failure_without_applied_effect_can_terminally_fail() {
         error_code: Some(failure_code.clone()),
     };
     let failed = machine
-        .transition(&rejected, &terminal_failure)
+        .transition_scheduled(&rejected, &work, &terminal_failure)
         .unwrap_or_else(|failure| panic!("terminal failure transition failed: {failure}"));
     let snapshot = decode_response_record(&failed)
         .unwrap_or_else(|failure| panic!("terminal failure decode failed: {failure}"));

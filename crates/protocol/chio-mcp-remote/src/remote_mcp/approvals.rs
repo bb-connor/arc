@@ -16,7 +16,7 @@ mod validation;
 use records::load_record;
 pub(super) use redemption::{validate_redemption, ApprovalRedemption};
 
-const RECORD_SCHEMA: &str = "chio.mcp.operator-approval.v2";
+const RECORD_SCHEMA: &str = "chio.mcp.operator-approval.v1";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]

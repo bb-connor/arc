@@ -22,7 +22,7 @@ pub mod signing;
 
 pub use canonical::canonicalize_json_str;
 pub use capability::{
-    capability_body_canonical_json, parse_capability_json, verify_capability,
+    capability_signing_body_canonical_json, parse_capability_json, verify_capability,
     verify_capability_json, CapabilityTimeStatus, CapabilityVerification,
 };
 pub use error::{Error, ErrorCode, Result};

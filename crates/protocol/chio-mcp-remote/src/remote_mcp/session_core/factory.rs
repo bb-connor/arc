@@ -733,7 +733,6 @@ impl RemoteSessionFactory {
             resume_generation: record.resume_generation,
             upstream_transport: upstream_notification_source,
         })?);
-        session.resume_envelope.raise(record.resume_integrity.envelope);
         if !subscriptions_restored {
             return Ok(Some(RestoredSession::SubscriptionNotRestored(session)));
         }

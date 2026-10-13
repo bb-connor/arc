@@ -217,8 +217,9 @@ impl SqliteReceiptStore {
 ///
 /// Settlement attempts are likewise live work. Every row in `settle_attempts`
 /// is pending or retryable, so its receipt remains in the live store until the
-/// attempt is resolved and removed. Legacy stores may not have that projection;
-/// they retain the pre-settlement retention behavior.
+/// attempt is resolved and removed. A store without the `settle_attempts`
+/// projection cannot prove that no settlement work is pending, so rotation is
+/// refused.
 fn compute_archival_watermark(
     connection: &rusqlite::Connection,
     cutoff_unix_secs: u64,
@@ -235,19 +236,14 @@ fn compute_archival_watermark(
         [],
         |row| row.get(0),
     )?;
-    let active_settlement_guard = if settlement_attempts_installed {
-        r#"
-        AND NOT EXISTS (
-            SELECT 1 FROM settle_attempts sa
-            JOIN claim_receipt_log_entries e ON e.receipt_id = sa.receipt_id
-            WHERE e.entry_seq <= kc.batch_end_seq
-        )
-        "#
-    } else {
-        ""
-    };
-    let query = format!(
-        r#"
+    if !settlement_attempts_installed {
+        return Err(ReceiptStoreError::Conflict(
+            "receipt store has no settle_attempts projection; refusing to rotate receipts whose \
+             settlement work cannot be proven resolved"
+                .to_owned(),
+        ));
+    }
+    let query = r#"
         SELECT COALESCE(MAX(kc.batch_end_seq), 0)
         FROM kernel_checkpoints kc
         WHERE kc.batch_end_seq <= ?2 AND NOT EXISTS (
@@ -281,11 +277,13 @@ fn compute_archival_watermark(
             WHERE e.entry_seq <= kc.batch_end_seq
               AND mbr.reconciliation_state IN ('open', 'retry_scheduled')
         )
-        {active_settlement_guard}
-        "#
-    );
-    let watermark: i64 =
-        connection.query_row(&query, params![cutoff, ceiling], |row| row.get(0))?;
+        AND NOT EXISTS (
+            SELECT 1 FROM settle_attempts sa
+            JOIN claim_receipt_log_entries e ON e.receipt_id = sa.receipt_id
+            WHERE e.entry_seq <= kc.batch_end_seq
+        )
+        "#;
+    let watermark: i64 = connection.query_row(query, params![cutoff, ceiling], |row| row.get(0))?;
     sqlite_u64(watermark, "retention watermark")
 }
 

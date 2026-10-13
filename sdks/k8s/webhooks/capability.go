@@ -222,9 +222,13 @@ func parseCapabilityToken(raw string) (CapabilityToken, error) {
 	return token, nil
 }
 
+// capabilitySchema is the only capability schema the webhook accepts. The
+// signing input always carries it, including for tokens that omit it.
+const capabilitySchema = "chio.capability.v1"
+
 // verifyCapabilitySignature reconstructs the canonical signing input from the
-// raw token bytes (stripping the signature field) and verifies the ed25519
-// signature against the issuer public key.
+// raw token bytes (the token without its signature, with the schema member
+// present) and verifies the ed25519 signature against the issuer public key.
 func verifyCapabilitySignature(raw, issuerHex, signatureHex string) error {
 	var parsed map[string]any
 	decoder := json.NewDecoder(strings.NewReader(raw))
@@ -233,6 +237,12 @@ func verifyCapabilitySignature(raw, issuerHex, signatureHex string) error {
 		return fmt.Errorf("malformed capability token: %w", err)
 	}
 	delete(parsed, "signature")
+	switch schema, present := parsed["schema"]; {
+	case !present:
+		parsed["schema"] = capabilitySchema
+	case schema != capabilitySchema:
+		return fmt.Errorf("malformed capability token: schema must be %q", capabilitySchema)
+	}
 
 	canonical, err := canonicalJSON(parsed)
 	if err != nil {

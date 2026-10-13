@@ -26,8 +26,8 @@ pub fn parse_capability_json(input: &str) -> Result<CapabilityToken> {
     Ok(serde_json::from_str(input)?)
 }
 
-pub fn capability_body_canonical_json(capability: &CapabilityToken) -> Result<String> {
-    chio_core::canonical_json_string(&capability.body()).map_err(Into::into)
+pub fn capability_signing_body_canonical_json(capability: &CapabilityToken) -> Result<String> {
+    chio_core::canonical_json_string(&capability.signing_body()).map_err(Into::into)
 }
 
 pub fn verify_capability(

@@ -70,7 +70,7 @@ The current public export surface is:
 ### Capabilities
 
 - `parse_capability_json`
-- `capability_body_canonical_json`
+- `capability_signing_body_canonical_json`
 - `verify_capability`
 - `verify_capability_json`
 - `CapabilityTimeStatus`

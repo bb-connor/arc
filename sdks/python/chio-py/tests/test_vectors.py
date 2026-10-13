@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from chio.invariants import (
-    capability_body_canonical_json,
+    capability_signing_body_canonical_json,
     canonicalize_json,
     canonicalize_json_string,
     parse_capability_json,
@@ -153,8 +153,8 @@ class VectorTests(unittest.TestCase):
         for case in fixture["cases"]:
             capability = parse_capability_json(json.dumps(case["capability"]))
             self.assertEqual(
-                capability_body_canonical_json(capability),
-                case["capability_body_canonical_json"],
+                capability_signing_body_canonical_json(capability),
+                case["capability_signing_body_canonical_json"],
                 case["id"],
             )
             self.assertEqual(

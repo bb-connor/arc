@@ -77,7 +77,6 @@ pub fn validate_response_snapshot_lifecycle(
     let mut apply_failure_errors = vec![None; snapshot.plan.effects.len()];
     let mut applying_transition_seen = false;
     let mut scheduler_fence: Option<(LeaseOwnerId, u64)> = None;
-    let mut highest_legacy_scheduler_fencing_token = 0;
     let mut effect_generations = vec![0; snapshot.plan.effects.len()];
     let mut receipt_backed_effects = vec![false; snapshot.plan.effects.len()];
     for (index, mutation) in snapshot.mutations.as_slice().iter().enumerate().skip(1) {
@@ -132,7 +131,6 @@ pub fn validate_response_snapshot_lifecycle(
                     record.scheduler_fencing_token,
                     applying_renewal,
                     &mut scheduler_fence,
-                    &mut highest_legacy_scheduler_fencing_token,
                 )?;
                 if record.from_state != replay_state
                     || !is_legal_response_transition(record.from_state, record.to_state)
@@ -208,7 +206,6 @@ pub fn validate_response_snapshot_lifecycle(
                     },
                     ResponseEffectReceiptOrderState {
                         scheduler_fence: &mut scheduler_fence,
-                        highest_legacy_scheduler_fencing_token: &mut highest_legacy_scheduler_fencing_token,
                         effect_generations: &mut effect_generations,
                         receipt_backed_effects: &mut receipt_backed_effects,
                     },
@@ -226,7 +223,6 @@ pub fn validate_response_snapshot_lifecycle(
                     scheduler_fencing_token: record.scheduler_fencing_token,
                     effect_transition_id: record.effect_transition_id.as_ref(),
                     current_scheduler_fence: scheduler_fence.as_ref(),
-                    highest_legacy_scheduler_fencing_token,
                     effect_generations: &effect_generations,
                     receipt_backed_effects: &receipt_backed_effects,
                 }
@@ -250,7 +246,6 @@ pub fn validate_response_snapshot_lifecycle(
                     },
                     ResponseEffectReceiptOrderState {
                         scheduler_fence: &mut scheduler_fence,
-                        highest_legacy_scheduler_fencing_token: &mut highest_legacy_scheduler_fencing_token,
                         effect_generations: &mut effect_generations,
                         receipt_backed_effects: &mut receipt_backed_effects,
                     },
@@ -268,7 +263,6 @@ pub fn validate_response_snapshot_lifecycle(
                     scheduler_fencing_token: record.scheduler_fencing_token,
                     effect_transition_id: record.effect_transition_id.as_ref(),
                     current_scheduler_fence: scheduler_fence.as_ref(),
-                    highest_legacy_scheduler_fencing_token,
                     effect_generations: &effect_generations,
                     receipt_backed_effects: &receipt_backed_effects,
                 }
@@ -296,7 +290,6 @@ pub fn validate_response_snapshot_lifecycle(
                     },
                     ResponseEffectReceiptOrderState {
                         scheduler_fence: &mut scheduler_fence,
-                        highest_legacy_scheduler_fencing_token: &mut highest_legacy_scheduler_fencing_token,
                         effect_generations: &mut effect_generations,
                         receipt_backed_effects: &mut receipt_backed_effects,
                     },
@@ -327,7 +320,6 @@ pub fn validate_response_snapshot_lifecycle(
                     },
                     ResponseEffectReceiptOrderState {
                         scheduler_fence: &mut scheduler_fence,
-                        highest_legacy_scheduler_fencing_token: &mut highest_legacy_scheduler_fencing_token,
                         effect_generations: &mut effect_generations,
                         receipt_backed_effects: &mut receipt_backed_effects,
                     },
@@ -341,7 +333,6 @@ pub fn validate_response_snapshot_lifecycle(
                     record.scheduler_fencing_token,
                     false,
                     &mut scheduler_fence,
-                    &mut highest_legacy_scheduler_fencing_token,
                 )?;
                 let immediately_prior = index
                     .checked_sub(1)
@@ -438,7 +429,6 @@ pub fn validate_response_snapshot_lifecycle(
                     record.scheduler_fencing_token,
                     false,
                     &mut scheduler_fence,
-                    &mut highest_legacy_scheduler_fencing_token,
                 )?;
                 if record.from_state != replay_state
                     || !record.final_state.is_terminal()
@@ -507,7 +497,6 @@ struct LateAuthoritativeEffectTakeover<'a> {
     scheduler_fencing_token: u64,
     effect_transition_id: Option<&'a RecordId>,
     current_scheduler_fence: Option<&'a (LeaseOwnerId, u64)>,
-    highest_legacy_scheduler_fencing_token: u64,
     effect_generations: &'a [u64],
     receipt_backed_effects: &'a [bool],
 }
@@ -521,7 +510,6 @@ impl LateAuthoritativeEffectTakeover<'_> {
             && self.current_scheduler_fence.is_some_and(|(_, current_token)| {
                 self.scheduler_fencing_token > *current_token
             })
-            && self.scheduler_fencing_token > self.highest_legacy_scheduler_fencing_token
             && self
                 .effect_generations
                 .get(self.effect_index)
@@ -872,7 +860,6 @@ struct ResponseEffectReceiptOrderInput<'a> {
 
 struct ResponseEffectReceiptOrderState<'a> {
     scheduler_fence: &'a mut Option<(LeaseOwnerId, u64)>,
-    highest_legacy_scheduler_fencing_token: &'a mut u64,
     effect_generations: &'a mut [u64],
     receipt_backed_effects: &'a mut [bool],
 }
@@ -918,7 +905,6 @@ fn validate_response_effect_receipt_order(
             Some(input.scheduler_fencing_token),
             false,
             state.scheduler_fence,
-            state.highest_legacy_scheduler_fencing_token,
         )?;
         *receipt_backed = true;
     }
@@ -931,19 +917,9 @@ fn validate_response_scheduler_fence(
     token: Option<u64>,
     required: bool,
     current: &mut Option<(LeaseOwnerId, u64)>,
-    highest_legacy_token: &mut u64,
 ) -> Result<()> {
     match (owner, token) {
         (None, None) if !required && current.is_none() => Ok(()),
-        (None, Some(token)) if !required && current.is_none() && token > 0 => {
-            if token < *highest_legacy_token {
-                return Err(response_snapshot_error(
-                    "legacy scheduler fencing token regressed",
-                ));
-            }
-            *highest_legacy_token = token;
-            Ok(())
-        }
         (Some(owner), Some(token)) if token > 0 => {
             if let Some((current_owner, current_token)) = current.as_ref() {
                 if token < *current_token
@@ -954,10 +930,6 @@ fn validate_response_scheduler_fence(
                         "scheduler owner or fencing token regressed",
                     ));
                 }
-            } else if *highest_legacy_token > 0 && token <= *highest_legacy_token {
-                return Err(response_snapshot_error(
-                    "scheduler owner is not a strictly fenced legacy takeover",
-                ));
             }
             *current = Some((owner.clone(), token));
             Ok(())

@@ -880,8 +880,7 @@ def write_new_fsynced(path: Path, payload: bytes, mode: int) -> None:
         raise
 
 
-TRANSACTION_DIRECTORY = ".chio-security-adversarial-evidence.refresh-transaction"
-TRANSACTION_SCHEMA = "chio.security-adversarial-refresh-transaction.v1"
+IN_ROOT_TRANSACTION_DIRECTORY = ".chio-security-adversarial-evidence.refresh-transaction"
 
 
 def lexical_path_below_root(
@@ -1252,12 +1251,11 @@ def render_threat_aggregate_replacements(
 
 
 # Trusted refresh state is isolated from the repository.
-# Version 2 retains callable names and rejects repository-local transaction state.
-LEGACY_TRANSACTION_DIRECTORY = TRANSACTION_DIRECTORY
-STATE_DIRECTORY_PREFIX = ".chio-security-adversarial-evidence.state.v2."
+# Repository-local transaction state is rejected.
+STATE_DIRECTORY_PREFIX = ".chio-security-adversarial-evidence.state.v1."
 TRANSACTION_DIRECTORY = "refresh-transaction"
 LOCK_DIRECTORY = "refresh.lock"
-TRANSACTION_SCHEMA = "chio.security-adversarial-refresh-transaction.v2"
+TRANSACTION_SCHEMA = "chio.security-adversarial-refresh-transaction.v1"
 
 
 @dataclass(frozen=True)
@@ -1362,17 +1360,17 @@ def trusted_transaction_exists(root: Path) -> bool:
 
 
 def reject_in_root_transaction_state(root: Path) -> None:
-    legacy = root.resolve() / LEGACY_TRANSACTION_DIRECTORY
+    in_root = root.resolve() / IN_ROOT_TRANSACTION_DIRECTORY
     try:
-        legacy.lstat()
+        in_root.lstat()
     except FileNotFoundError:
         return
     except OSError as error:
         raise EvidenceError(
-            f"{legacy}: unable to inspect untrusted transaction state: {error}"
+            f"{in_root}: unable to inspect untrusted transaction state: {error}"
         ) from error
     raise EvidenceError(
-        f"{legacy}: untrusted in-repository transaction state is preserved for inspection"
+        f"{in_root}: untrusted in-repository transaction state is preserved for inspection"
     )
 
 
@@ -5523,10 +5521,7 @@ def require_directory_authority(
 
 def verifier_artifact_root(environment: dict[str, str]) -> Path | None:
     enterprise = environment.get("CHIO_ENTERPRISE_SECURITY_RUNNER") == "1"
-    legacy = environment.get("CHIO_SECURITY_CANDIDATE_ARTIFACTS")
     raw = environment.get("CHIO_SECURITY_VERIFIER_ARTIFACTS")
-    if legacy is not None:
-        raise EvidenceError("candidate artifact authority is forbidden")
     if not enterprise:
         if raw is not None:
             raise EvidenceError(
@@ -5898,7 +5893,7 @@ def main() -> int:
     environment["CARGO_BUILD_JOBS"] = "1"
     if args.promote_outcome and enterprise_security_runner(environment):
         raise EvidenceError(
-            "legacy --promote-outcome is forbidden in the enterprise boundary"
+            "--promote-outcome is forbidden in the enterprise boundary"
         )
     root = (args.root or Path(__file__).resolve().parents[1]).resolve()
     reject_in_root_transaction_state(root)
