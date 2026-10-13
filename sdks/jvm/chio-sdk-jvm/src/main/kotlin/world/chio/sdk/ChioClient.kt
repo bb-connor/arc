@@ -66,7 +66,7 @@ class ChioClient
             return parser.convertValue(node, Map::class.java) as Map<String, Any?>
         }
 
-        /** Boolean health check used by the Spring Boot ChioSidecarClient.healthCheck() wrapper. */
+        /** Returns true when the sidecar health endpoint answers 200; any error reads as unhealthy. */
         fun isHealthy(): Boolean =
             try {
                 val (status, _) = sendGet(SidecarPaths.HEALTH)
@@ -249,9 +249,6 @@ class ChioClient
             val node = postJson(SidecarPaths.VERIFY_HTTP_RECEIPT, receipt)
             return parser.treeToValue(node, VerifyReceiptResponse::class.java)
         }
-
-        /** Short-name alias for callers that already use Chio as the package context. */
-        fun verifyReceipt(receipt: HttpReceipt): VerifyReceiptResponse = verifyHttpReceipt(receipt)
 
         /**
          * Pure client-side Merkle chain walk. Mirrors verify_receipt_chain;
