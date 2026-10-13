@@ -1,4 +1,4 @@
-//! Check the private context boundary independently of caller-side preparation.
+//! Security release binds the private context to the persisted output.
 use super::*;
 use crate::tool_outcome::{test_support, tests as fixtures};
 use crate::{ToolCallChunk, ToolCallOutput, ToolCallStream};
@@ -24,7 +24,7 @@ struct Fixture {
 impl Fixture {
     fn new(stream: bool) -> TestResult<Self> {
         let operation = fixtures::committed_operation("release-output-binding");
-        let signer = Keypair::generate();
+        let signer = Keypair::from_seed(&[0x73; 32]);
         let capability = CapabilityToken::sign(
             CapabilityTokenBody {
                 id: "capability-1".into(),
@@ -51,8 +51,7 @@ impl Fixture {
             None,
         )?;
         let mut raw = RawInvocationOutcomeV1::from_canonical_bytes(raw.bytes())?.to_persisted();
-        raw.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA.into();
-        raw.request_canonical_json = Some(String::from_utf8(canonical(&request)?)?);
+        raw.request_canonical_json = String::from_utf8(canonical(&request)?)?;
         raw.security_invocation_context = Some(crate::SecurityInvocationContext::v1(
             crate::SecurityInvocationContextV1::new(
                 TenantId::new("tenant")?,
@@ -63,7 +62,7 @@ impl Fixture {
                 1,
             ),
         ));
-        raw.security_release_required = Some(true);
+        raw.security_release_required = true;
         let original =
             crate::admission_operation::NativeSecurityDispatchRequestBindingV1::from_live_request(
                 &request,
@@ -71,14 +70,13 @@ impl Fixture {
                     .as_ref()
                     .ok_or("security context")?,
             )?;
-        let raw = RawInvocationOutcomeV1::from_persisted(raw)?
-            .with_receipt_signing_identity(FrozenReceiptSigningIdentityV1::new(
-                signer.public_key(),
-                chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowClassical,
-            )?)?
-            .with_original_security_dispatch_binding(Some(Box::new(
-                OriginalSecurityDispatchBindingV1::new(&original)?,
-            )))?;
+        raw.receipt_signing_identity = FrozenReceiptSigningIdentityV1::new(
+            signer.public_key(),
+            chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowClassical,
+        )?;
+        raw.original_security_dispatch_binding =
+            Some(Box::new(OriginalSecurityDispatchBindingV1::new(&original)?));
+        let raw = RawInvocationOutcomeV1::from_persisted(raw)?;
         let outcome = ToolOutcomeRecordV1::record_tool_returned(
             &operation,
             &raw,

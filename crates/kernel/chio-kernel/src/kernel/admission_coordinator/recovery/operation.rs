@@ -108,12 +108,7 @@ impl ChioKernel {
                     nonce_preflight: None,
                 };
                 let returned = self.load_durable_tool_return(&admission)?;
-                let Some(request) = returned.recovery_request().map_err(tool_outcome_error)? else {
-                    return Err(failure::item_failure(
-                        Kind::RecoveryRequestAbsent,
-                        "retained tool return has no authenticated original request",
-                    ));
-                };
+                let request = returned.recovery_request().map_err(tool_outcome_error)?;
                 RECEIPT_EVALUATION_SCOPE_KEY
                     .sync_scope(uuid::Uuid::now_v7().to_string(), || {
                         self.finalize_durable_tool_return(&mut admission, &request, &returned)

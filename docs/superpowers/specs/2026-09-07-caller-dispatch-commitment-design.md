@@ -210,10 +210,12 @@ envelope and local accepted treaty report binding, not just derived receipt
 metadata. Before dispatch, the kernel validates those materials against the
 admitted peer, local identity, request and original admission time. The bounded
 canonical component becomes part of the content-addressed raw outcome under
-`chio.raw-invocation-outcome-with-federation-context.v1` after the tool returns.
-Legacy outcome schemas retain their existing bytes and cannot carry the new
-field. This is a private persistence format, not a provider report or public
-receipt metadata field.
+`chio.raw-invocation-outcome.v1`. Every envelope contains its retained request,
+frozen receipt signer and release requirement. Security context, federation
+context, caller delivery evidence and original dispatch binding have required
+keys with explicit null values when absent. Missing keys and unknown fields
+reject during decoding. This private persistence format grants no provider or
+public receipt authority.
 
 Recovery first validates the configured qualified outcome authority's exact raw
 blob against the operation's dispatch binding. It then checks the retained
@@ -1425,16 +1427,15 @@ explicitly absent participant snapshots. They cannot carry the new snapshot or
 be reissued as complete v3 context by filling it from current state.
 
 V2 retains the public receipt key and cryptographic floor selected before
-dispatch, separately from the classical kernel identity. New raw returns retain
-this selection in `chio.raw-invocation-outcome-with-signing-identity.v1`.
+dispatch, separately from the classical kernel identity. Raw returns retain
+this selection in `chio.raw-invocation-outcome.v1`.
 Unfinished finalization requires the original signer and an identity-bound
 signature; completed replay verifies the retained key under both the original
 and current floor. Signing runs outside the sequencer, followed by revalidation
 of the original operation and lease at fresh time. No private key is persisted.
-Legacy caller v1 and old raw formats remain explicitly unbound and keep the
-previous current-signer behavior. They are not rewritten or retroactively
-qualified. New formats missing their identity, or old formats carrying one,
-reject rather than silently downgrade. This is not witnessed key rotation or
+Raw outcomes require their retained request and frozen signing identity.
+Missing fields and alternate raw schema identifiers reject; finalization cannot
+substitute the current signer for a missing retained identity. This is not witnessed key rotation or
 complete native signing-owner custody.
 
 Local freeze validation and historical decoding share binding and canonical

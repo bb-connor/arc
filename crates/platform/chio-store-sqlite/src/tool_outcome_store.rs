@@ -25,15 +25,13 @@ use crate::serving_owner::SqliteServingOwner;
 use crate::store_connection::StoreConnection;
 
 const TOOL_OUTCOME_SCHEMA_KEY: &str = "tool_outcome";
-pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 4;
+pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const TOOL_OUTCOME_SCHEMA_ANCHORS: &[&str] = &[
     "tool_outcomes",
     "admission_operations",
     "chio_serving_owner",
 ];
 const TOOL_OUTCOME_SCHEMA: &str = include_str!("tool_outcome_store.sql");
-const SECURITY_RELEASE_SCHEMA: &str = include_str!("tool_outcome_security_release.sql");
-const PAYLOAD_COMPACTION_SCHEMA: &str = include_str!("tool_outcome_payload_compaction.sql");
 #[path = "tool_outcome_native_output.rs"]
 mod native_output;
 #[path = "tool_outcome_projection.rs"]
@@ -63,8 +61,7 @@ pub struct ToolOutcomeCompactionSummary {
     pub retained_unsupported: u64,
     pub retained_owner_budget: u64,
     pub inspected: u64,
-    /// A committed first page may leave work. Resume with the paged API and
-    /// this cursor; repeatedly calling this compatibility method restarts.
+    /// Cursor for the next bounded page when retained work remains.
     pub next_digest: Option<AdmissionDigest>,
     pub byte_budget_exhausted: bool,
 }
@@ -148,9 +145,8 @@ impl SqliteToolOutcomeStore {
             .map_err(|error| ToolOutcomeStoreError::Unavailable(error.to_string()))
     }
 
-    /// Compatibility entrypoint for one default bounded page, not a whole
-    /// sweep. The same custody, replay-profile, poison, fence, clock and work
-    /// gates apply. Use `next_digest` with the paged API to continue a sweep.
+    /// Compacts one page with default work limits under the custody, replay,
+    /// poison, fence and clock gates. `next_digest` identifies remaining work.
     pub fn compact_retained_invocation_blobs(
         &self,
         retention_cutoff_unix_ms: u64,
@@ -778,55 +774,32 @@ pub(crate) fn initialize_tool_outcome_schema(
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
     security_release::verify_unstamped_source(&transaction)?;
-    let on_disk = crate::check_schema_version(
+    let state = crate::check_current_schema(
         &transaction,
         TOOL_OUTCOME_SCHEMA_KEY,
         TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
         TOOL_OUTCOME_SCHEMA_ANCHORS,
     )
-    .map_err(|error| invariant(error.to_string()))?;
-    if on_disk == TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION {
-        verify_tool_outcome_invariants(&transaction)?;
-        return transaction.commit().map_err(sqlite_error);
-    }
-    if on_disk == 3 {
-        let expected = Connection::open_in_memory().map_err(sqlite_error)?;
-        expected
+    .map_err(|error| match error {
+        crate::SchemaVersionError::StaleSchema { found, current } => {
+            ToolOutcomeStoreError::StaleSchema { found, current }
+        }
+        error => invariant(error.to_string()),
+    })?;
+    if state == crate::SchemaState::Unstamped {
+        if !tool_outcome_schema_catalog(&transaction)?.is_empty() {
+            return Err(invariant("unstamped tool outcome schema cannot be adopted"));
+        }
+        transaction
             .execute_batch(TOOL_OUTCOME_SCHEMA)
             .map_err(sqlite_error)?;
-        expected
-            .execute_batch(SECURITY_RELEASE_SCHEMA)
-            .map_err(sqlite_error)?;
-        if tool_outcome_schema_catalog(&transaction)? != tool_outcome_schema_catalog(&expected)? {
-            return Err(invariant(
-                "pre-v4 outcome schema is not the exact qualified v3 predecessor",
-            ));
-        }
-        verify_tool_outcome_data_invariants(&transaction)?;
-    } else {
-        security_release::verify_pre_migration(&transaction, on_disk)?;
+        crate::stamp_schema_version(
+            &transaction,
+            TOOL_OUTCOME_SCHEMA_KEY,
+            TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| invariant(error.to_string()))?;
     }
-    // Version 2 permits a compacted payload to be restored when a later owner
-    // supplies the same digest- and size-verified canonical bytes. Recreate the
-    // trigger transactionally before applying the canonical schema definition.
-    transaction
-        .execute_batch("DROP TRIGGER IF EXISTS tool_outcome_blobs_immutable;")
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(TOOL_OUTCOME_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(SECURITY_RELEASE_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(PAYLOAD_COMPACTION_SCHEMA)
-        .map_err(sqlite_error)?;
-    crate::stamp_schema_version(
-        &transaction,
-        TOOL_OUTCOME_SCHEMA_KEY,
-        TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
     verify_tool_outcome_invariants(&transaction)?;
     transaction.commit().map_err(sqlite_error)
 }
@@ -837,12 +810,6 @@ pub(crate) fn verify_tool_outcome_invariants(
     let expected = Connection::open_in_memory().map_err(sqlite_error)?;
     expected
         .execute_batch(TOOL_OUTCOME_SCHEMA)
-        .map_err(sqlite_error)?;
-    expected
-        .execute_batch(SECURITY_RELEASE_SCHEMA)
-        .map_err(sqlite_error)?;
-    expected
-        .execute_batch(PAYLOAD_COMPACTION_SCHEMA)
         .map_err(sqlite_error)?;
     if tool_outcome_schema_catalog(connection)? != tool_outcome_schema_catalog(&expected)? {
         return Err(invariant(
@@ -1494,10 +1461,10 @@ fn tool_outcome_schema_catalog(
             r#"
             SELECT type, name, tbl_name, sql
             FROM sqlite_schema
-            WHERE name GLOB 'tool_outcome*'
-               OR tbl_name GLOB 'tool_outcome*'
-               OR name GLOB 'post_return_evaluation*'
-               OR tbl_name GLOB 'post_return_evaluation*'
+            WHERE lower(name) GLOB 'tool_outcome*'
+               OR lower(tbl_name) GLOB 'tool_outcome*'
+               OR lower(name) GLOB 'post_return_evaluation*'
+               OR lower(tbl_name) GLOB 'post_return_evaluation*'
             ORDER BY type, name, tbl_name
             "#,
         )

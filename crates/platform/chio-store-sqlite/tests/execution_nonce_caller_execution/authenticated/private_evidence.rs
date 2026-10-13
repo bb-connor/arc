@@ -1,7 +1,8 @@
-//! Codec checks use the actual atomically retained authenticated return, not a
-//! synthetic receipt marker. Legacy formats remain readable without new power.
+//! Private signed delivery evidence is mandatory for retained caller reports.
 use super::*;
-use chio_kernel::tool_outcome::{InvocationOutputV1, RawInvocationOutcomeV1, ToolOutcomeStore};
+use chio_kernel::tool_outcome::{
+    InvocationOutputV1, RawInvocationOutcomeV1, ToolOutcomeError, ToolOutcomeStore,
+};
 use chio_store_sqlite::caller_execution_ledger::SqliteCallerExecutionLedger;
 
 #[test]
@@ -72,9 +73,15 @@ fn private_delivery_evidence_rejects_tampering_and_schema_confusion() -> TestRes
             "commit" => altered.dispatch_operation_version += 1,
             _ => unreachable!(),
         }
-        assert!(
-            RawInvocationOutcomeV1::from_persisted(altered).is_err(),
-            "{change}"
+        let expected = if change == "schema" {
+            ToolOutcomeError::Invalid("raw.schema")
+        } else {
+            ToolOutcomeError::Binding("raw.caller_delivery_evidence")
+        };
+        assert_eq!(
+            RawInvocationOutcomeV1::from_persisted(altered),
+            Err(expected),
+            "{change}",
         );
     }
     let public_receipt = String::from_utf8(canonical(&response.receipt)?)?;

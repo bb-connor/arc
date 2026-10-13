@@ -700,7 +700,6 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "SecurityReleaseRecordV1::validate_against",
             "SecurityReleaseRecordV1::validate_retained_against",
             "RawInvocationOutcomeV1::security_dispatch_commitment_id",
-            "RawInvocationOutcomeV1::retained_security_dispatch_commitment_id",
         ],
     },
     RequiredSource {
@@ -708,12 +707,12 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
         symbols: &[
             "RawInvocationOutcomeV1",
             "PersistedRawInvocationOutcomeV1",
-            "RawInvocationOutcomeV1::from_committed_dispatch_parts",
+            "RawInvocationContext",
+            "required_option",
+            "RawInvocationOutcomeV1::from_committed_dispatch",
             "RawInvocationOutcomeV1::from_persisted",
             "RawInvocationOutcomeV1::to_persisted",
             "RawInvocationOutcomeV1::canonical_blob_bounded",
-            "RawInvocationOutcomeV1::with_federation_context_json",
-            "RawInvocationOutcomeV1::with_security_release_requirement",
             "RawInvocationOutcomeV1::requires_security_release",
             "ToolOutcomeStore",
         ],
@@ -726,7 +725,6 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "FrozenReceiptSigningIdentityV1::validate",
             "FrozenReceiptSigningIdentityV1::public_key",
             "FrozenReceiptSigningIdentityV1::crypto_floor",
-            "RawInvocationOutcomeV1::with_receipt_signing_identity",
             "RawInvocationOutcomeV1::receipt_signing_identity",
         ],
     },
@@ -734,7 +732,6 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
         path: "crates/kernel/chio-kernel/src/kernel/signing_authority.rs",
         symbols: &[
             "ChioKernel::freeze_receipt_signing_identity",
-            "ChioKernel::durable_return_signing_identity",
             "ChioKernel::require_original_receipt_signer",
         ],
     },
@@ -754,8 +751,6 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
         symbols: &[
             "has_release_namespace",
             "verify_unstamped_source",
-            "predecessor_schema",
-            "verify_pre_migration",
             "participant_digest",
             "load",
             "verify_projection",
