@@ -137,7 +137,7 @@ impl MarketplaceBasePrice {
 }
 
 /// Fully resolved per-invocation price emitted by
-/// [`compute_marketplace_invocation_price`].
+/// `compute_marketplace_invocation_price`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarketplaceInvocationPrice {
     /// Final price in minor units after applying tier-based adjustments.
@@ -152,7 +152,7 @@ pub struct MarketplaceInvocationPrice {
     pub discount_basis_points_per_hundred: u32,
 }
 
-/// Discount table consumed by [`compute_marketplace_invocation_price`].
+/// Discount table consumed by `compute_marketplace_invocation_price`.
 ///
 /// The table is intentionally small and deterministic. Tier0 pays the
 /// full sticker price (no discount). Higher tiers receive monotonic
@@ -180,9 +180,8 @@ impl FiscalDomainParams for FiscalMarketplaceDiscounts {
 /// Compute the per-invocation price for a guard manifest under a
 /// given tenant pricing context.
 ///
-/// This compatibility function assumes its inputs were already
-/// validated by the caller. New marketplace catalog and settlement
-/// consumers should prefer [`compute_checked_marketplace_invocation_price`].
+/// Inputs must already be validated; public callers go through
+/// [`compute_checked_marketplace_invocation_price`].
 ///
 /// The helper is deterministic in `(base, ctx)`: equal inputs produce
 /// equal outputs. Zero-priced manifests stay zero-priced regardless of
@@ -190,7 +189,7 @@ impl FiscalDomainParams for FiscalMarketplaceDiscounts {
 /// discount math is integer-only; rounding is half-down by truncation,
 /// matching minor-unit pricing semantics.
 #[must_use]
-pub fn compute_marketplace_invocation_price(
+fn compute_marketplace_invocation_price(
     base: &MarketplaceBasePrice,
     ctx: &MarketplacePricingContext,
 ) -> MarketplaceInvocationPrice {

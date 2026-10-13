@@ -367,7 +367,7 @@ embedder can wire a durable store once and clone the layer.
 ### D. api-protect wiring, CLI refuse-ephemeral gate, manifests, docs
 
 Sidecar wiring. `api-protect` builds its evaluator through
-`RequestEvaluator::new_with_approval_store_and_trusted_capability_issuers`
+`RequestEvaluator::new_ephemeral_with_approval_store_and_trusted_capability_issuers`
 (`state.rs:251`), which reaches `HttpAuthority`. Route the durable store through
 the new builder so the embedded kernel (not just the proxy-level cache) gets a
 real `chio_store_sqlite::SqliteReceiptStore` and `SqliteRevocationStore`. The

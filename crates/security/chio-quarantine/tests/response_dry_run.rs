@@ -1,4 +1,4 @@
-use chio_quarantine::simulation::{evaluate_response_simulation, rollback_response_simulation};
+use chio_response_model::simulation::{evaluate_response_simulation, rollback_response_simulation};
 use chio_security_types::{ports::*, response_simulation::*, *};
 use serde_json::json;
 
