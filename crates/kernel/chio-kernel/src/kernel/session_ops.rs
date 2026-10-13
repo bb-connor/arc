@@ -762,7 +762,7 @@ impl ChioKernel {
         operation: &SessionOperation,
     ) -> Result<SessionOperationResponse, KernelError> {
         if let SessionOperation::ToolCall(tool_call) = operation {
-            reject_reserved_receipt_metadata(tool_call.extra_metadata.as_ref())?;
+            validate_caller_receipt_metadata(tool_call.extra_metadata.as_ref())?;
         }
         let tenant_id = self.resolve_tenant_id_for_session(Some(&context.session_id));
         let _tenant_request_scope = self

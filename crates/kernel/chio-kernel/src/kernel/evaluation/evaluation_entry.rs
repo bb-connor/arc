@@ -115,7 +115,7 @@ impl ChioKernel {
         request: &ToolCallRequest,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
-        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
+        validate_caller_receipt_metadata(extra_metadata.as_ref())?;
         self.evaluate_tool_call_async_with_session_context(
             request,
             None,
@@ -151,7 +151,7 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         security_context: &SecurityInvocationContext,
     ) -> Result<ToolCallResponse, KernelError> {
-        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
+        validate_caller_receipt_metadata(extra_metadata.as_ref())?;
         self.evaluate_tool_call_async_with_session_context(
             request,
             None,
@@ -169,7 +169,7 @@ impl ChioKernel {
         reason: &str,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
-        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
+        validate_caller_receipt_metadata(extra_metadata.as_ref())?;
         self.build_deny_response_with_metadata(
             request,
             reason,

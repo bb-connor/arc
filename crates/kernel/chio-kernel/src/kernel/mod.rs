@@ -183,7 +183,7 @@ fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option
         .find(|key| object.contains_key(*key))
 }
 
-fn reject_reserved_receipt_metadata(
+fn validate_caller_receipt_metadata(
     metadata: Option<&serde_json::Value>,
 ) -> Result<(), KernelError> {
     if metadata.is_some_and(|value| !value.is_object()) {
@@ -191,6 +191,7 @@ fn reject_reserved_receipt_metadata(
             "receipt metadata must be a JSON object".into(),
         ));
     }
+    crate::receipt_support::validate_caller_provenance_metadata(metadata)?;
     let Some(key) = reserved_receipt_metadata_key(metadata) else {
         return Ok(());
     };
@@ -217,7 +218,7 @@ fn registry_validated_manifest_security_metadata(
     security: &chio_manifest::BridgeSecurityMetadata,
     metadata: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, KernelError> {
-    reject_reserved_receipt_metadata(metadata.as_ref())?;
+    validate_caller_receipt_metadata(metadata.as_ref())?;
     registry
         .validate_invocation_arguments(
             &request.server_id,

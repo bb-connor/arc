@@ -142,6 +142,21 @@ fn is_w3c_span_id(value: &str) -> bool {
     is_w3c_lower_hex_id(value, 16)
 }
 
+/// Refuse malformed caller provenance before any effect, with the exact
+/// reason receipt construction would report.
+pub(crate) fn validate_caller_provenance_metadata(
+    extra_metadata: Option<&serde_json::Value>,
+) -> Result<(), KernelError> {
+    receipt_provenance_metadata(extra_metadata)
+        .map(|_| ())
+        .map_err(|error| match error {
+            KernelError::ReceiptSigningFailed(reason) => {
+                KernelError::InvalidReceiptMetadata(reason)
+            }
+            other => other,
+        })
+}
+
 fn receipt_provenance_metadata(
     extra_metadata: Option<&serde_json::Value>,
 ) -> Result<Option<serde_json::Value>, KernelError> {

@@ -18,6 +18,7 @@ pub(crate) use receipt_content::{
 };
 #[cfg(test)]
 pub(crate) use receipt_metadata::governed_request_metadata;
+pub(crate) use receipt_metadata::validate_caller_provenance_metadata;
 pub(crate) use receipt_metadata::{
     checked_receipt_count, merge_metadata_objects, receipt_attribution_metadata,
     request_receipt_metadata, request_receipt_metadata_with_payee_binding,
