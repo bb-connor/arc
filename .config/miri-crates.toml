@@ -53,6 +53,30 @@ reason = "syscall: pidfd_spawnp, the child is spawned through posix_spawn"
 [[crate.skip]]
 test = "launch::platform::stdio_tests::swapped_live_stdio_descriptors_fail_identity_verification"
 reason = "syscall: fstat on a descriptor that is not file-backed is not supported by Miri"
+[[crate.skip]]
+test = "linux::runtime_open_tests::runtime_artifacts_reject_fifo_without_waiting_for_writer"
+reason = "syscall: pidfd_spawnp, the child is spawned through posix_spawn"
+[[crate.skip]]
+test = "linux::runtime_open_tests::regular_runtime_artifact_retains_original_descriptor_after_path_replacement"
+reason = "calls into C: chmod through std::fs::set_permissions"
+[[crate.skip]]
+test = "linux::scan_bounds_tests::read_directory_scan_refuses_excess_entries_even_when_every_child_is_skipped"
+reason = "syscall: open with O_PATH is not supported by Miri"
+[[crate.skip]]
+test = "linux::scan_bounds_tests::bounded_read_directory_keeps_sorted_descendants_and_skips_symlinks"
+reason = "syscall: open with O_PATH is not supported by Miri"
+[[crate.skip]]
+test = "linux::scan_bounds_tests::directory_collection_accepts_exact_entry_and_name_byte_bounds"
+reason = "syscall: getdents64 is not implemented by Miri"
+[[crate.skip]]
+test = "linux::scan_bounds_tests::skipped_entries_share_one_read_budget_across_declared_roots"
+reason = "syscall: open with O_PATH is not supported by Miri"
+[[crate.skip]]
+test = "linux::scan_bounds_tests::vanished_entries_still_consume_the_directory_scan_budget"
+reason = "syscall: getdents64 is not implemented by Miri"
+[[crate.skip]]
+test = "linux::scan_bounds_tests::forbidden_directory_budget_counts_skipped_entries_across_roots"
+reason = "syscall: getdents64 is not implemented by Miri"
 
 [[crate]]
 name = "chio-keyring"
@@ -64,6 +88,51 @@ reason = "syscall: openat with O_DIRECTORY (flag 0x4000) is not supported by Mir
 [[crate.skip]]
 test = "storage_identity_tests::trusted_parent_policy_requires_private_child_below_system_temp_directory"
 reason = "syscall: openat with O_DIRECTORY (flag 0x4000) is not supported by Miri"
+[[crate.skip]]
+test = "ipc::listener_tests::a_service_socket_directory_replaced_before_bind_is_detected"
+reason = "calls into C: chmod through std::fs::set_permissions"
+[[crate.skip]]
+test = "ipc::listener_tests::a_recorded_stale_generation_is_removed_and_rebound"
+reason = "calls into C: socket through rustix::net::socket"
+[[crate.skip]]
+test = "ipc::listener_tests::a_socket_replaced_during_the_stale_check_is_kept"
+reason = "calls into C: socket through rustix::net::socket"
+[[crate.skip]]
+test = "ipc::listener_tests::a_stale_socket_without_a_recorded_generation_is_kept"
+reason = "calls into C: socket through rustix::net::socket"
+[[crate.skip]]
+test = "ipc::listener_tests::a_wrong_or_malformed_generation_record_does_not_authorize_removal"
+reason = "calls into C: socket through rustix::net::socket"
+[[crate.skip]]
+test = "ipc::listener_tests::a_lock_without_private_custody_refuses_before_the_socket_is_probed"
+reason = "calls into C: socket through rustix::net::socket"
+[[crate.skip]]
+test = "ipc::listener_tests::a_crash_before_publication_leaves_a_socket_that_refuses_restart"
+reason = "syscall: pidfd_spawnp, the child is spawned through posix_spawn"
+[[crate.skip]]
+test = "ipc::listener_tests::a_failed_publication_removes_only_the_socket_it_bound"
+reason = "syscall: open with O_DIRECTORY is not supported by Miri"
+[[crate.skip]]
+test = "ipc::listener_tests::dropping_a_listener_leaves_a_name_it_no_longer_holds"
+reason = "syscall: open with O_DIRECTORY is not supported by Miri"
+[[crate.skip]]
+test = "ipc::listener_tests::the_listener_directory_and_lock_close_on_exec"
+reason = "syscall: open with O_DIRECTORY is not supported by Miri"
+[[crate.skip]]
+test = "ipc::listener_tests::a_peer_running_as_the_service_user_is_accepted"
+reason = "calls into C: getsockopt through rustix::net::sockopt::socket_peercred"
+[[crate.skip]]
+test = "ipc::listener_tests::a_peer_running_as_another_user_is_refused"
+reason = "calls into C: getsockopt through rustix::net::sockopt::socket_peercred"
+[[crate.skip]]
+test = "ipc::listener_tests::a_deadline_stream_reads_a_buffered_response_after_both_directions_close"
+reason = "calls into C: shutdown through std::os::unix::net::UnixStream::shutdown"
+[[crate.skip]]
+test = "storage_identity_tests::retained_sqlite_descriptor_rejects_group_or_world_access_to_the_database_file"
+reason = "syscall: open with O_DIRECTORY is not supported by Miri"
+[[crate.skip]]
+test = "sqlite::synchronization_tests::synchronization_page_and_head_share_a_snapshot_during_concurrent_append"
+reason = "syscall: open with O_DIRECTORY is not supported by Miri"
 
 # FFI buffers transfer Box ownership into the exported pointer and reconstruct
 # the same allocation when freed. The read/write/free regressions reproduced
