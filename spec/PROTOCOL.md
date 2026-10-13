@@ -2589,10 +2589,10 @@ selected receipts.
 The registered `chio.transparency.inclusion-proof.v1` format retains its
 selective-disclosure hash construction and does not qualify a transaction as
 `trust_anchored`. The checkpoint-anchored receipt format is
-`chio.transparency.inclusion-proof.v2`: it uses RFC 6962 leaf and node hashing,
+`chio.transparency.receipt-inclusion-proof.v1`: it uses RFC 6962 leaf and node hashing,
 binds the leaf to the transaction receipt bytes, and embeds a strictly parsed
 checkpoint statement signed by a verifier-pinned checkpoint key. Readers MUST
-NOT interpret v1 proof bytes with the v2 trust semantics.
+NOT interpret selective-disclosure proof bytes with receipt-proof trust semantics.
 
 The current bounded release treats checkpoints as local audit evidence with
 derived `log_id`, `log_tree_size`, predecessor-witness, and consistency-proof
