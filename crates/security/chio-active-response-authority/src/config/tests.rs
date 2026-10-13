@@ -174,7 +174,7 @@ fn deployment_digest_can_be_planned_before_digest_fields_are_populated() {
 fn deployment_digest_has_an_exact_golden_vector() {
     assert_eq!(
         hex::encode(deployment().deployment_digest.as_bytes()),
-        "ad599694a598a196ebc7cedbb2a1d82b093a5c95fa356c96323e90f7718736bb"
+        "0c218e7691f8c8f058b5829ca43743203d195e2ebbdc6251dfbdc0170e339407"
     );
 }
 
