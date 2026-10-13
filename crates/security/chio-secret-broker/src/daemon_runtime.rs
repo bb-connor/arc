@@ -59,7 +59,7 @@ use crate::{
     SealedSigningKeyFd,
 };
 
-pub const BROKER_DAEMON_CONFIG_SCHEMA: &str = "chio.secret-brokerd.runtime-config.v6";
+pub const BROKER_DAEMON_CONFIG_SCHEMA: &str = "chio.secret-brokerd.runtime-config.v1";
 const MAX_CONFIG_BYTES: u64 = 65_536;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

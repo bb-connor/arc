@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: ae513fe8e155813f74f4cf579519af96e27b03545b302a0d82fdfe33ecfc42ad
+// Schema SHA: e1be8bc417f58993b9f06c3af179c267682e3f4a8c22a7fb449934e9c26c2495
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -4466,6 +4466,7 @@ export namespace Security_BrokerExecuteResponseV1 {
     leaderEpoch: number;
     upstreamStatus: number;
     responseBodySha256: string;
+    responseHeadersSha256: string;
   }
   export interface ChioSignedBrokerExecutionReceiptV1 {
     body: ChioBrokerExecutionReceiptBodyV1;
@@ -4529,107 +4530,6 @@ export namespace Security_BrokerExecuteResponseV1 {
 }
 
 // -----------------------------------------------------------------------------
-// Source: spec/schemas/chio-wire/v1/security/broker-execute-response-v2.schema.json
-export namespace Security_BrokerExecuteResponseV2 {
-  export interface ChioBrokerExecuteResponseV2 {
-    status: number;
-    /**
-     * @maxItems 64
-     */
-    headers: Header[];
-    /**
-     * @maxItems 2097152
-     */
-    body: number[];
-    evidence: ChioBrokerExecutionEvidenceV2;
-    receiptReference: string;
-    receipt: ChioSignedBrokerExecutionReceiptV2;
-  }
-  export interface Header {
-    name: string;
-    /**
-     * @maxItems 8192
-     */
-    value: number[];
-  }
-  export interface ChioBrokerExecutionEvidenceV2 {
-    schema: "chio.broker-execution-evidence.v2";
-    attemptId: string;
-    invocationId: string;
-    holdId: string;
-    requestDigest: string;
-    capabilityDigest: string;
-    revocationSetDigest: string;
-    budgetCommitIndex: number;
-    revocationCommitIndex: number;
-    authorityCommitIndex: number;
-    leaderEpoch: number;
-    upstreamStatus: number;
-    responseBodySha256: string;
-    responseHeadersSha256: string;
-  }
-  export interface ChioSignedBrokerExecutionReceiptV2 {
-    body: ChioBrokerExecutionReceiptBodyV2;
-    signer: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
-    signature: string;
-  }
-  export interface ChioBrokerExecutionReceiptBodyV2 {
-    schema: "chio.broker-execution-receipt.v2";
-    receiptId: string;
-    issuedAtUnixSeconds: number;
-    evidence: ChioBrokerExecutionEvidenceV2;
-    operationId: string;
-    authorizeEventId: string;
-    captureEventId: string;
-    parentCapabilityId: string;
-    brokerCapabilityId: string;
-    subject: string;
-    credentialReferenceHash: string;
-    credentialVersion: number;
-    normalizedDestination: Destination;
-    requestBodySha256: string;
-    callerHeadersSha256: string;
-    callerOptionsSha256: string;
-    /**
-     * @minItems 1
-     * @maxItems 8
-     */
-    quotas:
-      | [Quota]
-      | [Quota, Quota]
-      | [Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota, Quota];
-    brokerQuotaKeyId: string;
-    providerAdapterId: string;
-    providerAdapterVersion: number;
-    requestBodyBytes: number;
-    responseBodyBytes: number;
-    /**
-     * @minItems 0
-     * @maxItems 64
-     */
-    sourceReceiptIds: string[];
-    outcome: "completed";
-  }
-  export interface Destination {
-    scheme: "https" | "http";
-    normalizedHost: string;
-    explicitPort: number;
-    exactPathAndQuery: string;
-    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
-  }
-  export interface Quota {
-    keyId: string;
-    maximumExecutions: number;
-  }
-}
-
-// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/broker-execution-evidence-v1.schema.json
 export namespace Security_BrokerExecutionEvidenceV1 {
   export type Identifier = string;
@@ -4637,29 +4537,6 @@ export namespace Security_BrokerExecutionEvidenceV1 {
 
   export interface ChioBrokerExecutionEvidenceV1 {
     schema: "chio.broker-execution-evidence.v1";
-    attemptId: Identifier;
-    invocationId: Identifier;
-    holdId: Identifier;
-    requestDigest: Digest;
-    capabilityDigest: Digest;
-    revocationSetDigest: Digest;
-    budgetCommitIndex: number;
-    revocationCommitIndex: number;
-    authorityCommitIndex: number;
-    leaderEpoch: number;
-    upstreamStatus: number;
-    responseBodySha256: Digest;
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Source: spec/schemas/chio-wire/v1/security/broker-execution-evidence-v2.schema.json
-export namespace Security_BrokerExecutionEvidenceV2 {
-  export type Identifier = string;
-  export type Digest = string;
-
-  export interface ChioBrokerExecutionEvidenceV2 {
-    schema: "chio.broker-execution-evidence.v2";
     attemptId: Identifier;
     invocationId: Identifier;
     holdId: Identifier;
@@ -4795,83 +4672,6 @@ export namespace Security_BrokerExecutionReceiptBodyV1 {
     leaderEpoch: number;
     upstreamStatus: number;
     responseBodySha256: string;
-  }
-  export interface Destination {
-    scheme: "https" | "http";
-    normalizedHost: string;
-    explicitPort: number;
-    exactPathAndQuery: string;
-    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
-  }
-  export interface Quota {
-    keyId: Identifier;
-    maximumExecutions: number;
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Source: spec/schemas/chio-wire/v1/security/broker-execution-receipt-body-v2.schema.json
-export namespace Security_BrokerExecutionReceiptBodyV2 {
-  export type Identifier = string;
-  export type PublicKey = string;
-  export type Digest = string;
-
-  export interface ChioBrokerExecutionReceiptBodyV2 {
-    schema: "chio.broker-execution-receipt.v2";
-    receiptId: Identifier;
-    issuedAtUnixSeconds: number;
-    evidence: ChioBrokerExecutionEvidenceV2;
-    operationId: Identifier;
-    authorizeEventId: Identifier;
-    captureEventId: Identifier;
-    parentCapabilityId: Identifier;
-    brokerCapabilityId: Identifier;
-    subject: PublicKey;
-    credentialReferenceHash: Digest;
-    credentialVersion: number;
-    normalizedDestination: Destination;
-    requestBodySha256: Digest;
-    callerHeadersSha256: Digest;
-    callerOptionsSha256: Digest;
-    /**
-     * @minItems 1
-     * @maxItems 8
-     */
-    quotas:
-      | [Quota]
-      | [Quota, Quota]
-      | [Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota, Quota];
-    brokerQuotaKeyId: Identifier;
-    providerAdapterId: Identifier;
-    providerAdapterVersion: number;
-    requestBodyBytes: number;
-    responseBodyBytes: number;
-    /**
-     * @minItems 0
-     * @maxItems 64
-     */
-    sourceReceiptIds: Identifier[];
-    outcome: "completed";
-  }
-  export interface ChioBrokerExecutionEvidenceV2 {
-    schema: "chio.broker-execution-evidence.v2";
-    attemptId: string;
-    invocationId: string;
-    holdId: string;
-    requestDigest: string;
-    capabilityDigest: string;
-    revocationSetDigest: string;
-    budgetCommitIndex: number;
-    revocationCommitIndex: number;
-    authorityCommitIndex: number;
-    leaderEpoch: number;
-    upstreamStatus: number;
-    responseBodySha256: string;
     responseHeadersSha256: string;
   }
   export interface Destination {
@@ -4943,88 +4743,6 @@ export namespace Security_BrokerExecutionReceiptEnvelopeV1 {
   }
   export interface ChioBrokerExecutionEvidenceV1 {
     schema: "chio.broker-execution-evidence.v1";
-    attemptId: string;
-    invocationId: string;
-    holdId: string;
-    requestDigest: string;
-    capabilityDigest: string;
-    revocationSetDigest: string;
-    budgetCommitIndex: number;
-    revocationCommitIndex: number;
-    authorityCommitIndex: number;
-    leaderEpoch: number;
-    upstreamStatus: number;
-    responseBodySha256: string;
-  }
-  export interface Destination {
-    scheme: "https" | "http";
-    normalizedHost: string;
-    explicitPort: number;
-    exactPathAndQuery: string;
-    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
-  }
-  export interface Quota {
-    keyId: string;
-    maximumExecutions: number;
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Source: spec/schemas/chio-wire/v1/security/broker-execution-receipt-envelope-v2.schema.json
-export namespace Security_BrokerExecutionReceiptEnvelopeV2 {
-  export type PublicKey = string;
-  export type Signature = string;
-
-  export interface ChioSignedBrokerExecutionReceiptV2 {
-    body: ChioBrokerExecutionReceiptBodyV2;
-    signer: PublicKey;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
-    signature: Signature;
-  }
-  export interface ChioBrokerExecutionReceiptBodyV2 {
-    schema: "chio.broker-execution-receipt.v2";
-    receiptId: string;
-    issuedAtUnixSeconds: number;
-    evidence: ChioBrokerExecutionEvidenceV2;
-    operationId: string;
-    authorizeEventId: string;
-    captureEventId: string;
-    parentCapabilityId: string;
-    brokerCapabilityId: string;
-    subject: string;
-    credentialReferenceHash: string;
-    credentialVersion: number;
-    normalizedDestination: Destination;
-    requestBodySha256: string;
-    callerHeadersSha256: string;
-    callerOptionsSha256: string;
-    /**
-     * @minItems 1
-     * @maxItems 8
-     */
-    quotas:
-      | [Quota]
-      | [Quota, Quota]
-      | [Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota]
-      | [Quota, Quota, Quota, Quota, Quota, Quota, Quota, Quota];
-    brokerQuotaKeyId: string;
-    providerAdapterId: string;
-    providerAdapterVersion: number;
-    requestBodyBytes: number;
-    responseBodyBytes: number;
-    /**
-     * @minItems 0
-     * @maxItems 64
-     */
-    sourceReceiptIds: string[];
-    outcome: "completed";
-  }
-  export interface ChioBrokerExecutionEvidenceV2 {
-    schema: "chio.broker-execution-evidence.v2";
     attemptId: string;
     invocationId: string;
     holdId: string;

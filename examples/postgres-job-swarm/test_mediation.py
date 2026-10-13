@@ -25,7 +25,7 @@ class MediationTests(unittest.TestCase):
         broker = {
             "status": 200, "headers": [],
             "body": list(json.dumps(application).encode()),
-            "evidence": {"schema": "chio.broker-execution-evidence.v2"},
+            "evidence": {"schema": "chio.broker-execution-evidence.v1"},
             "receiptReference": "fixture", "receipt": {},
         }
         response = {"verdict": "allow", "output": {"kind": "value", "value": broker}}

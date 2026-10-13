@@ -11,7 +11,7 @@ use crate::{validate_digest, validate_identifier, BrokerError, Result};
 pub const BROKER_CAPABILITY_SCHEMA: &str = "chio.broker-capability.v1";
 pub const BROKER_PROOF_SCHEMA: &str = "chio.broker-request-proof.v1";
 pub const BROKER_EXECUTE_SCHEMA: &str = "chio.broker-execute.v1";
-pub const BROKER_EVIDENCE_SCHEMA: &str = "chio.broker-execution-evidence.v2";
+pub const BROKER_EVIDENCE_SCHEMA: &str = "chio.broker-execution-evidence.v1";
 pub const MAX_WIRE_BYTES: usize = 1_048_576;
 // Request and administrative limits remain 1 MiB. Execute responses include a
 // byte array inside another JSON byte array: reserve bounded encoding space

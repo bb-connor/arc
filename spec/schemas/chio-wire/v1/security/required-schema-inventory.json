@@ -74,16 +74,8 @@
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execute-response-v1.schema.json"
     },
     {
-      "file": "broker-execute-response-v2.schema.json",
-      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execute-response-v2.schema.json"
-    },
-    {
       "file": "broker-execution-evidence-v1.schema.json",
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-evidence-v1.schema.json"
-    },
-    {
-      "file": "broker-execution-evidence-v2.schema.json",
-      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-evidence-v2.schema.json"
     },
     {
       "file": "broker-execution-failure-receipt-body-v1.schema.json",
@@ -98,16 +90,8 @@
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-receipt-body-v1.schema.json"
     },
     {
-      "file": "broker-execution-receipt-body-v2.schema.json",
-      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-receipt-body-v2.schema.json"
-    },
-    {
       "file": "broker-execution-receipt-envelope-v1.schema.json",
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-receipt-envelope-v1.schema.json"
-    },
-    {
-      "file": "broker-execution-receipt-envelope-v2.schema.json",
-      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-execution-receipt-envelope-v2.schema.json"
     },
     {
       "file": "broker-prepare-dispatch-acknowledgement-v1.schema.json",

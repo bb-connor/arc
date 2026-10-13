@@ -840,7 +840,7 @@ fn durable_failure_receipt_binds_truthful_dispatch_state_and_survives_restart() 
 
     let mut mutations = Vec::new();
     let mut schema = receipt.clone();
-    schema.body.schema = "chio.broker-execution-failure-receipt.v2".to_string();
+    schema.body.schema = "chio.broker-execution-failure-receipt.tampered".to_string();
     mutations.push(schema);
     let mut identifier = receipt.clone();
     identifier.body.receipt_id = "broker-failure-receipt-production-2".to_string();

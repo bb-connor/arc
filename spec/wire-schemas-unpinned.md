@@ -71,7 +71,7 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/operator_report/constants.rs:45` `CHIO_OAUTH_SENDER_PROOF_CHIO_ATTESTATION` = `chio_attestation_binding_v1`
 - `crates/kernel/chio-kernel/src/payment.rs:519` `ACP_SETTLEMENT_STATE_REQUEST_SCHEMA` = `chio.payment.acp-settlement-state-request.v1`
 - `crates/kernel/chio-kernel/src/payment.rs:520` `ACP_SETTLEMENT_STATE_RESPONSE_SCHEMA` = `chio.payment.acp-settlement-state-response.v1`
-- `crates/kernel/chio-kernel/src/receipt_store.rs:1084` `ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND` = `chio.admission.terminal-projection.v1`
+- `crates/kernel/chio-kernel/src/receipt_store.rs:1100` `ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND` = `chio.admission.terminal-projection.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:28` `SUPPLEMENTAL_REQUEST_BINDING_DOMAIN` = `chio.supplemental-quota-request-binding.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:29` `ADMISSION_REVOCATION_SET_DOMAIN` = `chio.admission-revocation-set.v1`
 - `crates/kernel/chio-kernel/src/tool_outcome.rs:24` `RAW_INVOCATION_OUTCOME_SCHEMA` = `chio.raw-invocation-outcome.v1`
@@ -97,7 +97,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/certify/schema.rs:9` `CERTIFICATION_CONSUMPTION_POLICY_PROFILE_V1` = `chio.certify.consume.v1`
 - `crates/platform/chio-control-plane/src/federation_policy.rs:15` `FEDERATION_ADMISSION_POLICY_RECORD_SCHEMA` = `chio.permissionless-federation-policy.v1`
 - `crates/platform/chio-control-plane/src/federation_policy.rs:17` `FEDERATION_ADMISSION_POLICY_REGISTRY_VERSION` = `chio.permissionless-federation-policy-registry.v1`
-- `crates/platform/chio-control-plane/src/keyring_runtime.rs:1316` `AUTHORITY_SEED_HANDOFF_SCHEMA` = `chio.authority-seed-handoff.v1`
+- `crates/platform/chio-control-plane/src/keyring_runtime.rs:1317` `AUTHORITY_SEED_HANDOFF_SCHEMA` = `chio.authority-seed-handoff.v1`
 - `crates/platform/chio-control-plane/src/passport_verifier.rs:54` `PASSPORT_STATUS_REGISTRY_VERSION` = `chio.passport-status-registry.v1`
 - `crates/platform/chio-control-plane/src/passport_verifier.rs:55` `PASSPORT_ISSUANCE_REGISTRY_VERSION` = `chio.passport-issuance-offers.v1`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:13` `SCIM_LIFECYCLE_REGISTRY_VERSION` = `chio.scim-lifecycle-registry.v1`
@@ -163,7 +163,7 @@ since been pinned is removed by the next `--update`.
 
 ## crates/security/chio-cage (1)
 
-- `crates/security/chio-cage/src/lib.rs:62` `COMPILED_SANDBOX_PROFILE_SCHEMA` = `chio.cage.compiled-sandbox-profile.v2`
+- `crates/security/chio-cage/src/lib.rs:63` `COMPILED_SANDBOX_PROFILE_SCHEMA` = `chio.cage.compiled-sandbox-profile.v2`
 
 ## crates/security/chio-cage-plan (2)
 
@@ -182,11 +182,11 @@ since been pinned is removed by the next `--update`.
 - `crates/security/chio-keyring/src/ipc.rs:20` `KEY_LOG_WITNESS_IPC_RESPONSE_SCHEMA` = `chio.key-log.witness-ipc-response.v1`
 - `crates/security/chio-keyring/src/ipc.rs:22` `KEY_LOG_AUDIT_IPC_REQUEST_SCHEMA` = `chio.key-log.audit-ipc-request.v1`
 - `crates/security/chio-keyring/src/ipc.rs:23` `KEY_LOG_AUDIT_IPC_RESPONSE_SCHEMA` = `chio.key-log.audit-ipc-response.v1`
-- `crates/security/chio-keyring/src/service.rs:15` `KEY_LOG_POLICY_DOCUMENT_SCHEMA` = `chio.key-log.policy.v1`
-- `crates/security/chio-keyring/src/service.rs:16` `KEY_LOG_WITNESS_REQUEST_SCHEMA` = `chio.key-log.witness-request.v1`
-- `crates/security/chio-keyring/src/service.rs:17` `KEY_LOG_WITNESS_RESPONSE_SCHEMA` = `chio.key-log.witness-response.v1`
-- `crates/security/chio-keyring/src/service.rs:18` `KEY_LOG_AUDIT_COMMAND_SCHEMA` = `chio.key-log.audit-command.v1`
-- `crates/security/chio-keyring/src/service.rs:19` `KEY_LOG_AUDIT_RESPONSE_SCHEMA` = `chio.key-log.audit-response.v1`
+- `crates/security/chio-keyring/src/service.rs:14` `KEY_LOG_POLICY_DOCUMENT_SCHEMA` = `chio.key-log.policy.v1`
+- `crates/security/chio-keyring/src/service.rs:15` `KEY_LOG_WITNESS_REQUEST_SCHEMA` = `chio.key-log.witness-request.v1`
+- `crates/security/chio-keyring/src/service.rs:16` `KEY_LOG_WITNESS_RESPONSE_SCHEMA` = `chio.key-log.witness-response.v1`
+- `crates/security/chio-keyring/src/service.rs:17` `KEY_LOG_AUDIT_COMMAND_SCHEMA` = `chio.key-log.audit-command.v1`
+- `crates/security/chio-keyring/src/service.rs:18` `KEY_LOG_AUDIT_RESPONSE_SCHEMA` = `chio.key-log.audit-response.v1`
 - `crates/security/chio-keyring/src/witness.rs:15` `CHECKPOINT_EQUIVOCATION_SCHEMA` = `chio.key-log.equivocation.v1`
 
 ## crates/security/chio-secret-broker (11)
@@ -194,7 +194,7 @@ since been pinned is removed by the next `--update`.
 - `crates/security/chio-secret-broker/src/audit.rs:40` `BROKER_AUDIT_GOVERNED_INTENT_SCHEMA` = `chio.broker-audit-intent.v1`
 - `crates/security/chio-secret-broker/src/daemon.rs:33` `DAEMON_ADMIN_INTENT_SCHEMA` = `chio.broker-daemon-admin-intent.v1`
 - `crates/security/chio-secret-broker/src/daemon.rs:34` `ISSUE_CAPABILITY_SCHEMA` = `chio.broker-issue-capability.v1`
-- `crates/security/chio-secret-broker/src/daemon_runtime.rs:62` `BROKER_DAEMON_CONFIG_SCHEMA` = `chio.secret-brokerd.runtime-config.v6`
+- `crates/security/chio-secret-broker/src/daemon_runtime.rs:62` `BROKER_DAEMON_CONFIG_SCHEMA` = `chio.secret-brokerd.runtime-config.v1`
 - `crates/security/chio-secret-broker/src/kernel_admission.rs:25` `VERIFIER_ID` = `chio.secret-broker.kernel-quota-verifier.v1`
 - `crates/security/chio-secret-broker/src/kernel_admission/registration.rs:23` `PARTICIPANT_ID` = `chio.secret-broker.kernel-registration.v1`
 - `crates/security/chio-secret-broker/src/kernel_admission/routes.rs:24` `VERIFIER_ID` = `chio.secret-broker.route-quota-verifier.v1`

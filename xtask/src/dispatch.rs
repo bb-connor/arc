@@ -2,6 +2,7 @@
 //! handler functions.
 
 use crate::adapter_no_bypass;
+use crate::broker_receipt_vectors;
 use crate::cli::{
     self, CheckCommand, CodegenArgs, ErrorsCompat, FormalCommand, GenCommand, Lang, QualifyCommand,
     SnippetsCompat, VerifyCommand,
@@ -29,6 +30,7 @@ pub(crate) fn dispatch(command: cli::Command) -> Result<(), XtaskError> {
             GenCommand::EvalReceipt { check } => eval_receipt_regen::run(check_argv(check)),
             GenCommand::FreezeVectors { check } => freeze_vectors(check_argv(check)),
             GenCommand::ProofCoverage { check } => proof_coverage::run(check),
+            GenCommand::BrokerReceiptVectors { check } => broker_receipt_vectors::run(check),
         },
         // -- check group --
         cli::Command::Check { command } => match command {
