@@ -20,7 +20,7 @@ use super::support::Fixture;
 use crate::receipt_store::test_hooks::FAIL_SEED_PATH_MARKER;
 use crate::receipt_store::SqliteReceiptStore;
 
-const PARENT_NAME: &str = "chio-receipt-snapshots-v2";
+const PARENT_NAME: &str = "chio-receipt-snapshots";
 
 const KILLED_OWNER_BASE: &str = "CHIO_SNAPSHOT_KILLED_OWNER_BASE";
 const KILLED_OWNER_SELECTOR: &str =

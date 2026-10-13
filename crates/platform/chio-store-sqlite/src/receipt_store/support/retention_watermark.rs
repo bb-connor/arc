@@ -2,7 +2,7 @@ use super::*;
 
 /// Append-only ledger of archival high-water marks. The effective watermark is
 /// `MAX(archived_through_entry_seq)`; a rotation that would lower it is rejected
-/// (`RetentionWatermarkRegression`). Created on every open (new and existing).
+/// (`RetentionWatermarkRegression`). Created by every writable open.
 ///
 /// The ledger is SECURITY-LOAD-BEARING: watermark-aware chain verification
 /// trusts `W = MAX(archived_through_entry_seq)` to SKIP the live
@@ -69,7 +69,7 @@ pub(crate) fn ensure_receipt_retention_watermark_table(
 /// full receipt), and the two `BEFORE INSERT` triggers RAISE(ABORT) any source
 /// insert whose id is tombstoned, DB-enforced like the immutability guards so a
 /// writer that bypasses the Rust append path still cannot resurrect an archived
-/// id. Created on every writable open (new and existing).
+/// id. Created by every writable open.
 ///
 /// The tombstone rows are themselves append-only. Once a rotation deletes the
 /// live receipt (and its `UNIQUE(receipt_id)` sentinel), the tombstone is the
@@ -124,22 +124,11 @@ pub(crate) fn ensure_receipt_retention_tombstones(
 /// The current effective archival watermark, or `None` if the store has never
 /// archived (no ledger rows).
 ///
-/// Called by `insert_receipt_retention_watermark`, the claim-log backfill
-/// guard (`claim_log/validation.rs`), the Rotate command, and the
+/// Called by `insert_receipt_retention_watermark`, the Rotate command, and the
 /// watermark-aware chain verification.
 pub(crate) fn retention_watermark(
     connection: &rusqlite::Connection,
 ) -> Result<Option<u64>, ReceiptStoreError> {
-    // A store created before the retention migration has no watermark ledger,
-    // and read-only observers (the SIEM watchdog, CLI inspectors) open such a
-    // store without the writable `open()` migration that creates the table. A
-    // missing table means "never archived" (None), not a hard error that would
-    // deny every reader a health report. Fail-closed safe: a None watermark
-    // disables the chain-verification skip exemption, so even a store whose
-    // ledger was dropped out of band falls back to full verification.
-    if !receipt_retention_watermark_table_exists(connection)? {
-        return Ok(None);
-    }
     let value: Option<i64> = connection.query_row(
         "SELECT MAX(archived_through_entry_seq) FROM receipt_retention_watermark",
         [],
@@ -165,9 +154,6 @@ pub(crate) fn retention_watermark(
 pub(crate) fn latest_watermark_archive_path(
     connection: &rusqlite::Connection,
 ) -> Result<Option<String>, ReceiptStoreError> {
-    if !receipt_retention_watermark_table_exists(connection)? {
-        return Ok(None);
-    }
     let path: Option<String> = connection
         .query_row(
             "SELECT archive_path FROM receipt_retention_watermark \
@@ -177,33 +163,6 @@ pub(crate) fn latest_watermark_archive_path(
         )
         .optional()?;
     Ok(path)
-}
-
-fn receipt_retention_watermark_table_exists(
-    connection: &rusqlite::Connection,
-) -> Result<bool, ReceiptStoreError> {
-    let exists: Option<i64> = connection
-        .query_row(
-            "SELECT 1 FROM sqlite_master \
-             WHERE type = 'table' AND name = 'receipt_retention_watermark'",
-            [],
-            |row| row.get(0),
-        )
-        .optional()?;
-    Ok(exists.is_some())
-}
-
-/// True if any checkpoint has ever been persisted. Called by the claim-log
-/// backfill guard (`claim_log/validation.rs`) and the watermark-aware chain
-/// verification.
-pub(crate) fn kernel_checkpoints_exist(
-    connection: &rusqlite::Connection,
-) -> Result<bool, ReceiptStoreError> {
-    let count: i64 =
-        connection.query_row("SELECT COUNT(*) FROM kernel_checkpoints", [], |row| {
-            row.get(0)
-        })?;
-    Ok(count > 0)
 }
 
 /// Record a new archival high-water mark. Fail-closed: a value below the
@@ -242,30 +201,5 @@ pub(crate) fn insert_receipt_retention_watermark(
             sqlite_i64(rotated_at, "watermark rotated_at")?,
         ],
     )?;
-    Ok(())
-}
-
-/// One-time migration: enable `PRAGMA auto_vacuum = INCREMENTAL` on a store
-/// that predates the pragma.
-///
-/// SQLite only applies a changed `auto_vacuum` mode to a brand-new (empty)
-/// database; on an existing populated database the pragma write is silently
-/// a no-op until a full `VACUUM` runs, which is the only way to convert an
-/// existing file's auto-vacuum mode (see the SQLite `auto_vacuum` pragma
-/// docs). `PRAGMA auto_vacuum` reads back `0` (NONE) until that conversion
-/// happens, so this helper checks the current mode and, only when it is
-/// still `NONE`, sets the pragma and runs one full `VACUUM` to convert the
-/// file. Idempotent: once converted, `PRAGMA auto_vacuum` reads back `2`
-/// (INCREMENTAL) and this becomes a cheap no-op read on every subsequent
-/// call. Called on the drained writer connection at the first rotation pass
-/// (`rotate_on_writer_connection`) so a legacy store converts exactly once,
-/// off the append hot path.
-pub(crate) fn migrate_auto_vacuum_incremental_if_needed(
-    connection: &rusqlite::Connection,
-) -> Result<(), ReceiptStoreError> {
-    let mode: i64 = connection.query_row("PRAGMA auto_vacuum", [], |row| row.get(0))?;
-    if mode == 0 {
-        connection.execute_batch("PRAGMA auto_vacuum = INCREMENTAL; VACUUM;")?;
-    }
     Ok(())
 }

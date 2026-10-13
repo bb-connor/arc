@@ -2552,11 +2552,12 @@
     "iou_envelope": [
       "crates/platform/chio-store-sqlite/src/iou_store.rs"
     ],
+    "chio_tool_receipts": [
+      "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs",
+      "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs"
+    ],
     "chio_authorization_receipt_consumptions": [
       "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs"
-    ],
-    "chio_tool_receipts": [
-      "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs"
     ],
     "sealed_decoy_records_v1": [
       "crates/platform/chio-store-sqlite/src/sealed_decoy_registry.rs"
@@ -2572,6 +2573,13 @@
     ],
     "watermark_sequence_operations_v1": [
       "crates/platform/chio-store-sqlite/src/sealed_decoy_registry.rs"
+    ],
+    "security_response_automatic_preparations": [
+      "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs"
+    ],
+    "security_ingress_rejections": [
+      "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
+      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_attested_finding_batches": [
       "crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs",
@@ -2604,6 +2612,9 @@
     "security_declassification_tombstones": [
       "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs",
       "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
+    ],
+    "security_response_effect_finality": [
+      "crates/platform/chio-store-sqlite/src/security_state/effect_finality/schema.rs"
     ],
     "security_attested_finding_response_outbox": [
       "crates/platform/chio-store-sqlite/src/security_state/response_schema.rs"
@@ -2657,13 +2668,6 @@
       "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_response_dispatches": [
-      "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
-    ],
-    "security_response_automatic_preparations": [
-      "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs"
-    ],
-    "security_ingress_rejections": [
-      "crates/platform/chio-store-sqlite/src/security_state/correlation.rs",
       "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
     ],
     "security_response_dispatch_fences": [
@@ -2749,9 +2753,6 @@
     ],
     "security_transitions": [
       "crates/platform/chio-store-sqlite/src/security_state/schema.rs"
-    ],
-    "security_response_effect_finality": [
-      "crates/platform/chio-store-sqlite/src/security_state/effect_finality/schema.rs"
     ]
   },
   "unscoped_sql": [
@@ -3940,34 +3941,12 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs",
-      "owner": "backfill_tool_receipt_attribution_columns",
-      "sha256": "24caaab20e6cd3474344dcb931c4000a753db9eae7304d899482ce91f42100d0",
+      "owner": "reconcile_receipt_cost_projection",
+      "sha256": "366c7e2e1485069d34e64cf2a18075adceaf968d7be356dc2b27b85464e2b7dd",
       "tables": [
         "chio_tool_receipts"
       ],
-      "sql": "UPDATE chio_tool_receipts SET grant_index = CAST(COALESCE( json_extract(raw_json, '$.metadata.attribution.grant_index'), json_extract(raw_json, '$.metadata.financial.grant_index') ) AS INTEGER) WHERE grant_index IS NULL AND COALESCE( json_extract(raw_json, '$.metadata.attribution.grant_index'), json_extract(raw_json, '$.metadata.financial.grant_index') ) IS NOT NULL",
-      "principal": "receipt-integrity",
-      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs",
-      "owner": "backfill_tool_receipt_attribution_columns",
-      "sha256": "8c6b6788289e422aaf9f58d985cae1dcef182e19eb23de16edc7d4e651ef7075",
-      "tables": [
-        "chio_tool_receipts"
-      ],
-      "sql": "UPDATE chio_tool_receipts SET subject_key = COALESCE( subject_key, CAST(json_extract(raw_json, '$.metadata.attribution.subject_key') AS TEXT), (SELECT cl.subject_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id) ) WHERE subject_key IS NULL AND COALESCE( CAST(json_extract(raw_json, '$.metadata.attribution.subject_key') AS TEXT), (SELECT cl.subject_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id) ) IS NOT NULL",
-      "principal": "receipt-integrity",
-      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs",
-      "owner": "backfill_tool_receipt_attribution_columns",
-      "sha256": "bab2f84a92a8be09bf214af58ab557d1ac7039620e7ca37dc968704dc10859cc",
-      "tables": [
-        "chio_tool_receipts"
-      ],
-      "sql": "UPDATE chio_tool_receipts SET issuer_key = COALESCE( issuer_key, CAST(json_extract(raw_json, '$.metadata.attribution.issuer_key') AS TEXT), (SELECT cl.issuer_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id) ) WHERE issuer_key IS NULL AND COALESCE( CAST(json_extract(raw_json, '$.metadata.attribution.issuer_key') AS TEXT), (SELECT cl.issuer_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id) ) IS NOT NULL",
+      "sql": "SELECT seq, raw_json, cost_currency, cost_charged_be, attempted_cost_be FROM chio_tool_receipts WHERE seq > ?1 ORDER BY seq ASC LIMIT 1",
       "principal": "receipt-integrity",
       "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
     },
@@ -19766,13 +19745,6 @@
       "backfill_checkpoint_transparency_projections::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::parse_persisted_checkpoint_row",
       "validate_adopted_claim_log_delta::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::trusted_retention_watermark"
     ],
-    "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_read.rs": [
-      "load::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::parse_checkpoint_signed_columns"
-    ],
-    "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_schema.rs": [
-      "ensure_checkpoint_schema::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_schema.rs::migrate_checkpoint_predecessor_column",
-      "migrate_checkpoint_predecessor_column::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::parse_checkpoint_signed_columns"
-    ],
     "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs": [
       "advance_verified_checkpoint_chain_frontier::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::load_checkpoint_chain_leaf_hashes",
       "advance_verified_checkpoint_chain_frontier::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_checkpoint_chain_integrity_with_frontier",
@@ -19816,9 +19788,6 @@
     ],
     "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs": [
       "audit_receipt_cost_projection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs::reconcile_receipt_cost_projection",
-      "migrate_archive_receipt_cost_projection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs::migrate_receipt_cost_projection_table",
-      "migrate_receipt_cost_projection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs::migrate_receipt_cost_projection_table",
-      "migrate_receipt_cost_projection_table::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs::reconcile_receipt_cost_projection",
       "reconcile_receipt_cost_projection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_store/support/lineage.rs": [

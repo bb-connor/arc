@@ -356,7 +356,7 @@ throughput, never on the size of the history.
   seconds.
 - **Storage backends.** On Linux the snapshot database is backed by a single
   private file (mode `0600`) in a private directory (mode `0700`) that the
-  service creates under `chio-receipt-snapshots-v2` in the receipt database's
+  service creates under `chio-receipt-snapshots` in the receipt database's
   directory, on the same filesystem, and removes when the snapshot is
   released; it uses an in-memory rollback journal and no WAL. The snapshot
   service removes files left by an earlier process that was killed, before its

@@ -71,11 +71,11 @@ fn watermark_ledger_reports_max_and_rejects_regression() -> Result<(), Box<dyn s
 }
 
 #[test]
-fn backfill_refuses_regeneration_over_checkpointed_range() -> Result<(), Box<dyn std::error::Error>>
-{
-    use crate::receipt_store::support::validate_or_backfill_claim_receipt_log_entries;
+fn missing_claim_log_projection_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::support::validate_claim_receipt_log_entries;
 
-    let path = unique_db_path("backfill-refuse");
+    let path = unique_db_path("claim-log-missing");
+    let mut first_receipt_id = None;
     {
         let store = SqliteReceiptStore::open(&path)?;
         let keypair = super::support::receipt_test_keypair();
@@ -83,15 +83,13 @@ fn backfill_refuses_regeneration_over_checkpointed_range() -> Result<(), Box<dyn
         for i in 0..2u64 {
             let receipt =
                 super::support::sample_receipt_with_keypair(&format!("bf-{i}"), i + 1, &keypair);
+            first_receipt_id.get_or_insert_with(|| receipt.id.clone());
             store.append_chio_receipt_returning_seq(&receipt)?;
         }
         store.flush_receipt_writes()?;
-        // A checkpoint now covers [1, 2].
         assert!(store.load_checkpoint_by_seq(1)?.is_some());
     }
 
-    // Simulate a botched manual repair: empty the projection on a checkpointed
-    // store by dropping the reject-delete guard and deleting the rows.
     let store = SqliteReceiptStore::open_existing(&path)?;
     store.writer_handle().run_write(|connection| {
         connection.execute_batch(
@@ -102,27 +100,20 @@ fn backfill_refuses_regeneration_over_checkpointed_range() -> Result<(), Box<dyn
     })?;
 
     let connection = store.reader_connection_for_test()?;
-    let error = validate_or_backfill_claim_receipt_log_entries(&connection, true);
-    let message = error
+    let error = validate_claim_receipt_log_entries(&connection)
         .err()
-        .ok_or("expected ArchivedRangeProjection, backfill regenerated instead")?
-        .to_string();
-    assert!(
-        message.contains("checkpointed or archived range"),
-        "unexpected error: {message}"
-    );
-    // `chio receipt retention repair` only removes claim-log rows whose source
-    // rows are already gone; with an empty projection it removes nothing and
-    // leaves the store bricked, so the guidance must not point there. It must
-    // name an applicable recovery instead.
-    assert!(
-        !message.contains("retention repair"),
-        "must not point at the no-op retention repair for a missing projection: {message}"
+        .ok_or("an empty claim-log projection over persisted receipts must be refused")?;
+    let first_receipt_id = first_receipt_id.ok_or("no receipt was appended")?;
+    let expected = format!(
+        "claim receipt log entry `{first_receipt_id}` is missing for persisted tool_receipt source row"
     );
     assert!(
-        message.contains("restore") && message.contains("backup"),
-        "must direct operators to an applicable recovery path: {message}"
+        matches!(&error, ReceiptStoreError::Conflict(message) if *message == expected),
+        "unexpected error: {error}"
     );
+    drop(connection);
+    drop(store);
+    assert!(SqliteReceiptStore::open(&path).is_err());
 
     let _ = std::fs::remove_file(&path);
     Ok(())
@@ -666,22 +657,8 @@ fn rotation_refreshes_stale_reconciliation_archive_rows() -> Result<(), Box<dyn 
     // bytes are now stale. The bulk evidence tables are created and copied
     // faithfully by the rotation itself.
     {
+        create_canonical_archive(&archive)?;
         let seed = rusqlite::Connection::open(&archive)?;
-        seed.execute_batch(
-            r#"
-            CREATE TABLE settlement_reconciliations (
-                receipt_id TEXT PRIMARY KEY, reconciliation_state TEXT NOT NULL,
-                note TEXT, updated_at INTEGER NOT NULL
-            );
-            CREATE TABLE metered_billing_reconciliations (
-                receipt_id TEXT PRIMARY KEY, adapter_kind TEXT NOT NULL,
-                evidence_id TEXT NOT NULL, observed_units INTEGER NOT NULL,
-                billed_cost_units INTEGER NOT NULL, billed_cost_currency TEXT NOT NULL,
-                evidence_sha256 TEXT, recorded_at INTEGER NOT NULL,
-                reconciliation_state TEXT NOT NULL, note TEXT, updated_at INTEGER NOT NULL
-            );
-            "#,
-        )?;
         seed.execute(
             "INSERT INTO settlement_reconciliations (receipt_id, reconciliation_state, note, updated_at) \
              VALUES (?1, 'settled-pending', 'stale-note', 100)",
@@ -1521,19 +1498,8 @@ fn co_archival_rejects_conflicting_stale_archive() -> Result<(), Box<dyn std::er
     // drops the faithful live row, so a count-only co-archival check would pass
     // while the archived bytes diverge.
     {
+        create_canonical_archive(&archive)?;
         let seed = rusqlite::Connection::open(&archive)?;
-        seed.execute_batch(
-            r#"
-            CREATE TABLE claim_receipt_log_entries (
-                entry_seq INTEGER PRIMARY KEY,
-                receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL,
-                source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL,
-                capability_id TEXT, session_id TEXT, parent_request_id TEXT,
-                request_id TEXT, subject_key TEXT, issuer_key TEXT,
-                tool_server TEXT, tool_name TEXT, raw_json TEXT NOT NULL
-            );
-            "#,
-        )?;
         seed.execute(
             "INSERT INTO claim_receipt_log_entries \
              (entry_seq, receipt_id, receipt_kind, source_seq, timestamp, raw_json) \
@@ -1625,17 +1591,8 @@ fn co_archival_rejects_conflicting_capability_lineage() -> Result<(), Box<dyn st
     // IGNORE copy keeps this stale row, so without an identity check the delete
     // would proceed and the standalone archive would misattribute the receipts.
     {
+        create_canonical_archive(&archive)?;
         let seed = rusqlite::Connection::open(&archive)?;
-        seed.execute_batch(
-            r#"
-            CREATE TABLE capability_lineage (
-                capability_id TEXT PRIMARY KEY, subject_key TEXT NOT NULL,
-                issuer_key TEXT NOT NULL, issued_at INTEGER NOT NULL,
-                expires_at INTEGER NOT NULL, grants_json TEXT NOT NULL,
-                delegation_depth INTEGER NOT NULL DEFAULT 0, parent_capability_id TEXT
-            );
-            "#,
-        )?;
         seed.execute(
             "INSERT INTO capability_lineage \
              (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, parent_capability_id) \
@@ -1679,6 +1636,7 @@ fn bricked_store_repair_restores_append() -> Result<(), Box<dyn std::error::Erro
     let path = unique_db_path("bricked-repair");
     let archive = unique_db_path("bricked-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    create_canonical_archive(&archive)?;
     let keypair = super::support::receipt_test_keypair();
 
     // Build a bricked store: archive + delete the source rows for a
@@ -1732,7 +1690,7 @@ fn bricked_store_repair_restores_append() -> Result<(), Box<dyn std::error::Erro
         "store should be bricked pre-repair"
     );
 
-    // Repair via open_existing (skips backfill), then append + open succeed.
+    // Repair via open_existing, then append + open succeed.
     let store = SqliteReceiptStore::open_existing(&path)?;
     let removed = store.retention_repair(archive_path)?;
     assert!(removed > 0, "repair removed the extra claim-log rows");
@@ -1743,80 +1701,6 @@ fn bricked_store_repair_restores_append() -> Result<(), Box<dyn std::error::Erro
         super::support::sample_receipt_with_keypair_and_timestamp("after-repair", 9, 900, &keypair);
     repaired.append_chio_receipt_returning_seq(&r)?;
     repaired.flush_receipt_writes()?;
-    assert!(repaired.receipt_store_health()?.healthy);
-
-    let _ = std::fs::remove_file(&path);
-    let _ = std::fs::remove_file(&archive);
-    Ok(())
-}
-
-/// A store created before the retention migration and bricked by old deletes
-/// has no watermark ledger, and repair opens it via `open_existing` (which does
-/// not run the writable open() migration). Repair must create the ledger before
-/// recording the repair watermark; otherwise the watermark insert fails on a
-/// missing table, rolls the whole repair transaction back, and leaves the
-/// legacy store unrepaired.
-#[test]
-fn repair_creates_missing_watermark_ledger_on_legacy_store(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("legacy-repair-watermark");
-    let archive = unique_db_path("legacy-repair-watermark-archive");
-    let archive_path = archive.to_str().ok_or("archive path invalid")?;
-    let keypair = super::support::receipt_test_keypair();
-
-    {
-        let store = SqliteReceiptStore::open(&path)?;
-        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
-        for i in 0..4u64 {
-            let r = super::support::sample_receipt_with_keypair_and_timestamp(
-                &format!("lg-{i}"),
-                i + 1,
-                100,
-                &keypair,
-            );
-            store.append_chio_receipt_returning_seq(&r)?;
-        }
-        store.flush_receipt_writes()?;
-        // Fabricate a legacy bricked state: co-archive the claim-log for [1,2],
-        // delete only the source rows (set drift), AND drop the watermark ledger
-        // so the store looks like it predates the retention migration.
-        store.writer_handle().run_write({
-            let archive_path = archive_path.to_string();
-            move |connection| {
-                let escaped = archive_path.replace('\'', "''");
-                connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
-                connection.execute_batch(
-                    "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
-                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
-                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
-                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
-                        tool_name TEXT, raw_json TEXT NOT NULL); \
-                     INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
-                       SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
-                     DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
-                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
-                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
-                       BEFORE DELETE ON chio_tool_receipts \
-                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END; \
-                     DROP TABLE IF EXISTS receipt_retention_watermark;",
-                )?;
-                copy_checkpoint_prefix_to_attached_archive(connection, 2)?;
-                super::support::restore_transparency_projection_guards(connection)?;
-                connection.execute_batch("DETACH DATABASE archive")?;
-                Ok(())
-            }
-        })?;
-    }
-
-    // Repair via open_existing (skips backfill). Without the ledger creation the
-    // watermark insert fails with "no such table: receipt_retention_watermark".
-    let store = SqliteReceiptStore::open_existing(&path)?;
-    let removed = store.retention_repair(archive_path)?;
-    assert!(removed > 0, "repair removed the extra claim-log rows");
-    drop(store);
-    // The repair recorded a watermark and the store reopens healthy.
-    let repaired = SqliteReceiptStore::open(&path)?;
-    repaired.wait_for_writer_ready(Duration::from_secs(10))?;
     assert!(repaired.receipt_store_health()?.healthy);
 
     let _ = std::fs::remove_file(&path);
@@ -1864,14 +1748,8 @@ fn co_archival_rejects_reused_seq_archive() -> Result<(), Box<dyn std::error::Er
         )?
     };
     {
+        create_canonical_archive(&archive)?;
         let seed = rusqlite::Connection::open(&archive)?;
-        seed.execute_batch(
-            "CREATE TABLE chio_tool_receipts (\
-                seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, timestamp INTEGER NOT NULL, \
-                capability_id TEXT NOT NULL, subject_key TEXT, issuer_key TEXT, grant_index INTEGER, \
-                tool_server TEXT NOT NULL, tool_name TEXT NOT NULL, decision_kind TEXT NOT NULL, \
-                policy_hash TEXT NOT NULL, content_hash TEXT NOT NULL, raw_json TEXT NOT NULL, tenant_id TEXT);",
-        )?;
         seed.execute(
             "INSERT INTO chio_tool_receipts \
              (seq, receipt_id, timestamp, capability_id, tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json) \
@@ -1954,15 +1832,9 @@ fn co_archival_rejects_divergent_attribution_columns() -> Result<(), Box<dyn std
     // silently diverges from the receipt being deleted.
     {
         let live_path = path.to_str().ok_or("db path invalid")?.replace('\'', "''");
+        create_canonical_archive(&archive)?;
         let seed = rusqlite::Connection::open(&archive)?;
         seed.execute_batch(&format!("ATTACH DATABASE '{live_path}' AS live;"))?;
-        seed.execute_batch(
-            "CREATE TABLE chio_tool_receipts (\
-                seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, timestamp INTEGER NOT NULL, \
-                capability_id TEXT NOT NULL, subject_key TEXT, issuer_key TEXT, grant_index INTEGER, \
-                tool_server TEXT NOT NULL, tool_name TEXT NOT NULL, decision_kind TEXT NOT NULL, \
-                policy_hash TEXT NOT NULL, content_hash TEXT NOT NULL, raw_json TEXT NOT NULL, tenant_id TEXT);",
-        )?;
         seed.execute_batch(
             "INSERT INTO chio_tool_receipts \
              (seq, receipt_id, timestamp, capability_id, subject_key, issuer_key, grant_index, \
@@ -2305,8 +2177,8 @@ mod repair_idempotence;
 
 /// A store whose entire checkpointed history was archived has legitimately empty
 /// source tables AND an empty projection. The next writable `open()` must NOT
-/// brick it on the empty-projection backfill guard just because a checkpoint or
-/// watermark exists; there is nothing to regenerate.
+/// brick it on the claim-log projection check just because a checkpoint or
+/// watermark exists; the empty projection matches the empty source tables.
 #[test]
 fn fully_archived_store_reopens_writable() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("fully-archived-reopen");
@@ -3054,44 +2926,6 @@ fn flush_reports_watermark_covered_checkpoint_from_stale_head(
     Ok(())
 }
 
-/// The read-only health path must survive a store created before the retention
-/// migration: a missing watermark ledger is "never archived" (None), not a hard
-/// error that denies the observer every health report.
-#[test]
-fn read_only_health_ok_on_pre_retention_schema() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("read-only-pre-retention");
-    let keypair = super::support::receipt_test_keypair();
-
-    {
-        let store = SqliteReceiptStore::open(&path)?;
-        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
-        for i in 0..2u64 {
-            let r =
-                super::support::sample_receipt_with_keypair(&format!("pr-{i}"), i + 1, &keypair);
-            store.append_chio_receipt_returning_seq(&r)?;
-        }
-        store.flush_receipt_writes()?;
-        // Simulate a pre-retention schema by dropping the watermark ledger the
-        // migration would have created. A read-only observer opens without the
-        // writable migration, so it must tolerate the missing table.
-        store.writer_handle().run_write(|connection| {
-            connection.execute_batch("DROP TABLE IF EXISTS receipt_retention_watermark;")?;
-            Ok(())
-        })?;
-        store.flush_receipt_writes()?;
-    }
-
-    let report = SqliteReceiptStore::receipt_store_health_read_only(&path)?;
-    assert!(
-        report.healthy,
-        "a pre-retention store must still report health to a read-only observer"
-    );
-    assert_eq!(report.retention_watermark_entry_seq, None);
-
-    let _ = std::fs::remove_file(&path);
-    Ok(())
-}
-
 /// A watermark that merely MATCHES a checkpoint boundary is not proof of
 /// archival. If the covered rows are still live (a raw INSERT at a real
 /// boundary), verification must NOT skip their Merkle rebuild; corruption below
@@ -3403,6 +3237,7 @@ fn repair_tombstones_archived_ids_to_block_reuse() -> Result<(), Box<dyn std::er
     let path = unique_db_path("repair-tombstone");
     let archive = unique_db_path("repair-tombstone-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    create_canonical_archive(&archive)?;
     let keypair = super::support::receipt_test_keypair();
 
     // Build a bricked store: co-archive the claim-log for [1,2], then delete
@@ -3480,6 +3315,7 @@ fn repair_tombstones_already_deleted_prefix_ids() -> Result<(), Box<dyn std::err
     let path = unique_db_path("repair-tombstone-prefix");
     let archive = unique_db_path("repair-tombstone-prefix-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    create_canonical_archive(&archive)?;
     let keypair = super::support::receipt_test_keypair();
 
     // Build a store, co-archive [1,2], then fabricate a mixed drift: delete the
@@ -3771,69 +3607,6 @@ fn rotation_archives_to_freshest_verified_checkpoint_despite_stale_head(
     assert_eq!(
         survivors, 0,
         "the aged, verified checkpoint's rows are pruned once the chain is audited"
-    );
-
-    let _ = std::fs::remove_file(&path);
-    let _ = std::fs::remove_file(&archive);
-    Ok(())
-}
-
-/// A store opened through `open_existing` skips the writable `open()` migration
-/// that creates the watermark ledger, so a legacy database can reach rotation
-/// without it. The rotation records the archival high-water mark, so it must
-/// create the ledger first; otherwise the insert fails on a missing table after
-/// the archive copy has run, rolling the delete back and looping forever without
-/// pruning.
-#[test]
-fn rotation_creates_missing_watermark_ledger_on_legacy_store(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("legacy-rotation-watermark");
-    let archive = unique_db_path("legacy-rotation-watermark-archive");
-    let archive_path = archive.to_str().ok_or("archive path invalid")?;
-    let keypair = super::support::receipt_test_keypair();
-
-    {
-        let store = SqliteReceiptStore::open(&path)?;
-        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
-        for i in 0..4u64 {
-            let r = super::support::sample_receipt_with_keypair_and_timestamp(
-                &format!("lgr-{i}"),
-                i + 1,
-                100,
-                &keypair,
-            );
-            store.append_chio_receipt_returning_seq(&r)?;
-        }
-        store.flush_receipt_writes()?;
-        assert!(store.load_checkpoint_by_seq(2)?.is_some());
-        // Drop the watermark ledger so the store looks like it predates the
-        // retention migration.
-        store.writer_handle().run_write(|connection| {
-            connection.execute_batch("DROP TABLE IF EXISTS receipt_retention_watermark;")?;
-            Ok(())
-        })?;
-    }
-
-    // Reopen through open_existing (skips the ledger-creating migration) and
-    // rotate. Without creating the ledger the watermark insert fails on the
-    // missing table and the rotation errors after copying the archive.
-    let store = SqliteReceiptStore::open_existing(&path)?;
-    let archived = store.archive_receipts_before(150, archive_path)?;
-    assert_eq!(
-        archived, 4,
-        "the aged checkpointed prefix archives once the ledger is created"
-    );
-
-    let conn = store.reader_connection_for_test()?;
-    let watermark: Option<i64> = conn.query_row(
-        "SELECT MAX(archived_through_entry_seq) FROM receipt_retention_watermark",
-        [],
-        |r| r.get(0),
-    )?;
-    assert_eq!(
-        watermark,
-        Some(4),
-        "the rotation created the ledger and recorded the boundary"
     );
 
     let _ = std::fs::remove_file(&path);
@@ -4240,5 +4013,19 @@ fn governed_receipt_lineage_is_co_archived() -> Result<(), Box<dyn std::error::E
 
     let _ = std::fs::remove_file(&path);
     let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
+/// Create the canonical, stamped retention archive schema at `archive` so a
+/// test can seed divergent rows into the exact tables a rotation copies into.
+fn create_canonical_archive(archive: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    let escaped = archive
+        .to_str()
+        .ok_or("archive path invalid")?
+        .replace('\'', "''");
+    let mut connection = rusqlite::Connection::open_in_memory()?;
+    connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
+    crate::receipt_store::evidence_retention::create_archive_schema(&mut connection)?;
+    connection.execute_batch("DETACH DATABASE archive")?;
     Ok(())
 }

@@ -224,22 +224,14 @@ pub(crate) fn load_latest_persisted_checkpoint_row(
 pub(crate) fn load_all_persisted_checkpoint_rows(
     connection: &Connection,
 ) -> Result<Vec<PersistedCheckpointRow>, ReceiptStoreError> {
-    load_checkpoint_rows_in_schema(connection, CheckpointSchema::Main)
-}
-
-pub(crate) fn load_checkpoint_rows_in_schema(
-    connection: &Connection,
-    schema: CheckpointSchema,
-) -> Result<Vec<PersistedCheckpointRow>, ReceiptStoreError> {
-    let name = schema.name();
-    let mut statement = connection.prepare(&format!(
+    let mut statement = connection.prepare(
         r#"
         SELECT id, checkpoint_seq, batch_start_seq, batch_end_seq, tree_size,
                merkle_root, issued_at, statement_json, signature, kernel_key, previous_checkpoint_sha256
-        FROM {name}.kernel_checkpoints
+        FROM kernel_checkpoints
         ORDER BY checkpoint_seq ASC
-        "#
-    ))?;
+        "#,
+    )?;
     let rows = statement.query_map([], |row| {
         Ok((
             row.get::<_, i64>(0)?,
@@ -1167,7 +1159,7 @@ pub(crate) fn create_checkpoint_anchored(
     clock: &crate::store_clock::StoreClock,
 ) -> Result<ReceiptCheckpointCreateReport, ReceiptStoreError> {
     checkpoint_guarded_anchored_immediate(connection, rollback_anchor, |tx| {
-        validate_or_backfill_claim_receipt_log_entries_in_transaction(tx, false)?;
+        validate_claim_receipt_log_entries_in_transaction(tx)?;
         create_next_receipt_checkpoint_tx(tx, max_batch, keypair, clock)
     })
 }

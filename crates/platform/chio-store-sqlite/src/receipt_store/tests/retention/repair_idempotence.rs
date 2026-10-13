@@ -1,7 +1,7 @@
 use super::super::support;
 use super::{
-    copy_checkpoint_prefix_to_attached_archive, unique_db_path, ReceiptStoreError,
-    SqliteReceiptStore,
+    copy_checkpoint_prefix_to_attached_archive, create_canonical_archive, unique_db_path,
+    ReceiptStoreError, SqliteReceiptStore,
 };
 
 /// A botched rotation can record a watermark and then fail before removing the
@@ -16,6 +16,7 @@ fn repair_is_idempotent_when_watermark_already_covers_boundary(
     let path = unique_db_path("repair-idempotent-watermark");
     let archive = unique_db_path("repair-idempotent-watermark-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    create_canonical_archive(&archive)?;
     let keypair = support::receipt_test_keypair();
 
     {
