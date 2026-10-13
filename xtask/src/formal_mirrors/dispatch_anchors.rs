@@ -765,6 +765,8 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "SqliteToolOutcomeStore::record_security_release",
             "SqliteToolOutcomeStore::lookup_security_release",
             "initialize_tool_outcome_schema",
+            "preflight_tool_outcome_schema",
+            "verify_tool_outcome_schema_catalog",
             "verify_tool_outcome_invariants",
         ],
     },

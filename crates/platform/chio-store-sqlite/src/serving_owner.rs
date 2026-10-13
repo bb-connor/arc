@@ -9,6 +9,7 @@ use chio_core::StoreMutationFence;
 use chio_kernel::budget_store::{
     BudgetEventAuthority, BudgetGuaranteeLevel, RevocationCommitMetadata,
 };
+use chio_kernel::tool_outcome::ToolOutcomeStoreError;
 use chio_kernel::{BudgetStoreError, RevocationStoreError};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 
@@ -145,6 +146,10 @@ pub enum SqliteServingOwnerError {
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
+    #[error("budget schema refused: {0}")]
+    BudgetSchema(#[source] BudgetStoreError),
+    #[error("tool outcome schema refused: {0}")]
+    ToolOutcomeSchema(#[source] ToolOutcomeStoreError),
     #[error("filesystem error: {0}")]
     Io(#[from] std::io::Error),
     #[error("sqlite authority store is not provisioned: {0}")]
@@ -353,6 +358,8 @@ impl SqliteAuthorityStore {
         let canonical_database_path = fs::canonicalize(database_path)?;
         let mut connection = open_existing_database(&canonical_database_path)?;
         validate_database_identity(&canonical_database_path, &expected_database)?;
+        crate::tool_outcome_store::preflight_tool_outcome_schema(&connection)
+            .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
         if owner_table_exists(&connection)? {
             verify_serving_owner_schema(&connection)?;
             let record = load_provisioning_record(&connection)?.ok_or_else(|| {
@@ -384,7 +391,7 @@ impl SqliteAuthorityStore {
                 &mut connection,
             )?;
             crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
-                .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+                .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
             crate::finding_market_store::initialize_finding_market_schema(&mut connection)
                 .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
             crate::finding_purchase_store::initialize_finding_purchase_schema(&mut connection)
@@ -426,10 +433,6 @@ impl SqliteAuthorityStore {
             (
                 "admission_operation",
                 crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "tool_outcome",
-                crate::tool_outcome_store::TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
             ),
             (
                 "frost",
@@ -536,7 +539,7 @@ impl SqliteAuthorityStore {
             &mut connection,
         )?;
         crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+            .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
         crate::finding_market_store::initialize_finding_market_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         crate::finding_purchase_store::initialize_finding_purchase_schema(&mut connection)
@@ -599,6 +602,8 @@ impl SqliteAuthorityStore {
         let mut connection = open_existing_database(&database_path)?;
         let expected_data_version = authority_data_version(&connection)?;
         validate_database_identity(&database_path, &expected_database)?;
+        crate::tool_outcome_store::preflight_tool_outcome_schema(&connection)
+            .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
         if !owner_table_exists(&connection)? {
             verify_path_available_for_new_identity(&lock_root, &database_path)?;
             return Err(SqliteServingOwnerError::NotProvisioned(path_text(
@@ -635,7 +640,7 @@ impl SqliteAuthorityStore {
             &mut connection,
         )?;
         crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+            .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
         crate::finding_market_store::initialize_finding_market_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         crate::finding_purchase_store::initialize_finding_purchase_schema(&mut connection)
@@ -654,10 +659,6 @@ impl SqliteAuthorityStore {
             (
                 "admission_operation",
                 crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "tool_outcome",
-                crate::tool_outcome_store::TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
             ),
             (
                 "frost",
@@ -1025,9 +1026,8 @@ fn initialize_offline_authority_schemas(
         )
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     }
-    SqliteBudgetStore::initialize_connection_offline(connection).map_err(|error| {
-        SqliteServingOwnerError::Invalid(format!("failed to initialize budget schema: {error}"))
-    })?;
+    SqliteBudgetStore::initialize_connection_offline(connection)
+        .map_err(SqliteServingOwnerError::BudgetSchema)?;
     initialize_revocation_schema(connection, true).map_err(|error| {
         SqliteServingOwnerError::Invalid(format!("failed to initialize revocation schema: {error}"))
     })?;

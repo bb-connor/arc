@@ -767,6 +767,40 @@ impl SqliteToolOutcomeStore {
 
 impl QualifiedToolOutcomeStore for SqliteToolOutcomeStore {}
 
+pub(crate) fn preflight_tool_outcome_schema(
+    connection: &Connection,
+) -> Result<(), ToolOutcomeStoreError> {
+    security_release::verify_unstamped_source(connection)?;
+    let version =
+        crate::schema_version::read_store_schema_version(connection, TOOL_OUTCOME_SCHEMA_KEY)
+            .map_err(|error| invariant(error.to_string()))?;
+    let Some(found) = version else {
+        if !tool_outcome_schema_catalog(connection)?.is_empty() {
+            return Err(invariant("unstamped tool outcome schema cannot be adopted"));
+        }
+        return Ok(());
+    };
+    let application_id = connection
+        .pragma_query_value(None, "application_id", |row| row.get::<_, i32>(0))
+        .map_err(sqlite_error)?;
+    if application_id != crate::CHIO_SQLITE_APPLICATION_ID {
+        return Err(invariant(
+            crate::SchemaVersionError::ForeignDatabase {
+                found: application_id,
+                expected: crate::CHIO_SQLITE_APPLICATION_ID,
+            }
+            .to_string(),
+        ));
+    }
+    if found != TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION {
+        return Err(ToolOutcomeStoreError::StaleSchema {
+            found,
+            current: TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
+        });
+    }
+    verify_tool_outcome_schema_catalog(connection)
+}
+
 pub(crate) fn initialize_tool_outcome_schema(
     connection: &mut Connection,
 ) -> Result<(), ToolOutcomeStoreError> {
@@ -807,6 +841,13 @@ pub(crate) fn initialize_tool_outcome_schema(
 pub(crate) fn verify_tool_outcome_invariants(
     connection: &Connection,
 ) -> Result<(), ToolOutcomeStoreError> {
+    verify_tool_outcome_schema_catalog(connection)?;
+    verify_tool_outcome_data_invariants(connection)
+}
+
+fn verify_tool_outcome_schema_catalog(
+    connection: &Connection,
+) -> Result<(), ToolOutcomeStoreError> {
     let expected = Connection::open_in_memory().map_err(sqlite_error)?;
     expected
         .execute_batch(TOOL_OUTCOME_SCHEMA)
@@ -816,7 +857,7 @@ pub(crate) fn verify_tool_outcome_invariants(
             "tool outcome schema differs from the canonical definition",
         ));
     }
-    verify_tool_outcome_data_invariants(connection)
+    Ok(())
 }
 
 fn verify_tool_outcome_data_invariants(

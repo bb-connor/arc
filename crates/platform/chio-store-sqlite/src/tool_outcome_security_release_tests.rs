@@ -272,3 +272,28 @@ fn tool_outcome_store_refuses_foreign_identity() -> TestResult {
         ),
     )
 }
+
+#[test]
+fn tool_outcome_preflight_leaves_a_fresh_database_unstamped() -> TestResult {
+    let connection = Connection::open_in_memory()?;
+    connection.pragma_update(None, "query_only", true)?;
+    let before_catalog = tool_outcome_schema_catalog(&connection)?;
+    let before_changes = connection.total_changes();
+    preflight_tool_outcome_schema(&connection)?;
+    assert_eq!(tool_outcome_schema_catalog(&connection)?, before_catalog);
+    assert_eq!(connection.total_changes(), before_changes);
+    assert_eq!(
+        connection.pragma_query_value(None, "application_id", |row| row.get::<_, i32>(0))?,
+        0
+    );
+    assert_eq!(
+        connection.pragma_query_value(None, "schema_version", |row| row.get::<_, i32>(0))?,
+        0
+    );
+    assert_eq!(
+        connection.query_row("SELECT COUNT(*) FROM sqlite_schema", [], |row| row
+            .get::<_, i64>(0),)?,
+        0
+    );
+    Ok(())
+}
