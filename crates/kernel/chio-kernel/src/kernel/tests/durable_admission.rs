@@ -77,7 +77,7 @@ pub(super) struct TestAdmissionState {
     tool_outcome: Option<ToolOutcomeRecordV1>,
     post_return_evaluation: Option<PostReturnEvaluationRecordV1>,
     resolved_output: Option<CanonicalResolvedOutputBlobV1>,
-    receipt: Option<chio_core::receipt::body::ChioReceipt>,
+    pub(super) receipt: Option<chio_core::receipt::body::ChioReceipt>,
     budget_authorization: Option<crate::budget_store::BudgetAuthorizeHoldRequest>,
     payment_journal: Option<crate::payment::PaymentJournalRecord>,
     payment_release_evidence: Option<crate::tool_outcome::PersistedMonetaryReleaseEvidenceV1>,

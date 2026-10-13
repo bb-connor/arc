@@ -410,7 +410,30 @@ fn suspended_delivery(nested: bool, outcome: SuspendedOutcome) -> TestResult {
             store.operation().state(),
             AdmissionOperationState::CompensatedBeforeDispatch
         );
-        assert!(kernel.receipt_log().receipts().is_empty());
+        let persisted = store
+            .state
+            .lock()
+            .map_err(|_| "state lock")?
+            .receipt
+            .clone()
+            .ok_or("persisted compensation receipt")?;
+        let logged = kernel.receipt_log().receipts();
+        assert_eq!(logged.len(), 1);
+        assert_eq!(
+            chio_core::canonical::canonical_json_bytes(&logged[0])?,
+            chio_core::canonical::canonical_json_bytes(&persisted)?
+        );
+        assert!(matches!(
+            persisted.decision,
+            Some(chio_core::receipt::decision::Decision::Cancelled { .. })
+        ));
+        assert_eq!(
+            persisted
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.pointer("/chio_runtime/identity_disposition")),
+            Some(&serde_json::json!("terminal"))
+        );
         return Ok(());
     }
     let _expired_clock = matches!(outcome, SuspendedOutcome::Expire)
