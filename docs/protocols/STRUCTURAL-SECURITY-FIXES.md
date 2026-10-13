@@ -280,13 +280,12 @@ fn verify_execution_nonce(
 }
 ```
 
-### 1.7 Backward Compatibility
+### 1.7 Optional Nonce
 
 The execution nonce is **optional**. When `ExecutionNonceConfig` is `None` on
 the kernel, no nonce is issued and `ToolCallResponse.execution_nonce` is
-`None`. Legacy integrations continue to work but are classified as
-`TrustLevel::Advisory` (see section 2). This is a documentation change, not
-a breaking change.
+`None`. Such integrations are classified as `TrustLevel::Advisory` (see
+section 2).
 
 ### 1.8 Transport: HTTP Header
 
@@ -1125,9 +1124,9 @@ HTTP handler extracts the tenant ID from the operator's authentication
 context and passes it to the store. There is no query parameter for tenant
 ID -- the tenant is determined by authentication, not by the caller's choice.
 
-### 6.5 Backward Compatibility
+### 6.5 Default Tenant
 
-`tenant_id` defaults to `None`. Single-tenant deployments are unaffected. The
+`tenant_id` defaults to `None`. The
 SQLite store treats `None` as a single implicit tenant. When `tenant_id` is
 first set on a deployment, existing receipts with `None` are accessible only
 to operators with the `system` tenant role.

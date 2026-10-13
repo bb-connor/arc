@@ -139,7 +139,7 @@ When NOT to migrate:
 
 The canonical example is chio-prefect's `_task_parameters`
 (`sdks/python/chio-prefect/src/chio_prefect/decorators.py`). It is a
-thin envelope shim over `bind_and_redact`: it preserves the
+thin envelope builder over `bind_and_redact`: it preserves the
 prefect-specific `parameters["args"]` / `parameters["kwargs"]`
 envelope plus the `__var_kw_spillover__` synthetic-key shape while
 delegating the shared binding and redaction logic to `bind_and_redact`.
@@ -160,22 +160,20 @@ Recipe:
    adapter-specific protected fields), and `drop_self=True` if
    the wrapper sees a method receiver in `args[0]`.
 
-3. **Keep (c) as a thin envelope shim.** If your adapter ships
-   a wire shape that downstream consumers (dashboards, receipt
-   queries) already depend on, do not change that shape; the
-   shim just rewraps `bind_and_redact`'s
-   `(redacted_args, redacted_kwargs)` into your envelope.
+3. **Build (c) in one place.** Wrap `bind_and_redact`'s
+   `(redacted_args, redacted_kwargs)` into the adapter's wire-shape
+   envelope at the single call site that builds tool-call parameters.
+   Leave no second helper behind.
 
 4. **Delete the helper's tests for cells `bind_and_redact` now
-   covers.** Keep tests that exercise your envelope shim
+   covers.** Keep tests that exercise your envelope
    specifically (e.g. "the synthetic spillover key still appears
    in the wire shape"). The shared-helper coverage lives in
    `chio_adapter_base/tests/test_bind_and_redact.py`.
 
-5. **Add one parity test** that asserts your shim plus
-   `bind_and_redact` produces the byte-identical wire shape your
-   old helper produced for at least one representative tool call
-   per signature shape your adapter wraps.
+5. **Add one wire-shape test** that asserts the envelope built from
+   `bind_and_redact` output matches a golden snapshot for at least one
+   representative tool call per signature shape your adapter wraps.
 
 The worked example lives in
 `sdks/python/chio-prefect/src/chio_prefect/decorators.py`'s
@@ -299,7 +297,6 @@ is the same across all of them:
    `byte_count == len(value.encode("utf-8"))` (or
    `len(value)` for `bytes` / `bytearray`).
 
-If your adapter has a parity shim wrapping `bind_and_redact`
-back into its previous envelope shape, also assert that the shim's
-output is byte-identical to a golden snapshot of that earlier output for
-at least one call per signature shape your adapter wraps.
+If your adapter wraps `bind_and_redact` output in an envelope, also assert
+that the envelope is byte-identical to a golden snapshot for at least one
+call per signature shape your adapter wraps.

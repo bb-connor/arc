@@ -109,8 +109,8 @@ receipt = await client.evaluate_tool_call_advisory(
 print(f"Advisory receipt: {receipt.id}")
 ```
 
-The `chio-api-protect` sidecar advisory routes
-(`POST /v1/evaluate/advisory` and deprecated `POST /v1/evaluate`) return
+The `chio-api-protect` sidecar advisory route
+(`POST /v1/evaluate/advisory`) returns
 `authorization: false`, `authorizationBasis: "advisory_only"`, and an
 advisory receipt. The SDK verifies that receipt's integrity, but advisory
 evaluation is observability only.

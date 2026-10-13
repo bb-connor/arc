@@ -1,12 +1,6 @@
 # `did:chio` Method
 
-**Status:** legacy compatibility method for current v1 profile; originally
-tracked under an internal portable-trust milestone
-
-**Transition note:** The Chio rename freezes `did:chio` as a legacy
-compatibility method for already-issued Chio artifacts. The planned Chio
-transition is documented in
-`docs/standards/CHIO_IDENTITY_TRANSITION.md`.
+**Status:** v1 profile
 
 ---
 

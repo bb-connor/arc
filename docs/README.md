@@ -10,7 +10,6 @@ everything in this tree is supporting material organized by audience.
 - [Native Adoption Guide](start-here/NATIVE_ADOPTION_GUIDE.md) - choose a native integration; process starters and coding sessions are experimental source-built Linux development profiles
 - [Vision](start-here/VISION.md) - what Chio is for and why
 - [Proof Room Quickstart](start-here/PROOF_ROOM_QUICKSTART.md) - run the checked-in Proof Room fixture bundle locally or via Docker
-- [Historical v2 Migration Draft](start-here/MIGRATION_GUIDE_V2.md) - archived internal draft notes, not current protocol guidance
 
 ## Large document status
 

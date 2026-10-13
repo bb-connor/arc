@@ -55,8 +55,6 @@ remaining honest about trust-boundary complexity in larger deployments.
 5. **Fail-fast validation** -- the config is fully validated at parse time.
    Missing fields, duplicate IDs, and broken references are caught before any
    adapter starts.
-6. **Backward compatibility** -- existing programmatic builder APIs continue to
-   work. The unified file is an alternative entry point, not a replacement.
 
 ## 3. File Format
 

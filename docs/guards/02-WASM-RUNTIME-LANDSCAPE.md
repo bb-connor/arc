@@ -525,8 +525,8 @@ pointer/length passing.
    `componentize-py`, `jco`) before the basic contract is validated.
 3. The v1 goal is to validate the execution envelope (latency, fuel, memory)
    on real Chio workloads -- the serialization format is not the bottleneck.
-4. WIT migration can be done non-destructively later: support both raw modules
-   (legacy) and components (new) during transition.
+4. A WIT interface replaces the raw module ABI when it is adopted; guards then
+   target the component contract only.
 
 **WIT remains the long-term target** because of type-safe bindings, automatic
 multi-language SDK generation, and interface versioning. But investing in both
@@ -536,8 +536,7 @@ The migration path (v2):
 
 1. Define the guard WIT interface (as sketched in Section 3.3).
 2. Implement the host side using `wasmtime::component::bindgen!`.
-3. Support both raw core modules (legacy) and components (new) during
-   transition.
+3. Replace the raw core-module ABI with the component contract.
 4. Publish the WIT package for guard authors to target.
 
 ---
@@ -674,7 +673,7 @@ to matter for guard functions that primarily do JSON parsing and field checks.
 > 1. Define and publish a WIT interface as the canonical guard contract.
 > 2. Provide a Rust SDK crate (`chio-guard-sdk`) with helpers.
 > 3. Document componentize-py and jco workflows for Python/TS authors.
-> 4. Accept both raw core modules (legacy) and components (new).
+> 4. Accept components only once the WIT contract replaces the raw ABI.
 
 ---
 
