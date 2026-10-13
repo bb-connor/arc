@@ -1,5 +1,6 @@
-//! EV15 baseline-compatible RED cases followed by post-repair controls
-//! exercising independently pinned receipts and the dispatch authenticity API.
+//! Alert dispatch pages only denials that verify against an independently
+//! pinned receipt authority; unpinned, forged or flag-mutated receipts never
+//! page.
 use super::*;
 use chio_core::receipt::body::chio_receipt_id;
 
@@ -209,7 +210,7 @@ async fn configured_pin_rechecks_every_receipt_component_and_ignores_public_flag
     assert!(bad_hash.verify_signature().unwrap());
     assert_eq!(chio_receipt_id(&bad_hash.body()).unwrap(), bad_hash.id);
     assert!(!bad_hash.action.verify_hash().unwrap());
-    // Mutate after event construction to exercise stale previously true flags.
+    // Mutate after event construction so the event carries stale true flags.
     let trusted_hex = std::collections::BTreeSet::from([trusted.public_key().to_hex()]);
     let mut stale = SiemEvent::from_receipt_with_trusted_kernel_keys(valid, Some(&trusted_hex));
     assert!(stale.authoritative && stale.signer_trusted);

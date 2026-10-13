@@ -161,9 +161,9 @@ impl NetworkPolicy {
 
 /// Secret-bearing transport selection is fixed for production callers.
 ///
-/// This example used to compile when arbitrary resolver and transport injection
-/// was public. It must remain a compile failure so an external caller cannot
-/// route credential-bearing requests through a transport of its choice.
+/// Resolver and transport injection is not public, so this example must not
+/// compile: an external caller cannot route credential-bearing requests through
+/// a transport of its choice.
 ///
 /// ```compile_fail
 /// use std::net::IpAddr;

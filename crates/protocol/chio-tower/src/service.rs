@@ -709,7 +709,7 @@ mod tests {
         assert!(matches!(result, Err(BufferBodyError::TooLarge)));
     }
 
-    /// Regression for enforcing body limits during collection: a streaming
+    /// Body limits are enforced during collection: a streaming
     /// body whose size hint hides its true length must abort as soon as the
     /// running buffer crosses the configured cap, so an attacker cannot
     /// exhaust host RAM by streaming chunks one at a time.
@@ -822,7 +822,7 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::PAYLOAD_TOO_LARGE);
     }
 
-    /// Regression for signed oversized-body deny receipts: the 413 response
+    /// Oversized-body denials are signed: the 413 response
     /// must carry a Chio-signed deny receipt as its JSON body (and as an
     /// extension), so an auditor can verify the rejection was a Chio decision
     /// rather than a stray network 413.
