@@ -29,7 +29,7 @@ class BrokerTests(unittest.TestCase):
                 "status": 200,
                 "headers": [],
                 "body": list(body),
-                "evidence": {"schema": "chio.broker-execution-evidence.v2"},
+                "evidence": {"schema": "chio.broker-execution-evidence.v1"},
                 "receiptReference": {},
                 "receipt": {},
             }
