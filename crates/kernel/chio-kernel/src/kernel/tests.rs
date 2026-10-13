@@ -281,9 +281,7 @@ use federation_cosign::{handshake_and_pin, CountingRejectingCosigner, FailingApp
 mod durable_admission;
 #[path = "tests/revocation_durability.rs"]
 mod revocation_durability;
-use durable_admission::{
-    admission_test_fence, durable_admission_fixture, TestAdmissionOperationStore,
-};
+use durable_admission::{durable_admission_fixture, TestAdmissionOperationStore};
 #[path = "tests/durable_admission_url_elicitation_support.rs"]
 mod durable_admission_url_elicitation_support;
 use durable_admission_url_elicitation_support::DurableUrlElicitationServer;
