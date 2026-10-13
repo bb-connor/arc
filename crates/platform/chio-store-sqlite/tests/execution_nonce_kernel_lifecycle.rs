@@ -285,17 +285,7 @@ fn unconfirmed_preflight_cleanup_is_compensated_by_startup_recovery() -> TestRes
     execute_sql(&fixture, &rollback_cutpoint("1"))?;
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "cleanup-cutpoint")?;
-    let denied = runtime.kernel.evaluate_tool_call_blocking(&request)?;
-    assert_eq!(denied.verdict, Verdict::Deny);
-    assert!(
-        denied
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("cleanup could not be confirmed")),
-        "{:?}",
-        denied.reason
-    );
-    assert!(denied.execution_nonce.is_none());
+    assert_unconfirmed_cleanup(&runtime, &request)?;
     assert_state(&fixture, &request, "prepared")?;
     assert_eq!(count_rows(&fixture, "admission_nonce_preflight_holds")?, 1);
     assert_eq!(
@@ -327,8 +317,7 @@ fn unconfirmed_preflight_cleanup_replays_on_the_next_preflight() -> TestResult {
     execute_sql(&fixture, &rollback_cutpoint("1"))?;
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "cleanup-retry")?;
-    let denied = runtime.kernel.evaluate_tool_call_blocking(&request)?;
-    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
+    assert_unconfirmed_cleanup(&runtime, &request)?;
     assert_eq!(grant_quota(&runtime, &request)?, (1, 0));
 
     let other = fixture.request(&runtime, "cleanup-other")?;
@@ -340,6 +329,23 @@ fn unconfirmed_preflight_cleanup_replays_on_the_next_preflight() -> TestResult {
     let executed = execute(&runtime, &request, &nonce)?;
     assert_eq!(executed.verdict, Verdict::Allow, "{:?}", executed.reason);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+/// Unconfirmed cleanup under a retained durable operation returns the typed
+/// store error and signs nothing; the operation keeps its original owner.
+fn assert_unconfirmed_cleanup(runtime: &Runtime, request: &ToolCallRequest) -> TestResult {
+    let receipts = runtime.kernel.receipt_log().len();
+    let error = runtime
+        .kernel
+        .evaluate_tool_call_blocking(request)
+        .err()
+        .ok_or("unconfirmed preflight cleanup signed a response")?;
+    assert_eq!(
+        format!("{error:?}"),
+        "BudgetStore(Sqlite(SqliteFailure(Error { code: ConstraintViolation, extended_code: 1811 }, Some(\"injected preflight rollback cutpoint\"))))"
+    );
+    assert_eq!(runtime.kernel.receipt_log().len(), receipts);
     Ok(())
 }
 
@@ -367,16 +373,19 @@ fn reserved_nonce_operation_is_compensated_by_startup_recovery() -> TestResult {
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "reserved-nonce")?;
     let nonce = preflight(&runtime, &request)?;
-    let denied = execute(&runtime, &request, &nonce)?;
-    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
-    assert!(
-        denied
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("injected capture cutpoint")),
-        "{:?}",
-        denied.reason
+    let receipts = runtime.kernel.receipt_log().len();
+    let mut execution = request.clone();
+    execution.execution_nonce = Some(nonce.clone());
+    let error = runtime
+        .kernel
+        .evaluate_tool_call_blocking(&execution)
+        .err()
+        .ok_or("a refused capture preparation signed a response")?;
+    assert_eq!(
+        format!("{error:?}"),
+        "AdmissionRecovery(Store(Unavailable(\"injected capture cutpoint\")))"
     );
+    assert_eq!(runtime.kernel.receipt_log().len(), receipts);
     assert_state(&fixture, &request, "ready_to_dispatch")?;
     assert_eq!(
         count_rows(&fixture, "admission_execution_nonce_reservations")?,
