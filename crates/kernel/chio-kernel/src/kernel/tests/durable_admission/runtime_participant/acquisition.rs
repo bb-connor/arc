@@ -326,7 +326,7 @@ fn runtime_claim_lost_ack_and_callback_panics_deny_without_losing_recovery() {
 }
 
 #[test]
-fn exhausted_budget_keeps_its_signed_denial_when_runtime_release_is_unconfirmed() {
+fn cleanup_fault_exhausted_budget_preserves_unconfirmed_runtime_owner() {
     for nested in [false, true] {
         exhausted_budget_with_unconfirmed_runtime_release(nested);
     }
@@ -354,7 +354,7 @@ fn exhausted_budget_with_unconfirmed_runtime_release(nested: bool) {
         .budget_store
         .try_increment(&request.capability.id, 0, Some(1))
         .expect("consume the only invocation"));
-    let response = if nested {
+    let result = if nested {
         let session = kernel
             .open_session(request.agent_id.clone(), Vec::new())
             .expect("session");
@@ -373,25 +373,26 @@ fn exhausted_budget_with_unconfirmed_runtime_release(nested: bool) {
         kernel.evaluate_tool_call_blocking(&request)
     };
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    let response = response.expect("signed budget denial");
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.verify_signature().expect("signature"));
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("budget")),
-        "{response:?}"
-    );
-    let metadata = response.receipt.metadata.as_ref().expect("metadata");
-    assert_eq!(metadata["chio_runtime"]["reservation_release_failed"], true);
-    assert_eq!(metadata["chio_runtime"]["reservation_retained"], true);
     // The unreleased participant keeps the operation on its recovery path.
-    assert!(!store.operation().state().is_terminal());
+    let retained = store.operation();
+    assert_eq!(
+        retained.state(),
+        AdmissionOperationState::BrokerAttemptRegistered
+    );
+    assert!(retained.dispatch_commit().is_none());
+    assert!(retained.terminal_replay().is_none());
     let state = store.runtime_recovery.0.lock().expect("fixture");
     assert_eq!(state.release_calls, 1);
     assert_eq!(
         state.history.as_ref().expect("history")[0].disposition,
         RuntimeParticipantDisposition::ReservedBeforeDispatch
     );
+    drop(state);
+    let error = result.expect_err("the retained runtime participant owns the terminal");
+    assert!(
+        matches!(error, KernelError::BudgetExhausted(_)),
+        "{error:?}"
+    );
+    assert!(kernel.receipt_log().is_empty());
+    assert_eq!(store.operation(), retained);
 }

@@ -265,10 +265,16 @@ fn conflict_receipt_survives_real_store_shutdown_and_reopen() -> TestResult {
     else {
         return Err("conflict denial missing".into());
     };
-    assert!(
-        matches!(receipt.decision.as_ref(), Some(chio_core::receipt::decision::Decision::Deny {
-        guard: signed_guard, reason: signed_reason,
-    }) if signed_guard == &guard && signed_reason == &reason)
+    assert_eq!(guard, "kernel");
+    assert!(receipt.decision.is_none());
+    assert_eq!(receipt.receipt_kind, ReceiptKind::TraceObservation);
+    assert_eq!(
+        receipt.metadata.as_ref().and_then(|metadata| {
+            metadata
+                .pointer("/session_report/reason")
+                .and_then(serde_json::Value::as_str)
+        }),
+        Some(reason.as_str())
     );
     fixture.assert_durable_after_shutdown(&[receipt])
 }

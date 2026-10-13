@@ -68,9 +68,12 @@ impl ChioKernel {
                         reason,
                         now,
                         Some(matched_grant_index),
-                        self.ambiguous_invocation_capture_receipt_metadata(
-                            budget_mutation,
-                            extra_metadata.clone(),
+                        RefusalReceiptMetadata::new(
+                            self.ambiguous_invocation_capture_receipt_metadata(
+                                budget_mutation,
+                                extra_metadata.clone(),
+                            ),
+                            IdentityDisposition::Retained,
                         ),
                     )
                 })

@@ -23,6 +23,7 @@
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_output.rs::prepare_native_output_for_test": 1,
     "crates/kernel/chio-kernel/src/kernel/construction.rs::refresh_receipt_writer_liveness_for_test": 1,
     "crates/kernel/chio-kernel/src/kernel/construction.rs::set_rss_shed_for_test": 1,
+    "crates/kernel/chio-kernel/src/kernel/effect_obligation/recovery.rs::empty_for_test": 1,
     "crates/kernel/chio-kernel/src/kernel/mod.rs::for_test": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/support_receipt_store_extensions.rs::load_chio_receipt_for_test": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/support_receipt_store_extensions.rs::load_retained_chio_receipt_commitment_for_test": 1,

@@ -182,7 +182,7 @@ fn payment_dispatch_failure(
         }));
     }
 
-    let response = if nested {
+    let outcome = if nested {
         let session = kernel.open_session("dispatch-failure-parent".to_owned(), Vec::new())?;
         kernel.activate_session(&session)?;
         let parent = make_operation_context(
@@ -201,17 +201,30 @@ fn payment_dispatch_failure(
             None,
             context.as_ref(),
             None,
-        )?
+        )
     } else if matches!(boundary, FailureBoundary::Security) {
         kernel.evaluate_tool_call_blocking_with_security_context(
             &request,
             &security_context(&request, "payment-security-session")?,
-        )?
+        )
     } else {
-        kernel.evaluate_tool_call_blocking(&request)?
+        kernel.evaluate_tool_call_blocking(&request)
     };
-    assert_eq!(response.verdict, Verdict::Deny, "{response:?}");
-    assert!(response.receipt.verify_signature()?);
+    let response = if matches!(boundary, FailureBoundary::UnwindAcknowledgement) {
+        let error = outcome.expect_err("unconfirmed cleanup must preserve the durable owner");
+        assert!(
+            matches!(error, KernelError::Internal(ref reason)
+            if reason == "payment unwind acknowledgement was not confirmed"),
+            "{error:?}"
+        );
+        assert!(kernel.receipt_log().is_empty());
+        None
+    } else {
+        let response = outcome?;
+        assert_eq!(response.verdict, Verdict::Deny, "{response:?}");
+        assert!(response.receipt.verify_signature()?);
+        Some(response)
+    };
     assert_eq!(
         reached.load(Ordering::SeqCst),
         u64::from(!matches!(
@@ -252,17 +265,26 @@ fn payment_dispatch_failure(
         .ok_or("missing original payment journal")?;
     assert_eq!(journal.operation_id, operation_id);
     let metadata = response
-        .receipt
-        .metadata
         .as_ref()
-        .ok_or("missing denial metadata")?;
-    let runtime = &metadata["chio_runtime"];
+        .map(|response| {
+            response
+                .receipt
+                .metadata
+                .as_ref()
+                .ok_or("missing denial metadata")
+        })
+        .transpose()?;
     if matches!(boundary, FailureBoundary::CommitFence) {
-        assert_eq!(runtime["identity_disposition"], "retained");
+        assert_eq!(
+            metadata.ok_or("commit metadata")?["chio_runtime"]["identity_disposition"],
+            "retained"
+        );
     }
 
     match boundary {
         FailureBoundary::Freeze | FailureBoundary::Security => {
+            let response = response.as_ref().ok_or("confirmed cleanup response")?;
+            let runtime = &metadata.ok_or("confirmed cleanup metadata")?["chio_runtime"];
             assert!(response
                 .reason
                 .as_deref()
@@ -345,9 +367,14 @@ fn payment_dispatch_failure(
                 }
             );
             if matches!(boundary, FailureBoundary::UnwindAcknowledgement) {
-                assert!(response.reason.as_deref().is_some_and(|reason| {
-                    reason.contains("payment unwind acknowledgement was not confirmed")
-                }));
+                assert!(response.is_none());
+                assert!(operation.dispatch_commit().is_none());
+                assert!(operation.terminal_replay().is_none());
+                assert_eq!(
+                    journal.authorization_id.as_deref(),
+                    Some("authorization-durable")
+                );
+                assert!(journal.settle_action.is_none());
                 assert_eq!(
                     settlements
                         .lock()
@@ -360,16 +387,9 @@ fn payment_dispatch_failure(
                     .map_err(|_| "settlement reference lock")?;
                 assert_eq!(attempted.as_slice(), [operation_id]);
                 assert_ne!(operation_id, request.request_id);
-                assert_eq!(
-                    metadata["financial"]["payment_unwind_attempt_reference"].as_str(),
-                    attempted.first().map(String::as_str)
-                );
-                assert_eq!(metadata["financial"]["payment_unwind_unconfirmed"], true);
-                assert_eq!(
-                    metadata["financial"]["payment_authorization_may_be_retained"],
-                    true
-                );
+                assert!(metadata.is_none());
             } else {
+                let metadata = metadata.ok_or("unknown commit metadata")?;
                 assert!(settlements
                     .lock()
                     .map_err(|_| "settlement lock")?
@@ -398,7 +418,11 @@ fn payment_dispatch_failure(
                     );
                 }
             }
-            assert!(runtime.get("pre_dispatch_payment_unwind").is_none());
+            if let Some(metadata) = metadata {
+                assert!(metadata["chio_runtime"]
+                    .get("pre_dispatch_payment_unwind")
+                    .is_none());
+            }
         }
     }
     if present_approval {
@@ -453,7 +477,7 @@ fn unconfirmed_dispatch_commit_retains_payment_quota_and_approval() -> TestResul
 }
 
 #[test]
-fn unconfirmed_payment_unwind_receipt_names_the_attempted_durable_operation() -> TestResult {
+fn unconfirmed_payment_unwind_preserves_the_attempted_durable_operation() -> TestResult {
     for nested in [false, true] {
         payment_dispatch_failure(nested, true, FailureBoundary::UnwindAcknowledgement)?;
     }

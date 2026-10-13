@@ -175,7 +175,7 @@ impl ChioKernel {
             reason,
             self.read_authority_time()?.as_secs(),
             None,
-            extra_metadata,
+            RefusalReceiptMetadata::new(extra_metadata, IdentityDisposition::Reusable),
         )
     }
 
@@ -253,7 +253,7 @@ impl ChioKernel {
             reason,
             self.read_authority_time()?.as_secs(),
             None,
-            Some(metadata),
+            RefusalReceiptMetadata::new(Some(metadata), IdentityDisposition::Reusable),
         )
     }
 

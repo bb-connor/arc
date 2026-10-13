@@ -1,4 +1,5 @@
 use super::*;
+use crate::kernel::tests::evidence_recovery::wait_for_post_effect_evidence;
 
 #[test]
 fn nested_flow_drop_post_dispatch_records_cancellation_receipt(
@@ -59,6 +60,7 @@ fn nested_flow_drop_post_dispatch_records_cancellation_receipt(
         1,
         "nested dispatch must have been entered before the drop"
     );
+    wait_for_post_effect_evidence(&kernel);
     let receipt_log = kernel.receipt_log();
     assert_eq!(
         receipt_log.len(),
@@ -72,14 +74,18 @@ fn nested_flow_drop_post_dispatch_records_cancellation_receipt(
     let Some(Decision::Cancelled { reason }) = &receipt.decision else {
         return Err("expected a cancelled decision on the nested drop receipt".into());
     };
-    assert_eq!(reason, "tool evaluation future dropped after admission");
+    assert_eq!(reason, "post-effect finalization failed; output withheld");
+    assert_eq!(
+        receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/post_effect_fault/code")),
+        Some(&serde_json::json!("CHIO-KERNEL-POST-EFFECT-DROP")),
+    );
     Ok(())
 }
 
-// Normal nested-flow exit: the buffered child receipt must be recorded exactly
-// once (no double-record between the normal `record_buffered_child_receipts`
-// flush and the disarmed drop guard) and the parent receipt must be a
-// non-cancellation.
+// Normal nested-flow exit commits each child once before its parent terminal.
 #[test]
 fn nested_flow_normal_path_records_child_receipt_exactly_once(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -130,6 +136,7 @@ fn nested_flow_normal_path_records_child_receipt_exactly_once(
         1,
         "the nested child op must have run once"
     );
+    wait_for_post_effect_evidence(&kernel);
     let receipt_log = kernel.receipt_log();
     assert_eq!(
         receipt_log.len(),
@@ -152,14 +159,11 @@ fn nested_flow_normal_path_records_child_receipt_exactly_once(
     Ok(())
 }
 
-// A saturated commit writer that times out the buffered child-receipt append
-// after nested dispatch must not strand the admission. The evaluation must run
-// the abort cleanup and record a signed cancellation receipt, rather than
-// returning the timeout with the admission holds still held and no terminal
-// receipt on the log.
+// An unknown child append with no authoritative readback keeps both the child
+// and parent evidence owned, and refuses subsequent dispatch.
 #[test]
-fn nested_flow_child_receipt_timeout_records_cancellation() -> Result<(), Box<dyn std::error::Error>>
-{
+fn nested_flow_unknown_child_append_retains_the_parent_obligation(
+) -> Result<(), Box<dyn std::error::Error>> {
     let child_ops = std::sync::Arc::new(AtomicU64::new(0));
     let mut kernel = make_kernel(make_config());
     kernel.set_receipt_store(Box::new(ChildAppendTimeoutStore))?;
@@ -207,32 +211,29 @@ fn nested_flow_child_receipt_timeout_records_cancellation() -> Result<(), Box<dy
         child_ops.load(Ordering::SeqCst) >= 1,
         "the nested child op must have run before the child-receipt append"
     );
-    assert!(
-        result.is_err(),
-        "a child-receipt append timeout must surface as an error"
-    );
-    let receipt_log = kernel.receipt_log();
-    assert_eq!(
-        receipt_log.len(),
-        1,
-        "the abort cleanup records exactly one terminal receipt on the timeout"
-    );
-    assert!(
-        receipt_log
-            .get(0)
-            .ok_or_else(|| std::io::Error::other("terminal receipt missing"))?
-            .is_cancelled(),
-        "the terminal receipt must be a signed cancellation"
-    );
+    assert!(matches!(
+        result,
+        Err(KernelError::ReceiptPersistence(ReceiptStoreError::Timeout {
+            operation,
+            timeout_ms: 0,
+        })) if operation == "append_child_receipt"
+    ));
+    assert!(matches!(
+        kernel.ensure_post_effect_evidence_latch_clear(),
+        Err(KernelError::PostEffectEvidencePending { buffered: 1 })
+    ));
+    assert!(kernel.receipt_log().is_empty());
+    assert!(kernel.child_receipt_log().is_empty());
+    assert!(matches!(
+        kernel.evaluate_tool_call_blocking(&request),
+        Err(KernelError::PostEffectEvidencePending { buffered: 1 })
+    ));
+    assert_eq!(child_ops.load(Ordering::SeqCst), 1);
     Ok(())
 }
 
-// A commit writer that times out the buffered child-receipt append on the
-// normal record path, then drains, must not lose the already-signed child
-// receipt. The still-armed drop path retries the flush, so the completed child
-// operation lands on the append-only log. Draining the guard buffer before the
-// append succeeded would leave the drop-path retry with nothing to flush and
-// strand the child receipt.
+// A completed writer barrier and retained-history absence permit a retry of
+// the same signed child. Recovery then commits one parent cancellation.
 #[test]
 fn nested_flow_transient_child_append_timeout_preserves_child_receipt(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -241,6 +242,7 @@ fn nested_flow_transient_child_append_timeout_preserves_child_receipt(
     let mut kernel = make_kernel(make_config());
     kernel.set_receipt_store(Box::new(ChildAppendFailsOnceStore {
         child_appends: std::sync::Arc::clone(&child_appends),
+        receipts: Mutex::new(Vec::new()),
     }))?;
     kernel.register_tool_server(Box::new(NestedChildOpServer::new(
         "srv-chio-runtime",
@@ -291,10 +293,11 @@ fn nested_flow_transient_child_append_timeout_preserves_child_receipt(
         result.is_err(),
         "the first child-receipt append timeout must surface as an error"
     );
+    wait_for_post_effect_evidence(&kernel);
     assert_eq!(
         child_appends.load(Ordering::SeqCst),
         2,
-        "the normal path times out once and the drop path retries the append"
+        "authoritative absence after the writer barrier permits one retry"
     );
     let receipt_log = kernel.receipt_log();
     assert_eq!(
@@ -318,11 +321,8 @@ fn nested_flow_transient_child_append_timeout_preserves_child_receipt(
     Ok(())
 }
 
-// Post-dispatch parent drop with more than one buffered child receipt where the
-// first bounded append fails closed. The drop path records each receipt
-// independently, so the second already-signed receipt must still land on the
-// append-only log rather than being discarded with the failed first append. A
-// stop-at-first-failure batch record would lose it.
+// A failed first child remains at the queue front until authoritative absence
+// permits retry. Both children must eventually persist, with distinct identities.
 #[test]
 fn nested_flow_drop_path_preserves_child_receipts_after_a_first_append_failure(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -331,6 +331,7 @@ fn nested_flow_drop_path_preserves_child_receipts_after_a_first_append_failure(
     let mut kernel = make_kernel(make_config());
     kernel.set_receipt_store(Box::new(ChildAppendFailsOnceStore {
         child_appends: std::sync::Arc::clone(&child_appends),
+        receipts: Mutex::new(Vec::new()),
     }))?;
     kernel.register_tool_server(Box::new(TwoChildOpParkingServer::new(
         "srv-chio-runtime",
@@ -384,20 +385,20 @@ fn nested_flow_drop_path_preserves_child_receipts_after_a_first_append_failure(
         2,
         "both nested child ops must have run before the drop"
     );
-    // The first buffered receipt's bounded append fails closed; the second must
-    // still be attempted. A batch record that stopped at the first failure
-    // would leave this at 1.
-    assert_eq!(
-        child_appends.load(Ordering::SeqCst),
-        2,
-        "the drop path must attempt every buffered child receipt, not stop at the first failure"
-    );
+    wait_for_post_effect_evidence(&kernel);
+    assert_eq!(child_appends.load(Ordering::SeqCst), 3);
     let child_receipt_log = kernel.child_receipt_log();
     assert_eq!(
         child_receipt_log.len(),
-        1,
-        "the child receipt queued behind the failed append must be preserved on the drop-path flush"
+        2,
+        "both children survive the first failure"
     );
+    let child_ids: Vec<_> = child_receipt_log
+        .iter()
+        .map(|receipt| &receipt.id)
+        .collect();
+    assert_ne!(child_ids[0], child_ids[1]);
+    assert_eq!(kernel.receipt_log().len(), 1);
     Ok(())
 }
 
@@ -463,6 +464,7 @@ fn nested_flow_drop_post_dispatch_flushes_buffered_child_receipt(
         1,
         "the nested child op must have run before the drop"
     );
+    wait_for_post_effect_evidence(&kernel);
     let receipt_log = kernel.receipt_log();
     assert_eq!(
         receipt_log.len(),
@@ -476,7 +478,14 @@ fn nested_flow_drop_post_dispatch_flushes_buffered_child_receipt(
     let Some(Decision::Cancelled { reason }) = &receipt.decision else {
         return Err("expected a cancelled decision on the nested drop receipt".into());
     };
-    assert_eq!(reason, "tool evaluation future dropped after admission");
+    assert_eq!(reason, "post-effect finalization failed; output withheld");
+    assert_eq!(
+        receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/post_effect_fault/code")),
+        Some(&serde_json::json!("CHIO-KERNEL-POST-EFFECT-DROP")),
+    );
     let child_receipt_log = kernel.child_receipt_log();
     assert_eq!(
         child_receipt_log.len(),

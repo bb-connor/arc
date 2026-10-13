@@ -188,17 +188,14 @@ fn assert_outcome_unknown(
     response: Result<ToolCallResponse, KernelError>,
     effects: u64,
 ) -> TestResult {
-    let response = response?;
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.output.is_none());
-    assert!(response.receipt.verify_signature()?);
-    assert_eq!(fixture.invocations.load(Ordering::SeqCst), effects);
-    let operation = fixture.store.operation();
-    assert!(operation.dispatch_commit().is_some());
-    assert_eq!(
-        operation.state(),
-        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    let error = response.expect_err("a clock fault withholds delivery without a second terminal");
+    assert!(matches!(error, KernelError::Clock(_)), "{error:?}");
+    assert!(
+        fixture.kernel.receipt_log().is_empty(),
+        "the original incident is the sole terminal"
     );
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), effects);
+    let operation = assert_original_unknown_incident(&fixture.store, &fixture.request);
     assert_eq!(recorded_elapsed_millis(fixture)?, None);
     let budget = fixture.store.budget_store();
     let hold_id = operation
@@ -225,13 +222,11 @@ fn assert_outcome_unknown(
         (0, 1)
     );
     // An unknown outcome must not admit another effect or refund captured quota.
-    assert_eq!(
-        fixture
-            .kernel
-            .evaluate_tool_call_blocking(&fixture.request)?
-            .verdict,
-        Verdict::Deny
+    assert_unknown_replay(
+        fixture.kernel.evaluate_tool_call_blocking(&fixture.request),
+        &operation,
     );
+    assert!(fixture.kernel.receipt_log().is_empty());
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), effects);
     assert_eq!(fixture.store.operation(), operation);
     assert_eq!(budget.get_budget_hold(hold_id.as_str())?, Some(hold));

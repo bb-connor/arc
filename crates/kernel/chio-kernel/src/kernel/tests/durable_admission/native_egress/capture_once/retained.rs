@@ -306,20 +306,17 @@ fn retained_capture(fault: Fault, egress: bool) -> CaptureResult {
     };
     assert_eq!(custody(&case)?, after, "{label}");
 
-    let replay = case
-        .kernel
-        .evaluate_tool_call_blocking_with_security_context(&case.request, &case.context)?;
-    assert_eq!(replay.verdict, Verdict::Deny, "{label}: {replay:?}");
-    assert_eq!(
-        replay.reason.as_deref(),
-        Some(
-            KernelError::DurableAdmission(replay_reason.into())
-                .to_string()
-                .as_str()
-        ),
-        "{label}"
-    );
-    assert!(replay.output.is_none(), "{label}");
+    let receipts = case.kernel.receipt_log().len();
+    let already_compensated = after.state == AdmissionOperationState::CompensatedBeforeDispatch;
+    assert_capture_replay(
+        case.kernel
+            .evaluate_tool_call_blocking_with_security_context(&case.request, &case.context),
+        already_compensated,
+        replay_reason,
+    )?;
+    if already_compensated {
+        assert_eq!(case.kernel.receipt_log().len(), receipts, "{label}");
+    }
     // Recovery keeps retained custody and never re-enters retention.
     assert_eq!(custody(&case)?, replayed, "{label}");
     assert_eq!(case.hook.callbacks.load(Ordering::SeqCst), 1, "{label}");

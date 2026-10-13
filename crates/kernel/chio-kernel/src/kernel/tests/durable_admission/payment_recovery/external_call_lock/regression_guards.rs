@@ -86,17 +86,11 @@ fn parked_capture_defers_a_live_duplicate_and_a_concurrent_tick() -> TestResult 
     );
     let duplicate = kernel.clone();
     let duplicate_request = request.clone();
-    let (verdict, reason) = concurrently(move || {
-        duplicate
-            .evaluate_tool_call_blocking(&duplicate_request)
-            .map(|response| (response.verdict, response.reason))
-    })??;
+    let refusal = concurrently(move || duplicate.evaluate_tool_call_blocking(&duplicate_request))?
+        .expect_err("the live finalization owns its terminal receipt");
     assert_eq!(
-        (verdict, reason.as_deref()),
-        (
-            Verdict::Deny,
-            Some("durable admission failed: operation already has a live evaluation or recovery owner")
-        )
+        refusal.to_string(),
+        "durable admission failed: operation already has a live evaluation or recovery owner"
     );
     assert_eq!(store.operation(), parked);
     assert_eq!(store.payment_journal(), Some(settling));

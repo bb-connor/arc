@@ -1,5 +1,4 @@
 use super::*;
-use crate::kernel::receipt_identity::{with_identity_disposition, IdentityDisposition};
 
 impl ChioKernel {
     pub(crate) fn build_monetary_deny_response_with_metadata(
@@ -9,7 +8,7 @@ impl ChioKernel {
         timestamp: u64,
         matching_grants: &[MatchingGrant<'_>],
         cap: &CapabilityToken,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
     ) -> Result<ToolCallResponse, KernelError> {
         // Look for a monetary grant among the matching candidates to populate metadata.
         let monetary_grant = matching_grants.iter().find(|m| {
@@ -17,6 +16,8 @@ impl ChioKernel {
         });
 
         if let Some(mg) = monetary_grant {
+            let extra_metadata =
+                self.prepare_refusal_receipt_metadata(&request.request_id, extra_metadata)?;
             let grant = mg.grant;
             let currency = grant
                 .max_cost_per_invocation
@@ -132,7 +133,7 @@ impl ChioKernel {
         charge: &BudgetChargeResult,
         committed_cost_after_release: u64,
         cap: &CapabilityToken,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_pre_execution_monetary_deny_response_with_recording(
@@ -197,10 +198,12 @@ impl ChioKernel {
         charge: &BudgetChargeResult,
         committed_cost_after_release: u64,
         cap: &CapabilityToken,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         record_mode: ReceiptRecordMode,
     ) -> Result<ToolCallResponse, KernelError> {
+        let extra_metadata =
+            self.prepare_refusal_receipt_metadata(&request.request_id, extra_metadata)?;
         let financial_metadata =
             Self::pre_execution_financial_metadata(charge, committed_cost_after_release, cap)?;
         let deny_extra_metadata =
@@ -255,23 +258,6 @@ impl ChioKernel {
         })
     }
 
-    /// Build a denial response with a signed receipt.
-    pub(crate) fn build_deny_response(
-        &self,
-        request: &ToolCallRequest,
-        reason: &str,
-        timestamp: u64,
-        matched_grant_index: Option<usize>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        self.build_deny_response_with_metadata(
-            request,
-            reason,
-            timestamp,
-            matched_grant_index,
-            None,
-        )
-    }
-
     fn build_local_v1_failclosed_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
@@ -281,6 +267,10 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         guard: &str,
     ) -> Result<ToolCallResponse, KernelError> {
+        let extra_metadata = self.prepare_refusal_receipt_metadata(
+            &request.request_id,
+            RefusalReceiptMetadata::new(extra_metadata, IdentityDisposition::Reusable),
+        )?;
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -380,7 +370,7 @@ impl ChioKernel {
             reason,
             timestamp,
             matched_grant_index,
-            with_identity_disposition(extra_metadata, IdentityDisposition::Reusable),
+            extra_metadata,
             "kernel",
         )
     }
@@ -445,7 +435,7 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_deny_response_with_recording(
             request,
@@ -468,7 +458,7 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_deny_response_with_recording(
@@ -488,7 +478,7 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_deny_response_with_recording(
             request,
@@ -511,10 +501,81 @@ impl ChioKernel {
         reason: &str,
         timestamp: u64,
         matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
+        extra_metadata: RefusalReceiptMetadata,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         record_mode: ReceiptRecordMode,
     ) -> Result<ToolCallResponse, KernelError> {
+        let prepared = self.prepare_deny_response_with_recording(
+            request,
+            reason,
+            timestamp,
+            matched_grant_index,
+            extra_metadata,
+            verified_payee_binding,
+            record_mode,
+        )?;
+        self.publish_prepared_response(request, prepared)
+    }
+
+    pub(in crate::kernel) fn prepare_deny_response_with_metadata(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: RefusalReceiptMetadata,
+    ) -> Result<PreparedResponse, KernelError> {
+        self.prepare_deny_response_with_recording(
+            request,
+            reason,
+            timestamp,
+            matched_grant_index,
+            extra_metadata,
+            None,
+            ReceiptRecordMode::WithFederation,
+        )
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Preparation preserves the existing response input contract."
+    )]
+    pub(in crate::kernel) fn prepare_deny_response_with_metadata_and_payee_binding(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: RefusalReceiptMetadata,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+    ) -> Result<PreparedResponse, KernelError> {
+        self.prepare_deny_response_with_recording(
+            request,
+            reason,
+            timestamp,
+            matched_grant_index,
+            extra_metadata,
+            verified_payee_binding,
+            ReceiptRecordMode::WithFederation,
+        )
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Preparation preserves the existing response input contract."
+    )]
+    fn prepare_deny_response_with_recording(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: RefusalReceiptMetadata,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+        record_mode: ReceiptRecordMode,
+    ) -> Result<PreparedResponse, KernelError> {
+        let extra_metadata =
+            self.prepare_refusal_receipt_metadata(&request.request_id, extra_metadata)?;
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -553,16 +614,17 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_chio_receipt_with_mode(request, &receipt, record_mode)?;
-
-        Ok(ToolCallResponse {
-            request_id: request.request_id.clone(),
-            verdict: Verdict::Deny,
-            output: None,
-            reason: Some(reason.to_string()),
-            terminal_state: OperationTerminalState::Completed,
-            receipt,
-            execution_nonce: None,
-        })
+        Ok(PreparedResponse::terminal(
+            ToolCallResponse {
+                request_id: request.request_id.clone(),
+                verdict: Verdict::Deny,
+                output: None,
+                reason: Some(reason.to_string()),
+                terminal_state: OperationTerminalState::Completed,
+                receipt,
+                execution_nonce: None,
+            },
+            record_mode,
+        ))
     }
 }

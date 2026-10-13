@@ -194,7 +194,7 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
 
 #[test]
 fn chio_runtime_release_failure_surfaces_cleanup_failure_on_pending_approval() {
-    let (mut kernel, mut request, _store, invocations) =
+    let (mut kernel, mut request, store, invocations) =
         durable_admission_fixture("req-chio-runtime-release-failure-pending");
     let approver_a = CoreKeypair::generate();
     let approver_b = CoreKeypair::generate();
@@ -260,24 +260,18 @@ fn chio_runtime_release_failure_surfaces_cleanup_failure_on_pending_approval() {
         lease_id: "lease-release-failure-pending",
     }));
 
-    let response = kernel
+    let error = kernel
         .evaluate_tool_call_blocking(&request)
-        .expect("pending-approval evaluation");
+        .expect_err("the live pending operation owns its terminal");
 
     // The runtime lease was reserved before the budget check parked the call for
     // cumulative approval, and its release could not be confirmed. A retained
     // lease cannot be parked for approval, so the outcome fails closed instead
     // of returning a bare pending verdict.
-    assert_ne!(
-        response.verdict,
-        Verdict::PendingApproval,
-        "a stuck runtime lease must not surface as a bare pending approval"
-    );
-    assert_eq!(
-        response.verdict,
-        Verdict::Deny,
-        "unexpected verdict: {:?}",
-        response.reason
+    assert!(
+        matches!(error, KernelError::DurableAdmission(ref reason)
+        if reason == "runtime admission reservation retained on pending approval"),
+        "{error:?}"
     );
     assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
     assert_eq!(
@@ -286,22 +280,18 @@ fn chio_runtime_release_failure_surfaces_cleanup_failure_on_pending_approval() {
         "runtime release must be attempted before surfacing the cleanup failure"
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    let metadata = response
-        .receipt
-        .metadata
-        .expect("cleanup-failure metadata present");
-    assert_eq!(metadata["chio_runtime"]["reservation_release_failed"], true);
-    assert_eq!(metadata["chio_runtime"]["reservation_retained"], true);
-    assert_eq!(
-        metadata["chio_runtime"]["reserved_destructive_lease_id"],
-        "lease-release-failure-pending"
-    );
+    let retained = store.operation();
+    assert_eq!(retained.state(), AdmissionOperationState::ApprovalRequired);
+    assert!(retained.threshold_proposal().is_some());
+    assert!(retained.dispatch_commit().is_none());
+    assert!(retained.terminal_replay().is_none());
+    assert!(kernel.receipt_log().is_empty());
 }
 
 #[test]
 fn nested_runtime_release_failure_denies_pending_approval() {
     let request_id = "req-chio-runtime-nested-release-failure-pending";
-    let (mut kernel, mut request, _store, invocations) = durable_admission_fixture(request_id);
+    let (mut kernel, mut request, store, invocations) = durable_admission_fixture(request_id);
     let approver_a = CoreKeypair::generate();
     let approver_b = CoreKeypair::generate();
     let requirement = ThresholdApprovalRequirement::new(
@@ -389,24 +379,24 @@ fn nested_runtime_release_failure_denies_pending_approval() {
         extra_metadata: None,
     };
     let mut client = NoopNestedFlowClient;
-    let response = kernel
+    let error = kernel
         .evaluate_tool_call_operation_with_nested_flow_client(&context, &operation, &mut client)
-        .expect("nested pending-approval evaluation");
+        .expect_err("the live nested pending operation owns its terminal");
 
-    assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
+    assert!(
+        matches!(error, KernelError::DurableAdmission(ref reason)
+        if reason == "runtime admission reservation retained on pending approval"),
+        "{error:?}"
+    );
     assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
     assert_eq!(releases.load(Ordering::SeqCst), 1);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    let metadata = response
-        .receipt
-        .metadata
-        .expect("cleanup-failure metadata present");
-    assert_eq!(metadata["chio_runtime"]["reservation_release_failed"], true);
-    assert_eq!(metadata["chio_runtime"]["reservation_retained"], true);
-    assert_eq!(
-        metadata["chio_runtime"]["reserved_destructive_lease_id"],
-        "lease-nested-release-failure-pending"
-    );
+    let retained = store.operation();
+    assert_eq!(retained.state(), AdmissionOperationState::ApprovalRequired);
+    assert!(retained.threshold_proposal().is_some());
+    assert!(retained.dispatch_commit().is_none());
+    assert!(retained.terminal_replay().is_none());
+    assert!(kernel.receipt_log().is_empty());
 }
 
 #[test]
@@ -500,17 +490,22 @@ fn drop_guard_reverse_failure_records_cleanup_fault() {
     assert_eq!(
         receipt_log.len(),
         1,
-        "drop guard must emit exactly one cancellation receipt"
+        "drop guard must emit exactly one fault observation"
     );
     let receipt = receipt_log.get(0).unwrap();
-    assert!(
-        receipt.is_cancelled(),
-        "drop guard receipt must be a cancellation"
+    assert_eq!(
+        receipt.receipt_kind,
+        chio_core::receipt::kinds::ReceiptKind::TraceObservation
     );
+    assert!(receipt.decision.is_none());
+    assert!(receipt.verify_signature().expect("observation signature"));
     let metadata = receipt
         .metadata
         .as_ref()
-        .expect("cancellation receipt must carry metadata");
+        .expect("fault observation must carry metadata");
+    assert!(metadata
+        .pointer("/chio_runtime/identity_disposition")
+        .is_none());
     assert_eq!(
         metadata["chio_runtime"]["pre_dispatch_cleanup_failed"], true,
         "reverse failure must be visible as a pre-dispatch cleanup fault"
@@ -945,11 +940,19 @@ fn drop_pre_dispatch_records_receipt_on_cleanup_fault() -> Result<(), Box<dyn st
     let receipt = receipt_log
         .get(0)
         .ok_or_else(|| std::io::Error::other("pre-dispatch cleanup fault receipt missing"))?;
-    assert!(receipt.is_cancelled());
+    assert_eq!(
+        receipt.receipt_kind,
+        chio_core::receipt::kinds::ReceiptKind::TraceObservation
+    );
+    assert!(receipt.decision.is_none());
+    assert!(receipt.verify_signature()?);
     let receipt_metadata = receipt
         .metadata
         .as_ref()
         .ok_or_else(|| std::io::Error::other("fault receipt metadata missing"))?;
+    assert!(receipt_metadata
+        .pointer("/chio_runtime/identity_disposition")
+        .is_none());
     assert_eq!(
         receipt_metadata["chio_runtime"]["pre_dispatch_cleanup_failed"],
         true

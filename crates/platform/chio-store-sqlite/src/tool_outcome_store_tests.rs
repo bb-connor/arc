@@ -29,6 +29,8 @@ mod pure_finalization;
 mod qualified_claims;
 #[path = "tool_outcome_store_tests/recovery_component.rs"]
 mod recovery_component;
+#[path = "tool_outcome_store_tests/unknown_incident_race.rs"]
+mod unknown_incident_race;
 
 #[path = "tool_outcome_store_tests/compaction_fixture.rs"]
 mod compaction_fixture;

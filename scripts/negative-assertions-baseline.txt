@@ -174,7 +174,6 @@
 1	crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	admit_capability_budget_fails_closed_on_a_poisoned_registry	kernel.ensure_tcb_locks_healthy().is_err()
 1	crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	admit_capability_budget_fails_closed_on_a_poisoned_registry	poison.is_err()
 1	crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs	admit_capability_budget_fails_closed_on_a_poisoned_registry	result.is_err()
-1	crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/child_receipts.rs	nested_flow_child_receipt_timeout_records_cancellation	result.is_err()
 1	crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/child_receipts.rs	nested_flow_drop_path_preserves_child_receipts_after_a_first_append_failure	raced.is_err()
 1	crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/child_receipts.rs	nested_flow_drop_post_dispatch_flushes_buffered_child_receipt	raced.is_err()
 1	crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/child_receipts.rs	nested_flow_drop_post_dispatch_records_cancellation_receipt	raced.is_err()

@@ -149,7 +149,35 @@ fn invocation_owned_connections_close_on_completion_denial_and_cancellation() ->
                     .poll(&mut Context::from_waker(Waker::noop()))
                     .is_pending());
                 assert_eq!(live.load(Ordering::SeqCst), 1);
+                let committed =
+                    matches!(outcome, OwnedOutcome::CancelDispatch).then(|| store.operation());
                 drop(evaluation);
+                if let Some(committed) = committed {
+                    assert_eq!(
+                        committed.state(),
+                        AdmissionOperationState::DispatchCommitted
+                    );
+                    assert_eq!(
+                        store.operation(),
+                        committed,
+                        "Drop retains the original saga for its real recovery driver"
+                    );
+                    assert!(kernel.receipt_log().is_empty());
+                    kernel.reconcile_recoverable_admissions()?;
+                    let terminal = assert_original_unknown_incident(&store, &request);
+                    assert_eq!(terminal.binding(), committed.binding());
+                    assert_eq!(terminal.dispatch_commit(), committed.dispatch_commit());
+                    kernel.reconcile_recoverable_admissions()?;
+                    assert_eq!(
+                        store.operation(),
+                        terminal,
+                        "recovery cannot replace the committed incident"
+                    );
+                    assert!(
+                        kernel.receipt_log().is_empty(),
+                        "recovery creates no second frontdoor terminal"
+                    );
+                }
                 assert_eq!(
                     store.operation().state(),
                     if matches!(outcome, OwnedOutcome::CancelDispatch) {

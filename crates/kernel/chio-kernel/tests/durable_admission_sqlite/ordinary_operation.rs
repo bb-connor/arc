@@ -42,57 +42,6 @@ pub(super) fn from_signed_response(
     Ok(operation)
 }
 
-pub(super) fn from_retained_payment_response(
-    operations: &chio_store_sqlite::SqliteAdmissionOperationStore,
-    fence: &StoreMutationFence,
-    request: &ToolCallRequest,
-    response: &ToolCallResponse,
-    reference: &str,
-) -> Result<AdmissionOperationV1, Box<dyn Error>> {
-    assert!(response.receipt.verify_signature()?);
-    assert_eq!(response.receipt.kernel_key, request.capability.issuer);
-    assert_eq!(response.request_id, request.request_id);
-    assert_eq!(response.receipt.capability_id, request.capability.id);
-    assert_eq!(response.receipt.tool_server, request.server_id);
-    assert_eq!(response.receipt.tool_name, request.tool_name);
-    let operation = from_rail_reference(operations, fence, request, reference)?;
-    let journal = operations
-        .load_payment_journal(operation.binding().operation_id().as_str(), fence)?
-        .ok_or("original retained authorization journal")?;
-    let authorization_id = journal
-        .authorization_id
-        .as_deref()
-        .ok_or("original retained authorization ID")?;
-    let metadata = response
-        .receipt
-        .metadata
-        .as_ref()
-        .ok_or("original signed retained-payment metadata")?;
-    assert_eq!(
-        metadata
-            .get("receipt_context")
-            .and_then(|context| context.get("request_id"))
-            .and_then(serde_json::Value::as_str),
-        Some(request.request_id.as_str())
-    );
-    let financial = metadata
-        .get("financial")
-        .ok_or("original signed financial reference")?;
-    assert_eq!(
-        financial
-            .get("payment_reference")
-            .and_then(serde_json::Value::as_str),
-        Some(authorization_id)
-    );
-    assert_eq!(
-        financial
-            .get("payment_authorization_retained")
-            .and_then(serde_json::Value::as_bool),
-        Some(true)
-    );
-    Ok(operation)
-}
-
 pub(super) fn from_rail_reference(
     operations: &chio_store_sqlite::SqliteAdmissionOperationStore,
     fence: &StoreMutationFence,

@@ -172,6 +172,11 @@ impl ChioKernel {
                             .map(DurableToolAdmission::operation),
                         runtime_admission_metadata,
                     );
+                if !runtime_release_confirmed && durable_admission.is_some() {
+                    return Err(KernelError::DurableAdmission(
+                        "runtime admission reservation release could not be confirmed".into(),
+                    ));
+                }
                 if runtime_release_confirmed {
                     self.compensate_durable_admission_after_pre_dispatch_cleanup(
                         durable_admission
@@ -188,7 +193,14 @@ impl ChioKernel {
                             &msg,
                             now,
                             Some(matching.index),
-                            runtime_admission_metadata,
+                            RefusalReceiptMetadata::new(
+                                runtime_admission_metadata,
+                                if durable_admission.is_some() || !runtime_release_confirmed {
+                                    IdentityDisposition::Terminal
+                                } else {
+                                    IdentityDisposition::Reusable
+                                },
+                            ),
                         )
                     })
                     .map(ControlFlow::Break);
@@ -308,6 +320,9 @@ impl ChioKernel {
                                 .map(DurableToolAdmission::operation),
                             runtime_admission_metadata,
                         );
+                    if !runtime_release_confirmed && durable_admission.is_some() {
+                        return Err(error);
+                    }
                     if runtime_release_confirmed {
                         self.compensate_durable_admission_after_pre_dispatch_cleanup(
                             durable_admission
@@ -325,9 +340,16 @@ impl ChioKernel {
                                 now,
                                 matching_grants,
                                 cap,
-                                self.merge_budget_receipt_metadata(
-                                    runtime_admission_metadata,
-                                    self.budget_backend_receipt_metadata()?,
+                                RefusalReceiptMetadata::new(
+                                    self.merge_budget_receipt_metadata(
+                                        runtime_admission_metadata,
+                                        self.budget_backend_receipt_metadata()?,
+                                    ),
+                                    if durable_admission.is_some() || !runtime_release_confirmed {
+                                        IdentityDisposition::Terminal
+                                    } else {
+                                        IdentityDisposition::Reusable
+                                    },
                                 ),
                             )
                         })
@@ -368,7 +390,14 @@ impl ChioKernel {
                                 now,
                                 matching_grants,
                                 cap,
-                                receipt_metadata,
+                                RefusalReceiptMetadata::new(
+                                    receipt_metadata,
+                                    if durable_admission.is_some() {
+                                        IdentityDisposition::Terminal
+                                    } else {
+                                        IdentityDisposition::Reusable
+                                    },
+                                ),
                             )
                         })
                         .map(ControlFlow::Break);
@@ -380,6 +409,9 @@ impl ChioKernel {
                 )
             });
             let msg = error.to_string();
+            if runtime_release_retained && durable_admission.is_some() {
+                return Err(error);
+            }
             // An unconfirmed runtime release keeps the operation on its
             // recovery path, as at every other pre-dispatch denial.
             if !runtime_release_retained
@@ -403,12 +435,19 @@ impl ChioKernel {
                     now,
                     matching_grants,
                     cap,
-                    self.merge_budget_receipt_metadata(
-                        error.rejection_metadata(merge_metadata_objects(
-                            extra_metadata.clone(),
-                            budget_error_metadata,
-                        )),
-                        self.budget_backend_receipt_metadata()?,
+                    RefusalReceiptMetadata::new(
+                        self.merge_budget_receipt_metadata(
+                            error.rejection_metadata(merge_metadata_objects(
+                                extra_metadata.clone(),
+                                budget_error_metadata,
+                            )),
+                            self.budget_backend_receipt_metadata()?,
+                        ),
+                        if durable_admission.is_some() || runtime_release_retained {
+                            IdentityDisposition::Terminal
+                        } else {
+                            IdentityDisposition::Reusable
+                        },
                     ),
                 )
                 .map(ControlFlow::Break);

@@ -1,6 +1,6 @@
 //! An output guard rejects the value a committed dispatch actually returned.
 //! The rejection happens before the return is recorded, so the operation must
-//! terminalize as outcome unknown with a signed denial and no redispatch.
+//! retain the original outcome-unknown incident without a second receipt or dispatch.
 use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -188,7 +188,8 @@ fn rejected_output_terminalizes_unknown(entry: Entry) -> TestResult {
     } = fixture(&format!("returned-output-rejected-{entry:?}"), true);
 
     let parent = parent(&kernel, &request, entry)?;
-    let denied = evaluate(&kernel, &request, parent.as_ref())?;
+    let error = evaluate(&kernel, &request, parent.as_ref())
+        .expect_err("a refused raw return withholds output under its original incident");
 
     assert_eq!(
         observed(&seen)?,
@@ -200,18 +201,9 @@ fn rejected_output_terminalizes_unknown(entry: Entry) -> TestResult {
         KernelError::GuardDenied(REJECTION.to_owned())
     ))
     .to_string();
-    assert_eq!(denied.verdict, Verdict::Deny, "{entry:?}: {denied:?}");
-    assert_eq!(denied.reason.as_deref(), Some(expected_reason.as_str()));
-    assert!(denied.output.is_none());
-    assert!(denied.receipt.verify_signature()?);
-    assert!(denied.receipt.is_denied());
+    assert_eq!(error.to_string(), expected_reason, "{entry:?}");
 
-    let retained = store.operation();
-    assert_eq!(
-        retained.state(),
-        AdmissionOperationState::OutcomeUnknownAfterDispatch
-    );
-    assert!(retained.dispatch_commit().is_some());
+    let retained = assert_original_unknown_incident(&store, &request);
     {
         let state = store.state.lock().map_err(|_| "admission state poisoned")?;
         assert!(state.raw_outcome.is_none());
@@ -225,20 +217,13 @@ fn rejected_output_terminalizes_unknown(entry: Entry) -> TestResult {
         .ok_or("committed quota must remain retained")?;
     assert_eq!(usage.invocation_count, 1);
     let receipt_log = kernel.receipt_log();
-    assert_eq!(receipt_log.len(), 1, "{entry:?}");
-    let logged = receipt_log.get(0).ok_or("returned output denial receipt")?;
-    assert_eq!(logged.id, denied.receipt.id);
-    assert!(logged.is_denied());
-    assert!(logged.verify_signature()?);
+    assert!(
+        receipt_log.is_empty(),
+        "{entry:?}: the original incident is the sole terminal"
+    );
 
-    let replay = evaluate(&kernel, &request, parent.as_ref())?;
-    assert_eq!(replay.verdict, Verdict::Deny, "{entry:?}: {replay:?}");
-    assert!(replay
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("OutcomeUnknownAfterDispatch")));
-    assert!(replay.output.is_none());
-    assert!(replay.receipt.verify_signature()?);
+    assert_unknown_replay(evaluate(&kernel, &request, parent.as_ref()), &retained);
+    assert!(kernel.receipt_log().is_empty(), "{entry:?}");
     assert_eq!(store.operation(), retained);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert_eq!(observed(&seen)?.len(), 1, "{entry:?}");

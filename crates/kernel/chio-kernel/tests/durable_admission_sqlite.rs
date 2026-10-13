@@ -32,6 +32,8 @@ use chio_kernel::{
 };
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
 
+#[path = "durable_admission_sqlite/aggregate_budget.rs"]
+mod aggregate_budget;
 #[path = "durable_admission_sqlite/dpop_replay.rs"]
 mod dpop_replay;
 #[path = "durable_admission_sqlite/federation_context.rs"]
@@ -107,7 +109,7 @@ impl ToolServerConnection for MutationServer {
     }
 
     fn tool_names(&self) -> Vec<String> {
-        vec!["mutate".to_owned()]
+        vec!["mutate".to_owned(), "mutate-alt".to_owned()]
     }
 
     async fn invoke(
@@ -765,14 +767,16 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
         let agent = Keypair::generate();
         let capability = kernel.issue_capability(&agent.public_key(), paid_scope(), 300)?;
         let request = paid_request(&capability);
-        let denied = kernel.evaluate_tool_call_blocking(&request)?;
-        assert_eq!(denied.verdict, Verdict::Deny);
-        assert!(denied.output.is_none());
-        assert!(denied.receipt.verify_signature()?);
-        assert!(denied
-            .reason
-            .as_deref()
-            .is_some_and(|reason| { reason.contains("injected tool outcome write failure") }));
+        let Err(error) = kernel.evaluate_tool_call_blocking(&request) else {
+            return Err("a failed return write must preserve its original incident owner".into());
+        };
+        assert!(
+            matches!(error, KernelError::AdmissionRecovery(ref failure)
+            if matches!(failure.as_ref(), chio_kernel::admission_operation::AdmissionRecoveryError::Outcome(
+                ToolOutcomeStoreError::Unavailable(reason)) if reason == "injected tool outcome write failure")),
+            "{error:?}"
+        );
+        assert!(kernel.receipt_log().is_empty());
         assert!(operations
             .list_recoverable(now_unix_ms()? + 120_000, 10)?
             .is_empty());
@@ -783,11 +787,10 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
         let [reference] = references.as_slice() else {
             return Err("expected one original authorization reference".into());
         };
-        let operation = ordinary_operation::from_retained_payment_response(
+        let operation = ordinary_operation::from_rail_reference(
             operations.as_ref(),
             &fence,
             &request,
-            &denied,
             reference,
         )?;
         assert_eq!(

@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "durable_admission/cleanup_fault_ownership.rs"]
+mod cleanup_fault_ownership;
 #[path = "durable_admission/configuration.rs"]
 mod configuration;
 #[path = "durable_admission/cumulative_budget.rs"]
@@ -10,7 +12,11 @@ mod output_finalization;
 mod pre_dispatch;
 #[path = "durable_admission/recovery.rs"]
 mod recovery;
+
+#[path = "durable_admission/unknown_incident_assertions.rs"]
+mod unknown_incident_assertions;
 use receipt_projection::AdmissionReceiptProjectionStore;
+use unknown_incident_assertions::{assert_original_unknown_incident, assert_unknown_replay};
 
 #[path = "durable_admission/authority_profile.rs"]
 mod authority_profile;
@@ -28,6 +34,8 @@ mod dpop_acquisition;
 mod federation_context;
 #[path = "durable_admission/governed_acquisition.rs"]
 mod governed_acquisition;
+#[path = "durable_admission/identity_disposition.rs"]
+mod identity_disposition;
 #[path = "durable_admission/monetary.rs"]
 mod monetary;
 #[path = "durable_admission/native_acquisition.rs"]
@@ -82,6 +90,10 @@ pub(super) struct TestAdmissionOperationStore {
     approval_recovery: governed_acquisition::TestApproval,
     runtime_recovery: runtime_participant::TestRuntimeRecovery,
     pub(super) fence: std::sync::Mutex<StoreMutationFence>,
+    lose_next_begin_ack: std::sync::atomic::AtomicBool,
+    fail_next_replay_read: std::sync::atomic::AtomicBool,
+    capture_pending_failure: std::sync::atomic::AtomicU8,
+    lose_next_command_ack: std::sync::atomic::AtomicBool,
     fail_next_outcome_write: std::sync::atomic::AtomicBool,
     fail_next_evaluation_begin: std::sync::atomic::AtomicBool,
     fail_next_evaluation_stage: std::sync::atomic::AtomicBool,
@@ -108,6 +120,10 @@ impl TestAdmissionOperationStore {
             approval_recovery: governed_acquisition::TestApproval::default(),
             runtime_recovery: runtime_participant::TestRuntimeRecovery::default(),
             fence: std::sync::Mutex::new(fence),
+            lose_next_begin_ack: std::sync::atomic::AtomicBool::new(false),
+            fail_next_replay_read: std::sync::atomic::AtomicBool::new(false),
+            capture_pending_failure: std::sync::atomic::AtomicU8::new(0),
+            lose_next_command_ack: std::sync::atomic::AtomicBool::new(false),
             fail_next_outcome_write: std::sync::atomic::AtomicBool::new(false),
             fail_next_evaluation_begin: std::sync::atomic::AtomicBool::new(false),
             fail_next_evaluation_stage: std::sync::atomic::AtomicBool::new(false),
@@ -282,8 +298,18 @@ impl ReceiptStore for TestAdmissionOperationStore {
             .terminal_replay()
             .cloned()
             .ok_or_else(|| ReceiptStoreError::Conflict("terminal replay is absent".to_owned()))?;
-        if let AdmissionTerminalProjection::Completed(completed) = projection {
-            state.receipt = Some(completed.receipt.receipt().clone());
+        match projection {
+            AdmissionTerminalProjection::Completed(completed) => {
+                state.receipt = Some(completed.receipt.receipt().clone());
+            }
+            AdmissionTerminalProjection::DeniedAfterDelivery { evidence, .. } => {
+                if let crate::admission_operation::AdmissionReceiptOrIncident::Receipt(receipt) =
+                    evidence.as_ref()
+                {
+                    state.receipt = Some(receipt.receipt().clone());
+                }
+            }
+            _ => {}
         }
         state.operation = Some(updated.clone());
         state.claim = None;

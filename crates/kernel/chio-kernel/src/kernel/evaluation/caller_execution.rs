@@ -341,6 +341,10 @@ impl ChioKernel {
         let nonce = match reserved {
             Ok(nonce) => nonce,
             Err(error) => {
+                if !error.durable_commit_outcome_is_unknown() {
+                    return Err(error);
+                }
+
                 let reason = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&reason), "caller execution reservation could not be confirmed");
                 return self.build_deny_response_with_metadata(
@@ -348,7 +352,10 @@ impl ChioKernel {
                     &reason,
                     now,
                     Some(matched_grant_index),
-                    self.retained_admission_receipt_metadata(budget_mutation, extra_metadata),
+                    RefusalReceiptMetadata::new(
+                        self.retained_admission_receipt_metadata(budget_mutation, extra_metadata),
+                        IdentityDisposition::Retained,
+                    ),
                 );
             }
         };

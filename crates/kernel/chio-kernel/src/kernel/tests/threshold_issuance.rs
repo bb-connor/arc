@@ -554,10 +554,17 @@ fn pending_retry_rechecks_current_directory() -> TestResult {
                 120,
             )?,
         )));
-    let response = fixture
+    let receipts = fixture.kernel.receipt_log().len();
+    let error = fixture
         .kernel
-        .evaluate_tool_call_blocking(&fixture.request)?;
-    assert_eq!(response.verdict, Verdict::Deny);
+        .evaluate_tool_call_blocking(&fixture.request)
+        .expect_err("changed policy cannot terminalize the pending approval");
+    assert!(
+        matches!(error, KernelError::GovernedTransactionDenied(ref reason)
+        if reason.contains("threshold proposal does not match")),
+        "{error:?}"
+    );
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
     assert_eq!(
         fixture.store.operation().threshold_proposal(),
         Some(&proposal)

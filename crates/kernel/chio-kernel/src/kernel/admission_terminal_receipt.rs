@@ -184,7 +184,10 @@ impl ChioKernel {
             action,
             content_hash: receipt_content.content_hash,
             canonical_content: receipt_content.canonical_content,
-            metadata: Some(security_admission_operation_metadata(terminal)),
+            metadata: crate::kernel::receipt_identity::with_identity_disposition(
+                Some(security_admission_operation_metadata(terminal)),
+                IdentityDisposition::Terminal,
+            ),
             timestamp: self.read_authority_time()?.as_secs(),
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,

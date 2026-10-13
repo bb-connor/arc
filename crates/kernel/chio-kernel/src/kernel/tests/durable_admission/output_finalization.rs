@@ -1,5 +1,15 @@
 use super::*;
 
+fn assert_terminal_identity(response: &ToolCallResponse, operation: &AdmissionOperationV1) {
+    assert!(response.receipt.verify_signature().unwrap());
+    let metadata = response.receipt.metadata.as_ref().unwrap();
+    assert_eq!(metadata["chio_runtime"]["identity_disposition"], "terminal");
+    assert_eq!(
+        metadata["receipt_context"]["request_namespace_digest"],
+        operation.binding().request_namespace_digest().as_str()
+    );
+}
+
 #[test]
 fn durable_post_invocation_identity_binds_transformed_output_and_replay() {
     let (mut kernel, request, store, invocations) =
@@ -71,12 +81,18 @@ fn durable_redaction_cannot_upgrade_incomplete_transport_and_replay_is_exactly_o
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 
+    assert_terminal_identity(&response, &store.operation());
+
     let replay = kernel
         .evaluate_tool_call_blocking(&request)
         .expect("durable incomplete stream replay");
     assert_eq!(replay.output, response.output);
     assert_eq!(replay.receipt.id, response.receipt.id);
     assert_eq!(replay.terminal_state, response.terminal_state);
+    assert_eq!(
+        serde_json::to_value(&replay.receipt).unwrap(),
+        serde_json::to_value(&response.receipt).unwrap()
+    );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 
@@ -117,6 +133,7 @@ fn durable_redaction_recovery_uses_the_recorded_stream_limits() {
         .evaluate_tool_call_blocking(&request)
         .expect("recover redacted stream with recorded limits");
     assert_eq!(recovered.verdict, Verdict::Deny);
+    assert_terminal_identity(&recovered, &store.operation());
     assert!(recovered
         .reason
         .as_deref()
@@ -172,26 +189,46 @@ fn durable_post_invocation_identity_change_cannot_replace_recovered_finalization
     }));
 
     let retained = store.operation();
-    let denial = recovered_kernel
+    let error = recovered_kernel
         .evaluate_tool_call_blocking(&request)
-        .expect("identity substitution must produce a signed denial");
-    assert_eq!(denial.verdict, Verdict::Deny);
-    assert!(denial.output.is_none());
-    assert!(denial.receipt.verify_signature().expect("denial signature"));
+        .expect_err("identity substitution must preserve the original finalization");
     assert_eq!(
-        denial.reason.as_deref(),
-        Some(
-            format!(
-                "durable admission failed: request id conflicts with retained operation {}",
-                retained.binding().operation_id().as_str()
-            )
-            .as_str()
+        error.to_string(),
+        format!(
+            "durable admission failed: request id conflicts with retained operation {}",
+            retained.binding().operation_id().as_str()
         )
     );
     assert_eq!(store.operation(), retained);
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::Finalizing
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn durable_delivery_denial_binds_terminal_identity_and_replays_one_receipt() {
+    let mut grant = make_grant("durable-server", "mutate");
+    grant
+        .constraints
+        .push(crate::Constraint::OutputDigestSha256("a".repeat(64)));
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture_with_grants("terminal-delivery-denial", vec![grant]);
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.output.is_none());
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::DeniedAfterDelivery
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_terminal_identity(&response, &store.operation());
+    let replay = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert_eq!(
+        serde_json::to_value(&replay.receipt).unwrap(),
+        serde_json::to_value(&response.receipt).unwrap()
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }

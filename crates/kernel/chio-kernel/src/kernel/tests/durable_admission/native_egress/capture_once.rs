@@ -357,6 +357,38 @@ fn evaluate(case: &Case) -> Result<ToolCallResponse, KernelError> {
     }
 }
 
+fn assert_capture_replay(
+    result: Result<ToolCallResponse, KernelError>,
+    already_compensated: bool,
+    reason: &str,
+) -> CaptureResult {
+    if already_compensated {
+        let error = result.expect_err("a compensated operation cannot mint another receipt");
+        assert!(
+            matches!(error, KernelError::DurableAdmission(ref detail) if detail == reason),
+            "{error:?}"
+        );
+    } else {
+        let response = result?;
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert_eq!(
+            response.reason,
+            Some(KernelError::DurableAdmission(reason.into()).to_string())
+        );
+        assert!(response.output.is_none());
+        assert!(response.receipt.verify_signature()?);
+        assert_eq!(
+            response
+                .receipt
+                .metadata
+                .as_ref()
+                .ok_or("missing metadata")?["chio_runtime"]["identity_disposition"],
+            "terminal"
+        );
+    }
+    Ok(())
+}
+
 fn single_use_capture(site: Site, entry: Entry, boundary: Boundary) -> CaptureResult {
     let label = format!("{site:?}/{entry:?}/{boundary:?}");
     let case = arrange(site, entry, boundary)?;
@@ -416,24 +448,19 @@ fn single_use_capture(site: Site, entry: Entry, boundary: Boundary) -> CaptureRe
     };
     let operation = assert_retained(&case, &label, state, hold, quota)?;
 
-    let replay = evaluate(&case)?;
-    let replay_reason = KernelError::DurableAdmission(
-        match boundary {
-            Boundary::StoreEntered => "native preparation requires original pre-budget authority",
-            Boundary::BeforeStore => {
-                "request replay is retained in state CompensatedBeforeDispatch"
-            }
-        }
-        .into(),
-    );
-    assert_eq!(replay.verdict, Verdict::Deny, "{label}: {replay:?}");
-    assert_eq!(
-        replay.reason.as_deref(),
-        Some(replay_reason.to_string().as_str()),
-        "{label}"
-    );
-    assert!(replay.output.is_none());
-    assert!(replay.receipt.verify_signature()?);
+    let receipts = case.kernel.receipt_log().len();
+    let replay_reason = match boundary {
+        Boundary::StoreEntered => "native preparation requires original pre-budget authority",
+        Boundary::BeforeStore => "request replay is retained in state CompensatedBeforeDispatch",
+    };
+    assert_capture_replay(
+        evaluate(&case),
+        boundary == Boundary::BeforeStore,
+        replay_reason,
+    )?;
+    if boundary == Boundary::BeforeStore {
+        assert_eq!(case.kernel.receipt_log().len(), receipts, "{label}");
+    }
     let replayed = assert_retained(
         &case,
         &label,

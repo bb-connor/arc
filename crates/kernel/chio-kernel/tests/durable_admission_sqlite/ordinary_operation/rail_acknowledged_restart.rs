@@ -1,23 +1,22 @@
-//! A process that dies after the rail acknowledged a capture, but before the
-//! completion compare-and-set, leaves only the durable settlement intent. The
-//! next owner re-drives that intent once and never reapplies its reconcile.
+//! A clock fault after capture acknowledgement leaves the durable settlement
+//! intent incomplete. A reopened owner retries that intent without repeating
+//! the tool invocation or its budget reconciliation.
 use super::*;
 use chio_security_types::clock::{Clock, ClockError, ClockReading};
 
-struct ProcessDied;
+struct LostCaptureAcknowledgement;
 
-/// The kernel's first clock read after the rail acknowledged is the relock
-/// that precedes the completion compare-and-set, so dying there loses only
-/// the in-memory acknowledgement.
-struct DieAfterAcknowledgement {
+/// Panics on the first clock read after capture acknowledgement, before the
+/// completion compare-and-set can persist that acknowledgement.
+struct PanicAfterAcknowledgement {
     source: Arc<dyn Clock>,
     acknowledged: Arc<AtomicBool>,
 }
 
-impl Clock for DieAfterAcknowledgement {
+impl Clock for PanicAfterAcknowledgement {
     fn read(&self) -> Result<ClockReading, ClockError> {
         if self.acknowledged.swap(false, Ordering::SeqCst) {
-            std::panic::resume_unwind(Box::new(ProcessDied));
+            std::panic::resume_unwind(Box::new(LostCaptureAcknowledgement));
         }
         self.source.read()
     }
@@ -79,7 +78,7 @@ impl PaymentAdapter for AcknowledgingRail {
 }
 
 #[test]
-fn sqlite_death_after_rail_acknowledgement_redrives_the_capture_once() -> Result<(), Box<dyn Error>>
+fn sqlite_restart_after_capture_acknowledgement_fault_redrives_once() -> Result<(), Box<dyn Error>>
 {
     let temp = tempfile::tempdir()?;
     secure_directory(temp.path())?;
@@ -92,7 +91,7 @@ fn sqlite_death_after_rail_acknowledgement_redrives_the_capture_once() -> Result
     let calls = Arc::new(PaymentCalls::default());
     let acknowledged = Arc::new(AtomicBool::new(false));
 
-    let (request, operation_id, capability_id, died_journal, died_fence) = {
+    let (request, operation_id, capability_id, retained_journal, original_fence) = {
         let authority = SqliteAuthorityStore::open_serving_with_clock(
             &database,
             &lock_root,
@@ -102,7 +101,7 @@ fn sqlite_death_after_rail_acknowledgement_redrives_the_capture_once() -> Result
         let operations = Arc::new(authority.admission_operation_store());
         let mut kernel = ChioKernel::new_with_clock(
             kernel_config(keypair.clone()),
-            Arc::new(DieAfterAcknowledgement {
+            Arc::new(PanicAfterAcknowledgement {
                 source: chio_test_support::clock::clock(),
                 acknowledged: acknowledged.clone(),
             }),
@@ -125,18 +124,14 @@ fn sqlite_death_after_rail_acknowledgement_redrives_the_capture_once() -> Result
         let agent = Keypair::generate();
         let capability = kernel.issue_capability(&agent.public_key(), paid_scope(), 300)?;
         let request = paid_request(&capability);
-        let died = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            kernel.evaluate_tool_call_blocking(&request)
-        }));
-        let payload = match died {
-            Err(payload) => payload,
-            Ok(result) => {
-                return Err(
-                    format!("evaluation outlived the acknowledged capture: {result:?}").into(),
-                )
-            }
+        let Err(error) = kernel.evaluate_tool_call_blocking(&request) else {
+            return Err("clock fault must retain the original settlement intent".into());
         };
-        assert!(payload.downcast_ref::<ProcessDied>().is_some());
+        assert!(
+            matches!(error, KernelError::Clock(ClockError::Unavailable)),
+            "{error:?}"
+        );
+        assert!(kernel.receipt_log().is_empty());
         assert!(!acknowledged.load(Ordering::SeqCst));
         assert_eq!(calls.captures.load(Ordering::SeqCst), 1);
         let reference = {
@@ -153,7 +148,7 @@ fn sqlite_death_after_rail_acknowledgement_redrives_the_capture_once() -> Result
         assert_eq!(operation.state(), AdmissionOperationState::Finalizing);
         let journal = operations
             .load_payment_journal(operation.binding().operation_id().as_str(), &fence)?
-            .ok_or("journal at the death")?;
+            .ok_or("retained settlement journal")?;
         assert_eq!(
             (
                 journal.state,
@@ -181,13 +176,13 @@ fn sqlite_death_after_rail_acknowledgement_redrives_the_capture_once() -> Result
         chio_test_support::clock::clock(),
     )?;
     let fence = authority.mutation_fence();
-    assert_eq!(fence.store_uuid, died_fence.store_uuid);
-    assert!(fence.owner_epoch > died_fence.owner_epoch);
+    assert_eq!(fence.store_uuid, original_fence.store_uuid);
+    assert!(fence.owner_epoch > original_fence.owner_epoch);
     let operations = Arc::new(authority.admission_operation_store());
     let budget = Arc::new(authority.budget_store());
     assert_eq!(
         operations.load_payment_journal(operation_id.as_str(), &fence)?,
-        Some(died_journal)
+        Some(retained_journal)
     );
     let reconciled = budget
         .get_usage(&capability_id, 0)?

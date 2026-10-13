@@ -310,6 +310,8 @@ mod drop_guard_proptest;
 mod formal_closure;
 #[path = "tests/invocation_dispatch.rs"]
 mod invocation_dispatch;
+#[path = "tests/post_effect_receipts.rs"]
+mod post_effect_receipts;
 
 #[path = "tests/automatic_active_response_fence.rs"]
 mod automatic_active_response_fence;
@@ -326,3 +328,11 @@ use treaty_dsse::TreatyDsseAdmissionHook;
 
 #[path = "tests/receipt_publication.rs"]
 mod receipt_publication;
+
+#[path = "tests/receipt_namespace.rs"]
+mod receipt_namespace;
+
+#[path = "tests/evidence_recovery.rs"]
+mod evidence_recovery;
+#[path = "tests/obligation_capacity.rs"]
+mod obligation_capacity;
