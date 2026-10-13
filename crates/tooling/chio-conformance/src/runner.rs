@@ -15,6 +15,7 @@ use crate::{
 };
 
 mod native_launch;
+mod restart_probe;
 
 const SERVER_STARTUP_ATTEMPTS: usize = 900;
 const SERVER_STARTUP_POLL_INTERVAL: Duration = Duration::from_millis(100);
@@ -64,6 +65,8 @@ pub struct ConformanceRunOptions {
     pub go_binary: OsString,
     pub cargo_binary: OsString,
     pub peer_binaries: Vec<(PeerTarget, PathBuf)>,
+    /// Restart the server mid-run to check hosted session recovery.
+    pub restart_probe: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -271,6 +274,7 @@ pub fn default_run_options() -> ConformanceRunOptions {
         go_binary: OsString::from("go"),
         cargo_binary: OsString::from("cargo"),
         peer_binaries: Vec::new(),
+        restart_probe: false,
         repo_root,
     }
 }
@@ -386,6 +390,33 @@ pub fn run_conformance_harness(
             &peer_log_path,
         )?;
         peer_result_files.push(peer_results_path);
+    }
+
+    if options.restart_probe {
+        let restarted_log_path = logs_dir.join("chio-mcp-serve-http-restarted.log");
+        let probe_results = restart_probe::run(options, listen, || {
+            // A crash, not a graceful stop: graceful shutdown terminalizes
+            // every session, and only a crashed host restores them.
+            server_guard.child.kill()?;
+            server_guard.child.wait()?;
+            server_guard.child = spawn_remote_edge(
+                &chio_executable,
+                options,
+                listen,
+                &runtime_state,
+                &native_security,
+                &restarted_log_path,
+            )?;
+            wait_for_server(listen, &mut server_guard.child, &restarted_log_path)
+        })?;
+        let probe_results_path = options
+            .results_dir
+            .join(format!("{}-remote-http.json", restart_probe::PEER_LABEL));
+        fs::write(
+            &probe_results_path,
+            serde_json::to_vec_pretty(&probe_results).map_err(std::io::Error::other)?,
+        )?;
+        peer_result_files.push(probe_results_path);
     }
 
     let results = load_results_from_dir(&options.results_dir)?;
