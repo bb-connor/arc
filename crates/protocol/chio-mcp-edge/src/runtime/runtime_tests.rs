@@ -4490,3 +4490,5 @@ fn serve_stdio_refreshes_roots_after_list_changed_notification() {
 
 #[path = "runtime_tests/protocol_boundaries.rs"]
 mod protocol_boundaries;
+#[path = "runtime_tests/stateless_revision.rs"]
+mod stateless_revision;

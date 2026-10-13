@@ -143,7 +143,32 @@ impl ChioMcpEdge {
         let mut peer_capabilities = parse_peer_capabilities(&params);
         peer_capabilities.authorization = Some(authorization.clone());
 
-        let opened_session = match self.initial_session_id.clone() {
+        let session_id = match self.open_kernel_session(peer_capabilities) {
+            Ok(session_id) => session_id,
+            Err(message) => return jsonrpc_error(id, JSONRPC_INTERNAL_ERROR, &message),
+        };
+        self.state = EdgeState::WaitingForInitialized { session_id };
+
+        let capabilities = self.advertised_capabilities(&authorization, selected_protocol_version);
+
+        jsonrpc_result(
+            id,
+            json!({
+                "protocolVersion": selected_protocol_version,
+                "capabilities": Value::Object(capabilities),
+                "serverInfo": {
+                    "name": self.config.server_name,
+                    "version": self.config.server_version,
+                }
+            }),
+        )
+    }
+
+    pub(super) fn open_kernel_session(
+        &mut self,
+        peer_capabilities: PeerCapabilities,
+    ) -> Result<SessionId, String> {
+        let session_id = match self.initial_session_id.clone() {
             Some(session_id) => self.kernel.open_session_with_id(
                 session_id,
                 self.agent_id.clone(),
@@ -152,39 +177,22 @@ impl ChioMcpEdge {
             None => self
                 .kernel
                 .open_session(self.agent_id.clone(), self.capabilities.clone()),
-        };
-        let session_id = match opened_session {
-            Ok(session_id) => session_id,
-            Err(error) => {
-                return jsonrpc_error(
-                    id,
-                    JSONRPC_INTERNAL_ERROR,
-                    &format!("failed to open session: {error}"),
-                );
-            }
-        };
-        if let Err(error) = self
-            .kernel
+        }
+        .map_err(|error| format!("failed to open session: {error}"))?;
+        self.kernel
             .set_session_auth_context(&session_id, self.session_auth_context.clone())
-        {
-            return jsonrpc_error(
-                id,
-                JSONRPC_INTERNAL_ERROR,
-                &format!("failed to persist session auth context: {error}"),
-            );
-        }
-        if let Err(error) = self
-            .kernel
+            .map_err(|error| format!("failed to persist session auth context: {error}"))?;
+        self.kernel
             .set_session_peer_capabilities(&session_id, peer_capabilities)
-        {
-            return jsonrpc_error(
-                id,
-                JSONRPC_INTERNAL_ERROR,
-                &format!("failed to persist peer capabilities: {error}"),
-            );
-        }
-        self.state = EdgeState::WaitingForInitialized { session_id };
+            .map_err(|error| format!("failed to persist peer capabilities: {error}"))?;
+        Ok(session_id)
+    }
 
+    pub(super) fn advertised_capabilities(
+        &self,
+        authorization: &chio_core::capability::features::CapabilityNegotiation,
+        selected_protocol_version: &str,
+    ) -> serde_json::Map<String, Value> {
         let mut capabilities = serde_json::Map::new();
         capabilities.insert(
             "tools".to_string(),
@@ -266,18 +274,7 @@ impl ChioMcpEdge {
                 }
             }),
         );
-
-        jsonrpc_result(
-            id,
-            json!({
-                "protocolVersion": selected_protocol_version,
-                "capabilities": Value::Object(capabilities),
-                "serverInfo": {
-                    "name": self.config.server_name,
-                    "version": self.config.server_version,
-                }
-            }),
-        )
+        capabilities
     }
 
     pub(super) fn handle_tools_list(&mut self, id: Value, params: Value) -> Value {

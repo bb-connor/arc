@@ -6,5 +6,6 @@ mod operator_approvals;
 mod protocol_refusal;
 mod session_isolation;
 mod session_lifecycle;
+mod stateless_http;
 mod support;
 mod support_config;
