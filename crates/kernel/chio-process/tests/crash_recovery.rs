@@ -552,14 +552,28 @@ async fn subprocess_worker() -> Result {
         assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
         assert!(response.output.is_none());
         assert!(response.receipt.verify_signature()?);
-        assert!(
-            response
-                .reason
-                .as_deref()
-                .unwrap_or_default()
-                .contains("OutcomeUnknownAfterDispatch"),
-            "{:?}",
-            response.reason
+        assert_eq!(
+            response.reason.as_deref(),
+            Some("dispatch outcome is unknown after recovery")
+        );
+        let metadata = response
+            .receipt
+            .metadata
+            .as_ref()
+            .ok_or("receipt metadata")?;
+        assert_eq!(
+            metadata.pointer("/admission_operation/projected_state"),
+            Some(&json!("outcome_unknown_after_dispatch"))
+        );
+        let process = &metadata["chio_process"];
+        assert_eq!(process["runtime_id"], json!(runtime.runtime_id()));
+        assert_eq!(process["process_id"], json!("root"));
+        assert_eq!(process["operation_key"], json!("publish"));
+        assert_eq!(process["attempt"], json!(1));
+        let replay = runtime.invoke("root", "publish", &request).await?;
+        assert_eq!(
+            serde_json::to_value(&replay.receipt)?,
+            serde_json::to_value(&response.receipt)?
         );
     } else {
         assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
