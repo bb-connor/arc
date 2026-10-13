@@ -1147,12 +1147,28 @@ fn oracle_drop_disposition(
             )?;
             let receipt = &receipts[0];
             require(
-                receipt.is_cancelled(),
-                "cleanup fault receipt is not cancelled",
+                receipt.receipt_kind == chio_core::receipt::kinds::ReceiptKind::TraceObservation
+                    && receipt.decision.is_none(),
+                "cleanup fault is not a decision-free observation",
             )?;
             require(
-                cancelled_reason(receipt) == Some(PRE_DISPATCH_DROP_REASON),
-                "cleanup fault receipt reason drift",
+                receipt
+                    .metadata
+                    .as_ref()
+                    .and_then(|metadata| {
+                        metadata.pointer("/chio_runtime/pre_dispatch_cleanup_reason")
+                    })
+                    .and_then(serde_json::Value::as_str)
+                    == Some(PRE_DISPATCH_DROP_REASON),
+                "cleanup fault observation reason drift",
+            )?;
+            require(
+                receipt
+                    .metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.pointer("/chio_runtime/identity_disposition"))
+                    .is_none(),
+                "cleanup fault observation claimed an identity disposition",
             )?;
             let cleanup_failed = receipt
                 .metadata
