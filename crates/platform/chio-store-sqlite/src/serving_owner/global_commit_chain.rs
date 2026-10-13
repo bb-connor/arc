@@ -14,6 +14,7 @@ use super::finding_market_snapshot_versions::{
     FindingMarketSnapshotShape,
 };
 use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
+use crate::admission_operation_store as admission_store;
 
 mod projection_reference;
 mod schema_migration;
@@ -1712,13 +1713,11 @@ fn without_factor_assignment_tables(tables: Vec<String>) -> Vec<String> {
 fn verify_global_projection_coverage(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    crate::admission_operation_store::verify_runtime_replay_projection_coverage(connection)?;
-    crate::admission_operation_store::verify_governed_approval_replay_projection_coverage(
-        connection,
-    )?;
-    crate::admission_operation_store::verify_dpop_replay_projection_coverage(connection)?;
-    crate::admission_operation_store::verify_security_participant_migration_coverage(connection)?;
-    crate::admission_operation_store::verify_stop_epoch_projection_coverage(connection)?;
+    admission_store::verify_runtime_replay_projection_coverage(connection)?;
+    admission_store::verify_governed_approval_replay_projection_coverage(connection)?;
+    admission_store::verify_dpop_replay_projection_coverage(connection)?;
+    admission_store::verify_security_participant_migration_coverage(connection)?;
+    admission_store::verify_stop_epoch_projection_coverage(connection)?;
     verify_channel_release_projection_coverage(connection)?;
     verify_finding_challenge_projection_coverage(connection)?;
     verify_finding_status_projection_coverage(connection)?;

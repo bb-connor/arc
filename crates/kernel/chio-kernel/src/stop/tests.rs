@@ -126,20 +126,34 @@ fn chain_rejects_gaps_forks_repeats_and_foreign_records() {
     let mut inconsistent_state = second.clone();
     inconsistent_state.state = StopState::Stopped;
 
-    for bad in [
-        gap,
-        fork,
-        repeat,
-        foreign,
-        wrong_schema,
-        clockless_resume,
-        inconsistent_state,
+    for (bad, detail) in [
+        (gap, "stop chain epoch is not contiguous"),
+        (fork, "stop record does not extend its predecessor"),
+        (repeat, "stop record repeats its predecessor's state"),
+        (foreign, "stop record belongs to another authority"),
+        (wrong_schema, "stop record schema is not chio.stop-epoch.v1"),
+        (
+            clockless_resume,
+            "a resume requires observed authority time",
+        ),
+        (
+            inconsistent_state,
+            "stop record state does not follow its transition",
+        ),
     ] {
         let chain = [first.clone(), bad];
-        assert!(verify_stop_chain(AUTHORITY, StopScope::Kernel, &chain).is_err());
+        assert_eq!(
+            verify_stop_chain(AUTHORITY, StopScope::Kernel, &chain),
+            Err(StopChainError(detail.to_owned()))
+        );
     }
     let opening_resume = record(None, StopTransition::Resume);
-    assert!(verify_stop_chain(AUTHORITY, StopScope::Kernel, &[opening_resume]).is_err());
+    assert_eq!(
+        verify_stop_chain(AUTHORITY, StopScope::Kernel, &[opening_resume]),
+        Err(StopChainError(
+            "stop record repeats its predecessor's state".to_owned()
+        ))
+    );
 }
 
 #[test]
@@ -217,7 +231,10 @@ fn a_failed_durable_append_still_stops_this_process() {
     assert_eq!(status.durability, "process_only");
     assert!(control.heads().is_stopped());
 
-    assert!(control.resume(resume_command(None)).is_err());
+    assert!(matches!(
+        control.resume(resume_command(None)),
+        Err(StopControlError::Refused(detail)) if detail.contains("disk full")
+    ));
     assert!(control.heads().is_stopped());
     store.fail_appends.store(false, Ordering::SeqCst);
     assert!(!control.resume(resume_command(None)).unwrap().stopped);
@@ -276,6 +293,9 @@ fn stop_reasons_are_bounded() {
         ));
     }
     let long = "x".repeat(MAX_STOP_REASON_BYTES + 1);
-    assert!(control.stop(stop_command(&long)).is_err());
+    assert!(matches!(
+        control.stop(stop_command(&long)),
+        Err(StopControlError::BadRequest(detail)) if detail == "stop reason is too long"
+    ));
     assert!(!control.heads().is_stopped());
 }
