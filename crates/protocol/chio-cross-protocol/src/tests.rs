@@ -1484,30 +1484,98 @@ fn plan_authoritative_route_attentuates_to_native_fallback_when_requested_route_
     );
 }
 
-#[test]
-fn plan_authoritative_route_ignores_snake_case_control_plane_keys() {
+fn mcp_available_native_unavailable() -> BTreeMap<DiscoveryProtocol, RouteAvailabilityStatus> {
     let mut availability = BTreeMap::new();
+    availability.insert(DiscoveryProtocol::Mcp, RouteAvailabilityStatus::available());
     availability.insert(
-        DiscoveryProtocol::Mcp,
-        RouteAvailabilityStatus::unavailable("mcp route unavailable"),
+        DiscoveryProtocol::Native,
+        RouteAvailabilityStatus::unavailable("native route unavailable"),
     );
+    availability
+}
+
+fn plan_mcp_route_with_context(context: Value) -> Result<RoutePlanningOutcome, BridgeError> {
     let executor = MockMcpExecutor;
     let registry = TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);
-    let planning = plan_authoritative_route(
-        "req-route-snake",
+    let mut intent = governed_intent_with_control_plane(json!({}));
+    intent.context = Some(context);
+    plan_authoritative_route(
+        "req-route-control-plane-shape",
         DiscoveryProtocol::A2a,
         DiscoveryProtocol::Mcp,
-        Some(&governed_intent_with_control_plane(json!({
-            "allow_native_fallback": true
-        }))),
+        Some(&intent),
         &registry,
-        &availability,
+        &mcp_available_native_unavailable(),
     )
-    .unwrap();
+}
 
-    assert_ne!(
+#[test]
+fn plan_authoritative_route_refuses_snake_case_control_plane_key() {
+    let error = plan_mcp_route_with_context(json!({
+        "chio_control_plane": { "disallowProjectedProtocols": true }
+    }))
+    .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "invalid request envelope: governed intent context key `chio_control_plane` is not recognized; route hints belong under `chioControlPlane`"
+    );
+}
+
+#[test]
+fn plan_authoritative_route_refuses_snake_case_restriction_field() {
+    let error = plan_mcp_route_with_context(json!({
+        "chioControlPlane": { "disallow_projected_protocols": true }
+    }))
+    .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "invalid request envelope: governed intent chioControlPlane context is invalid: unknown field `disallow_projected_protocols`, expected one of `preferredTargetProtocol`, `allowNativeFallback`, `disallowProjectedProtocols`"
+    );
+}
+
+#[test]
+fn plan_authoritative_route_refuses_snake_case_fallback_field() {
+    let error = plan_mcp_route_with_context(json!({
+        "chioControlPlane": { "allow_native_fallback": true }
+    }))
+    .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "invalid request envelope: governed intent chioControlPlane context is invalid: unknown field `allow_native_fallback`, expected one of `preferredTargetProtocol`, `allowNativeFallback`, `disallowProjectedProtocols`"
+    );
+}
+
+#[test]
+fn plan_authoritative_route_refuses_non_boolean_restriction() {
+    let error = plan_mcp_route_with_context(json!({
+        "chioControlPlane": { "disallowProjectedProtocols": "true" }
+    }))
+    .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "invalid request envelope: governed intent chioControlPlane context is invalid: invalid type: string \"true\", expected a boolean"
+    );
+}
+
+#[test]
+fn plan_authoritative_route_camel_case_restriction_denies_available_projected_route() {
+    let planning = plan_mcp_route_with_context(json!({
+        "chioControlPlane": { "disallowProjectedProtocols": true }
+    }))
+    .unwrap();
+    assert_eq!(planning.selected_target_protocol, None);
+    assert_eq!(planning.evidence.decision, RouteSelectionDecision::Deny);
+}
+
+#[test]
+fn plan_authoritative_route_selects_projected_route_without_restriction() {
+    let planning = plan_mcp_route_with_context(json!({
+        "chioControlPlane": { "allowNativeFallback": false }
+    }))
+    .unwrap();
+    assert_eq!(
         planning.selected_target_protocol,
-        Some(DiscoveryProtocol::Native)
+        Some(DiscoveryProtocol::Mcp)
     );
 }
 
