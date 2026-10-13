@@ -167,6 +167,27 @@ html, body, #root {
   line-height: 1.5;
 }
 
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.auth-form [role="alert"] {
+  color: var(--color-deny);
+}
+
+.auth-logout {
+  margin: 0 0 0 auto;
+}
+
+.auth-form button:focus-visible,
+.auth-logout:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* Receipt table */
 .receipt-table-container {
   flex: 1;

@@ -13,8 +13,10 @@ npm run build
 
 ## Runtime contract
 
-- The dashboard reads a bearer token from `?token=` on first load, stores it in
-  `sessionStorage`, and removes it from the visible URL.
+- Enter a trust-control bearer token in the login form. The dashboard stores it
+  in the tab's `sessionStorage` and sends it in the `Authorization` header.
+  Logging out clears the token and displayed receipt data.
+- Query-string tokens are removed from the URL and cannot authorize requests.
 - Receipt lists come from `/v1/receipts/query`.
 - Agent cost history comes from `/v1/receipts/analytics` rather than
   reconstructing totals client-side from paged receipt subsets.

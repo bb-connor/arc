@@ -181,8 +181,10 @@ curl \
 You can also inspect the viewer directly at:
 
 ```text
-http://127.0.0.1:8940/?token=demo-control-token
+http://127.0.0.1:8940/
 ```
+
+Enter `demo-control-token` in the **Bearer token** field and select **Log in**.
 
 The receipt detail view shows the decision, timestamp, and delegation-chain
 projection for the selected governed call.
