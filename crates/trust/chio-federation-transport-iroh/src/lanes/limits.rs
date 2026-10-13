@@ -22,7 +22,7 @@
 //! ## What this module deliberately does NOT set
 //!
 //! The QUIC `Endpoint::max_idle_timeout` is a transport-level backstop owned by
-//! the WIRING (Phase 4), not by this crate. It should sit comfortably above the
+//! the endpoint wiring, not by this crate. It should sit comfortably above the
 //! app-level [`AcceptLimitConfig::linger_timeout`] so a legitimately slow but
 //! live exchange is not killed underneath these bounds. See
 //! [`RECOMMENDED_MAX_IDLE_TIMEOUT`] for the value the wiring can consume.
@@ -39,9 +39,8 @@ use tokio::sync::OwnedSemaphorePermit;
 use tokio::sync::Semaphore;
 
 /// QUIC application close code used when a handler resets after a fail-closed
-/// lane error (framing / transport / verification-plumbing failure). Value `1`
-/// matches the pheromone lane's historical reset code so the three direct lanes
-/// share one reset vocabulary.
+/// lane error (framing / transport / verification-plumbing failure). The three
+/// direct lanes share this code as one reset vocabulary.
 pub const LANE_RESET_CLOSE_CODE: u32 = 1;
 
 /// QUIC application close code used when a handler resets a connection because a
@@ -100,7 +99,7 @@ pub const DEFAULT_MAX_IN_FLIGHT_PER_PEER: usize = 16;
 /// (bounded queueing, never unbounded) with [`ACCEPT_BUSY_CLOSE_CODE`].
 pub const DEFAULT_SHED_WAIT: Duration = Duration::from_millis(250);
 
-/// Recommended `Endpoint::max_idle_timeout` for the WIRING (Phase 4) to consume.
+/// Recommended `Endpoint::max_idle_timeout` for the endpoint wiring to consume.
 ///
 /// The QUIC idle timeout is a transport backstop BELOW these app-level bounds.
 /// Set it above [`DEFAULT_LINGER_TIMEOUT`] so a legitimately slow live exchange
@@ -157,10 +156,9 @@ impl std::fmt::Display for AcceptPhase {
 
 /// Tunable, fail-closed bounds shared by the three direct-lane accept handlers.
 ///
-/// [`Default`] preserves the historically unbounded behavior generously: the
-/// per-phase bounds are tens of seconds and the concurrency cap is high, so a
-/// legitimate exchange never trips them, while a hostile peer can no longer hang
-/// a task or spawn handlers without limit.
+/// [`Default`] is generous: the per-phase bounds are tens of seconds and the
+/// concurrency cap is high, so a legitimate exchange never trips them, while a
+/// hostile peer cannot hang a task or spawn handlers without limit.
 #[derive(Debug, Clone, Copy)]
 pub struct AcceptLimitConfig {
     /// Bound on `accept_bi()`.

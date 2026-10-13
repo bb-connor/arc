@@ -259,7 +259,7 @@ fn service_fragment(base: &str, ordinal: usize) -> String {
     }
 }
 
-pub fn resolve_did_arc(value: &str, options: &ResolveOptions) -> Result<DidDocument, DidError> {
+pub fn resolve_did_chio(value: &str, options: &ResolveOptions) -> Result<DidDocument, DidError> {
     DidChio::from_str(value).map(|did| did.resolve_with_options(options))
 }
 

@@ -9,8 +9,8 @@ use crate::{AttestError, ExpectedIdentity};
 use super::bundle_verify::{
     bundle_leaf_certificate_der, bundle_rekor_inclusion_verified, bundle_rekor_metadata,
 };
-use super::compat as sigstore_protobuf_specs_compat;
 use super::identity::{match_identity, read_oidc_issuer_extension};
+use super::material;
 use super::parse::{decode_oidc_issuer_value, parse_certificate_to_der};
 use super::policy::IssuerOnlyPolicy;
 use super::validators::{
@@ -492,7 +492,7 @@ mod sigstore_internal_tests {
 
     // -----------------------------------------------------------------
     // Bundle helper tests: build sigstore_protobuf_specs Bundle structs
-    // from scratch and feed them through the private compat helpers so
+    // from scratch and feed them through the private material helpers so
     // mutants in the bundle field walk are killed by direct assertions.
     // -----------------------------------------------------------------
 
@@ -588,7 +588,7 @@ mod sigstore_internal_tests {
     }
 
     // -----------------------------------------------------------------
-    // sigstore_protobuf_specs_compat::leaf_der
+    // material::leaf_der
     // -----------------------------------------------------------------
 
     #[test]
@@ -600,7 +600,7 @@ mod sigstore_internal_tests {
         let first = vec![0x30, 0xAA, 0xBB, 0xCC];
         let second = vec![0x30, 0xDD, 0xEE];
         let bundle = build_bundle_with_x509_chain(vec![first.clone(), second.clone()]);
-        let extracted = sigstore_protobuf_specs_compat::leaf_der(&bundle);
+        let extracted = material::leaf_der(&bundle);
         match extracted {
             Some(bytes) => {
                 assert_eq!(
@@ -639,7 +639,7 @@ mod sigstore_internal_tests {
         //        replace leaf_der -> None.
         let raw = vec![0x30, 0x82, 0x10, 0x00];
         let bundle = build_bundle_with_single_certificate(raw.clone());
-        match sigstore_protobuf_specs_compat::leaf_der(&bundle) {
+        match material::leaf_der(&bundle) {
             Some(bytes) => {
                 assert_eq!(
                     bytes, raw,
@@ -663,7 +663,7 @@ mod sigstore_internal_tests {
         //        replace leaf_der -> Some(vec![1]).
         let bundle = build_bundle_without_verification_material();
         assert!(
-            sigstore_protobuf_specs_compat::leaf_der(&bundle).is_none(),
+            material::leaf_der(&bundle).is_none(),
             "leaf_der MUST be None when verification_material is absent"
         );
     }
@@ -678,13 +678,13 @@ mod sigstore_internal_tests {
         //        skip past to either Certificate (n/a) or fall through).
         let bundle = build_bundle_with_x509_chain(Vec::new());
         assert!(
-            sigstore_protobuf_specs_compat::leaf_der(&bundle).is_none(),
+            material::leaf_der(&bundle).is_none(),
             "leaf_der MUST be None when the X.509 chain has no certificates"
         );
     }
 
     // -----------------------------------------------------------------
-    // sigstore_protobuf_specs_compat::rekor_metadata
+    // material::rekor_metadata
     // -----------------------------------------------------------------
 
     #[test]
@@ -693,7 +693,7 @@ mod sigstore_internal_tests {
         // the None replacement: distinct (log_index, integrated_time)
         // values must round-trip through the helper.
         let bundle = build_bundle_with_rekor_entry(98_765_432, 1_700_000_000);
-        match sigstore_protobuf_specs_compat::rekor_metadata(&bundle) {
+        match material::rekor_metadata(&bundle) {
             Some((index, integrated)) => {
                 assert_eq!(index, 98_765_432, "log_index must round-trip exactly");
                 assert_eq!(
@@ -720,7 +720,7 @@ mod sigstore_internal_tests {
         //        replace rekor_metadata -> Some((1, -1)).
         let bundle = build_bundle_without_tlog_entries();
         assert!(
-            sigstore_protobuf_specs_compat::rekor_metadata(&bundle).is_none(),
+            material::rekor_metadata(&bundle).is_none(),
             "rekor_metadata MUST be None when tlog_entries is empty"
         );
     }
@@ -735,7 +735,7 @@ mod sigstore_internal_tests {
         //        replace rekor_metadata -> Some((1, -1)).
         let bundle = build_bundle_without_verification_material();
         assert!(
-            sigstore_protobuf_specs_compat::rekor_metadata(&bundle).is_none(),
+            material::rekor_metadata(&bundle).is_none(),
             "rekor_metadata MUST be None when verification_material is absent"
         );
     }

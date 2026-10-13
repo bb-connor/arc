@@ -7,7 +7,7 @@
 use std::error::Error;
 use std::sync::Arc;
 
-use chio_custody_hw::attestation::google_root::play_integrity_jwks_json;
+use chio_custody_hw::attestation::google_root::play_integrity_pinned_jwks_json;
 use chio_custody_hw::{
     verify_play_integrity, AttestationError, InMemoryMobileChallengeStore,
     MobileAttestationBinding, MobileChallengeAuthority, MobileChallengeError,
@@ -28,7 +28,7 @@ fn play_integrity_token_replay_fails_nonce_expiry_and_audience_gates() -> Result
         expected_nonce: NONCE,
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })?;
     assert_eq!(valid.nonce, NONCE);
@@ -39,7 +39,7 @@ fn play_integrity_token_replay_fails_nonce_expiry_and_audience_gates() -> Result
         expected_nonce: "already-used-nonce",
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })
     .err()
@@ -52,7 +52,7 @@ fn play_integrity_token_replay_fails_nonce_expiry_and_audience_gates() -> Result
         expected_nonce: NONCE,
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })
     .err()
@@ -73,7 +73,7 @@ fn play_integrity_token_replay_fails_nonce_expiry_and_audience_gates() -> Result
         expected_nonce: NONCE,
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })
     .err()

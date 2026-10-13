@@ -57,8 +57,7 @@
 //! bound `k + 1`. `expect_report_data` hashes `p256:` plus the 130-char
 //! hex key (135 bytes) and then the 32-byte root: 167 bytes, two full
 //! blocks in `update` and one padded block in `finalize`. The checked
-//! compatibility assertion requires this unchanged P256 fixture to use
-//! the stack renderer; a non-P256 key fails that additional obligation.
+//! renderer assertion requires this P256 fixture to use the stack renderer; a non-P256 key fails that additional obligation.
 //! This harness does not establish arbitrary-algorithm renderer behavior.
 //! Its standalone encoding/SHA profile requests no owned-renderer selector.
 //! Loops: the
@@ -107,8 +106,9 @@ pub(super) fn public_key(seed: u8) -> PublicKey {
 }
 
 /// Real SHA-256 determinism, zero padding and context-wrapper equivalence
-/// for every original symbolic key seed and receipt-root position. Digest
-/// noncollision relies on ASSUME-SHA256; its original harness is unproved research.
+/// for every symbolic key seed and receipt-root position. Digest noncollision
+/// relies on ASSUME-SHA256; the noncollision harness in `kani_crypto_research`
+/// is unproved.
 /// Production entries: `expect_report_data` and `QuoteVerificationContext::expected_report_data`.
 #[kani::proof]
 #[kani::solver(kissat)]
@@ -139,8 +139,9 @@ pub fn public_expect_report_data_determinism_and_binding() {
         assert_eq!(*byte, 0);
     }
 
-    // Noncollision is ASSUME-SHA256. The original inequality is retained
-    // separately as unproved research, with real-SHA runtime tamper controls.
+    // Noncollision is ASSUME-SHA256. The inequality lives in
+    // `kani_crypto_research` as an unproved obligation, with real-SHA runtime
+    // tamper controls.
 
     // (3) `QuoteVerificationContext::expected_report_data` is a real
     // `pub fn` thin wrapper around `expect_report_data`. Pin the
