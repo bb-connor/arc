@@ -1,6 +1,6 @@
 // tenant-read-contract: security_attested_finding_response_outbox; class=tenant-predicate; principal=security-runtime
 use super::{
-    from_i64, params, scheduler_lease_body_hash, schema_object_definition_is_exact, sqlite_error,
+    from_i64, scheduler_lease_body_hash, schema_object_definition_is_exact, sqlite_error,
     table_definition_is_exact, table_has_foreign_key_violation, ActionId, BTreeSet, Connection,
     LeaseOwnerId, PortError, PortResult, RecordId, TenantId,
 };
@@ -176,7 +176,7 @@ BEGIN
 END
 "#;
 
-pub(super) fn ensure_lineage_fence_binding_columns(connection: &Connection) -> PortResult<()> {
+pub(super) fn validate_lineage_fence_binding_columns(connection: &Connection) -> PortResult<()> {
     let mut statement = connection
         .prepare("PRAGMA table_info(security_lineage_fences)")
         .map_err(sqlite_error)?;
@@ -187,20 +187,10 @@ pub(super) fn ensure_lineage_fence_binding_columns(connection: &Connection) -> P
         .map_err(sqlite_error)?;
     drop(statement);
     if !columns.contains("scheduler_lease_owner_id") {
-        connection
-            .execute(
-                "ALTER TABLE security_lineage_fences ADD COLUMN scheduler_lease_owner_id TEXT NOT NULL DEFAULT ''",
-                [],
-            )
-            .map_err(sqlite_error)?;
+        return Err(PortError::integrity_failure());
     }
     if !columns.contains("scheduler_fencing_token") {
-        connection
-            .execute(
-                "ALTER TABLE security_lineage_fences ADD COLUMN scheduler_fencing_token INTEGER NOT NULL DEFAULT 0",
-                [],
-            )
-            .map_err(sqlite_error)?;
+        return Err(PortError::integrity_failure());
     }
     let mut statement = connection
         .prepare("PRAGMA table_info(security_issuance_freeze_effects)")
@@ -212,25 +202,17 @@ pub(super) fn ensure_lineage_fence_binding_columns(connection: &Connection) -> P
         .map_err(sqlite_error)?;
     drop(statement);
     if !columns.contains("external_scheduler_lease_owner_id") {
-        connection
-            .execute(
-                "ALTER TABLE security_issuance_freeze_effects ADD COLUMN external_scheduler_lease_owner_id TEXT NOT NULL DEFAULT ''",
-                [],
-            )
-            .map_err(sqlite_error)?;
+        return Err(PortError::integrity_failure());
     }
     if !columns.contains("external_scheduler_fencing_token") {
-        connection
-            .execute(
-                "ALTER TABLE security_issuance_freeze_effects ADD COLUMN external_scheduler_fencing_token INTEGER NOT NULL DEFAULT 0",
-                [],
-            )
-            .map_err(sqlite_error)?;
+        return Err(PortError::integrity_failure());
     }
     Ok(())
 }
 
-pub(super) fn ensure_response_effect_generation_column(connection: &Connection) -> PortResult<()> {
+pub(super) fn validate_response_effect_generation_column(
+    connection: &Connection,
+) -> PortResult<()> {
     let mut statement = connection
         .prepare("PRAGMA table_info(security_response_effects)")
         .map_err(sqlite_error)?;
@@ -247,44 +229,8 @@ pub(super) fn ensure_response_effect_generation_column(connection: &Connection) 
     }
     drop(rows);
     drop(statement);
-    if !generation_exists {
-        connection
-            .execute(
-                "ALTER TABLE security_response_effects ADD COLUMN generation INTEGER NOT NULL DEFAULT 0",
-                [],
-            )
-            .map_err(sqlite_error)?;
-    }
-    if !scheduler_lease_owner_id_exists {
-        connection
-            .execute(
-                "ALTER TABLE security_response_effects ADD COLUMN scheduler_lease_owner_id TEXT NOT NULL DEFAULT ''",
-                [],
-            )
-            .map_err(sqlite_error)?;
-        connection
-            .execute(
-                r#"
-                UPDATE security_response_effects AS effects
-                SET scheduler_lease_owner_id = (
-                    SELECT leases.lease_owner_id
-                    FROM security_scheduler_leases AS leases
-                    WHERE leases.tenant_id = effects.tenant_id
-                      AND leases.action_id = effects.action_id
-                      AND leases.fencing_token = effects.scheduler_fencing_token
-                )
-                WHERE scheduler_lease_owner_id = ''
-                  AND EXISTS (
-                    SELECT 1
-                    FROM security_scheduler_leases AS leases
-                    WHERE leases.tenant_id = effects.tenant_id
-                      AND leases.action_id = effects.action_id
-                      AND leases.fencing_token = effects.scheduler_fencing_token
-                  )
-                "#,
-                [],
-            )
-            .map_err(sqlite_error)?;
+    if !generation_exists || !scheduler_lease_owner_id_exists {
+        return Err(PortError::integrity_failure());
     }
     let unresolved_owner: bool = connection
         .query_row(
@@ -299,7 +245,7 @@ pub(super) fn ensure_response_effect_generation_column(connection: &Connection) 
     Ok(())
 }
 
-pub(super) fn ensure_scheduler_lease_body_hash_column(connection: &Connection) -> PortResult<()> {
+pub(super) fn validate_scheduler_lease_body_hash_column(connection: &Connection) -> PortResult<()> {
     let mut statement = connection
         .prepare("PRAGMA table_info(security_scheduler_leases)")
         .map_err(sqlite_error)?;
@@ -309,14 +255,8 @@ pub(super) fn ensure_scheduler_lease_body_hash_column(connection: &Connection) -
         .collect::<Result<BTreeSet<_>, _>>()
         .map_err(sqlite_error)?;
     drop(statement);
-    let body_hash_exists = columns.contains("lease_body_hash");
-    if !body_hash_exists {
-        connection
-            .execute(
-                "ALTER TABLE security_scheduler_leases ADD COLUMN lease_body_hash BLOB",
-                [],
-            )
-            .map_err(sqlite_error)?;
+    if !columns.contains("lease_body_hash") {
+        return Err(PortError::integrity_failure());
     }
 
     type StoredLeaseBody = (
@@ -390,26 +330,9 @@ pub(super) fn ensure_scheduler_lease_body_hash_column(connection: &Connection) -
             lease_expires_at,
             fencing_token,
         )?;
-        if body_hash_exists {
-            let stored_hash = stored_hash.ok_or_else(PortError::integrity_failure)?;
-            if stored_hash.as_slice() != expected_hash.as_slice() {
-                return Err(PortError::integrity_failure());
-            }
-        } else {
-            let updated = connection
-                .execute(
-                    r#"
-                    UPDATE security_scheduler_leases
-                    SET lease_body_hash = ?3
-                    WHERE tenant_id = ?1 AND action_id = ?2
-                      AND lease_body_hash IS NULL
-                    "#,
-                    params![tenant_id, action_id, expected_hash.as_slice()],
-                )
-                .map_err(sqlite_error)?;
-            if updated != 1 {
-                return Err(PortError::integrity_failure());
-            }
+        let stored_hash = stored_hash.ok_or_else(PortError::integrity_failure)?;
+        if stored_hash.as_slice() != expected_hash.as_slice() {
+            return Err(PortError::integrity_failure());
         }
     }
     let invalid_hash_exists = connection
@@ -431,7 +354,7 @@ pub(super) fn ensure_scheduler_lease_body_hash_column(connection: &Connection) -
     Ok(())
 }
 
-pub(super) fn ensure_scheduler_retry_health_columns(connection: &Connection) -> PortResult<()> {
+pub(super) fn validate_scheduler_retry_health_columns(connection: &Connection) -> PortResult<()> {
     let mut statement = connection
         .prepare("PRAGMA table_info(security_scheduler_retries)")
         .map_err(sqlite_error)?;
@@ -450,34 +373,13 @@ pub(super) fn ensure_scheduler_retry_health_columns(connection: &Connection) -> 
     }
     drop(rows);
     drop(statement);
-    if !first_failure_exists {
-        connection
-            .execute(
-                "ALTER TABLE security_scheduler_retries ADD COLUMN first_failure_at INTEGER NOT NULL DEFAULT 0",
-                [],
-            )
-            .map_err(sqlite_error)?;
-    }
-    if !health_event_id_exists {
-        connection
-            .execute(
-                "ALTER TABLE security_scheduler_retries ADD COLUMN health_event_id TEXT",
-                [],
-            )
-            .map_err(sqlite_error)?;
-    }
-    if !health_event_delivered_exists {
-        connection
-            .execute(
-                "ALTER TABLE security_scheduler_retries ADD COLUMN health_event_delivered INTEGER NOT NULL DEFAULT 0 CHECK (health_event_delivered IN (0, 1))",
-                [],
-            )
-            .map_err(sqlite_error)?;
+    if !first_failure_exists || !health_event_id_exists || !health_event_delivered_exists {
+        return Err(PortError::integrity_failure());
     }
     Ok(())
 }
 
-pub(super) fn ensure_response_dispatch_commit_mode_column(
+pub(super) fn validate_response_dispatch_commit_mode_column(
     connection: &Connection,
 ) -> PortResult<()> {
     let mut statement = connection
@@ -490,16 +392,11 @@ pub(super) fn ensure_response_dispatch_commit_mode_column(
         .map_err(sqlite_error)?;
     drop(statement);
     if !columns.iter().any(|column| column == "commit_mode") {
-        connection
-            .execute(
-                "ALTER TABLE security_response_dispatches ADD COLUMN commit_mode TEXT NOT NULL DEFAULT 'fresh' CHECK (commit_mode IN ('fresh', 'governed_committed_resume', 'governed_committed_expired_resume'))",
-                [],
-            )
-            .map_err(sqlite_error)?;
+        return Err(PortError::integrity_failure());
     }
     let invalid: i64 = connection
         .query_row(
-            "SELECT COUNT(*) FROM security_response_dispatches WHERE commit_mode NOT IN ('fresh', 'governed_committed_resume', 'governed_committed_expired_resume')",
+            "SELECT COUNT(*) FROM security_response_dispatches WHERE commit_mode IS NULL OR commit_mode NOT IN ('fresh', 'governed_committed_resume', 'governed_committed_expired_resume')",
             [],
             |row| row.get(0),
         )
@@ -510,60 +407,23 @@ pub(super) fn ensure_response_dispatch_commit_mode_column(
     Ok(())
 }
 
-pub(super) fn ensure_attested_finding_response_outbox_schema(
+pub(super) fn create_attested_finding_response_outbox_schema(
     connection: &Connection,
 ) -> PortResult<()> {
-    let table_ddl = ATTESTED_FINDING_RESPONSE_OUTBOX_CANONICAL_DDL.replacen(
-        "CREATE TABLE ",
-        "CREATE TABLE IF NOT EXISTS ",
-        1,
-    );
-    let index_ddl = ATTESTED_FINDING_RESPONSE_OUTBOX_DUE_INDEX_DDL.replacen(
-        "CREATE INDEX ",
-        "CREATE INDEX IF NOT EXISTS ",
-        1,
-    );
-    let immutable_trigger_ddl = ATTESTED_FINDING_RESPONSE_OUTBOX_IMMUTABLE_TRIGGER_DDL.replacen(
-        "CREATE TRIGGER ",
-        "CREATE TRIGGER IF NOT EXISTS ",
-        1,
-    );
-    let delete_trigger_ddl = ATTESTED_FINDING_RESPONSE_OUTBOX_DELETE_TRIGGER_DDL.replacen(
-        "CREATE TRIGGER ",
-        "CREATE TRIGGER IF NOT EXISTS ",
-        1,
-    );
     connection
         .execute_batch(&format!(
-            "{};{};{};{};",
-            table_ddl, index_ddl, immutable_trigger_ddl, delete_trigger_ddl,
+            "{ATTESTED_FINDING_RESPONSE_OUTBOX_CANONICAL_DDL};\
+             {ATTESTED_FINDING_RESPONSE_OUTBOX_DUE_INDEX_DDL};\
+             {ATTESTED_FINDING_RESPONSE_OUTBOX_IMMUTABLE_TRIGGER_DDL};\
+             {ATTESTED_FINDING_RESPONSE_OUTBOX_DELETE_TRIGGER_DDL};",
         ))
         .map_err(sqlite_error)?;
-    if connection
-        .execute(
-            r#"
-            INSERT INTO security_attested_finding_response_outbox (
-                tenant_id, batch_id, ordinal, evidence_id, finding_id,
-                finding_hash, action_id, reservation_id, planning_state,
-                admission_state, completion_state
-            )
-            SELECT item.tenant_id, item.batch_id, item.ordinal, item.evidence_id,
-                   item.finding_id, item.finding_hash, item.action_id,
-                   item.reservation_id, 'pending', 'pending', 'not_started'
-            FROM security_attested_finding_batch_items AS item
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM security_attested_finding_response_outbox AS outbox
-                WHERE outbox.tenant_id = item.tenant_id
-                  AND outbox.action_id = item.action_id
-            )
-            "#,
-            [],
-        )
-        .is_err()
-    {
-        return Err(PortError::integrity_failure());
-    }
+    validate_attested_finding_response_outbox_schema(connection)
+}
+
+pub(super) fn validate_attested_finding_response_outbox_schema(
+    connection: &Connection,
+) -> PortResult<()> {
     if !table_definition_is_exact(
         connection,
         "security_attested_finding_response_outbox",

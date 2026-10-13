@@ -73,20 +73,6 @@ fn no_active_contribution(connection: &Connection, marker: &Marker) -> PortResul
     }
 }
 
-pub(super) fn backfill(connection: &Connection) -> PortResult<()> {
-    for kind in KINDS {
-        visit_commands(connection, kind, |command| {
-            if command.request.operation == EffectOperation::Remove {
-                let marker = Marker::from_command(&command)?;
-                no_active_contribution(connection, &marker)?;
-                persist_first(connection, &marker)?;
-            }
-            Ok(())
-        })?;
-    }
-    verify_coverage(connection)
-}
-
 pub(super) fn verify_kind_coverage(
     connection: &Connection,
     kind: ResponseEffectKind,

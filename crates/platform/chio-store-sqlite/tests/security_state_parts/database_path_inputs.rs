@@ -23,7 +23,7 @@ fn security_state_rejects_ephemeral_sqlite_paths() {
 }
 
 #[test]
-fn migration_is_idempotent_and_preserves_existing_tables() {
+fn opening_is_idempotent_and_preserves_sibling_tables() {
     let directory =
         chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
@@ -32,11 +32,11 @@ fn migration_is_idempotent_and_preserves_existing_tables() {
     let keypair = Keypair::generate();
     let receipt = ChioReceipt::sign(
         ChioReceiptBody {
-            id: "security-migration-receipt".to_owned(),
+            id: "security-cohosted-receipt".to_owned(),
             timestamp: 1,
-            capability_id: "security-migration-capability".to_owned(),
-            tool_server: "migration-server".to_owned(),
-            tool_name: "migration-tool".to_owned(),
+            capability_id: "security-cohosted-capability".to_owned(),
+            tool_server: "cohosted-server".to_owned(),
+            tool_name: "cohosted-tool".to_owned(),
             action: ToolCallAction::from_parameters(serde_json::json!({}))
                 .unwrap_or_else(|error| panic!("tool action: {error}")),
             decision: Some(Decision::Allow),

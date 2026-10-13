@@ -30,67 +30,9 @@ BEGIN
 END
 "#;
 
-pub(in crate::security_state) fn revision(connection: &Connection) -> PortResult<i32> {
-    let present: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE lower(name) = 'chio_store_schema_versions')",
-        [], |row| row.get(0),
-    ).map_err(sqlite_error)?;
-    if !present {
-        return Ok(0);
-    }
-    let mut statement = connection.prepare(
-        "SELECT store_key, typeof(version), version FROM chio_store_schema_versions WHERE lower(store_key) = 'security_state'",
-    ).map_err(sqlite_error)?;
-    let rows = statement
-        .query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, i32>(2)?,
-            ))
-        })
-        .map_err(sqlite_error)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(sqlite_error)?;
-    match rows.as_slice() {
-        [] => Ok(0),
-        [(key, kind, value)]
-            if key == "security_state" && kind == "integer" && (*value == 0 || *value == 1) =>
-        {
-            Ok(*value)
-        }
-        _ => Err(PortError::integrity_failure()),
-    }
-}
-
-pub(in crate::security_state) fn objects_absent(connection: &Connection) -> PortResult<bool> {
-    let count: i64 = connection.query_row(
-        "SELECT COUNT(*) FROM sqlite_master WHERE lower(name) GLOB 'security_response_effect_finality*' OR lower(tbl_name) = 'security_response_effect_finality'",
-        [], |row| row.get(0),
-    ).map_err(sqlite_error)?;
-    Ok(count == 0)
-}
-
-pub(in crate::security_state) fn preflight(connection: &Connection) -> PortResult<()> {
-    match revision(connection)? {
-        0 if objects_absent(connection)? => Ok(()),
-        0 => Err(PortError::integrity_failure()),
-        1 => {
-            validate_schema(connection)?;
-            super::migration::verify_coverage(connection)
-        }
-        _ => Err(PortError::integrity_failure()),
-    }
-}
-
-pub(in crate::security_state) fn ensure_schema(connection: &Connection) -> PortResult<()> {
+pub(in crate::security_state) fn create_schema(connection: &Connection) -> PortResult<()> {
     connection
-        .execute_batch(&format!(
-            "{};{};{};",
-            TABLE_DDL.replacen("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ", 1),
-            UPDATE_DDL.replacen("CREATE TRIGGER ", "CREATE TRIGGER IF NOT EXISTS ", 1),
-            DELETE_DDL.replacen("CREATE TRIGGER ", "CREATE TRIGGER IF NOT EXISTS ", 1),
-        ))
+        .execute_batch(&format!("{TABLE_DDL};{UPDATE_DDL};{DELETE_DDL};",))
         .map_err(sqlite_error)?;
     validate_schema(connection)
 }
