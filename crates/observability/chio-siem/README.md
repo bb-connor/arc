@@ -58,7 +58,7 @@ For polling, create `ExporterManager::new(SiemConfig { .. })`, register sinks
 with `add_exporter`, and await `run` with a Tokio watch receiver for cancellation.
 The receipt database must already exist. Set `trusted_kernel_keys` from trusted
 configuration and `cursor_db_path` to a separate writable SQLite file for
-persistent per-exporter progress.
+per-exporter progress.
 
 ## Guarantees
 
@@ -71,9 +71,8 @@ persistent per-exporter progress.
   evidence details, actor chains, freeform reasons, and arbitrary metadata.
 - `ExporterManager::new` validates nonzero polling and batch settings and requires
   `ReceiptReadBoundary::AdminAll`. Its source connection opens read-only.
-- With a configured `SiemCursorStore`, polling uses per-exporter high-water marks
-  and captures malformed rows before advancing. The default cursor mode advances
-  past failures and replays from sequence zero on restart.
+- Polling uses per-exporter high-water marks in `SiemCursorStore`, captures
+  malformed rows before advancing, and never advances past a failed batch.
 
 ## Status
 

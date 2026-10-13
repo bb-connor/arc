@@ -34,7 +34,7 @@ use chio_security_types::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-const EFFECT_JOURNAL_SCHEMA_VERSION: u8 = 2;
+const EFFECT_JOURNAL_SCHEMA_VERSION: u8 = 1;
 const EFFECT_COMMAND_ID_DOMAIN: &[u8] = b"chio.response-effect-command.v1\0";
 const EFFECT_TRANSITION_ID_DOMAIN: &[u8] = b"chio.response-effect-transition.v1\0";
 const RECEIPT_CURSOR_ID_DOMAIN: &[u8] = b"chio.response-receipt-cursor.v1\0";

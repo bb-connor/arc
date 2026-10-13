@@ -52,12 +52,11 @@ pub struct SiemConfig {
     /// Explicit read authority for local receipt polling. SIEM polling is an
     /// operator surface and must not run with tenant-scoped authority.
     pub read_context: ReceiptReadContext,
-    /// Optional path to the SIEM-owned RW cursor store (per-exporter high-water
-    /// mark). When set, delivery is at-least-once: the read cursor resumes at
-    /// min(acked_seq) so a failed exporter forces bounded redelivery instead of
-    /// a silent skip. None keeps the legacy advance-regardless behavior. Distinct
-    /// from the read-only receipt DB.
-    pub cursor_db_path: Option<PathBuf>,
+    /// Path to the SIEM-owned RW cursor store (per-exporter high-water mark).
+    /// Delivery is at-least-once: the read cursor resumes at min(acked_seq) so
+    /// a failed exporter forces bounded redelivery instead of a silent skip.
+    /// Distinct from the read-only receipt DB.
+    pub cursor_db_path: PathBuf,
 }
 
 impl Default for SiemConfig {
@@ -72,7 +71,7 @@ impl Default for SiemConfig {
             rate_limit: None,
             trusted_kernel_keys: BTreeSet::new(),
             read_context: ReceiptReadContext::local_operator_admin_all(),
-            cursor_db_path: None,
+            cursor_db_path: PathBuf::from("siem-cursor.sqlite3"),
         }
     }
 }
@@ -84,11 +83,9 @@ impl Default for SiemConfig {
 /// Exporter. Failed exports are retried with exponential backoff; events that
 /// exhaust all retries are placed on the DeadLetterQueue.
 ///
-/// When `SiemConfig::cursor_db_path` is None the read cursor is NOT persisted:
-/// on restart the manager re-exports all receipts from seq=0 (both Splunk HEC
-/// timestamp dedup and Elasticsearch _id upsert handle duplicates idempotently).
-/// When set, a per-exporter high-water mark is persisted and the cursor resumes
-/// at min(acked_seq) for at-least-once delivery.
+/// A per-exporter high-water mark is persisted at `SiemConfig::cursor_db_path`
+/// and the cursor resumes at min(acked_seq) for at-least-once delivery. A
+/// failed batch never advances the cursor.
 ///
 /// A single read-only SQLite connection is opened at construction time and
 /// reused across all poll cycles. This avoids the overhead of re-opening the
@@ -110,9 +107,8 @@ pub struct ExporterManager {
     // no-op so chio-siem stays decoupled from the metric registry; the host
     // installs a registry-backed sink.
     metrics: std::sync::Arc<dyn crate::metrics_sink::SiemMetricsSink>,
-    /// SIEM-owned RW high-water-mark store. None keeps the legacy
-    /// advance-regardless behavior.
-    cursor_store: Option<crate::cursor_store::SiemCursorStore>,
+    /// SIEM-owned RW high-water-mark store.
+    cursor_store: crate::cursor_store::SiemCursorStore,
     /// In-memory per-exporter high-water mark, seeded from the store at open and
     /// advanced only on confirmed acceptance.
     acked: std::collections::BTreeMap<String, u64>,
@@ -152,16 +148,10 @@ impl ExporterManager {
         .map_err(|e| SiemError::DbError(e.to_string()))?;
 
         let dlq = DeadLetterQueue::new(config.dlq_capacity);
-        // Open the SIEM-owned cursor store when configured and resume the read
-        // cursor at the slowest exporter's high-water mark.
-        let cursor_store = match &config.cursor_db_path {
-            Some(path) => Some(crate::cursor_store::SiemCursorStore::open(path)?),
-            None => None,
-        };
-        let acked = match &cursor_store {
-            Some(store) => store.acked_seqs()?,
-            None => std::collections::BTreeMap::new(),
-        };
+        // Open the SIEM-owned cursor store and resume the read cursor at the
+        // slowest exporter's high-water mark.
+        let cursor_store = crate::cursor_store::SiemCursorStore::open(&config.cursor_db_path)?;
+        let acked = cursor_store.acked_seqs()?;
         let cursor = acked.values().copied().min().unwrap_or(0);
         Ok(Self {
             exporters: Vec::new(),
@@ -189,40 +179,29 @@ impl ExporterManager {
 
     /// Register an exporter to receive receipt batches.
     ///
-    /// With a configured cursor store, a registered exporter that has no
-    /// persisted high-water mark row is seeded at BASELINE (0): it must receive
+    /// A registered exporter that has no persisted high-water mark row is seeded at BASELINE (0): it must receive
     /// every receipt persisted before it was registered, so it pins the resume
     /// cursor at 0 until its first ack rather than inheriting an already-advanced
     /// cursor from a faster peer and silently skipping the backlog. The read
     /// cursor is then recomputed as the
-    /// minimum high-water mark across the known exporter set. In legacy None mode
-    /// the cursor is not persisted and always advances past the batch, so no
-    /// baseline pin is applied here.
+    /// minimum high-water mark across the known exporter set.
     pub fn add_exporter(&mut self, exporter: Box<dyn Exporter>) {
-        if self.cursor_store.is_some() {
-            // Key by the exporter's STABLE, config-derived identity, not
-            // registration index, so inserting or reordering a same-named
-            // exporter cannot let a new instance inherit a previous instance's
-            // high-water mark and skip receipts. A brand-new identity seeds at
-            // BASELINE 0; a persisted identity keeps its mark.
-            let key = exporter.cursor_identity();
-            self.acked.entry(key).or_insert(0);
-            self.exporters.push(exporter);
-            // Recompute the resume cursor over ONLY currently-registered exporter
-            // identities. Orphaned rows from a prior identity scheme (e.g. old
-            // index-keyed "0:webhook" rows superseded by stable-identity keying)
-            // remain in self.acked but must NOT drag the read cursor down to their
-            // stale low mark: a min() over EVERY loaded row would
-            // resume at an orphan's 0 even though the current exporters durably
-            // acked far ahead, re-exporting history until they catch up. Every
-            // registered key has an entry (or_insert above), so the baseline/
-            // max_seq arguments are unused here.
-            let keys: Vec<String> = self.exporters.iter().map(|e| e.cursor_identity()).collect();
-            let key_refs: Vec<&str> = keys.iter().map(String::as_str).collect();
-            self.cursor = resume_cursor(&key_refs, &self.acked, 0, 0);
-        } else {
-            self.exporters.push(exporter);
-        }
+        // Key by the exporter's STABLE, config-derived identity, not
+        // registration index, so inserting or reordering a same-named
+        // exporter cannot let a new instance inherit a previous instance's
+        // high-water mark and skip receipts. A brand-new identity seeds at
+        // BASELINE 0; a persisted identity keeps its mark.
+        let key = exporter.cursor_identity();
+        self.acked.entry(key).or_insert(0);
+        self.exporters.push(exporter);
+        // Recompute the resume cursor over ONLY currently-registered exporter
+        // identities: persisted rows for exporters that are no longer registered
+        // remain in self.acked but must NOT drag the read cursor down to their
+        // stale low mark. Every registered key has an entry (or_insert above),
+        // so the baseline/max_seq arguments are unused here.
+        let keys: Vec<String> = self.exporters.iter().map(|e| e.cursor_identity()).collect();
+        let key_refs: Vec<&str> = keys.iter().map(String::as_str).collect();
+        self.cursor = resume_cursor(&key_refs, &self.acked, 0, 0);
     }
 
     /// Return the current number of entries in the dead-letter queue.
@@ -345,19 +324,14 @@ impl ExporterManager {
                     // an unconditional in-memory `dlq.push` + `_deserialize`
                     // counters are not, so repeated redelivery would inflate the
                     // `_deserialize` DLQ depth and evict real exporter failures
-                    // from the bounded DLQ. Legacy None mode has
-                    // no durable table and advances the cursor past the row, so it
-                    // never redelivers: report once.
-                    let newly_captured = match &self.cursor_store {
-                        Some(store) => store.persist_dead_letter(
-                            *seq,
-                            "_deserialize",
-                            raw_json,
-                            &redacted,
-                            failed_at,
-                        )?,
-                        None => true,
-                    };
+                    // from the bounded DLQ.
+                    let newly_captured = self.cursor_store.persist_dead_letter(
+                        *seq,
+                        "_deserialize",
+                        raw_json,
+                        &redacted,
+                        failed_at,
+                    )?;
                     if newly_captured {
                         self.metrics.record_export(
                             "_deserialize",
@@ -388,8 +362,7 @@ impl ExporterManager {
                             "Failed to deserialize receipt -- captured to durable DLQ"
                         );
                     }
-                    // Durably captured (or legacy None mode, which replays from
-                    // seq=0 on restart), so advancing past it is now safe.
+                    // Durably captured, so advancing past it is now safe.
                     if *seq > max_seq {
                         max_seq = *seq;
                     }
@@ -405,17 +378,13 @@ impl ExporterManager {
             // resumes AFTER them instead of re-reading and re-DLQ'ing the same
             // seqs every boot: advancing only the in-memory cursor would leave
             // siem_export_cursor behind, so a restart would re-read the range.
-            // max() never regresses a peer already further ahead. In legacy None
-            // mode there is no durable cursor; the in-memory advance below
-            // suffices (restart replays from seq 0, dedup'd downstream).
-            if let Some(store) = &self.cursor_store {
-                let exporter_keys: Vec<String> =
-                    self.exporters.iter().map(|e| e.cursor_identity()).collect();
-                for key in exporter_keys {
-                    let advanced = self.acked.get(&key).copied().unwrap_or(0).max(max_seq);
-                    self.acked.insert(key.clone(), advanced);
-                    store.set_acked(&key, advanced)?;
-                }
+            // max() never regresses a peer already further ahead.
+            let exporter_keys: Vec<String> =
+                self.exporters.iter().map(|e| e.cursor_identity()).collect();
+            for key in exporter_keys {
+                let advanced = self.acked.get(&key).copied().unwrap_or(0).max(max_seq);
+                self.acked.insert(key.clone(), advanced);
+                self.cursor_store.set_acked(&key, advanced)?;
             }
             self.cursor = max_seq;
             return Ok(());
@@ -507,9 +476,7 @@ impl ExporterManager {
                             .unwrap_or(0)
                             .max(target);
                         self.acked.insert(cursor_key.clone(), advanced);
-                        if let Some(store) = &self.cursor_store {
-                            store.set_acked(&cursor_key, advanced)?;
-                        }
+                        self.cursor_store.set_acked(&cursor_key, advanced)?;
                     }
                 }
                 Err(e) => {
@@ -555,23 +522,14 @@ impl ExporterManager {
             }
         }
 
-        // Advance the read cursor. In legacy None mode (no cursor store) the
-        // cursor ALWAYS advances past the batch: delivery is not persisted and
-        // downstream ingest dedups idempotently, so a failed exporter must not
-        // hold the cursor or the next tick re-reads the same batch and pushes
-        // duplicate DLQ entries indefinitely until it recovers (the
-        // advance-regardless behavior). With a configured cursor store the cursor
-        // resumes at the slowest REGISTERED exporter so nothing is skipped: a
-        // registered exporter that has never acked is held at its baseline
-        // (at-least-once). Zero registered exporters falls back to max_seq.
-        self.cursor = if self.cursor_store.is_some() {
-            let exporter_keys: Vec<String> =
-                self.exporters.iter().map(|e| e.cursor_identity()).collect();
-            let key_refs: Vec<&str> = exporter_keys.iter().map(String::as_str).collect();
-            resume_cursor(&key_refs, &self.acked, cursor, max_seq)
-        } else {
-            max_seq
-        };
+        // The cursor resumes at the slowest REGISTERED exporter so nothing is
+        // skipped: a registered exporter that has never acked is held at its
+        // baseline (at-least-once). Zero registered exporters falls back to
+        // max_seq.
+        let exporter_keys: Vec<String> =
+            self.exporters.iter().map(|e| e.cursor_identity()).collect();
+        let key_refs: Vec<&str> = exporter_keys.iter().map(String::as_str).collect();
+        self.cursor = resume_cursor(&key_refs, &self.acked, cursor, max_seq);
 
         Ok(())
     }
@@ -650,8 +608,7 @@ impl ExporterManager {
 /// A registered exporter absent from `acked` has never acked (it failed before
 /// its first successful export); it is held at `baseline` (the pre-poll cursor)
 /// so the un-acked batch is redelivered rather than skipped. With zero
-/// registered exporters the cursor advances to `max_seq`,
-/// matching the legacy headless / malformed-only advance-regardless behavior.
+/// registered exporters the cursor advances to `max_seq`.
 fn resume_cursor(
     exporter_names: &[&str],
     acked: &std::collections::BTreeMap<String, u64>,
@@ -738,7 +695,7 @@ mod tests {
         let cursor = resume_cursor(&[], &acked, 3, 10);
         assert_eq!(
             cursor, 10,
-            "with no registered exporters the cursor advances (legacy headless behavior)"
+            "with no registered exporters the cursor advances to max_seq"
         );
     }
 
@@ -792,6 +749,7 @@ mod tests {
             ..crate::WebhookConfig::default()
         })?;
         let mut manager = ExporterManager::new(SiemConfig {
+            cursor_db_path: db.with_file_name("cursor.sqlite3"),
             db_path: db,
             max_retries: 1,
             base_backoff_ms: 1,
@@ -893,7 +851,7 @@ mod tests {
 
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
-            cursor_db_path: Some(cursor_db.clone()),
+            cursor_db_path: cursor_db.clone(),
             ..SiemConfig::default()
         })?;
 
@@ -925,7 +883,7 @@ mod tests {
 
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
-            cursor_db_path: Some(cursor_db.clone()),
+            cursor_db_path: cursor_db.clone(),
             ..SiemConfig::default()
         })?;
 
@@ -962,7 +920,7 @@ mod tests {
         {
             let mut manager = ExporterManager::new(SiemConfig {
                 db_path: receipt_db.clone(),
-                cursor_db_path: Some(cursor_db.clone()),
+                cursor_db_path: cursor_db.clone(),
                 ..SiemConfig::default()
             })?;
             manager.add_exporter(Box::new(OkExporter {
@@ -990,7 +948,7 @@ mod tests {
         {
             let mut manager = ExporterManager::new(SiemConfig {
                 db_path: receipt_db.clone(),
-                cursor_db_path: Some(cursor_db.clone()),
+                cursor_db_path: cursor_db.clone(),
                 ..SiemConfig::default()
             })?;
             manager.add_exporter(Box::new(OkExporter {
@@ -1297,6 +1255,7 @@ mod tests {
         let sink = std::sync::Arc::new(RecordingSink::default());
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
+            cursor_db_path: dir.path().join("cursor.sqlite3"),
             ..SiemConfig::default()
         })?
         .with_metrics_sink(sink.clone());
@@ -1356,7 +1315,7 @@ mod tests {
 
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
-            cursor_db_path: Some(cursor_db.clone()),
+            cursor_db_path: cursor_db.clone(),
             ..SiemConfig::default()
         })?;
         // Registered at index 0, but its durable mark is looked up by its stable
@@ -1397,7 +1356,7 @@ mod tests {
 
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
-            cursor_db_path: Some(cursor_db.clone()),
+            cursor_db_path: cursor_db.clone(),
             ..SiemConfig::default()
         })?;
         manager.add_exporter(Box::new(IdentityExporter {
@@ -1427,7 +1386,7 @@ mod tests {
         let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
-            cursor_db_path: Some(cursor_db.clone()),
+            cursor_db_path: cursor_db.clone(),
             max_retries: 0,
             ..SiemConfig::default()
         })?;
@@ -1514,7 +1473,7 @@ mod tests {
         let sink = std::sync::Arc::new(RecordingSink::default());
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
-            cursor_db_path: Some(cursor_db.clone()),
+            cursor_db_path: cursor_db.clone(),
             max_retries: 0,
             ..SiemConfig::default()
         })?
@@ -1618,7 +1577,7 @@ mod tests {
 
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
-            cursor_db_path: Some(cursor_db.clone()),
+            cursor_db_path: cursor_db.clone(),
             ..SiemConfig::default()
         })?;
         assert_eq!(
@@ -1638,36 +1597,8 @@ mod tests {
         Ok(())
     }
 
-    /// In the default None mode (no cursor store) a failed exporter must NOT hold
-    /// the read cursor. The cursor advances to max_seq (legacy advance-regardless)
-    /// so the next poll does not re-read and re-DLQ the same batch forever.
-    #[tokio::test]
-    async fn legacy_none_mode_advances_cursor_past_failed_batch() -> TestResult {
-        let dir = tempfile::tempdir()?;
-        let receipt_db = dir.path().join("receipts.sqlite3");
-        seed_valid_receipt_db(&receipt_db, 3)?;
-
-        let mut manager = ExporterManager::new(SiemConfig {
-            db_path: receipt_db.clone(),
-            max_retries: 0,
-            cursor_db_path: None,
-            ..SiemConfig::default()
-        })?;
-        manager.add_exporter(Box::new(FailExporter {
-            name: "webhook".to_string(),
-        }));
-
-        manager.poll_once().await?;
-        assert_eq!(
-            manager.cursor, 3,
-            "None mode advances past the DLQ'd batch (legacy behavior preserved)"
-        );
-        Ok(())
-    }
-
-    /// WITH a cursor store, the same failed exporter holds the cursor at its
-    /// baseline so the un-acked batch is redelivered (at-least-once); this
-    /// behavior is gated on a configured store.
+    /// A failed exporter holds the cursor at its baseline so the un-acked
+    /// batch is redelivered (at-least-once).
     #[tokio::test]
     async fn configured_store_holds_cursor_for_failed_never_acked_exporter() -> TestResult {
         let dir = tempfile::tempdir()?;
@@ -1678,7 +1609,7 @@ mod tests {
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
             max_retries: 0,
-            cursor_db_path: Some(cursor_db.clone()),
+            cursor_db_path: cursor_db.clone(),
             ..SiemConfig::default()
         })?;
         manager.add_exporter(Box::new(FailExporter {
@@ -1706,7 +1637,7 @@ mod tests {
         let sink = std::sync::Arc::new(RecordingSink::default());
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
-            cursor_db_path: Some(cursor_db.clone()),
+            cursor_db_path: cursor_db.clone(),
             ..SiemConfig::default()
         })?
         .with_metrics_sink(sink.clone());
@@ -1779,18 +1710,24 @@ mod tests {
             // Batch of 2 so poll 1 reads only the two valid rows and poll 2 reads
             // the malformed row alone (a malformed-only batch).
             batch_size: 2,
-            // Legacy None mode: the cursor advances past the failed batch so poll 2
-            // reaches the malformed row.
-            cursor_db_path: None,
+            cursor_db_path: dir.path().join("cursor.sqlite3"),
             ..SiemConfig::default()
         })?
         .with_metrics_sink(sink.clone());
-        // A failing exporter fills the SHARED DLQ with two "webhook" entries.
-        manager.add_exporter(Box::new(FailExporter {
+        // Two "webhook" failures already sit in the SHARED DLQ.
+        for _ in 0..2 {
+            manager.dlq.push(FailedEvent {
+                event_json: "{}".to_string(),
+                error: "prior failure".to_string(),
+                failed_at: 1,
+                exporter_name: "webhook".to_string(),
+            });
+        }
+        manager.add_exporter(Box::new(OkExporter {
             name: "webhook".to_string(),
         }));
 
-        // Poll 1: both valid rows fail export -> 2 "webhook" DLQ entries.
+        // Poll 1: both valid rows export.
         manager.poll_once().await?;
         // Poll 2: the malformed row alone -> the _deserialize gauge must report 1,
         // not the global DLQ length of 3 (2 webhook + 1 _deserialize).
@@ -1831,7 +1768,7 @@ mod tests {
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
             max_retries: 0,
-            cursor_db_path: None,
+            cursor_db_path: dir.path().join("cursor.sqlite3"),
             ..SiemConfig::default()
         })?
         .with_metrics_sink(sink.clone());
@@ -1880,7 +1817,7 @@ mod tests {
         let mut manager = ExporterManager::new(SiemConfig {
             db_path: receipt_db.clone(),
             max_retries: 0,
-            cursor_db_path: Some(cursor_db.clone()),
+            cursor_db_path: cursor_db.clone(),
             ..SiemConfig::default()
         })?;
         // Both report the metric name "webhook" but have distinct endpoint-derived

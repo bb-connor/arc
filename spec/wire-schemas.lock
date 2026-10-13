@@ -3325,11 +3325,6 @@ files = ["crates/products/chio-mercury-core/src/proof_package.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.mercury.proof_package.v2"
-files = ["crates/products/chio-mercury-core/src/proof_package.rs"]
-first_seen = "38f1240b97"
-
-[[schema]]
 value = "chio.mercury.publication_profile.v1"
 files = ["crates/products/chio-mercury-core/src/proof_package.rs"]
 first_seen = "11e573d2d7"
@@ -5340,9 +5335,9 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/
 first_seen = "1b9620751d"
 
 [[schema]]
-value = "chio.transparency.inclusion-proof.v2"
+value = "chio.transparency.receipt-inclusion-proof.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/chio-transaction-passport/src/minimal.rs"]
-first_seen = "784b74cd2c"
+first_seen = "3e05970851"
 
 [[schema]]
 value = "chio.trust.key-state.v1"

@@ -1,10 +1,11 @@
+use chio_core_types::{canonical_json_bytes, sha256};
 use chio_security_types::ports::{
-    AdvisorySecurityEvent, BoundedVec, CorrelationCasRequest, CorrelationDeleteRequest,
-    CorrelationEventAdmission, CorrelationEventAdmissionRequest, CorrelationEventIndexRequest,
-    CorrelationOutcomeCommitRequest, CorrelationOutcomeKey, CorrelationOutcomePublication,
-    CorrelationOutcomeStatus, CorrelationPartial, CorrelationPartitionKey, CorrelationScan,
-    CreateOutcome, EventAppend, EventPartitionScan, PortError, PortResult, SecurityEventStore,
-    SecurityEventVerificationRecord,
+    AdvisorySecurityEvent, BoundedVec, CanonicalBody, CorrelationCasRequest,
+    CorrelationDeleteRequest, CorrelationEventAdmission, CorrelationEventAdmissionRequest,
+    CorrelationEventIndexRequest, CorrelationOutcomeCommitRequest, CorrelationOutcomeKey,
+    CorrelationOutcomePublication, CorrelationOutcomeStatus, CorrelationPartial,
+    CorrelationPartitionKey, CorrelationScan, CreateOutcome, Digest32, EventAppend,
+    EventPartitionScan, PortError, PortResult, SecurityEventStore, SecurityEventVerificationRecord,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -59,6 +60,25 @@ impl TestStore {
 
     pub fn durable_outcome_count(&self) -> PortResult<usize> {
         Ok(self.lock()?.outcomes.len())
+    }
+
+    pub fn rewrite_outcome_journals(
+        &self,
+        edit: impl Fn(&mut serde_json::Value),
+    ) -> PortResult<()> {
+        let mut state = self.lock()?;
+        for publication in state.outcomes.values_mut() {
+            let mut journal: serde_json::Value =
+                serde_json::from_slice(publication.canonical_body.as_bytes())
+                    .map_err(|_| PortError::invalid_data())?;
+            edit(&mut journal);
+            let canonical =
+                canonical_json_bytes(&journal).map_err(|_| PortError::invalid_data())?;
+            publication.body_hash = Digest32::new(*sha256(&canonical).as_bytes());
+            publication.canonical_body =
+                CanonicalBody::new(canonical).map_err(|_| PortError::invalid_data())?;
+        }
+        Ok(())
     }
 
     fn lock(&self) -> PortResult<MutexGuard<'_, State>> {

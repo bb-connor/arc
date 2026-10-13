@@ -510,7 +510,7 @@ fn proof_package_build_and_verify_passes() {
         vec![sample_mercury_bundle_manifest()],
     )
     .expect("proof package");
-    assert_eq!(package.schema, "chio.mercury.proof_package.v2");
+    assert_eq!(package.schema, "chio.mercury.proof_package.v1");
     let claim_boundary = package
         .publication_claim_boundary
         .as_ref()
@@ -683,9 +683,9 @@ fn proof_package_rejects_package_id_tampering() {
 }
 
 #[test]
-fn legacy_v1_package_identity_still_verifies_and_builds_an_inquiry() {
+fn package_with_partial_identity_is_refused() {
     let mut package = build_sample_proof_package(sample_bundle()).expect("proof package");
-    package.schema = "chio.mercury.proof_package.v1".to_string();
+    assert_eq!(package.schema, "chio.mercury.proof_package.v1");
     package.package_id = build_hash_id(
         "proof",
         &serde_json::json!({
@@ -695,24 +695,33 @@ fn legacy_v1_package_identity_still_verifies_and_builds_an_inquiry() {
             "receiptIds": ordered_receipt_ids(&package),
         }),
     )
-    .expect("legacy package identity");
-    let encoded = serde_json::to_vec(&package).expect("serialize legacy package");
+    .expect("partial package identity");
+    let encoded = serde_json::to_vec(&package).expect("serialize package");
     let restored: MercuryProofPackage =
-        serde_json::from_slice(&encoded).expect("deserialize legacy package");
+        serde_json::from_slice(&encoded).expect("deserialize package");
 
-    restored
+    let error = restored
         .verify(1_775_137_901)
-        .expect("legacy package remains verifiable");
-    MercuryInquiryPackage::build(
-        restored,
-        MercuryInquiryPackageArgs {
-            created_at: 1_775_137_902,
-            audience: "legacy-reviewer".to_string(),
-            redaction_profile: None,
-            verifier_equivalent: false,
-        },
-    )
-    .expect("legacy package can still seed an inquiry");
+        .expect_err("partial identity is refused");
+    assert!(
+        error
+            .to_string()
+            .contains("does not match the deterministic proof-package identity"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn package_with_unknown_fields_is_refused() {
+    let package = build_sample_proof_package(sample_bundle()).expect("proof package");
+    let mut value = serde_json::to_value(&package).expect("package value");
+    value["extraField"] = serde_json::json!(true);
+    let error =
+        serde_json::from_value::<MercuryProofPackage>(value).expect_err("unknown field is refused");
+    assert!(
+        error.to_string().contains("unknown field `extraField`"),
+        "unexpected error: {error}"
+    );
 }
 
 #[test]
