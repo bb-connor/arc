@@ -21,7 +21,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!();
     println!("== Bilateral co-sign succeeded ==");
-    println!("  DualSignedReceipt schema: {}", summary.dual_signed_schema);
     println!(
         "  DSSE signature-slice envelope: payloadType={}, signatures.len={}",
         summary.dsse_payload_type, summary.dsse_signature_count

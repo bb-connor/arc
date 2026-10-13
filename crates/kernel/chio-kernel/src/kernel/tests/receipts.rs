@@ -524,7 +524,6 @@ fn kernel_bounded_registry_lists_every_labelled_structure() {
     for expected in [
         "receipt_mirror",
         "child_receipt_mirror",
-        "federation_dual_receipts",
         "federation_dsse_envelopes",
     ] {
         assert!(

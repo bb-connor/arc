@@ -48,9 +48,10 @@
 //! ## Usage from the local fixture helper
 //!
 //! [`crate::bilateral::execute_local_bilateral_invocation_fixture`] is the
-//! local fixture helper that drives [`sign_dsse_envelope_full`] and
+//! local fixture helper that drives
+//! [`crate::bilateral_dsse::sign_dsse_envelope_with_cosigner`] and
 //! immediately runs this partial local verifier before returning the
-//! [`crate::bilateral::BilateralCoSignArtifacts`]. Callers that want to
+//! envelope. Callers that want to
 //! verify externally produced envelopes call
 //! [`verify_bilateral_cosign_invocation`] directly.
 

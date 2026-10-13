@@ -136,10 +136,7 @@ Rationale: anchoring to the receipt body's content hash makes the
 predicate refer to a precise invocation event independent of where the
 receipt is stored. A verifier resolving the receipt out of a kernel's
 audit log can re-hash the body and confirm subject membership without
-needing to dereference any external pointer. This mirrors the chio
-internal pattern in
-[../crates/trust/chio-federation/src/bilateral.rs](../crates/trust/chio-federation/src/bilateral.rs)
-where both kernels sign over the canonical bytes of `CoSigningBody`.
+needing to dereference any external pointer.
 
 ---
 

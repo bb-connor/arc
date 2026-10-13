@@ -553,18 +553,6 @@ where
 }
 
 impl BilateralCoSigningProtocol for IrohBilateralCoSigner {
-    fn request_cosignature(
-        &self,
-        request: &chio_federation::bilateral::CoSigningRequest,
-    ) -> Result<chio_federation::bilateral::CoSigningResponse, BilateralCoSigningError> {
-        // This lane implements the DSSE PAE profile only; the detached
-        // CoSigningBody profile is rejected fail-closed.
-        let _ = request;
-        Err(BilateralCoSigningError::UnsupportedSchema(
-            chio_federation::bilateral::BILATERAL_COSIGNING_SCHEMA.to_string(),
-        ))
-    }
-
     /// Synchronous contract entry point. Bridges to
     /// [`Self::request_dsse_cosignature_over_iroh`]. Works from a multi-threaded
     /// tokio runtime (uses `block_in_place`) or from a plain non-async thread

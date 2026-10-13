@@ -204,7 +204,7 @@ mod trust_commands_cli;
 pub(crate) use trust_commands_cli::select_receipt_for_explain;
 #[allow(unused_imports)]
 pub(crate) use trust_commands_cli::{
-    bilateral_field, build_underwriting_policy_input_query, cmd_receipt_audit,
+    build_underwriting_policy_input_query, cmd_receipt_audit,
     cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status, cmd_receipt_checkpoint_verify,
     cmd_receipt_explain, cmd_receipt_flush, cmd_receipt_health, cmd_receipt_list,
     cmd_receipt_retention_repair, cmd_trust_credit_backtest_export,
@@ -226,9 +226,9 @@ pub(crate) use trust_commands_cli::{
     cmd_trust_underwriting_appeal_resolve, cmd_trust_underwriting_decision_evaluate,
     cmd_trust_underwriting_decision_issue, cmd_trust_underwriting_decision_list,
     cmd_trust_underwriting_decision_simulate, cmd_trust_underwriting_input_export,
-    decision_details, explain_decision_label, explain_dsse_envelope, explain_dual_signed_receipt,
+    decision_details, explain_decision_label, explain_dsse_envelope,
     explain_receipt_value, finish_receipt_for_explain, inspect_bilateral_envelope_trace,
-    is_bilateral_artifacts_value, json_path_str, load_credit_bonded_execution_control_policy,
+    is_dsse_envelope_value, json_path_str, load_credit_bonded_execution_control_policy,
     load_existing_kernel_checkpoint_keypair, load_json_or_yaml,
     load_liability_auto_bind_issue_request, load_liability_bound_coverage_issue_request,
     load_liability_claim_adjudication_issue_request, load_liability_claim_dispute_issue_request,

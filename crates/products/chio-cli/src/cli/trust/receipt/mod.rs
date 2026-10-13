@@ -7,9 +7,9 @@ mod list;
 
 #[allow(unused_imports)]
 pub(crate) use explain::{
-    bilateral_field, cmd_receipt_explain, decision_details, explain_decision_label,
-    explain_dsse_envelope, explain_dual_signed_receipt, explain_receipt_value,
-    finish_receipt_for_explain, inspect_bilateral_envelope_trace, is_bilateral_artifacts_value,
+    cmd_receipt_explain, decision_details, explain_decision_label,
+    explain_dsse_envelope, explain_receipt_value,
+    finish_receipt_for_explain, inspect_bilateral_envelope_trace, is_dsse_envelope_value,
     json_path_str, load_receipt_for_explain, print_bilateral_human,
     push_receipt_explain_matches, receipt_value_matches_id, render_bilateral_explain,
     repair_hint, ReceiptExplainArgs,

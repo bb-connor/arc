@@ -196,7 +196,6 @@ fn combined_owned_dispatch_retains_all_three_resources_and_replays_without_reacq
     assert_eq!(response.verdict, Verdict::Allow, "{response:#?}");
     assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 1);
     assert!(response.receipt.verify_signature()?);
-    assert!(kernel.dual_signed_receipt(&response.receipt.id).is_some());
     assert!(kernel
         .federation_dsse_envelope(&response.receipt.id)
         .is_some());

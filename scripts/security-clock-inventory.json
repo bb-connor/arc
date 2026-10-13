@@ -15,7 +15,6 @@
     "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/admission_gates.rs::federated_origin_without_runtime_hook_or_context_fails_closed": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/recovery.rs::completed_federated_replay_remains_closed_until_cosign_succeeds": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::bounded_in_memory_artifact_store_loses_evidence_when_both_layers_evict": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_with_fresh_peer_but_missing_cosigner_fails_closed_post_dispatch": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_without_receipt_store_denies_before_dispatch_or_cosign": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federation_cosigner_not_called_when_local_persistence_fails": 1,
@@ -202,11 +201,6 @@
       "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
     },
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::bounded_in_memory_artifact_store_loses_evidence_when_both_layers_evict": {
-      "occurrences": 1,
-      "disposition": "fixture",
-      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
-    },
-    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs": {
       "occurrences": 1,
       "disposition": "fixture",
       "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."

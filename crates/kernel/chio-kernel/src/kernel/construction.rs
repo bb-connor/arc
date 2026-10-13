@@ -257,7 +257,6 @@ impl ChioKernel {
         // each structure and the telemetry / registry readers.
         let receipt_mirror_gauge;
         let child_receipt_mirror_gauge;
-        let federation_dual_receipts_gauge;
         let federation_dsse_envelopes_gauge;
         let mut kernel = Self {
             clock: clock.clone(),
@@ -375,16 +374,6 @@ impl ChioKernel {
             capability_trust_roots: ArcSwap::from_pointee(HashMap::new()),
             capability_trust_roots_write_lock: Mutex::new(()),
             federation_cosigner: None,
-            federation_dual_receipts: {
-                let gauge = chio_bounded::SizeGauge::new();
-                federation_dual_receipts_gauge = gauge.clone();
-                Mutex::new(chio_bounded::BoundedMap::new(
-                    federation_cache_capacity,
-                    federation_cache_idle_ttl,
-                    gauge,
-                ))
-            },
-            federation_dual_receipts_gauge,
             federation_dsse_envelopes: {
                 let gauge = chio_bounded::SizeGauge::new();
                 federation_dsse_envelopes_gauge = gauge.clone();
@@ -1377,15 +1366,15 @@ impl ChioKernel {
     /// Install a durable [`crate::federation_artifact_store::FederationArtifactStore`]
     /// for bilateral co-sign artifacts.
     ///
-    /// When set, [`Self::apply_federation_cosign`] writes each
-    /// `DualSignedReceipt` / `DsseEnvelope` through to the store BEFORE inserting
-    /// it into the bounded in-memory caches, and [`Self::dual_signed_receipt`] /
-    /// [`Self::federation_dsse_envelope`] fall back to the store on a cache miss.
+    /// When set, [`Self::apply_federation_cosign`] writes each `DsseEnvelope`
+    /// through to the store BEFORE inserting it into the bounded in-memory
+    /// cache, and [`Self::federation_dsse_envelope`] falls back to the store on a
+    /// cache miss.
     /// This closes the evidence-loss window where a federated deployment
     /// producing more than `federation_cache_capacity` receipts would drop
     /// evicted co-sign artifacts while the durable receipt store keeps only the
     /// base receipt. Without a store installed, evicted co-sign artifacts are
-    /// lossy by policy (the bounded caches drop-oldest at capacity).
+    /// lossy by policy (the bounded cache drops oldest at capacity).
     ///
     /// A deployment requiring durable bilateral evidence installs a
     /// database-backed impl; the bundled
@@ -1430,44 +1419,10 @@ impl ChioKernel {
         self.federation_peers.load().values().cloned().collect()
     }
 
-    /// Look up a dual-signed receipt by the underlying
+    /// Look up the bilateral DSSE envelope by the underlying
     /// [`chio_core::receipt::body::ChioReceipt`] id. Returns `None` when the
-    /// receipt did not cross a federation boundary or when the
-    /// co-signing hook has not yet produced a dual-signed artifact
-    /// for it.
-    pub fn dual_signed_receipt(
-        &self,
-        receipt_id: &str,
-    ) -> Option<chio_federation::bilateral::DualSignedReceipt> {
-        let now = self.trusted_now_millis().ok()?.as_secs();
-        {
-            let mut cache = match self.federation_dual_receipts.lock() {
-                Ok(g) => g,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-            if let Some(hit) = cache.get(&receipt_id.to_string(), now) {
-                return Some(hit.clone());
-            }
-        }
-        self.federation_artifact_store.as_ref().and_then(|store| {
-            // A store READ error is not an admission gate (writes fail closed via
-            // `?` elsewhere), but collapsing Err to None silently makes a transient
-            // read failure indistinguishable from an absent artifact. Log it so the
-            // read-through fallback is observable.
-            match store.get_dual_signed(receipt_id) {
-                Ok(hit) => hit,
-                Err(error) => {
-                    debug!(
-                        receipt_id = %receipt_id,
-                        reason = %redacted!(&error.to_string()),
-                        "federation artifact-store dual-signed read failed; treating as absent"
-                    );
-                    None
-                }
-            }
-        })
-    }
-
+    /// receipt did not cross a federation boundary or when the co-signing
+    /// hook has not yet produced an envelope for it.
     pub fn federation_dsse_envelope(
         &self,
         receipt_id: &str,
@@ -1483,9 +1438,10 @@ impl ChioKernel {
             }
         }
         self.federation_artifact_store.as_ref().and_then(|store| {
-            // As with the dual-signed read above: log a swallowed store read error
-            // so a transient failure is not silently reported as an absent DSSE
-            // envelope.
+            // A store READ error is not an admission gate (writes fail closed via
+            // `?` elsewhere), but collapsing Err to None silently makes a transient
+            // read failure indistinguishable from an absent artifact. Log it so the
+            // read-through fallback is observable.
             match store.get_dsse(receipt_id) {
                 Ok(hit) => hit,
                 Err(error) => {
@@ -1514,8 +1470,8 @@ impl ChioKernel {
     /// signature has already landed in the `ChioReceipt`. When
     /// `federated_origin_kernel_id` is set and the admission-time peer
     /// snapshot is available, this dispatches the receipt to the
-    /// cosigner, assembles a [`chio_federation::bilateral::DualSignedReceipt`],
-    /// and stashes it for retrieval via [`Self::dual_signed_receipt`].
+    /// cosigner, assembles the bilateral DSSE envelope, and stashes it for
+    /// retrieval via [`Self::federation_dsse_envelope`].
     ///
     /// Fail-closed: any error from the admitted peer snapshot, verified
     /// treaty material, or cosigner is
@@ -1561,9 +1517,9 @@ impl ChioKernel {
                 // A federated request rejected before runtime treaty admission
                 // ran (capability verification, time bounds, revocation, subject
                 // binding) never produced the bilateral treaty material the
-                // dual-sign path binds, and dispatched no cross-org outcome to
-                // co-sign. Record such a deny single-signed, with no dual-signed
-                // or DSSE artifact, matching the pre-dispatch denial contract in
+                // co-sign path binds, and dispatched no cross-org outcome to
+                // co-sign. Record such a deny single-signed, with no DSSE
+                // artifact, matching the pre-dispatch denial contract in
                 // federated_request_without_receipt_store_denies_before_dispatch_or_cosign.
                 // An allowed federated outcome always carries treaty material, so
                 // any non-deny receipt still fails closed here.
@@ -1586,15 +1542,6 @@ impl ChioKernel {
             &self.config.keypair.public_key(),
         )?;
         let extensions = treaty_material.extensions_for_receipt(request, receipt)?;
-        let dual = chio_federation::bilateral::co_sign_with_origin(
-            origin_kernel_id,
-            &peer.public_key,
-            &local_kernel_id,
-            &self.config.keypair,
-            receipt.clone(),
-            cosigner.as_ref(),
-        )
-        .map_err(|e| KernelError::Internal(format!("bilateral co-sign failed: {e}")))?;
         let timestamp_unix_ms = self.trusted_now_millis()?.get();
         let dsse_envelope =
             chio_federation::bilateral_dsse::sign_chio_bilateral_dsse_envelope_with_cosigner(
@@ -1608,43 +1555,30 @@ impl ChioKernel {
                 extensions,
                 cosigner.as_ref(),
             )
-            .map_err(|e| KernelError::Internal(format!("bilateral DSSE co-sign failed: {e}")))?;
+            .map_err(|e| KernelError::Internal(format!("bilateral co-sign failed: {e}")))?;
 
         // Write through to the artifact store (if one is installed via
-        // set_federation_artifact_store) BEFORE the bounded caches. An entry
-        // evicted from a cache is only guaranteed resolvable when the store
+        // set_federation_artifact_store) BEFORE the bounded cache. An entry
+        // evicted from the cache is only guaranteed resolvable when the store
         // DURABLY retains it: a bounded in-memory store can evict the same id the
-        // caches did, so only a store that reports itself durable suppresses the
+        // cache did, so only a store that reports itself durable suppresses the
         // evidence-loss signal below.
         let durable_store_installed = self
             .federation_artifact_store
             .as_ref()
             .is_some_and(|store| store.is_durable());
         if let Some(store) = self.federation_artifact_store.as_ref() {
-            store.put_dual_signed(&receipt.id, &dual)?;
             store.put_dsse(&receipt.id, &dsse_envelope)?;
         }
         let now = self.read_authority_time()?.as_secs();
         {
-            let mut cache = match self.federation_dual_receipts.lock() {
+            let mut cache = match self.federation_dsse_envelopes.lock() {
                 Ok(g) => g,
                 Err(poisoned) => poisoned.into_inner(),
             };
             // An evicted entry survives only through a durable store. Without one
             // the drop is lossy by policy (bounded drop-oldest); log it so the
             // evidence loss is explicit for operators.
-            if cache.insert(receipt.id.clone(), dual, now).is_some() && !durable_store_installed {
-                debug!(
-                    request_id = %request.request_id,
-                    "dropping an evicted dual-signed co-sign artifact: bounded federation cache is full and no durable FederationArtifactStore is installed"
-                );
-            }
-        }
-        {
-            let mut cache = match self.federation_dsse_envelopes.lock() {
-                Ok(g) => g,
-                Err(poisoned) => poisoned.into_inner(),
-            };
             if cache
                 .insert(receipt.id.clone(), dsse_envelope, now)
                 .is_some()
@@ -1735,10 +1669,6 @@ impl ChioKernel {
             (
                 "child_receipt_mirror",
                 self.child_receipt_mirror_gauge.get(),
-            ),
-            (
-                "federation_dual_receipts",
-                self.federation_dual_receipts_gauge.get(),
             ),
             (
                 "federation_dsse_envelopes",

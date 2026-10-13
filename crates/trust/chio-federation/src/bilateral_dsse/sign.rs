@@ -88,9 +88,7 @@ pub fn sign_dsse_envelope_full(
     };
 
     // Self-check: the envelope verifies under the same public keys we signed
-    // with. Mirrors the self-check `co_sign_with_origin` performs on the
-    // `DualSignedReceipt` so any subtle encoding drift is caught at
-    // the producer.
+    // with, so any subtle encoding drift is caught at the producer.
     verify_dsse_envelope(&envelope, &org_a_pub, &org_b_pub)?;
     Ok(envelope)
 }
@@ -172,6 +170,33 @@ pub fn sign_dsse_envelope_with_cosigner(
     extensions: BilateralPredicateExtensions,
     cosigner: &dyn BilateralCoSigningProtocol,
 ) -> Result<DsseEnvelope, BilateralCoSigningError> {
+    crate::metrics::observe_federation_hop(|| {
+        co_sign_signature_slice(
+            receipt,
+            org_a_public_key,
+            org_b_keypair,
+            org_a_kernel_id,
+            org_b_kernel_id,
+            tool_name,
+            timestamp_unix_ms,
+            extensions,
+            cosigner,
+        )
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn co_sign_signature_slice(
+    receipt: &ChioReceipt,
+    org_a_public_key: &PublicKey,
+    org_b_keypair: &Keypair,
+    org_a_kernel_id: &str,
+    org_b_kernel_id: &str,
+    tool_name: &str,
+    timestamp_unix_ms: u64,
+    extensions: BilateralPredicateExtensions,
+    cosigner: &dyn BilateralCoSigningProtocol,
+) -> Result<DsseEnvelope, BilateralCoSigningError> {
     let org_a_keyid = Keyid::from_public_key(org_a_public_key);
     let org_b_pub = org_b_keypair.public_key();
     let org_b_keyid = Keyid::from_public_key(&org_b_pub);
@@ -236,6 +261,33 @@ pub fn sign_dsse_envelope_with_cosigner(
 
 #[allow(clippy::too_many_arguments)]
 pub fn sign_chio_bilateral_dsse_envelope_with_cosigner(
+    receipt: &ChioReceipt,
+    org_a_public_key: &PublicKey,
+    org_b_keypair: &Keypair,
+    org_a_kernel_id: &str,
+    org_b_kernel_id: &str,
+    tool_name: &str,
+    timestamp_unix_ms: u64,
+    extensions: BilateralPredicateExtensions,
+    cosigner: &dyn BilateralCoSigningProtocol,
+) -> Result<DsseEnvelope, BilateralCoSigningError> {
+    crate::metrics::observe_federation_hop(|| {
+        co_sign_chio_bilateral(
+            receipt,
+            org_a_public_key,
+            org_b_keypair,
+            org_a_kernel_id,
+            org_b_kernel_id,
+            tool_name,
+            timestamp_unix_ms,
+            extensions,
+            cosigner,
+        )
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn co_sign_chio_bilateral(
     receipt: &ChioReceipt,
     org_a_public_key: &PublicKey,
     org_b_keypair: &Keypair,

@@ -54,10 +54,10 @@ pub(super) struct CountingRejectingCosigner {
 }
 
 impl BilateralCoSigningProtocol for CountingRejectingCosigner {
-    fn request_cosignature(
+    fn request_dsse_cosignature(
         &self,
-        _request: &CoSigningRequest,
-    ) -> Result<CoSigningResponse, BilateralCoSigningError> {
+        _request: &DsseCoSigningRequest,
+    ) -> Result<DsseCoSigningResponse, BilateralCoSigningError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Err(BilateralCoSigningError::PeerRejected(
             "test cosigner should not be called before local durability".to_string(),
@@ -209,7 +209,7 @@ pub(super) fn handshake_and_pin(
 }
 
 #[test]
-fn federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs() {
+fn federated_request_produces_dsse_envelope_verifiable_by_both_orgs() {
     // Org A holds the origin kernel; Org B hosts the tool.
     let origin_kp = Keypair::generate(); // Org A (origin) kernel key
     let origin_kernel_id = "kernel.org-a";
@@ -219,23 +219,23 @@ fn federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs() {
     let tool_host_public_key = kernel.config.keypair.public_key();
     let tool_host_kernel_id = "kernel.org-b";
     kernel.set_federation_local_kernel_id(tool_host_kernel_id);
-    let path = unique_receipt_db_path("federated-dual-signed-receipt");
+    let path = unique_receipt_db_path("federated-dsse-envelope");
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
 
     kernel.register_tool_server(Box::new(EchoServer::new("srv-fed", vec!["file_read"])));
 
-    // Pin Org A as a trusted peer on Org B's side. Use wall-clock now so
-    // the freshness window stays open when the kernel's post-sign hook
-    // queries `current_unix_timestamp()` during evaluation.
+    // Pin Org A as a trusted peer on Org B's side at the kernel's own clock so
+    // the freshness window stays open when the post-sign hook reads it.
     let trust = KernelTrustExchange::new(tool_host_kernel_id, kernel.config.keypair.clone())
         .with_trusted_peer(origin_kernel_id, origin_kp.public_key());
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let peer = handshake_and_pin(&trust, origin_kernel_id, &origin_kp, now);
+    let peer = handshake_and_pin(
+        &trust,
+        origin_kernel_id,
+        &origin_kp,
+        current_unix_timestamp(),
+    );
     let kernel = kernel.with_federation_peers(vec![peer.clone()]);
 
     // Install the in-process bilateral cosigner: the test holds Org A's
@@ -283,18 +283,7 @@ fn federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs() {
         response.reason
     );
 
-    // The post-sign hook fired and a DualSignedReceipt was stashed.
-    let dual = kernel
-        .dual_signed_receipt(&response.receipt.id)
-        .expect("dual-signed receipt must exist for federated request");
-    assert_eq!(dual.org_a_kernel_id, origin_kernel_id);
-    assert_eq!(dual.org_b_kernel_id, tool_host_kernel_id);
-    assert_eq!(dual.body.id, response.receipt.id);
-
-    // Either org can independently verify the receipt chain.
-    dual.verify(&origin_kp.public_key(), &tool_host_public_key)
-        .expect("dual-signed receipt must verify against both pinned peer keys");
-
+    // The post-sign hook fired and the DSSE envelope was stashed.
     let envelope = kernel
         .federation_dsse_envelope(&response.receipt.id)
         .expect("DSSE envelope must exist for federated request");
@@ -386,7 +375,6 @@ fn forged_runtime_treaty_metadata_cannot_reach_dispatch_or_cosign() {
         .as_deref()
         .is_some_and(|reason| reason.contains("verified federation treaty material missing")));
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    assert!(kernel.dual_signed_receipt(&response.receipt.id).is_none());
     assert!(kernel
         .federation_dsse_envelope(&response.receipt.id)
         .is_none());
@@ -567,10 +555,6 @@ fn federated_request_without_receipt_store_denies_before_dispatch_or_cosign() {
         "cosigner must not run before durable local receipt state exists"
     );
     assert!(
-        kernel.dual_signed_receipt(&response.receipt.id).is_none(),
-        "dual-signed receipt must not be produced for a pre-dispatch denial"
-    );
-    assert!(
         kernel
             .federation_dsse_envelope(&response.receipt.id)
             .is_none(),
@@ -666,9 +650,9 @@ fn non_federated_kernel_without_receipt_store_fails_closed_unless_ephemeral_enab
 }
 
 #[test]
-fn non_federated_request_leaves_no_dual_signed_artifact_behind() {
+fn non_federated_request_leaves_no_cosign_artifact_behind() {
     let mut kernel = make_kernel(make_config());
-    let path = unique_receipt_db_path("non-federated-no-dual-signed");
+    let path = unique_receipt_db_path("non-federated-no-cosign-artifact");
     kernel
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
         .unwrap();
@@ -690,7 +674,6 @@ fn non_federated_request_leaves_no_dual_signed_artifact_behind() {
     );
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
-    assert!(kernel.dual_signed_receipt(&response.receipt.id).is_none());
     assert!(kernel
         .federation_dsse_envelope(&response.receipt.id)
         .is_none());
@@ -856,12 +839,11 @@ fn federated_request_with_fresh_peer_but_missing_cosigner_fails_closed_post_disp
 #[test]
 fn installed_artifact_store_preserves_cosign_evidence_across_cache_eviction() {
     // A federated deployment producing more than federation_cache_capacity receipts
-    // drops evicted DualSignedReceipt / DSSE artifacts from the bounded in-memory
-    // caches. Installing a write-through FederationArtifactStore via
+    // drops evicted DSSE envelopes from the bounded in-memory cache. Installing a write-through FederationArtifactStore via
     // set_federation_artifact_store makes the co-sign hook write through to the
     // store before the cache, so an artifact evicted from the front cache still
     // resolves from the store (as long as the store itself has not evicted it) and
-    // dual_signed_receipt / federation_dsse_envelope keep resolving older receipts
+    // federation_dsse_envelope keeps resolving older receipts
     // instead of returning None.
     let origin_kp = Keypair::generate();
     let origin_kernel_id = "kernel.org-a";
@@ -899,7 +881,7 @@ fn installed_artifact_store_preserves_cosign_evidence_across_cache_eviction() {
         kernel.config.keypair.clone(),
     )));
 
-    // Install the durable artifact store via the new setter.
+    // Install the write-through artifact store.
     kernel.set_federation_artifact_store(std::sync::Arc::new(
         crate::federation_artifact_store::InMemoryFederationArtifactStore::default(),
     ));
@@ -941,33 +923,31 @@ fn installed_artifact_store_preserves_cosign_evidence_across_cache_eviction() {
     assert_ne!(receipt_a_id, receipt_b_id);
 
     // The bounded cache holds only the most recent artifact (A was evicted).
-    let dual_gauge = kernel
+    let dsse_gauge = kernel
         .bounded_structure_gauges()
         .into_iter()
-        .find(|(label, _)| *label == "federation_dual_receipts")
+        .find(|(label, _)| *label == "federation_dsse_envelopes")
         .map(|(_, count)| count)
-        .expect("federation_dual_receipts gauge must exist");
+        .expect("federation_dsse_envelopes gauge must exist");
     assert_eq!(
-        dual_gauge, 1,
+        dsse_gauge, 1,
         "cap-1 cache must hold only the newest artifact"
     );
 
     // The evicted receipt A is no longer in the cache (gauge == 1 holds only B),
     // so it can only still resolve via the durable store fallback.
-    let dual_a = kernel
-        .dual_signed_receipt(&receipt_a_id)
-        .expect("evicted dual-signed receipt must resolve from the artifact store");
-    assert_eq!(dual_a.body.id, receipt_a_id);
-    dual_a
-        .verify(&origin_kp.public_key(), &tool_host_public_key)
-        .expect("store-served dual-signed receipt must still verify against both peers");
-    assert!(
-        kernel.federation_dsse_envelope(&receipt_a_id).is_some(),
-        "evicted DSSE envelope must resolve from the artifact store"
-    );
+    let envelope_a = kernel
+        .federation_dsse_envelope(&receipt_a_id)
+        .expect("evicted DSSE envelope must resolve from the artifact store");
+    chio_federation::bilateral_dsse::verify_chio_bilateral_dsse_envelope(
+        &envelope_a,
+        &origin_kp.public_key(),
+        &tool_host_public_key,
+    )
+    .expect("store-served DSSE envelope must still verify against both peers");
 
     // The most recent receipt B resolves from the cache.
-    assert!(kernel.dual_signed_receipt(&receipt_b_id).is_some());
+    assert!(kernel.federation_dsse_envelope(&receipt_b_id).is_some());
 
     let _ = std::fs::remove_file(path);
 }
@@ -1058,16 +1038,12 @@ fn bounded_in_memory_artifact_store_loses_evidence_when_both_layers_evict() {
     // The bounded store did NOT preserve A: both layers evicted it, so it is
     // unrecoverable. Treating this store as durable would have masked the loss.
     assert!(
-        kernel.dual_signed_receipt(&receipt_a_id).is_none(),
-        "a bounded in-memory store must not be relied on to durably retain evicted artifacts"
-    );
-    assert!(
         kernel.federation_dsse_envelope(&receipt_a_id).is_none(),
         "a bounded in-memory store must not be relied on to durably retain evicted envelopes"
     );
 
     // The most recent receipt B still resolves from the surviving layers.
-    assert!(kernel.dual_signed_receipt(&receipt_b_id).is_some());
+    assert!(kernel.federation_dsse_envelope(&receipt_b_id).is_some());
 
     let _ = std::fs::remove_file(path);
 }
