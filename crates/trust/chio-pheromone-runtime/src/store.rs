@@ -274,6 +274,7 @@ impl SqlitePheromoneRuntimeStore {
 
     fn run_migrations(&self) -> Result<(), PheromoneRuntimeError> {
         let conn = self.conn.lock()?;
+        refuse_retired_tables(&conn)?;
         conn.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
@@ -863,6 +864,29 @@ impl PheromoneRuntimeStore for SqlitePheromoneRuntimeStore {
         }
         Ok(reports)
     }
+}
+
+const RETIRED_TABLES: [&str; 2] = [
+    "chio_pheromone_pair_counts",
+    "chio_pheromone_passport_caps_v2",
+];
+
+/// Refuses a database written with a retired table layout instead of
+/// opening it alongside the current tables.
+fn refuse_retired_tables(conn: &rusqlite::Connection) -> Result<(), PheromoneRuntimeError> {
+    for table in RETIRED_TABLES {
+        let present: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+            [table],
+            |row| row.get(0),
+        )?;
+        if present {
+            return Err(PheromoneRuntimeError::SchemaInvalid(format!(
+                "stale pheromone runtime schema: retired table {table} is present"
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn scarcity_bucket_count(
