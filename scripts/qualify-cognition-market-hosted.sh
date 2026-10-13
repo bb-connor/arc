@@ -91,6 +91,15 @@ run_gate() {
     "${gate_id}" \
     "${command_display}" | tee "${log_path}"
   "$@" 2>&1 | tee -a "${log_path}"
+  if [[ "${1:-}" == cargo && "${2:-}" == test ]]; then
+    local passed
+    passed="$(sed -nE 's/^test result: ok\. ([0-9]+) passed;.*/\1/p' "${log_path}" |
+      awk '{ total += $1 } END { print total + 0 }')"
+    if [[ "${passed}" -eq 0 ]]; then
+      echo "hosted cognition-market gate ${gate_id} ran no tests" >&2
+      exit 1
+    fi
+  fi
 }
 
 run_gate format cargo fmt --all -- --check
