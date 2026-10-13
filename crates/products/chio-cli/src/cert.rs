@@ -185,7 +185,7 @@ pub(crate) fn cmd_cert_verify_with_profile(
     };
     let mut result = verify_compliance_certificate(&cert, mode, entries.as_deref(), &config);
     if let Some(snapshot) = &snapshot {
-        if cert.body.coverage.as_ref() != Some(&snapshot_reference(snapshot)) {
+        if cert.body.coverage != snapshot_reference(snapshot) {
             result.passed = false;
             result.body_consistent = false;
             result.verification_scope = CertificateVerificationScope::Unverified;
