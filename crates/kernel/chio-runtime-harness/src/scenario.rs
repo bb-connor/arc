@@ -125,11 +125,11 @@ mod tests {
             Ok(_) => panic!("accepted top-level admission fields"),
             Err(error) => error,
         };
+        let message = error.to_string();
         assert!(
-            error
-                .to_string()
-                .starts_with("unknown field `admissionProfile`"),
-            "{error}"
+            message.starts_with("unknown field `admission")
+                && message.contains("expected `runId` or `steps`"),
+            "{message}"
         );
     }
 }

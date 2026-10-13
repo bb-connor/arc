@@ -2,9 +2,7 @@ mod support;
 
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_kernel::{KernelError, NestedFlowBridge, ToolServerConnection};
-use chio_process::{
-    ProcessError, ProcessLimits, ProcessRuntime, ProcessStateLimits, MAX_STATE_BLOB_BYTES,
-};
+use chio_process::{ProcessError, ProcessRuntime, ProcessStateLimits, MAX_STATE_BLOB_BYTES};
 use serde_json::{json, Value};
 use std::sync::Arc;
 use support::{child, kernel, limits, parent_key, root, scope, Result};
