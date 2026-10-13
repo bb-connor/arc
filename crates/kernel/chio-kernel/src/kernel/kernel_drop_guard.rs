@@ -13,6 +13,7 @@ use chio_log_redact::redacted;
 use tracing::warn;
 
 use crate::admission_operation::{AdmissionOperationV1, LOCAL_SYSTEM_TENANT_ID};
+use crate::kernel::admission_coordinator::DurableRefusalResponse;
 use crate::receipt_support::{
     next_receipt_id, receipt_attribution_metadata, request_receipt_metadata_with_payee_binding,
 };
@@ -133,16 +134,8 @@ impl<'a> PostAdmissionDropGuard<'a> {
         self.armed = false;
     }
 
-    /// Fully unwind a future dropped BEFORE tool-server dispatch. No side
-    /// effect is possible, so every pre-execution mutation is reversed: the
-    /// monetary hold, an invocation-only budget increment,
-    /// runtime-admission reservations, and an admitted child/delegated
-    /// capability budget share. A clean unwind records NO receipt
-    /// (the intended receipt-free exit). If any step fails, a signed fault
-    /// receipt is attempted to identify the stuck hold/reservation. Cleanup and
-    /// receipt publication are best-effort from Drop: each cleanup step is
-    /// attempted independently, and clock, construction or append failure is
-    /// reported through an audit fault without claiming signed evidence.
+    /// Release participants held before dispatch and persist the durable cancellation.
+    /// Cleanup faults produce signed observations when signing and persistence succeed.
     fn handle_pre_dispatch_drop(&self) {
         let mut faults: Vec<PreDispatchCleanupFault> = Vec::new();
 
@@ -274,14 +267,28 @@ impl<'a> PostAdmissionDropGuard<'a> {
 
         if faults.is_empty() {
             if let Some(operation) = self.durable_operation {
-                if let Err(error) = self
-                    .kernel
-                    .compensate_durable_admission_after_pre_dispatch_cleanup(
-                        Some(operation),
-                        None,
-                        self.payment_authorization,
-                    )
-                {
+                if let Err(error) = self.kernel.with_pre_invocation_guard_evidence(
+                    &self.receipt_context.pre_invocation_guard_evidence,
+                    || {
+                        self.kernel
+                            .compensate_durable_admission_after_pre_dispatch_cleanup(
+                                Some(operation),
+                                None,
+                                self.payment_authorization,
+                                None,
+                                DurableRefusalResponse {
+                                    reason: "evaluation cancelled before dispatch",
+                                    cancelled: true,
+                                    matched_grant_index: self.matched_grant_index,
+                                    metadata: self.receipt_context.extra_metadata.clone(),
+                                    verified_payee_binding: self
+                                        .receipt_context
+                                        .verified_payee_binding
+                                        .as_ref(),
+                                },
+                            )
+                    },
+                ) {
                     let reason = redacted!(&error).to_string();
                     warn!(
                         request_id = %self.request.request_id,
@@ -297,8 +304,6 @@ impl<'a> PostAdmissionDropGuard<'a> {
             }
         }
 
-        // 5. Fault receipt. Clean cleanup is receipt-free (the
-        //    intended design); any fault attempts a signed receipt.
         if !faults.is_empty() {
             self.record_pre_dispatch_cleanup_fault_receipt(&faults);
         }

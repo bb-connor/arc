@@ -284,8 +284,9 @@ fn prepared_credit_operation(
         request_id: identifier("request_id", request_id),
         capability_id: identifier("capability_id", CAPABILITY_ID),
         authorization_capability_hash: digest("authorization_capability_hash", 'a'),
-        request_binding: AdmissionRequestBindingV1::new(
+        request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
             digest("immutable_request_hash", 'b'),
+            AdmissionDigest::try_new("action_parameter_hash", sha256_hex(b"{}"))?,
             requirements,
         )?,
         policy_hash: digest("policy_hash", 'c'),

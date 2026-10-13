@@ -454,7 +454,9 @@ fn pre_dispatch_rail_release_leaves_the_fence_mutation_lock_free() -> TestResult
                 serde_json::json!({"authority": "external-call-lock"}),
                 current_unix_timestamp_ms(),
                 None,
+                compensation_response(),
             )
+            .map(|_| ())
             .map_err(|error| error.to_string())
     });
 

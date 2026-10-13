@@ -925,9 +925,17 @@ fn outcome_unknown_after_dispatch_keeps_the_reservation_live() -> TestResult {
         identifier("incident_id", "channel-outcome-unknown")?,
         admission_digest("incident_digest", "channel-outcome-unknown")?,
     )?;
+    let receipt = crate::admission_operation_store::refusal_receipt(
+        &operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        &flow.kernel_key,
+        &channel_action()?.parameters,
+    )?;
     let projection = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
         context,
         incident: Box::new(incident),
+        receipt: Box::new(receipt),
     };
     let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
         &operation,

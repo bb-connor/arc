@@ -86,7 +86,7 @@ fn exercise(route: Route) -> TestResult {
                     assert_eq!(
                         serde_json::from_slice::<serde_json::Value>(original.canonical_bytes())?
                             ["schema"],
-                        "chio.retained-tool-admission-request.v4"
+                        "chio.retained-tool-admission-request.v1"
                     );
                     if committed_egress {
                         let history = kernel

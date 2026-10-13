@@ -1273,7 +1273,7 @@ fn compensation_recovery_discards_a_stage_after_terminal_commit_ack_loss() -> Te
         &fixture.fence,
         now + 2,
     )?;
-    let projection = verified_pre_dispatch_compensation_projection(
+    let projection = verified_pre_dispatch_incident_projection(
         &operation,
         AdmissionProjectionContext {
             operation_id: operation.binding().operation_id().clone(),

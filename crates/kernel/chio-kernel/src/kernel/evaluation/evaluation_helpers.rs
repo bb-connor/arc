@@ -1,6 +1,7 @@
 use super::*;
 use crate::admission_operation::AdmissionOperationV1;
 use crate::budget_store::BudgetReverseHoldDecision;
+use crate::kernel::admission_coordinator::DurableRefusalResponse;
 use crate::kernel::dispatch::PreDispatchMonetaryUnwindFailure;
 use crate::kernel::responses::{PreflightNonceSource, ReservedHoldStamp};
 
@@ -88,11 +89,21 @@ impl ChioKernel {
         }
         let reason = "durable execution nonces do not support reserve-for-caller authorization";
         warn!(request_id = %request.request_id, reason, "durable admission denied");
-        self.compensate_durable_admission_after_pre_dispatch_cleanup(
+        if let Some(response) = self.compensate_durable_admission_after_pre_dispatch_cleanup(
             admission.map(DurableToolAdmission::operation),
             None,
             None,
-        )?;
+            None,
+            DurableRefusalResponse {
+                reason,
+                cancelled: false,
+                matched_grant_index: None,
+                metadata: metadata.cloned(),
+                verified_payee_binding: None,
+            },
+        )? {
+            return Ok(Some(response));
+        }
         self.build_deny_response_with_metadata(
             request,
             reason,
@@ -258,24 +269,11 @@ impl ChioKernel {
         operation: Option<&AdmissionOperationV1>,
         reverse: Option<&BudgetReverseHoldDecision>,
         payment_authorization: Option<&PaymentAuthorization>,
-    ) -> Result<(), KernelError> {
-        self.compensate_durable_admission_after_pre_dispatch_cleanup_with_payment_unwind(
-            operation,
-            reverse,
-            payment_authorization,
-            None,
-        )
-    }
-
-    fn compensate_durable_admission_after_pre_dispatch_cleanup_with_payment_unwind(
-        &self,
-        operation: Option<&AdmissionOperationV1>,
-        reverse: Option<&BudgetReverseHoldDecision>,
-        payment_authorization: Option<&PaymentAuthorization>,
         payment_unwind: Option<&PreDispatchPaymentUnwindEvidence>,
-    ) -> Result<(), KernelError> {
+        response: DurableRefusalResponse<'_>,
+    ) -> Result<Option<ToolCallResponse>, KernelError> {
         let Some(operation) = operation else {
-            return Ok(());
+            return Ok(None);
         };
         // This sample is only a floor. The durable runtime refreshes it from
         // its own fenced clock and refuses without trusted time, so a failed
@@ -304,7 +302,9 @@ impl ChioKernel {
             }),
             trusted_floor_unix_ms,
             payment_unwind,
+            response,
         )
+        .map(Some)
     }
 
     pub(in crate::kernel) fn with_pre_invocation_guard_evidence<T>(
@@ -450,6 +450,9 @@ impl ChioKernel {
         let cancellation = match self.cancel_captured_monetary_before_dispatch(&cap.id, charge) {
             Ok(cancellation) => cancellation,
             Err(error) => {
+                if durable_operation.is_some() {
+                    return Err(error);
+                }
                 let internal_reason = error.to_string();
                 warn!(
                     request_id = %request.request_id,
@@ -469,12 +472,42 @@ impl ChioKernel {
                 );
             }
         };
-        if runtime_release_confirmed && lease_release.confirmed {
-            self.compensate_durable_admission_after_pre_dispatch_cleanup(
+        let metadata = self.merge_budget_receipt_metadata(
+            runtime_metadata,
+            self.budget_execution_receipt_metadata(
+                charge,
+                Some(("cancelled_before_dispatch", &cancellation)),
+                None,
+            ),
+        );
+        if durable_operation.is_some() && (!runtime_release_confirmed || !lease_release.confirmed) {
+            return Err(KernelError::DurableAdmission(
+                "pre-dispatch reservation release could not be confirmed".into(),
+            ));
+        }
+        if runtime_release_confirmed && lease_release.confirmed && durable_operation.is_some() {
+            if let Some(response) = self.compensate_durable_admission_after_pre_dispatch_cleanup(
                 durable_operation,
                 Some(&cancellation),
                 None,
-            )?;
+                None,
+                DurableRefusalResponse {
+                    reason,
+                    cancelled: false,
+                    matched_grant_index: Some(charge.grant_index),
+                    metadata: merge_metadata_objects(
+                        Self::pre_execution_financial_metadata(
+                            charge,
+                            cancellation.committed_cost_units_after,
+                            cap,
+                        )?,
+                        metadata.clone(),
+                    ),
+                    verified_payee_binding,
+                },
+            )? {
+                return Ok(response);
+            }
         }
         self.build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
             request,
@@ -483,17 +516,7 @@ impl ChioKernel {
             charge,
             cancellation.committed_cost_units_after,
             cap,
-            RefusalReceiptMetadata::new(
-                self.merge_budget_receipt_metadata(
-                    runtime_metadata,
-                    self.budget_execution_receipt_metadata(
-                        charge,
-                        Some(("cancelled_before_dispatch", &cancellation)),
-                        None,
-                    ),
-                ),
-                IdentityDisposition::Terminal,
-            ),
+            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
             verified_payee_binding,
         )
     }
@@ -595,15 +618,8 @@ impl ChioKernel {
                             && operation.budget_hold_id().is_some_and(|hold|
                                 hold.as_str() == charge.budget_hold_id))
         });
-        let mut saga_compensated = false;
         let reverse_result = match custody_check {
-            Err(_) if original_saga.is_some() => self
-                .compensate_durable_admission_after_pre_dispatch_cleanup(original_saga, None, None)
-                .map(|()| {
-                    saga_compensated = true;
-                    (None, None)
-                })
-                .map_err(PreDispatchMonetaryUnwindFailure::from),
+            Err(_) if original_saga.is_some() => Ok((None, None)),
             Err(error) => Err(PreDispatchMonetaryUnwindFailure::from(error)),
             Ok(_) => match denial.payment_authorization {
                 Some(payment_authorization) => self
@@ -730,14 +746,6 @@ impl ChioKernel {
                 "pre-dispatch reservation release could not be confirmed".into(),
             ));
         }
-        if !saga_compensated && runtime_release_confirmed && lease_release.confirmed {
-            self.compensate_durable_admission_after_pre_dispatch_cleanup_with_payment_unwind(
-                denial.durable_operation,
-                reverse.as_ref(),
-                denial.payment_authorization,
-                unwind_evidence.as_ref(),
-            )?;
-        }
         let identity_disposition = if denial.durable_operation.is_some()
             || denial.budget_mutation.durable_hold_result().is_some()
             || denial.payment_authorization.is_some()
@@ -750,15 +758,49 @@ impl ChioKernel {
             IdentityDisposition::Reusable
         };
 
-        if let (Some(charge), Some(reverse)) =
+        let (matched_grant_index, metadata) = if let (Some(charge), Some(reverse)) =
             (denial.budget_mutation.charge_result(), reverse.as_ref())
         {
             let metadata = self.merge_budget_receipt_metadata(
                 runtime_admission_metadata,
                 self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse)), None),
             );
-            return match outcome {
-                PreDispatchCleanupOutcome::Denied => self
+            (
+                charge.grant_index,
+                merge_metadata_objects(
+                    Self::pre_execution_financial_metadata(
+                        charge,
+                        reverse.committed_cost_units_after,
+                        denial.cap,
+                    )?,
+                    metadata,
+                ),
+            )
+        } else {
+            (denial.matched_grant_index, runtime_admission_metadata)
+        };
+        if runtime_release_confirmed && lease_release.confirmed {
+            if let Some(response) = self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                denial.durable_operation,
+                reverse.as_ref(),
+                denial.payment_authorization,
+                unwind_evidence.as_ref(),
+                DurableRefusalResponse {
+                    reason: denial.reason,
+                    cancelled: matches!(outcome, PreDispatchCleanupOutcome::Cancelled),
+                    matched_grant_index: Some(matched_grant_index),
+                    metadata: metadata.clone(),
+                    verified_payee_binding: denial.verified_payee_binding,
+                },
+            )? {
+                return Ok(response);
+            }
+        }
+        if matches!(outcome, PreDispatchCleanupOutcome::Denied) {
+            if let (Some(charge), Some(reverse)) =
+                (denial.budget_mutation.charge_result(), reverse.as_ref())
+            {
+                return self
                     .build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
                         denial.request,
                         denial.reason,
@@ -768,36 +810,16 @@ impl ChioKernel {
                         denial.cap,
                         RefusalReceiptMetadata::new(metadata, identity_disposition),
                         denial.verified_payee_binding,
-                    ),
-                PreDispatchCleanupOutcome::Cancelled => self
-                    .build_cancelled_response_with_metadata_and_payee_binding(
-                        denial.request,
-                        denial.reason,
-                        denial.timestamp,
-                        Some(charge.grant_index),
-                        RefusalReceiptMetadata::new(
-                            merge_metadata_objects(
-                                Self::pre_execution_financial_metadata(
-                                    charge,
-                                    reverse.committed_cost_units_after,
-                                    denial.cap,
-                                )?,
-                                metadata,
-                            ),
-                            identity_disposition,
-                        ),
-                        denial.verified_payee_binding,
-                    ),
-            };
+                    );
+            }
         }
-
         build_outcome_response(
             self,
             denial.request,
             denial.reason,
             denial.timestamp,
-            Some(denial.matched_grant_index),
-            RefusalReceiptMetadata::new(runtime_admission_metadata, identity_disposition),
+            Some(matched_grant_index),
+            RefusalReceiptMetadata::new(metadata, identity_disposition),
             denial.verified_payee_binding,
         )
     }
@@ -949,11 +971,23 @@ impl ChioKernel {
                 }
             }
             durable_admission => {
-                self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                    durable_admission.map(|admission| admission.operation()),
-                    reverse.as_ref(),
-                    None,
-                )?;
+                if let Some(response) = self
+                    .compensate_durable_admission_after_pre_dispatch_cleanup(
+                        durable_admission.map(|admission| admission.operation()),
+                        reverse.as_ref(),
+                        None,
+                        None,
+                        DurableRefusalResponse {
+                            reason: EXECUTION_NONCE_PREFLIGHT_RETRY_REASON,
+                            cancelled: false,
+                            matched_grant_index: Some(matched_grant_index),
+                            metadata: metadata.clone(),
+                            verified_payee_binding: None,
+                        },
+                    )?
+                {
+                    return Ok(response);
+                }
                 PreflightNonceSource::Mint
             }
         };

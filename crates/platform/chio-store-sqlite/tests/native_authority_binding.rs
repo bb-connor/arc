@@ -149,10 +149,10 @@ impl NativeAdmissionProbe {
         retained.validate_native_security_context(&self.context)?;
         retained.validate_native_security_authority(&self.selected.admission_binding()?)?;
         let wire: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
-        assert_eq!(wire["schema"], "chio.retained-tool-admission-request.v4");
+        assert_eq!(wire["schema"], "chio.retained-tool-admission-request.v1");
         assert_eq!(
             serde_json::from_slice::<serde_json::Value>(retained.canonical_bytes())?["schema"],
-            "chio.retained-tool-admission-request.v4"
+            "chio.retained-tool-admission-request.v1"
         );
         let (current, joined) = self
             .store

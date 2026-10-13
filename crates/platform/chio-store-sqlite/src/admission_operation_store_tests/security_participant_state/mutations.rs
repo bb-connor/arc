@@ -204,24 +204,13 @@ fn setup_with_requirements(
             "context_generation": ctx.context_generation()
         }, "pre_dispatch_required": true, "pre_dispatch_hook_installed": true
     });
-    let hash_schema = if let Some(selected) = selected {
+    if let Some(selected) = selected {
         binding["schema"] = "chio.admission-security-binding.v2".into();
         binding["native_authority"] = serde_json::to_value(selected)?;
-        "chio.tool-admission-request.v3"
-    } else {
-        "chio.tool-admission-request.v2"
-    };
-    let inner = sha256_hex(&canonical_json_bytes(&serde_json::json!({
-        "schema": hash_schema,
-        "unbound_request_hash": super::super::retained_request::base_request_hash(original.request_for_revalidation())?,
-        "security_binding": binding
-    }))?);
+    }
     let mut retained: serde_json::Value = serde_json::from_slice(original.canonical_bytes())?;
     retained["security_binding"] = binding;
-    let immutable = sha256_hex(&canonical_json_bytes(&serde_json::json!({
-        "schema": "chio.tool-admission-request.v4", "prior_request_hash": inner,
-        "authority_profile": retained["authority_profile"],
-    }))?);
+    let immutable = super::super::retained_request::immutable_request_hash(&retained)?;
     let retained =
         RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(&retained)?)?;
     let old = unbound.to_persisted().binding;

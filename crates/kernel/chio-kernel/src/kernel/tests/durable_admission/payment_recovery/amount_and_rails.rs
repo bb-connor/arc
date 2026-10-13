@@ -45,6 +45,7 @@ fn review_payment_amount_refund_uses_quote_five_and_preserves_exposure_ten() -> 
         serde_json::json!({"authority": "actual-debit-regression"}),
         current_unix_timestamp_ms(),
         None,
+        compensation_response(),
     )?;
     let refunds = calls.refunds.lock().map_err(|_| "refund lock")?;
     assert_eq!(refunds.len(), 1);

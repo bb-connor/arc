@@ -274,12 +274,11 @@ fn durable_pre_dispatch_denial_commits_terminal_compensation() {
     let receipts = kernel.receipt_log().len();
     let replay = kernel
         .evaluate_tool_call_blocking(&request)
-        .expect_err("terminal compensation cannot mint another receipt");
-    assert!(
-        matches!(replay, KernelError::DurableAdmission(ref reason)
-        if reason == "request replay is retained in state CompensatedBeforeDispatch"),
-        "{replay:?}"
-    );
+        .expect("terminal compensation replays its original receipt");
+    assert_eq!(replay.verdict, response.verdict);
+    assert_eq!(replay.reason, response.reason);
+    assert_eq!(replay.output, response.output);
+    assert_same_receipt(&replay.receipt, &response.receipt);
     assert_eq!(store.operation(), operation);
     assert_eq!(kernel.receipt_log().len(), receipts);
     assert_eq!(

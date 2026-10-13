@@ -126,8 +126,7 @@ async fn cleanup_fault_observation_preserves_the_original_terminal_owner() {
         Some(ObservationOutcome::Observed)
     );
     assert_eq!(
-        report.decision,
-        None,
+        report.decision, None,
         "the live operation owns its execution decision"
     );
     let metadata = report.metadata.as_ref().expect("fault metadata");
@@ -172,7 +171,7 @@ async fn cleanup_fault_observation_preserves_the_original_terminal_owner() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn cleanup_fault_control_confirmed_compensation_remains_receipt_free() {
+async fn confirmed_cleanup_replays_its_original_cancellation_receipt() {
     let (mut kernel, request, store, invocations) =
         durable_admission_fixture("cleanup-fault-confirmed-control");
     let gate = GuardGate::install(&mut kernel);
@@ -184,13 +183,27 @@ async fn cleanup_fault_control_confirmed_compensation_remains_receipt_free() {
         AdmissionOperationState::CompensatedBeforeDispatch
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    assert!(kernel.receipt_log().is_empty());
-    assert!(matches!(
-        kernel.evaluate_tool_call(&request).await,
-        Err(KernelError::DurableAdmission(reason))
-            if reason == "request replay is retained in state CompensatedBeforeDispatch"
-    ));
+    let original = store
+        .state
+        .lock()
+        .expect("admission state")
+        .receipt
+        .clone()
+        .expect("committed cancellation receipt");
+    assert!(original.verify_signature().expect("cancellation signature"));
+    let replay = kernel
+        .evaluate_tool_call(&request)
+        .await
+        .expect("replay original cancellation");
+    assert_same_receipt(&replay.receipt, &original);
+    assert!(replay.output.is_none());
     assert_eq!(store.operation(), terminal);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    assert!(kernel.receipt_log().is_empty());
+    assert_eq!(kernel.receipt_log().len(), 1);
+    let second_replay = kernel
+        .evaluate_tool_call(&request)
+        .await
+        .expect("repeat original cancellation");
+    assert_same_receipt(&second_replay.receipt, &original);
+    assert_eq!(kernel.receipt_log().len(), 1);
 }

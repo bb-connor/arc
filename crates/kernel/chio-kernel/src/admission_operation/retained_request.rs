@@ -10,13 +10,16 @@ use super::{
     AdmissionOperationStoreError, NativeSecurityAuthorityBindingV1,
 };
 use crate::kernel::MatchingGrant;
-use crate::tool_outcome::FrozenEvaluationStepV1;
+use crate::tool_outcome::{FrozenEvaluationStepV1, FrozenReceiptSigningIdentityV1};
 use crate::ToolCallRequest;
 
-const SCHEMA: &str = "chio.retained-tool-admission-request.v4";
+const SCHEMA: &str = "chio.retained-tool-admission-request.v1";
 const MAX_BYTES: usize = 262_144;
 
 mod security_binding;
+
+#[cfg(test)]
+mod tests;
 pub(crate) use security_binding::AdmissionSecurityBindingV1;
 
 /// Bounded original capability and immutable request material retained by the
@@ -30,9 +33,7 @@ pub(crate) use security_binding::AdmissionSecurityBindingV1;
 /// data establishes neither a current trusted host context nor claim authority.
 #[derive(Clone)]
 pub struct RetainedToolAdmissionRequestV1 {
-    // Historical custody verification composes several store layers. Keep the
-    // decoded request heap-owned so each validating frame carries a handle,
-    // not another full capability/request/authority-profile value.
+    // Heap ownership bounds stack use during custody validation.
     wire: Box<RetainedRequestWire>,
     canonical: Vec<u8>,
 }
@@ -55,6 +56,7 @@ struct RetainedRequestWire {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     security_binding: Option<AdmissionSecurityBindingV1>,
     authority_profile: AdmissionAuthorityProfileV1,
+    frozen_receipt_signing_identity: FrozenReceiptSigningIdentityV1,
 }
 
 #[derive(Serialize)]
@@ -69,6 +71,9 @@ struct ImmutableToolAdmissionRequest<'a> {
     federated_origin_kernel_id: &'a Option<String>,
     matching_grants: Vec<ImmutableMatchingGrant<'a>>,
     post_return_steps: &'a [FrozenEvaluationStepV1],
+    security_binding: Option<&'a AdmissionSecurityBindingV1>,
+    authority_profile: &'a AdmissionAuthorityProfileV1,
+    frozen_receipt_signing_identity: &'a FrozenReceiptSigningIdentityV1,
 }
 
 #[derive(Serialize)]
@@ -82,7 +87,15 @@ pub(crate) fn immutable_tool_request_hash(
     matching_grants: &[MatchingGrant<'_>],
     post_return_steps: &[FrozenEvaluationStepV1],
     security_binding: Option<&AdmissionSecurityBindingV1>,
+    authority_profile: &AdmissionAuthorityProfileV1,
+    frozen_receipt_signing_identity: &FrozenReceiptSigningIdentityV1,
 ) -> Result<AdmissionDigest, AdmissionOperationStoreError> {
+    if let Some(security_binding) = security_binding {
+        security_binding.validate()?;
+    }
+    frozen_receipt_signing_identity
+        .validate()
+        .map_err(|_| invalid("retained request receipt signing identity is invalid"))?;
     let immutable = ImmutableToolAdmissionRequest {
         schema: "chio.tool-admission-request.v1",
         server_id: &request.server_id,
@@ -100,58 +113,11 @@ pub(crate) fn immutable_tool_request_hash(
             })
             .collect(),
         post_return_steps,
-    };
-    let mut bytes = canonical_json_bytes(&immutable).map_err(invalid)?;
-    if let Some(security_binding) = security_binding {
-        security_binding.validate()?;
-        #[derive(Serialize)]
-        struct SecurityBoundRequest<'a> {
-            schema: &'static str,
-            unbound_request_hash: String,
-            security_binding: &'a AdmissionSecurityBindingV1,
-        }
-        bytes = canonical_json_bytes(&SecurityBoundRequest {
-            schema: if security_binding.native_authority().is_some() {
-                "chio.tool-admission-request.v3"
-            } else {
-                "chio.tool-admission-request.v2"
-            },
-            unbound_request_hash: sha256_hex(&bytes),
-            security_binding,
-        })
-        .map_err(invalid)?;
-    }
-    AdmissionDigest::try_new("immutable_request_hash", sha256_hex(&bytes)).map_err(Into::into)
-}
-
-pub(crate) fn immutable_tool_request_hash_with_profile(
-    request: &ToolCallRequest,
-    matching_grants: &[MatchingGrant<'_>],
-    post_return_steps: &[FrozenEvaluationStepV1],
-    security_binding: Option<&AdmissionSecurityBindingV1>,
-    authority_profile: Option<&AdmissionAuthorityProfileV1>,
-) -> Result<AdmissionDigest, AdmissionOperationStoreError> {
-    let prior_request_hash = immutable_tool_request_hash(
-        request,
-        matching_grants,
-        post_return_steps,
         security_binding,
-    )?;
-    let Some(authority_profile) = authority_profile else {
-        return Ok(prior_request_hash);
-    };
-    #[derive(Serialize)]
-    struct ProfileBoundRequest<'a> {
-        schema: &'static str,
-        prior_request_hash: &'a AdmissionDigest,
-        authority_profile: &'a AdmissionAuthorityProfileV1,
-    }
-    let bytes = canonical_json_bytes(&ProfileBoundRequest {
-        schema: "chio.tool-admission-request.v4",
-        prior_request_hash: &prior_request_hash,
         authority_profile,
-    })
-    .map_err(invalid)?;
+        frozen_receipt_signing_identity,
+    };
+    let bytes = canonical_json_bytes(&immutable).map_err(invalid)?;
     AdmissionDigest::try_new("immutable_request_hash", sha256_hex(&bytes)).map_err(Into::into)
 }
 
@@ -182,7 +148,6 @@ impl RetainedToolAdmissionRequestV1 {
     }
 
     /// In-memory equality binding, not a retained artifact or authorization.
-    /// Ordinary dispatch does not inherit the stored artifact's size limit.
     pub(crate) fn request_material_digest(
         request: &ToolCallRequest,
     ) -> Result<AdmissionDigest, AdmissionOperationStoreError> {
@@ -206,6 +171,7 @@ impl RetainedToolAdmissionRequestV1 {
         post_return_steps: &[FrozenEvaluationStepV1],
         security_binding: Option<&AdmissionSecurityBindingV1>,
         authority_profile: &AdmissionAuthorityProfileV1,
+        frozen_receipt_signing_identity: &FrozenReceiptSigningIdentityV1,
     ) -> Result<Self, AdmissionOperationStoreError> {
         let request = Self::request_without_transient_credentials(request);
         let wire = RetainedRequestWire {
@@ -215,6 +181,7 @@ impl RetainedToolAdmissionRequestV1 {
             post_return_steps: post_return_steps.to_vec(),
             security_binding: security_binding.cloned(),
             authority_profile: authority_profile.clone(),
+            frozen_receipt_signing_identity: frozen_receipt_signing_identity.clone(),
         };
         let canonical = canonical_json_bytes(&wire).map_err(invalid)?;
         Self::from_canonical_bytes(&canonical)
@@ -243,6 +210,9 @@ impl RetainedToolAdmissionRequestV1 {
                 "retained request contains unsupported authority material",
             ));
         }
+        wire.frozen_receipt_signing_identity
+            .validate()
+            .map_err(|_| invalid("retained request receipt signing identity is invalid"))?;
         if let Some(binding) = wire.security_binding.as_ref() {
             binding.validate()?;
         }
@@ -268,6 +238,10 @@ impl RetainedToolAdmissionRequestV1 {
     #[must_use]
     pub fn authority_profile(&self) -> &AdmissionAuthorityProfileV1 {
         &self.wire.authority_profile
+    }
+
+    pub(crate) fn frozen_receipt_signing_identity(&self) -> &FrozenReceiptSigningIdentityV1 {
+        &self.wire.frozen_receipt_signing_identity
     }
 
     /// Historical authority selection only. It cannot authorize a new write.
@@ -347,6 +321,7 @@ impl RetainedToolAdmissionRequestV1 {
             &self.wire.post_return_steps,
             self.wire.security_binding.as_ref(),
             &self.wire.authority_profile,
+            &self.wire.frozen_receipt_signing_identity,
         )?;
         if candidate.canonical != self.canonical {
             return Err(invalid(
@@ -380,7 +355,8 @@ impl RetainedToolAdmissionRequestV1 {
             &self.matching_grants()?,
             &self.wire.post_return_steps,
             self.wire.security_binding.as_ref(),
-            Some(&self.wire.authority_profile),
+            &self.wire.authority_profile,
+            &self.wire.frozen_receipt_signing_identity,
         )
     }
 
@@ -390,17 +366,19 @@ impl RetainedToolAdmissionRequestV1 {
         matching_grants: &[MatchingGrant<'_>],
         post_return_steps: &[FrozenEvaluationStepV1],
         security_binding: Option<&AdmissionSecurityBindingV1>,
-        authority_profile: Option<&AdmissionAuthorityProfileV1>,
+        authority_profile: &AdmissionAuthorityProfileV1,
+        frozen_receipt_signing_identity: &FrozenReceiptSigningIdentityV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         let capability_hash =
             sha256_hex(&canonical_json_bytes(&request.capability).map_err(invalid)?);
         let action_hash = sha256_hex(&canonical_json_bytes(&request.arguments).map_err(invalid)?);
-        let request_hash = immutable_tool_request_hash_with_profile(
+        let request_hash = immutable_tool_request_hash(
             request,
             matching_grants,
             post_return_steps,
             security_binding,
             authority_profile,
+            frozen_receipt_signing_identity,
         )?;
         if binding.kind() != super::AdmissionOperationKind::ToolDispatch
             || binding.request_id().as_str() != request.request_id

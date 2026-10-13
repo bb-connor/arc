@@ -5,7 +5,7 @@ use super::nested_flow_grant_selection::{NestedFlowGrantSelection, SelectedNeste
 use super::*;
 use crate::budget_store::BudgetInvocationCaptureDecision;
 use crate::finding_denial::denied_metadata;
-use crate::kernel::admission_coordinator::DispatchTransport;
+use crate::kernel::admission_coordinator::{DispatchTransport, DurableRefusalResponse};
 use crate::kernel::dispatch::dispatch_admission_error_reason;
 
 impl ChioKernel {
@@ -462,13 +462,23 @@ impl ChioKernel {
         if let Err(error) = self.record_observed_capability_snapshot(cap) {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "failed to persist capability lineage");
-            self.compensate_durable_admission_after_pre_dispatch_cleanup(
+            if let Some(response) = self.compensate_durable_admission_after_pre_dispatch_cleanup(
                 durable_admission
                     .as_ref()
                     .map(DurableToolAdmission::operation),
                 None,
                 None,
-            )?;
+                None,
+                DurableRefusalResponse {
+                    reason: &msg,
+                    cancelled: false,
+                    matched_grant_index: None,
+                    metadata: extra_metadata.clone(),
+                    verified_payee_binding: None,
+                },
+            )? {
+                return Ok(response);
+            }
             return self.build_deny_response_with_metadata(
                 request,
                 &msg,
@@ -492,13 +502,25 @@ impl ChioKernel {
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "session filesystem roots lookup failed pre-dispatch (nested flow)");
-                self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                    durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    None,
-                    None,
-                )?;
+                if let Some(response) = self
+                    .compensate_durable_admission_after_pre_dispatch_cleanup(
+                        durable_admission
+                            .as_ref()
+                            .map(DurableToolAdmission::operation),
+                        None,
+                        None,
+                        None,
+                        DurableRefusalResponse {
+                            reason: &msg,
+                            cancelled: false,
+                            matched_grant_index: None,
+                            metadata: extra_metadata.clone(),
+                            verified_payee_binding: None,
+                        },
+                    )?
+                {
+                    return Ok(response);
+                }
                 return self.build_deny_response_with_metadata(
                     request,
                     &msg,

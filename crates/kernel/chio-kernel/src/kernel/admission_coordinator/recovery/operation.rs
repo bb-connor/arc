@@ -35,7 +35,18 @@ impl ChioKernel {
             AdmissionOperationState::AwaitingCallerReport => Ok(false),
             AdmissionOperationState::DispatchCommitted => {
                 if !self.retain_authenticated_caller_wait(operation, now)? {
-                    self.terminalize_dispatch_committed_admission(operation, now)?;
+                    self.terminalize_dispatch_committed_admission(
+                        operation,
+                        now,
+                        None,
+                        DurableRefusalResponse {
+                            reason: "dispatch outcome is unknown after recovery",
+                            cancelled: false,
+                            matched_grant_index: None,
+                            metadata: None,
+                            verified_payee_binding: None,
+                        },
+                    )?;
                 }
                 Ok(true)
             }
@@ -56,7 +67,14 @@ impl ChioKernel {
             | AdmissionOperationState::ReadyToDispatch
             | AdmissionOperationState::CapturePending => {
                 self.compensate_durable_admission_before_dispatch(operation,
-                    serde_json::json!({"authority": "startup-recovery", "cause": "no-authoritative-budget-participant"}), now, None)?;
+                    serde_json::json!({"authority": "startup-recovery", "cause": "no-authoritative-budget-participant"}), now, None,
+                    DurableRefusalResponse {
+                        reason: "admission recovered before dispatch",
+                        cancelled: true,
+                        matched_grant_index: None,
+                        metadata: None,
+                        verified_payee_binding: None,
+                    })?;
                 Ok(true)
             }
             AdmissionOperationState::ApprovalRequired => {
@@ -67,7 +85,14 @@ impl ChioKernel {
                     return Ok(false);
                 };
                 self.compensate_durable_admission_before_dispatch(operation,
-                    serde_json::json!({"authority": "startup-recovery", "cause": "approval-deadline-elapsed", "proposal_deadline_unix_ms": deadline}), now, None)?;
+                    serde_json::json!({"authority": "startup-recovery", "cause": "approval-deadline-elapsed", "proposal_deadline_unix_ms": deadline}), now, None,
+                    DurableRefusalResponse {
+                        reason: "approval proposal deadline elapsed before dispatch",
+                        cancelled: false,
+                        matched_grant_index: None,
+                        metadata: None,
+                        verified_payee_binding: None,
+                    })?;
                 Ok(true)
             }
             AdmissionOperationState::Finalizing => {

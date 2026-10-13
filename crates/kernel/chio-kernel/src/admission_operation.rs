@@ -73,9 +73,7 @@ pub use nonce_preflight::{
 pub use projection::*;
 pub use recovery::*;
 pub use remote_projection::*;
-#[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash;
-pub(crate) use retained_request::immutable_tool_request_hash_with_profile;
 pub(crate) use retained_request::AdmissionSecurityBindingV1;
 pub use retained_request::RetainedToolAdmissionRequestV1;
 pub use runtime_replay::{

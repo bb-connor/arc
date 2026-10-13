@@ -88,17 +88,17 @@ pub(super) fn original_with_capability(
         "governed_intent": governed_intent,
     }))?;
     let profile = authority_profile::selection(None, None, None)?;
-    let immutable = serde_json::json!({
-        "schema": "chio.tool-admission-request.v4",
-        "prior_request_hash": base_request_hash(&request)?,
+    let retained_wire = serde_json::json!({
+        "schema": "chio.retained-tool-admission-request.v1", "request": request,
         "authority_profile": profile,
+        "frozen_receipt_signing_identity": {
+            "public_key": key.public_key(), "crypto_floor": "allow_classical",
+        },
+        "matching_grant_indices": [0], "post_return_steps": [],
     });
+    let immutable = immutable_request_hash(&retained_wire)?;
     let retained = RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(
-        &serde_json::json!({
-            "schema": "chio.retained-tool-admission-request.v4", "request": request,
-            "authority_profile": profile,
-            "matching_grant_indices": [0], "post_return_steps": [],
-        }),
+        &retained_wire,
     )?)?;
     let namespace = AuthenticatedRequestNamespace::for_local_system(identifier(
         "authority",
@@ -114,7 +114,7 @@ pub(super) fn original_with_capability(
             sha256_hex(&canonical_json_bytes(&request.capability)?),
         )?,
         request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
-            AdmissionDigest::try_new("immutable", sha256_hex(&canonical_json_bytes(&immutable)?))?,
+            AdmissionDigest::try_new("immutable", immutable)?,
             AdmissionDigest::try_new(
                 "action",
                 sha256_hex(&canonical_json_bytes(&request.arguments)?),
@@ -130,17 +130,29 @@ pub(super) fn original_with_capability(
     ))
 }
 
-// Independently reconstruct the current hash's inner request domain. The outer
-// v4 domain binds the explicit authority selection before the operation begins.
-pub(crate) fn base_request_hash(request: &chio_kernel::ToolCallRequest) -> TestResult<String> {
+pub(crate) fn immutable_request_hash(wire: &serde_json::Value) -> TestResult<String> {
+    let request = &wire["request"];
+    let indices = wire["matching_grant_indices"]
+        .as_array()
+        .ok_or("matching indices")?;
+    let mut matching_grants = Vec::with_capacity(indices.len());
+    for index in indices {
+        let index = usize::try_from(index.as_u64().ok_or("matching index")?)?;
+        let grant = request["capability"]["scope"]["grants"]
+            .get(index)
+            .ok_or("matching grant")?;
+        matching_grants.push(serde_json::json!({"index": index, "grant": grant}));
+    }
     Ok(sha256_hex(&canonical_json_bytes(&serde_json::json!({
-        "schema": "chio.tool-admission-request.v1", "server_id": request.server_id,
-        "tool_name": request.tool_name, "agent_id": request.agent_id,
-        "arguments": request.arguments, "governed_intent": request.governed_intent,
-        "model_metadata": request.model_metadata,
-        "federated_origin_kernel_id": request.federated_origin_kernel_id,
-        "matching_grants": [{"index": 0, "grant": &request.capability.scope.grants[0]}],
-        "post_return_steps": [],
+        "schema": "chio.tool-admission-request.v1", "server_id": request["server_id"],
+        "tool_name": request["tool_name"], "agent_id": request["agent_id"],
+        "arguments": request["arguments"], "governed_intent": request["governed_intent"],
+        "model_metadata": request["model_metadata"],
+        "federated_origin_kernel_id": request["federated_origin_kernel_id"],
+        "matching_grants": matching_grants, "post_return_steps": wire["post_return_steps"],
+        "security_binding": wire["security_binding"],
+        "authority_profile": wire["authority_profile"],
+        "frozen_receipt_signing_identity": wire["frozen_receipt_signing_identity"],
     }))?))
 }
 

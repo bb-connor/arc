@@ -188,7 +188,10 @@ fn equal_request_ids_in_distinct_tenants_keep_separate_terminal_bindings() {
 fn caller_cannot_supply_receipt_namespace_or_disposition() {
     for (key, purpose) in [
         ("receipt_context", "kernel-derived receipts"),
-        ("chio_runtime", "kernel-derived runtime admission reservations"),
+        (
+            "chio_runtime",
+            "kernel-derived runtime admission reservations",
+        ),
     ] {
         let (kernel, request, invocations) = fixture();
         let result = kernel.evaluate_tool_call_blocking_with_metadata(
@@ -463,7 +466,9 @@ fn a_store_panic_after_commit_retains_identity_without_poisoning_publication() {
         "an entered append panic must return retained evidence"
     );
     let original_id = receipts.lock().unwrap().first().unwrap().id.clone();
-    let first = first.unwrap().expect_err("store panic must retain its receipt identity");
+    let first = first
+        .unwrap()
+        .expect_err("store panic must retain its receipt identity");
     let KernelError::ReceiptAppendOutcomeUnknown { receipt_id, source } = first else {
         panic!("expected an unresolved receipt append: {first:?}");
     };

@@ -1127,18 +1127,28 @@ fn pre_dispatch_compensation_requires_the_executable_hold_to_be_reversed() {
 
     let projection = |fixture: &Fixture, operation: &AdmissionOperationV1, now: u64| {
         let lease = claim(fixture, operation, "compensation-worker", now);
+        let context = AdmissionProjectionContext {
+            operation_id: operation.binding().operation_id().clone(),
+            request_id: operation.binding().request_id().clone(),
+            expected_operation_version: operation.version(),
+            trusted_time_unix_ms: now,
+            coordinator_lease_id: lease.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            store_fence: fixture.fence.clone(),
+        };
+        let receipt = refusal_receipt(
+            operation,
+            &context,
+            AdmissionOperationState::CompensatedBeforeDispatch,
+            &Keypair::generate(),
+            &serde_json::json!({}),
+        )
+        .expect("bound refusal receipt");
         verified_released_pre_dispatch_compensation_projection_for_test(
             operation,
-            AdmissionProjectionContext {
-                operation_id: operation.binding().operation_id().clone(),
-                request_id: operation.binding().request_id().clone(),
-                expected_operation_version: operation.version(),
-                trusted_time_unix_ms: now,
-                coordinator_lease_id: lease.coordinator_lease_id().clone(),
-                coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-                store_fence: fixture.fence.clone(),
-            },
+            context,
             serde_json::json!({"policy": "compensated-hold-test"}),
+            receipt,
         )
         .expect("compensation projection")
     };

@@ -70,6 +70,7 @@ pub(in crate::kernel) struct Discharged<'a> {
 enum Delivery<'a> {
     Receipt(Box<ReceiptDelivery<'a>>),
     Durable(Box<DurableDelivery<'a>>),
+    Terminal(Box<ToolCallResponse>),
     Buffered(Box<KernelError>),
     Saga(Box<KernelError>),
     OwnershipFailure(Box<KernelError>),
@@ -311,21 +312,43 @@ impl<'a> PostEffectObligation<'a> {
                 return self.ownership_failure("durable_fault_handoff");
             };
             let binding = parts.inputs.prepared.binding.clone();
+            let mut terminal_response = None;
+            let mut delivery_error = None;
             if let Some(admission) = parts.inputs.admission.as_ref() {
-                // This commits only the original saga's incident. The helper
-                // refuses when a tool outcome already exists, so an uncertain
-                // return write cannot create a competing unknown terminal.
-                if let Err(terminal_error) = self.kernel.terminalize_dispatch_committed_admission(
+                // An existing tool outcome excludes a competing unknown terminal.
+                let reason = source.to_string();
+                match self.kernel.terminalize_dispatch_committed_admission(
                     admission.operation(),
                     parts
                         .inputs
                         .prepared
                         .evaluation_timestamp
                         .saturating_mul(1_000),
+                    parts.inputs.return_context.as_ref(),
+                    super::admission_coordinator::DurableRefusalResponse {
+                        reason: &reason,
+                        cancelled: matches!(&source, KernelError::RequestCancelled { .. }),
+                        matched_grant_index: Some(parts.inputs.matched_grant_index),
+                        metadata: self.kernel.ambiguous_dispatch_receipt_metadata(
+                            &parts.inputs.budget,
+                            parts.inputs.payment.as_ref(),
+                            parts.inputs.metadata.clone(),
+                        ),
+                        verified_payee_binding: parts.inputs.payee.as_ref(),
+                    },
                 ) {
-                    tracing::warn!(request_id = %binding.request_id, code = %terminal_error.report().code,
-                        audit_fault = "durable_unknown_terminal_pending",
-                        "original saga retains its incident or recorded return");
+                    Ok(response) => terminal_response = Some(response),
+                    Err(terminal_error) => {
+                        tracing::warn!(request_id = %binding.request_id, code = %terminal_error.report().code,
+                            audit_fault = "durable_unknown_terminal_pending",
+                            "original saga retains its terminal obligation or recorded return");
+                        if matches!(
+                            &terminal_error,
+                            KernelError::DeliveryFailedAfterReceipt { .. }
+                        ) {
+                            delivery_error = Some(terminal_error);
+                        }
+                    }
                 }
             }
             buffer_durable_children(self.kernel, &mut parts);
@@ -333,7 +356,10 @@ impl<'a> PostEffectObligation<'a> {
                 audit_fault = "durable_post_effect_reconciliation", "durable saga retains terminal ownership");
             return Discharged {
                 kernel: self.kernel,
-                delivery: Some(Delivery::Saga(Box::new(source))),
+                delivery: Some(match terminal_response {
+                    Some(response) => Delivery::Terminal(Box::new(response)),
+                    None => Delivery::Saga(Box::new(delivery_error.unwrap_or(source))),
+                }),
             };
         }
         let Some(parts) = self.parts.as_mut() else {
@@ -547,6 +573,7 @@ impl<'a> Discharged<'a> {
         match delivery {
             Delivery::OwnershipFailure(error) => Err(*error),
             Delivery::Buffered(source) | Delivery::Saga(source) => Err(*source),
+            Delivery::Terminal(response) => Ok(*response),
             Delivery::Receipt(delivery) => {
                 let ReceiptDelivery {
                     mut parts,

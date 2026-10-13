@@ -6,7 +6,7 @@ use chio_core::canonical::canonical_json_bytes;
 
 #[test]
 fn native_retained_codec_is_strict_and_hash_domain_is_versioned() -> TestResult {
-    let (_, request, _, _) = durable_admission_fixture("native-codec");
+    let (kernel, request, _, _) = durable_admission_fixture("native-codec");
     let context = context(&request, 1)?;
     let selected = binding("native-store", "source", b"initialization")?;
     let security = AdmissionSecurityBindingV1::from_trusted_selection(
@@ -16,24 +16,51 @@ fn native_retained_codec_is_strict_and_hash_domain_is_versioned() -> TestResult 
         Some(selected.clone()),
     )?;
     let matching = matching(&request)?;
+    let profile = crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?;
+    let signer = kernel.freeze_receipt_signing_identity()?;
     let retained = RetainedToolAdmissionRequestV1::from_admission(
         &request,
         &matching,
         &[],
         security.as_ref(),
-        &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+        &profile,
+        &signer,
     )?;
     retained.validate_native_security_context(&context)?;
     retained.validate_native_security_authority(&selected)?;
     let original: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
     assert_eq!(
         original["schema"],
-        "chio.retained-tool-admission-request.v4"
+        "chio.retained-tool-admission-request.v1"
     );
-    let unbound = immutable_tool_request_hash(&request, &matching, &[], None)?;
-    let independent = serde_json::json!({"schema": "chio.tool-admission-request.v3", "unbound_request_hash": unbound, "security_binding": original["security_binding"]});
+    let independent = serde_json::json!({
+        "schema": "chio.tool-admission-request.v1",
+        "server_id": request.server_id,
+        "tool_name": request.tool_name,
+        "agent_id": request.agent_id,
+        "arguments": request.arguments,
+        "governed_intent": request.governed_intent,
+        "model_metadata": request.model_metadata,
+        "federated_origin_kernel_id": request.federated_origin_kernel_id,
+        "matching_grants": matching.iter().map(|selected| serde_json::json!({
+            "index": selected.index,
+            "grant": selected.grant,
+        })).collect::<Vec<_>>(),
+        "post_return_steps": [],
+        "security_binding": original["security_binding"],
+        "authority_profile": profile,
+        "frozen_receipt_signing_identity": signer,
+    });
     assert_eq!(
-        immutable_tool_request_hash(&request, &matching, &[], security.as_ref())?.as_str(),
+        immutable_tool_request_hash(
+            &request,
+            &matching,
+            &[],
+            security.as_ref(),
+            &profile,
+            &signer,
+        )?
+        .as_str(),
         sha256_hex(&canonical_json_bytes(&independent)?)
     );
     for variant in 0..14 {
@@ -92,16 +119,19 @@ fn native_retained_codec_is_strict_and_hash_domain_is_versioned() -> TestResult 
 
 #[test]
 fn current_profile_with_context_only_binding_has_exact_bytes_and_hash() -> TestResult {
-    let (_, request, _, _) = durable_admission_fixture("native-context-only");
+    let (kernel, request, _, _) = durable_admission_fixture("native-context-only");
     let context = context(&request, 1)?;
     let security = AdmissionSecurityBindingV1::from_trusted_context(Some(&context), true, true)?;
     let matching = matching(&request)?;
+    let profile = crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?;
+    let signer = kernel.freeze_receipt_signing_identity()?;
     let retained = RetainedToolAdmissionRequestV1::from_admission(
         &request,
         &matching,
         &[],
         security.as_ref(),
-        &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+        &profile,
+        &signer,
     )?;
     let mut independent: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
     let context = context.as_v1();
@@ -112,16 +142,39 @@ fn current_profile_with_context_only_binding_has_exact_bytes_and_hash() -> TestR
             "lineage_root_id": context.lineage_root_id(), "context_generation": context.context_generation() },
         "pre_dispatch_required": true, "pre_dispatch_hook_installed": true
     });
-    independent["schema"] = "chio.retained-tool-admission-request.v4".into();
+    independent["schema"] = "chio.retained-tool-admission-request.v1".into();
     assert_eq!(
         retained.canonical_bytes(),
         canonical_json_bytes(&independent)?
     );
-    let hash = serde_json::json!({"schema": "chio.tool-admission-request.v2",
-        "unbound_request_hash": immutable_tool_request_hash(&request, &matching, &[], None)?,
-        "security_binding": independent["security_binding"]});
+    let hash = serde_json::json!({
+        "schema": "chio.tool-admission-request.v1",
+        "server_id": request.server_id,
+        "tool_name": request.tool_name,
+        "agent_id": request.agent_id,
+        "arguments": request.arguments,
+        "governed_intent": request.governed_intent,
+        "model_metadata": request.model_metadata,
+        "federated_origin_kernel_id": request.federated_origin_kernel_id,
+        "matching_grants": matching.iter().map(|selected| serde_json::json!({
+            "index": selected.index,
+            "grant": selected.grant,
+        })).collect::<Vec<_>>(),
+        "post_return_steps": [],
+        "security_binding": independent["security_binding"],
+        "authority_profile": profile,
+        "frozen_receipt_signing_identity": signer,
+    });
     assert_eq!(
-        immutable_tool_request_hash(&request, &matching, &[], security.as_ref())?.as_str(),
+        immutable_tool_request_hash(
+            &request,
+            &matching,
+            &[],
+            security.as_ref(),
+            &profile,
+            &signer,
+        )?
+        .as_str(),
         sha256_hex(&canonical_json_bytes(&hash)?)
     );
     assert!(retained.native_security_authority_binding().is_none());

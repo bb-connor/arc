@@ -12,6 +12,9 @@ mod output_finalization;
 mod pre_dispatch;
 #[path = "durable_admission/recovery.rs"]
 mod recovery;
+#[path = "durable_admission/terminal_refusal.rs"]
+mod terminal_refusal;
+use terminal_refusal::compensation_response;
 
 #[path = "durable_admission/unknown_incident_assertions.rs"]
 mod unknown_incident_assertions;
@@ -302,12 +305,16 @@ impl ReceiptStore for TestAdmissionOperationStore {
             AdmissionTerminalProjection::Completed(completed) => {
                 state.receipt = Some(completed.receipt.receipt().clone());
             }
-            AdmissionTerminalProjection::DeniedAfterDelivery { evidence, .. } => {
+            AdmissionTerminalProjection::DeniedAfterDelivery { evidence, .. }
+            | AdmissionTerminalProjection::CompensatedBeforeDispatch { evidence, .. } => {
                 if let crate::admission_operation::AdmissionReceiptOrIncident::Receipt(receipt) =
                     evidence.as_ref()
                 {
                     state.receipt = Some(receipt.receipt().clone());
                 }
+            }
+            AdmissionTerminalProjection::OutcomeUnknownAfterDispatch { receipt, .. } => {
+                state.receipt = Some(receipt.receipt().clone());
             }
             _ => {}
         }

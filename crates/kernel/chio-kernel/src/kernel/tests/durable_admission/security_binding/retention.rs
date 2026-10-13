@@ -7,7 +7,7 @@ use chio_core::canonical::canonical_json_bytes;
 
 #[test]
 fn retained_current_profile_binds_security_but_not_mutable_flow_generation() -> TestResult {
-    let (_, request, _, _) = durable_admission_fixture("retained-security");
+    let (kernel, request, _, _) = durable_admission_fixture("retained-security");
     let original = context(&request, 1)?;
     let binding = AdmissionSecurityBindingV1::from_trusted_context(Some(&original), false, false)?;
     let matching = matching(&request)?;
@@ -17,12 +17,13 @@ fn retained_current_profile_binds_security_but_not_mutable_flow_generation() -> 
         &[],
         binding.as_ref(),
         &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+        &kernel.freeze_receipt_signing_identity()?,
     )?;
     let decoded = RetainedToolAdmissionRequestV1::from_canonical_bytes(retained.canonical_bytes())?;
     decoded.validate_security_binding(binding.as_ref())?;
     decoded.validate_request_material(&request)?;
     let encoded: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
-    assert_eq!(encoded["schema"], "chio.retained-tool-admission-request.v4");
+    assert_eq!(encoded["schema"], "chio.retained-tool-admission-request.v1");
     assert!(encoded["security_binding"]["context"]
         .get("flow_state_generation")
         .is_none());
@@ -49,7 +50,7 @@ fn retained_current_profile_binds_security_but_not_mutable_flow_generation() -> 
 #[test]
 fn retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid_generations(
 ) -> TestResult {
-    let (_, request, _, _) = durable_admission_fixture("security-codec");
+    let (kernel, request, _, _) = durable_admission_fixture("security-codec");
     let binding =
         AdmissionSecurityBindingV1::from_trusted_context(Some(&context(&request, 1)?), true, true)?;
     let retained = RetainedToolAdmissionRequestV1::from_admission(
@@ -58,12 +59,13 @@ fn retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid
         &[],
         binding.as_ref(),
         &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+        &kernel.freeze_receipt_signing_identity()?,
     )?;
     let original: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
     for variant in 0..8 {
         let mut candidate = original.clone();
         match variant {
-            0 => candidate["schema"] = serde_json::json!("chio.retained-tool-admission-request.v1"),
+            0 => candidate["schema"] = serde_json::json!("chio.retained-tool-admission-request.v4"),
             1 => {
                 candidate
                     .as_object_mut()
@@ -92,7 +94,13 @@ fn retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid
                 Err(crate::admission_operation::AdmissionOperationStoreError::Invariant(_))
             ));
         } else {
-            if matches!(variant, 0 | 2 | 3) {
+            if variant == 0 {
+                assert!(
+                    matches!(result, Err(AdmissionOperationStoreError::Invariant(ref message))
+                        if message == "retained request contains unsupported authority material"),
+                    "variant {variant}: {result:?}"
+                );
+            } else if matches!(variant, 2 | 3) {
                 assert!(
                     matches!(result, Err(AdmissionOperationStoreError::Invariant(_))),
                     "variant {variant}: {result:?}"
@@ -120,8 +128,8 @@ fn retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid
 }
 
 #[test]
-fn current_profile_without_security_context_keeps_its_exact_inner_hash() -> TestResult {
-    let (_, request, _, _) = durable_admission_fixture("profile-without-security-context");
+fn current_profile_without_security_context_has_exact_authority_bound_hash() -> TestResult {
+    let (kernel, request, _, _) = durable_admission_fixture("profile-without-security-context");
     let matching = matching(&request)?;
     let retained = RetainedToolAdmissionRequestV1::from_admission(
         &request,
@@ -129,9 +137,10 @@ fn current_profile_without_security_context_keeps_its_exact_inner_hash() -> Test
         &[],
         None,
         &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+        &kernel.freeze_receipt_signing_identity()?,
     )?;
     let encoded: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
-    assert_eq!(encoded["schema"], "chio.retained-tool-admission-request.v4");
+    assert_eq!(encoded["schema"], "chio.retained-tool-admission-request.v1");
     assert!(encoded.get("security_binding").is_none());
     let independent_v1 = serde_json::json!({
         "schema": "chio.tool-admission-request.v1",
@@ -140,10 +149,18 @@ fn current_profile_without_security_context_keeps_its_exact_inner_hash() -> Test
         "governed_intent": request.governed_intent, "model_metadata": request.model_metadata,
         "federated_origin_kernel_id": request.federated_origin_kernel_id,
         "matching_grants": [{"index": 0, "grant": &request.capability.scope.grants[0]}],
-        "post_return_steps": [],
+        "post_return_steps": [], "security_binding": null,
+        "authority_profile": retained.authority_profile(),
+        "frozen_receipt_signing_identity": retained.frozen_receipt_signing_identity(),
     });
-    let hash =
-        crate::admission_operation::immutable_tool_request_hash(&request, &matching, &[], None)?;
+    let hash = crate::admission_operation::immutable_tool_request_hash(
+        &request,
+        &matching,
+        &[],
+        None,
+        retained.authority_profile(),
+        retained.frozen_receipt_signing_identity(),
+    )?;
     assert_eq!(
         hash.as_str(),
         sha256_hex(&canonical_json_bytes(&independent_v1)?)

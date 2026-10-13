@@ -343,11 +343,6 @@ pub enum KernelError {
     #[error("durable admission failed: {0}")]
     AdmissionRecovery(#[source] Box<crate::admission_operation::AdmissionRecoveryError>),
 
-    /// A replay observed a retained unknown outcome. Box the full historical
-    /// projection so refusal does not widen every kernel error. This metadata
-    /// neither claims a new terminal transition nor grants recovery authority.
-    #[error("durable admission failed: request replay is retained in state {:?}", .0.projected_state)]
-    DurableAdmissionRetained(Box<crate::admission_operation::AdmissionReceiptMetadataV1>),
     /// A consumed security mutation could not persist its terminal dispatch
     /// outcome, so callers must reconcile before any retry.
     #[error("security dispatch outcome requires reconciliation: {0}")]
@@ -806,11 +801,6 @@ impl KernelError {
                 serde_json::json!({ "reason": failure.to_string() }),
                 "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
             ),
-            Self::DurableAdmissionRetained(projection) => self.report_with_context(
-                "CHIO-KERNEL-DURABLE-ADMISSION",
-                serde_json::json!({ "admission_operation": projection }),
-                "Inspect the retained operation. A fresh attempt requires the kernel's conservative eligibility classification, not merely read-only tool metadata.",
-            ),
             Self::SecurityDispatchOutcomeRecoveryRequired(reason) => self.report_with_context(
                 "CHIO-KERNEL-SECURITY-DISPATCH-OUTCOME-RECOVERY-REQUIRED",
                 serde_json::json!({
@@ -959,14 +949,6 @@ impl KernelError {
         match self {
             Self::FindingDenied(denial) => {
                 crate::finding_denial::record_finding_denial(metadata.clone(), denial.code())
-            }
-            Self::DurableAdmissionRetained(projection) => {
-                crate::receipt_support::merge_metadata_objects(
-                    metadata.clone(),
-                    Some(serde_json::json!({
-                        "admission_operation": projection
-                    })),
-                )
             }
             _ => metadata.clone(),
         }

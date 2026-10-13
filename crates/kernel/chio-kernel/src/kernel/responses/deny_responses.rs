@@ -1,6 +1,64 @@
 use super::*;
 
 impl ChioKernel {
+    pub(in crate::kernel) fn monetary_deny_metadata(
+        &self,
+        matching_grants: &[MatchingGrant<'_>],
+        cap: &CapabilityToken,
+    ) -> Result<(Option<usize>, Option<serde_json::Value>), KernelError> {
+        let Some(mg) = matching_grants.iter().find(|matching| {
+            matching.grant.max_cost_per_invocation.is_some()
+                || matching.grant.max_total_cost.is_some()
+        }) else {
+            return Ok((None, None));
+        };
+        let grant = mg.grant;
+        let currency = grant
+            .max_cost_per_invocation
+            .as_ref()
+            .map(|m| m.currency.clone())
+            .or_else(|| grant.max_total_cost.as_ref().map(|m| m.currency.clone()))
+            .unwrap_or_else(|| "USD".to_string());
+        let budget_total = grant.max_total_cost.as_ref().map(|m| m.units);
+        let attempted_cost = grant
+            .max_cost_per_invocation
+            .as_ref()
+            .map(|m| m.units)
+            .unwrap_or(0);
+        let delegation_depth = crate::receipt_support::checked_receipt_count(
+            cap.delegation_chain.len(),
+            "delegation depth",
+        )?;
+        let root_budget_holder = cap.issuer.to_hex();
+        let (payment_reference, settlement_status) =
+            ReceiptSettlement::not_applicable().into_receipt_parts();
+
+        let usage = self.with_budget_store(|store| Ok(store.get_usage(&cap.id, mg.index)?))?;
+        let committed = usage
+            .map(|usage| usage.committed_cost_units())
+            .transpose()?
+            .unwrap_or(0);
+        let budget_remaining = financial_budget_remaining(budget_total, committed)?;
+        let financial_meta = FinancialReceiptMetadata {
+            grant_index: crate::receipt_support::checked_receipt_count(mg.index, "grant index")?,
+            cost_charged: 0,
+            currency,
+            budget_remaining,
+            budget_total,
+            delegation_depth,
+            root_budget_holder,
+            payment_reference,
+            settlement_status,
+            cost_breakdown: None,
+            oracle_evidence: None,
+            attempted_cost: Some(attempted_cost),
+        };
+        Ok((
+            Some(mg.index),
+            Some(serde_json::json!({ "financial": financial_meta })),
+        ))
+    }
+
     pub(crate) fn build_monetary_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
@@ -10,59 +68,11 @@ impl ChioKernel {
         cap: &CapabilityToken,
         extra_metadata: RefusalReceiptMetadata,
     ) -> Result<ToolCallResponse, KernelError> {
-        // Look for a monetary grant among the matching candidates to populate metadata.
-        let monetary_grant = matching_grants.iter().find(|m| {
-            m.grant.max_cost_per_invocation.is_some() || m.grant.max_total_cost.is_some()
-        });
-
-        if let Some(mg) = monetary_grant {
+        let (matched_grant_index, financial_metadata) =
+            self.monetary_deny_metadata(matching_grants, cap)?;
+        if let Some(matched_grant_index) = matched_grant_index {
             let extra_metadata =
                 self.prepare_refusal_receipt_metadata(&request.request_id, extra_metadata)?;
-            let grant = mg.grant;
-            let currency = grant
-                .max_cost_per_invocation
-                .as_ref()
-                .map(|m| m.currency.clone())
-                .or_else(|| grant.max_total_cost.as_ref().map(|m| m.currency.clone()))
-                .unwrap_or_else(|| "USD".to_string());
-            let budget_total = grant.max_total_cost.as_ref().map(|m| m.units);
-            let attempted_cost = grant
-                .max_cost_per_invocation
-                .as_ref()
-                .map(|m| m.units)
-                .unwrap_or(0);
-            let delegation_depth = crate::receipt_support::checked_receipt_count(
-                cap.delegation_chain.len(),
-                "delegation depth",
-            )?;
-            let root_budget_holder = cap.issuer.to_hex();
-            let (payment_reference, settlement_status) =
-                ReceiptSettlement::not_applicable().into_receipt_parts();
-
-            let usage = self.with_budget_store(|store| Ok(store.get_usage(&cap.id, mg.index)?))?;
-            let committed = usage
-                .map(|usage| usage.committed_cost_units())
-                .transpose()?
-                .unwrap_or(0);
-            let budget_remaining = financial_budget_remaining(budget_total, committed)?;
-            let financial_meta = FinancialReceiptMetadata {
-                grant_index: crate::receipt_support::checked_receipt_count(
-                    mg.index,
-                    "grant index",
-                )?,
-                cost_charged: 0,
-                currency,
-                budget_remaining,
-                budget_total,
-                delegation_depth,
-                root_budget_holder,
-                payment_reference,
-                settlement_status,
-                cost_breakdown: None,
-                oracle_evidence: None,
-                attempted_cost: Some(attempted_cost),
-            };
-            let financial_metadata = Some(serde_json::json!({ "financial": financial_meta }));
             let deny_extra_metadata =
                 merge_metadata_objects(financial_metadata.clone(), extra_metadata.clone());
             let request_metadata = request_receipt_metadata(
@@ -74,7 +84,7 @@ impl ChioKernel {
 
             let metadata = merge_metadata_objects(
                 merge_metadata_objects(
-                    receipt_attribution_metadata(cap, Some(mg.index))?,
+                    receipt_attribution_metadata(cap, Some(matched_grant_index))?,
                     deny_extra_metadata,
                 ),
                 request_metadata,

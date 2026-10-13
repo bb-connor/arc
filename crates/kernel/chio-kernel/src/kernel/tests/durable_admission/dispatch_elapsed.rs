@@ -14,6 +14,7 @@ struct Script {
     reads: u64,
     monotonic_ms: u64,
     step_ms: u64,
+    unavailable: bool,
     fail_read: Option<u64>,
     regress_read: Option<u64>,
 }
@@ -50,7 +51,7 @@ impl Clock for ScriptedClock {
         let mut script = self.script();
         script.reads += 1;
         script.monotonic_ms += script.step_ms;
-        if script.fail_read == Some(script.reads) {
+        if script.unavailable || script.fail_read == Some(script.reads) {
             return Err(ClockError::Unavailable);
         }
         let monotonic_ms = if script.regress_read == Some(script.reads) {
@@ -187,15 +188,19 @@ fn assert_outcome_unknown(
     fixture: &Fixture,
     response: Result<ToolCallResponse, KernelError>,
     effects: u64,
+    clock_error: ClockError,
 ) -> TestResult {
-    let error = response.expect_err("a clock fault withholds delivery without a second terminal");
-    assert!(matches!(error, KernelError::Clock(_)), "{error:?}");
-    assert!(
-        fixture.kernel.receipt_log().is_empty(),
-        "the original incident is the sole terminal"
+    let response = response?;
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.reason,
+        Some(KernelError::Clock(clock_error).to_string())
     );
+    assert_eq!(response.output, None);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), effects);
     let operation = assert_original_unknown_incident(&fixture.store, &fixture.request);
+    assert_unknown_replay(Ok(response), &operation, &fixture.store);
+    assert_eq!(fixture.kernel.receipt_log().len(), 1);
     assert_eq!(recorded_elapsed_millis(fixture)?, None);
     let budget = fixture.store.budget_store();
     let hold_id = operation
@@ -225,8 +230,9 @@ fn assert_outcome_unknown(
     assert_unknown_replay(
         fixture.kernel.evaluate_tool_call_blocking(&fixture.request),
         &operation,
+        &fixture.store,
     );
-    assert!(fixture.kernel.receipt_log().is_empty());
+    assert_eq!(fixture.kernel.receipt_log().len(), 1);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), effects);
     assert_eq!(fixture.store.operation(), operation);
     assert_eq!(budget.get_budget_hold(hold_id.as_str())?, Some(hold));
@@ -272,7 +278,7 @@ fn start_read_failure_retains_the_committed_operation(nested: bool) -> TestResul
     let fixture = fixture("elapsed-start-fault", clock.clone(), || {})?;
     clock.fail_read(clock.reads() + start_read_offset);
     let response = evaluate(&fixture, nested);
-    assert_outcome_unknown(&fixture, response, 0)
+    assert_outcome_unknown(&fixture, response, 0, ClockError::Unavailable)
 }
 
 fn end_read_failure_retains_the_executed_operation(nested: bool) -> TestResult {
@@ -282,7 +288,7 @@ fn end_read_failure_retains_the_executed_operation(nested: bool) -> TestResult {
         during.fail_read(during.reads() + 1);
     })?;
     let response = evaluate(&fixture, nested);
-    assert_outcome_unknown(&fixture, response, 1)
+    assert_outcome_unknown(&fixture, response, 1, ClockError::Unavailable)
 }
 
 fn monotonic_regression_retains_the_executed_operation(nested: bool) -> TestResult {
@@ -293,7 +299,61 @@ fn monotonic_regression_retains_the_executed_operation(nested: bool) -> TestResu
         during.regress_read(during.reads() + 1);
     })?;
     let response = evaluate(&fixture, nested);
-    assert_outcome_unknown(&fixture, response, 1)
+    assert_outcome_unknown(&fixture, response, 1, ClockError::MonotonicRegression)
+}
+
+fn persistent_end_read_failure_withholds_the_terminal_receipt(nested: bool) -> TestResult {
+    let clock = Arc::new(ScriptedClock::default());
+    let during = clock.clone();
+    let fixture = fixture("elapsed-persistent-end-fault", clock, move || {
+        during.script().unavailable = true;
+    })?;
+    let result = evaluate(&fixture, nested);
+    assert!(
+        matches!(result, Err(KernelError::Clock(ClockError::Unavailable))),
+        "{result:?}"
+    );
+    let operation = fixture.store.operation();
+    assert_eq!(
+        operation.state(),
+        AdmissionOperationState::DispatchCommitted
+    );
+    assert!(operation.terminal_replay().is_none());
+    assert!(operation.dispatch_commit().is_some());
+    assert_eq!(recorded_elapsed_millis(&fixture)?, None);
+    let budget = fixture.store.budget_store();
+    let hold_id = operation
+        .budget_hold_id()
+        .ok_or("missing original hold ID")?;
+    let hold = budget
+        .get_budget_hold(hold_id.as_str())?
+        .ok_or("missing original hold")?;
+    let quota_key = crate::budget_store::BudgetQuotaKey::grant(&fixture.request.capability.id, 0);
+    let quota = budget
+        .get_invocation_quota_usage(&quota_key)?
+        .ok_or("missing committed quota")?;
+    assert_eq!(
+        (quota.reserved_invocations, quota.captured_invocations),
+        (0, 1)
+    );
+    let replay = fixture.kernel.evaluate_tool_call_blocking(&fixture.request);
+    assert!(
+        matches!(replay, Err(KernelError::Clock(ClockError::Unavailable))),
+        "{replay:?}"
+    );
+    assert_eq!(fixture.store.operation(), operation);
+    assert_eq!(budget.get_budget_hold(hold_id.as_str())?, Some(hold));
+    assert_eq!(budget.get_invocation_quota_usage(&quota_key)?, Some(quota));
+    assert!(fixture
+        .store
+        .state
+        .lock()
+        .map_err(|_| "test admission state lock")?
+        .receipt
+        .is_none());
+    assert!(fixture.kernel.receipt_log().is_empty());
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    Ok(())
 }
 
 #[test]
@@ -344,4 +404,14 @@ fn ordinary_monotonic_regression_retains_the_executed_operation() -> TestResult 
 #[test]
 fn nested_monotonic_regression_retains_the_executed_operation() -> TestResult {
     monotonic_regression_retains_the_executed_operation(true)
+}
+
+#[test]
+fn ordinary_persistent_end_read_failure_withholds_the_terminal_receipt() -> TestResult {
+    persistent_end_read_failure_withholds_the_terminal_receipt(false)
+}
+
+#[test]
+fn nested_persistent_end_read_failure_withholds_the_terminal_receipt() -> TestResult {
+    persistent_end_read_failure_withholds_the_terminal_receipt(true)
 }

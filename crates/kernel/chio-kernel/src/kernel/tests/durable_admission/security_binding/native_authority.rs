@@ -159,11 +159,11 @@ fn replay(nested: bool) -> TestResult {
     retained.validate_native_security_authority(&selected)?;
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(retained.canonical_bytes())?["schema"],
-        "chio.retained-tool-admission-request.v4"
+        "chio.retained-tool-admission-request.v1"
     );
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(retained.canonical_bytes())?["schema"],
-        "chio.retained-tool-admission-request.v4"
+        "chio.retained-tool-admission-request.v1"
     );
     for changed in [
         None,
@@ -363,7 +363,7 @@ fn native_selection_requires_retained_admission_outside_mode_coverage() -> TestR
         retained.validate_native_security_authority(&selected)?;
         assert_eq!(
             serde_json::from_slice::<serde_json::Value>(retained.canonical_bytes())?["schema"],
-            "chio.retained-tool-admission-request.v4"
+            "chio.retained-tool-admission-request.v1"
         );
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
     }

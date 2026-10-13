@@ -14,6 +14,7 @@ struct OutcomeUnknownReplayBinding<'a> {
 pub fn verified_outcome_unknown_after_dispatch_projection(
     operation: &AdmissionOperationV1,
     context: AdmissionProjectionContext,
+    receipt: VerifiedAdmissionReceipt,
 ) -> Result<AdmissionTerminalProjection, AdmissionOperationError> {
     if !matches!(
         operation.binding().kind(),
@@ -22,6 +23,13 @@ pub fn verified_outcome_unknown_after_dispatch_projection(
     {
         return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
     }
+    receipt.validate_against(
+        operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        AdmissionCompensationStatus::NotCompensated,
+        None,
+    )?;
     let dispatch_commit = operation
         .dispatch_commit()
         .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
@@ -54,5 +62,6 @@ pub fn verified_outcome_unknown_after_dispatch_projection(
     Ok(AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
         context,
         incident: Box::new(incident),
+        receipt: Box::new(receipt),
     })
 }

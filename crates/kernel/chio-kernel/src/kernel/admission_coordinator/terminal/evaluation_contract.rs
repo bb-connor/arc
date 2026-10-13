@@ -27,15 +27,18 @@ impl ChioKernel {
         // never a source of authority for a new invocation or redispatch.
         let security_binding =
             self.admission_security_binding(raw.security_invocation_context())?;
+        let original = admission.original_retained_request().ok_or_else(|| {
+            KernelError::DurableAdmission(
+                "terminal evaluation lost its original admission request".into(),
+            )
+        })?;
         let recovered_request_hash = immutable_tool_admission_request_hash(
             request,
             &matching_grants,
             &plan,
             security_binding.as_ref(),
-            admission
-                .retained_request
-                .as_ref()
-                .map(|original| original.authority_profile()),
+            original.authority_profile(),
+            original.frozen_receipt_signing_identity(),
         )?;
         if &recovered_request_hash != admission.operation.binding().immutable_request_hash() {
             return Err(super::super::recovery::failure::item_failure(

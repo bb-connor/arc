@@ -177,9 +177,17 @@ fn durable_nonce_lifecycle_signed_terminal_paths_preserve_disposition() -> TestR
                 identifier("incident", "nonce-outcome-unknown"),
                 digest("incident", 'e'),
             )?;
+            let receipt = refusal_receipt(
+                &fixture.operation,
+                &context,
+                AdmissionOperationState::OutcomeUnknownAfterDispatch,
+                &fixture.key,
+                &fixture.original.request_for_revalidation().arguments,
+            )?;
             AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
                 context,
                 incident: Box::new(incident),
+                receipt: Box::new(receipt),
             }
         };
         let signed = SignedAdmissionTerminalProjectionV1::from_verified(

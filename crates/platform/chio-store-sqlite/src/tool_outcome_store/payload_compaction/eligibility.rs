@@ -97,26 +97,21 @@ pub(super) fn qualified_replay_owners(
             "SELECT participant_digest FROM admission_operation_commits WHERE operation_id=?1 AND mutation_kind='begin'",
             [&owner],|row|row.get(0),
         ).map_err(sqlite_error)?;
-        let unprofiled = match request_bytes {
-            Some(request_bytes) => {
-                if begin_digest.as_deref() != Some(sha256_hex(&request_bytes).as_str()) {
-                    return Err(invariant("retained request lost its begin commitment"));
-                }
-                let retained = RetainedToolAdmissionRequestV1::from_canonical_bytes(&request_bytes)
-                    .map_err(admission_error)?;
-                retained
-                    .validate_binding(operation.binding())
-                    .map_err(admission_error)?;
-                if retained.native_security_authority_binding().is_some()
-                    || !raw.matches_compacted_original_request(&retained)
-                {
-                    return Ok(ReplayOwners::Unsupported);
-                }
-                false
-            }
-            None if begin_digest.is_none() => true,
-            None => return Err(invariant("committed original retained request disappeared")),
-        };
+        let request_bytes = request_bytes
+            .ok_or_else(|| invariant("committed original retained request disappeared"))?;
+        if begin_digest.as_deref() != Some(sha256_hex(&request_bytes).as_str()) {
+            return Err(invariant("retained request lost its begin commitment"));
+        }
+        let retained = RetainedToolAdmissionRequestV1::from_canonical_bytes(&request_bytes)
+            .map_err(admission_error)?;
+        retained
+            .validate_binding(operation.binding())
+            .map_err(admission_error)?;
+        if retained.native_security_authority_binding().is_some()
+            || !raw.matches_compacted_original_request(&retained)
+        {
+            return Ok(ReplayOwners::Unsupported);
+        }
         let projection = super::super::projection::load_verified_projection_with_retained_inputs(
             transaction,
             &operation,
@@ -132,13 +127,6 @@ pub(super) fn qualified_replay_owners(
             })
         {
             return Ok(ReplayOwners::Unsupported);
-        }
-        if unprofiled
-            && !projection.evaluation.as_ref().is_some_and(|evaluation| {
-                raw.matches_unprofiled_compacted_admission(&operation, evaluation)
-            })
-        {
-            return Err(invariant("unprofiled retained raw request conflicts with its admission and frozen evaluation"));
         }
         let Some(AdmissionTerminalReplay::Receipt { .. }) = operation.terminal_replay() else {
             return Ok(ReplayOwners::Unsupported);

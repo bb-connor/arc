@@ -233,6 +233,7 @@ fn release_across_owner_rotation_is_fenced_without_recording() -> TestResult {
             serde_json::json!({"authority": "external-call-lock"}),
             current_unix_timestamp_ms(),
             None,
+            compensation_response(),
         )
     });
     wait_for_entry(&gate, &finished)?;

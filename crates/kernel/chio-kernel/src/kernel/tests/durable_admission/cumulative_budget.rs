@@ -241,6 +241,7 @@ fn exercise_cumulative_approval(
             serde_json::json!({"authority": "original-cumulative-admission-owner"}),
             now + 1,
             None,
+            compensation_response(),
         )?;
         assert_eq!(
             store.operation().state(),

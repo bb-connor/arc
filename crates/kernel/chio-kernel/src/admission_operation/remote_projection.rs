@@ -192,6 +192,29 @@ struct UntrustedDeniedAfterDeliveryProjectionV1 {
     observer_work: Option<UntrustedObservationAttemptZeroV1>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum UntrustedUnknownTerminalTagV1 {
+    OutcomeUnknownAfterDispatch,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UntrustedAdmissionIncidentV1 {
+    binding: AdmissionExactProjectionBindingV1,
+    record_id: AdmissionIdentifier,
+    record_digest: AdmissionDigest,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UntrustedOutcomeUnknownProjectionV1 {
+    terminal: UntrustedUnknownTerminalTagV1,
+    context: AdmissionProjectionContext,
+    incident: UntrustedAdmissionIncidentV1,
+    receipt: ChioReceipt,
+}
+
 impl SignedAdmissionTerminalProjectionV1 {
     pub fn from_verified(
         source_operation: &AdmissionOperationV1,
@@ -316,6 +339,13 @@ impl SignedAdmissionTerminalProjectionV1 {
             &terminal_operation,
             &self.body.context,
             &self.body.signer_key,
+        )?;
+        validate_unknown_projection_body(
+            &projection_json,
+            &records,
+            &source_operation,
+            &terminal_operation,
+            &self.body.context,
         )?;
         validate_denied_projection_body(
             &projection_json,
@@ -704,6 +734,7 @@ fn validate_record_set_shape(
         }
         AdmissionOperationState::OutcomeUnknownAfterDispatch => {
             expected.insert(AdmissionProjectionRecordKind::Incident);
+            expected.insert(AdmissionProjectionRecordKind::Receipt);
         }
         AdmissionOperationState::EconomicMutationApplied
         | AdmissionOperationState::EconomicMutationNotApplied => {
@@ -1069,7 +1100,10 @@ fn validate_receipt_record(
             AdmissionCompensationStatus::NotAcceptedAfterDispatchCommit
         }
         // A denied delivery released its hold; nothing was compensated.
-        AdmissionOperationState::DeniedAfterDelivery => AdmissionCompensationStatus::NotCompensated,
+        AdmissionOperationState::DeniedAfterDelivery
+        | AdmissionOperationState::OutcomeUnknownAfterDispatch => {
+            AdmissionCompensationStatus::NotCompensated
+        }
         _ => return Err(AdmissionOperationError::TerminalProjectionBindingMismatch),
     };
     // The denied terminal exists to carry a signed Deny; an imported
@@ -1090,6 +1124,57 @@ fn validate_receipt_record(
         compensation,
         outcome,
     )
+}
+
+fn validate_unknown_projection_body(
+    projection_json: &[u8],
+    records: &[VerifiedAdmissionTerminalProjectionRecordV1],
+    source: &AdmissionOperationV1,
+    terminal: &AdmissionOperationV1,
+    context: &AdmissionProjectionContext,
+) -> Result<(), AdmissionOperationError> {
+    if terminal.state() != AdmissionOperationState::OutcomeUnknownAfterDispatch {
+        return Ok(());
+    }
+    let mismatch = || AdmissionOperationError::TerminalProjectionBindingMismatch;
+    let projection: UntrustedOutcomeUnknownProjectionV1 =
+        chio_core::canonical::UntrustedJsonText::from_wire(
+            projection_json,
+            MAX_ADMISSION_TERMINAL_PROJECTION_BYTES,
+        )
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| mismatch())?;
+    if projection.context != *context
+        || canonical_json_bytes(&projection).map_err(|_| mismatch())? != projection_json
+    {
+        return Err(mismatch());
+    }
+    projection.incident.binding.validate_against(
+        source,
+        context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+    )?;
+    for (kind, id, value) in [
+        (
+            AdmissionProjectionRecordKind::Incident,
+            projection.incident.record_id.as_str(),
+            canonical_json_bytes(&projection.incident).map_err(|_| mismatch())?,
+        ),
+        (
+            AdmissionProjectionRecordKind::Receipt,
+            projection.receipt.id.as_str(),
+            canonical_json_bytes(&projection.receipt).map_err(|_| mismatch())?,
+        ),
+    ] {
+        let record = records
+            .iter()
+            .find(|record| record.kind == kind)
+            .ok_or_else(mismatch)?;
+        if record.record_id.as_str() != id || record.canonical_json != value {
+            return Err(mismatch());
+        }
+    }
+    Ok(())
 }
 
 fn validate_denied_projection_body(

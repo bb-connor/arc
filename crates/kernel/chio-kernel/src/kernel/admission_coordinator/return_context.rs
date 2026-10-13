@@ -358,43 +358,9 @@ impl ChioKernel {
                 return Ok(());
             }
         } else {
-            // Do not reconstruct missing caller provenance from a live request.
-            if admission.requires_execution_nonce()
-                || admission
-                    .operation
-                    .provider_attempt()
-                    .is_some_and(is_caller_report_attempt)
-            {
-                return Err(KernelError::DurableAdmission(
-                    "return context lost its original admission request".into(),
-                ));
-            }
-            // Ordinary calls retain no original-request artifact. Bind the live
-            // material to the admitted operation before the effect, without
-            // creating an artifact or imposing the caller retention size cap.
-            let matching = resolve_required_matching_grants(
-                &request.capability,
-                &request.tool_name,
-                &request.server_id,
-                &request.arguments,
-                request.model_metadata.as_ref(),
-            )
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-            RetainedToolAdmissionRequestV1::validate_request_binding(
-                admission.operation.binding(),
-                request,
-                &matching,
-                &self.durable_post_return_plan()?.frozen_steps,
-                security_binding.as_ref(),
-                None,
-            )
-            .map_err(durable_store_error)?;
-            if matching
-                .iter()
-                .any(|grant| grant.index == matched_grant_index)
-            {
-                return Ok(());
-            }
+            return Err(KernelError::DurableAdmission(
+                "return context lost its original admission request".into(),
+            ));
         }
         Err(KernelError::DurableAdmission(
             "return context request or selected grant differs from admission".into(),

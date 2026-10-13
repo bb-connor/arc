@@ -21,21 +21,26 @@ fn original_dispatch_incident_and_tool_return_mutually_refuse_the_losing_write()
         )
         .expect("valid return for the original dispatch");
         let lease = claim(&fixture, &operation, at);
-        // These are two competing successors of the same read. The incident
-        // context is the production terminalizer's exact version-bound shape.
-        let incident = verified_outcome_unknown_after_dispatch_projection(
+        let context = AdmissionProjectionContext {
+            operation_id: operation.binding().operation_id().clone(),
+            request_id: operation.binding().request_id().clone(),
+            expected_operation_version: operation.version(),
+            trusted_time_unix_ms: at + 2,
+            coordinator_lease_id: lease.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            store_fence: fixture.fence.clone(),
+        };
+        let receipt = crate::admission_operation_store::refusal_receipt(
             &operation,
-            AdmissionProjectionContext {
-                operation_id: operation.binding().operation_id().clone(),
-                request_id: operation.binding().request_id().clone(),
-                expected_operation_version: operation.version(),
-                trusted_time_unix_ms: at + 2,
-                coordinator_lease_id: lease.coordinator_lease_id().clone(),
-                coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-                store_fence: fixture.fence.clone(),
-            },
+            &context,
+            AdmissionOperationState::OutcomeUnknownAfterDispatch,
+            &chio_core::crypto::Keypair::generate(),
+            &serde_json::json!({}),
         )
-        .expect("verified original-dispatch incident");
+        .expect("bound refusal receipt");
+        let incident =
+            verified_outcome_unknown_after_dispatch_projection(&operation, context, receipt)
+                .expect("verified original-dispatch incident");
         assert_eq!(
             incident.context().expected_operation_version,
             operation.version()
@@ -53,7 +58,7 @@ fn original_dispatch_incident_and_tool_return_mutually_refuse_the_losing_write()
             );
             assert!(matches!(
                 terminal.replay,
-                AdmissionTerminalReplay::Incident { .. }
+                AdmissionTerminalReplay::Receipt { .. }
             ));
         } else {
             let (stored, finalizing) = fixture
@@ -144,7 +149,7 @@ fn original_dispatch_incident_and_tool_return_mutually_refuse_the_losing_write()
         assert_eq!(
             counts,
             if incident_first {
-                (0, 0, 1, 0)
+                (0, 0, 1, 1)
             } else {
                 (1, 1, 0, 0)
             },

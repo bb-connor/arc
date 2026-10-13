@@ -189,12 +189,18 @@ fn failed_tool_return_persistence_terminalizes_unknown_and_blocks_redispatch() {
         durable_admission_fixture("durable-return-write-failure");
     store.fail_next_outcome_write();
 
-    let error = kernel
+    let response = kernel
         .evaluate_tool_call_blocking(&request)
-        .expect_err("unrecordable return withholds output under its original incident");
-    assert!(error
-        .to_string()
-        .contains("injected tool outcome write failure"));
+        .expect("unrecordable return persists its original terminal refusal");
+    let expected = KernelError::AdmissionRecovery(Box::new(
+        crate::admission_operation::AdmissionRecoveryError::Outcome(
+            ToolOutcomeStoreError::Unavailable("injected tool outcome write failure".to_owned()),
+        ),
+    ));
+    assert_eq!(
+        response.reason.as_deref(),
+        Some(expected.to_string().as_str())
+    );
     let retained = assert_original_unknown_incident(&store, &request);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     let usage = store
@@ -212,13 +218,15 @@ fn failed_tool_return_persistence_terminalizes_unknown_and_blocks_redispatch() {
         .expect("outcome state")
         .raw_outcome
         .is_none());
-    assert!(
-        kernel.receipt_log().is_empty(),
-        "the original incident is the sole terminal"
-    );
+    assert_unknown_replay(Ok(response), &retained, &store);
+    assert_eq!(kernel.receipt_log().len(), 1);
 
-    assert_unknown_replay(kernel.evaluate_tool_call_blocking(&request), &retained);
-    assert!(kernel.receipt_log().is_empty());
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_blocking(&request),
+        &retained,
+        &store,
+    );
+    assert_eq!(kernel.receipt_log().len(), 1);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert_eq!(
         store.operation(),

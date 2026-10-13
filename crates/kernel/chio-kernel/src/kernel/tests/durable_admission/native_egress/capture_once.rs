@@ -359,15 +359,15 @@ fn evaluate(case: &Case) -> Result<ToolCallResponse, KernelError> {
 
 fn assert_capture_replay(
     result: Result<ToolCallResponse, KernelError>,
-    already_compensated: bool,
+    original_compensation: Option<&ToolCallResponse>,
     reason: &str,
 ) -> CaptureResult {
-    if already_compensated {
-        let error = result.expect_err("a compensated operation cannot mint another receipt");
-        assert!(
-            matches!(error, KernelError::DurableAdmission(ref detail) if detail == reason),
-            "{error:?}"
-        );
+    if let Some(original) = original_compensation {
+        let replay = result?;
+        assert_eq!(replay.verdict, original.verdict);
+        assert_eq!(replay.reason, original.reason);
+        assert_eq!(replay.output, original.output);
+        assert_same_receipt(&replay.receipt, &original.receipt);
     } else {
         let response = result?;
         assert_eq!(response.verdict, Verdict::Deny);
@@ -449,14 +449,10 @@ fn single_use_capture(site: Site, entry: Entry, boundary: Boundary) -> CaptureRe
     let operation = assert_retained(&case, &label, state, hold, quota)?;
 
     let receipts = case.kernel.receipt_log().len();
-    let replay_reason = match boundary {
-        Boundary::StoreEntered => "native preparation requires original pre-budget authority",
-        Boundary::BeforeStore => "request replay is retained in state CompensatedBeforeDispatch",
-    };
     assert_capture_replay(
         evaluate(&case),
-        boundary == Boundary::BeforeStore,
-        replay_reason,
+        (boundary == Boundary::BeforeStore).then_some(&denied),
+        "native preparation requires original pre-budget authority",
     )?;
     if boundary == Boundary::BeforeStore {
         assert_eq!(case.kernel.receipt_log().len(), receipts, "{label}");

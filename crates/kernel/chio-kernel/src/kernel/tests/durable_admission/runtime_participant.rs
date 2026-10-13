@@ -159,12 +159,15 @@ fn fixture() -> (ChioKernel, Arc<TestAdmissionOperationStore>, Arc<AtomicU64>) {
 }
 
 fn compensate(kernel: &ChioKernel, store: &TestAdmissionOperationStore) -> Result<(), KernelError> {
-    kernel.compensate_durable_admission_before_dispatch(
-        &store.operation(),
-        serde_json::json!({"authority": "test"}),
-        current_unix_timestamp_ms(),
-        None,
-    )
+    kernel
+        .compensate_durable_admission_before_dispatch(
+            &store.operation(),
+            serde_json::json!({"authority": "test"}),
+            current_unix_timestamp_ms(),
+            None,
+            compensation_response(),
+        )
+        .map(|_| ())
 }
 
 #[test]

@@ -360,29 +360,27 @@ async fn mcp_projection_control_valid_v2_nonce_is_preserved_through_delivery_and
         approval: None,
         dpop: None,
     })?;
-    // Ordinary MCP calls deliberately retain no original-request artifact.
-    // This metadata-only fixture uses the existing canonical store-test recipe
-    // for the actual issued capability, caller arguments and grant selection.
-    // The public binding validator checks both request commitments; no opaque
-    // digest or nonce signature context is fabricated and nothing is dispatched.
-    let prior_request_hash = sha256_hex(&canonical_json_bytes(&json!({
-        "schema":"chio.tool-admission-request.v1", "server_id":request.server_id,
-        "tool_name":request.tool_name, "agent_id":request.agent_id,
-        "arguments":request.arguments, "governed_intent":request.governed_intent,
-        "model_metadata":request.model_metadata,
-        "federated_origin_kernel_id":request.federated_origin_kernel_id,
-        "matching_grants":[{"index":grant_index,"grant":grant}], "post_return_steps":[],
-    }))?);
+    let keypair = runtime.kernel_keypair();
+    let frozen_receipt_signing_identity = json!({
+        "public_key": keypair.public_key(), "crypto_floor": "allow_classical",
+    });
     let immutable_request_hash = AdmissionDigest::try_new(
         "immutable_request_hash",
         sha256_hex(&canonical_json_bytes(&json!({
-            "schema":"chio.tool-admission-request.v4", "prior_request_hash":prior_request_hash,
-            "authority_profile":&profile,
+            "schema":"chio.tool-admission-request.v1", "server_id":request.server_id,
+            "tool_name":request.tool_name, "agent_id":request.agent_id,
+            "arguments":request.arguments, "governed_intent":request.governed_intent,
+            "model_metadata":request.model_metadata,
+            "federated_origin_kernel_id":request.federated_origin_kernel_id,
+            "matching_grants":[{"index":grant_index,"grant":grant}], "post_return_steps":[],
+            "security_binding": null, "authority_profile": &profile,
+            "frozen_receipt_signing_identity": &frozen_receipt_signing_identity,
         }))?),
     )?;
     let original = RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(
-        &json!({"schema":"chio.retained-tool-admission-request.v4", "request":&request,
-            "authority_profile":profile,"matching_grant_indices":[grant_index], "post_return_steps":[]}),
+        &json!({"schema":"chio.retained-tool-admission-request.v1", "request":&request,
+            "authority_profile":profile,"matching_grant_indices":[grant_index], "post_return_steps":[],
+            "frozen_receipt_signing_identity":frozen_receipt_signing_identity}),
     )?)?;
     original.validate_request_material(&request)?;
     let binding = base.binding();
@@ -408,7 +406,6 @@ async fn mcp_projection_control_valid_v2_nonce_is_preserved_through_delivery_and
     let operation = AdmissionOperationV1::prepare(nonce_binding, base.coordinator_lease_epoch())?;
     // This public API mints checked metadata. It neither reserves a nonce nor
     // commits a new operation, and this control dispatches no additional tool.
-    let keypair = runtime.kernel_keypair();
     let issuance = AdmissionExecutionNonceReservationV1::mint_for_operation(
         &operation,
         &original,

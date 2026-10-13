@@ -167,16 +167,36 @@ fn invocation_owned_connections_close_on_completion_denial_and_cancellation() ->
                     let terminal = assert_original_unknown_incident(&store, &request);
                     assert_eq!(terminal.binding(), committed.binding());
                     assert_eq!(terminal.dispatch_commit(), committed.dispatch_commit());
+                    assert_eq!(kernel.receipt_log().len(), 1);
+                    let receipt = store
+                        .state
+                        .lock()
+                        .map_err(|_| "test admission state lock")?
+                        .receipt
+                        .clone()
+                        .ok_or("missing original unknown-outcome receipt")?;
                     kernel.reconcile_recoverable_admissions()?;
                     assert_eq!(
                         store.operation(),
                         terminal,
-                        "recovery cannot replace the committed incident"
+                        "recovery cannot replace the terminal projection"
                     );
-                    assert!(
-                        kernel.receipt_log().is_empty(),
-                        "recovery creates no second frontdoor terminal"
+                    assert_unknown_replay(
+                        kernel.evaluate_tool_call_blocking(&request),
+                        &terminal,
+                        &store,
                     );
+                    assert_same_receipt(
+                        store
+                            .state
+                            .lock()
+                            .map_err(|_| "test admission state lock")?
+                            .receipt
+                            .as_ref()
+                            .ok_or("missing canonical unknown-outcome receipt")?,
+                        &receipt,
+                    );
+                    assert_eq!(kernel.receipt_log().len(), 1);
                 }
                 assert_eq!(
                     store.operation().state(),

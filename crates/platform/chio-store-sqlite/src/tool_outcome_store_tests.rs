@@ -112,8 +112,13 @@ fn prepared(fence: &StoreMutationFence, request_id: &str) -> AdmissionOperationV
         request_id: id("request_id", request_id),
         capability_id: id("capability_id", "tool-outcome-capability"),
         authorization_capability_hash: digest("authorization_capability_hash", 'a'),
-        request_binding: AdmissionRequestBindingV1::new(
+        request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
             digest("immutable_request_hash", 'b'),
+            AdmissionDigest::try_new(
+                "action_parameter_hash",
+                chio_core::crypto::sha256_hex(b"{}"),
+            )
+            .expect("action parameter hash"),
             requirements,
         )
         .expect("request binding"),

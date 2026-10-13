@@ -4,6 +4,8 @@ use super::*;
 mod evidence;
 #[path = "federation_context/recovery_isolation.rs"]
 mod recovery_isolation;
+#[path = "federation_context/refusal.rs"]
+mod refusal;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 

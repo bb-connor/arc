@@ -69,6 +69,7 @@ fn caller_custody_rejects_each_selected_family_without_its_physical_ledger() -> 
             &[],
             None,
             &profile,
+            &fixture.kernel.freeze_receipt_signing_identity()?,
         )?);
         let result = fixture.kernel.read_caller_participant_custody(
             &fixture.admission,

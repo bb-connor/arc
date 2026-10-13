@@ -80,27 +80,22 @@ fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
         store: store.clone(),
     }));
 
-    let result = kernel.evaluate_tool_call_blocking(&request);
-    assert!(
-        matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
-        "unexpected durable URL elicitation result: {result:?}"
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("unknown URL elicitation persists its original terminal refusal");
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("URL elicitation required before tool execution")
     );
     let retained = assert_original_unknown_incident(&store, &request);
-    assert!(
-        kernel.receipt_log().is_empty(),
-        "the original incident is the sole terminal"
+    assert_unknown_replay(Ok(response), &retained, &store);
+    assert_eq!(kernel.receipt_log().len(), 1);
+    let projection = assert_unknown_replay(
+        kernel.evaluate_tool_call_blocking(&request),
+        &retained,
+        &store,
     );
-    for time in [0, (1_u64 << 53)] {
-        assert!(
-            crate::admission_operation::AdmissionReceiptMetadataV1::retained_unknown_dispatch(
-                &retained, time
-            )
-            .is_err(),
-            "unsafe observation time accepted: {time}"
-        );
-    }
-    let projection = assert_unknown_replay(kernel.evaluate_tool_call_blocking(&request), &retained);
-    assert!(kernel.receipt_log().is_empty());
+    assert_eq!(kernel.receipt_log().len(), 1);
     let metadata = &serde_json::to_value(projection).expect("retained projection");
     let schema: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -209,35 +204,33 @@ fn dpop_profile_removal_distinguishes_selected_authority_from_configuration() {
             );
         }
         assert!(!kernel.can_redispatch_unknown_read(&request));
-        assert!(matches!(
-            kernel.evaluate_tool_call_blocking(&request),
-            Err(KernelError::UrlElicitationsRequired { .. })
-        ));
-        let retained = assert_original_unknown_incident(&store, &request);
-        assert!(
-            kernel.receipt_log().is_empty(),
-            "DPoP profile removal cannot create a competing terminal"
+        let response = kernel
+            .evaluate_tool_call_blocking(&request)
+            .expect("unknown read persists its original terminal refusal");
+        assert_eq!(
+            response.reason.as_deref(),
+            Some("URL elicitation required before tool execution")
         );
+        let retained = assert_original_unknown_incident(&store, &request);
+        assert_unknown_replay(Ok(response), &retained, &store);
+        assert_eq!(kernel.receipt_log().len(), 1);
         let claim = store.state.lock().expect("state").claim.clone();
         assert_eq!(retained.dpop_replay_ledger_digest().is_some(), selected);
-        assert_eq!(
-            store
-                .state
-                .lock()
-                .expect("state")
-                .retained_request
-                .is_some(),
-            selected
-        );
+        assert!(store
+            .state
+            .lock()
+            .expect("state")
+            .retained_request
+            .is_some());
         kernel.dpop_authority = None;
         assert_eq!(kernel.can_redispatch_unknown_read(&request), !selected);
         let result = kernel.evaluate_tool_call_blocking(&request);
         if selected {
             result.expect_err("removed authority cannot advertise a retained identity as reusable");
-            assert!(kernel.receipt_log().is_empty());
+            assert_eq!(kernel.receipt_log().len(), 1);
         } else {
-            assert_unknown_replay(result, &retained);
-            assert!(kernel.receipt_log().is_empty());
+            assert_unknown_replay(result, &retained, &store);
+            assert_eq!(kernel.receipt_log().len(), 1);
         }
         assert_eq!(store.operation(), retained);
         assert_eq!(store.state.lock().expect("state").claim, claim);
@@ -266,12 +259,15 @@ fn durable_server_url_elicitation_finalizes_the_pool_claim() {
         .set_finding_pool_ledger(ledger.clone())
         .expect("qualified finding pool ledger");
 
-    let error = kernel.evaluate_tool_call_blocking(&request);
-    assert!(
-        matches!(error, Err(KernelError::UrlElicitationsRequired { .. })),
-        "unexpected durable URL elicitation result: {error:?}"
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("unknown URL elicitation persists its original terminal refusal");
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("URL elicitation required before tool execution")
     );
     let terminal = assert_original_unknown_incident(&store, &request);
+    assert_unknown_replay(Ok(response), &terminal, &store);
     assert!(ledger
         .list_claimed_admission_operations(None, 10)
         .expect("read finalized pool claims")
@@ -281,7 +277,11 @@ fn durable_server_url_elicitation_finalizes_the_pool_claim() {
         vec![terminal.binding().operation_id().as_str().to_owned()]
     );
     let receipts = kernel.receipt_log().len();
-    assert_unknown_replay(kernel.evaluate_tool_call_blocking(&request), &terminal);
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_blocking(&request),
+        &terminal,
+        &store,
+    );
     assert_eq!(kernel.receipt_log().len(), receipts);
     assert_eq!(
         store.operation(),
@@ -441,21 +441,16 @@ fn nested_durable_url_elicitation_terminalizes_as_outcome_unknown() {
         .expect("begin parent request");
     let mut client = NoopNestedFlowClient;
 
-    let result = kernel.evaluate_tool_call_with_nested_flow_client(
-        &parent_context,
-        &request,
-        &mut client,
-        None,
-    );
-    assert!(
-        matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
-        "unexpected nested durable URL elicitation result: {result:?}"
+    let response = kernel
+        .evaluate_tool_call_with_nested_flow_client(&parent_context, &request, &mut client, None)
+        .expect("unknown nested URL elicitation persists its original terminal refusal");
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("URL elicitation required before tool execution")
     );
     let retained = assert_original_unknown_incident(&store, &request);
-    assert!(
-        kernel.receipt_log().is_empty(),
-        "the original nested saga incident is the sole terminal"
-    );
+    assert_unknown_replay(Ok(response), &retained, &store);
+    assert_eq!(kernel.receipt_log().len(), 1);
     assert_unknown_replay(
         kernel.evaluate_tool_call_with_nested_flow_client(
             &parent_context,
@@ -464,8 +459,9 @@ fn nested_durable_url_elicitation_terminalizes_as_outcome_unknown() {
             None,
         ),
         &retained,
+        &store,
     );
-    assert!(kernel.receipt_log().is_empty());
+    assert_eq!(kernel.receipt_log().len(), 1);
     assert_eq!(
         store.operation(),
         retained,

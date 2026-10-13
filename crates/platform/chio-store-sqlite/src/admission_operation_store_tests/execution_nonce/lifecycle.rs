@@ -143,19 +143,28 @@ pub(super) fn release(fixture: &NonceFixture) -> TestResult {
 pub(super) fn projection(fixture: &NonceFixture) -> TestResult<AdmissionTerminalProjection> {
     let command = command(fixture)?;
     let lease = command.recovery_lease();
+    let context = AdmissionProjectionContext {
+        operation_id: fixture.operation.binding().operation_id().clone(),
+        request_id: fixture.operation.binding().request_id().clone(),
+        expected_operation_version: fixture.operation.version(),
+        trusted_time_unix_ms: now_ms(),
+        coordinator_lease_id: lease.coordinator_lease_id().clone(),
+        coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+        store_fence: fixture.fixture.fence.clone(),
+    };
+    let receipt = refusal_receipt(
+        &fixture.operation,
+        &context,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        &fixture.key,
+        &fixture.original.request_for_revalidation().arguments,
+    )?;
     Ok(
         verified_released_pre_dispatch_compensation_projection_for_test(
             &fixture.operation,
-            AdmissionProjectionContext {
-                operation_id: fixture.operation.binding().operation_id().clone(),
-                request_id: fixture.operation.binding().request_id().clone(),
-                expected_operation_version: fixture.operation.version(),
-                trusted_time_unix_ms: now_ms(),
-                coordinator_lease_id: lease.coordinator_lease_id().clone(),
-                coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-                store_fence: fixture.fixture.fence.clone(),
-            },
+            context,
             serde_json::json!({"policy":"nonce-lifecycle-test-release"}),
+            receipt,
         )?,
     )
 }

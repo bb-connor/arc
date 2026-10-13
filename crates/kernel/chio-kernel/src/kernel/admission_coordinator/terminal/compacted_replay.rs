@@ -85,19 +85,19 @@ impl ChioKernel {
             &request.arguments,
             request.model_metadata.as_ref(),
         )?;
-        let security_binding = admission
-            .original_retained_request()
-            .and_then(|original| original.security_binding());
-        // A context-bearing original without retained context material is held
-        // by maintenance. This path never invents that original context.
+        let original = admission.original_retained_request().ok_or_else(|| {
+            KernelError::DurableAdmission(
+                "compacted replay lost its original admission request".into(),
+            )
+        })?;
+        let security_binding = original.security_binding();
         let request_hash = immutable_tool_admission_request_hash(
             request,
             &matching,
             &plan,
             security_binding,
-            admission
-                .original_retained_request()
-                .map(|original| original.authority_profile()),
+            original.authority_profile(),
+            original.frozen_receipt_signing_identity(),
         )?;
         if &request_hash != operation.binding().immutable_request_hash() {
             return Err(KernelError::DurableAdmission(

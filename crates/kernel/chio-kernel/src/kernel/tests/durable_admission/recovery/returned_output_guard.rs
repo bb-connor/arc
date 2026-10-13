@@ -1,6 +1,6 @@
 //! An output guard rejects the value a committed dispatch actually returned.
 //! The rejection happens before the return is recorded, so the operation must
-//! retain the original outcome-unknown incident without a second receipt or dispatch.
+//! retain its unknown outcome and signed refusal without another dispatch.
 use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -188,8 +188,8 @@ fn rejected_output_terminalizes_unknown(entry: Entry) -> TestResult {
     } = fixture(&format!("returned-output-rejected-{entry:?}"), true);
 
     let parent = parent(&kernel, &request, entry)?;
-    let error = evaluate(&kernel, &request, parent.as_ref())
-        .expect_err("a refused raw return withholds output under its original incident");
+    let response = evaluate(&kernel, &request, parent.as_ref())
+        .expect("a refused raw return persists its original terminal refusal");
 
     assert_eq!(
         observed(&seen)?,
@@ -201,7 +201,11 @@ fn rejected_output_terminalizes_unknown(entry: Entry) -> TestResult {
         KernelError::GuardDenied(REJECTION.to_owned())
     ))
     .to_string();
-    assert_eq!(error.to_string(), expected_reason, "{entry:?}");
+    assert_eq!(
+        response.reason.as_deref(),
+        Some(expected_reason.as_str()),
+        "{entry:?}"
+    );
 
     let retained = assert_original_unknown_incident(&store, &request);
     {
@@ -216,14 +220,15 @@ fn rejected_output_terminalizes_unknown(entry: Entry) -> TestResult {
         .get_usage(&request.capability.id, 0)?
         .ok_or("committed quota must remain retained")?;
     assert_eq!(usage.invocation_count, 1);
-    let receipt_log = kernel.receipt_log();
-    assert!(
-        receipt_log.is_empty(),
-        "{entry:?}: the original incident is the sole terminal"
-    );
+    assert_unknown_replay(Ok(response), &retained, &store);
+    assert_eq!(kernel.receipt_log().len(), 1, "{entry:?}");
 
-    assert_unknown_replay(evaluate(&kernel, &request, parent.as_ref()), &retained);
-    assert!(kernel.receipt_log().is_empty(), "{entry:?}");
+    assert_unknown_replay(
+        evaluate(&kernel, &request, parent.as_ref()),
+        &retained,
+        &store,
+    );
+    assert_eq!(kernel.receipt_log().len(), 1, "{entry:?}");
     assert_eq!(store.operation(), retained);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert_eq!(observed(&seen)?.len(), 1, "{entry:?}");
