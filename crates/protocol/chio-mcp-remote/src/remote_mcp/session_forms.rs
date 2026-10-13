@@ -48,7 +48,7 @@ struct AdminRevokeCapabilityRequest {
     capability_id: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct AuthorizationRequest {
     response_type: String,
     client_id: String,
@@ -75,29 +75,12 @@ struct AuthorizationRequest {
     chio_sender_attestation_sha256: Option<String>,
 }
 
+/// The consent form submission. The authorization request itself stays on
+/// the server under `consent_nonce`, which the rendered page carries.
 #[derive(Debug, Deserialize)]
 struct AuthorizationApprovalForm {
-    response_type: String,
-    client_id: String,
-    redirect_uri: String,
     #[serde(default)]
-    state: Option<String>,
-    #[serde(default)]
-    scope: Option<String>,
-    #[serde(default)]
-    resource: Option<String>,
-    #[serde(default)]
-    authorization_details: Option<String>,
-    #[serde(default)]
-    chio_transaction_context: Option<String>,
-    code_challenge: String,
-    code_challenge_method: String,
-    #[serde(default)]
-    chio_sender_dpop_public_key: Option<String>,
-    #[serde(default)]
-    chio_sender_mtls_thumbprint_sha256: Option<String>,
-    #[serde(default)]
-    chio_sender_attestation_sha256: Option<String>,
+    consent_nonce: Option<String>,
     decision: String,
 }
 

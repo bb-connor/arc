@@ -342,28 +342,11 @@ fn encode_sender_dpop_header(
     URL_SAFE_NO_PAD.encode(serde_json::to_vec(&proof).expect("serialize DPoP proof"))
 }
 
-fn oauth_form_with_sender_constraint<'a>(
-    redirect_uri: &'a str,
-    resource: &'a str,
-    challenge: &'a str,
-    decision: &'a str,
-    sender_fields: &[(&'a str, &'a str)],
-    extra_fields: &[(&'a str, &'a str)],
-) -> Vec<(&'a str, &'a str)> {
-    let mut fields = vec![
-        ("response_type", "code"),
-        ("client_id", "https://client.example/app"),
-        ("redirect_uri", redirect_uri),
-        ("state", "state-123"),
-        ("resource", resource),
-        ("scope", "mcp:invoke"),
-        ("code_challenge", challenge),
-        ("code_challenge_method", "S256"),
-        ("decision", decision),
-    ];
-    fields.extend_from_slice(extra_fields);
-    fields.extend_from_slice(sender_fields);
-    fields
+fn consent_nonce(page: &str) -> String {
+    page.split_once("name=\"consent_nonce\" value=\"")
+        .and_then(|(_, rest)| rest.split_once('"'))
+        .map(|(nonce, _)| nonce.to_string())
+        .expect("consent page carries a nonce")
 }
 
 fn authorize_sender_bound_code(
@@ -392,23 +375,20 @@ fn authorize_sender_bound_code(
     for (name, value) in approval_extra_fields {
         authorize = authorize.query(&[(*name, *value)]);
     }
-    authorize
+    let page = authorize
         .send()
         .expect("send authorize request")
         .error_for_status()
-        .expect("authorize page ok");
+        .expect("authorize page ok")
+        .text()
+        .expect("read authorize page");
 
-    let approval_fields = oauth_form_with_sender_constraint(
-        redirect_uri,
-        resource,
-        challenge.as_str(),
-        "approve",
-        sender_query_fields,
-        approval_extra_fields,
-    );
     let approval_response = client
         .post(format!("{base_url}/oauth/authorize"))
-        .form(&approval_fields)
+        .form(&[
+            ("consent_nonce", consent_nonce(&page)),
+            ("decision", "approve".to_string()),
+        ])
         .send()
         .expect("submit approval");
     assert!(approval_response.status().is_redirection());
@@ -662,20 +642,8 @@ fn mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange() {
     let approval_response = client
         .post(format!("{base_url}/oauth/authorize"))
         .form(&[
-            ("response_type", "code"),
-            ("client_id", "https://client.example/app"),
-            ("redirect_uri", redirect_uri),
-            ("state", state),
-            ("resource", resource.as_str()),
-            ("scope", "mcp:invoke"),
-            ("authorization_details", authorization_details_json.as_str()),
-            (
-                "chio_transaction_context",
-                transaction_context_json.as_str(),
-            ),
-            ("code_challenge", challenge.as_str()),
-            ("code_challenge_method", "S256"),
-            ("decision", "approve"),
+            ("consent_nonce", consent_nonce(&authorize_response)),
+            ("decision", "approve".to_string()),
         ])
         .send()
         .expect("submit approval");

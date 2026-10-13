@@ -547,20 +547,28 @@ chio::Result<std::string> perform_authorization_code_flow(
                     "cpp-peer::perform_authorization_code_flow"});
   }
 
+  const std::string nonce_marker = "name=\"consent_nonce\" value=\"";
+  const auto& page = authorize_response.value().body;
+  const auto nonce_start = page.find(nonce_marker);
+  const auto nonce_end = nonce_start == std::string::npos
+                             ? std::string::npos
+                             : page.find('"', nonce_start + nonce_marker.size());
+  if (nonce_end == std::string::npos || nonce_end == nonce_start + nonce_marker.size()) {
+    return chio::Result<std::string>::failure(
+        chio::Error{chio::ErrorCode::Protocol,
+                    "authorization approval page carries no consent nonce",
+                    "cpp-peer::perform_authorization_code_flow"});
+  }
+  const std::string consent_nonce = page.substr(
+      nonce_start + nonce_marker.size(), nonce_end - nonce_start - nonce_marker.size());
+
   chio::HttpRequest approval_request{
       "POST",
       authorization_endpoint,
       {{"Content-Type", "application/x-www-form-urlencoded"}},
       form_encode({
-          {"client_id", client_id},
-          {"code_challenge", pkce.value().challenge},
-          {"code_challenge_method", "S256"},
+          {"consent_nonce", consent_nonce},
           {"decision", "approve"},
-          {"redirect_uri", redirect_uri},
-          {"resource", resource},
-          {"response_type", "code"},
-          {"scope", args.auth_scope},
-          {"state", state},
       }),
   };
   auto approval_response = transport->send(approval_request);

@@ -682,6 +682,7 @@ fn build_local_auth_server(
         code_ttl_secs: config.auth_code_ttl_secs,
         access_token_ttl_secs: config.auth_access_token_ttl_secs,
         codes: Arc::new(StdMutex::new(HashMap::new())),
+        consents: Arc::new(StdMutex::new(HashMap::new())),
         sender_dpop_nonce_store,
         sender_dpop_config,
     }))

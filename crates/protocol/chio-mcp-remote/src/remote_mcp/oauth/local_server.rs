@@ -21,7 +21,98 @@ struct SignedAccessTokenInput<'a> {
     sender_constraint: Option<&'a ChioSenderConstraintClaims>,
 }
 
+/// Bounds a deadline-keyed store: drops expired entries and refuses a new
+/// entry once `MAX_PENDING_AUTHORIZATIONS` live entries remain.
+fn reserve_capacity<T>(
+    entries: &mut HashMap<String, T>,
+    reading: chio_security_types::clock::ClockReading,
+    deadline: impl Fn(&T) -> &AuthorityDeadline,
+    exhausted: &str,
+) -> Result<(), Response> {
+    let mut expired = Vec::new();
+    for (id, entry) in entries.iter() {
+        match deadline(entry).remaining(reading) {
+            Err(ClockError::Expired) => expired.push(id.clone()),
+            Err(error) => return Err(clock::rejection(error)),
+            Ok(_) => {}
+        }
+    }
+    for id in expired {
+        entries.remove(&id);
+    }
+    if entries.len() >= MAX_PENDING_AUTHORIZATIONS {
+        return Err(oauth_token_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            OAuthError::TemporarilyUnavailable,
+            exhausted,
+        ));
+    }
+    Ok(())
+}
+
+const MAX_PENDING_AUTHORIZATIONS: usize = 4096;
+
+fn consent_refusal(detail: &str) -> Response {
+    oauth_token_error(StatusCode::BAD_REQUEST, OAuthError::InvalidRequest, detail)
+}
+
 impl LocalAuthorizationServer {
+    fn issue_consent_nonce(&self, request: &AuthorizationRequest) -> Result<String, Response> {
+        let entropy = Keypair::generate().public_key().to_hex();
+        let nonce = format!("consent-{}", sha256_hex(entropy.as_bytes()));
+        let mut consents = self
+            .consents
+            .lock()
+            .map_err(|_| clock::rejection(ClockError::Unavailable))?;
+        let reading = self.clock.read().map_err(clock::rejection)?;
+        let timeout_ms = self
+            .code_ttl_secs
+            .checked_mul(1000)
+            .ok_or_else(|| clock::rejection(ClockError::Overflow))?;
+        let deadline =
+            AuthorityDeadline::for_timeout_ms(reading, timeout_ms).map_err(clock::rejection)?;
+        reserve_capacity(
+            &mut consents,
+            reading,
+            |consent| &consent.deadline,
+            "consent capacity exhausted",
+        )?;
+        consents.insert(
+            nonce.clone(),
+            PendingConsent {
+                deadline,
+                request: request.clone(),
+            },
+        );
+        Ok(nonce)
+    }
+
+    fn take_pending_consent(&self, nonce: Option<&str>) -> Result<AuthorizationRequest, Response> {
+        let nonce = nonce
+            .filter(|nonce| !nonce.is_empty())
+            .ok_or_else(|| consent_refusal("missing consent_nonce"))?;
+        let mut consents = self
+            .consents
+            .lock()
+            .map_err(|_| clock::rejection(ClockError::Unavailable))?;
+        let reading = self.clock.read().map_err(clock::rejection)?;
+        let pending = consents
+            .get(nonce)
+            .ok_or_else(|| consent_refusal("unknown or answered consent_nonce"))?;
+        match pending.deadline.remaining(reading) {
+            Ok(_) => {}
+            Err(ClockError::Expired) => {
+                consents.remove(nonce);
+                return Err(consent_refusal("consent_nonce expired"));
+            }
+            Err(error) => return Err(clock::rejection(error)),
+        }
+        consents
+            .remove(nonce)
+            .map(|pending| pending.request)
+            .ok_or_else(|| consent_refusal("unknown or answered consent_nonce"))
+    }
+
     pub(super) fn token_endpoint_url(&self) -> String {
         format!("{}/token", self.issuer.trim_end_matches('/'))
     }
@@ -54,24 +145,7 @@ impl LocalAuthorizationServer {
             request.chio_sender_attestation_sha256.as_deref(),
             transaction_context.as_ref(),
         )?;
-        let state = request.state.clone().unwrap_or_default();
         let scopes_display = scopes.join(" ");
-        let authorization_details_hidden =
-            request.authorization_details.clone().unwrap_or_default();
-        let transaction_context_hidden =
-            request.chio_transaction_context.clone().unwrap_or_default();
-        let sender_dpop_hidden = request
-            .chio_sender_dpop_public_key
-            .clone()
-            .unwrap_or_default();
-        let sender_mtls_hidden = request
-            .chio_sender_mtls_thumbprint_sha256
-            .clone()
-            .unwrap_or_default();
-        let sender_attestation_hidden = request
-            .chio_sender_attestation_sha256
-            .clone()
-            .unwrap_or_default();
         let details_display = authorization_details
             .as_ref()
             .map_or("none".to_string(), |details| {
@@ -105,48 +179,37 @@ impl LocalAuthorizationServer {
                 parts.join(" + ")
             },
         );
+        let consent_nonce = self.issue_consent_nonce(request)?;
         Ok(format!(
-            "<!doctype html><html><body><h1>Authorize MCP Access</h1><p>Client: {client}</p><p>Resource: {resource}</p><p>Subject: {subject}</p><p>Scopes: {scopes}</p><p>Chio Authorization Details: {details_display}</p><p>Chio Transaction Context: {transaction_display}</p><p>Sender Constraint: {sender_constraint_display}</p><form method=\"post\" action=\"{path}\"><input type=\"hidden\" name=\"response_type\" value=\"code\"><input type=\"hidden\" name=\"client_id\" value=\"{client}\"><input type=\"hidden\" name=\"redirect_uri\" value=\"{redirect}\"><input type=\"hidden\" name=\"state\" value=\"{state}\"><input type=\"hidden\" name=\"scope\" value=\"{scope}\"><input type=\"hidden\" name=\"resource\" value=\"{resource}\"><input type=\"hidden\" name=\"authorization_details\" value=\"{authorization_details}\"><input type=\"hidden\" name=\"chio_transaction_context\" value=\"{transaction_context}\"><input type=\"hidden\" name=\"chio_sender_dpop_public_key\" value=\"{sender_dpop}\"><input type=\"hidden\" name=\"chio_sender_mtls_thumbprint_sha256\" value=\"{sender_mtls}\"><input type=\"hidden\" name=\"chio_sender_attestation_sha256\" value=\"{sender_attestation}\"><input type=\"hidden\" name=\"code_challenge\" value=\"{challenge}\"><input type=\"hidden\" name=\"code_challenge_method\" value=\"{method}\"><button type=\"submit\" name=\"decision\" value=\"approve\">Approve</button><button type=\"submit\" name=\"decision\" value=\"deny\">Deny</button></form></body></html>",
+            "<!doctype html><html><body><h1>Authorize MCP Access</h1><p>Client: {client}</p><p>Resource: {resource}</p><p>Subject: {subject}</p><p>Scopes: {scopes}</p><p>Chio Authorization Details: {details_display}</p><p>Chio Transaction Context: {transaction_display}</p><p>Sender Constraint: {sender_constraint_display}</p><form method=\"post\" action=\"{path}\"><input type=\"hidden\" name=\"consent_nonce\" value=\"{consent_nonce}\"><button type=\"submit\" name=\"decision\" value=\"approve\">Approve</button><button type=\"submit\" name=\"decision\" value=\"deny\">Deny</button></form></body></html>",
             client = html_escape(&request.client_id),
-            redirect = html_escape(&request.redirect_uri),
-            state = html_escape(&state),
-            scope = html_escape(&scopes.join(" ")),
             resource = html_escape(&resource),
             subject = html_escape(&self.subject),
             scopes = html_escape(&scopes_display),
             details_display = html_escape(&details_display),
             transaction_display = html_escape(&transaction_display),
             sender_constraint_display = html_escape(&sender_constraint_display),
-            authorization_details = html_escape(&authorization_details_hidden),
-            transaction_context = html_escape(&transaction_context_hidden),
-            sender_dpop = html_escape(&sender_dpop_hidden),
-            sender_mtls = html_escape(&sender_mtls_hidden),
-            sender_attestation = html_escape(&sender_attestation_hidden),
-            challenge = html_escape(request.code_challenge.as_deref().unwrap_or_default()),
-            method = html_escape(request.code_challenge_method.as_deref().unwrap_or_default()),
+            consent_nonce = html_escape(&consent_nonce),
             path = LOCAL_AUTHORIZATION_PATH,
         ))
     }
 
+    /// Answers a rendered consent page. The nonce is consumed by the first
+    /// answer, approve or deny; the approved request is the one stored when
+    /// the page was rendered, never fields from the submission.
     pub(super) fn approve_authorization(
         &self,
         form: AuthorizationApprovalForm,
     ) -> Result<Redirect, Response> {
-        let request = AuthorizationRequest {
-            response_type: form.response_type.clone(),
-            client_id: form.client_id.clone(),
-            redirect_uri: form.redirect_uri.clone(),
-            state: form.state.clone(),
-            scope: form.scope.clone(),
-            resource: form.resource.clone(),
-            authorization_details: form.authorization_details.clone(),
-            chio_transaction_context: form.chio_transaction_context.clone(),
-            code_challenge: Some(form.code_challenge.clone()),
-            code_challenge_method: Some(form.code_challenge_method.clone()),
-            chio_sender_dpop_public_key: form.chio_sender_dpop_public_key.clone(),
-            chio_sender_mtls_thumbprint_sha256: form.chio_sender_mtls_thumbprint_sha256.clone(),
-            chio_sender_attestation_sha256: form.chio_sender_attestation_sha256.clone(),
-        };
+        let request = self.take_pending_consent(form.consent_nonce.as_deref())?;
+        if form.decision != "approve" {
+            return Err(redirect_oauth_error(
+                &request.redirect_uri,
+                OAuthError::AccessDenied,
+                "authorization request denied",
+                request.state.as_deref(),
+            ));
+        }
         let resource = validate_authorization_request(
             &self.clock,
             &request,
@@ -154,32 +217,24 @@ impl LocalAuthorizationServer {
             &self.default_audience,
         )?;
         let authorization_details =
-            parse_request_time_authorization_details(form.authorization_details.as_deref())?;
+            parse_request_time_authorization_details(request.authorization_details.as_deref())?;
         let transaction_context = parse_request_time_transaction_context(
             &self.clock,
-            form.chio_transaction_context.as_deref(),
+            request.chio_transaction_context.as_deref(),
         )?;
         validate_request_time_transaction_context_binding(
             transaction_context.as_ref(),
-            &form.client_id,
+            &request.client_id,
             None,
         )?;
         let sender_constraint = build_request_sender_constraint(
-            form.chio_sender_dpop_public_key.as_deref(),
-            form.chio_sender_mtls_thumbprint_sha256.as_deref(),
-            form.chio_sender_attestation_sha256.as_deref(),
+            request.chio_sender_dpop_public_key.as_deref(),
+            request.chio_sender_mtls_thumbprint_sha256.as_deref(),
+            request.chio_sender_attestation_sha256.as_deref(),
             transaction_context.as_ref(),
         )?;
-        if form.decision != "approve" {
-            return Err(redirect_oauth_error(
-                &form.redirect_uri,
-                OAuthError::AccessDenied,
-                "authorization request denied",
-                form.state.as_deref(),
-            ));
-        }
 
-        let scopes = resolve_requested_scopes(form.scope.as_deref(), &self.supported_scopes)?;
+        let scopes = resolve_requested_scopes(request.scope.as_deref(), &self.supported_scopes)?;
         let code = generate_authorization_code();
         let mut codes = self
             .codes
@@ -194,13 +249,13 @@ impl LocalAuthorizationServer {
             AuthorityDeadline::for_timeout_ms(reading, timeout_ms).map_err(clock::rejection)?;
         let grant = AuthorizationCodeGrant {
             deadline,
-            client_id: form.client_id.clone(),
-            redirect_uri: form.redirect_uri.clone(),
+            client_id: request.client_id.clone(),
+            redirect_uri: request.redirect_uri.clone(),
             resource: resource.clone(),
             scopes,
             subject: self.subject.clone(),
-            code_challenge: form.code_challenge,
-            code_challenge_method: form.code_challenge_method,
+            code_challenge: request.code_challenge.clone().unwrap_or_default(),
+            code_challenge_method: request.code_challenge_method.clone().unwrap_or_default(),
             expires_at: reading
                 .unix_millis()
                 .as_secs()
@@ -210,28 +265,16 @@ impl LocalAuthorizationServer {
             transaction_context,
             sender_constraint,
         };
-        let mut expired = Vec::new();
-        for (id, retained) in codes.iter_mut() {
-            match retained.deadline.remaining(reading) {
-                Err(ClockError::Expired) => expired.push(id.clone()),
-                Err(error) => return Err(clock::rejection(error)),
-                Ok(_) => {}
-            }
-        }
-        for id in expired {
-            codes.remove(&id);
-        }
-        if codes.len() >= 4096 {
-            return Err(oauth_token_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                OAuthError::TemporarilyUnavailable,
-                "authorization grant capacity exhausted",
-            ));
-        }
+        reserve_capacity(
+            &mut codes,
+            reading,
+            |grant| &grant.deadline,
+            "authorization grant capacity exhausted",
+        )?;
         codes.insert(code.clone(), grant);
         drop(codes);
 
-        let mut redirect_uri = Url::parse(&form.redirect_uri).map_err(|error| {
+        let mut redirect_uri = Url::parse(&request.redirect_uri).map_err(|error| {
             input::with_source(
                 oauth_token_error(
                     StatusCode::BAD_REQUEST,
@@ -244,7 +287,7 @@ impl LocalAuthorizationServer {
         {
             let mut pairs = redirect_uri.query_pairs_mut();
             pairs.append_pair("code", &code);
-            if let Some(state) = form.state.as_deref() {
+            if let Some(state) = request.state.as_deref() {
                 pairs.append_pair("state", state);
             }
         }

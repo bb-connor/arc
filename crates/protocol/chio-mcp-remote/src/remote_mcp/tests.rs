@@ -456,13 +456,14 @@ fn test_local_authorization_server() -> LocalAuthorizationServer {
         code_ttl_secs: 300,
         access_token_ttl_secs: 600,
         codes: Arc::new(StdMutex::new(HashMap::new())),
+        consents: Arc::new(StdMutex::new(HashMap::new())),
         sender_dpop_nonce_store,
         sender_dpop_config,
     }
 }
 
-fn test_authorization_approval_form() -> AuthorizationApprovalForm {
-    AuthorizationApprovalForm {
+fn test_authorization_request() -> AuthorizationRequest {
+    AuthorizationRequest {
         response_type: "code".to_string(),
         client_id: "client-abc".to_string(),
         redirect_uri: "https://client.example/callback".to_string(),
@@ -471,12 +472,31 @@ fn test_authorization_approval_form() -> AuthorizationApprovalForm {
         resource: Some("https://edge.example/mcp".to_string()),
         authorization_details: None,
         chio_transaction_context: None,
-        code_challenge: "challenge".to_string(),
-        code_challenge_method: "S256".to_string(),
+        code_challenge: Some("challenge".to_string()),
+        code_challenge_method: Some("S256".to_string()),
         chio_sender_dpop_public_key: None,
         chio_sender_mtls_thumbprint_sha256: None,
         chio_sender_attestation_sha256: None,
-        decision: "approve".to_string(),
+    }
+}
+
+/// Renders the consent page for `request` and answers it with `decision`.
+fn test_authorization_approval_form(
+    server: &LocalAuthorizationServer,
+    request: &AuthorizationRequest,
+    decision: &str,
+) -> AuthorizationApprovalForm {
+    let page = server
+        .authorization_page(request)
+        .expect("render consent page");
+    let consent_nonce = page
+        .split_once("name=\"consent_nonce\" value=\"")
+        .and_then(|(_, rest)| rest.split_once('"'))
+        .map(|(nonce, _)| nonce.to_string())
+        .expect("consent page carries a nonce");
+    AuthorizationApprovalForm {
+        consent_nonce: Some(consent_nonce),
+        decision: decision.to_string(),
     }
 }
 
@@ -1282,13 +1302,21 @@ fn local_authorization_server_issues_unique_codes_for_same_second_approvals() {
         let server = test_local_authorization_server();
         let first = authorization_code_from_redirect(
             server
-                .approve_authorization(test_authorization_approval_form())
+                .approve_authorization(test_authorization_approval_form(
+                    &server,
+                    &test_authorization_request(),
+                    "approve",
+                ))
                 .expect("first approval succeeds"),
         );
         let first_expires_at = stored_authorization_code_expiry(&server, &first);
         let second = authorization_code_from_redirect(
             server
-                .approve_authorization(test_authorization_approval_form())
+                .approve_authorization(test_authorization_approval_form(
+                    &server,
+                    &test_authorization_request(),
+                    "approve",
+                ))
                 .expect("second approval succeeds"),
         );
         let second_expires_at = stored_authorization_code_expiry(&server, &second);
