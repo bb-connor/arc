@@ -45,8 +45,8 @@ pub enum CredentialError {
     #[error("passport schema must be {PASSPORT_SCHEMA}")]
     InvalidPassportSchema,
 
-    #[error("unsupported versioned passport schema: {0}")]
-    UnsupportedVersionedPassportSchema(String),
+    #[error("unsupported financial agent passport schema: {0}")]
+    UnsupportedFinancialPassportSchema(String),
 
     #[error("unsupported financial credential schema: {0}")]
     UnsupportedFinancialCredentialSchema(String),

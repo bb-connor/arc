@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.world/schemas/chio/agent-passport/source-manifest/v2.schema.json",
+  "$id": "https://chio.world/schemas/chio/financial-agent-passport/source-manifest/v1.schema.json",
   "$defs": {
     "enterpriseIdentityProvenance": {
       "type": "object",

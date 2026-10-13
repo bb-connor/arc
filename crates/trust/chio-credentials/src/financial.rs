@@ -411,7 +411,7 @@ fn preflight_financial_credential_value(
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
-pub enum PassportCredentialFamilyV2 {
+pub enum FinancialPassportCredentialFamily {
     Reputation,
     CreditScorecard,
     ExposureHistory,
@@ -422,15 +422,15 @@ pub enum PassportCredentialFamilyV2 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PassportCredentialManifestLeafV2 {
+pub struct FinancialPassportManifestLeaf {
     pub credential_id: String,
-    pub family: PassportCredentialFamilyV2,
+    pub family: FinancialPassportCredentialFamily,
     pub credential_ref_digest: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PassportSourceManifestV2 {
+pub struct FinancialPassportSourceManifest {
     pub schema: String,
     pub source_passport_id: String,
     pub issuer: String,
@@ -446,13 +446,13 @@ pub struct PassportSourceManifestV2 {
     pub trust_tier: Option<TrustTier>,
 }
 
-pub type SignedPassportSourceManifestV2 =
-    chio_core::receipt::lineage::SignedExportEnvelope<PassportSourceManifestV2>;
+pub type SignedFinancialPassportSourceManifest =
+    chio_core::receipt::lineage::SignedExportEnvelope<FinancialPassportSourceManifest>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PassportCredentialMembershipProofV2 {
-    pub leaf: PassportCredentialManifestLeafV2,
+pub struct FinancialPassportMembershipProof {
+    pub leaf: FinancialPassportManifestLeaf,
     pub proof: chio_core::MerkleProof,
 }
 
@@ -463,23 +463,23 @@ pub struct PassportCredentialMembershipProofV2 {
     rename_all = "snake_case",
     deny_unknown_fields
 )]
-pub enum PassportCredentialV2 {
+pub enum FinancialPassportCredential {
     Reputation(Box<ReputationCredential>),
     Financial(Box<FinancialCredentialEnvelope>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PassportValidityWindowV2 {
+pub struct FinancialPassportValidityWindow {
     pub issued_at: u64,
     pub expires_at: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct AgentPassportV2 {
+pub struct FinancialAgentPassport {
     pub schema: String,
     pub subject: String,
-    pub credentials: Vec<PassportCredentialV2>,
+    pub credentials: Vec<FinancialPassportCredential>,
     pub merkle_roots: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub enterprise_identity_provenance: Vec<EnterpriseIdentityProvenance>,
@@ -487,30 +487,30 @@ pub struct AgentPassportV2 {
     pub valid_until: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trust_tier: Option<TrustTier>,
-    pub source_manifest: SignedPassportSourceManifestV2,
+    pub source_manifest: SignedFinancialPassportSourceManifest,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PresentedAgentPassportV2 {
+pub struct PresentedFinancialAgentPassport {
     pub schema: String,
-    pub source_manifest: SignedPassportSourceManifestV2,
-    pub credentials: Vec<PassportCredentialV2>,
-    pub membership_proofs: Vec<PassportCredentialMembershipProofV2>,
+    pub source_manifest: SignedFinancialPassportSourceManifest,
+    pub credentials: Vec<FinancialPassportCredential>,
+    pub membership_proofs: Vec<FinancialPassportMembershipProof>,
     pub challenge_digest: String,
     pub presentation_digest: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PassportCredentialSelectorV2 {
-    pub family: PassportCredentialFamilyV2,
+pub struct FinancialPassportCredentialSelector {
+    pub family: FinancialPassportCredentialFamily,
     pub credential_ref_digest: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PassportPresentationChallengeV2 {
+pub struct FinancialPassportPresentationChallenge {
     pub schema: String,
     pub verifier: String,
     pub verifier_key_epoch: u64,
@@ -519,32 +519,32 @@ pub struct PassportPresentationChallengeV2 {
     pub issued_at: String,
     pub expires_at: String,
     pub source_passport_id: String,
-    pub selectors: Vec<PassportCredentialSelectorV2>,
+    pub selectors: Vec<FinancialPassportCredentialSelector>,
     pub challenge_digest: String,
 }
 
-pub type SignedPassportPresentationChallengeV2 =
-    chio_core::receipt::lineage::SignedExportEnvelope<PassportPresentationChallengeV2>;
+pub type SignedFinancialPassportPresentationChallenge =
+    chio_core::receipt::lineage::SignedExportEnvelope<FinancialPassportPresentationChallenge>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PassportPresentationResponseV2 {
+pub struct FinancialPassportPresentationResponse {
     pub schema: String,
-    pub challenge: SignedPassportPresentationChallengeV2,
-    pub presentation: PresentedAgentPassportV2,
+    pub challenge: SignedFinancialPassportPresentationChallenge,
+    pub presentation: PresentedFinancialAgentPassport,
     pub proof: PresentationProof,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct UnsignedPassportPresentationResponseV2<'a> {
+struct UnsignedFinancialPassportPresentationResponse<'a> {
     schema: &'a str,
-    challenge: &'a SignedPassportPresentationChallengeV2,
-    presentation: &'a PresentedAgentPassportV2,
+    challenge: &'a SignedFinancialPassportPresentationChallenge,
+    presentation: &'a PresentedFinancialAgentPassport,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PassportPresentationChallengeIdentityV2 {
+pub struct FinancialPassportChallengeIdentity {
     pub verifier: String,
     pub challenge_id: String,
     pub nonce: String,
@@ -559,19 +559,19 @@ pub enum PassportPresentationChallengeUseError {
 pub trait PassportPresentationChallengeUseStore {
     fn consume_once(
         &mut self,
-        identity: &PassportPresentationChallengeIdentityV2,
+        identity: &FinancialPassportChallengeIdentity,
     ) -> Result<(), PassportPresentationChallengeUseError>;
 }
 
 #[derive(Debug, Default)]
-pub struct OfflinePassportPresentationChallengeUseStoreV2 {
-    used_challenges: BTreeSet<PassportPresentationChallengeIdentityV2>,
+pub struct OfflinePassportPresentationChallengeUseStore {
+    used_challenges: BTreeSet<FinancialPassportChallengeIdentity>,
 }
 
-impl PassportPresentationChallengeUseStore for OfflinePassportPresentationChallengeUseStoreV2 {
+impl PassportPresentationChallengeUseStore for OfflinePassportPresentationChallengeUseStore {
     fn consume_once(
         &mut self,
-        identity: &PassportPresentationChallengeIdentityV2,
+        identity: &FinancialPassportChallengeIdentity,
     ) -> Result<(), PassportPresentationChallengeUseError> {
         if self.used_challenges.insert(identity.clone()) {
             Ok(())
@@ -581,31 +581,31 @@ impl PassportPresentationChallengeUseStore for OfflinePassportPresentationChalle
     }
 }
 
-#[path = "financial/passport_v2.rs"]
-mod financial_passport_v2;
+#[path = "financial/agent_passport.rs"]
+mod financial_agent_passport;
 
-use financial_passport_v2::validate_agent_passport_v2_contract;
-pub use financial_passport_v2::{
-    build_agent_passport_v2, build_presented_agent_passport_v2,
-    create_passport_presentation_challenge_v2, inspect_agent_passport_v2,
-    inspect_passport_presentation_challenge_v2, inspect_passport_presentation_response_v2,
-    inspect_passport_source_manifest_v2_signature, inspect_presented_agent_passport_v2,
-    issue_passport_source_manifest_v2, respond_to_passport_presentation_challenge_v2,
+use financial_agent_passport::validate_financial_agent_passport_contract;
+pub use financial_agent_passport::{
+    build_financial_agent_passport, build_presented_financial_agent_passport,
+    create_financial_passport_presentation_challenge, inspect_financial_agent_passport,
+    inspect_financial_passport_presentation_challenge, inspect_financial_passport_presentation_response,
+    inspect_financial_passport_source_manifest_signature, inspect_presented_financial_agent_passport,
+    issue_financial_passport_source_manifest, respond_to_financial_passport_presentation_challenge,
 };
 
 #[path = "financial/authority.rs"]
 mod financial_authority;
 pub use financial_authority::*;
 
-pub fn decode_agent_passport_v2(bytes: &[u8]) -> Result<AgentPassportV2, CredentialError> {
+pub fn decode_financial_agent_passport(bytes: &[u8]) -> Result<FinancialAgentPassport, CredentialError> {
     let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
         bytes,
         MAX_FINANCIAL_PRESENTATION_BYTES,
     )?
     .decode_signed()?;
-    let passport: AgentPassportV2 = serde_json::from_value(value)
+    let passport: FinancialAgentPassport = serde_json::from_value(value)
         .map_err(|error| invalid_financial_error(error.to_string()))?;
-    validate_agent_passport_v2_contract(&passport)?;
+    validate_financial_agent_passport_contract(&passport)?;
     Ok(passport)
 }
 

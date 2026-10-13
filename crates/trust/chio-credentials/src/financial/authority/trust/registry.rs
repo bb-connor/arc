@@ -2,65 +2,65 @@ use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct IssuerTrustKeyV2 {
+pub struct IssuerTrustKey {
     pub issuer_did: String,
     pub verification_method: String,
     pub key_epoch: u64,
     pub public_key: PublicKey,
-    pub status: TrustedKeyStatusV2,
+    pub status: TrustedKeyStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct VerifierTrustKeyV2 {
+pub struct VerifierTrustKey {
     pub verifier_id: String,
     pub signer_key_id: String,
     pub signer_key_epoch: u64,
     pub public_key: PublicKey,
-    pub status: TrustedKeyStatusV2,
+    pub status: TrustedKeyStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct MigrationAttesterTrustKeyV2 {
+pub struct MigrationAttesterTrustKey {
     pub attester_id: String,
     pub signer_key_id: String,
     pub signer_key_epoch: u64,
     pub public_key: PublicKey,
-    pub status: TrustedKeyStatusV2,
+    pub status: TrustedKeyStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LifecycleResolverTrustKeyV2 {
+pub struct LifecycleResolverTrustKey {
     pub resolver_identity: String,
     pub signer_key_id: String,
     pub signer_key_epoch: u64,
     pub public_key: PublicKey,
-    pub status: TrustedKeyStatusV2,
+    pub status: TrustedKeyStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LifecycleGenerationAnchorTrustKeyV2 {
+pub struct LifecycleGenerationAnchorTrustKey {
     pub anchor_id: String,
     pub signer_key_epoch: u64,
     pub public_key: PublicKey,
-    pub status: TrustedKeyStatusV2,
+    pub status: TrustedKeyStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LifecycleHighWaterTrustKeyV2 {
+pub struct LifecycleHighWaterTrustKey {
     pub store_id: String,
     pub signer_key_epoch: u64,
     pub public_key: PublicKey,
-    pub status: TrustedKeyStatusV2,
+    pub status: TrustedKeyStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct IssuerActivationMetadataV2 {
+pub struct IssuerActivationMetadata {
     pub issuer_did: String,
     pub profile_family: String,
     pub source_kind: CrossIssuerPortfolioEntryKind,
@@ -68,29 +68,29 @@ pub struct IssuerActivationMetadataV2 {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct CrossIssuerTrustRegistryConfigV2 {
-    pub issuer_keys: Vec<IssuerTrustKeyV2>,
-    pub verifier_keys: Vec<VerifierTrustKeyV2>,
-    pub migration_attester_keys: Vec<MigrationAttesterTrustKeyV2>,
-    pub lifecycle_resolver_keys: Vec<LifecycleResolverTrustKeyV2>,
-    pub lifecycle_generation_anchor_keys: Vec<LifecycleGenerationAnchorTrustKeyV2>,
-    pub lifecycle_high_water_keys: Vec<LifecycleHighWaterTrustKeyV2>,
-    pub activation_metadata: Vec<IssuerActivationMetadataV2>,
+pub struct CrossIssuerTrustRegistryConfig {
+    pub issuer_keys: Vec<IssuerTrustKey>,
+    pub verifier_keys: Vec<VerifierTrustKey>,
+    pub migration_attester_keys: Vec<MigrationAttesterTrustKey>,
+    pub lifecycle_resolver_keys: Vec<LifecycleResolverTrustKey>,
+    pub lifecycle_generation_anchor_keys: Vec<LifecycleGenerationAnchorTrustKey>,
+    pub lifecycle_high_water_keys: Vec<LifecycleHighWaterTrustKey>,
+    pub activation_metadata: Vec<IssuerActivationMetadata>,
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct CrossIssuerTrustRegistryV2 {
-    issuer_keys: BTreeMap<(String, String, u64), IssuerTrustKeyV2>,
-    verifier_keys: BTreeMap<(String, String, u64), VerifierTrustKeyV2>,
-    migration_attester_keys: BTreeMap<(String, String, u64), MigrationAttesterTrustKeyV2>,
-    lifecycle_resolver_keys: BTreeMap<(String, String, u64), LifecycleResolverTrustKeyV2>,
-    lifecycle_generation_anchor_keys: BTreeMap<(String, u64), LifecycleGenerationAnchorTrustKeyV2>,
-    lifecycle_high_water_keys: BTreeMap<(String, u64), LifecycleHighWaterTrustKeyV2>,
-    activation_metadata: BTreeMap<String, IssuerActivationMetadataV2>,
+pub struct CrossIssuerTrustRegistry {
+    issuer_keys: BTreeMap<(String, String, u64), IssuerTrustKey>,
+    verifier_keys: BTreeMap<(String, String, u64), VerifierTrustKey>,
+    migration_attester_keys: BTreeMap<(String, String, u64), MigrationAttesterTrustKey>,
+    lifecycle_resolver_keys: BTreeMap<(String, String, u64), LifecycleResolverTrustKey>,
+    lifecycle_generation_anchor_keys: BTreeMap<(String, u64), LifecycleGenerationAnchorTrustKey>,
+    lifecycle_high_water_keys: BTreeMap<(String, u64), LifecycleHighWaterTrustKey>,
+    activation_metadata: BTreeMap<String, IssuerActivationMetadata>,
 }
 
-impl CrossIssuerTrustRegistryV2 {
-    pub fn new(config: CrossIssuerTrustRegistryConfigV2) -> Result<Self, CredentialError> {
+impl CrossIssuerTrustRegistry {
+    pub fn new(config: CrossIssuerTrustRegistryConfig) -> Result<Self, CredentialError> {
         let mut registry = Self::default();
         for entry in config.issuer_keys {
             DidChio::from_str(&entry.issuer_did)?;
@@ -191,7 +191,7 @@ impl CrossIssuerTrustRegistryV2 {
     }
 
     #[must_use]
-    pub fn verifier_keys(&self) -> Vec<VerifierTrustKeyV2> {
+    pub fn verifier_keys(&self) -> Vec<VerifierTrustKey> {
         self.verifier_keys.values().cloned().collect()
     }
 
@@ -199,7 +199,7 @@ impl CrossIssuerTrustRegistryV2 {
     pub fn lifecycle_resolver_identities(&self) -> BTreeSet<String> {
         self.lifecycle_resolver_keys
             .values()
-            .filter(|entry| entry.status == TrustedKeyStatusV2::Active)
+            .filter(|entry| entry.status == TrustedKeyStatus::Active)
             .map(|entry| entry.resolver_identity.clone())
             .collect()
     }
@@ -209,7 +209,7 @@ impl CrossIssuerTrustRegistryV2 {
         issuer: &str,
         verification_method: &str,
         epoch: u64,
-    ) -> Result<&IssuerTrustKeyV2, CredentialError> {
+    ) -> Result<&IssuerTrustKey, CredentialError> {
         active_key(
             self.issuer_keys
                 .get(&(issuer.to_string(), verification_method.to_string(), epoch)),
@@ -221,12 +221,12 @@ impl CrossIssuerTrustRegistryV2 {
         &self,
         issuer: &str,
         signer_key: &PublicKey,
-    ) -> Result<&IssuerTrustKeyV2, CredentialError> {
+    ) -> Result<&IssuerTrustKey, CredentialError> {
         let matches = self
             .issuer_keys
             .values()
             .filter(|entry| {
-                entry.status == TrustedKeyStatusV2::Active
+                entry.status == TrustedKeyStatus::Active
                     && entry.issuer_did == issuer
                     && &entry.public_key == signer_key
             })
@@ -244,7 +244,7 @@ impl CrossIssuerTrustRegistryV2 {
         verifier_id: &str,
         signer_key_id: &str,
         epoch: u64,
-    ) -> Result<&VerifierTrustKeyV2, CredentialError> {
+    ) -> Result<&VerifierTrustKey, CredentialError> {
         active_key(
             self.verifier_keys
                 .get(&(verifier_id.to_string(), signer_key_id.to_string(), epoch)),
@@ -257,7 +257,7 @@ impl CrossIssuerTrustRegistryV2 {
         attester_id: &str,
         signer_key_id: &str,
         epoch: u64,
-    ) -> Result<&MigrationAttesterTrustKeyV2, CredentialError> {
+    ) -> Result<&MigrationAttesterTrustKey, CredentialError> {
         active_key(
             self.migration_attester_keys.get(&(
                 attester_id.to_string(),
@@ -273,7 +273,7 @@ impl CrossIssuerTrustRegistryV2 {
         resolver_identity: &str,
         signer_key_id: &str,
         epoch: u64,
-    ) -> Result<&LifecycleResolverTrustKeyV2, CredentialError> {
+    ) -> Result<&LifecycleResolverTrustKey, CredentialError> {
         active_key(
             self.lifecycle_resolver_keys.get(&(
                 resolver_identity.to_string(),
@@ -288,7 +288,7 @@ impl CrossIssuerTrustRegistryV2 {
         &self,
         anchor_id: &str,
         epoch: u64,
-    ) -> Result<&LifecycleGenerationAnchorTrustKeyV2, CredentialError> {
+    ) -> Result<&LifecycleGenerationAnchorTrustKey, CredentialError> {
         active_key(
             self.lifecycle_generation_anchor_keys
                 .get(&(anchor_id.to_string(), epoch)),
@@ -300,7 +300,7 @@ impl CrossIssuerTrustRegistryV2 {
         &self,
         store_id: &str,
         epoch: u64,
-    ) -> Result<&LifecycleHighWaterTrustKeyV2, CredentialError> {
+    ) -> Result<&LifecycleHighWaterTrustKey, CredentialError> {
         active_key(
             self.lifecycle_high_water_keys
                 .get(&(store_id.to_string(), epoch)),
@@ -311,7 +311,7 @@ impl CrossIssuerTrustRegistryV2 {
     pub(in crate::financial_authority) fn activation_metadata(
         &self,
         issuer: &str,
-    ) -> Result<&IssuerActivationMetadataV2, CredentialError> {
+    ) -> Result<&IssuerActivationMetadata, CredentialError> {
         self.activation_metadata
             .get(issuer)
             .ok_or_else(|| authority_error("issuer activation metadata is unavailable"))

@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct PassportSourceManifestIdPreimageV2<'a> {
+struct PassportSourceManifestIdPreimage<'a> {
     schema: &'a str,
     issuer: &'a str,
     subject: &'a str,
@@ -17,29 +17,29 @@ struct PassportSourceManifestIdPreimageV2<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct PassportCredentialRefPreimageV2<'a> {
-    family: PassportCredentialFamilyV2,
-    credential: &'a PassportCredentialV2,
+struct PassportCredentialRefPreimage<'a> {
+    family: FinancialPassportCredentialFamily,
+    credential: &'a FinancialPassportCredential,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct PassportPresentationDigestPreimageV2<'a> {
+struct PassportPresentationDigestPreimage<'a> {
     source_manifest_digest: &'a str,
     challenge_digest: &'a str,
-    credentials: &'a [PassportPresentationDigestEntryV2<'a>],
+    credentials: &'a [PassportPresentationDigestEntry<'a>],
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct PassportPresentationDigestEntryV2<'a> {
+struct PassportPresentationDigestEntry<'a> {
     credential_id: &'a str,
     credential_ref_digest: &'a str,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct PassportPresentationChallengeDigestPreimageV2<'a> {
+struct PassportPresentationChallengeDigestPreimage<'a> {
     schema: &'a str,
     verifier: &'a str,
     verifier_key_epoch: u64,
@@ -48,15 +48,15 @@ struct PassportPresentationChallengeDigestPreimageV2<'a> {
     issued_at: &'a str,
     expires_at: &'a str,
     source_passport_id: &'a str,
-    selectors: &'a [PassportCredentialSelectorV2],
+    selectors: &'a [FinancialPassportCredentialSelector],
 }
 
-pub(super) fn passport_presentation_challenge_digest_v2(
-    challenge: &PassportPresentationChallengeV2,
+pub(super) fn financial_passport_presentation_challenge_digest(
+    challenge: &FinancialPassportPresentationChallenge,
 ) -> Result<String, CredentialError> {
     domain_digest(
         PASSPORT_PRESENTATION_CHALLENGE_DIGEST_DOMAIN,
-        &PassportPresentationChallengeDigestPreimageV2 {
+        &PassportPresentationChallengeDigestPreimage {
             schema: &challenge.schema,
             verifier: &challenge.verifier,
             verifier_key_epoch: challenge.verifier_key_epoch,
@@ -70,39 +70,39 @@ pub(super) fn passport_presentation_challenge_digest_v2(
     )
 }
 
-pub(super) fn passport_manifest_leaf_v2(
-    credential: &PassportCredentialV2,
-) -> Result<PassportCredentialManifestLeafV2, CredentialError> {
+pub(super) fn financial_passport_manifest_leaf(
+    credential: &FinancialPassportCredential,
+) -> Result<FinancialPassportManifestLeaf, CredentialError> {
     let family = match credential {
-        PassportCredentialV2::Reputation(_) => PassportCredentialFamilyV2::Reputation,
-        PassportCredentialV2::Financial(credential) => match credential.family {
+        FinancialPassportCredential::Reputation(_) => FinancialPassportCredentialFamily::Reputation,
+        FinancialPassportCredential::Financial(credential) => match credential.family {
             FinancialCredentialFamilyV1::CreditScorecard => {
-                PassportCredentialFamilyV2::CreditScorecard
+                FinancialPassportCredentialFamily::CreditScorecard
             }
             FinancialCredentialFamilyV1::ExposureHistory => {
-                PassportCredentialFamilyV2::ExposureHistory
+                FinancialPassportCredentialFamily::ExposureHistory
             }
             FinancialCredentialFamilyV1::SettlementReliability => {
-                PassportCredentialFamilyV2::SettlementReliability
+                FinancialPassportCredentialFamily::SettlementReliability
             }
             FinancialCredentialFamilyV1::PremiumHistory => {
-                PassportCredentialFamilyV2::PremiumHistory
+                FinancialPassportCredentialFamily::PremiumHistory
             }
-            FinancialCredentialFamilyV1::LossHistory => PassportCredentialFamilyV2::LossHistory,
+            FinancialCredentialFamilyV1::LossHistory => FinancialPassportCredentialFamily::LossHistory,
         },
     };
     let credential_ref_digest = domain_digest(
         PASSPORT_CREDENTIAL_REF_DOMAIN,
-        &PassportCredentialRefPreimageV2 {
+        &PassportCredentialRefPreimage {
             family: family.clone(),
             credential,
         },
     )?;
     let credential_id = match credential {
-        PassportCredentialV2::Reputation(_) => credential_ref_digest.clone(),
-        PassportCredentialV2::Financial(credential) => credential.credential_id.clone(),
+        FinancialPassportCredential::Reputation(_) => credential_ref_digest.clone(),
+        FinancialPassportCredential::Financial(credential) => credential.credential_id.clone(),
     };
-    Ok(PassportCredentialManifestLeafV2 {
+    Ok(FinancialPassportManifestLeaf {
         credential_id,
         family,
         credential_ref_digest,
@@ -110,11 +110,11 @@ pub(super) fn passport_manifest_leaf_v2(
 }
 
 pub(super) fn recompute_source_passport_id(
-    body: &PassportSourceManifestV2,
+    body: &FinancialPassportSourceManifest,
 ) -> Result<String, CredentialError> {
     domain_digest(
         PASSPORT_SOURCE_MANIFEST_ID_DOMAIN,
-        &PassportSourceManifestIdPreimageV2 {
+        &PassportSourceManifestIdPreimage {
             schema: &body.schema,
             issuer: &body.issuer,
             subject: &body.subject,
@@ -130,21 +130,21 @@ pub(super) fn recompute_source_passport_id(
 }
 
 pub(super) fn recompute_presentation_digest(
-    manifest: &SignedPassportSourceManifestV2,
+    manifest: &SignedFinancialPassportSourceManifest,
     challenge_digest: &str,
-    proofs: &[PassportCredentialMembershipProofV2],
+    proofs: &[FinancialPassportMembershipProof],
 ) -> Result<String, CredentialError> {
     let source_manifest_digest = sha256_hex(&canonical_json_bytes(manifest)?);
     let entries = proofs
         .iter()
-        .map(|proof| PassportPresentationDigestEntryV2 {
+        .map(|proof| PassportPresentationDigestEntry {
             credential_id: &proof.leaf.credential_id,
             credential_ref_digest: &proof.leaf.credential_ref_digest,
         })
         .collect::<Vec<_>>();
     domain_digest(
         PASSPORT_PRESENTATION_DIGEST_DOMAIN,
-        &PassportPresentationDigestPreimageV2 {
+        &PassportPresentationDigestPreimage {
             source_manifest_digest: &source_manifest_digest,
             challenge_digest,
             credentials: &entries,

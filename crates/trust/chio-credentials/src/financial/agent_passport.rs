@@ -1,23 +1,23 @@
 use super::*;
 
-#[path = "passport_v2/digest.rs"]
+#[path = "agent_passport/digest.rs"]
 mod digest;
 use digest::*;
 
-pub fn issue_passport_source_manifest_v2(
+pub fn issue_financial_passport_source_manifest(
     issuer_keypair: &Keypair,
     subject: &str,
-    credentials: &[PassportCredentialV2],
+    credentials: &[FinancialPassportCredential],
     issued_at: u64,
     expires_at: u64,
 ) -> Result<
     (
-        SignedPassportSourceManifestV2,
-        Vec<PassportCredentialMembershipProofV2>,
+        SignedFinancialPassportSourceManifest,
+        Vec<FinancialPassportMembershipProof>,
     ),
     CredentialError,
 > {
-    issue_passport_source_manifest_v2_with_trust_tier(
+    issue_financial_passport_source_manifest_with_trust_tier(
         issuer_keypair,
         subject,
         credentials,
@@ -27,17 +27,17 @@ pub fn issue_passport_source_manifest_v2(
     )
 }
 
-fn issue_passport_source_manifest_v2_with_trust_tier(
+fn issue_financial_passport_source_manifest_with_trust_tier(
     issuer_keypair: &Keypair,
     subject: &str,
-    credentials: &[PassportCredentialV2],
+    credentials: &[FinancialPassportCredential],
     issued_at: u64,
     expires_at: u64,
     trust_tier: Option<TrustTier>,
 ) -> Result<
     (
-        SignedPassportSourceManifestV2,
-        Vec<PassportCredentialMembershipProofV2>,
+        SignedFinancialPassportSourceManifest,
+        Vec<FinancialPassportMembershipProof>,
     ),
     CredentialError,
 > {
@@ -59,7 +59,7 @@ fn issue_passport_source_manifest_v2_with_trust_tier(
         validate_manifest_credential(credential, &issuer, &subject, issued_at)?;
         committed_expires_at =
             committed_expires_at.min(manifest_credential_expiration(credential)?);
-        let leaf = passport_manifest_leaf_v2(credential)?;
+        let leaf = financial_passport_manifest_leaf(credential)?;
         if !ids.insert(leaf.credential_id.clone())
             || !refs.insert(leaf.credential_ref_digest.clone())
         {
@@ -77,7 +77,7 @@ fn issue_passport_source_manifest_v2_with_trust_tier(
         .collect::<Result<Vec<_>, _>>()?;
     let tree = chio_core::MerkleTree::from_leaves(&leaf_bytes)?;
     let (merkle_roots, enterprise_identity_provenance) = derive_passport_metadata(credentials)?;
-    let mut body = PassportSourceManifestV2 {
+    let mut body = FinancialPassportSourceManifest {
         schema: FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V1.to_string(),
         source_passport_id: String::new(),
         issuer,
@@ -92,12 +92,12 @@ fn issue_passport_source_manifest_v2_with_trust_tier(
         trust_tier,
     };
     body.source_passport_id = recompute_source_passport_id(&body)?;
-    let signed = SignedPassportSourceManifestV2::sign(body, issuer_keypair)?;
+    let signed = SignedFinancialPassportSourceManifest::sign(body, issuer_keypair)?;
     let proofs = leaves
         .into_iter()
         .enumerate()
         .map(|(index, leaf)| {
-            Ok(PassportCredentialMembershipProofV2 {
+            Ok(FinancialPassportMembershipProof {
                 leaf,
                 proof: tree.inclusion_proof(index)?,
             })
@@ -106,15 +106,15 @@ fn issue_passport_source_manifest_v2_with_trust_tier(
     Ok((signed, proofs))
 }
 
-pub fn build_agent_passport_v2(
+pub fn build_financial_agent_passport(
     issuer_keypair: &Keypair,
     subject: impl Into<String>,
-    credentials: Vec<PassportCredentialV2>,
+    credentials: Vec<FinancialPassportCredential>,
     merkle_roots: Vec<String>,
     enterprise_identity_provenance: Vec<EnterpriseIdentityProvenance>,
-    validity: PassportValidityWindowV2,
+    validity: FinancialPassportValidityWindow,
     trust_tier: Option<TrustTier>,
-) -> Result<(AgentPassportV2, Vec<PassportCredentialMembershipProofV2>), CredentialError> {
+) -> Result<(FinancialAgentPassport, Vec<FinancialPassportMembershipProof>), CredentialError> {
     let subject = subject.into();
     let (derived_merkle_roots, derived_enterprise_identity_provenance) =
         derive_passport_metadata(&credentials)?;
@@ -124,7 +124,7 @@ pub fn build_agent_passport_v2(
     if enterprise_identity_provenance != derived_enterprise_identity_provenance {
         return Err(CredentialError::PassportEnterpriseIdentityProvenanceMismatch);
     }
-    let (source_manifest, membership_proofs) = issue_passport_source_manifest_v2_with_trust_tier(
+    let (source_manifest, membership_proofs) = issue_financial_passport_source_manifest_with_trust_tier(
         issuer_keypair,
         &subject,
         &credentials,
@@ -132,7 +132,7 @@ pub fn build_agent_passport_v2(
         validity.expires_at,
         trust_tier,
     )?;
-    let passport = AgentPassportV2 {
+    let passport = FinancialAgentPassport {
         schema: FINANCIAL_AGENT_PASSPORT_SCHEMA_V1.to_string(),
         subject,
         credentials,
@@ -143,15 +143,15 @@ pub fn build_agent_passport_v2(
         trust_tier,
         source_manifest,
     };
-    validate_agent_passport_v2_contract(&passport)?;
+    validate_financial_agent_passport_contract(&passport)?;
     Ok((passport, membership_proofs))
 }
 
-pub fn inspect_agent_passport_v2(
-    passport: &AgentPassportV2,
+pub fn inspect_financial_agent_passport(
+    passport: &FinancialAgentPassport,
     now: u64,
 ) -> Result<(), CredentialError> {
-    let (issued_at, valid_until) = validate_agent_passport_v2_contract(passport)?;
+    let (issued_at, valid_until) = validate_financial_agent_passport_contract(passport)?;
     validate_time("agentPassport.now", now)?;
     if now < issued_at {
         return Err(CredentialError::CredentialNotYetValid);
@@ -166,8 +166,8 @@ pub fn inspect_agent_passport_v2(
     )
 }
 
-pub fn inspect_passport_source_manifest_v2_signature(
-    manifest: &SignedPassportSourceManifestV2,
+pub fn inspect_financial_passport_source_manifest_signature(
+    manifest: &SignedFinancialPassportSourceManifest,
     now: u64,
 ) -> Result<(), CredentialError> {
     let body = &manifest.body;
@@ -206,11 +206,11 @@ pub fn inspect_passport_source_manifest_v2_signature(
     }
 }
 
-pub(super) fn validate_agent_passport_v2_contract(
-    passport: &AgentPassportV2,
+pub(super) fn validate_financial_agent_passport_contract(
+    passport: &FinancialAgentPassport,
 ) -> Result<(u64, u64), CredentialError> {
     if passport.schema != FINANCIAL_AGENT_PASSPORT_SCHEMA_V1 {
-        return Err(CredentialError::UnsupportedVersionedPassportSchema(
+        return Err(CredentialError::UnsupportedFinancialPassportSchema(
             passport.schema.clone(),
         ));
     }
@@ -218,7 +218,7 @@ pub(super) fn validate_agent_passport_v2_contract(
     if passport.credentials.is_empty()
         || passport.credentials.len() > MAX_FINANCIAL_SOURCE_ARTIFACTS
     {
-        return invalid_financial("agent passport v2 credential count is invalid");
+        return invalid_financial("financial agent passport credential count is invalid");
     }
     let issued_at = unix_from_rfc3339(&passport.issued_at)?;
     let valid_until = unix_from_rfc3339(&passport.valid_until)?;
@@ -239,7 +239,7 @@ pub(super) fn validate_agent_passport_v2_contract(
             != passport.enterprise_identity_provenance
         || source_manifest.body.trust_tier != passport.trust_tier
     {
-        return invalid_financial("agent passport v2 source manifest binding is invalid");
+        return invalid_financial("financial agent passport source manifest binding is invalid");
     }
     validate_passport_source_manifest_credential_set(
         source_manifest,
@@ -250,11 +250,11 @@ pub(super) fn validate_agent_passport_v2_contract(
 }
 
 fn validate_passport_source_manifest_credential_set(
-    manifest: &SignedPassportSourceManifestV2,
-    credentials: &[PassportCredentialV2],
+    manifest: &SignedFinancialPassportSourceManifest,
+    credentials: &[FinancialPassportCredential],
     now: u64,
 ) -> Result<(), CredentialError> {
-    inspect_passport_source_manifest_v2_signature(manifest, now)?;
+    inspect_financial_passport_source_manifest_signature(manifest, now)?;
     if credentials.is_empty()
         || credentials.len() > MAX_FINANCIAL_SOURCE_ARTIFACTS
         || manifest.body.credential_count
@@ -273,7 +273,7 @@ fn validate_passport_source_manifest_credential_set(
             &manifest.body.subject,
             now,
         )?;
-        let leaf = passport_manifest_leaf_v2(credential)?;
+        let leaf = financial_passport_manifest_leaf(credential)?;
         if !ids.insert(leaf.credential_id.clone())
             || !refs.insert(leaf.credential_ref_digest.clone())
         {
@@ -299,16 +299,16 @@ fn validate_passport_source_manifest_credential_set(
     Ok(())
 }
 
-pub fn create_passport_presentation_challenge_v2(
+pub fn create_financial_passport_presentation_challenge(
     verifier_keypair: &Keypair,
     verifier_key_epoch: u64,
     challenge_id: impl Into<String>,
     nonce: impl Into<String>,
     source_passport_id: impl Into<String>,
-    selectors: Vec<PassportCredentialSelectorV2>,
-    validity: PassportValidityWindowV2,
-) -> Result<SignedPassportPresentationChallengeV2, CredentialError> {
-    let mut challenge = PassportPresentationChallengeV2 {
+    selectors: Vec<FinancialPassportCredentialSelector>,
+    validity: FinancialPassportValidityWindow,
+) -> Result<SignedFinancialPassportPresentationChallenge, CredentialError> {
+    let mut challenge = FinancialPassportPresentationChallenge {
         schema: FINANCIAL_PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V1.to_string(),
         verifier: DidChio::from_public_key(verifier_keypair.public_key())?.to_string(),
         verifier_key_epoch,
@@ -320,18 +320,18 @@ pub fn create_passport_presentation_challenge_v2(
         selectors: normalize_selectors(selectors)?,
         challenge_digest: String::new(),
     };
-    challenge.challenge_digest = passport_presentation_challenge_digest_v2(&challenge)?;
-    validate_passport_presentation_challenge_v2_body_contract(&challenge)?;
-    let signed = SignedPassportPresentationChallengeV2::sign(challenge, verifier_keypair)?;
-    validate_passport_presentation_challenge_v2_contract(&signed)?;
+    challenge.challenge_digest = financial_passport_presentation_challenge_digest(&challenge)?;
+    validate_financial_passport_presentation_challenge_body_contract(&challenge)?;
+    let signed = SignedFinancialPassportPresentationChallenge::sign(challenge, verifier_keypair)?;
+    validate_financial_passport_presentation_challenge_contract(&signed)?;
     Ok(signed)
 }
 
-pub fn inspect_passport_presentation_challenge_v2(
-    challenge: &SignedPassportPresentationChallengeV2,
+pub fn inspect_financial_passport_presentation_challenge(
+    challenge: &SignedFinancialPassportPresentationChallenge,
     now: u64,
 ) -> Result<(), CredentialError> {
-    let (issued_at, expires_at) = validate_passport_presentation_challenge_v2_contract(challenge)?;
+    let (issued_at, expires_at) = validate_financial_passport_presentation_challenge_contract(challenge)?;
     validate_time("challenge.now", now)?;
     if now < issued_at {
         return Err(CredentialError::ChallengeNotYetValid);
@@ -342,13 +342,13 @@ pub fn inspect_passport_presentation_challenge_v2(
     Ok(())
 }
 
-pub fn build_presented_agent_passport_v2(
-    source_manifest: SignedPassportSourceManifestV2,
-    credentials: Vec<PassportCredentialV2>,
-    membership_proofs: Vec<PassportCredentialMembershipProofV2>,
-    challenge: &SignedPassportPresentationChallengeV2,
-) -> Result<PresentedAgentPassportV2, CredentialError> {
-    validate_passport_presentation_challenge_v2_contract(challenge)?;
+pub fn build_presented_financial_agent_passport(
+    source_manifest: SignedFinancialPassportSourceManifest,
+    credentials: Vec<FinancialPassportCredential>,
+    membership_proofs: Vec<FinancialPassportMembershipProof>,
+    challenge: &SignedFinancialPassportPresentationChallenge,
+) -> Result<PresentedFinancialAgentPassport, CredentialError> {
+    validate_financial_passport_presentation_challenge_contract(challenge)?;
     if source_manifest.body.source_passport_id != challenge.body.source_passport_id {
         return Err(CredentialError::ChallengeMismatch);
     }
@@ -357,7 +357,7 @@ pub fn build_presented_agent_passport_v2(
     }
     let mut entries = Vec::with_capacity(credentials.len());
     for credential in credentials {
-        let leaf = passport_manifest_leaf_v2(&credential)?;
+        let leaf = financial_passport_manifest_leaf(&credential)?;
         let mut matches = membership_proofs.iter().filter(|proof| proof.leaf == leaf);
         let proof = matches
             .next()
@@ -374,7 +374,7 @@ pub fn build_presented_agent_passport_v2(
     let selected = normalize_selectors(
         entries
             .iter()
-            .map(|(leaf, _, _)| PassportCredentialSelectorV2 {
+            .map(|(leaf, _, _)| FinancialPassportCredentialSelector {
                 family: leaf.family.clone(),
                 credential_ref_digest: leaf.credential_ref_digest.clone(),
             })
@@ -394,7 +394,7 @@ pub fn build_presented_agent_passport_v2(
     let challenge_digest = challenge.body.challenge_digest.clone();
     let presentation_digest =
         recompute_presentation_digest(&source_manifest, &challenge_digest, &membership_proofs)?;
-    Ok(PresentedAgentPassportV2 {
+    Ok(PresentedFinancialAgentPassport {
         schema: PRESENTED_FINANCIAL_AGENT_PASSPORT_SCHEMA_V1.to_string(),
         source_manifest,
         credentials,
@@ -404,13 +404,13 @@ pub fn build_presented_agent_passport_v2(
     })
 }
 
-pub fn inspect_presented_agent_passport_v2(
-    presentation: &PresentedAgentPassportV2,
-    expected_challenge: &SignedPassportPresentationChallengeV2,
+pub fn inspect_presented_financial_agent_passport(
+    presentation: &PresentedFinancialAgentPassport,
+    expected_challenge: &SignedFinancialPassportPresentationChallenge,
     now: u64,
 ) -> Result<(), CredentialError> {
-    inspect_passport_presentation_challenge_v2(expected_challenge, now)?;
-    validate_presented_agent_passport_v2_contract(presentation, now, true)?;
+    inspect_financial_passport_presentation_challenge(expected_challenge, now)?;
+    validate_presented_financial_agent_passport_contract(presentation, now, true)?;
     if presentation.source_manifest.body.source_passport_id
         != expected_challenge.body.source_passport_id
     {
@@ -424,7 +424,7 @@ pub fn inspect_presented_agent_passport_v2(
         presentation
             .membership_proofs
             .iter()
-            .map(|proof| PassportCredentialSelectorV2 {
+            .map(|proof| FinancialPassportCredentialSelector {
                 family: proof.leaf.family.clone(),
                 credential_ref_digest: proof.leaf.credential_ref_digest.clone(),
             })
@@ -436,22 +436,22 @@ pub fn inspect_presented_agent_passport_v2(
     Ok(())
 }
 
-pub(super) fn validate_presented_agent_passport_v2_authority_contract(
-    presentation: &PresentedAgentPassportV2,
+pub(super) fn validate_presented_financial_agent_passport_authority_contract(
+    presentation: &PresentedFinancialAgentPassport,
     now: u64,
 ) -> Result<(), CredentialError> {
-    validate_presented_agent_passport_v2_contract(presentation, now, false)
+    validate_presented_financial_agent_passport_contract(presentation, now, false)
 }
 
-fn validate_presented_agent_passport_v2_contract(
-    presentation: &PresentedAgentPassportV2,
+fn validate_presented_financial_agent_passport_contract(
+    presentation: &PresentedFinancialAgentPassport,
     now: u64,
     validate_sources: bool,
 ) -> Result<(), CredentialError> {
     if presentation.schema != PRESENTED_FINANCIAL_AGENT_PASSPORT_SCHEMA_V1 {
         return invalid_financial("presented passport schema is invalid");
     }
-    inspect_passport_source_manifest_v2_signature(&presentation.source_manifest, now)?;
+    inspect_financial_passport_source_manifest_signature(&presentation.source_manifest, now)?;
     validate_digest("challengeDigest", &presentation.challenge_digest)?;
     validate_digest("presentationDigest", &presentation.presentation_digest)?;
     if presentation.credentials.is_empty()
@@ -480,7 +480,7 @@ fn validate_presented_agent_passport_v2_contract(
                 now,
             )?;
         }
-        let leaf = passport_manifest_leaf_v2(credential)?;
+        let leaf = financial_passport_manifest_leaf(credential)?;
         if leaf != membership.leaf || membership.proof.tree_size != tree_size {
             return invalid_financial("presented credential membership binding is invalid");
         }
@@ -504,34 +504,34 @@ fn validate_presented_agent_passport_v2_contract(
     Ok(())
 }
 
-pub fn respond_to_passport_presentation_challenge_v2(
+pub fn respond_to_financial_passport_presentation_challenge(
     holder_keypair: &Keypair,
-    source_manifest: SignedPassportSourceManifestV2,
-    credentials: Vec<PassportCredentialV2>,
-    membership_proofs: Vec<PassportCredentialMembershipProofV2>,
-    challenge: &SignedPassportPresentationChallengeV2,
+    source_manifest: SignedFinancialPassportSourceManifest,
+    credentials: Vec<FinancialPassportCredential>,
+    membership_proofs: Vec<FinancialPassportMembershipProof>,
+    challenge: &SignedFinancialPassportPresentationChallenge,
     now: u64,
-) -> Result<PassportPresentationResponseV2, CredentialError> {
-    inspect_passport_presentation_challenge_v2(challenge, now)?;
-    inspect_passport_source_manifest_v2_signature(&source_manifest, now)?;
+) -> Result<FinancialPassportPresentationResponse, CredentialError> {
+    inspect_financial_passport_presentation_challenge(challenge, now)?;
+    inspect_financial_passport_source_manifest_signature(&source_manifest, now)?;
     let holder = DidChio::from_public_key(holder_keypair.public_key())?;
     if holder.to_string() != source_manifest.body.subject {
         return Err(CredentialError::PresentationHolderMismatch);
     }
-    let presentation = build_presented_agent_passport_v2(
+    let presentation = build_presented_financial_agent_passport(
         source_manifest,
         credentials,
         membership_proofs,
         challenge,
     )?;
-    inspect_presented_agent_passport_v2(&presentation, challenge, now)?;
-    let unsigned = UnsignedPassportPresentationResponseV2 {
+    inspect_presented_financial_agent_passport(&presentation, challenge, now)?;
+    let unsigned = UnsignedFinancialPassportPresentationResponse {
         schema: FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1,
         challenge,
         presentation: &presentation,
     };
     let (signature, _) = holder_keypair.sign_canonical(&unsigned)?;
-    Ok(PassportPresentationResponseV2 {
+    Ok(FinancialPassportPresentationResponse {
         schema: FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1.to_string(),
         challenge: challenge.clone(),
         presentation,
@@ -545,9 +545,9 @@ pub fn respond_to_passport_presentation_challenge_v2(
     })
 }
 
-pub fn inspect_passport_presentation_response_v2(
-    response: &PassportPresentationResponseV2,
-    expected_challenge: &SignedPassportPresentationChallengeV2,
+pub fn inspect_financial_passport_presentation_response(
+    response: &FinancialPassportPresentationResponse,
+    expected_challenge: &SignedFinancialPassportPresentationChallenge,
     now: u64,
     challenge_use_store: &mut impl PassportPresentationChallengeUseStore,
 ) -> Result<(), CredentialError> {
@@ -557,7 +557,7 @@ pub fn inspect_passport_presentation_response_v2(
     if &response.challenge != expected_challenge {
         return Err(CredentialError::ChallengeMismatch);
     }
-    inspect_presented_agent_passport_v2(&response.presentation, expected_challenge, now)?;
+    inspect_presented_financial_agent_passport(&response.presentation, expected_challenge, now)?;
     if response.proof.proof_type != PROOF_TYPE {
         return Err(CredentialError::InvalidPresentationProofType);
     }
@@ -577,7 +577,7 @@ pub fn inspect_passport_presentation_response_v2(
     if proof_created < challenge_issued_at || proof_created >= challenge_expires_at {
         return Err(CredentialError::PresentationProofOutsideChallengeWindow);
     }
-    let unsigned = UnsignedPassportPresentationResponseV2 {
+    let unsigned = UnsignedFinancialPassportPresentationResponse {
         schema: &response.schema,
         challenge: &response.challenge,
         presentation: &response.presentation,
@@ -589,7 +589,7 @@ pub fn inspect_passport_presentation_response_v2(
     {
         return Err(CredentialError::InvalidPresentationSignature);
     }
-    let identity = PassportPresentationChallengeIdentityV2 {
+    let identity = FinancialPassportChallengeIdentity {
         verifier: expected_challenge.body.verifier.clone(),
         challenge_id: expected_challenge.body.challenge_id.clone(),
         nonce: expected_challenge.body.nonce.clone(),
@@ -607,10 +607,10 @@ pub fn inspect_passport_presentation_response_v2(
     Ok(())
 }
 
-fn validate_passport_presentation_challenge_v2_contract(
-    challenge: &SignedPassportPresentationChallengeV2,
+fn validate_financial_passport_presentation_challenge_contract(
+    challenge: &SignedFinancialPassportPresentationChallenge,
 ) -> Result<(u64, u64), CredentialError> {
-    let validity = validate_passport_presentation_challenge_v2_body_contract(&challenge.body)?;
+    let validity = validate_financial_passport_presentation_challenge_body_contract(&challenge.body)?;
     let verifier = DidChio::from_str(&challenge.body.verifier)?;
     if verifier.public_key() != &challenge.signer_key {
         return Err(CredentialError::ChallengeVerifierKeyMismatch);
@@ -622,8 +622,8 @@ fn validate_passport_presentation_challenge_v2_contract(
     }
 }
 
-fn validate_passport_presentation_challenge_v2_body_contract(
-    challenge: &PassportPresentationChallengeV2,
+fn validate_financial_passport_presentation_challenge_body_contract(
+    challenge: &FinancialPassportPresentationChallenge,
 ) -> Result<(u64, u64), CredentialError> {
     if challenge.schema != FINANCIAL_PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V1 {
         return Err(CredentialError::InvalidChallengeSchema);
@@ -646,15 +646,15 @@ fn validate_passport_presentation_challenge_v2_body_contract(
         return Err(CredentialError::PresentationSelectorMismatch);
     }
     validate_digest("challenge.challengeDigest", &challenge.challenge_digest)?;
-    if passport_presentation_challenge_digest_v2(challenge)? != challenge.challenge_digest {
+    if financial_passport_presentation_challenge_digest(challenge)? != challenge.challenge_digest {
         return Err(CredentialError::InvalidChallengeDigest);
     }
     Ok((issued_at, expires_at))
 }
 
 fn normalize_selectors(
-    mut selectors: Vec<PassportCredentialSelectorV2>,
-) -> Result<Vec<PassportCredentialSelectorV2>, CredentialError> {
+    mut selectors: Vec<FinancialPassportCredentialSelector>,
+) -> Result<Vec<FinancialPassportCredentialSelector>, CredentialError> {
     if selectors.is_empty() || selectors.len() > MAX_FINANCIAL_SOURCE_ARTIFACTS {
         return Err(CredentialError::PresentationSelectorMismatch);
     }
@@ -672,13 +672,13 @@ fn normalize_selectors(
 }
 
 fn validate_manifest_credential(
-    credential: &PassportCredentialV2,
+    credential: &FinancialPassportCredential,
     issuer: &str,
     subject: &str,
     now: u64,
 ) -> Result<(), CredentialError> {
     match credential {
-        PassportCredentialV2::Reputation(credential) => {
+        FinancialPassportCredential::Reputation(credential) => {
             verify_reputation_credential(credential, now)?;
             if now < unix_from_rfc3339(&credential.unsigned.issuance_date)? {
                 return Err(CredentialError::CredentialNotYetValid);
@@ -689,7 +689,7 @@ fn validate_manifest_credential(
                 return invalid_financial("source manifest reputation binding is invalid");
             }
         }
-        PassportCredentialV2::Financial(credential) => {
+        FinancialPassportCredential::Financial(credential) => {
             inspect_financial_credential_signature(credential, now)?;
             if credential.issuer != issuer || credential.credential_subject.id() != subject {
                 return invalid_financial("source manifest financial binding is invalid");
@@ -700,13 +700,13 @@ fn validate_manifest_credential(
 }
 
 fn validate_manifest_credential_shape(
-    credential: &PassportCredentialV2,
+    credential: &FinancialPassportCredential,
     issuer: &str,
     subject: &str,
     now: u64,
 ) -> Result<(), CredentialError> {
     match credential {
-        PassportCredentialV2::Reputation(credential) => {
+        FinancialPassportCredential::Reputation(credential) => {
             verify_reputation_credential(credential, now)?;
             if credential.unsigned.issuer != issuer
                 || credential.unsigned.credential_subject.id != subject
@@ -714,7 +714,7 @@ fn validate_manifest_credential_shape(
                 return invalid_financial("source manifest reputation binding is invalid");
             }
         }
-        PassportCredentialV2::Financial(credential) => {
+        FinancialPassportCredential::Financial(credential) => {
             let (issued_at, expires_at) = credential.validate_contract_shape()?;
             if now < issued_at {
                 return Err(CredentialError::CredentialNotYetValid);
@@ -731,12 +731,12 @@ fn validate_manifest_credential_shape(
 }
 
 fn derive_passport_metadata(
-    credentials: &[PassportCredentialV2],
+    credentials: &[FinancialPassportCredential],
 ) -> Result<(Vec<String>, Vec<EnterpriseIdentityProvenance>), CredentialError> {
     let mut merkle_roots = BTreeSet::new();
     let mut reputation_credentials = Vec::new();
     for credential in credentials {
-        if let PassportCredentialV2::Reputation(credential) = credential {
+        if let FinancialPassportCredential::Reputation(credential) = credential {
             merkle_roots.extend(
                 credential
                     .unsigned
@@ -755,7 +755,7 @@ fn derive_passport_metadata(
 }
 
 fn validate_manifest_metadata_contract(
-    body: &PassportSourceManifestV2,
+    body: &FinancialPassportSourceManifest,
 ) -> Result<(), CredentialError> {
     if body.merkle_roots.len() > MAX_FINANCIAL_SOURCE_ARTIFACTS
         || body.enterprise_identity_provenance.len() > MAX_FINANCIAL_SOURCE_ARTIFACTS
@@ -788,13 +788,13 @@ fn validate_manifest_metadata_contract(
 }
 
 fn manifest_credential_expiration(
-    credential: &PassportCredentialV2,
+    credential: &FinancialPassportCredential,
 ) -> Result<u64, CredentialError> {
     match credential {
-        PassportCredentialV2::Reputation(credential) => {
+        FinancialPassportCredential::Reputation(credential) => {
             unix_from_rfc3339(&credential.unsigned.expiration_date)
         }
-        PassportCredentialV2::Financial(credential) => {
+        FinancialPassportCredential::Financial(credential) => {
             unix_from_rfc3339(&credential.expiration_date)
         }
     }
