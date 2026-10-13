@@ -474,7 +474,7 @@ pub(super) fn verify(
             metadata.pointer("/chio_runtime/identity_disposition"),
             Some(&serde_json::json!("terminal"))
         );
-        let receipts = store.list_admission_receipts_after(None, 1_000)?.len();
+        let receipts = store.list_admission_receipts_after(None, 256)?.len();
         let second = kernel.evaluate_tool_call_blocking_with_security_context(
             &witness.request,
             &witness.context,
@@ -484,7 +484,7 @@ pub(super) fn verify(
             chio_core::canonical_json_bytes(&second.receipt)?
         );
         assert_eq!(
-            store.list_admission_receipts_after(None, 1_000)?.len(),
+            store.list_admission_receipts_after(None, 256)?.len(),
             receipts
         );
     }
