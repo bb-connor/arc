@@ -88,53 +88,6 @@ pub use tenant::HostedTenantLimits;
 pub use transactions::HostedPurchaseRecoveryOutcome;
 
 const MIGRATION_LOCK_NAME: &str = "chio.finding.market.migrations.v1";
-const LEGACY_MIGRATIONS: &[(i64, &str, &str)] = &[
-    (
-        1,
-        "hosted_market",
-        include_str!("../migrations/0001_hosted_market.sql"),
-    ),
-    (
-        2,
-        "terminal_jobs",
-        include_str!("../migrations/0002_terminal_jobs.sql"),
-    ),
-    (
-        3,
-        "lease_fencing",
-        include_str!("../migrations/0003_lease_fencing.sql"),
-    ),
-    (
-        4,
-        "hosted_auth",
-        include_str!("../migrations/0004_hosted_auth.sql"),
-    ),
-    (
-        5,
-        "market_aggregates",
-        include_str!("../migrations/0005_market_aggregates.sql"),
-    ),
-    (
-        6,
-        "tenant_registry_rls",
-        include_str!("../migrations/0006_tenant_registry_rls.sql"),
-    ),
-    (
-        7,
-        "tenant_limits",
-        include_str!("../migrations/0007_tenant_limits.sql"),
-    ),
-    (
-        8,
-        "append_only_aggregates",
-        include_str!("../migrations/0008_append_only_aggregates.sql"),
-    ),
-    (
-        9,
-        "aggregate_checkpoints",
-        include_str!("../migrations/0009_aggregate_checkpoints.sql"),
-    ),
-];
 const MAX_JOB_ID_BYTES: usize = 256;
 const MAX_JOB_KIND_BYTES: usize = 96;
 const GC_JOB_TOMBSTONE_CONSTRAINT: &str = "chio_finding_market_jobs_gc_tombstone_v1";
@@ -202,98 +155,6 @@ async fn verify_schema_current(pool: &PgPool) -> Result<(), HostedMarketStoreErr
         if version != expected.version || checksum != expected_checksum || !success {
             return Err(HostedMarketStoreError::MigrationDrift);
         }
-    }
-    Ok(())
-}
-
-async fn bridge_legacy_migration_ledger(
-    connection: &mut sqlx::pool::PoolConnection<Postgres>,
-) -> Result<(), HostedMarketStoreError> {
-    let sqlx_table: Option<String> =
-        sqlx::query_scalar("SELECT to_regclass('public._sqlx_migrations')::text")
-            .fetch_one(&mut **connection)
-            .await
-            .map_err(unavailable)?;
-    if sqlx_table.is_some() {
-        let applied: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations")
-            .fetch_one(&mut **connection)
-            .await
-            .map_err(unavailable)?;
-        if applied > 0 {
-            return Ok(());
-        }
-    }
-
-    sqlx::raw_sql(
-        r#"CREATE TABLE IF NOT EXISTS chio_finding_market_schema_migrations (
-            version BIGINT PRIMARY KEY CHECK (version > 0),
-            name TEXT NOT NULL UNIQUE CHECK (length(name) BETWEEN 1 AND 128),
-            checksum_sha256 CHAR(64) NOT NULL CHECK (
-                checksum_sha256 !~ '[^0-9a-f]'
-            ),
-            applied_at BIGINT NOT NULL CHECK (applied_at > 0)
-        )"#,
-    )
-    .execute(&mut **connection)
-    .await
-    .map_err(unavailable)?;
-    let rows = sqlx::query(
-        "SELECT version, name, checksum_sha256 FROM chio_finding_market_schema_migrations ORDER BY version",
-    )
-    .fetch_all(&mut **connection)
-    .await
-    .map_err(unavailable)?;
-    if rows.len() > LEGACY_MIGRATIONS.len() {
-        return Err(HostedMarketStoreError::MigrationDrift);
-    }
-    for (index, row) in rows.iter().enumerate() {
-        let (version, name, sql) = LEGACY_MIGRATIONS
-            .get(index)
-            .ok_or(HostedMarketStoreError::MigrationDrift)?;
-        if row.try_get::<i64, _>(0).map_err(unavailable)? != *version
-            || row.try_get::<String, _>(1).map_err(unavailable)? != *name
-            || row.try_get::<String, _>(2).map_err(unavailable)? != sha256_hex(sql.as_bytes())
-        {
-            return Err(HostedMarketStoreError::MigrationDrift);
-        }
-    }
-    if rows.is_empty() {
-        return Ok(());
-    }
-
-    sqlx::raw_sql(
-        r#"CREATE TABLE IF NOT EXISTS _sqlx_migrations (
-            version BIGINT PRIMARY KEY,
-            description TEXT NOT NULL,
-            installed_on TIMESTAMPTZ NOT NULL DEFAULT now(),
-            success BOOLEAN NOT NULL,
-            checksum BYTEA NOT NULL,
-            execution_time BIGINT NOT NULL
-        )"#,
-    )
-    .execute(&mut **connection)
-    .await
-    .map_err(unavailable)?;
-    let embedded = chio_finding_market_migrations::MIGRATOR
-        .iter()
-        .filter(|migration| !migration.migration_type.is_down_migration())
-        .collect::<Vec<_>>();
-    for (legacy, migration) in rows.iter().zip(embedded) {
-        let version: i64 = legacy.try_get(0).map_err(unavailable)?;
-        if migration.version != version {
-            return Err(HostedMarketStoreError::MigrationDrift);
-        }
-        let description: &str = migration.description.as_ref();
-        let checksum: &[u8] = migration.checksum.as_ref();
-        sqlx::query(
-            "INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time) VALUES ($1, $2, TRUE, $3, 0)",
-        )
-        .bind(version)
-        .bind(description)
-        .bind(checksum)
-        .execute(&mut **connection)
-        .await
-        .map_err(unavailable)?;
     }
     Ok(())
 }
@@ -573,13 +434,10 @@ impl PostgresFindingMarketMigrator {
             .execute(&mut *connection)
             .await
             .map_err(unavailable)?;
-        let migrated = match bridge_legacy_migration_ledger(&mut connection).await {
-            Ok(()) => chio_finding_market_migrations::MIGRATOR
-                .run_direct(&mut *connection)
-                .await
-                .map_err(|_| HostedMarketStoreError::MigrationDrift),
-            Err(error) => Err(error),
-        };
+        let migrated = chio_finding_market_migrations::MIGRATOR
+            .run_direct(&mut *connection)
+            .await
+            .map_err(|_| HostedMarketStoreError::MigrationDrift);
         let unlocked = sqlx::query("SELECT pg_advisory_unlock(hashtextextended($1, 0))")
             .bind(MIGRATION_LOCK_NAME)
             .execute(&mut *connection)

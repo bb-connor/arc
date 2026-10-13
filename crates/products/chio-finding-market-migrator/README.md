@@ -43,8 +43,8 @@ search path.
   constructing `HostedPostgresConfig`.
 - `PostgresFindingMarketMigrator::connect` checks the dedicated role through
   `verify_migrator_role` before exposing migration execution.
-- `PostgresFindingMarketMigrator::migrate` holds an advisory lock while bridging
-  the legacy ledger and running embedded SQLx migrations. Drift or unlock
+- `PostgresFindingMarketMigrator::migrate` holds an advisory lock while running
+  the embedded SQLx migrations. Drift or unlock
   failures return errors.
 - `main` returns a failing process exit code and a fixed diagnostic on error.
   Successful migration exits without a report on stdout.
