@@ -12,7 +12,7 @@ pub struct MailboxConfig {
     #[serde(default)]
     pub limits: MailboxLimits,
     /// Advertise a separately granted endpoint for renewing live delivery claims.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub renewable_leases: bool,
 }
 

@@ -25,7 +25,7 @@ fn retained_state_is_read_without_launch_keys_credentials_or_migration() -> Resu
     // Use the current journal schema while retaining deliberately unusable
     // authority material. Administrative reads must not deserialize it.
     db.execute_batch(
-        "INSERT INTO process_runtime VALUES (1,2,'retained','unavailable','unavailable');
+        "INSERT INTO process_runtime VALUES (1,1,'retained','unavailable','unavailable');
         INSERT INTO processes(id,root_id,depth,capability,limits,revision,checkpoint)
         VALUES ('coder','coder',0,'unavailable','unavailable',9007199254740993,'{\"complete\":true}');",
     )?;
@@ -70,20 +70,23 @@ fn retained_state_is_read_without_launch_keys_credentials_or_migration() -> Resu
     assert_eq!(fs::read(&path)?, before);
     assert!(!dir.path().join("process.db-wal").exists());
     let db = rusqlite::Connection::open(&path)?;
-    db.execute("UPDATE process_runtime SET version=1", [])?;
+    db.execute("UPDATE process_runtime SET version=2", [])?;
     drop(db);
-    let legacy_journal = fs::read(&path)?;
+    let unsupported_journal = fs::read(&path)?;
     let rejected = run(&[])?;
     assert!(!rejected.status.success());
     assert!(
         String::from_utf8_lossy(&rejected.stderr).contains("unsupported process journal version")
     );
-    assert_eq!(fs::read(&path)?, legacy_journal);
+    assert_eq!(fs::read(&path)?, unsupported_journal);
     assert!(!dir.path().join("process.db-wal").exists());
     fs::write(&path, &before)?;
-    let mut legacy = record.clone();
-    legacy["abi"] = json!("chio.process.abi.v1");
-    fs::write(dir.path().join("host.json"), serde_json::to_vec(&legacy)?)?;
+    let mut unsupported = record.clone();
+    unsupported["abi"] = json!("chio.process.abi.v1");
+    fs::write(
+        dir.path().join("host.json"),
+        serde_json::to_vec(&unsupported)?,
+    )?;
     assert!(!run(&[])?.status.success());
     assert_eq!(fs::read(&path)?, before);
     fs::write(dir.path().join("host.json"), serde_json::to_vec(&record)?)?;

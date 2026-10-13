@@ -388,5 +388,5 @@ and the per-process preparation count. It performs no provider action.
 Python workers use `chio_process.broker.BrokerProcessClient` to prepare, then
 invoke the original envelope. Receipts and completion evidence retain their
 original broker identities. `decode_broker_output` is an application decoder,
-not a receipt verifier. ABI v3 and process journal version 2 are required; old
-journals and ABI records are refused without migration fallback.
+not a receipt verifier. ABI v3 and process journal version 1 are required; any other
+journal version or ABI record is refused without migration fallback.
