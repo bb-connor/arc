@@ -10,6 +10,8 @@ conformance runner all use the same explicit operator configuration:
 | `CHIO_CAGE_INIT` | Absolute path to the reviewed static `chio-cage-init` executable for this host. |
 | `CHIO_RECEIPT_ANCHOR_ROOT` | Absolute path to the independently provisioned receipt rollback anchor directory. |
 | `CHIO_CAGE_READ_PATHS_FILE` | Absolute path to a UTF-8 file listing reviewed absolute read paths, one per line. Empty lines are skipped. |
+| `CHIO_CAGE_RUNTIME_FILES_FILE` | Absolute path to a UTF-8 file listing the loader, shared objects and interpreter files a dynamic target retains, one per line, each also a read path. Required by the shell helper, where a static target uses an empty file. |
+| `CHIO_CAGE_SYSCALL_PROFILE` | `native-minimal-v1` for a static target or `native-standard-v1` for a dynamic interpreter. Required by the shell helper; the Python helper defaults to the minimal profile. |
 
 Follow the [reference runtime deployment](../../deploy/reference-runtime/README.md)
 for helper, execution identity, storage and Linux enforcement requirements.
@@ -18,8 +20,8 @@ private-directory checks. The read-grants file is operator input, not a script;
 its lines are passed as literal `--read-path` arguments. Include the specific
 interpreter, shared-library and module paths a dynamic target needs. Prefer the
 static reference tools when a Python runtime is unnecessary. Only read grants
-are synthesized by these helpers; networked or write-capable tools require an
-operator policy that explicitly supports those effects.
+and runtime files are synthesized by these helpers; networked or write-capable
+tools require an operator policy that explicitly supports those effects.
 
 With those variables exported on a qualified host, invoke the existing helper:
 
@@ -31,7 +33,10 @@ chio_provision_mcp_launch "$(command -v chio)" "$PWD/reader-security" \
 ```
 
 The helper uses `security provision-reference-runtime --stage enforced` and
-confines live tool discovery. It preserves existing signed material and asks
+confines live tool discovery. It binds the invoking user with its supplementary
+groups, binds every target argument that names a regular file as a read path
+and retained runtime file at its canonical path, and signs an artifact bound
+equal to the largest retained artifact. It preserves existing signed material and asks
 the provisioner to revalidate it on restart. A changed executable or contract
 requires deliberate new provisioning; the helper does not delete old authority
 or replace it with a weaker launch mode.
