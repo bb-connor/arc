@@ -270,7 +270,7 @@ release is the correct response.
 
 ## Candidate archive staging and promotion
 
-SemVer prereleases such as `v0.1.1-rc.1` produce a GitHub draft prerelease.
+SemVer prereleases such as `v0.2.0-alpha.1` produce a GitHub draft prerelease.
 Stable tags also stage as drafts. The source CI/security/qualification
 checks, auditable build, SBOM validation and cosign signing still run before
 release assets are attached. A hyphen in build metadata alone, such as
@@ -302,7 +302,7 @@ empty download directory:
 
 ```sh
 REPO=bb-connor/arc
-TAG=v0.1.1-rc.1
+TAG=v0.2.0-alpha.1
 SOURCE="$(git rev-list -n 1 "$TAG")"
 CANDIDATE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/chio-rc-qualification.XXXXXX")"
 mkdir "$CANDIDATE_ROOT/assets"
@@ -321,7 +321,7 @@ replace the source gates or publish anything.
 
 Before executing a downloaded binary, perform the cosign and SLSA verification
 recipes below for its exact archive. Pin the exact certificate identity, for
-example `https://github.com/bb-connor/arc/.github/workflows/release-binaries.yml@refs/tags/v0.1.1-rc.1`,
+example `https://github.com/bb-connor/arc/.github/workflows/release-binaries.yml@refs/tags/v0.2.0-alpha.1`,
 and the GitHub OIDC issuer. Run `scripts/verify-release-provenance.py verify`
 with the intended source SHA, run ID and attempt as shown below. It verifies the
 signed source commit, tag, original workflow and immutable upstream builder
@@ -329,7 +329,7 @@ identity. Compare the attached SBOM/native reports to the copies
 inside the signed archive and run the existing binary inventory/linkage validators.
 Retain those verification outputs with the acceptance record.
 
-For Apple Silicon, extract and test `chio-0.1.1-rc.1-aarch64-apple-darwin.tar.gz`
+For Apple Silicon, extract and test `chio-0.2.0-alpha.1-aarch64-apple-darwin.tar.gz`
 from this download. Record both archive and extracted executable hashes. Run each
 required real host and the documented installer against that executable, along
 with the selected plugin/SDK archives. A local build or a different hosted rebuild
@@ -481,7 +481,7 @@ image uses the literal tag identity; a deliberately selected main-branch image
 uses the literal `@refs/heads/main` identity and is not release acceptance.
 
 ```bash
-TAG=v0.1.1-rc.1
+TAG=v0.2.0-alpha.1
 DIGEST='sha256:<verified-image-digest>'
 cosign verify \
   --certificate-identity \
@@ -569,9 +569,9 @@ Use the executable [native archive recipe in VERIFY.md](VERIFY.md#native-archive
 For example:
 
 ```bash
-TAG=v0.1.1-rc.1
+TAG=v0.2.0-alpha.1
 : "${SOURCE_SHA:?Set the independently accepted full source commit}"
-ARCHIVE=chio-0.1.1-rc.1-x86_64-unknown-linux-gnu.tar.gz
+ARCHIVE=chio-0.2.0-alpha.1-x86_64-unknown-linux-gnu.tar.gz
 gh release download "$TAG" --repo bb-connor/arc \
   --pattern "$ARCHIVE" --pattern "${ARCHIVE}.sig" --pattern "${ARCHIVE}.pem"
 python3 scripts/verify-release-identity.py verify \

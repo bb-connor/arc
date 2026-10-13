@@ -8,7 +8,7 @@ The formula is not covered by the detached archive signature checks; use
 ## One-line Install After A Tagged Release
 
 ```bash
-TAG=v0.1.1-rc.1
+TAG=v0.2.0-alpha.1
 curl -fsSL -o /tmp/chio.rb "https://github.com/bb-connor/arc/releases/download/${TAG}/chio.rb"
 brew install --formula /tmp/chio.rb
 ```
@@ -23,7 +23,7 @@ archives when a release is cut.
 ## Upgrading After A Tagged Release
 
 ```bash
-TAG=v0.1.1-rc.1
+TAG=v0.2.0-alpha.1
 curl -fsSL -o /tmp/chio.rb "https://github.com/bb-connor/arc/releases/download/${TAG}/chio.rb"
 brew upgrade --formula /tmp/chio.rb
 ```
