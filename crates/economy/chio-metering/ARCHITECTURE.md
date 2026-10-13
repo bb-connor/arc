@@ -2,7 +2,7 @@
 
 ## Responsibility and boundary
 
-The crate owns cost-record models, cost aggregation, flat budget counters,
+The crate owns cost-record models, cost aggregation,
 hierarchical budget evaluation, and billing export projections. It accepts
 caller-provided data and returns models or decisions. It does not load signed
 receipts, authenticate measurements, persist budgets, reserve funds, or execute
@@ -11,7 +11,6 @@ settlement. Runtime consumers must establish those boundaries separately.
 `CostMetadata` identifies a receipt, agent, server, tool, optional session, and
 time. It carries a vector of cost dimensions and a cached monetary total.
 `BudgetTree` stores policy nodes; `SpendSnapshot` supplies current usage.
-`BudgetEnforcer` retains process-local counters and is deprecated.
 
 ## Structure
 
@@ -19,11 +18,10 @@ time. It carries a vector of cost dimensions and a cached monetary total.
   dimensions, plus record construction and resource totals.
 - `query` defines filters, groups, summaries, and `execute_cost_query`.
 - `export` flattens records with `create_billing_export` and formats timestamps.
-- `budget` defines the deprecated flat policy and check/record counter model.
 - `budget_hierarchy` defines nodes, windows, limits, snapshots, tree validation,
   evaluation, and JSON serialization.
 
-The crate root re-exports models and budget APIs. Query execution and billing
+The crate root re-exports models and budget-tree APIs. Query execution and billing
 export functions remain accessible through their module paths. There are no
 optional Cargo features or oracle client dependencies.
 
@@ -64,12 +62,6 @@ rolling windows use fixed-duration buckets computed from the timestamp.
 Callers must supply the intended current bucket and a fresh authoritative
 snapshot, including aggregate ancestor usage.
 
-The deprecated `BudgetEnforcer` constructor does not validate policy currency
-consistency. `check` accepts units already denominated in the policy currency;
-it supplies no conversion. Counters use saturating addition. `record` does not
-repeat `check`, so callers must synchronize the sequence themselves. Restart
-resets all counters, requiring the kernel's durable budget store for continuity.
-
 Cost sums use saturating arithmetic. A record's monetary calculation chooses
 the first API-cost currency and skips subsequent different currencies. Query
 and export batch totals detect mixed cached currencies and return no total.
@@ -86,7 +78,7 @@ signature or canonical-wire check. Chrono supplies UTC timestamp formatting.
 ## Verification
 
 `cargo test -p chio-metering` exercises resource aggregation, mixed currencies,
-query filters and caps, grouped summaries, export records, and flat budgets.
+query filters and caps, grouped summaries, export records.
 `tests/budget_hierarchy.rs` checks parent caps, disabled ancestors, tree loading,
 window changes, missing nodes, currency mismatch, stale/undated snapshots, and
 monetary and nonmonetary overflow. Property tests exercise capped-path currency

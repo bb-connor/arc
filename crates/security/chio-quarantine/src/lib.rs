@@ -48,8 +48,6 @@ pub use state_machine::{
     ResponseStateMachine, ResponseTransitionRequest, StateMachineError,
 };
 
-pub mod simulation;
-
 mod rejection_codes;
 
 #[cfg(any(test, feature = "fuzz"))]

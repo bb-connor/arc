@@ -25,8 +25,7 @@ Callers establish producer authenticity before supplying verification records.
 - `scheduler.rs` claims work, validates leases, renews fences, and handles retries.
 - `executor.rs` and its effect-journal include implement effect execution and
   recovery; `executor_proof.rs` checks retained dispatch and execution evidence.
-- `native_receipts.rs` constructs receipt material. `simulation.rs` re-exports
-  pure snapshot simulations; `fuzz.rs` is exposed for tests or the `fuzz` feature.
+- `native_receipts.rs` constructs receipt material. `fuzz.rs` is exposed for tests or the `fuzz` feature.
 
 ## Data and control flow
 
