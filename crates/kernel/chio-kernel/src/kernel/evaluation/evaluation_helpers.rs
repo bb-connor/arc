@@ -599,7 +599,30 @@ impl ChioKernel {
             .durable_hold_result()
             .map(crate::kernel::validation::ensure_fresh_budget_cleanup_custody)
             .transpose();
+        let original_saga = denial.durable_operation.filter(|operation| {
+            cleanup_custody == Some(crate::budget_store::BudgetHoldCleanupCustody::Unknown)
+                && matches!(outcome, PreDispatchCleanupOutcome::Cancelled)
+                && runtime_release_confirmed
+                && lease_release.confirmed
+                && denial.payment_authorization.is_none()
+                && matches!(denial.budget_mutation,
+                    PreExecutionBudgetMutation::InvocationHold(charge)
+                        if charge.invocation_capture.is_none()
+                            && operation.binding().request_id().as_str()
+                                == denial.request.request_id
+                            && operation.binding().capability_id().as_str() == denial.cap.id
+                            && operation.budget_hold_id().is_some_and(|hold|
+                                hold.as_str() == charge.budget_hold_id))
+        });
+        let mut saga_compensated = false;
         let reverse_result = match custody_check {
+            Err(_) if original_saga.is_some() => self
+                .compensate_durable_admission_after_pre_dispatch_cleanup(original_saga, None, None)
+                .map(|()| {
+                    saga_compensated = true;
+                    (None, None)
+                })
+                .map_err(PreDispatchMonetaryUnwindFailure::from),
             Err(error) => Err(PreDispatchMonetaryUnwindFailure::from(error)),
             Ok(_) => match denial.payment_authorization {
                 Some(payment_authorization) => self
@@ -716,7 +739,7 @@ impl ChioKernel {
             ),
             None => runtime_admission_metadata,
         };
-        if runtime_release_confirmed && lease_release.confirmed {
+        if !saga_compensated && runtime_release_confirmed && lease_release.confirmed {
             self.compensate_durable_admission_after_pre_dispatch_cleanup_with_payment_unwind(
                 denial.durable_operation,
                 reverse.as_ref(),
@@ -724,6 +747,14 @@ impl ChioKernel {
                 unwind_evidence.as_ref(),
             )?;
         }
+        let runtime_admission_metadata = if saga_compensated {
+            crate::kernel::receipt_identity::with_identity_disposition(
+                runtime_admission_metadata,
+                crate::kernel::receipt_identity::IdentityDisposition::Terminal,
+            )
+        } else {
+            runtime_admission_metadata
+        };
 
         if let (Some(charge), Some(reverse)) =
             (denial.budget_mutation.charge_result(), reverse.as_ref())
