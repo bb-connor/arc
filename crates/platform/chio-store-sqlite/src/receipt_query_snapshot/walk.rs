@@ -744,8 +744,8 @@ pub(super) fn copy_checkpoints(
         .map_err(|error| classify(sql(error), None))?;
     let guard = StepGuard::install(&live_tx, ctx.limits.sql_steps, ctx.cancel)?;
     let watermark = watermark_i64(&live_tx).map_err(|error| guard.classify(error))?;
-    let sizes = checkpoint_row_sizes(&live_tx, start, page_end, false)
-        .map_err(|error| guard.classify(error))?;
+    let sizes =
+        checkpoint_row_sizes(&live_tx, start, page_end).map_err(|error| guard.classify(error))?;
     let needs_archive = sizes
         .iter()
         .any(|(_, batch_end, _)| *batch_end <= watermark);
@@ -779,7 +779,7 @@ pub(super) fn copy_checkpoints(
             });
         }
         if let (Some(archive), true) = (archive.as_ref(), batch_end <= watermark) {
-            let archived = checkpoint_row_sizes(archive, seq, seq, true)
+            let archived = checkpoint_row_sizes(archive, seq, seq)
                 .map_err(|error| classify(error, None))?
                 .first()
                 .map_or(0, |(_, _, length)| *length);
@@ -859,29 +859,15 @@ fn checkpoint_row_sizes(
     connection: &Connection,
     start: i64,
     end: i64,
-    tolerate_legacy_layout: bool,
 ) -> Result<Vec<(i64, i64, u64)>, ReceiptStoreError> {
-    let has_predecessor: bool = if tolerate_legacy_layout {
-        connection.query_row(
-            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('kernel_checkpoints') WHERE name = 'previous_checkpoint_sha256')",
-            [],
-            |row| row.get(0),
-        )?
-    } else {
-        true
-    };
-    let predecessor = if has_predecessor {
-        "COALESCE(length(CAST(previous_checkpoint_sha256 AS BLOB)), 0)"
-    } else {
-        "0"
-    };
-    let mut statement = connection.prepare(&format!(
+    let mut statement = connection.prepare(
         "SELECT checkpoint_seq, batch_end_seq,
                 length(CAST(merkle_root AS BLOB)) + length(CAST(statement_json AS BLOB))
-                + length(CAST(signature AS BLOB)) + length(CAST(kernel_key AS BLOB)) + {predecessor}
+                + length(CAST(signature AS BLOB)) + length(CAST(kernel_key AS BLOB))
+                + COALESCE(length(CAST(previous_checkpoint_sha256 AS BLOB)), 0)
          FROM kernel_checkpoints WHERE checkpoint_seq >= ?1 AND checkpoint_seq <= ?2
-         ORDER BY checkpoint_seq ASC"
-    ))?;
+         ORDER BY checkpoint_seq ASC",
+    )?;
     let rows = statement.query_map(params![start, end], |row| {
         Ok((
             row.get::<_, i64>(0)?,

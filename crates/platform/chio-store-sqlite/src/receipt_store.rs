@@ -3057,9 +3057,7 @@ fn execute_anchored_receipt_write(
         verify_latest_checkpoint_integrity(&tx)
             // The actor already owns an IMMEDIATE transaction. Validate in
             // that snapshot instead of trying to open a nested transaction.
-            .and_then(|()| {
-                validate_or_backfill_claim_receipt_log_entries_in_transaction(&tx, false)
-            })
+            .and_then(|()| validate_claim_receipt_log_entries_in_transaction(&tx))
     };
     let generation = match pre_check.and_then(|()| {
         rollback_anchor
@@ -3189,11 +3187,6 @@ fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError 
             ReceiptStoreError::RetentionWatermarkRegression {
                 attempted: *attempted,
                 current: *current,
-            }
-        }
-        ReceiptStoreError::ArchivedRangeProjection { watermark } => {
-            ReceiptStoreError::ArchivedRangeProjection {
-                watermark: *watermark,
             }
         }
         ReceiptStoreError::RetentionTenantScopeUnsupported => {

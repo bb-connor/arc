@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use super::super::reclaim_abandoned_snapshots;
 use crate::receipt_store::SqliteReceiptStore;
 
-const PARENT_NAME: &str = "chio-receipt-snapshots-v2";
+const PARENT_NAME: &str = "chio-receipt-snapshots";
 
 fn private_directory(path: &Path) {
     std::fs::DirBuilder::new().mode(0o700).create(path).unwrap();

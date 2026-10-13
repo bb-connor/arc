@@ -70,8 +70,7 @@ fn receipt_store_error(error: chio_kernel::ReceiptStoreError) -> PortError {
         | ReceiptStoreError::Canonical(_)
         | ReceiptStoreError::CryptoDecode(_)
         | ReceiptStoreError::Json(_)
-        | ReceiptStoreError::RetentionArchiveIncomplete { .. }
-        | ReceiptStoreError::ArchivedRangeProjection { .. } => {
+        | ReceiptStoreError::RetentionArchiveIncomplete { .. } => {
             (PortErrorKind::IntegrityFailure, RECEIPT_VERIFICATION_FAILED)
         }
         ReceiptStoreError::ReadBoundary(_) | ReceiptStoreError::Fenced => {

@@ -601,21 +601,6 @@ pub(super) fn rotate_on_writer_connection(
         return Err(ReceiptStoreError::RetentionTenantScopeUnsupported);
     }
     clock.unix_millis()?;
-    // One-time migration: enable incremental auto-vacuum on a legacy store
-    // that predates this pragma so the first rotation on the drained writer
-    // starts reclaiming freed pages. A no-op once migrated.
-    super::support::migrate_auto_vacuum_incremental_if_needed(connection)?;
-    // The delete transaction writes archived ids into the tombstone table; make
-    // sure it and its reuse-reject triggers exist even on a store opened before
-    // this migration.
-    super::support::ensure_receipt_retention_tombstones(connection)?;
-    // A store opened through `open_existing` skips the writable `open()`
-    // migration that creates the watermark ledger, so a legacy database can
-    // reach rotation without it. The delete transaction records the archival
-    // high-water mark here; create the ledger first so that insert cannot fail
-    // on a missing table after the archive copy has already run and roll the
-    // whole rotation back into an endless retry.
-    super::support::ensure_receipt_retention_watermark_table(connection)?;
     let Some(cutoff) = resolve_rotation_cutoff(connection, config, clock)? else {
         return Ok(0);
     };
@@ -712,14 +697,13 @@ fn archive_range(
 /// values insert verbatim), settlement/metered reconciliations,
 /// authorization consumptions, and the governed-receipt lineage statements
 /// (keyed by `receipt_id`) that carry each archived receipt's call-chain
-/// provenance. The archive `chio_tool_receipts` mirrors the
-/// live column layout exactly, including the `tenant_id` column added to the
-/// live table by the attribution migration (`ensure_tool_receipt_attribution_columns`),
-/// so a global rotation over a mixed-tenant store preserves tenant attribution
-/// in the archive. Every copy names its columns explicitly (except the tables
-/// copied with `SELECT *`, whose column order is asserted to match the live
-/// DDL) so a future column added to one side cannot silently produce a
-/// positional or column-count mismatch at runtime.
+/// provenance. The archive `chio_tool_receipts` mirrors the live column
+/// layout exactly, including `tenant_id`, so a global rotation over a
+/// mixed-tenant store preserves tenant attribution in the archive. Every copy
+/// names its columns explicitly (except the tables copied with `SELECT *`,
+/// whose column order is asserted to match the live DDL) so a column added to
+/// one side cannot silently produce a positional or column-count mismatch at
+/// runtime.
 ///
 /// The checkpoint-projection tables (`checkpoint_tree_heads`,
 /// `checkpoint_predecessor_witnesses`, `checkpoint_publication_metadata`,
@@ -753,22 +737,37 @@ pub(super) fn create_archive_schema(
         [],
         |row| row.get(0),
     )?;
-    let archive_schema_version = if version_table_exists {
-        transaction
+    if version_table_exists {
+        let archive_schema_version = transaction
             .query_row(
                 "SELECT version FROM archive.chio_store_schema_versions WHERE store_key = ?1",
                 [RECEIPT_STORE_SCHEMA_KEY],
                 |row| row.get::<_, i32>(0),
             )
             .optional()?
-            .unwrap_or(0)
+            .ok_or_else(|| {
+                ReceiptStoreError::Conflict(
+                    "retention archive carries no receipt schema version".to_owned(),
+                )
+            })?;
+        if archive_schema_version != RECEIPT_STORE_SCHEMA_VERSION {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "retention archive schema version {archive_schema_version} is not the current \
+                 receipt schema version {RECEIPT_STORE_SCHEMA_VERSION}"
+            )));
+        }
     } else {
-        0
-    };
-    if archive_schema_version > RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION {
-        return Err(ReceiptStoreError::Conflict(format!(
-            "retention archive schema version {archive_schema_version} is newer than this binary supports ({RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION})"
-        )));
+        let archive_tables: i64 = transaction.query_row(
+            "SELECT COUNT(*) FROM archive.sqlite_master \
+             WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+            [],
+            |row| row.get(0),
+        )?;
+        if archive_tables != 0 {
+            return Err(ReceiptStoreError::Conflict(
+                "retention archive carries tables but no receipt schema version".to_owned(),
+            ));
+        }
     }
 
     transaction.execute_batch(
@@ -889,7 +888,6 @@ pub(super) fn create_archive_schema(
         ) STRICT;
         "#,
     )?;
-    super::support::migrate_checkpoint_predecessor_column(&transaction, CheckpointSchema::Archive)?;
     super::support::ensure_archive_security_evidence_schema(&transaction)?;
     transaction.execute(
         "INSERT OR IGNORE INTO archive.chio_receipt_sink_identity (singleton, sink_id) \
@@ -909,51 +907,8 @@ pub(super) fn create_archive_schema(
             "retention archive sink identity is not canonical".to_owned(),
         ));
     }
-    if archive_schema_version < RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION {
-        migrate_archive_receipt_cost_projection(
-            &transaction,
-            archive_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION,
-        )?;
-    }
+    super::support::install_archive_receipt_cost_indexes(&transaction)?;
     verify_archive_receipt_cost_projection(&transaction)?;
-    for (column, definition) in [
-        ("signed_capability_json", "signed_capability_json TEXT"),
-        (
-            "federated_parent_capability_id",
-            "federated_parent_capability_id TEXT",
-        ),
-        (
-            "provenance",
-            "provenance TEXT NOT NULL DEFAULT 'legacy_projection' CHECK (provenance IN \
-             ('signed_token', 'synthetic_anchor', 'legacy_projection'))",
-        ),
-    ] {
-        let has_column = {
-            let mut statement =
-                transaction.prepare("PRAGMA archive.table_info(capability_lineage)")?;
-            let mut rows = statement.query([])?;
-            let mut found = false;
-            while let Some(row) = rows.next()? {
-                if row.get::<_, String>(1)? == column {
-                    found = true;
-                    break;
-                }
-            }
-            found
-        };
-        if !has_column {
-            transaction.execute(
-                &format!("ALTER TABLE archive.capability_lineage ADD COLUMN {definition}"),
-                [],
-            )?;
-        }
-    }
-    transaction.execute(
-        "UPDATE archive.capability_lineage SET provenance = 'signed_token' \
-         WHERE provenance = 'legacy_projection' \
-           AND signed_capability_json IS NOT NULL",
-        [],
-    )?;
     transaction.execute_batch(&format!(
         "PRAGMA archive.application_id = {}; \
          CREATE TABLE IF NOT EXISTS archive.chio_store_schema_versions (\
@@ -964,10 +919,7 @@ pub(super) fn create_archive_schema(
     transaction.execute(
         "INSERT INTO archive.chio_store_schema_versions (store_key, version) VALUES (?1, ?2) \
          ON CONFLICT(store_key) DO UPDATE SET version = excluded.version",
-        params![
-            RECEIPT_STORE_SCHEMA_KEY,
-            RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
-        ],
+        params![RECEIPT_STORE_SCHEMA_KEY, RECEIPT_STORE_SCHEMA_VERSION],
     )?;
     transaction.commit()?;
     Ok(())
@@ -1697,11 +1649,6 @@ pub(super) fn retention_repair_on_writer(
         let now_i64 = sqlite_i64(now, "repair tombstone timestamp")?;
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         tx.execute_batch("DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete;")?;
-        // Repair runs on an `open_existing` connection, which skips the writable
-        // open() migration that creates the tombstone table and its reuse-reject
-        // triggers. Create them before deleting so a legacy store repaired here
-        // still blocks archived-id reuse.
-        super::support::ensure_receipt_retention_tombstones(&tx)?;
         // Tombstone EVERY archived id in the repaired prefix, not just the
         // claim-log rows that survived as extras. A botched rotation may have
         // already deleted some archived rows from the live projection, so those
@@ -1728,13 +1675,6 @@ pub(super) fn retention_repair_on_writer(
                 params![entry_seq],
             )?;
         }
-        // A store created before the retention migration has no watermark ledger,
-        // and repair runs on an `open_existing` connection, which skips the
-        // writable open() migration that would create it. Create the ledger before
-        // recording the repair watermark; otherwise the insert fails on a missing
-        // table and rolls the whole repair back, leaving the bricked store
-        // unrepaired.
-        super::support::ensure_receipt_retention_watermark_table(&tx)?;
         // A prior botched rotation may have already recorded a watermark at or
         // above this repair boundary while leaving the orphaned claim-log rows
         // behind. The ledger's monotonic-insert trigger rejects a non-increasing

@@ -375,7 +375,7 @@ mod snapshot_recovery {
             // Model the on-disk liveness state after owner death: no handle
             // holds the child lock. Actual SIGKILL behavior is covered by the
             // backing crate's killed-owner controls.
-            let parent = directory.path().join("chio-receipt-snapshots-v2");
+            let parent = directory.path().join("chio-receipt-snapshots");
             fs::DirBuilder::new().mode(0o700).create(&parent)?;
             let cursor = parent.join("reclaim-cursor");
             fs::OpenOptions::new()

@@ -345,37 +345,6 @@ pub(crate) fn load_claim_receipt_log_projection_row(
         .transpose()
 }
 
-pub(crate) fn insert_claim_receipt_log_projection_row(
-    connection: &Connection,
-    row: &ClaimReceiptLogProjectionRow,
-) -> Result<(), ReceiptStoreError> {
-    connection.execute(
-        r#"
-        INSERT INTO claim_receipt_log_entries (
-            receipt_id, receipt_kind, source_seq, timestamp, capability_id,
-            session_id, parent_request_id, request_id, subject_key, issuer_key,
-            tool_server, tool_name, raw_json
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
-        "#,
-        params![
-            row.receipt_id.as_str(),
-            row.receipt_kind.as_str(),
-            sqlite_i64(row.source_seq, "claim log source_seq")?,
-            sqlite_i64(row.timestamp, "claim log timestamp")?,
-            row.capability_id.as_deref(),
-            row.session_id.as_deref(),
-            row.parent_request_id.as_deref(),
-            row.request_id.as_deref(),
-            row.subject_key.as_deref(),
-            row.issuer_key.as_deref(),
-            row.tool_server.as_deref(),
-            row.tool_name.as_deref(),
-            row.raw_json.as_str(),
-        ],
-    )?;
-    Ok(())
-}
-
 pub(crate) fn load_claim_receipt_log_receipt_ids(
     connection: &Connection,
 ) -> Result<BTreeSet<String>, ReceiptStoreError> {

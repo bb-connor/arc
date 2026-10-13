@@ -1,36 +1,6 @@
 use super::super::*;
 use super::support::*;
 
-fn stage_receipt_schema_v0(path: &std::path::Path) {
-    drop(SqliteReceiptStore::open(path).test_unwrap());
-    let connection = rusqlite::Connection::open(path).test_unwrap();
-    connection
-        .execute("DROP INDEX idx_capability_lineage_federated_parent", [])
-        .test_unwrap();
-    for table in ["capability_lineage", "federated_share_capability_lineage"] {
-        for column in [
-            "provenance",
-            "federated_parent_capability_id",
-            "signed_capability_json",
-        ] {
-            connection
-                .execute(&format!("ALTER TABLE {table} DROP COLUMN {column}"), [])
-                .test_unwrap();
-        }
-    }
-    crate::stamp_schema_version(&connection, "receipt", 0).test_unwrap();
-}
-
-fn table_has_column(connection: &rusqlite::Connection, table: &str, column: &str) -> bool {
-    connection
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM pragma_table_info(?1) WHERE name = ?2)",
-            rusqlite::params![table, column],
-            |row| row.get(0),
-        )
-        .test_unwrap()
-}
-
 #[test]
 fn sqlite_receipt_store_persists_across_reopen() {
     let path = unique_db_path("chio-receipts");
@@ -240,86 +210,18 @@ fn sqlite_receipt_store_configures_durable_pragmas() {
 }
 
 #[test]
-fn sqlite_receipt_store_stamps_application_id_and_refuses_future_database() {
+fn sqlite_receipt_store_stamps_application_id_and_current_schema_version() {
     let path = unique_db_path("chio-receipts-schema-stamp");
-
-    // A fresh open stamps the Chio application_id and leaves the database-wide
-    // user_version untouched: the schema revision lives in keyed metadata so
-    // co-located stores can version independently.
-    {
-        let store = SqliteReceiptStore::open(&path).test_unwrap();
-        let connection = store.connection().test_unwrap();
-        let app_id: i32 = connection
-            .query_row("PRAGMA application_id", [], |row| row.get(0))
-            .test_unwrap();
-        assert_eq!(app_id, crate::CHIO_SQLITE_APPLICATION_ID);
-        let user_version: i32 = connection
-            .query_row("PRAGMA user_version", [], |row| row.get(0))
-            .test_unwrap();
-        assert_eq!(user_version, 0);
-    }
-
-    // Simulate a database written by a newer binary and confirm the older binary
-    // refuses to open it rather than silently misreading a future schema. The
-    // receipt store records its revision under its own key in the shared metadata
-    // table, so the future revision is staged there.
-    {
-        let connection = rusqlite::Connection::open(&path).test_unwrap();
-        crate::stamp_schema_version(&connection, "receipt", 99).test_unwrap();
-    }
-    assert!(
-        SqliteReceiptStore::open_existing(&path).is_err(),
-        "a future-version receipt database must be refused"
-    );
-
-    let _ = fs::remove_file(path);
-}
-
-#[test]
-fn open_existing_rejects_v0_until_writable_open_migrates_it() {
-    let path = unique_db_path("chio-receipts-v0-open-existing");
-    stage_receipt_schema_v0(&path);
-
-    let error = SqliteReceiptStore::open_existing(&path).test_unwrap_err();
-    assert!(
-        error.to_string().contains("requires writable migration"),
-        "unexpected error: {error}"
-    );
-    let unmigrated = rusqlite::Connection::open(&path).test_unwrap();
-    assert!(!table_has_column(
-        &unmigrated,
-        "capability_lineage",
-        "signed_capability_json"
-    ));
-    assert!(!table_has_column(
-        &unmigrated,
-        "capability_lineage",
-        "provenance"
-    ));
-    drop(unmigrated);
-
-    let migrated = SqliteReceiptStore::open(&path).test_unwrap();
-    let connection = migrated.connection().test_unwrap();
-    assert!(table_has_column(
-        &connection,
-        "capability_lineage",
-        "signed_capability_json"
-    ));
-    assert!(table_has_column(
-        &connection,
-        "federated_share_capability_lineage",
-        "signed_capability_json"
-    ));
-    assert!(table_has_column(
-        &connection,
-        "capability_lineage",
-        "federated_parent_capability_id"
-    ));
-    assert!(table_has_column(
-        &connection,
-        "capability_lineage",
-        "provenance"
-    ));
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
+    let connection = store.connection().test_unwrap();
+    let app_id: i32 = connection
+        .query_row("PRAGMA application_id", [], |row| row.get(0))
+        .test_unwrap();
+    assert_eq!(app_id, crate::CHIO_SQLITE_APPLICATION_ID);
+    let user_version: i32 = connection
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .test_unwrap();
+    assert_eq!(user_version, 0);
     let version: i32 = connection
         .query_row(
             "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
@@ -327,76 +229,102 @@ fn open_existing_rejects_v0_until_writable_open_migrates_it() {
             |row| row.get(0),
         )
         .test_unwrap();
-    assert_eq!(
-        version,
-        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
-    );
+    assert_eq!(version, crate::receipt_store::RECEIPT_STORE_SCHEMA_VERSION);
     drop(connection);
-    drop(migrated);
-
+    drop(store);
     let _ = fs::remove_file(path);
 }
 
 #[test]
-fn concurrent_writable_opens_serialize_lineage_migration_and_stamp() {
-    let path = unique_db_path("chio-receipts-v1-concurrent-migration");
-    stage_receipt_schema_v0(&path);
-    let barrier = Arc::new(std::sync::Barrier::new(3));
-    let mut workers = Vec::new();
-    for _ in 0..2 {
-        let path = path.clone();
-        let barrier = Arc::clone(&barrier);
-        workers.push(std::thread::spawn(move || {
-            barrier.wait();
-            SqliteReceiptStore::open(&path).map(drop)
-        }));
+fn receipt_store_refuses_a_schema_version_other_than_current() {
+    for (version, expected) in [
+        (
+            0,
+            "database schema version 0 is not the current schema version 1; refusing to open",
+        ),
+        (
+            7,
+            "database schema version 7 is not the current schema version 1; refusing to open",
+        ),
+    ] {
+        let path = unique_db_path("chio-receipts-schema-refused");
+        drop(SqliteReceiptStore::open(&path).test_unwrap());
+        {
+            let connection = rusqlite::Connection::open(&path).test_unwrap();
+            crate::stamp_schema_version(&connection, "receipt", version).test_unwrap();
+        }
+        for opened in [
+            SqliteReceiptStore::open(&path),
+            SqliteReceiptStore::open_existing(&path),
+        ] {
+            assert!(
+                matches!(&opened, Err(ReceiptStoreError::Conflict(message)) if message == expected),
+                "version {version} must be refused, got {:?}",
+                opened.err()
+            );
+        }
+        let _ = fs::remove_file(path);
     }
-    barrier.wait();
-    for worker in workers {
-        worker.join().test_unwrap().test_unwrap();
-    }
-
-    let connection = rusqlite::Connection::open(&path).test_unwrap();
-    assert!(table_has_column(
-        &connection,
-        "capability_lineage",
-        "signed_capability_json"
-    ));
-    assert!(table_has_column(
-        &connection,
-        "federated_share_capability_lineage",
-        "signed_capability_json"
-    ));
-    assert!(table_has_column(
-        &connection,
-        "capability_lineage",
-        "federated_parent_capability_id"
-    ));
-    assert!(table_has_column(
-        &connection,
-        "capability_lineage",
-        "provenance"
-    ));
-    let version: i32 = connection
-        .query_row(
-            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
-            [],
-            |row| row.get(0),
-        )
-        .test_unwrap();
-    assert_eq!(
-        version,
-        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
-    );
-    drop(connection);
-
-    let _ = fs::remove_file(path);
 }
 
 #[test]
-fn receipt_cost_projection_migration_backfills_full_u64_domain(
+fn receipt_store_refuses_a_current_stamp_over_a_retired_table_shape(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-cost-projection-migration");
+    let path = unique_db_path("chio-receipts-retired-shape");
+    {
+        let connection = rusqlite::Connection::open(&path)?;
+        connection.execute_batch(&format!(
+            "PRAGMA application_id = {};
+             CREATE TABLE chio_tool_receipts (
+                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                 receipt_id TEXT NOT NULL UNIQUE,
+                 timestamp INTEGER NOT NULL,
+                 capability_id TEXT NOT NULL,
+                 subject_key TEXT,
+                 issuer_key TEXT,
+                 grant_index INTEGER,
+                 tool_server TEXT NOT NULL,
+                 tool_name TEXT NOT NULL,
+                 decision_kind TEXT NOT NULL,
+                 policy_hash TEXT NOT NULL,
+                 content_hash TEXT NOT NULL,
+                 raw_json TEXT NOT NULL,
+                 tenant_id TEXT,
+                 cost_currency TEXT,
+                 cost_charged_be BLOB
+             );",
+            crate::CHIO_SQLITE_APPLICATION_ID
+        ))?;
+        crate::stamp_schema_version(
+            &connection,
+            "receipt",
+            crate::receipt_store::RECEIPT_STORE_SCHEMA_VERSION,
+        )?;
+    }
+    for opened in [
+        SqliteReceiptStore::open(&path),
+        SqliteReceiptStore::open_existing(&path),
+    ] {
+        let error = opened
+            .err()
+            .ok_or("a retired receipt table shape must be refused")?;
+        assert_eq!(error.to_string(), "RETIRED_SHAPE_PLACEHOLDER");
+    }
+    let connection = rusqlite::Connection::open(&path)?;
+    let attempted_cost_columns: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('chio_tool_receipts') WHERE name = 'attempted_cost_be'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(attempted_cost_columns, 0, "a refused store is not repaired");
+    drop(connection);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn receipt_cost_projection_covers_full_u64_domain() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-receipts-cost-projection-domain");
     let store = SqliteReceiptStore::open(&path)?;
     let signed_max = u64::try_from(i64::MAX)?;
     store.append_chio_receipt(&sample_receipt_with_id("no-cost"))?;
@@ -409,18 +337,8 @@ fn receipt_cost_projection_migration_backfills_full_u64_domain(
     }
     drop(store);
 
-    let connection = rusqlite::Connection::open(&path)?;
-    connection.execute_batch(
-        "DROP INDEX IF EXISTS idx_chio_tool_receipts_cost;\
-         DROP INDEX IF EXISTS idx_chio_tool_receipts_cost_global;\
-         ALTER TABLE chio_tool_receipts DROP COLUMN cost_charged_be;\
-         ALTER TABLE chio_tool_receipts DROP COLUMN cost_currency;",
-    )?;
-    crate::stamp_schema_version(&connection, "receipt", 2)?;
-    drop(connection);
-
-    let migrated = SqliteReceiptStore::open(&path)?;
-    let connection = migrated.connection()?;
+    let reopened = SqliteReceiptStore::open(&path)?;
+    let connection = reopened.connection()?;
     let rows = connection
         .prepare("SELECT cost_currency, cost_charged_be FROM chio_tool_receipts ORDER BY seq ASC")?
         .query_map([], |row| {
@@ -469,184 +387,10 @@ fn receipt_cost_projection_migration_backfills_full_u64_domain(
         [],
         |row| row.get(0),
     )?;
-    assert_eq!(
-        version,
-        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
-    );
+    assert_eq!(version, crate::receipt_store::RECEIPT_STORE_SCHEMA_VERSION);
 
     drop(connection);
-    drop(migrated);
-    let _ = fs::remove_file(path);
-    Ok(())
-}
-
-#[test]
-fn receipt_store_failed_open_rolls_back_schema_backfill_and_guards(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let directory = tempfile::tempdir()?;
-    let path = directory.path().join("migration.db");
-    {
-        let store = SqliteReceiptStore::open(&path)?;
-        store.append_chio_receipt(&sample_financial_receipt("migration-receipt", 7)?)?;
-        store.flush_receipt_writes()?;
-    }
-    let connection = rusqlite::Connection::open(&path)?;
-    let original: String = connection.query_row(
-        "SELECT raw_json FROM chio_tool_receipts WHERE seq = 1",
-        [],
-        |row| row.get(0),
-    )?;
-    // An older lineage schema needs migration, but a malformed receipt makes
-    // the later projection backfill fail. Opening must preserve both inputs.
-    connection.execute_batch(
-        "DROP INDEX idx_receipt_lineage_statement_id;\
-         ALTER TABLE receipt_lineage_statements DROP COLUMN statement_id;\
-         DROP TRIGGER chio_tool_receipts_reject_update;\
-         UPDATE chio_tool_receipts SET raw_json = '{' WHERE seq = 1;",
-    )?;
-    super::super::support::ensure_transparency_projection_guards(&connection)?;
-    let schema_before = connection
-        .prepare("SELECT type, name, sql FROM sqlite_schema ORDER BY type, name")?
-        .query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<String>>(2)?,
-            ))
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let Err(error) = SqliteReceiptStore::open(&path) else {
-        return Err("malformed receipt migration unexpectedly succeeded".into());
-    };
-    assert!(error.to_string().contains("malformed JSON"), "{error}");
-    let schema_after = connection
-        .prepare("SELECT type, name, sql FROM sqlite_schema ORDER BY type, name")?
-        .query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<String>>(2)?,
-            ))
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-    assert_eq!(schema_after, schema_before);
-    assert!(!table_has_column(
-        &connection,
-        "receipt_lineage_statements",
-        "statement_id"
-    ));
-    assert!(connection
-        .execute("DELETE FROM chio_tool_receipts WHERE seq = 1", [])
-        .is_err());
-    let raw: String = connection.query_row(
-        "SELECT raw_json FROM chio_tool_receipts WHERE seq = 1",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(raw, "{");
-
-    connection.execute_batch("DROP TRIGGER chio_tool_receipts_reject_update")?;
-    connection.execute(
-        "UPDATE chio_tool_receipts SET raw_json = ?1 WHERE seq = 1",
-        [original],
-    )?;
-    super::super::support::ensure_transparency_projection_guards(&connection)?;
-    let migrated = SqliteReceiptStore::open(&path)?;
-    migrated.flush_receipt_writes()?;
-    assert!(table_has_column(
-        &connection,
-        "receipt_lineage_statements",
-        "statement_id"
-    ));
-    assert!(migrated.receipt_store_health()?.healthy);
-    Ok(())
-}
-
-#[test]
-fn receipt_cost_projection_migration_rolls_back_malformed_receipt(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-cost-projection-malformed");
-    let store = SqliteReceiptStore::open(&path)?;
-    store.append_chio_receipt(&sample_financial_receipt("valid-cost", 7)?)?;
-    store.append_chio_receipt(&sample_financial_receipt("malformed-cost", 8)?)?;
-    drop(store);
-
-    let mut connection = rusqlite::Connection::open(&path)?;
-    connection.execute_batch(
-        "DROP TRIGGER chio_tool_receipts_reject_update;\
-         DROP INDEX idx_chio_tool_receipts_cost;\
-         DROP INDEX idx_chio_tool_receipts_cost_global;\
-         ALTER TABLE chio_tool_receipts DROP COLUMN cost_charged_be;\
-         ALTER TABLE chio_tool_receipts DROP COLUMN cost_currency;\
-         UPDATE chio_tool_receipts SET raw_json = '{' WHERE seq = 2;",
-    )?;
-    let migration =
-        connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-    let error = match migrate_receipt_cost_projection(&migration, true) {
-        Ok(()) => {
-            return Err(std::io::Error::other("malformed receipt migration succeeded").into())
-        }
-        Err(error) => error,
-    };
-    assert!(matches!(error, ReceiptStoreError::UntrustedInput(source)
-        if matches!(source.as_ref(), chio_core::canonical::UntrustedJsonError::SignedInput(_))));
-    migration.rollback()?;
-    let projected_columns: i64 = connection.query_row(
-        "SELECT COUNT(*) FROM pragma_table_info('chio_tool_receipts') \
-         WHERE name IN ('cost_currency', 'cost_charged_be')",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(projected_columns, 0);
-
-    drop(connection);
-    let _ = fs::remove_file(path);
-    Ok(())
-}
-
-#[test]
-fn receipt_cost_projection_migration_rolls_back_divergent_projection(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-cost-projection-divergent");
-    let store = SqliteReceiptStore::open(&path)?;
-    store.append_chio_receipt(&sample_financial_receipt("missing-cost", 7)?)?;
-    store.append_chio_receipt(&sample_financial_receipt("divergent-cost", 8)?)?;
-    drop(store);
-
-    let mut connection = rusqlite::Connection::open(&path)?;
-    connection.execute_batch("DROP TRIGGER chio_tool_receipts_reject_update")?;
-    connection.execute(
-        "UPDATE chio_tool_receipts SET cost_currency = NULL, cost_charged_be = NULL WHERE seq = 1",
-        [],
-    )?;
-    connection.execute(
-        "UPDATE chio_tool_receipts SET cost_charged_be = ?1 WHERE seq = 2",
-        [0_u64.to_be_bytes().as_slice()],
-    )?;
-    let migration =
-        connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-    let error = match migrate_receipt_cost_projection(&migration, true) {
-        Ok(()) => {
-            return Err(std::io::Error::other("divergent projection migration succeeded").into())
-        }
-        Err(error) => error,
-    };
-    assert!(error.to_string().contains("different cost projection"));
-    migration.rollback()?;
-    let first_projection = connection.query_row(
-        "SELECT cost_currency, cost_charged_be FROM chio_tool_receipts WHERE seq = 1",
-        [],
-        |row| {
-            Ok((
-                row.get::<_, Option<String>>(0)?,
-                row.get::<_, Option<Vec<u8>>>(1)?,
-            ))
-        },
-    )?;
-    assert_eq!(first_projection, (None, None));
-
-    drop(connection);
+    drop(reopened);
     let _ = fs::remove_file(path);
     Ok(())
 }
@@ -830,7 +574,7 @@ fn open_refuses_foreign_database_without_switching_it_to_wal() {
 }
 
 #[test]
-fn open_refuses_a_foreign_db_with_a_lookalike_legacy_receipt_table() {
+fn open_refuses_an_unstamped_db_with_a_lookalike_receipt_table() {
     let path = unique_db_path("chio-receipts-foreign-lookalike");
 
     // An unrelated SQLite database that merely happens to carry a table named
@@ -844,9 +588,7 @@ fn open_refuses_a_foreign_db_with_a_lookalike_legacy_receipt_table() {
 
     let error = SqliteReceiptStore::open(&path).test_unwrap_err();
     assert!(
-        error
-            .to_string()
-            .contains("refusing to adopt a foreign database"),
+        error.to_string().contains("not a Chio store"),
         "unexpected error: {error}"
     );
 
@@ -861,32 +603,27 @@ fn open_refuses_a_foreign_db_with_a_lookalike_legacy_receipt_table() {
 }
 
 #[test]
-fn open_adopts_a_legacy_receipt_db_carrying_the_payload_column() {
-    let path = unique_db_path("chio-receipts-legacy-adopt");
-
-    // A pre-stamping receipt database: a legacy anchor table carrying the
-    // receipt payload column, which the store must still adopt and upgrade.
+fn open_refuses_an_unstamped_db_carrying_a_receipt_payload_column() {
+    let path = unique_db_path("chio-receipts-unstamped-payload");
     {
-        let legacy = rusqlite::Connection::open(&path).test_unwrap();
-        legacy
+        let unstamped = rusqlite::Connection::open(&path).test_unwrap();
+        unstamped
             .execute_batch(
                 "CREATE TABLE tool_receipts (id TEXT PRIMARY KEY, receipt_json TEXT NOT NULL);",
             )
             .test_unwrap();
     }
 
-    let store = SqliteReceiptStore::open(&path).test_unwrap();
-    drop(store);
-
+    let error = SqliteReceiptStore::open(&path).test_unwrap_err();
+    assert!(
+        error.to_string().contains("not a Chio store"),
+        "unexpected error: {error}"
+    );
     let reopened = rusqlite::Connection::open(&path).test_unwrap();
     let app_id: i32 = reopened
         .query_row("PRAGMA application_id", [], |row| row.get(0))
         .test_unwrap();
-    assert_eq!(
-        app_id,
-        crate::CHIO_SQLITE_APPLICATION_ID,
-        "a legacy receipt database with the payload column is adopted and stamped"
-    );
+    assert_eq!(app_id, 0, "a refused database must not be stamped");
 
     let _ = fs::remove_file(path);
 }

@@ -36,7 +36,7 @@ use super::directory::{directory_flags, DirectoryCustody};
 use super::{SnapshotBackingError, SnapshotLocationRefusal};
 
 /// Versioned name of the private parent of every snapshot directory.
-pub(super) const PARENT_NAME: &str = "chio-receipt-snapshots-v2";
+pub(super) const PARENT_NAME: &str = "chio-receipt-snapshots";
 const CURSOR_NAME: &str = "reclaim-cursor";
 /// Directory entries one attempt reads.
 const SCAN_ENTRIES: usize = 256;

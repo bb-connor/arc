@@ -13,7 +13,7 @@ use crate::receipt_store::SqliteReceiptStore;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const PARENT_NAME: &str = "chio-receipt-snapshots-v2";
+const PARENT_NAME: &str = "chio-receipt-snapshots";
 const RELATIVE_PROBE: &str = "receipt_query_snapshot::preopen::tests::relative_names_probe";
 const RELATIVE_PROBE_ENV: &str = "CHIO_SNAPSHOT_RELATIVE_NAMES_PROBE";
 const RELATIVE_RESOLVED: &str = "chio_snapshot_relative_names_resolved";

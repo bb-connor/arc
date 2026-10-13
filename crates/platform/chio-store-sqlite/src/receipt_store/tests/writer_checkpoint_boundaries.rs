@@ -232,57 +232,6 @@ fn signed_checkpoint_rows(connection: &Connection) -> rusqlite::Result<Vec<(Stri
         .collect()
 }
 
-fn downgrade_checkpoint_column_to_v6(connection: &Connection) -> TestResult {
-    connection.execute_batch(
-        "DROP TRIGGER IF EXISTS kernel_checkpoints_project_tree_head;
-         DROP TRIGGER IF EXISTS kernel_checkpoints_enforce_append_only;
-         ALTER TABLE kernel_checkpoints DROP COLUMN previous_checkpoint_sha256;",
-    )?;
-    connection.execute_batch(include_str!("fixtures/checkpoint_projection_v6.sql"))?;
-    crate::stamp_schema_version(connection, "receipt", 6)?;
-    Ok(())
-}
-
-#[test]
-fn retained_v6_checkpoints_can_rotate_again_after_restart() -> TestResult {
-    for downgrade_live in [true, false] {
-        let (directory, path) = temp_db("chio-retained-checkpoint-upgrade")?;
-        let archive_path = directory.path().join("archive.sqlite3");
-        seed_checkpoint_chain(&path)?;
-        let store = SqliteReceiptStore::open(&path)?;
-        assert_eq!(
-            store.archive_receipts_before(2, archive_path.to_str().ok_or("archive path")?)?,
-            2
-        );
-        drop(store);
-        let archive = Connection::open(&archive_path)?;
-        let before = signed_checkpoint_rows(&archive)?;
-        downgrade_checkpoint_column_to_v6(&archive)?;
-        drop(archive);
-        if downgrade_live {
-            downgrade_checkpoint_column_to_v6(&Connection::open(&path)?)?;
-        }
-
-        let store = SqliteReceiptStore::open(&path)?;
-        store.wait_for_writer_ready(Duration::from_secs(5))?;
-        store.append_chio_receipt(&sample_receipt_with_id("after-archive-upgrade"))?;
-        store.create_next_receipt_checkpoint(1, &receipt_test_keypair())?;
-        assert_eq!(
-            store.archive_receipts_before(2, archive_path.to_str().ok_or("archive path")?)?,
-            1
-        );
-        let archive = Connection::open(&archive_path)?;
-        assert_eq!(&signed_checkpoint_rows(&archive)?[..2], before.as_slice());
-        let version: i32 = archive.query_row(
-            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
-            [],
-            |row| row.get(0),
-        )?;
-        assert_eq!(version, RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION);
-    }
-    Ok(())
-}
-
 fn assert_checkpoint_column_constraints(connection: &Connection) -> TestResult {
     use rusqlite::types::Value;
     for (table, guard) in [
@@ -321,80 +270,7 @@ fn assert_checkpoint_column_constraints(connection: &Connection) -> TestResult {
 }
 
 #[test]
-fn checkpoint_v6_upgrade_preserves_signatures_constraints_and_restart() -> TestResult {
-    let directory = tempfile::tempdir()?;
-    let path = directory.path().join("upgrade.db");
-    seed_checkpoint_chain(&path)?;
-    let connection = Connection::open(&path)?;
-    let original = signed_checkpoint_rows(&connection)?;
-    downgrade_checkpoint_column_to_v6(&connection)?;
-    drop(connection);
-    let store = SqliteReceiptStore::open(&path)?;
-    assert_eq!(signed_checkpoint_rows(&*store.connection()?)?, original);
-    store.append_chio_receipt(&sample_receipt_with_id("after-upgrade"))?;
-    store.create_next_receipt_checkpoint(1, &receipt_test_keypair())?;
-    drop(store);
-    let store = SqliteReceiptStore::open(&path)?;
-    let mut connection = Connection::open(&path)?;
-    assert_eq!(load_all_persisted_checkpoint_rows(&connection)?.len(), 3);
-    verify_checkpoint_chain_integrity(&connection)?;
-    let tx = connection.transaction()?;
-    assert_checkpoint_column_constraints(&tx)?;
-    tx.rollback()?;
-    drop(connection);
-    drop(store);
-    Ok(())
-}
-
-#[test]
-fn invalid_checkpoint_v6_upgrade_rolls_back_schema_guards_and_version() -> TestResult {
-    for invalid_signature in [true, false] {
-        let directory = tempfile::tempdir()?;
-        let path = directory.path().join("refused.db");
-        seed_checkpoint_chain(&path)?;
-        let connection = Connection::open(&path)?;
-        downgrade_checkpoint_column_to_v6(&connection)?;
-        if invalid_signature {
-            connection.execute_batch("DROP TRIGGER kernel_checkpoints_reject_update;
-                UPDATE kernel_checkpoints SET signature = lower(hex(zeroblob(64))) WHERE checkpoint_seq = 2;
-                CREATE TRIGGER kernel_checkpoints_reject_update BEFORE UPDATE ON kernel_checkpoints
-                BEGIN SELECT RAISE(ABORT, 'kernel checkpoints are immutable'); END;")?;
-        } else {
-            connection.execute_batch("DROP TRIGGER checkpoint_tree_heads_reject_update;
-                UPDATE checkpoint_tree_heads SET previous_checkpoint_sha256 = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' WHERE checkpoint_seq = 2;
-                CREATE TRIGGER checkpoint_tree_heads_reject_update BEFORE UPDATE ON checkpoint_tree_heads
-                BEGIN SELECT RAISE(ABORT, 'checkpoint tree heads are immutable'); END;")?;
-        }
-        let before = signed_checkpoint_rows(&connection)?;
-        let schema = |connection: &Connection| -> rusqlite::Result<Vec<(String, String)>> {
-            connection
-                .prepare("SELECT name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name")?
-                .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
-                .collect()
-        };
-        let before_schema = schema(&connection)?;
-        drop(connection);
-        assert!(matches!(
-            SqliteReceiptStore::open(&path),
-            Err(ReceiptStoreError::Conflict(_))
-        ));
-        let connection = Connection::open(&path)?;
-        assert_eq!(schema(&connection)?, before_schema);
-        assert_eq!(signed_checkpoint_rows(&connection)?, before);
-        assert_eq!(
-            connection.query_row(
-                "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
-                [],
-                |row| row.get::<_, i32>(0)
-            )?,
-            6
-        );
-    }
-    Ok(())
-}
-
-#[test]
-fn checkpoint_archive_upgrades_and_reopens_with_exact_typed_predecessors() -> TestResult {
+fn checkpoint_archive_reopens_with_exact_typed_predecessors() -> TestResult {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("live.db");
     let archive = directory.path().join("archive.db");
@@ -408,7 +284,6 @@ fn checkpoint_archive_upgrades_and_reopens_with_exact_typed_predecessors() -> Te
     drop(store);
     let connection = Connection::open(&archive)?;
     assert_eq!(signed_checkpoint_rows(&connection)?, original);
-    downgrade_checkpoint_column_to_v6(&connection)?;
     drop(connection);
     let mut connection = Connection::open_in_memory()?;
     connection.execute(
@@ -432,43 +307,13 @@ fn checkpoint_archive_upgrades_and_reopens_with_exact_typed_predecessors() -> Te
 }
 
 #[test]
-fn checkpoint_v6_retained_prefix_reopens_and_appends_without_archive_writes() -> TestResult {
-    for old_archive in [false, true] {
-        let directory = tempfile::tempdir()?;
-        let live = directory.path().join("live.db");
-        let archive = directory.path().join("archive.db");
-        seed_checkpoint_chain(&live)?;
-        let store = SqliteReceiptStore::open(&live)?;
-        assert_eq!(
-            store.archive_receipts_before(2, archive.to_str().ok_or("path")?)?,
-            2
-        );
-        drop(store);
-        downgrade_checkpoint_column_to_v6(&Connection::open(&live)?)?;
-        if old_archive {
-            downgrade_checkpoint_column_to_v6(&Connection::open(&archive)?)?;
-        }
-        let archive_before = std::fs::read(&archive)?;
-        let store = SqliteReceiptStore::open(&live)?;
-        store.append_chio_receipt(&sample_receipt_with_id("after-retained-upgrade"))?;
-        store.create_next_receipt_checkpoint(1, &receipt_test_keypair())?;
-        drop(store);
-        let store = SqliteReceiptStore::open(&live)?;
-        store.append_chio_receipt(&sample_receipt_with_id("after-retained-restart"))?;
-        store.flush_receipt_writes()?;
-        assert_eq!(std::fs::read(&archive)?, archive_before);
-    }
-    Ok(())
-}
-
-#[test]
-fn checkpoint_v6_retained_prefix_rejects_corruption_and_unknown_schema() -> TestResult {
-    for (legacy, corruption) in [
-        (true, "UPDATE kernel_checkpoints SET signature = lower(hex(zeroblob(64))) WHERE checkpoint_seq = 2"),
-        (true, "UPDATE kernel_checkpoints SET merkle_root = lower(hex(zeroblob(32))) WHERE checkpoint_seq = 2"),
-        (true, "UPDATE chio_store_schema_versions SET version = 7 WHERE store_key = 'receipt'"),
-        (false, "UPDATE chio_store_schema_versions SET version = 8 WHERE store_key = 'receipt'"),
-        (false, "DELETE FROM chio_store_schema_versions WHERE store_key = 'receipt'"),
+fn retained_prefix_rejects_corruption_and_unknown_schema() -> TestResult {
+    for corruption in [
+        "UPDATE kernel_checkpoints SET signature = lower(hex(zeroblob(64))) WHERE checkpoint_seq = 2",
+        "UPDATE kernel_checkpoints SET merkle_root = lower(hex(zeroblob(32))) WHERE checkpoint_seq = 2",
+        "UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'receipt'",
+        "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'receipt'",
+        "DELETE FROM chio_store_schema_versions WHERE store_key = 'receipt'",
     ] {
         let directory = tempfile::tempdir()?;
         let live = directory.path().join("live.db");
@@ -477,11 +322,7 @@ fn checkpoint_v6_retained_prefix_rejects_corruption_and_unknown_schema() -> Test
         let store = SqliteReceiptStore::open(&live)?;
         store.archive_receipts_before(2, archive.to_str().ok_or("path")?)?;
         drop(store);
-        downgrade_checkpoint_column_to_v6(&Connection::open(&live)?)?;
         let connection = Connection::open(&archive)?;
-        if legacy {
-            downgrade_checkpoint_column_to_v6(&connection)?;
-        }
         connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
         connection.execute_batch(corruption)?;
         drop(connection);

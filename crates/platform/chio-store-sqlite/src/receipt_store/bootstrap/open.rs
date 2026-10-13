@@ -1,3 +1,4 @@
+// tenant-read-contract: chio_tool_receipts; class=administrative; principal=receipt-integrity
 // tenant-read-contract: chio_authorization_receipt_consumptions; class=administrative; principal=kernel-admission
 // Contracts: docs/security/trust-boundary-inventory.json
 use super::*;
@@ -6,13 +7,10 @@ use std::path::PathBuf;
 
 use r2d2_sqlite::SqliteConnectionManager;
 
-/// Tables that identify a database this receipt store may open, all of them the
-/// store's own: `chio_tool_receipts` is the current anchor (also the table the
-/// store shipped before schema stamping existed) and `http_receipts` /
-/// `tool_receipts` are legacy names it may still encounter on disk. A populated
-/// database carrying none of these is refused rather than adopted, so a path
-/// mistargeted at another store's file (an approval, revocation, budget, or
-/// authority database) never has receipt tables written into it.
+/// Table that identifies a database this receipt store may open. A populated
+/// database without it is refused rather than adopted, so a path mistargeted at
+/// another store's file (an approval, revocation, budget, or authority database)
+/// never has receipt tables written into it.
 ///
 /// `chio api protect` co-locates the receipt and approval stores in one SQLite
 /// file and opens the receipt store first, so this store owns the shared file's
@@ -20,15 +18,7 @@ use r2d2_sqlite::SqliteConnectionManager;
 /// receipt-anchored file through its own co-located open; the receipt store never
 /// needs to recognize a neighbor's table to bootstrap the shared file, so a
 /// standalone approval database is refused here.
-const RECEIPT_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
-    &["chio_tool_receipts", "http_receipts", "tool_receipts"];
-
-/// The subset of legacy anchors whose names are generic enough that an unrelated
-/// SQLite database could carry them by coincidence. Adopting an unstamped
-/// database on one of these names alone would let a mistargeted path capture a
-/// foreign file, so each must also carry a receipt payload column before it is
-/// accepted. The Chio-specific `chio_tool_receipts` anchor needs no such check.
-const RECEIPT_STORE_GENERIC_LEGACY_ANCHOR_TABLES: &[&str] = &["http_receipts", "tool_receipts"];
+const RECEIPT_STORE_ANCHOR_TABLES: &[&str] = &["chio_tool_receipts"];
 
 struct QualifiedReceiptSink {
     durable_sink_id: Option<String>,
@@ -583,17 +573,19 @@ impl SqliteReceiptStore {
             // Validate provenance before configuring pragmas: a foreign or
             // future database must be refused before any write touches its
             // header, so a mistargeted path is never mutated into WAL mode.
-            let on_disk_schema_version = crate::check_schema_version(
+            let schema_state = crate::check_current_schema(
                 &connection,
                 RECEIPT_STORE_SCHEMA_KEY,
-                RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
-                RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
+                RECEIPT_STORE_SCHEMA_VERSION,
+                RECEIPT_STORE_ANCHOR_TABLES,
             )
             .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
-            if on_disk_schema_version < RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION {
-                return Err(ReceiptStoreError::Conflict(format!(
-                    "receipt database schema version {on_disk_schema_version} requires writable migration to version {RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION}; reopen it with SqliteReceiptStore::open"
-                )));
+            if schema_state != crate::SchemaState::Current {
+                return Err(ReceiptStoreError::Conflict(
+                    "receipt database carries no receipt schema version; open it with \
+                     SqliteReceiptStore::open"
+                        .to_string(),
+                ));
             }
             configure_sqlite_connection(&mut connection, options.pool.max_page_count)?;
             super::support::ensure_transparency_projection_guards(&connection)?;
@@ -644,16 +636,12 @@ impl SqliteReceiptStore {
 
         // Validate provenance before configuring pragmas: an existing file that
         // is a foreign database must be refused before any write touches its
-        // header, so a mistargeted path is never mutated into WAL mode. The
-        // schema-version check adopts an unstamped database on a legacy anchor
-        // name alone, so first reject one whose generic anchor lacks the receipt
-        // shape, keeping a foreign file that merely reuses the name out.
-        reject_foreign_legacy_receipt_anchor(&connection)?;
-        let on_disk_schema_version = crate::check_schema_version(
+        // header, so a mistargeted path is never mutated into WAL mode.
+        crate::check_current_schema(
             &connection,
             RECEIPT_STORE_SCHEMA_KEY,
-            RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
-            RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
+            RECEIPT_STORE_SCHEMA_VERSION,
+            RECEIPT_STORE_ANCHOR_TABLES,
         )
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
         configure_sqlite_connection(&mut connection, options.pool.max_page_count)?;
@@ -675,6 +663,7 @@ impl SqliteReceiptStore {
                 policy_hash TEXT NOT NULL,
                 content_hash TEXT NOT NULL,
                 raw_json TEXT NOT NULL,
+                tenant_id TEXT,
                 cost_currency TEXT CHECK (
                     cost_currency IS NULL OR (
                         typeof(cost_currency) = 'text' AND
@@ -709,6 +698,8 @@ impl SqliteReceiptStore {
                 ON chio_tool_receipts(tool_server, tool_name);
             CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_decision
                 ON chio_tool_receipts(decision_kind);
+            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_tenant
+                ON chio_tool_receipts(tenant_id);
 
             CREATE TABLE IF NOT EXISTS chio_security_evidence_index (
                 evidence_id TEXT NOT NULL PRIMARY KEY,
@@ -1377,6 +1368,9 @@ impl SqliteReceiptStore {
                 ON receipt_lineage_statements(session_id, parent_request_id);
             CREATE INDEX IF NOT EXISTS idx_receipt_lineage_parent_receipt
                 ON receipt_lineage_statements(parent_receipt_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_receipt_lineage_statement_id
+                ON receipt_lineage_statements(statement_id)
+                WHERE statement_id IS NOT NULL;
             CREATE INDEX IF NOT EXISTS idx_receipt_lineage_anchor
                 ON receipt_lineage_statements(session_anchor_id);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_receipt_lineage_request_anchor
@@ -1410,6 +1404,8 @@ impl SqliteReceiptStore {
                 ON capability_lineage(issued_at);
             CREATE INDEX IF NOT EXISTS idx_capability_lineage_parent
                 ON capability_lineage(parent_capability_id);
+            CREATE INDEX IF NOT EXISTS idx_capability_lineage_federated_parent
+                ON capability_lineage(federated_parent_capability_id);
             CREATE TABLE IF NOT EXISTS federated_lineage_bridges (
                 local_capability_id TEXT PRIMARY KEY REFERENCES capability_lineage(capability_id) ON DELETE CASCADE,
                 parent_capability_id TEXT NOT NULL,
@@ -1481,37 +1477,27 @@ impl SqliteReceiptStore {
 
             "#,
         )?;
-        // Keep schema changes, projection backfills and the temporary removal
-        // of immutability guards in one transaction. A failed or interrupted
-        // open must leave the original schema and guards intact; another
-        // connection must never observe an unguarded intermediate state.
         schema_migration.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
         schema_migration.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
         schema_migration.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
-        ensure_tool_receipt_attribution_columns(&schema_migration)?;
-        super::support::migrate_indexed_security_evidence_schema(&schema_migration)?;
-        super::support::ensure_receipt_lineage_statement_columns(&schema_migration)?;
-        super::support::drop_transparency_projection_guards(&schema_migration)?;
+        super::support::install_receipt_cost_indexes(&schema_migration)?;
+        super::support::validate_indexed_security_evidence_schema(&schema_migration)?;
         super::support::ensure_receipt_retention_watermark_table(&schema_migration)?;
         super::support::ensure_receipt_retention_tombstones(&schema_migration)?;
-        backfill_tool_receipt_attribution_columns(&schema_migration)?;
+        // Projections derived from the authoritative receipt and checkpoint rows
+        // are rebuilt under the same transaction with the immutability guards
+        // lifted, so another connection never observes an unguarded state.
+        super::support::drop_transparency_projection_guards(&schema_migration)?;
         super::support::backfill_provenance_lineage_tables(&schema_migration)?;
-        super::support::backfill_claim_receipt_log_entries(&schema_migration)?;
+        super::support::validate_claim_receipt_log_entries_in_transaction(&schema_migration)?;
         super::support::backfill_checkpoint_transparency_projections(&schema_migration)?;
-        if on_disk_schema_version < RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION {
-            migrate_receipt_cost_projection(
-                &schema_migration,
-                on_disk_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION,
-            )?;
-        }
         super::support::ensure_transparency_projection_guards(&schema_migration)?;
         verify_receipt_cost_projection(&schema_migration)?;
-        ensure_capability_lineage_provenance_columns(&schema_migration)?;
         let internal_sink_id = ensure_receipt_sink_identity(&schema_migration)?;
         crate::stamp_schema_version(
             &schema_migration,
             RECEIPT_STORE_SCHEMA_KEY,
-            RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
+            RECEIPT_STORE_SCHEMA_VERSION,
         )
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
         schema_migration.commit()?;
@@ -1647,177 +1633,4 @@ fn require_existing_receipt_schema(
     }
 
     Ok(())
-}
-
-/// Refuse an unstamped database whose generic legacy anchor (`http_receipts` or
-/// `tool_receipts`) does not carry a receipt payload column. These names are
-/// generic enough that an unrelated SQLite database could hold one by
-/// coincidence; the schema-version check would otherwise adopt and stamp such a
-/// file as a receipt store. A database already carrying the Chio application_id
-/// is provably a Chio store and is left to the schema-version check.
-fn reject_foreign_legacy_receipt_anchor(connection: &Connection) -> Result<(), ReceiptStoreError> {
-    let application_id: i32 =
-        connection.query_row("PRAGMA application_id", [], |row| row.get(0))?;
-    if application_id != 0 {
-        return Ok(());
-    }
-    for anchor in RECEIPT_STORE_GENERIC_LEGACY_ANCHOR_TABLES {
-        if table_exists(connection, anchor)?
-            && !table_has_receipt_payload_column(connection, anchor)?
-        {
-            return Err(ReceiptStoreError::Conflict(format!(
-                "database has a `{anchor}` table without a receipt payload column \
-                 (raw_json or receipt_json); refusing to adopt a foreign database as a receipt store"
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn table_exists(connection: &Connection, table: &str) -> Result<bool, ReceiptStoreError> {
-    let present: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
-        [table],
-        |row| row.get(0),
-    )?;
-    Ok(present)
-}
-
-/// Whether `table` stores a receipt payload under a recognised JSON column:
-/// `raw_json` on the current store, `receipt_json` on the pre-stamping one. The
-/// table name is one of the store's own compile-time anchors, never caller
-/// input, and `PRAGMA table_info` takes no bound parameter for it.
-fn table_has_receipt_payload_column(
-    connection: &Connection,
-    table: &str,
-) -> Result<bool, ReceiptStoreError> {
-    let mut statement = connection.prepare(&format!("PRAGMA table_info({table})"))?;
-    let mut rows = statement.query([])?;
-    while let Some(row) = rows.next()? {
-        let column: String = row.get(1)?;
-        if column.eq_ignore_ascii_case("raw_json") || column.eq_ignore_ascii_case("receipt_json") {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-fn ensure_capability_lineage_provenance_columns(
-    connection: &Connection,
-) -> Result<(), ReceiptStoreError> {
-    for table in ["capability_lineage", "federated_share_capability_lineage"] {
-        if !table_has_column(connection, table, "signed_capability_json")? {
-            connection.execute(
-                &format!("ALTER TABLE {table} ADD COLUMN signed_capability_json TEXT"),
-                [],
-            )?;
-        }
-        if !table_has_column(connection, table, "federated_parent_capability_id")? {
-            connection.execute(
-                &format!("ALTER TABLE {table} ADD COLUMN federated_parent_capability_id TEXT"),
-                [],
-            )?;
-        }
-        if !table_has_column(connection, table, "provenance")? {
-            connection.execute(
-                &format!(
-                    "ALTER TABLE {table} ADD COLUMN provenance TEXT NOT NULL DEFAULT \
-                     'legacy_projection' CHECK (provenance IN ('signed_token', \
-                     'synthetic_anchor', 'legacy_projection'))"
-                ),
-                [],
-            )?;
-        }
-        connection.execute(
-            &format!(
-                "UPDATE {table} SET provenance = 'signed_token' \
-                 WHERE provenance = 'legacy_projection' \
-                   AND signed_capability_json IS NOT NULL"
-            ),
-            [],
-        )?;
-    }
-
-    let conflicting_bridge: bool = connection.query_row(
-        r#"
-        SELECT EXISTS(
-            SELECT 1
-            FROM capability_lineage c
-            INNER JOIN federated_lineage_bridges b
-                ON b.local_capability_id = c.capability_id
-            WHERE c.federated_parent_capability_id IS NOT NULL
-              AND c.federated_parent_capability_id != b.parent_capability_id
-        )
-        "#,
-        [],
-        |row| row.get(0),
-    )?;
-    if conflicting_bridge {
-        return Err(ReceiptStoreError::Conflict(
-            "capability lineage federation metadata conflicts with its persisted bridge"
-                .to_string(),
-        ));
-    }
-    let bridges_to_backfill = {
-        let mut statement = connection.prepare(
-            r#"
-            SELECT b.local_capability_id, b.parent_capability_id
-            FROM federated_lineage_bridges b
-            INNER JOIN capability_lineage c
-                ON c.capability_id = b.local_capability_id
-            WHERE c.federated_parent_capability_id IS NULL
-            ORDER BY c.rowid
-            "#,
-        )?;
-        let bridges = statement
-            .query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        bridges
-    };
-    let mut next_rowid: i64 = connection.query_row(
-        "SELECT COALESCE(MAX(rowid), 0) FROM capability_lineage",
-        [],
-        |row| row.get(0),
-    )?;
-    for (local_capability_id, parent_capability_id) in bridges_to_backfill {
-        next_rowid = next_rowid.checked_add(1).ok_or_else(|| {
-            ReceiptStoreError::Conflict(
-                "capability lineage replication sequence is exhausted".to_string(),
-            )
-        })?;
-        connection.execute(
-            r#"
-            UPDATE capability_lineage
-            SET federated_parent_capability_id = ?2,
-                rowid = ?3
-            WHERE capability_id = ?1
-              AND federated_parent_capability_id IS NULL
-            "#,
-            params![local_capability_id, parent_capability_id, next_rowid],
-        )?;
-    }
-    connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_capability_lineage_federated_parent \
-         ON capability_lineage(federated_parent_capability_id)",
-        [],
-    )?;
-    Ok(())
-}
-
-fn table_has_column(
-    connection: &Connection,
-    table: &str,
-    expected_column: &str,
-) -> Result<bool, ReceiptStoreError> {
-    let mut statement = connection.prepare(&format!("PRAGMA table_info({table})"))?;
-    let mut rows = statement.query([])?;
-    while let Some(row) = rows.next()? {
-        let column: String = row.get(1)?;
-        if column.eq_ignore_ascii_case(expected_column) {
-            return Ok(true);
-        }
-    }
-    Ok(false)
 }
