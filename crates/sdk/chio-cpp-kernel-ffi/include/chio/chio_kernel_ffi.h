@@ -19,16 +19,10 @@
 #include <stdlib.h>
 
 /**
- * C ABI version of this kernel FFI surface.
- *
- * Bumped from 1 to 2 when `chio_kernel_sign_receipt_json` gained a third
- * pointer argument (`canonical_content_hex`, the WYSIWYS preimage). The symbol
- * name is unchanged, so an old 2-arg client linked against v1 would call the
- * 3-arg symbol with a missing third pointer (undefined behavior). Clients that
- * gate on `chio_kernel_ffi_abi_version()` now fail closed against this v2
- * surface instead of invoking the signer with a dangling argument.
+ * C ABI version of this kernel FFI surface. Clients gate on
+ * `chio_kernel_ffi_abi_version()` before calling any other symbol.
  */
-#define CHIO_CPP_KERNEL_FFI_ABI_VERSION 2
+#define CHIO_CPP_KERNEL_FFI_ABI_VERSION 1
 
 #define CHIO_KERNEL_FFI_STATUS_OK 0
 
