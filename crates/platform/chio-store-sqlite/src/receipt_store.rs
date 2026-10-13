@@ -1647,12 +1647,10 @@ fn handle_non_append_command(
                         if let Ok(mut last_error) = health.last_error.lock() {
                             *last_error = Some(error.to_string());
                         }
-                        let poison_message = error.to_string();
-
+                        health.set_head_poisoned(true);
+                        *head_state = WriterHeadState::Poisoned(error.to_string());
                         respond(Err(error), &mut permit);
                         completion.complete();
-                        health.set_head_poisoned(true);
-                        *head_state = WriterHeadState::Poisoned(poison_message);
                         return None;
                     }
                     // Post-resync: absorb whatever the closure committed
@@ -1661,36 +1659,30 @@ fn handle_non_append_command(
                     // cross-check cannot false-Conflict.
                     match resync_head_after_write(&connection, head) {
                         Ok(()) => {
-                            // Reconcile committed/failed for this writer-routed
-                            // job using the responder's resync-adjusted outcome
-                            // signal. Decrement before the response reaches the
-                            // caller; the post-response catch-up build below
-                            // reads no inflight state.
-
+                            // Health reflects the resynced head before the
+                            // caller observes the response, so a caller that
+                            // reads health after its write returns never sees
+                            // the pre-write state.
+                            health.store_head_snapshot(head);
+                            // A writer-routed recovery such as
+                            // `create_next_receipt_checkpoint` builds or adopts
+                            // the missing checkpoint inside the job, advancing
+                            // the head's checkpoint seq during the resync above.
+                            // `build_due_checkpoints_and_record` below then finds
+                            // nothing due and would leave a prior background-build
+                            // `last_error` in place. Clear it only when the
+                            // checkpoint chain actually advanced; a later build
+                            // failure sets it again.
+                            if head.checkpoint_seq() > pre_checkpoint_seq {
+                                if let Ok(mut last_error) = health.last_error.lock() {
+                                    *last_error = None;
+                                }
+                            }
                             let committed = respond(Ok(()), &mut permit);
                             completion.complete();
                             if fail_closed_on_error && !committed {
                                 poison_head_from_writer_error(head_state, health);
                                 return None;
-                            }
-                            health.store_head_snapshot(head);
-                            // Clear a stale checkpoint error after a manual
-                            // recovery: a writer-routed
-                            // op such as `create_next_receipt_checkpoint` can
-                            // build/adopt the missing checkpoint inside the job,
-                            // advancing the head's checkpoint seq during the resync
-                            // above. `build_due_checkpoints_and_record` below then
-                            // finds nothing due (`Ok(false)`) and would leave a
-                            // prior background-build `last_error` in place, so
-                            // `receipt_store_health` keeps reporting the store
-                            // unhealthy after the repair. Clear it here when the
-                            // checkpoint chain actually advanced (clear only on
-                            // an actual advance, never on an idle refresh); a
-                            // real later build failure re-sets it below.
-                            if head.checkpoint_seq() > pre_checkpoint_seq {
-                                if let Ok(mut last_error) = health.last_error.lock() {
-                                    *last_error = None;
-                                }
                             }
                             // Writer-routed appends (child receipts, consuming
                             // auth) can cross the threshold too; no
@@ -1729,17 +1721,14 @@ fn handle_non_append_command(
                             if let Ok(mut last_error) = health.last_error.lock() {
                                 *last_error = Some(error.to_string());
                             }
-                            let poison_message = error.to_string();
                             // Surface the resync failure to the caller: a write
-                            // that returned `Ok` from its closure must NOT report
-                            // success when the head is now poisoned. Count the
-                            // failed outcome. Decrement before the response
-                            // reaches the caller.
-
+                            // that returned `Ok` from its closure must not report
+                            // success when the head is poisoned. The poison is
+                            // recorded before the caller observes the error.
+                            health.set_head_poisoned(true);
+                            *head_state = WriterHeadState::Poisoned(error.to_string());
                             respond(Err(error), &mut permit);
                             completion.complete();
-                            health.set_head_poisoned(true);
-                            *head_state = WriterHeadState::Poisoned(poison_message);
                         }
                     }
                 }
