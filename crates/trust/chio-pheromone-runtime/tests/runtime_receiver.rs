@@ -530,6 +530,32 @@ fn receiver_accepts_fixture_and_persists_report() {
 }
 
 #[test]
+fn store_refuses_database_with_retired_tables() {
+    for table in [
+        "chio_pheromone_pair_counts",
+        "chio_pheromone_passport_caps_v2",
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("pheromone.sqlite3");
+        rusqlite::Connection::open(&path)
+            .unwrap()
+            .execute_batch(&format!("CREATE TABLE {table} (kernel_id TEXT NOT NULL);"))
+            .unwrap();
+
+        let Err(error) = SqlitePheromoneRuntimeStore::open(&path) else {
+            panic!("store opened a database with retired table {table}");
+        };
+        assert_eq!(error.code(), "schema_invalid");
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "schema_invalid: stale pheromone runtime schema: retired table {table} is present"
+            )
+        );
+    }
+}
+
+#[test]
 fn receiver_rejects_relay_frame_without_receiver_pinned_ladder_refs() {
     let (mut policy, config) = load_runtime_policy();
     policy.pinned_ladder_refs.clear();

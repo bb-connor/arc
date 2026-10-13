@@ -482,7 +482,7 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
   - Claude Code and Codex are co-first, in MCP mode. Hooks count as coverage, never enforcement, because hook failure does not block either host.
   - Linux restricted launchers for the HOST-M2 harnesses. Today Pi has bubblewrap; Claude Code, Codex, Cursor and Hermes are Seatbelt-only; OpenClaw is a container.
   - Publish Pi, the bridge and the plugins with tested version ranges.
-  - Fix `backbay-labs/chio-bridge#3`.
+  - The bridge operator checks the requested approval ID and signed decision before retaining a response ([implementation and regression tests](https://github.com/backbay-labs/chio-bridge/pull/4)); [`chio-bridge#3`](https://github.com/backbay-labs/chio-bridge/issues/3) is closed. Archive publication and tested plugin version ranges remain required.
   - **Exit:** on Linux, each HOST-M2 harness's restricted launcher leaves the kernel port unreachable, denies arbitrary egress and records its KSPEC-07 evidence; Pi, the bridge and the plugins are published with tested version ranges; `chio-bridge#3` is closed.
 - **REL-4: the operator surface.**
   - The trust-control dashboard is the one operator web client. It is read-only today and served only from a relative path.
@@ -676,7 +676,7 @@ None of these depended on #1160, which is now on main. Status is as of main `b6a
 | U3 | **Positioning PR** (section 9). It covers every stale surface on main. |
 | U4 | **In progress.** **KDEF-N23:** constant-time comparison of the admin token (`crates/platform/chio-http-core/src/emergency.rs:193`, the `token == self.expected_admin_token` match arm, still present on main), plus the AC6 stop-scope document. |
 | U5 | **In progress.** **x402 fails open.** `X402AuthorizeResponse.settled` defaults to `true` when the field is absent (`crates/kernel/chio-kernel/src/payment.rs:496`, `default_true` at `:958`, still present on main). Default to not settled, failing closed. |
-| U6 | **`backbay-labs/chio-bridge#3`:** `approval-decide` does not check the recorded decision or the approval ID. The scope is that utility; the gateway resume path honours the signed decision. |
+| U6 | **Done.** [`backbay-labs/chio-bridge#3`](https://github.com/backbay-labs/chio-bridge/issues/3): `approval-decide` binds both approval IDs and the verified decision to the operator's request before retaining a response. A matching signed denial cannot activate a resumed action. [Implementation and regression tests](https://github.com/backbay-labs/chio-bridge/pull/4). REL-3 publication remains open. |
 | U7 | **Recruiting:** a named owner, trial terms and legal groundwork. |
 | U8 | **IETF -00:** decide whether to submit by the cutoff (section 10). If it is submitted, fix or flag the single-key multi-hop rule first: step 7 of the draft's Delegated Issuance section (the delegation policy's signer must be a key the issuing authority itself trusts), read with the one-link limit in its Chain Binding section. |
 | U9 | **CT-CROSS:** decided on 2026-10-09 (D4). Draft the contract early, because the free iroh relays end (section 10). |

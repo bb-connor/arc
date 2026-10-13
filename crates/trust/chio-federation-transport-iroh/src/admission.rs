@@ -274,12 +274,12 @@ mod tests {
 
     #[test]
     fn transport_key_rotation_flips_admitted_endpoint_at_the_gate() {
-        // Option B end-to-end at the admission layer: alice's ed25519 transport
+        // Split-key binding end-to-end at the admission layer: alice's ed25519 transport
         // EndpointId rotates from E_old to E_new while her passport (seed 1) stays
         // fixed. The gate admits whichever endpoint the current directory binds.
         // (The chained fail-closed VERIFICATION of the N -> N+1 bundle, and the
         // passport-over-transport endorsement of E_new, are covered in
-        // identity.rs; here we assert the resulting gate DECISION flips.)
+        // identity.rs; this test asserts the resulting gate DECISION flips.)
         let e_old = endpoint_from_seed(10);
         let e_new = endpoint_from_seed(20);
 

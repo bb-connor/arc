@@ -5,16 +5,16 @@
 **Status:** Normative
 
 This specification defines the receipt metering and cost attribution system
-for Chio runtimes. Implementations MUST support the cost dimensions, budget
-enforcement semantics, billing export formats, and query interface described
+for Chio runtimes. Implementations MUST support the cost dimensions, billing
+export formats, and query interface described
 herein.
 
 ---
 
 ## 1. Purpose
 
-Chio metering provides per-receipt cost attribution, cumulative budget
-enforcement, billing-compatible export, and operator query tools. Every tool
+Chio metering provides per-receipt cost attribution, hierarchical budget
+trees, billing-compatible export, and operator query tools. Every tool
 invocation can carry cost metadata describing the resources consumed:
 compute time, data volume, monetary API cost, and custom dimensions.
 
@@ -77,67 +77,12 @@ When no `ApiCost` dimensions are present, `total_monetary_cost` MUST be
 
 ---
 
-## 3. Budget Enforcement
-
-Budget enforcement tracks cumulative spending and rejects invocations that
-would exceed configured limits. Enforcement is fail-closed: any error during
-budget evaluation MUST deny the request.
-
-### 3.1 BudgetPolicy
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `max_total` | MonetaryAmount | Yes | Maximum total spending across all dimensions |
-| `max_per_session` | MonetaryAmount | No | Per-session spending limit |
-| `max_per_agent` | MonetaryAmount | No | Per-agent spending limit |
-| `max_per_tool` | map[string, MonetaryAmount] | No | Per-tool limits; key format `"server:tool"` |
-| `currency` | string | Yes | Currency for budget enforcement |
-
-### 3.2 Enforcement Semantics
-
-Budget checks evaluate in the following order. The first violation
-encountered MUST be returned:
-
-1. **Total budget**: `total_spent + cost > max_total.units`
-2. **Per-session budget**: `session_spent + cost > max_per_session.units`
-3. **Per-agent budget**: `agent_spent + cost > max_per_agent.units`
-4. **Per-tool budget**: `tool_spent + cost > max_per_tool[key].units`
-
-All arithmetic MUST use saturating addition. Overflow MUST saturate to
-`u64::MAX` rather than wrapping.
-
-A cost of zero MUST always pass budget checks regardless of current spending
-levels.
-
-### 3.3 BudgetViolation
-
-When a budget check fails, the enforcer MUST return a typed violation:
-
-| Variant | Fields | Description |
-|---------|--------|-------------|
-| `Total` | `limit_units, current_units, requested_units, currency` | Total budget exceeded |
-| `Session` | `session_id, limit_units, current_units, requested_units, currency` | Per-session budget exceeded |
-| `Agent` | `agent_id, limit_units, current_units, requested_units, currency` | Per-agent budget exceeded |
-| `Tool` | `tool_key, limit_units, current_units, requested_units, currency` | Per-tool budget exceeded |
-
-### 3.4 Recording
-
-After a tool invocation succeeds and the receipt is signed, the enforcer
-records the cost against all applicable counters (total, session, agent,
-tool). Recording uses saturating addition.
-
-The `record` operation does not enforce limits; it only updates tracking
-counters. Budget enforcement happens exclusively in the `check` operation
-before invocation.
-
----
-
-## 4. Billing Export
+## 3. Billing Export
 
 Billing export transforms Chio cost metadata into flat, denormalized records
 suitable for ingestion by external billing systems.
 
-### 4.1 BillingRecord
+### 3.1 BillingRecord
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -159,7 +104,7 @@ All timestamps MUST use ISO 8601 format with UTC timezone and `Z` suffix.
 Implementations MUST fall back to `"unix:<timestamp>"` when the Unix
 timestamp cannot be converted to a calendar date.
 
-### 4.2 BillingExport
+### 3.2 BillingExport
 
 A batch of billing records.
 
@@ -174,7 +119,7 @@ A batch of billing records.
 When records contain costs in multiple currencies, `total_cost` MUST be
 `null` rather than summing incompatible amounts.
 
-### 4.3 Export Formats
+### 3.3 Export Formats
 
 Implementations MUST support JSON export. Implementations SHOULD support
 CSV export. CSV output MUST use the same field names as the JSON schema with
@@ -182,11 +127,11 @@ one record per row and a header line.
 
 ---
 
-## 5. Query Interface
+## 4. Query Interface
 
 The query interface supports cost aggregation across multiple dimensions.
 
-### 5.1 CostQuery
+### 4.1 CostQuery
 
 All filter fields are optional. When omitted, the filter matches all
 records. Multiple filters are ANDed together.
@@ -203,7 +148,7 @@ records. Multiple filters are ANDed together.
 | `limit` | usize | Maximum detailed records to return |
 | `group_by` | GroupBy | Aggregation dimension |
 
-### 5.2 GroupBy
+### 4.2 GroupBy
 
 | Value | Description |
 |-------|-------------|
@@ -212,7 +157,7 @@ records. Multiple filters are ANDed together.
 | `agent` | Group by agent ID |
 | `tool` | Group by tool key (`"server:tool_name"`) |
 
-### 5.3 CostQueryResult
+### 4.3 CostQueryResult
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -220,7 +165,7 @@ records. Multiple filters are ANDed together.
 | `groups` | CostGroup[] | Grouped rows (empty when group_by is `none`) |
 | `truncated` | bool | Whether the result was truncated due to limit |
 
-### 5.4 CostSummary
+### 4.4 CostSummary
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -231,7 +176,7 @@ records. Multiple filters are ANDed together.
 | `distinct_agents` | u64 | Number of distinct agents |
 | `distinct_tools` | u64 | Number of distinct tools |
 
-### 5.5 CostGroup
+### 4.5 CostGroup
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -241,7 +186,7 @@ records. Multiple filters are ANDed together.
 | `total_data_bytes` | u64 | Data volume for this group |
 | `total_monetary_cost` | MonetaryAmount | Cost for this group (null if mixed currencies) |
 
-### 5.6 Limits
+### 4.6 Limits
 
 The maximum number of records returned by a single query MUST NOT exceed
 500. When the matching set exceeds the limit, the result MUST set

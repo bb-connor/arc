@@ -15,8 +15,7 @@ use crate::issuer::{
     TRUSTED_ISSUER_REGISTRY_SCHEMA,
 };
 use crate::revocation::{
-    revoked_key_fingerprints, validate_revocation_checkpoint, ChioRevocationMaterial,
-    SignedChioRevocationCheckpoint,
+    revoked_key_fingerprints, validate_revocation_checkpoint, SignedChioRevocationCheckpoint,
 };
 use crate::validation::{
     canonical_sha256, key_fingerprint, validate_sha256_hex, validate_trust_field,
@@ -24,7 +23,6 @@ use crate::validation::{
 };
 
 pub const VERIFIER_TRUST_BUNDLE_SCHEMA: &str = "chio.federation.verifier-trust-bundle.v1";
-pub const CHIO_FEDERATION_VERIFIER_TRUST_BUNDLE_SCHEMA: &str = VERIFIER_TRUST_BUNDLE_SCHEMA;
 pub const WORKFLOW_GRANT_ISSUE_ACTION_CLASS_ID: &str = "workflow.grant_issue";
 pub const WORKFLOW_AGGREGATE_PUBLISH_ACTION_CLASS_ID: &str = "workflow.aggregate_publish";
 
@@ -108,15 +106,11 @@ pub struct ChioVerifierTrustBundleDocument {
     pub vendors: Vec<VendorKeyBinding>,
     pub action_classes: Vec<ChioTrustedActionClass>,
     pub workflow_intersections: Vec<ChioTrustedWorkflowIntersection>,
-    #[serde(default)]
     pub runtime_policy_issuer_public_keys: Vec<PublicKey>,
-    #[serde(default)]
     pub lease_authorities: Vec<ChioTrustedLeaseAuthority>,
-    #[serde(default)]
     pub governance_authorities: Vec<ChioTrustedGovernanceAuthority>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub disclosure_policy: Option<ChioDisclosurePolicy>,
-    pub revocation: ChioRevocationMaterial,
+    pub disclosure_policy: ChioDisclosurePolicy,
+    pub revocation: SignedChioRevocationCheckpoint,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -170,17 +164,9 @@ impl ChioVerifierTrustBundle {
                     .to_string(),
             ));
         }
-        let Some(disclosure_policy) = document.disclosure_policy else {
-            return Err(ChioPackageError::TrustBundle(
-                "verifier trust bundle v3 requires a disclosure policy".to_string(),
-            ));
-        };
+        let disclosure_policy = document.disclosure_policy;
         validate_disclosure_policy(&disclosure_policy)?;
-        let ChioRevocationMaterial::Checkpoint(revocation) = document.revocation else {
-            return Err(ChioPackageError::TrustBundle(
-                "verifier trust bundle v3 requires a signed revocation checkpoint".to_string(),
-            ));
-        };
+        let revocation = document.revocation;
         validate_revocation_checkpoint(&revocation)?;
         let revoked_key_fingerprints =
             revoked_key_fingerprints(&revocation.body.revoked_key_fingerprints)?;
@@ -325,7 +311,7 @@ impl ChioVerifierTrustBundle {
             governance_authorities,
             runtime_policy_issuer_public_keys: document.runtime_policy_issuer_public_keys,
             disclosure_policy,
-            revocation: *revocation,
+            revocation,
             revoked_key_fingerprints,
         })
     }

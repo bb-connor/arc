@@ -225,60 +225,27 @@ impl IssuerService {
         self
     }
 
-    /// Wire the DURABLE, default-posture stores: a SQLite-backed
-    /// revocation oracle and replay nonce store, both persisted under
-    /// `dir`. This is the wired-by-default path for a production issuer:
-    /// the revocation cascade and the replay-detection state survive an
-    /// issuer restart instead of resetting to empty (which would silently
-    /// re-admit a previously-revoked credential or a previously-seen
-    /// replay nonce after a crash).
-    ///
-    /// Builder-style: returns the issuer with both durable stores wired.
-    /// The two stores live in sibling files under `dir`
-    /// (`revocation.sqlite3` and `nonces.sqlite3`). Tests and
+    /// Wire the durable, default-posture stores: a SQLite-backed revocation
+    /// oracle and replay nonce store, both persisted under `dir`
+    /// (`revocation.sqlite3` and `nonces.sqlite3`). The revocation cascade and
+    /// the replay-detection state survive an issuer restart, so a crash never
+    /// re-admits a revoked credential or a seen replay nonce. Tests and
     /// single-process deployments can instead wire the in-memory stores via
     /// [`Self::with_revocation_oracle`] / [`Self::with_nonce_store`].
     ///
-    /// Fail-closed: if either durable store cannot be opened (I/O fault,
-    /// permission error, corrupt schema), this returns
-    /// [`CustodyError`] and NO issuer is produced, so a deployment never
-    /// silently falls back to a non-durable posture.
-    ///
-    /// This is the backward-compatible shape that hides the durable handles
-    /// inside the issuer. When a deployment also needs to call
-    /// `revoke_credential` / `is_revoked` (or share the same revoked-set
-    /// cache across services) on the SAME `Arc` the issuer reads, use
-    /// [`Self::with_durable_stores_handle`] instead: opening
-    /// `revocation.sqlite3` through a SECOND oracle would NOT update this
-    /// issuer's in-RAM cache, so post-startup revocations would not be
-    /// observed by `mint_capability` until the issuer is rebuilt.
-    #[cfg(feature = "sqlite-store")]
-    pub fn with_durable_stores(self, dir: &std::path::Path) -> Result<Self, CustodyError> {
-        // Construct and discard the handle: callers that only want the
-        // wired issuer keep the original signature.
-        let (issuer, _revocation) = self.with_durable_stores_handle(dir)?;
-        Ok(issuer)
-    }
-
-    /// Like [`Self::with_durable_stores`], but ALSO returns the shared
-    /// durable revocation oracle handle so a deployment can query
-    /// `is_revoked` / drive `revoke_credential` on the very same `Arc` the
-    /// issuer consults, or share that single revoked-set cache across
-    /// services.
-    ///
-    /// The returned `Arc<SqliteCredentialRevocationOracle>` is the EXACT
+    /// Returns the issuer together with the shared durable revocation oracle.
+    /// The returned `Arc<SqliteCredentialRevocationOracle>` is the exact
     /// instance wired into the issuer (cloned, not reopened), so an operator
     /// revocation made through the handle is observed by `mint_capability`
-    /// immediately, with no reopen and no second in-RAM cache to drift out of
-    /// sync. The nonce store stays encapsulated; only the revocation oracle
-    /// is shareable because it is the handle the operator/control-plane path
-    /// needs.
+    /// immediately. Opening `revocation.sqlite3` through a second oracle would
+    /// not update this issuer's in-RAM cache. The nonce store stays
+    /// encapsulated.
     ///
-    /// Same fail-closed contract as [`Self::with_durable_stores`]: if either
-    /// store cannot be opened, this returns [`CustodyError`] and produces
-    /// neither an issuer nor a handle.
+    /// Fail-closed: if either durable store cannot be opened (I/O fault,
+    /// permission error, corrupt schema), this returns [`CustodyError`] and
+    /// produces neither an issuer nor a handle.
     #[cfg(feature = "sqlite-store")]
-    pub fn with_durable_stores_handle(
+    pub fn with_durable_stores(
         self,
         dir: &std::path::Path,
     ) -> Result<
@@ -317,10 +284,7 @@ impl IssuerService {
     /// [`Self::with_durable_stores`], but a deployment that builds the issuer
     /// by hand can chain `.enforce_revocation_replay()?` as the final builder
     /// step to turn an accidental fail-open posture into a loud, fail-closed
-    /// construction error rather than a silent runtime gap. This is purely
-    /// additive (existing call sites that deliberately run a minimal issuer,
-    /// such as tests or deployments that enforce revocation/replay upstream,
-    /// are unaffected unless they opt in to this guard).
+    /// construction error rather than a silent runtime gap.
     pub fn enforce_revocation_replay(self) -> Result<Self, CustodyError> {
         if self.revocation.is_none() {
             return Err(CustodyError::Encoding(
@@ -356,7 +320,7 @@ impl IssuerService {
     /// out of sync. Returns `None` for a `with_signer`-only issuer that has
     /// not wired an oracle. For the durable concrete handle (e.g. to share a
     /// single SQLite-backed revoked-set cache across services), construct
-    /// with [`Self::with_durable_stores_handle`].
+    /// with [`Self::with_durable_stores`].
     #[must_use]
     pub fn revocation_oracle(&self) -> Option<Arc<dyn CredentialRevocationOracle>> {
         self.revocation.clone()
@@ -683,10 +647,10 @@ mod tests {
         }
 
         let (svc, handle) = match IssuerService::with_signer("urn:chio:audience:kernel", signer(9))
-            .with_durable_stores_handle(&dir)
+            .with_durable_stores(&dir)
         {
             Ok(pair) => pair,
-            Err(e) => panic!("with_durable_stores_handle: {e}"),
+            Err(e) => panic!("with_durable_stores: {e}"),
         };
 
         let req = MintRequest {

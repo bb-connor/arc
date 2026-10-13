@@ -43,7 +43,7 @@ A signing failure can leave that nonce consumed; no transaction spans signing.
 
 `with_signer` attaches the default rate limiter, with no revocation or nonce
 store. Feature availability does not attach these gates.
-`with_durable_stores_handle` opens sibling SQLite stores and returns the same
+`with_durable_stores` opens sibling SQLite stores and returns the same
 revocation instance read by the issuer. Separate instances have separate
 caches. `enforce_revocation_replay` checks that both gate handles exist.
 

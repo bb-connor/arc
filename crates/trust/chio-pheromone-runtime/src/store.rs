@@ -274,6 +274,7 @@ impl SqlitePheromoneRuntimeStore {
 
     fn run_migrations(&self) -> Result<(), PheromoneRuntimeError> {
         let conn = self.conn.lock()?;
+        refuse_retired_tables(&conn)?;
         conn.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
@@ -300,22 +301,6 @@ impl SqlitePheromoneRuntimeStore {
 
             CREATE INDEX IF NOT EXISTS idx_chio_pheromone_replay_expiry
                 ON chio_pheromone_replay_nonces(expires_at_unix_ms);
-
-            CREATE TABLE IF NOT EXISTS chio_pheromone_pair_counts (
-                kernel_id TEXT NOT NULL,
-                passport_key_hash TEXT NOT NULL,
-                subject_class TEXT NOT NULL,
-                treaty_id TEXT NOT NULL,
-                count INTEGER NOT NULL,
-                PRIMARY KEY (kernel_id, passport_key_hash, subject_class, treaty_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_pheromone_passport_caps (
-                kernel_id TEXT NOT NULL,
-                subject_class TEXT NOT NULL,
-                passport_key_hash TEXT NOT NULL,
-                PRIMARY KEY (kernel_id, subject_class, passport_key_hash)
-            );
 
             CREATE TABLE IF NOT EXISTS chio_pheromone_scarcity_buckets (
                 reputation_epoch INTEGER NOT NULL,
@@ -353,7 +338,7 @@ impl SqlitePheromoneRuntimeStore {
                 )
             );
 
-            CREATE TABLE IF NOT EXISTS chio_pheromone_passport_caps_v2 (
+            CREATE TABLE IF NOT EXISTS chio_pheromone_passport_caps (
                 reputation_epoch INTEGER NOT NULL,
                 window_id TEXT NOT NULL,
                 treaty_id TEXT NOT NULL,
@@ -383,12 +368,14 @@ impl SqlitePheromoneRuntimeStore {
                 report_sha256 TEXT PRIMARY KEY,
                 received_at_unix_ms INTEGER NOT NULL,
                 json TEXT NOT NULL,
-                batch_sha256 TEXT,
-                sender_kernel_id TEXT
+                batch_sha256 TEXT NOT NULL,
+                sender_kernel_id TEXT NOT NULL
             );
+
+            CREATE INDEX IF NOT EXISTS idx_receive_reports_batch_sender
+                ON chio_pheromone_receive_reports (batch_sha256, sender_kernel_id);
             "#,
         )?;
-        ensure_receive_report_recovery_columns(&conn)?;
         Ok(())
     }
 
@@ -589,7 +576,7 @@ fn admit_deposit_scoped_tx(
         }
         tx.execute(
             r#"
-            INSERT INTO chio_pheromone_passport_caps_v2
+            INSERT INTO chio_pheromone_passport_caps
                 (reputation_epoch, window_id, treaty_id, subject_class_namespace,
                  subject_class, kernel_id, passport_key_hash)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
@@ -879,43 +866,26 @@ impl PheromoneRuntimeStore for SqlitePheromoneRuntimeStore {
     }
 }
 
-/// Additive migration: the recovery columns + index for verdict recovery.
-/// `batch_sha256` keys the recovery lookup; `sender_kernel_id` SCOPES it to the
-/// authenticated sender, so a lookup for a batch that several senders recorded reports
-/// for (for example a wrong-sender replay that recorded a rejected verdict alongside the
-/// correct sender's crash-recovery report) returns the CORRECT sender's row rather than
-/// an arbitrary one. Existing rows keep NULL columns and are not recoverable-by-batch
-/// (acceptable: only reports written after the migration need recovery). Idempotent.
-pub(crate) fn ensure_receive_report_recovery_columns(
-    conn: &rusqlite::Connection,
-) -> Result<(), PheromoneRuntimeError> {
-    let mut existing_columns = std::collections::HashSet::new();
-    let mut stmt = conn.prepare("PRAGMA table_info(chio_pheromone_receive_reports)")?;
-    let mut rows = stmt.query([])?;
-    while let Some(row) = rows.next()? {
-        let name: String = row.get(1)?;
-        existing_columns.insert(name);
-    }
-    drop(rows);
-    drop(stmt);
-    if !existing_columns.contains("batch_sha256") {
-        conn.execute(
-            "ALTER TABLE chio_pheromone_receive_reports ADD COLUMN batch_sha256 TEXT",
-            [],
+const RETIRED_TABLES: [&str; 2] = [
+    "chio_pheromone_pair_counts",
+    "chio_pheromone_passport_caps_v2",
+];
+
+/// Refuses a database written with a retired table layout instead of
+/// opening it alongside the current tables.
+fn refuse_retired_tables(conn: &rusqlite::Connection) -> Result<(), PheromoneRuntimeError> {
+    for table in RETIRED_TABLES {
+        let present: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+            [table],
+            |row| row.get(0),
         )?;
+        if present {
+            return Err(PheromoneRuntimeError::SchemaInvalid(format!(
+                "stale pheromone runtime schema: retired table {table} is present"
+            )));
+        }
     }
-    if !existing_columns.contains("sender_kernel_id") {
-        conn.execute(
-            "ALTER TABLE chio_pheromone_receive_reports ADD COLUMN sender_kernel_id TEXT",
-            [],
-        )?;
-    }
-    // Composite index so the sender-scoped recovery lookup is a single index probe.
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_receive_reports_batch_sender \
-         ON chio_pheromone_receive_reports (batch_sha256, sender_kernel_id)",
-        [],
-    )?;
     Ok(())
 }
 
@@ -983,7 +953,7 @@ fn passport_seen(
     Ok(tx
         .query_row(
             r#"
-            SELECT 1 FROM chio_pheromone_passport_caps_v2
+            SELECT 1 FROM chio_pheromone_passport_caps
             WHERE reputation_epoch = ?1 AND window_id = ?2 AND treaty_id = ?3
               AND subject_class_namespace = ?4 AND subject_class = ?5
               AND kernel_id = ?6 AND passport_key_hash = ?7
@@ -1010,7 +980,7 @@ fn passport_count(
 ) -> Result<u64, PheromoneRuntimeError> {
     let count = tx.query_row(
         r#"
-        SELECT COUNT(*) FROM chio_pheromone_passport_caps_v2
+        SELECT COUNT(*) FROM chio_pheromone_passport_caps
         WHERE reputation_epoch = ?1 AND window_id = ?2 AND treaty_id = ?3
           AND subject_class_namespace = ?4 AND subject_class = ?5 AND kernel_id = ?6
         "#,

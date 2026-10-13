@@ -5,18 +5,11 @@ host. It demonstrates a durable mailbox handoff, recovery after the producer
 exits, scoped tool access, and verification of five original signed receipts.
 The result is `{"item_count": 3, "total": 10}`. It requires no model API key.
 
-The process stack is under review in
-[PR #1154](https://github.com/bb-connor/arc/pull/1154) and its dependencies.
-Use this source revision:
-
-```text
-repository: https://github.com/bb-connor/arc.git
-revision:   d99e03027c57dc9c0929a5bca553e745c6286d99
-```
-
-The `backbay-labs/chio` mirror did not contain this starter when checked on
-2026-09-08. Its website installer also pointed to missing release downloads.
-Neither path substitutes for the revision above.
+Build from the current `main` of `https://github.com/bb-connor/arc.git`. No
+release is published (see [Install Chio](README.md)), and the preview carries
+no format compatibility with other revisions (see
+[Format Stability](../release/FORMAT_STABILITY.md)), so build and run the
+starter from the same checkout.
 
 ## Build and run on Linux
 
@@ -28,7 +21,6 @@ installs its included SDK packages offline and runs outside the checkout.
 ```bash
 git clone https://github.com/bb-connor/arc.git chio-process-preview
 cd chio-process-preview
-git checkout --detach d99e03027c57dc9c0929a5bca553e745c6286d99
 cargo build --locked -p chio-cli --bin chio
 python3 scripts/qualify-process-packages.py --chio target/debug/chio \
   --output /tmp/chio-process-starter
@@ -68,13 +60,13 @@ acceptance gates pass.
 
 ## Packaged artifacts and qualification
 
-The [process workflow for this revision](https://github.com/bb-connor/arc/actions/runs/34298643178)
-builds and qualifies the starter. A successful `MCP process host recovery` job
-uploads `chio-process-starter-Linux-X64`, containing
-`chio-process-starter.tar.gz`. GitHub artifact downloads require a signed-in
-account and remain subject to retention limits. Check that the run succeeded
-at the revision above before using its artifact. If it is still running, fails,
-or the artifact has expired, use the source route above.
+The `process-workers` workflow
+(`.github/workflows/process-workers.yml`) builds and qualifies the starter. Its
+`Installed native consumer recovery` job uploads `chio-process-starter-Linux-X64`,
+containing `chio-process-starter.tar.gz`. GitHub artifact downloads require a
+signed-in account and remain subject to retention limits. Use an artifact only
+from a run that succeeded at the commit you are evaluating. If no such run
+exists or the artifact has expired, use the source route above.
 
 The tar archive preserves the host's executable file mode. Extract it into a
 directory you control and follow the included `README.md`. `manifest.json`

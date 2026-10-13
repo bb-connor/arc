@@ -1770,9 +1770,9 @@ files = ["crates/trust/chio-federation-authority/src/lib.rs"]
 first_seen = "91fd03d85c"
 
 [[schema]]
-value = "chio.federation.transport.iroh.peer-directory-bundle.v2"
+value = "chio.federation.transport.iroh.peer-directory-bundle.v1"
 files = ["crates/trust/chio-federation-transport-iroh/src/identity.rs"]
-first_seen = "7f8e156d3c"
+first_seen = "201dd96a83"
 
 [[schema]]
 value = "chio.federation.transport.iroh.revocation-catchup-manifest.v1"
