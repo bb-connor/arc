@@ -767,16 +767,26 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
         let agent = Keypair::generate();
         let capability = kernel.issue_capability(&agent.public_key(), paid_scope(), 300)?;
         let request = paid_request(&capability);
-        let Err(error) = kernel.evaluate_tool_call_blocking(&request) else {
-            return Err("a failed return write must preserve its original incident owner".into());
-        };
+        let response = kernel.evaluate_tool_call_blocking(&request)?;
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert!(response.output.is_none());
         assert!(
-            matches!(error, KernelError::AdmissionRecovery(ref failure)
-            if matches!(failure.as_ref(), chio_kernel::admission_operation::AdmissionRecoveryError::Outcome(
-                ToolOutcomeStoreError::Unavailable(reason)) if reason == "injected tool outcome write failure")),
-            "{error:?}"
+            response
+                .reason
+                .as_deref()
+                .is_some_and(|reason| reason.contains("injected tool outcome write failure")),
+            "{:?}",
+            response.reason
         );
-        assert!(kernel.receipt_log().is_empty());
+        assert_eq!(
+            response
+                .receipt
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.pointer("/admission_operation/projected_state")),
+            Some(&serde_json::json!("outcome_unknown_after_dispatch"))
+        );
+        assert_eq!(kernel.receipt_log().len(), 1);
         assert!(operations
             .list_recoverable(now_unix_ms()? + 120_000, 10)?
             .is_empty());
