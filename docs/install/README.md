@@ -12,8 +12,7 @@ chio --help
 ```
 
 For the process host with Python and Node workers, use the
-[process preview guide](PROCESS_PREVIEW.md). It pins the exact repository and
-revision to build.
+[process preview guide](PROCESS_PREVIEW.md). It builds from the same checkout.
 
 ## Release status
 
