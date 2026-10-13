@@ -25,6 +25,7 @@ fn native_retained_codec_is_strict_and_hash_domain_is_versioned() -> TestResult 
         security.as_ref(),
         &profile,
         &signer,
+        None,
     )?;
     retained.validate_native_security_context(&context)?;
     retained.validate_native_security_authority(&selected)?;
@@ -59,6 +60,7 @@ fn native_retained_codec_is_strict_and_hash_domain_is_versioned() -> TestResult 
             security.as_ref(),
             &profile,
             &signer,
+            None,
         )?
         .as_str(),
         sha256_hex(&canonical_json_bytes(&independent)?)
@@ -132,6 +134,7 @@ fn current_profile_with_context_only_binding_has_exact_bytes_and_hash() -> TestR
         security.as_ref(),
         &profile,
         &signer,
+        None,
     )?;
     let mut independent: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
     let context = context.as_v1();
@@ -173,6 +176,7 @@ fn current_profile_with_context_only_binding_has_exact_bytes_and_hash() -> TestR
             security.as_ref(),
             &profile,
             &signer,
+            None,
         )?
         .as_str(),
         sha256_hex(&canonical_json_bytes(&hash)?)

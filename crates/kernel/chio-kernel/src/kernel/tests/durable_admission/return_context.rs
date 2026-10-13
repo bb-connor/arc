@@ -70,6 +70,7 @@ fn oversized_request_is_refused_before_admission(nested: bool) -> TestResult {
             &request, &matching, &[], None,
             &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
             &kernel.freeze_receipt_signing_identity()?,
+        None,
         ),
         Err(crate::admission_operation::AdmissionOperationStoreError::Invariant(message))
             if message == "retained request exceeds its artifact bound"

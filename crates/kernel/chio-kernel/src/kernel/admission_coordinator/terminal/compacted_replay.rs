@@ -98,6 +98,7 @@ impl ChioKernel {
             security_binding,
             original.authority_profile(),
             original.frozen_receipt_signing_identity(),
+            original.admitted_receipt_metadata(),
         )?;
         if &request_hash != operation.binding().immutable_request_hash() {
             return Err(KernelError::DurableAdmission(

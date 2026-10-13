@@ -13,6 +13,9 @@ use crate::kernel::MatchingGrant;
 use crate::tool_outcome::{FrozenEvaluationStepV1, FrozenReceiptSigningIdentityV1};
 use crate::ToolCallRequest;
 
+/// Caller-supplied receipt metadata admitted with the original request.
+pub type AdmittedReceiptMetadata = serde_json::Map<String, serde_json::Value>;
+
 const SCHEMA: &str = "chio.retained-tool-admission-request.v1";
 const MAX_BYTES: usize = 262_144;
 
@@ -57,6 +60,8 @@ struct RetainedRequestWire {
     security_binding: Option<AdmissionSecurityBindingV1>,
     authority_profile: AdmissionAuthorityProfileV1,
     frozen_receipt_signing_identity: FrozenReceiptSigningIdentityV1,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    admitted_receipt_metadata: Option<AdmittedReceiptMetadata>,
 }
 
 #[derive(Serialize)]
@@ -74,6 +79,8 @@ struct ImmutableToolAdmissionRequest<'a> {
     security_binding: Option<&'a AdmissionSecurityBindingV1>,
     authority_profile: &'a AdmissionAuthorityProfileV1,
     frozen_receipt_signing_identity: &'a FrozenReceiptSigningIdentityV1,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    admitted_receipt_metadata: Option<&'a AdmittedReceiptMetadata>,
 }
 
 #[derive(Serialize)]
@@ -89,7 +96,11 @@ pub(crate) fn immutable_tool_request_hash(
     security_binding: Option<&AdmissionSecurityBindingV1>,
     authority_profile: &AdmissionAuthorityProfileV1,
     frozen_receipt_signing_identity: &FrozenReceiptSigningIdentityV1,
+    admitted_receipt_metadata: Option<&AdmittedReceiptMetadata>,
 ) -> Result<AdmissionDigest, AdmissionOperationStoreError> {
+    if admitted_receipt_metadata.is_some_and(serde_json::Map::is_empty) {
+        return Err(invalid("admitted receipt metadata must not be empty"));
+    }
     if let Some(security_binding) = security_binding {
         security_binding.validate()?;
     }
@@ -116,6 +127,7 @@ pub(crate) fn immutable_tool_request_hash(
         security_binding,
         authority_profile,
         frozen_receipt_signing_identity,
+        admitted_receipt_metadata,
     };
     let bytes = canonical_json_bytes(&immutable).map_err(invalid)?;
     AdmissionDigest::try_new("immutable_request_hash", sha256_hex(&bytes)).map_err(Into::into)
@@ -172,6 +184,7 @@ impl RetainedToolAdmissionRequestV1 {
         security_binding: Option<&AdmissionSecurityBindingV1>,
         authority_profile: &AdmissionAuthorityProfileV1,
         frozen_receipt_signing_identity: &FrozenReceiptSigningIdentityV1,
+        admitted_receipt_metadata: Option<&AdmittedReceiptMetadata>,
     ) -> Result<Self, AdmissionOperationStoreError> {
         let request = Self::request_without_transient_credentials(request);
         let wire = RetainedRequestWire {
@@ -182,6 +195,7 @@ impl RetainedToolAdmissionRequestV1 {
             security_binding: security_binding.cloned(),
             authority_profile: authority_profile.clone(),
             frozen_receipt_signing_identity: frozen_receipt_signing_identity.clone(),
+            admitted_receipt_metadata: admitted_receipt_metadata.cloned(),
         };
         let canonical = canonical_json_bytes(&wire).map_err(invalid)?;
         Self::from_canonical_bytes(&canonical)
@@ -213,6 +227,13 @@ impl RetainedToolAdmissionRequestV1 {
         wire.frozen_receipt_signing_identity
             .validate()
             .map_err(|_| invalid("retained request receipt signing identity is invalid"))?;
+        if wire
+            .admitted_receipt_metadata
+            .as_ref()
+            .is_some_and(serde_json::Map::is_empty)
+        {
+            return Err(invalid("admitted receipt metadata must not be empty"));
+        }
         if let Some(binding) = wire.security_binding.as_ref() {
             binding.validate()?;
         }
@@ -242,6 +263,13 @@ impl RetainedToolAdmissionRequestV1 {
 
     pub(crate) fn frozen_receipt_signing_identity(&self) -> &FrozenReceiptSigningIdentityV1 {
         &self.wire.frozen_receipt_signing_identity
+    }
+
+    /// Caller receipt metadata bound into the original admission. Every
+    /// canonical refusal signed for this operation carries it unchanged.
+    #[must_use]
+    pub fn admitted_receipt_metadata(&self) -> Option<&AdmittedReceiptMetadata> {
+        self.wire.admitted_receipt_metadata.as_ref()
     }
 
     /// Historical authority selection only. It cannot authorize a new write.
@@ -322,6 +350,7 @@ impl RetainedToolAdmissionRequestV1 {
             self.wire.security_binding.as_ref(),
             &self.wire.authority_profile,
             &self.wire.frozen_receipt_signing_identity,
+            self.wire.admitted_receipt_metadata.as_ref(),
         )?;
         if candidate.canonical != self.canonical {
             return Err(invalid(
@@ -357,6 +386,7 @@ impl RetainedToolAdmissionRequestV1 {
             self.wire.security_binding.as_ref(),
             &self.wire.authority_profile,
             &self.wire.frozen_receipt_signing_identity,
+            self.wire.admitted_receipt_metadata.as_ref(),
         )
     }
 
@@ -368,6 +398,7 @@ impl RetainedToolAdmissionRequestV1 {
         security_binding: Option<&AdmissionSecurityBindingV1>,
         authority_profile: &AdmissionAuthorityProfileV1,
         frozen_receipt_signing_identity: &FrozenReceiptSigningIdentityV1,
+        admitted_receipt_metadata: Option<&AdmittedReceiptMetadata>,
     ) -> Result<(), AdmissionOperationStoreError> {
         let capability_hash =
             sha256_hex(&canonical_json_bytes(&request.capability).map_err(invalid)?);
@@ -379,6 +410,7 @@ impl RetainedToolAdmissionRequestV1 {
             security_binding,
             authority_profile,
             frozen_receipt_signing_identity,
+            admitted_receipt_metadata,
         )?;
         if binding.kind() != super::AdmissionOperationKind::ToolDispatch
             || binding.request_id().as_str() != request.request_id

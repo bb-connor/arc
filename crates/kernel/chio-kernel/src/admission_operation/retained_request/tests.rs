@@ -58,6 +58,7 @@ fn fixture() -> TestResult<(RetainedToolAdmissionRequestV1, AdmissionOperationBi
         None,
         &profile,
         &signer,
+        None,
     )?;
     let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
         kind: AdmissionOperationKind::ToolDispatch,
@@ -72,7 +73,7 @@ fn fixture() -> TestResult<(RetainedToolAdmissionRequestV1, AdmissionOperationBi
             sha256_hex(&canonical_json_bytes(&request.capability)?),
         )?,
         request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
-            immutable_tool_request_hash(&request, &matching, &[], None, &profile, &signer)?,
+            immutable_tool_request_hash(&request, &matching, &[], None, &profile, &signer, None)?,
             AdmissionDigest::try_new(
                 "action",
                 sha256_hex(&canonical_json_bytes(&request.arguments)?),
@@ -201,6 +202,7 @@ fn retained_request_rejects_oversized_material() -> TestResult {
         None,
         retained.authority_profile(),
         retained.frozen_receipt_signing_identity(),
+        None,
     )
     .err()
     .ok_or("oversized request retained")?;

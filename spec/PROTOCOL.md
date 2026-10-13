@@ -1029,6 +1029,17 @@ any of its fields. Serving-owner epochs and reusable credentials are excluded
 from the profile. Retained requests MUST omit DPoP proofs, execution nonces,
 approval credentials, supplemental authorization and declassification grants.
 
+Caller-supplied receipt metadata is admitted with the request. A non-empty
+object is retained as `admitted_receipt_metadata` and committed by the same
+`chio.tool-admission-request.v1` hash; it is omitted from both when the caller
+supplies none. Kernel-derived keys, including `admission_operation`,
+`attribution`, `chio_runtime` and `receipt_context`, MUST be refused before
+admission. Every canonical refusal the kernel signs for the operation
+(compensation, recovery and unknown outcome) MUST carry the retained metadata
+unchanged, so an exact replay returns the identical receipt. A retry whose
+metadata differs from the retained commitment is a conflicting request and
+MUST be refused without a new receipt.
+
 Before a new claim, the kernel MUST check the original selection and the store
 MUST compare the requested authority with the retained profile inside the actual
 operation-lease transaction. Current configuration cannot replace an original

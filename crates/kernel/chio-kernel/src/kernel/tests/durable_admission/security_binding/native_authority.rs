@@ -65,6 +65,7 @@ fn historical_native_response(
             request,
             &matching,
             Some(security_context),
+            None,
             now,
             DispatchTransport::KernelToolServer,
         )
@@ -346,6 +347,7 @@ fn native_selection_requires_retained_admission_outside_mode_coverage() -> TestR
             &request,
             &matching(&request)?,
             Some(&original),
+            None,
             current_unix_timestamp_ms(),
             DispatchTransport::KernelToolServer,
         )?;
@@ -393,6 +395,7 @@ fn native_selection_cannot_fall_back_without_a_durable_store() -> TestResult {
             &request,
             &matching(&request)?,
             Some(&original),
+            None,
             current_unix_timestamp_ms(),
             DispatchTransport::KernelToolServer,
         );
@@ -425,6 +428,7 @@ fn native_selection_change_is_rejected_before_dispatch_capture() -> TestResult {
             &request,
             &matching,
             Some(&original),
+            None,
             now,
             DispatchTransport::KernelToolServer,
         )?

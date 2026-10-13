@@ -428,6 +428,7 @@ impl ChioKernel {
             request,
             &matching_grants,
             security_context,
+            extra_metadata.as_ref(),
             now_unix_ms,
             DispatchTransport::KernelToolServer,
         ) {

@@ -92,6 +92,7 @@ pub(super) fn fixture(
             &request,
             &matching,
             Some(&context),
+            None,
             now,
             DispatchTransport::KernelToolServer,
         )?

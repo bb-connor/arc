@@ -108,6 +108,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
         None,
         &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
         &kernel.freeze_receipt_signing_identity()?,
+        None,
     )?;
     let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
         kind: AdmissionOperationKind::ToolDispatch,
@@ -129,6 +130,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
                 None,
                 original.authority_profile(),
                 original.frozen_receipt_signing_identity(),
+                None,
             )?,
             AdmissionDigest::try_new(
                 "action",

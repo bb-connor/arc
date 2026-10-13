@@ -476,6 +476,7 @@ fn immutable_tool_admission_request_hash(
     security_binding: Option<&crate::admission_operation::AdmissionSecurityBindingV1>,
     authority_profile: &crate::admission_operation::AdmissionAuthorityProfileV1,
     signing_identity: &crate::tool_outcome::FrozenReceiptSigningIdentityV1,
+    admitted_receipt_metadata: Option<&crate::admission_operation::AdmittedReceiptMetadata>,
 ) -> Result<AdmissionDigest, KernelError> {
     crate::admission_operation::immutable_tool_request_hash(
         request,
@@ -484,6 +485,7 @@ fn immutable_tool_admission_request_hash(
         security_binding,
         authority_profile,
         signing_identity,
+        admitted_receipt_metadata,
     )
     .map_err(durable_store_error)
 }
@@ -554,6 +556,7 @@ impl ChioKernel {
             request,
             matching_grants,
             None,
+            None,
             trusted_now_unix_ms,
             DispatchTransport::KernelToolServer,
         )
@@ -564,11 +567,22 @@ impl ChioKernel {
         request: &ToolCallRequest,
         matching_grants: &[MatchingGrant<'_>],
         security_context: Option<&SecurityInvocationContext>,
+        admitted_receipt_metadata: Option<&serde_json::Value>,
         trusted_now_unix_ms: u64,
         transport: DispatchTransport,
     ) -> Result<Option<DurableToolAdmission>, AdmissionStartFailure> {
         let mut receipt_disposition = Some(IdentityDisposition::Reusable);
         let result = (|| -> Result<_, KernelError> {
+            let admitted_receipt_metadata = admitted_receipt_metadata
+                .map(|metadata| {
+                    metadata.as_object().ok_or_else(|| {
+                        KernelError::InvalidReceiptMetadata(
+                            "receipt metadata must be a JSON object".into(),
+                        )
+                    })
+                })
+                .transpose()?
+                .filter(|metadata| !metadata.is_empty());
             self.validate_security_invocation_context_binding(request, security_context, None)?;
             let security_binding = self.admission_security_binding(security_context)?;
             let aggregate_quota =
@@ -776,6 +790,7 @@ impl ChioKernel {
                 security_binding.as_ref(),
                 &authority_profile,
                 &signing_identity,
+                admitted_receipt_metadata,
             )?;
             let action =
                 ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
@@ -845,6 +860,7 @@ impl ChioKernel {
                     security_binding.as_ref(),
                     &authority_profile,
                     &signing_identity,
+                    admitted_receipt_metadata,
                 )
                 .map_err(durable_store_error)?,
             );

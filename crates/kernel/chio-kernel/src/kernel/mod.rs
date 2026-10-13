@@ -160,7 +160,9 @@ const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
 const PROTOCOL_REFUSAL_METADATA_KEY: &str = "protocol_refusal";
 const RUNTIME_ADMISSION_METADATA_KEY: &str = "chio_runtime";
 
-const RESERVED_RECEIPT_METADATA_KEYS: [&str; 10] = [
+const RESERVED_RECEIPT_METADATA_KEYS: [&str; 12] = [
+    crate::admission_operation::ADMISSION_RECEIPT_METADATA_KEY,
+    "attribution",
     MANIFEST_SECURITY_METADATA_KEY,
     PROTOCOL_ADMISSION_METADATA_KEY,
     BUDGET_AUTHORITY_METADATA_KEY,

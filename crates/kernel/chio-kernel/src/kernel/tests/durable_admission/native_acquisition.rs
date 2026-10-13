@@ -249,6 +249,7 @@ fn native_recovery_lease_panic_does_not_poison_the_mutation_sequencer(
             &request,
             &security_binding::matching(&request)?,
             Some(&context),
+            None,
             now,
             DispatchTransport::KernelToolServer,
         )?
@@ -522,6 +523,7 @@ fn native_dispatch_retains_original_requirement_when_live_selection_is_absent(
                         &request,
                         &security_binding::matching(&request)?,
                         Some(&context),
+                        None,
                         now,
                         DispatchTransport::KernelToolServer,
                     )?
@@ -684,6 +686,7 @@ fn native_preparation_rejects_substituted_original_request_before_any_join(
                 &request,
                 &security_binding::matching(&request)?,
                 Some(&context),
+                None,
                 now,
                 DispatchTransport::KernelToolServer,
             )?

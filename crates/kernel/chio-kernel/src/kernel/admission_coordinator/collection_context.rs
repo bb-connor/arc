@@ -167,6 +167,7 @@ impl ChioKernel {
             retained.security_binding(),
             retained.authority_profile(),
             retained.frozen_receipt_signing_identity(),
+            retained.admitted_receipt_metadata(),
         )
         .map_err(denied)?
             != *binding.immutable_request_hash()

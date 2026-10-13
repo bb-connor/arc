@@ -278,6 +278,7 @@ fn changed_security_identity_is_rejected_before_dispatch_capture() -> TestResult
             &request,
             &matching,
             Some(&original),
+            None,
             now,
             DispatchTransport::KernelToolServer,
         )?

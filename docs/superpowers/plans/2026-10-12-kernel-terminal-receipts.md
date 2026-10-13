@@ -230,6 +230,10 @@ Durable admission returns a typed failure with an optional receipt disposition s
 
 Original controls use the actual ordinary and nested entrypoints: expired signed capabilities must produce Reusable with no invocation; a missing session root after durable admission must produce Terminal after compensation. Keep healthy Allow and approval-required controls, and the existing CommitUnconfirmed Retained control. Approval-required is a distinct response state even when its signed wire decision is Deny.
 
+Canonical refusals sign the caller's admitted receipt metadata, which is
+retained with the original request and committed by the immutable request
+hash. A replay with different metadata conflicts with the retained operation.
+
 No caller gains retry authority from a Terminal or Retained response. The remaining recovery-driver and historical model limitations remain open.
 
 ## Producer validation checkpoint

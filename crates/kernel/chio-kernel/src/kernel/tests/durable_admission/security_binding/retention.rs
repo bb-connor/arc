@@ -18,6 +18,7 @@ fn retained_current_profile_binds_security_but_not_mutable_flow_generation() -> 
         binding.as_ref(),
         &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
         &kernel.freeze_receipt_signing_identity()?,
+        None,
     )?;
     let decoded = RetainedToolAdmissionRequestV1::from_canonical_bytes(retained.canonical_bytes())?;
     decoded.validate_security_binding(binding.as_ref())?;
@@ -60,6 +61,7 @@ fn retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid
         binding.as_ref(),
         &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
         &kernel.freeze_receipt_signing_identity()?,
+        None,
     )?;
     let original: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
     for variant in 0..8 {
@@ -138,6 +140,7 @@ fn current_profile_without_security_context_has_exact_authority_bound_hash() -> 
         None,
         &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
         &kernel.freeze_receipt_signing_identity()?,
+        None,
     )?;
     let encoded: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
     assert_eq!(encoded["schema"], "chio.retained-tool-admission-request.v1");
@@ -160,6 +163,7 @@ fn current_profile_without_security_context_has_exact_authority_bound_hash() -> 
         None,
         retained.authority_profile(),
         retained.frozen_receipt_signing_identity(),
+        None,
     )?;
     assert_eq!(
         hash.as_str(),

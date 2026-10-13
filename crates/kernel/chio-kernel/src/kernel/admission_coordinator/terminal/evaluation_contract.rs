@@ -39,6 +39,7 @@ impl ChioKernel {
             security_binding.as_ref(),
             original.authority_profile(),
             original.frozen_receipt_signing_identity(),
+            original.admitted_receipt_metadata(),
         )?;
         if &recovered_request_hash != admission.operation.binding().immutable_request_hash() {
             return Err(super::super::recovery::failure::item_failure(

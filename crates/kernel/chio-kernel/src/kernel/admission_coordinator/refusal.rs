@@ -228,8 +228,14 @@ impl ChioKernel {
         };
         let timestamp = context.trusted_time_unix_ms / 1_000;
         let extra = merge_metadata_objects(
-            response.metadata,
-            Some(serde_json::json!({ ADMISSION_RECEIPT_METADATA_KEY: metadata })),
+            original
+                .admitted_receipt_metadata()
+                .cloned()
+                .map(serde_json::Value::Object),
+            merge_metadata_objects(
+                response.metadata,
+                Some(serde_json::json!({ ADMISSION_RECEIPT_METADATA_KEY: metadata })),
+            ),
         );
         let request_metadata = request_receipt_metadata_with_payee_binding(
             request,

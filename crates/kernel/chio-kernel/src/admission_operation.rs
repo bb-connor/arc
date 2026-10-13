@@ -76,7 +76,7 @@ pub use recovery::*;
 pub use remote_projection::*;
 pub(crate) use retained_request::immutable_tool_request_hash;
 pub(crate) use retained_request::AdmissionSecurityBindingV1;
-pub use retained_request::RetainedToolAdmissionRequestV1;
+pub use retained_request::{AdmittedReceiptMetadata, RetainedToolAdmissionRequestV1};
 pub use runtime_replay::{
     RuntimeReplayParticipantKind, RuntimeReplaySourceMarkerV1, RuntimeReplaySourcePort,
     RuntimeReplaySourceSnapshotV1, MAX_RUNTIME_REPLAY_SOURCE_BYTES,

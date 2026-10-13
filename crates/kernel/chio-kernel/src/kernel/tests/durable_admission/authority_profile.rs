@@ -184,7 +184,8 @@ fn immutable_request_commits_to_every_original_profile_selection(
         }
     });
     let profile: AdmissionAuthorityProfileV1 = serde_json::from_value(wire.clone())?;
-    let actual = immutable_tool_request_hash(&request, &matching, &[], None, &profile, &signer)?;
+    let actual =
+        immutable_tool_request_hash(&request, &matching, &[], None, &profile, &signer, None)?;
     let independent = serde_json::json!({
         "schema": "chio.tool-admission-request.v1",
         "server_id": request.server_id, "tool_name": request.tool_name,
@@ -206,6 +207,7 @@ fn immutable_request_commits_to_every_original_profile_selection(
         None,
         &profile,
         &signer,
+        None,
     )?;
     let decoded = RetainedToolAdmissionRequestV1::from_canonical_bytes(retained.canonical_bytes())?;
     assert_eq!(decoded.authority_profile(), &profile);
@@ -259,7 +261,7 @@ fn immutable_request_commits_to_every_original_profile_selection(
             .ok_or("missing profile field")? = value;
         let profile: AdmissionAuthorityProfileV1 = serde_json::from_value(changed)?;
         assert_ne!(
-            immutable_tool_request_hash(&request, &matching, &[], None, &profile, &signer,)?,
+            immutable_tool_request_hash(&request, &matching, &[], None, &profile, &signer, None,)?,
             actual,
             "{pointer}"
         );
@@ -289,6 +291,7 @@ fn retained_current_profile_rejects_downgrades_duplicates_and_aliases(
         None,
         &AdmissionAuthorityProfileV1::unconfigured_for_test()?,
         &kernel.freeze_receipt_signing_identity()?,
+        None,
     )?;
     let bytes = retained.canonical_bytes();
     assert_eq!(

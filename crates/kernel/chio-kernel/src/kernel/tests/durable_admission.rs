@@ -21,6 +21,8 @@ mod unknown_incident_assertions;
 use receipt_projection::AdmissionReceiptProjectionStore;
 use unknown_incident_assertions::{assert_original_unknown_incident, assert_unknown_replay};
 
+#[path = "durable_admission/admitted_metadata.rs"]
+mod admitted_metadata;
 #[path = "durable_admission/authority_profile.rs"]
 mod authority_profile;
 #[path = "durable_admission/caller_budget_snapshot.rs"]
