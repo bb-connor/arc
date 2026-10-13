@@ -118,12 +118,11 @@ pub(crate) enum ReceiptCommands {
     },
     /// Explain why a receipt was allowed or denied.
     ///
-    /// When `--input-file` points at a `BilateralCoSignArtifacts` JSON
-    /// document (the federation signature-slice API emission with both a
-    /// `dualSignedReceipt` and a `dsseEnvelope`), the renderer auto-detects
-    /// the bilateral shape and prints both the non-section-6-conformant DualSignedReceipt
-    /// section (NON-SECTION-6-CONFORMANT per B4) and the DSSE signature-slice
-    /// section. It does not claim strict Chio DSSE section 6 predicate conformance.
+    /// When `--input-file` points at a bilateral DSSE envelope JSON
+    /// document (`payloadType`, `payload`, `signatures`), the renderer
+    /// auto-detects the envelope shape and prints the DSSE signature-slice
+    /// section. It does not claim strict Chio DSSE section 6 predicate
+    /// conformance.
     ///
     /// Pass `--inspect-bilateral` to additionally emit a structural
     /// **inspection trace** of the envelope (structural / schema checks
@@ -136,8 +135,8 @@ pub(crate) enum ReceiptCommands {
         /// bilateral artifact via `--input-file`; the receipt_id is
         /// informational for that path.
         receipt_id: String,
-        /// Optional JSON file containing one receipt, or a
-        /// `BilateralCoSignArtifacts` document.
+        /// Optional JSON file containing one receipt, or a bilateral DSSE
+        /// envelope.
         #[arg(long)]
         input_file: Option<PathBuf>,
         /// Maximum parent depth to render.

@@ -131,7 +131,6 @@ fn retained_federation_context_recovers_without_live_peer_or_new_runtime_admissi
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(admissions.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
-    assert!(kernel.dual_signed_receipt(&response.receipt.id).is_some());
     assert!(kernel
         .federation_dsse_envelope(&response.receipt.id)
         .is_some());
@@ -395,7 +394,6 @@ fn retained_federation_context_finalizing_recovery_survives_owner_rotation() -> 
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     let state = fixture.store.state.lock().map_err(|_| "test lock")?;
     let receipt = state.receipt.as_ref().ok_or("receipt")?;
-    assert!(kernel.dual_signed_receipt(&receipt.id).is_some());
     assert!(kernel.federation_dsse_envelope(&receipt.id).is_some());
     Ok(())
 }

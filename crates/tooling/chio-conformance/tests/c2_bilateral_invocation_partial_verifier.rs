@@ -1,6 +1,6 @@
 //! Drives [`chio_federation::bilateral::execute_local_bilateral_invocation_fixture`]
 //! end-to-end (NOT a mock - exercises the production
-//! `sign_dsse_envelope_full` signature-slice producer and the production partial local verifier
+//! `sign_dsse_envelope_with_cosigner` signature-slice producer and the production partial local verifier
 //! `verify_bilateral_cosign_invocation`, which covers a subset of the
 //! §7 step list), then mutates one byte at a time and asserts the
 //! verifier rejects with the correct spec §7.1 code. Coverage:
@@ -192,7 +192,7 @@ fn run_invocation_with(
 ) -> Result<chio_federation::bilateral::BilateralInvocationOutcome, BilateralInvocationError> {
     let request = LocalBilateralInvocationFixtureRequest {
         origin_kernel_id: ORG_A,
-        origin_keypair: &setup.kp_a,
+        origin_public_key: &setup.kp_a.public_key(),
         tool_host_kernel_id: ORG_B,
         tool_host_keypair: &setup.kp_b,
         receipt: setup.receipt.clone(),
@@ -280,8 +280,7 @@ fn happy_path_full_invocation_runs_end_to_end() {
     let outcome = run_default(&setup).unwrap_or_else(|e| panic!("happy path failed: {e:?}"));
     assert_eq!(outcome.verified.joint_verdict, "allow");
     assert_eq!(outcome.verified.resolved_receipt.id, setup.receipt.id);
-    // Both DualSignedReceipt and DSSE signature-slice artifacts populated.
-    assert_eq!(outcome.artifacts.dsse_envelope.signatures.len(), 2);
+    assert_eq!(outcome.dsse_envelope.signatures.len(), 2);
 }
 
 #[test]
@@ -289,7 +288,7 @@ fn full_fixture_statement_validates_against_signature_slice_schema() {
     let setup = setup();
     let outcome = run_default(&setup).unwrap_or_else(|e| panic!("happy path: {e:?}"));
     let statement_bytes = BASE64_STANDARD
-        .decode(&outcome.artifacts.dsse_envelope.payload)
+        .decode(&outcome.dsse_envelope.payload)
         .unwrap();
     let statement_json: serde_json::Value = serde_json::from_slice(&statement_bytes).unwrap();
     assert!(
@@ -348,7 +347,7 @@ fn step_7_missing_receipt_in_store_fails_with_subject_digest_mismatch() {
 fn step_7_raw_receipt_id_subject_name_fails_with_subject_digest_mismatch() {
     let setup = setup();
     let outcome = run_default(&setup).unwrap_or_else(|e| panic!("happy path: {e:?}"));
-    let mut envelope: DsseEnvelope = outcome.artifacts.dsse_envelope.clone();
+    let mut envelope: DsseEnvelope = outcome.dsse_envelope.clone();
     let (mut statement, _) = envelope.decode_statement().unwrap();
     assert_eq!(
         statement.subject[0].name,
@@ -390,7 +389,7 @@ fn steps_11_12_flipped_payload_byte_breaks_pae_preimage() {
     // Run the production flow, then mutate the envelope's payload byte
     // to break the PAE preimage and rerun the verifier directly.
     let outcome = run_default(&setup).unwrap_or_else(|e| panic!("happy path: {e:?}"));
-    let mut envelope: DsseEnvelope = outcome.artifacts.dsse_envelope.clone();
+    let mut envelope: DsseEnvelope = outcome.dsse_envelope.clone();
     // Flip the last char of payload (well-formed base64, but content
     // changes -> Statement parse fails -> dsse.malformed).
     let mut bytes = envelope.payload.into_bytes();
@@ -442,7 +441,7 @@ fn steps_11_12_flipped_payload_byte_breaks_pae_preimage() {
 fn step_11_flipped_sig_a_byte_yields_signature_server_a_invalid() {
     let setup = setup();
     let outcome = run_default(&setup).unwrap_or_else(|e| panic!("happy path: {e:?}"));
-    let mut envelope: DsseEnvelope = outcome.artifacts.dsse_envelope.clone();
+    let mut envelope: DsseEnvelope = outcome.dsse_envelope.clone();
 
     // Find the signature whose keyid matches kp_a's fingerprint and
     // flip a byte of its base64 payload (still well-formed base64 but
@@ -505,7 +504,7 @@ fn step_11_flipped_sig_a_byte_yields_signature_server_a_invalid() {
 fn step_12_flipped_sig_b_byte_yields_signature_server_b_invalid() {
     let setup = setup();
     let outcome = run_default(&setup).unwrap_or_else(|e| panic!("happy path: {e:?}"));
-    let mut envelope: DsseEnvelope = outcome.artifacts.dsse_envelope.clone();
+    let mut envelope: DsseEnvelope = outcome.dsse_envelope.clone();
     let key_b = Keyid::from_public_key(&setup.kp_b.public_key());
     let sig_b = envelope
         .signatures
@@ -872,7 +871,7 @@ fn step_16_quorum_required_with_bare_anchor_still_fails_without_quorum_proof() {
 fn co_sign_n_of_m_is_rejected_until_quorum_verification_exists() {
     let setup = setup();
     let outcome = run_default(&setup).unwrap_or_else(|e| panic!("happy path: {e:?}"));
-    let mut envelope: DsseEnvelope = outcome.artifacts.dsse_envelope.clone();
+    let mut envelope: DsseEnvelope = outcome.dsse_envelope.clone();
     let (mut statement, _) = envelope.decode_statement().unwrap();
     statement.predicate.co_sign = "n_of_m".to_string();
     envelope.payload = BASE64_STANDARD.encode(statement.canonical_bytes().unwrap());

@@ -746,18 +746,11 @@ pub struct ChioKernel {
     /// can declare peers while still using a mock cosigner in tests.
     pub(super) federation_cosigner:
         Option<Arc<dyn chio_federation::bilateral::BilateralCoSigningProtocol>>,
-    /// Locally-signed dual receipts, indexed by ChioReceipt.id.
-    /// Populated only when the post-sign hook fires successfully. Kept
-    /// in-memory; persistent storage plugs in via the federation-state
-    /// APIs already in chio-federation.
-    /// Capped, idle-swept, gauged instead of an unbounded DashMap: federated
-    /// calls no longer grow kernel RSS without bound.
-    pub(super) federation_dual_receipts:
-        Mutex<chio_bounded::BoundedMap<String, chio_federation::bilateral::DualSignedReceipt>>,
-    pub(super) federation_dual_receipts_gauge: chio_bounded::SizeGauge,
-    /// DSSE signature-slice envelopes, indexed by ChioReceipt.id.
-    /// These are emitted through the federation cosigner protocol rather than
-    /// by loading Org A private key material in the tool-host kernel.
+    /// Bilateral DSSE envelopes, indexed by ChioReceipt.id. Populated only
+    /// when the post-sign hook fires successfully. Emitted through the
+    /// federation cosigner protocol rather than by loading Org A private key
+    /// material in the tool-host kernel. Capped, idle-swept, and gauged so
+    /// federated calls do not grow kernel RSS without bound.
     pub(super) federation_dsse_envelopes:
         Mutex<chio_bounded::BoundedMap<String, chio_federation::bilateral_dsse::DsseEnvelope>>,
     pub(super) federation_dsse_envelopes_gauge: chio_bounded::SizeGauge,

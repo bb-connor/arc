@@ -45,32 +45,25 @@ fn write_artifact_fixture(dir: &std::path::Path) -> std::path::PathBuf {
     let kp_b = Keypair::generate();
     let receipt = sample_receipt(&kp_b);
     let cosigner = InProcessCoSigner::new(ORG_A_KERNEL_ID, kp_a.clone(), kp_b.public_key());
-    let artifacts = co_sign_with_origin_full(
+    let envelope = co_sign_with_origin_full(
         ORG_A_KERNEL_ID,
-        &kp_a,
+        &kp_a.public_key(),
         ORG_B_KERNEL_ID,
         &kp_b,
-        receipt,
+        &receipt,
         &cosigner,
         "file_read",
         1_736_000_000_000,
     )
-    .expect("hot path must produce both artifacts");
+    .expect("co-sign must produce the DSSE envelope");
 
-    // Hand-serialise to the snake_case shape the renderer detects. We
-    // include both halves so the renderer detection (`is_bilateral_artifacts_value`)
-    // fires unambiguously.
-    let value = serde_json::json!({
-        "dual_signed_receipt": serde_json::to_value(&artifacts.dual_signed_receipt).unwrap(),
-        "dsse_envelope": serde_json::to_value(&artifacts.dsse_envelope).unwrap(),
-    });
     let path = dir.join("bilateral.json");
-    std::fs::write(&path, serde_json::to_vec_pretty(&value).unwrap()).unwrap();
+    std::fs::write(&path, serde_json::to_vec_pretty(&envelope).unwrap()).unwrap();
     path
 }
 
 #[test]
-fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
+fn receipt_explain_bilateral_renders_dsse_and_inspection_trace() {
     let bin = env!("CARGO_BIN_EXE_chio");
     let tmp = tempfile::tempdir().expect("tempdir");
     let fixture = write_artifact_fixture(tmp.path());
@@ -103,26 +96,15 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
 
     assert_eq!(
         parsed["shape"].as_str(),
-        Some("BilateralCoSignArtifacts"),
-        "renderer must detect BilateralCoSignArtifacts shape"
+        Some("DsseEnvelope"),
+        "renderer must detect the DSSE envelope shape"
     );
     assert_eq!(
         parsed["schema"].as_str(),
         Some("chio.cli.receipt-explain.bilateral.v1"),
         "renderer must declare its own report schema"
     );
-    let dual = &parsed["dual_signed_receipt"];
-    let disclaimer = dual["non_section6_disclaimer"]
-        .as_str()
-        .expect("dual section must carry non-section-6 disclaimer string");
-    assert!(
-        disclaimer
-            .to_lowercase()
-            .contains("not section-6 conformant"),
-        "disclaimer must call out non-section-6 status: got {disclaimer}"
-    );
-
-    // (2) DSSE envelope section: section-6 binding.
+    // (1) DSSE envelope section: section-6 binding.
     let dsse = &parsed["dsse_envelope"];
     assert_eq!(
         dsse["payload_type"].as_str(),
@@ -144,7 +126,7 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
         );
     }
 
-    // (3) Bilateral inspection trace: must self-identify as inspection
+    // (2) Bilateral inspection trace: must self-identify as inspection
     // (not a verifier trace) so users do not mistake it for cryptographic
     // verification.
     let trace = &parsed["bilateral_inspection_trace"];
@@ -191,7 +173,7 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
     // type, subject arity, signature count, signature fields, keyid<->
     // predicate fingerprint binding, and predicate body schema.
     let must_be_ok = [
-        "receipt_body_present",
+        "receipt_subject_named",
         "payload_type_binding",
         "payload_base64_decodable",
         "predicate_type_recognised",
@@ -250,7 +232,7 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
 
 /// Negative path: when `--inspect-bilateral` is omitted, the renderer
 /// must NOT emit the trace (we don't want operators to think the trace
-/// ran when it didn't). The dual + DSSE sections still render.
+/// ran when it didn't). The DSSE section still renders.
 #[test]
 fn receipt_explain_bilateral_without_flag_omits_trace() {
     let bin = env!("CARGO_BIN_EXE_chio");
@@ -274,7 +256,7 @@ fn receipt_explain_bilateral_without_flag_omits_trace() {
         serde_json::from_str(stdout.trim()).expect("renderer must emit valid JSON");
     assert_eq!(
         parsed["shape"].as_str(),
-        Some("BilateralCoSignArtifacts"),
+        Some("DsseEnvelope"),
         "shape must still be detected without --inspect-bilateral"
     );
     // Trace key may exist but value must be null.
@@ -344,10 +326,6 @@ fn receipt_explain_bilateral_human_renderer_marks_section6_boundary() {
         .expect("invoke chio receipt explain");
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        stdout.contains("DualSignedReceipt"),
-        "human renderer must label the legacy section: {stdout}"
-    );
     assert!(
         stdout.contains("DSSE envelope"),
         "human renderer must label the section-6 section: {stdout}"

@@ -1,11 +1,13 @@
 //! Federation-hop metrics surfaced through the workspace
-//! `chio-metrics-spec` registry. The federation-hop boundary is wired into
-//! the workspace registry: every
-//! [`co_sign_with_origin`](crate::co_sign_with_origin) call increments
-//! [`CHIO_FEDERATION_HOP_TOTAL`] with a `result` label and observes
-//! [`CHIO_FEDERATION_HOP_LATENCY_SECONDS`] with the same label so the
-//! `chio:federation_hop_latency:histogram_quantile_p95_5m` recording rule
-//! in `deploy/prometheus/chio-recording-rules.yml` has a series to scrape.
+//! `chio-metrics-spec` registry. Every cosigner-routed DSSE co-sign
+//! ([`sign_dsse_envelope_with_cosigner`](crate::bilateral_dsse::sign_dsse_envelope_with_cosigner)
+//! and
+//! [`sign_chio_bilateral_dsse_envelope_with_cosigner`](crate::bilateral_dsse::sign_chio_bilateral_dsse_envelope_with_cosigner))
+//! increments [`CHIO_FEDERATION_HOP_TOTAL`] with a `result` label and
+//! observes [`CHIO_FEDERATION_HOP_LATENCY_SECONDS`] with the same label so
+//! the `chio:federation_hop_latency:histogram_quantile_p95_5m` recording
+//! rule in `deploy/prometheus/chio-recording-rules.yml` has a series to
+//! scrape.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -89,6 +91,20 @@ pub fn observe_federation_hop_latency_nanos(result: &str, nanos: u64) {
     }
     series.buckets[FEDERATION_HOP_BUCKET_UPPER_NANOS.len()].fetch_add(1, Ordering::Relaxed);
     record_federation_hop(result);
+}
+
+/// Run one federation hop, then record its result and latency.
+pub(crate) fn observe_federation_hop<T, E>(hop: impl FnOnce() -> Result<T, E>) -> Result<T, E> {
+    let started = std::time::Instant::now();
+    let outcome = hop();
+    let result = if outcome.is_ok() {
+        HOP_RESULT_OK
+    } else {
+        HOP_RESULT_ERROR
+    };
+    let elapsed_nanos = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+    observe_federation_hop_latency_nanos(result, elapsed_nanos);
+    outcome
 }
 
 #[must_use]

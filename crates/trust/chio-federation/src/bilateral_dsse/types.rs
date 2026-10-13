@@ -313,10 +313,7 @@ pub struct DsseEnvelope {
 }
 
 impl DsseEnvelope {
-    /// Recompute the DSSE PAE bytes that the signatures cover. Useful for
-    /// the negative conformance fixture (which compares this preimage
-    /// byte-for-byte against the `CoSigningBody` preimage used by
-    /// `DualSignedReceipt`).
+    /// Recompute the DSSE PAE bytes that the signatures cover.
     pub fn pae_bytes(&self) -> Result<Vec<u8>, BilateralCoSigningError> {
         let payload_bytes = self.decode_payload()?;
         Ok(pae(&self.payload_type, &payload_bytes))
