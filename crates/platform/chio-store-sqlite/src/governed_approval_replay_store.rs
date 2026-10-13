@@ -162,7 +162,7 @@ pub struct SqliteGovernedApprovalReplayStore {
 
 const GOVERNED_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const GOVERNED_APPROVAL_STORE_SCHEMA_KEY: &str = "governed_approval_replay";
-const GOVERNED_APPROVAL_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
+const GOVERNED_APPROVAL_STORE_ANCHOR_TABLES: &[&str] =
     &["chio_governed_approval_replay_entries"];
 
 impl SqliteGovernedApprovalReplayStore {
@@ -246,7 +246,7 @@ impl SqliteGovernedApprovalReplayStore {
             &conn,
             GOVERNED_APPROVAL_STORE_SCHEMA_KEY,
             GOVERNED_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
-            GOVERNED_APPROVAL_STORE_LEGACY_ANCHOR_TABLES,
+            GOVERNED_APPROVAL_STORE_ANCHOR_TABLES,
         )
         .map_err(|error| SqliteGovernedApprovalReplayStoreError::storage(error.to_string()))?;
         conn.execute_batch(

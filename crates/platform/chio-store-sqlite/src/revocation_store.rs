@@ -61,9 +61,8 @@ pub(crate) const REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 4;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const REVOCATION_STORE_SCHEMA_KEY: &str = "revocation";
-/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
-/// revocation database rather than reject it as foreign.
-const REVOCATION_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["revoked_capabilities"];
+/// Tables that identify a populated revocation database as this store's.
+const REVOCATION_STORE_ANCHOR_TABLES: &[&str] = &["revoked_capabilities"];
 
 impl SqliteRevocationStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, RevocationStoreError> {
@@ -126,7 +125,7 @@ impl SqliteRevocationStore {
             &connection,
             REVOCATION_STORE_SCHEMA_KEY,
             REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
-            REVOCATION_STORE_LEGACY_ANCHOR_TABLES,
+            REVOCATION_STORE_ANCHOR_TABLES,
         )
         .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
         initialize_revocation_schema(&mut connection, false)?;

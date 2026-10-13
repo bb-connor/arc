@@ -49,9 +49,8 @@ const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 4;
 const APPROVAL_STORE_SCHEMA_KEY: &str = "approval";
 /// Tables that identify a database this standalone approval store may open, all
 /// of them the store's own. `chio_hitl_pending` is the sole approval anchor.
-/// Receipt tables are deliberately excluded: a standalone receipt database (whose
-/// only tables are `chio_tool_receipts` or the pre-stamping `http_receipts` /
-/// `tool_receipts`) must be refused here rather than adopted and written with HITL
+/// Receipt tables are deliberately excluded: a standalone receipt database must be
+/// refused here rather than adopted and written with HITL
 /// tables. The sidecar co-location, where a receipt store creates the shared file
 /// first, adopts a receipt-anchored file through
 /// [`SqliteApprovalStore::open_colocated_with_receipt_store`] instead. A populated
@@ -72,12 +71,7 @@ const APPROVAL_STORE_OWN_ANCHOR_TABLES: &[&str] = &["chio_hitl_pending"];
 /// [`SqliteApprovalStore::open_colocated_with_receipt_store`]; the default
 /// [`SqliteApprovalStore::open`] keeps the strict own-anchor set so a standalone
 /// receipt database is never adopted as an approval store outside the sidecar.
-const APPROVAL_STORE_COLOCATED_ANCHOR_TABLES: &[&str] = &[
-    "chio_hitl_pending",
-    "http_receipts",
-    "tool_receipts",
-    "chio_tool_receipts",
-];
+const APPROVAL_STORE_COLOCATED_ANCHOR_TABLES: &[&str] = &["chio_hitl_pending", "chio_tool_receipts"];
 
 impl SqliteApprovalStore {
     /// Open the store at the given path. Creates the parent directory
@@ -1284,32 +1278,9 @@ mod tests {
 
     #[test]
     fn standalone_open_refuses_a_receipt_sidecar_that_colocated_open_adopts() {
-        // `chio api protect` keeps the approval store in the same file as its
-        // receipt and revocation sidecar tables, and opens the receipt store
-        // first so it owns the shared file's provenance anchor; the approval store
-        // then co-locates onto it. A database carrying only receipt (and
-        // revocation) tables and no approval anchor therefore belongs to the
-        // receipt store. The standalone approval open must refuse it rather than
-        // write HITL tables into a receipt store's file, while the dedicated
-        // co-located open adopts it as its sibling.
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("sidecar.sqlite3");
-        {
-            let conn = rusqlite::Connection::open(&path).unwrap();
-            conn.execute_batch(
-                "CREATE TABLE http_receipts (id TEXT PRIMARY KEY, receipt_json TEXT NOT NULL);
-                 CREATE TABLE tool_receipts (id TEXT PRIMARY KEY, receipt_json TEXT NOT NULL);
-                 CREATE TABLE revoked_capabilities (capability_id TEXT PRIMARY KEY);",
-            )
-            .unwrap();
-            let app_id: i32 = conn
-                .query_row("PRAGMA application_id", [], |row| row.get(0))
-                .unwrap();
-            assert_eq!(
-                app_id, 0,
-                "fixture must be unstamped like a legacy database"
-            );
-        }
+        crate::SqliteReceiptStore::open(&path).unwrap();
 
         assert!(
             SqliteApprovalStore::open(&path).is_err(),

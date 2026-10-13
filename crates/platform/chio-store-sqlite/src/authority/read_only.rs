@@ -286,7 +286,7 @@ fn validate_existing_schema(connection: &Connection) -> Result<(), AuthorityInsp
         connection,
         AUTHORITY_STORE_SCHEMA_KEY,
         AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION,
-        AUTHORITY_STORE_LEGACY_ANCHOR_TABLES,
+        AUTHORITY_STORE_ANCHOR_TABLES,
     )
     .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
     if version != AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION {

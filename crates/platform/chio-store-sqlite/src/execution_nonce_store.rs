@@ -181,8 +181,7 @@ const EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const EXECUTION_NONCE_STORE_SCHEMA_KEY: &str = "execution_nonce";
-/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
-/// execution-nonce database rather than reject it as foreign.
+/// Tables that identify a populated execution-nonce database as this store's.
 const EXECUTION_NONCE_STORE_ANCHOR_TABLES: &[&str] = &["chio_execution_nonces"];
 
 impl SqliteExecutionNonceStore {

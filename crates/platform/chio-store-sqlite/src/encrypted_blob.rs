@@ -368,9 +368,8 @@ const ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const ENCRYPTED_BLOB_STORE_SCHEMA_KEY: &str = "encrypted_blob";
-/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
-/// encrypted-blob database rather than reject it as foreign.
-const ENCRYPTED_BLOB_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
+/// Tables that identify a populated encrypted-blob database as this store's.
+const ENCRYPTED_BLOB_STORE_ANCHOR_TABLES: &[&str] =
     &["chio_encrypted_blobs", "security_transitions"];
 
 impl SqliteEncryptedBlobStore {
@@ -429,7 +428,7 @@ impl SqliteEncryptedBlobStore {
             &conn,
             ENCRYPTED_BLOB_STORE_SCHEMA_KEY,
             ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION,
-            ENCRYPTED_BLOB_STORE_LEGACY_ANCHOR_TABLES,
+            ENCRYPTED_BLOB_STORE_ANCHOR_TABLES,
         )
         .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?;
         conn.execute_batch(
