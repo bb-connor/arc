@@ -113,7 +113,7 @@ fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_exp
         ));
     }
     let connection = rusqlite::Connection::open(&ledger_path)?;
-    let custody: (u64, u64) = connection.query_row(
+    let custody: (i64, i64) = connection.query_row(
         "SELECT (SELECT count(*) FROM caller_executor_claims),
                 (SELECT count(*) FROM caller_executor_reports)",
         [],

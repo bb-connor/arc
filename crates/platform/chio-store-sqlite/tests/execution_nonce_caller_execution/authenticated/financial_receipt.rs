@@ -1,6 +1,7 @@
 use super::*;
 use chio_core::capability::scope::{ChioScope, MonetaryAmount, Operation, ToolGrant};
-use chio_kernel::{BudgetStore, FinancialReceiptMetadata, ToolInvocationCost};
+use chio_core::receipt::economics::FinancialReceiptMetadata;
+use chio_kernel::{BudgetStore, ToolInvocationCost};
 
 #[test]
 fn signed_financial_receipts_bind_the_ceiling_and_all_committed_exposure() -> TestResult {

@@ -1,6 +1,7 @@
 use super::*;
 use chio_core::capability::scope::MonetaryAmount;
-use chio_kernel::{BudgetStore, FinancialReceiptMetadata, SettlementStatus, ToolInvocationCost};
+use chio_core::receipt::economics::{FinancialReceiptMetadata, SettlementStatus};
+use chio_kernel::{BudgetStore, ToolInvocationCost};
 
 fn monetary_siblings(fixture: &Fixture, runtime: &mut Runtime) -> TestResult<Siblings> {
     let parent_scope = ChioScope {
@@ -115,7 +116,7 @@ fn assert_payment(fixture: &Fixture, expected_state: &str) -> TestResult {
         fixture.directory.path().join("local-payments.db"),
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
     )?;
-    let payment: (u64, String, u64) = connection.query_row(
+    let payment: (i64, String, i64) = connection.query_row(
         "SELECT count(*), min(state), sum(amount_units) FROM chio_finding_operator_payments",
         [],
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),

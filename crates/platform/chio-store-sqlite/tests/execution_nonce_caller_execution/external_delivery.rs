@@ -132,7 +132,7 @@ fn altered_start_authorization_cannot_claim_or_execute() -> TestResult {
     ));
     assert_eq!(effects.load(Ordering::SeqCst), 0);
     let connection = rusqlite::Connection::open(&ledger_path)?;
-    let claims: u64 =
+    let claims: i64 =
         connection.query_row("SELECT count(*) FROM caller_executor_claims", [], |row| {
             row.get(0)
         })?;
