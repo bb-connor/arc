@@ -249,7 +249,7 @@ impl ChioMcpEdge {
             json!({
                 "supportedProtocolVersions": SUPPORTED_MCP_PROTOCOL_VERSIONS,
                 "selectedProtocolVersion": selected_protocol_version,
-                "compatibility": "exact_match",
+                "compatibility": "server_selected",
                 "downgradeBehavior": "reject",
                 "errorRegistry": {
                     "schema": CHIO_ERROR_REGISTRY_SCHEMA,
