@@ -5,14 +5,8 @@ use chio_test_support::prelude::*;
 fn scheduler_fence_rejects_token_without_owner() {
     for token in [1, 9, u64::MAX] {
         let mut current = None;
-        let error = validate_response_scheduler_fence(
-            None,
-            Some(token),
-            false,
-            &mut current,
-            &mut 0,
-        )
-        .test_expect_err("a fencing token requires its owner");
+        let error = validate_response_scheduler_fence(None, Some(token), false, &mut current)
+            .test_expect_err("a fencing token requires its owner");
         assert!(matches!(
             error,
             Error::CanonicalJson(message)
@@ -39,7 +33,6 @@ fn receipt_backed_effect_rejects_token_without_owner() {
         },
         ResponseEffectReceiptOrderState {
             scheduler_fence: &mut scheduler_fence,
-            highest_legacy_scheduler_fencing_token: &mut 0,
             effect_generations: &mut effect_generations,
             receipt_backed_effects: &mut receipt_backed_effects,
         },
@@ -61,14 +54,8 @@ fn scheduler_fence_accepts_bound_lease_and_strict_takeover() {
     let successor = LeaseOwnerId::new("worker-2").test_expect("valid successor");
     let mut current = None;
     for (lease_owner, token) in [(&owner, 9), (&owner, 9), (&successor, 10)] {
-        validate_response_scheduler_fence(
-            Some(lease_owner),
-            Some(token),
-            true,
-            &mut current,
-            &mut 0,
-        )
-        .test_expect("owner-bound fence is valid");
+        validate_response_scheduler_fence(Some(lease_owner), Some(token), true, &mut current)
+            .test_expect("owner-bound fence is valid");
         assert_eq!(current, Some((lease_owner.clone(), token)));
     }
 }
@@ -79,14 +66,9 @@ fn scheduler_fence_rejects_equal_token_takeover_and_regression() {
     let successor = LeaseOwnerId::new("worker-2").test_expect("valid successor");
     for (lease_owner, token) in [(&owner, 8), (&successor, 9), (&successor, 8)] {
         let mut current = Some((owner.clone(), 9));
-        let error = validate_response_scheduler_fence(
-            Some(lease_owner),
-            Some(token),
-            true,
-            &mut current,
-            &mut 0,
-        )
-        .test_expect_err("takeover and renewal cannot regress the fence");
+        let error =
+            validate_response_scheduler_fence(Some(lease_owner), Some(token), true, &mut current)
+                .test_expect_err("takeover and renewal cannot regress the fence");
         assert!(matches!(
             error,
             Error::CanonicalJson(message)

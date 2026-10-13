@@ -1,7 +1,10 @@
 use chio_security_types::ports::{
     CreateOutcome, RecordId, ResponseCasRequest, ResponseEffectCasRequest, ResponseEffectKey,
     ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord, ResponseReceiptCursor,
-    ResponseReceiptCursorCasRequest, ResponseStore, ScheduledWork, SchedulerClaimRequest,
+    ResponseReceiptCursorCasRequest, ResponseScheduledMutationCasRequest, ResponseSchedulerStore,
+    ResponseStore, ScheduledWork, SchedulerClaimRequest, SchedulerHealthAckRequest,
+    SchedulerLeaseReleaseRequest, SchedulerLeaseRenewRequest, SchedulerRetryRequest,
+    SchedulerRetryState, SchedulerWorkKey,
 };
 use chio_security_types::ports::{PortError, PortResult};
 use std::collections::BTreeMap;
@@ -11,18 +14,34 @@ use std::sync::{Mutex, MutexGuard};
 struct State {
     plan: Option<ResponsePlanRecord>,
     transitions: BTreeMap<String, ResponseCasRequest>,
+    scheduled_transitions: BTreeMap<String, ResponseScheduledMutationCasRequest>,
+    work: Option<ScheduledWork>,
     effects: BTreeMap<String, ResponseEffectRecord>,
     effect_transitions: BTreeMap<String, ResponseEffectCasRequest>,
     receipt_cursor: Option<ResponseReceiptCursor>,
     receipt_cursor_transitions: BTreeMap<String, ResponseReceiptCursorCasRequest>,
 }
 
-#[derive(Default)]
 pub struct TestResponseStore {
     state: Mutex<State>,
 }
 
+impl Default for TestResponseStore {
+    fn default() -> Self {
+        Self::with_work(None)
+    }
+}
+
 impl TestResponseStore {
+    pub fn with_work(work: Option<ScheduledWork>) -> Self {
+        Self {
+            state: Mutex::new(State {
+                work,
+                ..State::default()
+            }),
+        }
+    }
+
     fn state(&self) -> PortResult<MutexGuard<'_, State>> {
         self.state.lock().map_err(|_| PortError::unavailable())
     }
@@ -212,6 +231,83 @@ impl ResponseStore for TestResponseStore {
 
     fn claim_due(&self, _request: &SchedulerClaimRequest) -> PortResult<Vec<ScheduledWork>> {
         Ok(Vec::new())
+    }
+}
+
+impl ResponseSchedulerStore for TestResponseStore {
+    fn load_retry(&self, _key: &SchedulerWorkKey) -> PortResult<Option<SchedulerRetryState>> {
+        Err(PortError::unavailable())
+    }
+
+    fn validate_lease(&self, work: &ScheduledWork) -> PortResult<()> {
+        if self.state()?.work.as_ref() != Some(work) {
+            return Err(PortError::conflict());
+        }
+        Ok(())
+    }
+
+    fn compare_and_swap_scheduled_mutation(
+        &self,
+        request: &ResponseScheduledMutationCasRequest,
+    ) -> PortResult<ResponsePlanRecord> {
+        let mut state = self.state()?;
+        if state.work.as_ref() != Some(&request.work) {
+            return Err(PortError::conflict());
+        }
+        if let Some(existing) = state
+            .scheduled_transitions
+            .get(request.transition_id.as_str())
+        {
+            if existing != request {
+                return Err(PortError::conflict());
+            }
+            return Ok(request.candidate.clone());
+        }
+        let current = state.plan.as_ref().ok_or_else(PortError::invalid_data)?;
+        if current != &request.current
+            || current.tenant_id != request.work.tenant_id
+            || current.action_id != request.work.action_id
+            || current.tenant_id != request.candidate.tenant_id
+            || current.action_id != request.candidate.action_id
+            || request.candidate.generation != current.generation.saturating_add(1)
+            || state
+                .transitions
+                .contains_key(request.transition_id.as_str())
+        {
+            return Err(PortError::conflict());
+        }
+        state.transitions.insert(
+            request.transition_id.as_str().to_owned(),
+            ResponseCasRequest {
+                record: request.candidate.clone(),
+                expected_generation: request.current.generation,
+                transition_id: request.transition_id.clone(),
+            },
+        );
+        state
+            .scheduled_transitions
+            .insert(request.transition_id.as_str().to_owned(), request.clone());
+        state.plan = Some(request.candidate.clone());
+        Ok(request.candidate.clone())
+    }
+
+    fn renew_lease(&self, _request: &SchedulerLeaseRenewRequest) -> PortResult<ScheduledWork> {
+        Err(PortError::unavailable())
+    }
+
+    fn record_retry(&self, _request: &SchedulerRetryRequest) -> PortResult<SchedulerRetryState> {
+        Err(PortError::unavailable())
+    }
+
+    fn acknowledge_health_event(
+        &self,
+        _request: &SchedulerHealthAckRequest,
+    ) -> PortResult<SchedulerRetryState> {
+        Err(PortError::unavailable())
+    }
+
+    fn release_lease(&self, _request: &SchedulerLeaseReleaseRequest) -> PortResult<()> {
+        Err(PortError::unavailable())
     }
 }
 

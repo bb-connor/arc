@@ -205,12 +205,6 @@ fn generated_active_defense_types_decode_reencode_and_reject() {
             "/../../../tests/bindings/vectors/security/active-defense/positive/effect-transition-receipt-body-v1.json"
         )));
     assert_generated_round_trip::<
-        generated::security_effect_transition_receipt_body_v1::ChioEffectTransitionReceiptBodyV1,
-    >(include_bytes!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../../tests/bindings/vectors/security/active-defense/positive/effect-transition-receipt-body-legacy-v1.json"
-        )));
-    assert_generated_round_trip::<
         generated::security_detector_health_receipt_body_v1::ChioDetectorHealthReceiptBodyV1,
     >(include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
