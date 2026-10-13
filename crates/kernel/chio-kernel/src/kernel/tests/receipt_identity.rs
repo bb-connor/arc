@@ -34,7 +34,14 @@ fn caller_cannot_supply_receipt_namespace_or_disposition() {
                 "request_namespace_digest": "caller-selected", "identity_disposition": "reusable"
             }})),
         );
-        assert!(result.is_err(), "caller metadata key {key} must be refused");
+        assert!(
+            matches!(
+                &result,
+                Err(KernelError::InvalidReceiptMetadata(message))
+                    if message.starts_with(&format!("{key} is reserved for "))
+            ),
+            "caller metadata key {key} must be refused: {result:?}"
+        );
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
         assert!(kernel.receipt_log().is_empty());
     }

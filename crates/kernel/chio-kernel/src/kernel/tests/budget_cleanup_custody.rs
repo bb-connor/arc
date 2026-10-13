@@ -1,6 +1,17 @@
 use super::*;
 use crate::budget_store::{BudgetHoldAuthorizationRecord, BudgetHoldCleanupCustody};
 
+fn assert_cleanup_custody_refused(error: &KernelError) {
+    assert!(
+        matches!(
+            error,
+            KernelError::BudgetStore(crate::budget_store::BudgetStoreError::Invariant(message))
+                if message.contains("requires fresh custody")
+        ),
+        "{error:?}"
+    );
+}
+
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 /// A bool-returning backend that inherits the default rich authorization method.
@@ -205,8 +216,13 @@ fn exercise_cleanup(replay: bool, legacy: bool) -> TestResult {
         assert!(evidence.is_some());
         assert_eq!(released.load(Ordering::SeqCst), 1);
     } else {
-        assert!(outcome.is_err());
-        assert!(kernel.reverse_budget_charge(&cap.id, &charge).is_err());
+        let failure = outcome.expect_err("non-fresh custody must refuse cleanup");
+        assert_cleanup_custody_refused(&failure.error);
+        assert_cleanup_custody_refused(
+            &kernel
+                .reverse_budget_charge(&cap.id, &charge)
+                .expect_err("non-fresh custody must refuse reversal"),
+        );
         assert_eq!(released.load(Ordering::SeqCst), 0);
     }
     assert_eq!(refunded.load(Ordering::SeqCst), 0);

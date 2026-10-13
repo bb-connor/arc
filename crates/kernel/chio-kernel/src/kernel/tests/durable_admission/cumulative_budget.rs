@@ -219,9 +219,11 @@ fn exercise_cumulative_approval(
             charge.cleanup_custody,
             crate::budget_store::BudgetHoldCleanupCustody::Unknown
         );
-        assert!(kernel
-            .reverse_budget_charge(&approved.capability.id, charge)
-            .is_err());
+        assert!(matches!(
+            kernel.reverse_budget_charge(&approved.capability.id, charge),
+            Err(KernelError::BudgetStore(crate::budget_store::BudgetStoreError::Invariant(message)))
+                if message.contains("requires fresh custody")
+        ));
         assert_eq!(
             admission.operation().state(),
             AdmissionOperationState::BudgetAuthorized
