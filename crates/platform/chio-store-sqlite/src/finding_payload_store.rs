@@ -121,7 +121,9 @@ impl SqliteFindingPayloadStore {
             fs::create_dir_all(parent)?;
         }
         let manager = SqliteConnectionManager::file(path).with_init(configure_pooled_connection);
-        let pool = Pool::builder().max_size(8).build(manager)?;
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(8)
+            .build(manager)?;
         let store = Self {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
@@ -139,7 +141,9 @@ impl SqliteFindingPayloadStore {
         clock: Arc<dyn Clock>,
     ) -> Result<Self, FindingPayloadStoreError> {
         let manager = SqliteConnectionManager::memory().with_init(configure_pooled_connection);
-        let pool = Pool::builder().max_size(1).build(manager)?;
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(1)
+            .build(manager)?;
         let store = Self {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),

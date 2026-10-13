@@ -409,7 +409,10 @@ mod tests {
         // Construct a pool directly so the test does not require a
         // sibling receipt store.
         let manager = SqliteConnectionManager::file(path);
-        let pool = Pool::builder().max_size(2).build(manager).unwrap();
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(2)
+            .build(manager)
+            .unwrap();
         // Leak the tempdir so the file outlives the test.
         std::mem::forget(dir);
         SqliteIouEnvelopeStore::open_with_pool(pool).unwrap()
@@ -445,7 +448,7 @@ mod tests {
         let directory = tempdir().unwrap();
         let path = directory.path().join("signed-iou.sqlite");
         let open = || {
-            let pool = Pool::builder()
+            let pool = crate::pool::sqlite_pool_builder()
                 .max_size(2)
                 .build(SqliteConnectionManager::file(&path))
                 .unwrap();
