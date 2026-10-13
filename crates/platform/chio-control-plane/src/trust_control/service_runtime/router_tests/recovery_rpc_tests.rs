@@ -1,5 +1,8 @@
 //! Actual authenticated recovery RPCs over a private temporary joint authority.
 use super::*;
+
+#[path = "recovery_rpc_tests/retained_requests.rs"]
+mod retained_requests;
 use chio_kernel::admission_operation::{
     AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingInputV1,
     AdmissionOperationBindingV1, AdmissionOperationKind, AdmissionOperationStore,
