@@ -7,8 +7,8 @@ status = "active"
 scenario_count = 72
 scenario_root = "scenarios"
 scenario_index_algorithm = "sha256(relative-path-tab-file-sha256-newline)"
-scenario_index_hash = "sha256:c24bec3f743ba830fedfd3141e8deb38b30c900fca649d0e273287f46299e7e3"
-corpus_sha256 = "c24bec3f743ba830fedfd3141e8deb38b30c900fca649d0e273287f46299e7e3"
+scenario_index_hash = "sha256:b100a9abb82a97adcf2119abfec207ab251e720f86d48e0f0d524e855062b19a"
+corpus_sha256 = "b100a9abb82a97adcf2119abfec207ab251e720f86d48e0f0d524e855062b19a"
 
 [corpus.categories]
 capability_subset = 12
