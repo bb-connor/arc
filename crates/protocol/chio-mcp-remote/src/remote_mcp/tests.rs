@@ -32,6 +32,37 @@ mod session_runtime;
 #[path = "tests/terminal_reason.rs"]
 mod terminal_reason;
 
+/// The default clock moved forward by a test-controlled offset.
+#[derive(Debug)]
+pub(crate) struct OffsetClock {
+    base: RemoteClock,
+    offset_millis: AtomicU64,
+}
+
+impl OffsetClock {
+    pub(crate) fn new() -> Arc<Self> {
+        Arc::new(Self {
+            base: RemoteClock::default(),
+            offset_millis: AtomicU64::new(0),
+        })
+    }
+
+    pub(crate) fn advance_millis(&self, millis: u64) {
+        self.offset_millis.fetch_add(millis, Ordering::SeqCst);
+    }
+}
+
+impl Clock for OffsetClock {
+    fn read(&self) -> Result<chio_security_types::clock::ClockReading, ClockError> {
+        let base = self.base.read()?;
+        let offset = self.offset_millis.load(Ordering::SeqCst);
+        Ok(chio_security_types::clock::ClockReading::new(
+            base.unix_millis().checked_add(offset)?,
+            base.monotonic().checked_add_millis(offset)?,
+        ))
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct TestNativeLaunchFactory;
 

@@ -104,23 +104,6 @@ struct Hosted {
 /// How far the clock cases move past the 300 second capability TTL.
 const PAST_CAPABILITY_TTL_MILLIS: u64 = 301_000;
 
-/// The default clock moved forward by a test-controlled offset.
-struct OffsetClock {
-    base: RemoteClock,
-    offset_millis: AtomicU64,
-}
-
-impl Clock for OffsetClock {
-    fn read(&self) -> Result<ClockReading, ClockError> {
-        let base = self.base.read()?;
-        let offset = self.offset_millis.load(Ordering::SeqCst);
-        Ok(ClockReading::new(
-            base.unix_millis().checked_add(offset)?,
-            base.monotonic().checked_add_millis(offset)?,
-        ))
-    }
-}
-
 impl Hosted {
     fn new(label: &str) -> Result<Self, Box<dyn std::error::Error>> {
         Self::with_clock(label, None)
@@ -340,10 +323,7 @@ async fn a_subscription_that_fails_re_authorization_terminates_the_session(
 }
 
 fn controlled_clock() -> (Arc<OffsetClock>, RemoteClock) {
-    let source = Arc::new(OffsetClock {
-        base: RemoteClock::default(),
-        offset_millis: AtomicU64::new(0),
-    });
+    let source = OffsetClock::new();
     let clock = RemoteClock::new(source.clone());
     (source, clock)
 }
@@ -438,9 +418,7 @@ async fn a_quiet_subscription_ends_when_its_capability_expires(
         Some(RemoteSessionEntry::Active(_))
     ));
 
-    source
-        .offset_millis
-        .store(PAST_CAPABILITY_TTL_MILLIS, Ordering::SeqCst);
+    source.advance_millis(PAST_CAPABILITY_TTL_MILLIS);
     ledger.cleanup_due_sessions().await?;
     assert_eq!(
         hosted.terminal(&session.session_id)?.terminal_reason,
@@ -466,9 +444,7 @@ async fn authority_that_lapses_during_the_restore_persist_is_never_served(
 
     restore_persisted_sessions(&hosted.path, &keyring, &ledger, |record| {
         let restored = hosted.factory.restore_session(record);
-        source
-            .offset_millis
-            .store(PAST_CAPABILITY_TTL_MILLIS, Ordering::SeqCst);
+        source.advance_millis(PAST_CAPABILITY_TTL_MILLIS);
         restored
     })
     .await?;
