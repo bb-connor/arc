@@ -59,35 +59,18 @@ pub(in crate::admission_operation_store) struct SemanticRefusedInputOriginData {
 }
 
 impl SemanticRefusedInputOriginData {
-    pub(in crate::admission_operation_store) fn native_authority(
-        &self,
-    ) -> &NativeSecurityAuthorityBindingV1 {
-        &self.body.native_authority
-    }
 
-    pub(in crate::admission_operation_store) fn source_key(&self) -> &FlowStateKey {
-        self.body.input.key()
-    }
 
-    pub(in crate::admission_operation_store) fn operation_id(&self) -> &AdmissionOperationId {
-        &self.body.operation
-    }
 
     pub(in crate::admission_operation_store) fn source_label(&self) -> &InformationLabel {
         &self.body.source_label
     }
 
-    pub(in crate::admission_operation_store) fn influence(&self) -> &ArtifactInfluenceV1 {
-        &self.influence
-    }
 
     pub(in crate::admission_operation_store) fn canonical_origin(&self) -> &CanonicalBytes {
         &self.canonical
     }
 
-    pub(in crate::admission_operation_store) fn selected_source_cut(&self) -> u64 {
-        self.body.selected_source_cut.get()
-    }
 
     /// These are data relationships. The separate native writer must prove
     /// its actual Input record, fresh global receipt, source cut and phase owner.

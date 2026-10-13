@@ -26,13 +26,7 @@ pub(in crate::admission_operation_store) struct HistoricalProtectedSourceData {
 }
 
 impl HistoricalProtectedSourceData {
-    pub(in crate::admission_operation_store) fn record_key(&self) -> &str {
-        &self.record_key
-    }
 
-    pub(in crate::admission_operation_store) fn global_commit_sequence(&self) -> u64 {
-        self.global_commit_sequence.get()
-    }
 }
 
 impl ProtectedSourceReference {
@@ -77,80 +71,6 @@ impl ProtectedSourceReference {
     }
 }
 
-/// Compare historical data at the original source cut. The caller separately
-/// authenticates the owning journal and global prefix. This never returns a
-/// current source reference, mutation owner or permission to append.
-pub(in crate::admission_operation_store) fn matches_historical_source_payload_at_cut(
-    tx: &Connection,
-    data: &HistoricalProtectedSourceData,
-    expected_key: &str,
-    expected_scope: &str,
-    expected_kind: &str,
-    canonical_payload: &[u8],
-    source_cut: u64,
-) -> Result<bool, AdmissionOperationStoreError> {
-    if expected_key.is_empty()
-        || expected_key.len() > 512
-        || expected_scope.len() != 64
-        || !matches!(expected_kind, "command" | "deployment")
-        || data.record_key != expected_key
-        || data.scope_key != expected_scope
-        || data.kind != expected_kind
-        || data.version.get() == 0
-        || data.event_sequence.get() == 0
-        || data.global_commit_sequence.get() == 0
-        || data.global_commit_sequence.get() > source_cut
-    {
-        return Ok(false);
-    }
-    let _: serde_json::Value = decode(canonical_payload)?;
-    let (digest, commit) = historical_record_reference(tx, expected_key, data.version.get())?;
-    let (sequence, retained_digest): (i64, String) = tx
-        .query_row(
-            "SELECT sequence,record_digest FROM main.admission_operation_recovery_events
-             WHERE record_key=?1 AND record_version=?2",
-            params![
-                expected_key,
-                i64::try_from(data.version.get())
-                    .map_err(|_| invariant("historical source version exhausted"))?
-            ],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .map_err(sqlite_error)?;
-    let latest: Option<i64> = tx
-        .query_row(
-            "SELECT projection_sequence FROM main.authority_global_commits
-             WHERE projection_kind='recovery' AND projection_key=?1
-               AND commit_sequence<=?2
-             ORDER BY commit_sequence DESC LIMIT 1",
-            params![
-                expected_key,
-                i64::try_from(source_cut)
-                    .map_err(|_| invariant("historical source cut exhausted"))?
-            ],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(sqlite_error)?;
-    Ok(latest
-        .map(|version| stored_u64(version, "historical selected source version"))
-        .transpose()?
-        == Some(data.version.get())
-        && stored_u64(sequence, "historical selected source event")? == data.event_sequence.get()
-        && commit == data.global_commit_sequence.get()
-        && retained_digest == digest
-        && digest == hex::encode(data.record_digest.as_bytes())
-        && digest
-            == record_digest(
-                expected_key,
-                expected_scope,
-                expected_kind,
-                data.version.get(),
-                canonical_payload,
-                None,
-                None,
-            )?)
-}
 
 pub(in crate::admission_operation_store) fn source_reference(
     tx: &Connection,

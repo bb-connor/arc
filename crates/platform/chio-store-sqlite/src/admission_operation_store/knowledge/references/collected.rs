@@ -24,11 +24,6 @@ pub(in crate::admission_operation_store) fn collected_publication_closure<'tx, '
 }
 
 impl<'tx, 'conn> CollectedPublicationReferenceClosure<'tx, 'conn> {
-    pub(in crate::admission_operation_store) fn authenticated_sources(
-        &self,
-    ) -> &[protected::ProtectedSourceReference] {
-        &self.sources
-    }
 
     pub(in crate::admission_operation_store) fn verify_current(
         &self,

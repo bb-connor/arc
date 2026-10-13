@@ -20,7 +20,6 @@ pub(crate) use output::NativeOutputJoinAuthority;
 pub(super) mod knowledge;
 pub(crate) use knowledge::NativeKnowledgeJoinAuthority;
 mod finishing_funding;
-pub(in crate::admission_operation_store) mod finishing_plan;
 mod history;
 #[cfg(feature = "admission-test-support")]
 mod image_visit_test_support;

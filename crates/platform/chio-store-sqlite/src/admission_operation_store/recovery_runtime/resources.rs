@@ -5,16 +5,6 @@ use super::*;
 
 const MIB: u64 = 1024 * 1024;
 
-mod physical_liability;
-pub(in crate::admission_operation_store) use physical_liability::{
-    physical_command_write_profile, price_native_knowledge_join_liability,
-    price_native_tool_outcome_phases, price_protected_command_liability,
-    price_raw_custody_liability, raw_custody_price_algorithm_fingerprint,
-    require_intake_preserving_liability, require_progress_preserving_liability,
-    tool_outcome_price_algorithm_fingerprint, NativeKnowledgeJoinPriceData,
-    PhysicalCommandWriteProfileData, PhysicalLiabilityData, ProtectedCommandLiabilityPlan,
-    ToolOutcomeTransactionPriceData,
-};
 
 #[cfg(test)]
 mod pressure_tests;

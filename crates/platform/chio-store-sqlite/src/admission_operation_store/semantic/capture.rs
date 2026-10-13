@@ -17,20 +17,6 @@ impl SemanticCaptureWitness {
         self.verified.valid_until_unix_ms
     }
 
-    /// Classify the status channel before any provider branch is observable.
-    /// This is available only after the pure and owning native checks succeeded.
-    pub(in crate::admission_operation_store) fn withheld_status_audience(
-        &self,
-    ) -> Option<&chio_security_types::InformationLabel> {
-        if self.record.invocation.action.output != SemanticOutputDispositionV1::Withhold {
-            return None;
-        }
-        self.record
-            .contract
-            .withheld_status
-            .as_ref()
-            .map(|status| &status.audience)
-    }
 }
 fn spent_key(
     scope: &RecoveryScopeV1,

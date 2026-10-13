@@ -30,11 +30,6 @@ impl<'tx, 'conn> KnowledgeReferenceColdActivation<'tx, 'conn> {
         Ok(activation)
     }
 
-    pub(in crate::admission_operation_store) fn baseline(
-        &self,
-    ) -> &VerifiedKnowledgeReferenceAccountBaseline<'tx, 'conn> {
-        &self.baseline
-    }
 
     /// A receipt is privately minted by a bounded account or exact cold index
     /// writer. It verifies every staged row identity and footprint, not just

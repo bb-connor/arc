@@ -53,31 +53,6 @@ fn seal_sweep_key(
     ))
 }
 
-/// Exact immutable collection acknowledgment, independent of a producer's
-/// current execution profile. Missing or shared legacy custody stays live.
-pub(super) fn publication_collection_source(
-    tx: &Connection,
-    record: &NativeArtifactRecordV1,
-) -> Result<Option<protected::ProtectedSourceReference>, AdmissionOperationStoreError> {
-    if record.state != ArtifactPublicationStateV1::Retired {
-        return Ok(None);
-    }
-    let Some(seal) = &record.seal else {
-        // A crash before recording the broker seal can leave an orphan object.
-        // An absent envelope field does not prove its physical collection.
-        return Ok(None);
-    };
-    let key = publication_sweep_key(record, seal)?;
-    let Some(row) = protected::raw_checked(tx, &key)? else {
-        return Ok(None);
-    };
-    let source = protected::source_reference(tx, &key)?;
-    if row.kind != "command" || row.scope != scope_key(&record.metadata.scope)? {
-        return Err(refused("collection source changed its scope"));
-    }
-    let sweep: SweepRecord = protected::decode(&row.payload)?;
-    Ok((sweep.seal == *seal && sweep.state == SweepState::Collected).then_some(source))
-}
 
 fn publication_sweep_key(
     record: &NativeArtifactRecordV1,

@@ -46,12 +46,6 @@ impl RestoreReferenceSource {
     pub(in crate::admission_operation_store::knowledge) fn scope(&self) -> &RecoveryScopeV1 {
         self.material.scope()
     }
-    pub(in crate::admission_operation_store::knowledge) fn checkpoint(&self) -> &CheckpointId {
-        self.material.checkpoint()
-    }
-    pub(in crate::admission_operation_store::knowledge) fn revision(&self) -> u64 {
-        self.material.revision()
-    }
     pub(in crate::admission_operation_store::knowledge) fn envelope(
         &self,
     ) -> &CanonicalPayloadDigest {
@@ -61,9 +55,6 @@ impl RestoreReferenceSource {
         &self,
     ) -> &[ArtifactVersionRefV1] {
         self.material.references()
-    }
-    pub(in crate::admission_operation_store::knowledge) fn request(&self) -> &RequestId {
-        &self.request
     }
     pub(in crate::admission_operation_store::knowledge) fn release(&self) -> &ReleaseId {
         &self.release
