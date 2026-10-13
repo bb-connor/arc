@@ -297,3 +297,35 @@ fn a_v37_store_migrates_to_an_empty_stop_chain() {
         .unwrap();
     assert_eq!(version, 38);
 }
+
+#[test]
+fn a_store_stamped_past_v38_is_refused() {
+    let fixture = fixture();
+    let database = fixture.database.clone();
+    let Fixture {
+        _temp,
+        lock_root,
+        authority,
+        store,
+        ..
+    } = fixture;
+    drop(store);
+    drop(authority);
+    Connection::open(&database)
+        .unwrap()
+        .execute(
+            "UPDATE chio_store_schema_versions SET version = 39
+              WHERE store_key = 'admission_operation'",
+            [],
+        )
+        .unwrap();
+    let Err(error) = crate::test_authority::open_serving(&database, &lock_root) else {
+        panic!("a store stamped past v38 must not open");
+    };
+    assert!(
+        error.to_string().contains(
+            "database schema version 39 is newer than this binary supports (38); refusing to open"
+        ),
+        "{error}"
+    );
+}
