@@ -28,6 +28,11 @@ pub enum BudgetStoreError {
         actual_epoch: Option<u64>,
     },
 
+    #[error(
+        "database schema version {found} is not the current schema version {current}; refusing to open"
+    )]
+    StaleSchema { found: i32, current: i32 },
+
     #[error("budget state invariant violated: {0}")]
     Invariant(String),
 
@@ -644,13 +649,6 @@ impl BudgetHoldDispositionView {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ReservedHoldEnvelope {
-    pub budget_total: Option<u64>,
-    pub delegation_depth: u32,
-    pub root_budget_holder: String,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BudgetHoldSnapshot {
     pub hold_id: String,
@@ -659,12 +657,6 @@ pub struct BudgetHoldSnapshot {
     pub authorized_exposure_units: u64,
     pub remaining_exposure_units: u64,
     pub disposition: BudgetHoldDispositionView,
-    pub reserved_until: Option<i64>,
-    pub reserved_currency: Option<String>,
-    pub reserved_payment_reference: Option<String>,
-    pub reserved_budget_total: Option<u64>,
-    pub reserved_delegation_depth: Option<u32>,
-    pub reserved_root_budget_holder: Option<String>,
     pub authority: Option<BudgetEventAuthority>,
 }
 
@@ -1096,20 +1088,6 @@ pub trait BudgetStore: Send + Sync {
         Ok(0)
     }
 
-    fn list_open_delegated_reserved_hold_ids(
-        &self,
-    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
-        Ok(None)
-    }
-
-    fn request_id_has_reserved_hold(
-        &self,
-        request_id: &str,
-    ) -> Result<Option<bool>, BudgetStoreError> {
-        let _ = request_id;
-        Ok(None)
-    }
-
     /// Authoritative recovery lookup. `None` means the store established that
     /// the hold is absent; unsupported or unavailable reads must return an error.
     fn get_budget_hold(
@@ -1120,37 +1098,6 @@ pub trait BudgetStore: Send + Sync {
         Err(BudgetStoreError::Invariant(
             "budget store does not support authoritative hold lookup".to_owned(),
         ))
-    }
-
-    fn mark_hold_reserved(
-        &self,
-        _hold_id: &str,
-        _reserved_until_unix_secs: i64,
-        _currency: &str,
-        _payment_reference: Option<&str>,
-        _envelope: &ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "budget store does not support durable monetary hold reservation".to_string(),
-        ))
-    }
-
-    fn reserve_invocation_hold(
-        &self,
-        _hold_id: &str,
-        _capability_id: &str,
-        _grant_index: usize,
-        _reserved_until_unix_secs: i64,
-        _envelope: &ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "budget store does not support durable invocation hold reservation".to_string(),
-        ))
-    }
-
-    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
-        let _ = now_unix_secs;
-        Ok(0)
     }
 }
 

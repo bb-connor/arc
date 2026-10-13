@@ -19,12 +19,6 @@ pub(crate) struct RetainedBudgetHoldWire {
     authorized_exposure_units: u64,
     remaining_exposure_units: u64,
     disposition: String,
-    reserved_until: Option<i64>,
-    reserved_currency: Option<String>,
-    reserved_payment_reference: Option<String>,
-    reserved_budget_total: Option<u64>,
-    reserved_delegation_depth: Option<u32>,
-    reserved_root_budget_holder: Option<String>,
     authority: Option<StructuredBudgetEventAuthorityView>,
 }
 
@@ -38,12 +32,6 @@ impl RetainedBudgetHoldWire {
             authorized_exposure_units: hold.authorized_exposure_units,
             remaining_exposure_units: hold.remaining_exposure_units,
             disposition: hold.disposition.as_str().to_owned(),
-            reserved_until: hold.reserved_until,
-            reserved_currency: hold.reserved_currency,
-            reserved_payment_reference: hold.reserved_payment_reference,
-            reserved_budget_total: hold.reserved_budget_total,
-            reserved_delegation_depth: hold.reserved_delegation_depth,
-            reserved_root_budget_holder: hold.reserved_root_budget_holder,
             authority: hold.authority.map(Into::into),
         })
     }
@@ -71,12 +59,6 @@ impl RetainedBudgetHoldWire {
             authorized_exposure_units: self.authorized_exposure_units,
             remaining_exposure_units: self.remaining_exposure_units,
             disposition,
-            reserved_until: self.reserved_until,
-            reserved_currency: self.reserved_currency,
-            reserved_payment_reference: self.reserved_payment_reference,
-            reserved_budget_total: self.reserved_budget_total,
-            reserved_delegation_depth: self.reserved_delegation_depth,
-            reserved_root_budget_holder: self.reserved_root_budget_holder,
             authority: self.authority.map(Into::into),
         })
     }

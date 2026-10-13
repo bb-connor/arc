@@ -22,12 +22,6 @@ fn retained_hold() -> BudgetHoldSnapshot {
         authorized_exposure_units: 100,
         remaining_exposure_units: 60,
         disposition: BudgetHoldDispositionView::Open,
-        reserved_until: Some(1234),
-        reserved_currency: Some("USD".to_owned()),
-        reserved_payment_reference: Some("payment-1".to_owned()),
-        reserved_budget_total: Some(1000),
-        reserved_delegation_depth: Some(2),
-        reserved_root_budget_holder: Some("root-capability".to_owned()),
         // A retained hold may legitimately predate the current serving lease.
         authority: Some(BudgetEventAuthority {
             authority_id: "hold-recovery-store".to_owned(),
@@ -35,6 +29,66 @@ fn retained_hold() -> BudgetHoldSnapshot {
             lease_epoch: 1,
         }),
     }
+}
+
+fn current_hold_value() -> serde_json::Value {
+    serde_json::json!({
+        "hold_id": "retained-hold",
+        "capability_id": "retained-capability",
+        "grant_index": 3,
+        "authorized_exposure_units": 100,
+        "remaining_exposure_units": 60,
+        "disposition": "open",
+        "authority": null
+    })
+}
+
+const RESERVATION_FIELDS: [&str; 6] = [
+    "reserved_until",
+    "reserved_currency",
+    "reserved_payment_reference",
+    "reserved_budget_total",
+    "reserved_delegation_depth",
+    "reserved_root_budget_holder",
+];
+
+fn unexpected_reservation_field(field: &str) -> String {
+    format!(
+        "unknown field `{field}`, expected one of `hold_id`, `capability_id`, `grant_index`, `authorized_exposure_units`, `remaining_exposure_units`, `disposition`, `authority`"
+    )
+}
+
+#[test]
+fn retained_hold_wire_rejects_reservation_fields() -> TestResult {
+    let _: RetainedBudgetHoldWire = serde_json::from_value(current_hold_value())?;
+    for field in RESERVATION_FIELDS {
+        let mut value = current_hold_value();
+        value[field] = serde_json::Value::Null;
+        let error = match serde_json::from_value::<RetainedBudgetHoldWire>(value) {
+            Ok(_) => panic!("retained hold accepted unsupported field {field}"),
+            Err(error) => error,
+        };
+        assert_eq!(error.to_string(), unexpected_reservation_field(field));
+    }
+    Ok(())
+}
+
+#[test]
+fn remote_hold_lookup_rejects_reservation_fields() -> TestResult {
+    for field in RESERVATION_FIELDS {
+        let mut value = current_hold_value();
+        value[field] = serde_json::Value::Null;
+        let body = serde_json::to_string(&AdmissionAuthorityResponse::success(&Some(value))?)?;
+        let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
+        let store = build_shared_remote_budget_store(&server.url, "secret", fence())?;
+        let message = match store.get_budget_hold("retained-hold") {
+            Err(chio_kernel::BudgetStoreError::Invariant(message)) => message,
+            other => panic!("unexpected retained hold response for {field}: {other:?}"),
+        };
+        assert_eq!(message, unexpected_reservation_field(field));
+        assert_eq!(server.requests().len(), 1);
+    }
+    Ok(())
 }
 
 #[test]

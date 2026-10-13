@@ -1,6 +1,4 @@
 //! A settled prepayment without its exact debit stays quarantined with its liability.
-//! The unit store models the journal shape the schema-12 store migration leaves
-//! for a legacy row; it does not run that SQLite migration.
 use super::*;
 use crate::admission_operation::{AdmissionRecoveryFailureKind, AdmissionRecoveryStatusV1};
 use crate::budget_store::BudgetHoldDispositionView;
@@ -38,7 +36,6 @@ fn review_legacy_settled_prepaid_quarantines_with_exact_legacy_amount_absent() -
                 Some(10)
             )
         );
-        // Match the settled legacy row in the budget12 migration control.
         // This field is a journal revision counter, not a schema version.
         journal.journal_version = 2;
         journal.authorization_attempt = None;

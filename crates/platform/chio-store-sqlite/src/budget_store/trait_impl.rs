@@ -1585,63 +1585,11 @@ impl BudgetStore for SqliteBudgetStore {
         Ok(self.list_open_holds()?.len())
     }
 
-    fn list_open_delegated_reserved_hold_ids(
-        &self,
-    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
-        Ok(Some(self.list_open_delegated_reserved_holds()?))
-    }
-
-    fn request_id_has_reserved_hold(
-        &self,
-        request_id: &str,
-    ) -> Result<Option<bool>, BudgetStoreError> {
-        Ok(Some(self.hold_exists_for_request_id(request_id)?))
-    }
-
     fn get_budget_hold(
         &self,
         hold_id: &str,
     ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
         self.budget_hold_snapshot(hold_id)
-    }
-
-    fn mark_hold_reserved(
-        &self,
-        hold_id: &str,
-        reserved_until_unix_secs: i64,
-        currency: &str,
-        payment_reference: Option<&str>,
-        envelope: &ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        self.mark_hold_reserved_until(
-            hold_id,
-            reserved_until_unix_secs,
-            currency,
-            payment_reference,
-            envelope,
-        )
-    }
-
-    fn reserve_invocation_hold(
-        &self,
-        hold_id: &str,
-        capability_id: &str,
-        grant_index: usize,
-        reserved_until_unix_secs: i64,
-        envelope: &ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        SqliteBudgetStore::reserve_invocation_hold(
-            self,
-            hold_id,
-            capability_id,
-            grant_index,
-            reserved_until_unix_secs,
-            envelope,
-        )
-    }
-
-    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
-        SqliteBudgetStore::reap_expired_reserved_holds(self, now_unix_secs)
     }
 }
 

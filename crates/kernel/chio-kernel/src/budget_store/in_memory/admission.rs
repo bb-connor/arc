@@ -468,10 +468,6 @@ impl InMemoryBudgetStoreInner {
                             BudgetMonetaryState::Exposed
                         },
                         authority: authority.cloned(),
-                        reserved_until: None,
-                        reserved_currency: None,
-                        reserved_payment_reference: None,
-                        reserved_envelope: ReservedHoldEnvelope::default(),
                     },
                 );
             }

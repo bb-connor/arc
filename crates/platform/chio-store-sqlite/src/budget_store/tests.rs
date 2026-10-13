@@ -7,6 +7,9 @@ mod composite_lifecycle;
 #[path = "tests/cleanup_custody.rs"]
 mod cleanup_custody;
 
+#[path = "tests/schema_contract.rs"]
+mod schema_contract;
+
 #[path = "tests/support.rs"]
 mod support;
 use support::*;
@@ -30,42 +33,32 @@ fn sqlite_budget_store_persists_across_reopen() {
 }
 
 #[test]
-fn sqlite_budget_store_rejects_pre_split_budget_schema() {
-    let path = unique_db_path("chio-budget-pre-split-schema");
-    {
-        let connection = Connection::open(&path).unwrap();
-        connection
-            .execute_batch(
-                r#"
-                    CREATE TABLE capability_grant_budgets (
-                        capability_id TEXT NOT NULL,
-                        grant_index INTEGER NOT NULL,
-                        invocation_count INTEGER NOT NULL,
-                        updated_at INTEGER NOT NULL,
-                        total_cost_charged INTEGER NOT NULL DEFAULT 0,
-                        PRIMARY KEY (capability_id, grant_index)
-                    );
-                    INSERT INTO capability_grant_budgets (
-                        capability_id,
-                        grant_index,
-                        invocation_count,
-                        updated_at,
-                        total_cost_charged
-                    ) VALUES ('cap-1', 0, 1, 10, 55);
-                    "#,
-            )
-            .unwrap();
-    }
+fn sqlite_budget_store_refuses_unstamped_unsplit_usage_without_mutation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("budget.db");
+    let connection = Connection::open(&path)?;
+    connection.execute_batch(
+        r#"
+        CREATE TABLE capability_grant_budgets (
+            capability_id TEXT NOT NULL,
+            grant_index INTEGER NOT NULL,
+            invocation_count INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            total_cost_charged INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (capability_id, grant_index)
+        );
+        INSERT INTO capability_grant_budgets (
+            capability_id, grant_index, invocation_count, updated_at, total_cost_charged
+        ) VALUES ('cap-1', 0, 1, 10, 55);
+        "#,
+    )?;
+    drop(connection);
 
-    let error = match SqliteBudgetStore::open(&path) {
-        Ok(_) => panic!("pre-split budget schema should be rejected"),
-        Err(error) => error,
-    };
-    assert!(error.to_string().contains(
-        "missing split cost columns `total_cost_exposed` and `total_cost_realized_spend`"
-    ));
-
-    let _ = fs::remove_file(path);
+    schema_contract::assert_refused_without_mutation(
+        &path,
+        "database application_id 0x0 is not a Chio store (expected 0x4348494f)",
+    )
 }
 
 #[path = "tests/durability.rs"]
@@ -602,11 +595,19 @@ fn caller_provided_snapshot_anchor_cannot_create_usage_or_coverage() {
     let error = store
         .upsert_usage(&usage)
         .expect_err("public usage upsert must not invent durable history");
-    assert!(error.to_string().contains("explicit history anchor"));
+    assert!(matches!(
+        error,
+        BudgetStoreError::Invariant(message)
+            if message == "budget usage `cap-anchor-only` grant 0 has no usage-mutating event or explicit history anchor"
+    ));
     let error = store
         .import_snapshot_records(std::slice::from_ref(&usage), &[])
-        .expect_err("the compatibility snapshot path must not invent durable history");
-    assert!(error.to_string().contains("explicit history anchor"));
+        .expect_err("a snapshot without anchors must not invent durable history");
+    assert!(matches!(
+        error,
+        BudgetStoreError::Invariant(message)
+            if message == "budget usage `cap-anchor-only` grant 0 has no usage-mutating event or explicit history anchor"
+    ));
     assert!(store.get_usage("cap-anchor-only", 0).unwrap().is_none());
     assert!(store.list_usage_history_anchors().unwrap().is_empty());
     assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);
@@ -619,13 +620,12 @@ fn caller_provided_snapshot_anchor_cannot_create_usage_or_coverage() {
             &[],
             42,
         )
-        .expect_err("a caller-provided anchor must not create migration provenance");
-    assert!(error
-        .to_string()
-        .contains("no identical locally migration-anchored state"));
-    assert!(error
-        .to_string()
-        .contains("elected-leader snapshot path with verified anchor provenance"));
+        .expect_err("a caller-provided anchor must not create trusted provenance");
+    assert!(matches!(
+        error,
+        BudgetStoreError::Invariant(message)
+            if message == "budget history anchor `cap-anchor-only` grant 0 has no identical locally anchored state; a fresh follower must use the elected-leader snapshot path with verified anchor provenance"
+    ));
     assert!(store.get_usage("cap-anchor-only", 0).unwrap().is_none());
     assert!(store.list_usage_history_anchors().unwrap().is_empty());
     assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);
@@ -634,10 +634,10 @@ fn caller_provided_snapshot_anchor_cannot_create_usage_or_coverage() {
 }
 
 #[test]
-fn elected_leader_provenance_bootstraps_a_fresh_pre_upgrade_follower() {
+fn elected_leader_provenance_bootstraps_a_fresh_follower() {
     let path = unique_db_path("chio-budget-verified-anchor-bootstrap");
     let store = SqliteBudgetStore::open(&path).unwrap();
-    let usage = usage_record("cap-legacy-anchor", 0, 7, 1_717_171_717, 42, 550, 375);
+    let usage = usage_record("cap-verified-anchor", 0, 7, 1_717_171_717, 42, 550, 375);
     let snapshot = BudgetStoreSnapshot {
         usages: vec![usage.clone()],
         usage_history_anchors: vec![usage.clone()],
@@ -680,7 +680,7 @@ fn elected_leader_provenance_bootstraps_a_fresh_pre_upgrade_follower() {
         .unwrap();
 
     assert_eq!(
-        store.get_usage("cap-legacy-anchor", 0).unwrap(),
+        store.get_usage("cap-verified-anchor", 0).unwrap(),
         Some(usage.clone())
     );
     assert_eq!(store.list_usage_history_anchors().unwrap(), vec![usage]);
@@ -744,8 +744,8 @@ fn anchor_provenance_rejects_wrong_cluster_root_before_install() {
 }
 
 #[test]
-fn identical_local_migration_anchor_is_idempotent_but_does_not_prove_coverage() {
-    let path = unique_db_path("chio-budget-local-migration-anchor");
+fn identical_local_anchor_is_idempotent_but_does_not_prove_coverage() {
+    let path = unique_db_path("chio-budget-local-anchor");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let usage = usage_record("cap-local-anchor", 0, 7, 1_717_171_717, 42, 550, 375);
     install_usage_anchor(&store, &usage);
@@ -938,9 +938,11 @@ fn full_snapshot_requires_the_exact_immutable_anchor_set() {
     let error = store
         .import_budget_snapshot(&incoming)
         .expect_err("immutable local anchors cannot be omitted from a full snapshot");
-    assert!(error
-        .to_string()
-        .contains("history anchor set differs from immutable local migration anchors"));
+    assert!(matches!(
+        error,
+        BudgetStoreError::Invariant(message)
+            if message == "budget snapshot history anchor set differs from immutable local anchors"
+    ));
     assert_eq!(store.export_budget_snapshot().unwrap(), before);
 
     let _ = fs::remove_file(path);
@@ -1080,7 +1082,7 @@ fn snapshot_export_is_consistent_while_another_connection_commits() {
 }
 
 #[test]
-fn migration_anchor_does_not_bootstrap_coverage_over_later_events() {
+fn usage_anchor_does_not_bootstrap_coverage_over_later_events() {
     let path = unique_db_path("chio-budget-anchor-plus-events");
     let anchor = usage_record("cap-anchor", 0, 7, 1_717_171_717, 42, 550, 375);
     let events = [
@@ -2226,7 +2228,7 @@ fn ack_head_reset_trigger_is_idempotent_across_reopens_and_concurrent_opens(
         handle
             .join()
             .expect("open thread panicked")
-            .expect("a concurrent open must not error on the trigger migration");
+            .expect("a concurrent open must preserve the catalog");
     }
 
     let store = SqliteBudgetStore::open(&path)?;

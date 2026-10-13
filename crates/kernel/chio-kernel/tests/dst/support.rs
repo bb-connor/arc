@@ -685,65 +685,11 @@ impl BudgetStore for FaultingBudgetStore {
         self.inner.count_open_holds()
     }
 
-    fn list_open_delegated_reserved_hold_ids(
-        &self,
-    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
-        self.inner.list_open_delegated_reserved_hold_ids()
-    }
-
-    fn request_id_has_reserved_hold(
-        &self,
-        request_id: &str,
-    ) -> Result<Option<bool>, BudgetStoreError> {
-        self.inner.request_id_has_reserved_hold(request_id)
-    }
-
     fn get_budget_hold(
         &self,
         hold_id: &str,
     ) -> Result<Option<chio_kernel::budget_store::BudgetHoldSnapshot>, BudgetStoreError> {
         self.inner.get_budget_hold(hold_id)
-    }
-
-    fn mark_hold_reserved(
-        &self,
-        hold_id: &str,
-        reserved_until_unix_secs: i64,
-        currency: &str,
-        payment_reference: Option<&str>,
-        envelope: &chio_kernel::budget_store::ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("mark_hold_reserved")?;
-        self.inner.mark_hold_reserved(
-            hold_id,
-            reserved_until_unix_secs,
-            currency,
-            payment_reference,
-            envelope,
-        )
-    }
-
-    fn reserve_invocation_hold(
-        &self,
-        hold_id: &str,
-        capability_id: &str,
-        grant_index: usize,
-        reserved_until_unix_secs: i64,
-        envelope: &chio_kernel::budget_store::ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("reserve_invocation_hold")?;
-        self.inner.reserve_invocation_hold(
-            hold_id,
-            capability_id,
-            grant_index,
-            reserved_until_unix_secs,
-            envelope,
-        )
-    }
-
-    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
-        self.mutation("reap_expired_reserved_holds")?;
-        self.inner.reap_expired_reserved_holds(now_unix_secs)
     }
 }
 

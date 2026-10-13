@@ -1,31 +1,31 @@
 use super::*;
 
 #[test]
-fn sqlite_legacy_event_only_authorization_replays_once_with_invocation_limit(
+fn sqlite_event_only_authorization_replays_once_with_invocation_limit(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-legacy-event-replay");
+    let path = unique_db_path("chio-budget-event-replay");
     let store = SqliteBudgetStore::open(&path)?;
     for _ in 0..2 {
         assert!(store.try_charge_cost_with_ids_and_authority(
-            "cap-legacy-event",
+            "cap-event",
             0,
             Some(1),
             10,
             Some(10),
             Some(10),
             None,
-            Some("legacy-authorize-event"),
+            Some("authorize-event"),
             None,
         )?);
     }
     let usage = store
-        .get_usage("cap-legacy-event", 0)?
-        .ok_or_else(|| std::io::Error::other("legacy event usage missing"))?;
+        .get_usage("cap-event", 0)?
+        .ok_or_else(|| std::io::Error::other("event usage missing"))?;
     assert_eq!(usage.invocation_count, 1);
     assert_usage_totals(&usage, 10, 0);
-    let events = store.list_mutation_events(10, Some("cap-legacy-event"), Some(0))?;
+    let events = store.list_mutation_events(10, Some("cap-event"), Some(0))?;
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].event_id, "legacy-authorize-event");
+    assert_eq!(events[0].event_id, "authorize-event");
 
     let _ = fs::remove_file(path);
     Ok(())
@@ -283,142 +283,83 @@ fn sqlite_budget_store_capture_overflow_rolls_back_hold_transition(
     Ok(())
 }
 
-#[test]
-fn sqlite_budget_store_migrates_invocation_captured_column(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-invocation-captured-migration");
-    {
-        let connection = Connection::open(&path)?;
-        connection.execute_batch(
-            r#"
-                CREATE TABLE capability_grant_budgets (
-                    capability_id TEXT NOT NULL,
-                    grant_index INTEGER NOT NULL,
-                    invocation_count INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL,
-                    seq INTEGER NOT NULL DEFAULT 0,
-                    total_cost_exposed INTEGER NOT NULL DEFAULT 0,
-                    total_cost_realized_spend INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY (capability_id, grant_index)
-                );
-                CREATE TABLE budget_authorization_holds (
-                    hold_id TEXT PRIMARY KEY,
-                    capability_id TEXT NOT NULL,
-                    grant_index INTEGER NOT NULL,
-                    authorized_exposure_units INTEGER NOT NULL,
-                    remaining_exposure_units INTEGER NOT NULL,
-                    invocation_count_debited INTEGER NOT NULL,
-                    disposition TEXT NOT NULL,
-                    created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL
-                );
-                INSERT INTO budget_authorization_holds (
-                    hold_id,
-                    capability_id,
-                    grant_index,
-                    authorized_exposure_units,
-                    remaining_exposure_units,
-                    invocation_count_debited,
-                    disposition,
-                    created_at,
-                    updated_at
-                ) VALUES
-                    ('hold-legacy-open', 'cap-legacy', 0, 100, 100, 1, 'open', 1, 1),
-                    ('hold-legacy-terminal', 'cap-legacy', 1, 100, 0, 1, 'reconciled', 1, 1);
-                INSERT INTO capability_grant_budgets (
-                    capability_id,
-                    grant_index,
-                    invocation_count,
-                    updated_at,
-                    seq,
-                    total_cost_exposed,
-                    total_cost_realized_spend
-                ) VALUES ('cap-legacy', 0, 1, 1, 1, 100, 0);
-                "#,
-        )?;
-    }
-
-    let store = SqliteBudgetStore::open(&path)?;
-    let mut connection = store.connection()?;
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
-    let open = SqliteBudgetStore::load_hold(&transaction, "hold-legacy-open")?
-        .ok_or_else(|| std::io::Error::other("migrated open budget hold missing"))?;
-    assert!(open.invocation_captured);
-    let terminal = SqliteBudgetStore::load_hold(&transaction, "hold-legacy-terminal")?
-        .ok_or_else(|| std::io::Error::other("migrated terminal budget hold missing"))?;
-    assert!(!terminal.invocation_captured);
-    transaction.rollback()?;
-    drop(connection);
-
-    assert!(store
-        .cancel_captured_before_dispatch(BudgetCancelCapturedBeforeDispatchRequest {
-            capability_id: "cap-legacy".to_string(),
-            grant_index: 0,
-            hold_id: "hold-legacy-open".to_string(),
-            event_id: "hold-legacy-open:cancel-captured-before-dispatch".to_string(),
-            authority: None,
-        })
-        .is_err());
-    let usage = store
-        .get_usage("cap-legacy", 0)?
-        .ok_or_else(|| std::io::Error::other("migrated legacy usage missing"))?;
-    assert_eq!(usage.invocation_count, 1);
-    assert_eq!(usage.total_cost_exposed, 100);
-    assert_eq!(usage.total_cost_realized_spend, 0);
-
-    let _ = fs::remove_file(path);
-    Ok(())
-}
-
-#[test]
-fn sqlite_budget_store_v1_existing_capture_column_quarantines_open_hold(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-v1-existing-capture-column");
-    drop(SqliteBudgetStore::open(&path)?);
-    let connection = Connection::open(&path)?;
-    connection.execute(
+fn populate_incomplete_budget_schema(connection: &Connection) -> rusqlite::Result<()> {
+    connection.execute_batch(
         r#"
+        CREATE TABLE capability_grant_budgets (
+            capability_id TEXT NOT NULL,
+            grant_index INTEGER NOT NULL,
+            invocation_count INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            seq INTEGER NOT NULL DEFAULT 0,
+            total_cost_exposed INTEGER NOT NULL DEFAULT 0,
+            total_cost_realized_spend INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (capability_id, grant_index)
+        );
+        CREATE TABLE budget_authorization_holds (
+            hold_id TEXT PRIMARY KEY,
+            capability_id TEXT NOT NULL,
+            grant_index INTEGER NOT NULL,
+            authorized_exposure_units INTEGER NOT NULL,
+            remaining_exposure_units INTEGER NOT NULL,
+            invocation_count_debited INTEGER NOT NULL,
+            disposition TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+        INSERT INTO budget_authorization_holds (
+            hold_id, capability_id, grant_index, authorized_exposure_units,
+            remaining_exposure_units, invocation_count_debited, disposition,
+            created_at, updated_at
+        ) VALUES
+            ('hold-open', 'cap-incomplete', 0, 100, 100, 1, 'open', 1, 1),
+            ('hold-terminal', 'cap-incomplete', 1, 100, 0, 1, 'reconciled', 1, 1);
         INSERT INTO capability_grant_budgets (
             capability_id, grant_index, invocation_count, updated_at, seq,
             total_cost_exposed, total_cost_realized_spend
-        ) VALUES ('cap-v1-captured', 0, 1, 1, 1, 25, 0)
+        ) VALUES ('cap-incomplete', 0, 1, 1, 1, 100, 0);
         "#,
-        [],
+    )
+}
+
+#[test]
+fn sqlite_budget_store_refuses_unstamped_open_liability_without_mutation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("budget.db");
+    let connection = Connection::open(&path)?;
+    populate_incomplete_budget_schema(&connection)?;
+    drop(connection);
+
+    schema_contract::assert_refused_without_mutation(
+        &path,
+        "database application_id 0x0 is not a Chio store (expected 0x4348494f)",
+    )
+}
+
+#[test]
+fn sqlite_budget_store_refuses_incomplete_stamp_one_with_open_liability(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("budget.db");
+    let connection = Connection::open(&path)?;
+    populate_incomplete_budget_schema(&connection)?;
+    connection.execute_batch(
+        "ALTER TABLE budget_authorization_holds
+         ADD COLUMN invocation_captured INTEGER NOT NULL DEFAULT 0",
     )?;
-    connection.execute(
-        r#"
-        INSERT INTO budget_authorization_holds (
-            hold_id, capability_id, grant_index, authorized_exposure_units,
-            remaining_exposure_units, invocation_count_debited,
-            invocation_captured, disposition, created_at, updated_at
-        ) VALUES ('hold-v1-captured', 'cap-v1-captured', 0, 25, 25, 1, 0, 'open', 1, 1)
-        "#,
-        [],
+    connection.pragma_update(
+        None,
+        "application_id",
+        crate::schema_version::CHIO_SQLITE_APPLICATION_ID,
     )?;
-    install_empty_legacy_payment_journal(&connection)?;
     crate::stamp_schema_version(&connection, "budget", 1)?;
     drop(connection);
 
-    let store = SqliteBudgetStore::open(&path)?;
-    let mut connection = store.connection()?;
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
-    let hold = SqliteBudgetStore::load_hold(&transaction, "hold-v1-captured")?
-        .ok_or_else(|| std::io::Error::other("migrated hold missing"))?;
-    assert!(hold.invocation_captured);
-    transaction.rollback()?;
-    drop(connection);
-    assert!(store
-        .cancel_captured_before_dispatch(BudgetCancelCapturedBeforeDispatchRequest {
-            capability_id: "cap-v1-captured".to_string(),
-            grant_index: 0,
-            hold_id: "hold-v1-captured".to_string(),
-            event_id: "hold-v1-captured:authorize:rollback:1".to_string(),
-            authority: None,
-        })
-        .is_err());
-
-    let _ = fs::remove_file(path);
-    Ok(())
+    schema_contract::assert_refused_without_mutation(
+        &path,
+        "budget schema does not match the current v1 shape",
+    )
 }
 
 #[test]
@@ -622,7 +563,7 @@ fn sqlite_rich_reverse_supports_kernel_cleanup_with_durable_projection(
 }
 
 #[test]
-fn sqlite_live_hold_blocks_unheld_legacy_mutations_without_state_drift(
+fn sqlite_live_hold_blocks_unheld_generic_mutations_without_state_drift(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-budget-live-hold-generic-fence");
     let store = SqliteBudgetStore::open(&path)?;
@@ -689,34 +630,23 @@ fn sqlite_live_hold_blocks_unheld_legacy_mutations_without_state_drift(
 }
 
 #[test]
-fn sqlite_budget_store_rejects_future_budget_schema_version(
+fn sqlite_budget_store_refuses_noncurrent_stamps_without_mutation(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-future-schema");
-    drop(SqliteBudgetStore::open(&path)?);
-    let connection = Connection::open(&path)?;
-    crate::stamp_schema_version(
-        &connection,
-        "budget",
-        BUDGET_STORE_SUPPORTED_SCHEMA_VERSION + 1,
-    )?;
-    drop(connection);
+    for found in [0, 2, 12, BUDGET_STORE_SUPPORTED_SCHEMA_VERSION + 100] {
+        let (_directory, path) = schema_contract::populated_database()?;
+        let connection = Connection::open(&path)?;
+        crate::stamp_schema_version(&connection, "budget", found)?;
+        drop(connection);
 
-    let error = match SqliteBudgetStore::open(&path) {
-        Ok(_) => return Err(std::io::Error::other("future budget schema was accepted").into()),
-        Err(error) => error,
-    };
-    assert!(error.to_string().contains(&format!(
-        "newer than this binary supports ({BUDGET_STORE_SUPPORTED_SCHEMA_VERSION})"
-    )));
-    let _ = fs::remove_file(path);
+        schema_contract::assert_stale_without_mutation(&path, found)?;
+    }
     Ok(())
 }
 
 #[test]
-fn sqlite_budget_store_rejects_capture_schema_stamp_without_column(
+fn sqlite_budget_store_refuses_missing_capture_column_without_mutation(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-capture-schema-mismatch");
-    drop(SqliteBudgetStore::open(&path)?);
+    let (_directory, path) = schema_contract::populated_database()?;
     let connection = Connection::open(&path)?;
     connection.execute(
         "ALTER TABLE budget_authorization_holds DROP COLUMN invocation_captured",
@@ -724,15 +654,10 @@ fn sqlite_budget_store_rejects_capture_schema_stamp_without_column(
     )?;
     drop(connection);
 
-    let error = match SqliteBudgetStore::open(&path) {
-        Ok(_) => return Err(std::io::Error::other("capture schema mismatch was accepted").into()),
-        Err(error) => error,
-    };
-    assert!(error
-        .to_string()
-        .contains("declares invocation capture support but the column is missing"));
-    let _ = fs::remove_file(path);
-    Ok(())
+    schema_contract::assert_refused_without_mutation(
+        &path,
+        "budget schema does not match the current v1 shape",
+    )
 }
 
 #[test]
@@ -1442,7 +1367,7 @@ fn budget_store_import_reconstructs_captured_before_dispatch_cancellation_sqlite
 }
 
 #[test]
-fn sqlite_captured_reconciled_hold_rejects_legacy_mutations_without_hold_id(
+fn sqlite_captured_reconciled_hold_rejects_generic_mutations_without_hold_id(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-captured-reconciled-no-hold-id");
     let store = SqliteBudgetStore::open(&path)?;

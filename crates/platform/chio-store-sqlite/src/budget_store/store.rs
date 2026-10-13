@@ -3,19 +3,8 @@ use super::*;
 mod invocations;
 use chio_kernel_core::budget_increment_admits;
 
-/// Budget-store schema revision. Bump on every schema-affecting change.
-pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 12;
-/// The revision from which a stamped database is expected to already
-/// carry the invocation-capture column. Pinned rather than tracking the
-/// supported revision, so a later migration cannot silently retire the
-/// consistency assertion below.
-const BUDGET_INVOCATION_CAPTURE_DECLARED_SCHEMA_VERSION: i32 = 10;
-const BUDGET_INVOCATION_CAPTURE_SCHEMA_VERSION: i32 = 2;
-/// Stable key under which this store records its schema revision in the shared
-/// keyed metadata table, distinct from any co-located store's key.
+pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
-/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
-/// budget database rather than reject it as foreign.
 pub(super) const LIST_ALL_USAGES_SQL: &str = r#"
     SELECT
         capability_id,
@@ -43,7 +32,7 @@ pub(super) const LIST_CAPABILITY_USAGES_SQL: &str = r#"
     ORDER BY updated_at DESC, capability_id ASC, grant_index ASC
 "#;
 
-const BUDGET_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
+const BUDGET_STORE_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
 
 impl SqliteBudgetStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BudgetStoreError> {
@@ -96,184 +85,42 @@ impl SqliteBudgetStore {
                 });
             }
         }
-        let on_disk_schema_version = crate::check_schema_version(
-            connection,
+        connection.busy_timeout(std::time::Duration::from_secs(5))?;
+        connection.pragma_update(None, "foreign_keys", true)?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let schema_state = crate::schema_version::check_current_schema(
+            &transaction,
             BUDGET_STORE_SCHEMA_KEY,
             BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
-            BUDGET_STORE_LEGACY_ANCHOR_TABLES,
+            BUDGET_STORE_ANCHOR_TABLES,
         )
-        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-        connection.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-            PRAGMA foreign_keys = ON;
-
-            CREATE TABLE IF NOT EXISTS capability_grant_budgets (
-                capability_id TEXT NOT NULL,
-                grant_index INTEGER NOT NULL,
-                invocation_count INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL,
-                seq INTEGER NOT NULL DEFAULT 0,
-                total_cost_exposed INTEGER NOT NULL DEFAULT 0,
-                total_cost_realized_spend INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (capability_id, grant_index)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_capability_grant_budgets_updated_at
-                ON capability_grant_budgets(updated_at);
-
-            CREATE TABLE IF NOT EXISTS budget_replication_meta (
-                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-                next_seq INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS budget_authorization_holds (
-                hold_id TEXT PRIMARY KEY,
-                capability_id TEXT NOT NULL,
-                grant_index INTEGER NOT NULL,
-                authorized_exposure_units INTEGER NOT NULL,
-                remaining_exposure_units INTEGER NOT NULL,
-                invocation_count_debited INTEGER NOT NULL,
-                invocation_captured INTEGER NOT NULL DEFAULT 0,
-                disposition TEXT NOT NULL,
-                authority_id TEXT,
-                lease_id TEXT,
-                lease_epoch INTEGER,
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_budget_authorization_holds_capability
-                ON budget_authorization_holds(capability_id, grant_index);
-
-            CREATE TABLE IF NOT EXISTS budget_mutation_events (
-                event_id TEXT PRIMARY KEY,
-                hold_id TEXT,
-                capability_id TEXT NOT NULL,
-                grant_index INTEGER NOT NULL,
-                kind TEXT NOT NULL,
-                allowed INTEGER,
-                recorded_at INTEGER NOT NULL,
-                event_seq INTEGER,
-                usage_seq INTEGER,
-                exposure_units INTEGER NOT NULL DEFAULT 0,
-                realized_spend_units INTEGER NOT NULL DEFAULT 0,
-                max_invocations INTEGER,
-                max_exposure_per_invocation INTEGER,
-                max_total_exposure_units INTEGER,
-                invocation_count_after INTEGER NOT NULL,
-                total_cost_exposed_after INTEGER NOT NULL,
-                total_cost_realized_spend_after INTEGER NOT NULL,
-                authority_id TEXT,
-                lease_id TEXT,
-                lease_epoch INTEGER
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_budget_mutation_events_capability
-                ON budget_mutation_events(capability_id, grant_index, recorded_at);
-
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_mutation_events_event_seq
-                ON budget_mutation_events(event_seq);
-
-            CREATE TABLE IF NOT EXISTS budget_import_floors (
-                authority_id TEXT PRIMARY KEY,
-                floor_seq    INTEGER NOT NULL DEFAULT 0,
-                CHECK (floor_seq >= 0)
-            );
-
-            CREATE TABLE IF NOT EXISTS budget_ack_head_watermark (
-                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-                head_seq  INTEGER NOT NULL DEFAULT 0,
-                CHECK (head_seq >= 0)
-            );
-
-            -- Incrementally-maintained per-origin ack head, so the status path does
-            -- not GROUP BY the full mutation history every call. Each entry is the
-            -- highest event_seq that origin has WITHIN the verified global contiguous
-            -- prefix (<= the watermark); a DELETE clears it (see the trigger) so a
-            -- hole forces a rebuild rather than leaving a stale-high per-origin head.
-            CREATE TABLE IF NOT EXISTS budget_origin_ack_heads (
-                authority_id TEXT PRIMARY KEY,
-                head_seq     INTEGER NOT NULL,
-                CHECK (head_seq >= 0)
-            );
-
-            -- Metadata tombstones for event_seqs that were CONSUMED but have no
-            -- surviving mutation event: the leader-local rollback-retry path
-            -- (existing_event_allowed) and the delta-import replace path delete a
-            -- rolled-back authorize and re-append it under a fresh higher seq,
-            -- permanently abandoning the original seq. Recording the abandoned seq
-            -- lets the global contiguous ack head treat it as FILLED so it does not
-            -- stall cluster-wide at the hole. This never over-counts: an abandoned
-            -- seq is never a live write (its write was rolled back / superseded), so
-            -- no witness targets it; a genuinely MISSING event (never received, never
-            -- deleted here) is not recorded and still caps the head.
-            CREATE TABLE IF NOT EXISTS budget_abandoned_event_seqs (
-                seq INTEGER PRIMARY KEY,
-                CHECK (seq > 0)
-            );
-            "#,
-        )?;
-        ensure_budget_ack_head_reset_trigger(connection)?;
-        connection.execute(
-            r#"
-            INSERT INTO budget_replication_meta (singleton, next_seq)
-            VALUES (1, 0)
-            ON CONFLICT(singleton) DO NOTHING
-            "#,
-            [],
-        )?;
-        connection.execute(
-            r#"
-            INSERT INTO budget_ack_head_watermark (singleton, head_seq)
-            VALUES (1, 0)
-            ON CONFLICT(singleton) DO NOTHING
-            "#,
-            [],
-        )?;
-        ensure_budget_seq_column(connection)?;
-        ensure_split_budget_cost_columns(connection)?;
-        ensure_budget_hold_authority_columns(connection)?;
-        ensure_budget_hold_reserved_until_column(connection)?;
-        ensure_budget_hold_reserved_currency_column(connection)?;
-        ensure_budget_hold_reserved_payment_reference_column(connection)?;
-        ensure_budget_hold_reserved_envelope_columns(connection)?;
-        ensure_budget_mutation_event_authority_columns(connection)?;
-        ensure_budget_mutation_event_seq_column(connection)?;
-        initialize_budget_replication_seq(connection)?;
-        let migration = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let capture_column_added = ensure_budget_hold_invocation_captured_column(&migration)?;
-        if on_disk_schema_version >= BUDGET_INVOCATION_CAPTURE_DECLARED_SCHEMA_VERSION
-            && capture_column_added
-        {
-            migration.rollback()?;
-            return Err(BudgetStoreError::Invariant(
-                "budget schema version declares invocation capture support but the column is missing"
-                    .to_string(),
-            ));
+        .map_err(|error| match error {
+            crate::schema_version::SchemaVersionError::StaleSchema { found, current } => {
+                BudgetStoreError::StaleSchema { found, current }
+            }
+            other => BudgetStoreError::Invariant(other.to_string()),
+        })?;
+        match schema_state {
+            crate::schema_version::SchemaState::Current => {
+                verify_budget_catalog(&transaction)?;
+            }
+            crate::schema_version::SchemaState::Unstamped => {
+                require_empty_budget_catalog(&transaction)?;
+                transaction.execute_batch(schema::SCHEMA)?;
+                crate::stamp_schema_version(
+                    &transaction,
+                    BUDGET_STORE_SCHEMA_KEY,
+                    BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
+                )
+                .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+            }
         }
-        if on_disk_schema_version < BUDGET_INVOCATION_CAPTURE_SCHEMA_VERSION {
-            migration.execute(
-                r#"
-                UPDATE budget_authorization_holds
-                SET invocation_captured = 1
-                WHERE disposition = 'open'
-                "#,
-                [],
-            )?;
-        }
-        ensure_composite_budget_schema(&migration, on_disk_schema_version)?;
-        crate::stamp_schema_version(
-            &migration,
-            BUDGET_STORE_SCHEMA_KEY,
-            BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
-        )
-        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-        migration.commit()?;
-        verify_budget_foreign_keys(connection)?;
-        verify_budget_projection_invariants(connection)?;
+        verify_budget_replication_state(&transaction)?;
+        verify_budget_foreign_keys(&transaction)?;
+        Self::verify_supplemental_artifact_selector_index(&transaction)?;
+        verify_budget_projection_invariants(&transaction)?;
+        transaction.commit()?;
+        connection.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")?;
         Self::rebuild_snapshot_proof_caches(connection)?;
 
         Ok(())

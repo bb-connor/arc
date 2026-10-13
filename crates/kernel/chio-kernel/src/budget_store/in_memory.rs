@@ -20,7 +20,7 @@ use super::{
     BudgetMonetaryState, BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey,
     BudgetReconcileHoldDecision, BudgetReconcileHoldRequest, BudgetReleaseHoldDecision,
     BudgetReleaseHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest, BudgetStore,
-    BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold, ReservedHoldEnvelope,
+    BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,10 +37,6 @@ struct BudgetHoldState {
     cumulative_approval: Option<BudgetCumulativeApprovalHoldState>,
     monetary_state: BudgetMonetaryState,
     authority: Option<BudgetEventAuthority>,
-    reserved_until: Option<i64>,
-    reserved_currency: Option<String>,
-    reserved_payment_reference: Option<String>,
-    reserved_envelope: ReservedHoldEnvelope,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

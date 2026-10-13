@@ -20,7 +20,7 @@ use chio_kernel::budget_store::{
     BudgetInvocationQuotaUsage, BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind,
     BudgetMutationRecord, BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldDecision,
     BudgetReconcileHoldRequest, BudgetReleaseHoldDecision, BudgetReleaseHoldRequest,
-    BudgetReverseHoldDecision, BudgetReverseHoldRequest, DeniedBudgetHold, ReservedHoldEnvelope,
+    BudgetReverseHoldDecision, BudgetReverseHoldRequest, DeniedBudgetHold,
     RevocationCommitMetadata,
 };
 use chio_kernel::budget_store::{ExposureBalance, ExposureUnits, InvocationCount};

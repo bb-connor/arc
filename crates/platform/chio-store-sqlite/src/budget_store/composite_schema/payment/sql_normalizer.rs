@@ -1,4 +1,4 @@
-//! Payment catalog comparison preserves every token and quoted byte.
+//! Catalog comparison preserves every token and quoted byte.
 
 /// Collapse ASCII whitespace only outside SQL string and identifier quotes.
 /// A whitespace run remains one separator, so tokens and operators never join.

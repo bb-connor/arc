@@ -494,7 +494,7 @@ impl SqliteBudgetStore {
         let mut connection = validator.connection()?;
         let transaction = validator.begin_write(&mut connection)?;
         transaction.execute(
-            "INSERT OR IGNORE INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
+            "INSERT OR IGNORE INTO budget_usage_anchor_write_gate(singleton) VALUES (1)",
             [],
         )?;
         for anchor in anchors {
@@ -505,7 +505,7 @@ impl SqliteBudgetStore {
                     capability_id, grant_index, invocation_count, updated_at, seq,
                     total_cost_exposed, total_cost_realized_spend,
                     anchored_schema_version
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 6)
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1)
                 "#,
                 params![
                     &anchor.capability_id,
@@ -521,7 +521,7 @@ impl SqliteBudgetStore {
                 ],
             )?;
         }
-        transaction.execute("DELETE FROM budget_usage_anchor_migration_gate", [])?;
+        transaction.execute("DELETE FROM budget_usage_anchor_write_gate", [])?;
         transaction.commit()?;
         Ok(())
     }
@@ -538,7 +538,7 @@ impl SqliteBudgetStore {
         });
         if local != incoming {
             return Err(BudgetStoreError::Invariant(
-                "budget snapshot history anchor set differs from immutable local migration anchors"
+                "budget snapshot history anchor set differs from immutable local anchors"
                     .to_string(),
             ));
         }
