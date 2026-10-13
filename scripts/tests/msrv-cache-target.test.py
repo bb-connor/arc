@@ -10,7 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = (ROOT / '.github/workflows/ci.yml').read_text()
-JOB = WORKFLOW.split('\n  msrv:\n', 1)[1].split('\n  cargo-vet:\n', 1)[0]
+JOB = WORKFLOW.split('\n  msrv-workspace:\n', 1)[1].split('\n  cargo-vet:\n', 1)[0]
 MAPPING = textwrap.dedent(JOB.split("python3 - <<'PY'\n", 1)[1].split('\n          PY', 1)[0])
 PIN = 'e18b497796c12c097a38f9edb9d0641fb99eee32'
 
@@ -86,7 +86,7 @@ class MsrvCacheTarget(unittest.TestCase):
         self.assertIn('workspaces: ${{ steps.msrv-cache.outputs.workspace }}', JOB)
         self.assertLess(JOB.index('python3 scripts/tests/msrv-cache-target.test.py'),
                         JOB.index('uses: Swatinem/rust-cache@'))
-        self.assertLess(JOB.index('uses: Swatinem/rust-cache@'), JOB.index('name: MSRV workspace lane'))
+        self.assertLess(JOB.index('uses: Swatinem/rust-cache@'), JOB.index('      - name: MSRV workspace lane\n'))
         for unsupported in ('cache-on-failure:', 'cache-workspace-crates:', 'shared-key:', 'continue-on-error:', 'save-if:'):
             self.assertNotIn(unsupported, JOB)
 
