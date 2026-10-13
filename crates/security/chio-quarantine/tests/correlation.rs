@@ -5,8 +5,8 @@ use chio_quarantine::{
     CorrelationPolicy, CorrelationStatus, RuleLimits, TemporalCorrelator, TemporalRule,
 };
 use chio_security_types::ports::{
-    CanonicalBody, Digest32, EventId, LineageId, OpaqueReceiptRef, ProducerId, ProducerTrustClass,
-    RecordId, SecurityEventVerificationRecord, SessionId, TenantId,
+    CanonicalBody, Digest32, EventId, LineageId, OpaqueReceiptRef, PortErrorKind, ProducerId,
+    ProducerTrustClass, RecordId, SecurityEventVerificationRecord, SessionId, TenantId,
 };
 use chio_security_types::{
     DetectorHealthKind, SecurityEventBody, SecurityEventBodyInput, SecurityEventKind,
@@ -827,6 +827,43 @@ fn correlation_outcome_journal_recovers_a_lost_commit_ack_with_the_exact_finding
         2,
         "recovery must not append a second journal record"
     );
+}
+
+#[test]
+fn correlation_outcome_journal_refuses_an_unknown_schema_version() {
+    let store = Arc::new(TestStore::default());
+    let engine = TemporalCorrelator::new(Arc::clone(&store), policy(0));
+    let rule = rule_with(
+        "outcome-journal-version",
+        8,
+        8,
+        false,
+        SecurityEventKind::CredentialAccess,
+        SecurityEventKind::EgressAttempt,
+        50,
+    );
+    let first = event(
+        "tenant-a",
+        "journal-version-first",
+        "session-journal-version",
+        "lineage-journal-version",
+        SecurityEventKind::CredentialAccess,
+        100,
+        ProducerTrustClass::InternalDetector,
+    );
+    assert_eq!(
+        engine.ingest(&rule, &first).status,
+        CorrelationStatus::Accepted
+    );
+    store
+        .rewrite_outcome_journals(|journal| journal["schema_version"] = serde_json::json!(2))
+        .unwrap_or_else(|error| panic!("rewrite outcome journal: {error:?}"));
+
+    let error = engine
+        .load_durable_outcome(&rule, &first)
+        .err()
+        .unwrap_or_else(|| panic!("a schema_version 2 outcome journal must be refused"));
+    assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
 }
 
 #[test]
