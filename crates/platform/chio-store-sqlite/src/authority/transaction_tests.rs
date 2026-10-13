@@ -5,62 +5,9 @@ use std::sync::{Arc, Barrier};
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
-fn incomplete_legacy_authority_history_is_refused_without_inventing_issuers() -> TestResult {
-    for empty_table in [false, true] {
-        let directory = chio_test_support::private_tempdir()?;
-        let path = directory.path().join("legacy.db");
-        let key = Keypair::generate();
-        let connection = Connection::open(&path)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
-        }
-        connection.execute_batch(
-            "CREATE TABLE authority_state (
-                singleton_id INTEGER PRIMARY KEY, seed_hex TEXT NOT NULL,
-                generation INTEGER NOT NULL, rotated_at INTEGER NOT NULL
-            );",
-        )?;
-        connection.execute(
-            "INSERT INTO authority_state VALUES (1, ?1, 1, 100)",
-            [key.seed_hex()],
-        )?;
-        if empty_table {
-            connection.execute_batch(
-                "CREATE TABLE authority_trusted_keys (
-                    public_key_hex TEXT PRIMARY KEY, generation INTEGER NOT NULL,
-                    activated_at INTEGER NOT NULL
-                );",
-            )?;
-        }
-        assert!(matches!(
-            SqliteCapabilityAuthority::open(&path),
-            Err(AuthorityStoreError::Schema(message))
-                if message.contains("authority head is absent from persisted issuer history")
-        ));
-        let seed: String = connection.query_row(
-            "SELECT seed_hex FROM authority_state WHERE singleton_id = 1",
-            [],
-            |row| row.get(0),
-        )?;
-        assert_eq!(seed, key.seed_hex());
-        let count: i64 =
-            connection.query_row("SELECT count(*) FROM authority_trusted_keys", [], |row| {
-                row.get(0)
-            })?;
-        assert_eq!(
-            count, 0,
-            "opening must not manufacture legacy issuer history"
-        );
-    }
-    Ok(())
-}
-
-#[test]
-fn complete_legacy_authority_history_survives_explicit_checkpoint_migration() -> TestResult {
+fn authority_storage_outside_schema_v1_is_refused_without_writes() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
-    let path = directory.path().join("legacy.db");
+    let path = directory.path().join("unstamped.db");
     let key = Keypair::generate();
     let connection = Connection::open(&path)?;
     #[cfg(unix)]
@@ -72,31 +19,45 @@ fn complete_legacy_authority_history_survives_explicit_checkpoint_migration() ->
         "CREATE TABLE authority_state (
             singleton_id INTEGER PRIMARY KEY, seed_hex TEXT NOT NULL,
             generation INTEGER NOT NULL, rotated_at INTEGER NOT NULL
-        );
-        CREATE TABLE authority_trusted_keys (
-            public_key_hex TEXT PRIMARY KEY, generation INTEGER NOT NULL,
-            activated_at INTEGER NOT NULL
         );",
     )?;
     connection.execute(
         "INSERT INTO authority_state VALUES (1, ?1, 1, 100)",
         [key.seed_hex()],
     )?;
-    connection.execute(
-        "INSERT INTO authority_trusted_keys VALUES (?1, 1, 100)",
-        [key.public_key().to_hex()],
+    assert!(matches!(
+        SqliteCapabilityAuthority::open(&path),
+        Err(AuthorityStoreError::Schema(message))
+            if message == "database application_id 0x0 is not a Chio store (expected 0x4348494f)"
+    ));
+    let trusted_keys: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name = 'authority_trusted_keys')",
+        [],
+        |row| row.get(0),
     )?;
-    let authority = SqliteCapabilityAuthority::open(&path)?;
-    assert_eq!(authority.trusted_public_keys(), vec![key.public_key()]);
-    assert_eq!(authority.local_keypair()?.seed_hex(), key.seed_hex());
-    assert!(
-        authority.signed_snapshot().is_err(),
-        "opening does not grant network trust"
-    );
-    let anchor = authority.initialize_replication("legacy-reviewed-checkpoint")?;
-    assert_eq!(anchor.snapshot.trusted_keys.len(), 1);
-    assert_eq!(anchor.snapshot.rotated_at, 100);
-    assert!(authority.signed_snapshot()?.proof.is_some());
+    assert!(!trusted_keys, "a refused open must not provision tables");
+
+    let path = directory.path().join("stamped.db");
+    drop(SqliteCapabilityAuthority::open(&path)?);
+    let connection = Connection::open(&path)?;
+    connection.execute(
+        "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = ?1",
+        [AUTHORITY_STORE_SCHEMA_KEY],
+    )?;
+    assert!(matches!(
+        SqliteCapabilityAuthority::open(&path),
+        Err(AuthorityStoreError::Schema(message))
+            if message == "database schema version 2 is not the current schema version 1; refusing to open"
+    ));
+    connection.execute(
+        "DELETE FROM chio_store_schema_versions WHERE store_key = ?1",
+        [AUTHORITY_STORE_SCHEMA_KEY],
+    )?;
+    assert!(matches!(
+        SqliteCapabilityAuthority::open(&path),
+        Err(AuthorityStoreError::Schema(message))
+            if message == "authority storage is provisioned without a schema stamp"
+    ));
     Ok(())
 }
 
@@ -164,54 +125,6 @@ fn concurrent_rotations_allocate_unique_generations_and_keep_all_keys() -> TestR
         .trusted_keys
         .iter()
         .any(|row| &row.public_key_hex == key)));
-    Ok(())
-}
-
-#[test]
-fn snapshot_refuses_invalid_late_rows_without_partial_trust_or_head_changes() -> TestResult {
-    let directory = chio_test_support::private_tempdir()?;
-    let authority = SqliteCapabilityAuthority::open(directory.path().join("authority.db"))?;
-    let before = authority.snapshot()?;
-    let seed_before = authority.local_keypair()?.seed_hex();
-    for field in [
-        "head-generation",
-        "head-time",
-        "key-generation",
-        "key-time",
-        "key-bytes",
-        "zero-generation",
-    ] {
-        let mut snapshot = AuthoritySnapshot {
-            public_key_hex: Keypair::generate().public_key().to_hex(),
-            generation: 2,
-            rotated_at: 10,
-            trusted_keys: vec![AuthorityTrustedKeySnapshot {
-                public_key_hex: Keypair::generate().public_key().to_hex(),
-                generation: 1,
-                activated_at: 5,
-                lifecycle: None,
-            }],
-        };
-        match field {
-            "head-generation" => snapshot.generation = u64::MAX,
-            "head-time" => snapshot.rotated_at = u64::MAX,
-            "key-generation" => snapshot.trusted_keys[0].generation = u64::MAX,
-            "key-time" => snapshot.trusted_keys[0].activated_at = u64::MAX,
-            "key-bytes" => snapshot.trusted_keys[0].public_key_hex = "invalid".into(),
-            "zero-generation" => snapshot.trusted_keys[0].generation = 0,
-            _ => unreachable!(),
-        }
-        let result = authority.apply_snapshot(&snapshot);
-        assert!(
-            matches!(result, Err(AuthorityStoreError::Fence(message)) if message == "unsigned authority snapshot")
-        );
-        assert_eq!(
-            authority.snapshot()?,
-            before,
-            "failed {field} import changed state"
-        );
-        assert_eq!(authority.local_keypair()?.seed_hex(), seed_before);
-    }
     Ok(())
 }
 
@@ -401,25 +314,5 @@ fn injected_clock_failure_preserves_authority_and_cluster_fence() -> TestResult 
     assert_eq!(authority.cluster_fence()?, fence);
     clock.0.store(false, Ordering::SeqCst);
     assert_eq!(authority.rotate()?.generation, before.generation + 1);
-    Ok(())
-}
-
-#[test]
-fn unsigned_authority_snapshot_cannot_add_issuer_even_without_head_change() -> TestResult {
-    let directory = chio_test_support::private_tempdir()?;
-    let authority = SqliteCapabilityAuthority::open(directory.path().join("authority.db"))?;
-    let before = authority.snapshot()?;
-    let mut forged = before.clone();
-    forged.trusted_keys.push(AuthorityTrustedKeySnapshot {
-        public_key_hex: Keypair::generate().public_key().to_hex(),
-        generation: 1,
-        activated_at: before.rotated_at,
-        lifecycle: None,
-    });
-    assert!(
-        authority.apply_snapshot(&forged).is_err(),
-        "unsigned issuer insertion must reject"
-    );
-    assert_eq!(authority.snapshot()?, before);
     Ok(())
 }

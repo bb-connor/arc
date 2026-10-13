@@ -198,7 +198,7 @@ fn unsigned_authority_full_snapshot_cannot_insert_issuer() {
             public_key_hex: Keypair::generate().public_key().to_hex(),
             generation: 1,
             activated_at: before.rotated_at,
-            lifecycle: None,
+            lifecycle: chio_kernel::authority::lifecycle::AuthorityKeyLifecycle::Active,
         });
     let mut state = state_with_cluster(
         "http://127.0.0.1:3300",
@@ -321,7 +321,7 @@ fn authority_replication_both_import_paths_reject_injected_issuer_and_kernel_den
             public_key_hex: attacker.public_key().to_hex(),
             generation: 2,
             activated_at: signed.snapshot.rotated_at,
-            lifecycle: None,
+            lifecycle: chio_kernel::authority::lifecycle::AuthorityKeyLifecycle::Active,
         });
     for mut forged in [injected, signed.clone()] {
         if forged.snapshot == signed.snapshot {

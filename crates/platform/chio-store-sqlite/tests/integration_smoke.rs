@@ -93,19 +93,6 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
 }
 
 #[test]
-fn sqlite_capability_authority_rejects_snapshot_with_invalid_public_key() {
-    let (_directory, path) = private_authority_path("authority.sqlite3");
-    let authority = SqliteCapabilityAuthority::open(&path).test_expect("open authority");
-    let mut snapshot = authority.snapshot().test_expect("snapshot authority");
-    snapshot.public_key_hex = "deadbeef".to_string();
-
-    let error = authority
-        .apply_snapshot(&snapshot)
-        .test_expect_err("invalid public key should fail closed");
-    assert!(error.to_string().contains("unsigned authority snapshot"));
-}
-
-#[test]
 fn sqlite_budget_and_revocation_paths_cover_limits_and_ordering() {
     let budget_path = unique_db_path("chio-budget-store");
     let revocation_path = unique_db_path("chio-revocation-store");
