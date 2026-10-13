@@ -192,8 +192,8 @@ impl ChioKernel {
     }
 
     /// A delegated token keeps the tenant and lineage of its nearest bound
-    /// ancestor. Missing ancestor evidence denies whenever the child is bound
-    /// or a freeze authority is configured.
+    /// ancestor. Resolving that ancestor requires signed evidence when the
+    /// child is bound or a freeze authority is configured.
     fn validate_delegation_ancestor_binding(
         &self,
         binding: Option<&chio_core::capability::caveat::CapabilitySecurityBinding>,
