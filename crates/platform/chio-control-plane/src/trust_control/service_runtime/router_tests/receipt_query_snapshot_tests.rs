@@ -298,7 +298,7 @@ async fn cancelled_response_finalization_keeps_the_export_lane_occupied() -> Tes
     Ok(())
 }
 
-/// Core C1 counts signature checks in the service itself. This HTTP control
+/// The core service counts signature checks itself. This HTTP control
 /// distinguishes that service from per-call corpus authentication: an edit to
 /// an unreturned row cannot change a pinned answer, while selecting it refuses.
 #[tokio::test]
