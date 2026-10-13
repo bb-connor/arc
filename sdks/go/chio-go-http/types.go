@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: a853c82d36820f41a0738efc444e9f0de8e507ee9b10cdc6c4c57b4c2cacdeb4
+// Schema content SHA-256: 38df88fc627feb603ea53a5702fdd3ec27ee9968665896f3f916057c3eb5888c
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -1321,7 +1321,7 @@ const (
 
 // Defines values for SecurityCageInitPlanV1CompilerVersion.
 const (
-	SecurityCageInitPlanV1CompilerVersionChioCageCompilerV2 SecurityCageInitPlanV1CompilerVersion = "chio-cage-compiler.v1"
+	SecurityCageInitPlanV1CompilerVersionChioCageCompilerV1 SecurityCageInitPlanV1CompilerVersion = "chio-cage-compiler.v1"
 )
 
 // Defines values for SecurityCageInitPlanV1HelperFdSlot.

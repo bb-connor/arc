@@ -28,6 +28,7 @@ pub(crate) fn dispatch(command: cli::Command) -> Result<(), XtaskError> {
             GenCommand::Snippets { check } => run_snippets(snippets_regen_argv(check)),
             GenCommand::EvalReceipt { check } => eval_receipt_regen::run(check_argv(check)),
             GenCommand::FreezeVectors { check } => freeze_vectors(check_argv(check)),
+            GenCommand::CageVectors { check } => crate::cage_vectors::run(check),
             GenCommand::ProofCoverage { check } => proof_coverage::run(check),
         },
         // -- check group --

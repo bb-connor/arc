@@ -1,4 +1,4 @@
-d5c2546fd143ee92f68b9034fa15861c17cff7cdcc5e402221e98b7e5e8265a6  spec/schemas/MANIFEST.sha256
+68843135d26b76ce2e7a831388017e24db2cc8dec7689779d760a1dcde1431de  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -486,11 +486,11 @@ f6e73ba557823ed85209d6b162ce7af2bb97f7bf634be187ba04b12958839d2c  spec/schemas/c
 1d4991e7b8baf76a7b7f6702e6ff284b4ffed9eaef6f4aca9f6c0ed2a48b16c4  spec/schemas/chio-wire/v1/security/broker-request-proof-body-v1.schema.json
 6d311f8bd90adf97b7c69819499ef356a8ba562fbaedbb290a828df307775fd5  spec/schemas/chio-wire/v1/security/broker-request-proof-envelope-v1.schema.json
 7d68484f8dfc2abd833bfc65ec950260fa7f332afc13f1edf24626aba8436eab  spec/schemas/chio-wire/v1/security/cage-enforcement-failure-v1.schema.json
-fb23c4ac6bd6b764ec08e761fac94296dcc3a96151852ea45f7eeef6698bc876  spec/schemas/chio-wire/v1/security/cage-enforcement-prepared-v1.schema.json
+e2eae422a7ff0e44bab998699690a6e490a7d165241708f99c01a0fb01db7ca3  spec/schemas/chio-wire/v1/security/cage-enforcement-prepared-v1.schema.json
 16242b528f954908c5a8e6498f26d700537476b2dd406ae7100ee4abb0930d63  spec/schemas/chio-wire/v1/security/cage-enforcement-record-v1.schema.json
 fc3aef4a4c751c6e39b7fda6d5ea0513812b506ce7d87494e48def9b545cbd0c  spec/schemas/chio-wire/v1/security/cage-exec-transition-observed-v1.schema.json
 cf0a29e92204cc16fd74dafc4cc3870f676d94d9d0ec218b7e988a6c1c06608b  spec/schemas/chio-wire/v1/security/cage-fully-enforced-evidence-v1.schema.json
-e131036e2146eea83988a92e67c959260a6f36cd948bb0ac6360c2f7f2b3acc2  spec/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json
+595656367477e737d6ef3f7f108b50b9a94813d3ac8a146ea8377fe6ddd8abbf  spec/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json
 52090151e09378b905edc5b46791aa460805df5ba081ee87c9c746f66c4eb623  spec/schemas/chio-wire/v1/security/cage-process-exit-evidence-v1.schema.json
 4f7e36d618bd340375993bb8aede7b010ba5465d0af4ac462adf41cb07c0fb23  spec/schemas/chio-wire/v1/security/cage-receipt-body-v1.schema.json
 5da9dfca334b1dfcf2f438dba900e8bda2fa6e8b0499303778618b0e5667d377  spec/schemas/chio-wire/v1/security/cage-receipt-metadata-v1.schema.json
@@ -521,7 +521,7 @@ fce6a4e763efa63821eeaeb5494ea442903d32871bb83068e679307f607983e0  spec/schemas/c
 12dd631dac1dd654e24cb13d976432b60a1763a32722d4e5599c7e5a2d40c24f  spec/schemas/chio-wire/v1/security/key-log-witness-signature-v1.schema.json
 0c352eab453320a55df09f32eabf9d235bf4f6a937a77b54e93aa6e16a7a8ada  spec/schemas/chio-wire/v1/security/keyring-artifact-signature-v1.schema.json
 ab857b7010dbdc6437056597f23fcbdf5f0a830b73eae31648b9ab1a51d82a0c  spec/schemas/chio-wire/v1/security/lift-rollback-completion-receipt-body-v1.schema.json
-2cad2f1d85bffa9247561875d8ab764e38227677835fde97889eeb8d28973824  spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json
+9cc5f96fb1418e35b3110faa297998704be828e0b174f92a5d3e4e16c27995d2  spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json
 cba94aa57349c4af61ef0846b0c58423e3e81b903952ed2355befd1ba77232db  spec/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json
 d52e1fa62a0e3ab9af7bc73038cfbbbba550af507635ee8443d747456c1dcbd0  spec/schemas/chio-wire/v1/security/response-effect-v1.schema.json
 b0def7efc306001c6e9158797ff48394ab5bccb8df21a84b09849e9f81c24bf0  spec/schemas/chio-wire/v1/security/response-plan-receipt-body-v1.schema.json
@@ -544,4 +544,4 @@ a89cebb22ad42d0353c5c0a2b35af56a2198a003b172e864741c5b9a878eaccc  spec/schemas/c
 f109672e496e5e3bb56c5a3d61ed882b922d8bbade45899975d1852921f7890e  spec/schemas/financial-credential-defs.v1.schema.json
 049d7788253b57ddf472ebed0e8e6cb1a26e2249e9645e9e18cfdc3606a2b669  spec/schemas/fiscal-defs.v1.schema.json
 216ca7d9c174f728a1931f84791858702bb365cb5f5acba24c5e936bc923955e  spec/schemas/policy/analysis-report.schema.json
-ebc6ab9e0bf6fa845d3678e06f5cbbef98f8d3602abb3c6ffa68798d1cfd201f  spec/schemas/registry.json
+c36b7b8e018992f06cfd0d2e60d13b5214b272458e61574d68e63335f89b254c  spec/schemas/registry.json

@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: ae513fe8e155813f74f4cf579519af96e27b03545b302a0d82fdfe33ecfc42ad
+// Schema SHA: 0b1813a31ea26759b19bb14b472e52770377237b9e98825a2c8acde1dffd083a
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -6294,7 +6294,7 @@ export namespace Security_CageInitPlanV1 {
   /**
    * Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.
    */
-  export type ChioCageInitPlanV1 = {
+  export type ChioCageInitPlanV2 = {
     [k: string]: unknown;
   } & {
     schema: "chio.cage.init-plan.v1";

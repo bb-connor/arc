@@ -4335,6 +4335,11 @@ files = ["crates/products/chio-cli/src/cli/process_host/run_evidence.rs"]
 first_seen = "0b8a7273ac"
 
 [[schema]]
+value = "chio.process.container-launch.v1"
+files = ["crates/kernel/chio-process/src/container_launch.rs"]
+first_seen = "bd6c10ac84"
+
+[[schema]]
 value = "chio.process.host.v1"
 files = ["crates/products/chio-cli/src/cli/process_host/state.rs"]
 first_seen = "fe45c50666"

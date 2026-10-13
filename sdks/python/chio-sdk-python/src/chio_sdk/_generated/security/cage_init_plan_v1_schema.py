@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 5eeeda30a956e0352287f049e9df4bcad380fd2b0e27f4f342e018d182e65033
+# Schema sha256: 83a339b16ea0670b081203ac454622bdf45bafad18137df2cf4e4112444dc48b
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -395,7 +395,7 @@ class Environment(
     ]
 
 
-class ChioCageInitPlanV1(BaseModel):
+class ChioCageInitPlanV2(BaseModel):
     """
     Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.
     """

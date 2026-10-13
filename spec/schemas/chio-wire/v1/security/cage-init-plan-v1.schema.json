@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json",
-  "title": "Chio cage-init plan v2",
+  "title": "Chio cage-init plan v1",
   "description": "Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.",
   "type": "object",
   "additionalProperties": false,

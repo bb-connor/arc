@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json",
-  "title": "Chio signed MCP cage launch policy v2",
+  "title": "Chio signed MCP cage launch policy v1",
   "description": "Canonical signed operator policy for a migration-enforced MCP stdio cage launch.",
   "type": "object",
   "additionalProperties": false,
