@@ -81,7 +81,6 @@ fn non_utf8_value_refuses_the_policy() {
     let error = SessionLifecyclePolicy::from_lookup(|name| {
         (name == SESSION_IDLE_EXPIRY_ENV).then(|| std::ffi::OsString::from_vec(vec![0x31, 0xff]))
     })
-    .err()
-    .expect("non-UTF-8 value must be refused");
+    .expect_err("non-UTF-8 value must be refused");
     assert_eq!(error.to_string(), refusal(SESSION_IDLE_EXPIRY_ENV));
 }
