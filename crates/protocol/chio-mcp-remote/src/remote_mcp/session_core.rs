@@ -124,9 +124,9 @@ const DEFAULT_REQUEST_RESPONSE_TIMEOUT_MILLIS: u64 = 15 * 60 * 1000;
 const IDENTITY_PROVIDER_FETCH_TIMEOUT_SECS: u64 = 5;
 const TOKEN_INTROSPECTION_TIMEOUT_SECS: u64 = 5;
 const IDENTITY_FEDERATION_DERIVATION_LABEL: &[u8] = b"chio.identity_federation.v1";
-const REMOTE_SESSION_RESUME_RECORD_HMAC_LABEL: &[u8] = b"chio.remote_mcp.resume_record_hmac.v2";
-const REMOTE_SESSION_TOMBSTONE_HMAC_LABEL: &[u8] = b"chio.remote_mcp.terminal_tombstone_hmac.v2";
-const REMOTE_SESSION_TERMINAL_FENCE_HMAC_LABEL: &[u8] = b"chio.remote_mcp.terminal_fence_hmac.v2";
+const REMOTE_SESSION_RESUME_RECORD_HMAC_LABEL: &[u8] = b"chio.remote_mcp.resume_record_hmac.v1";
+const REMOTE_SESSION_TOMBSTONE_HMAC_LABEL: &[u8] = b"chio.remote_mcp.terminal_tombstone_hmac.v1";
+const REMOTE_SESSION_TERMINAL_FENCE_HMAC_LABEL: &[u8] = b"chio.remote_mcp.terminal_fence_hmac.v1";
 const REMOTE_SESSION_HMAC_KEYRING_SCHEMA: &str = "chio.remote-mcp.resume-hmac-keyring.v1";
 const MAX_REMOTE_SESSION_HMAC_PREVIOUS_KEYS: usize = 4;
 const MAX_REMOTE_SESSION_HMAC_GRACE_MILLIS: u64 = 7 * 24 * 60 * 60 * 1_000;
@@ -135,7 +135,6 @@ const SESSION_DRAIN_GRACE_ENV: &str = "CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS";
 const SESSION_REAPER_INTERVAL_ENV: &str = "CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS";
 const SESSION_TOMBSTONE_RETENTION_ENV: &str = "CHIO_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS";
 const REQUEST_RESPONSE_TIMEOUT_ENV: &str = "CHIO_MCP_REQUEST_RESPONSE_TIMEOUT_MILLIS";
-const RESUME_RECORD_ENVELOPE_FLOOR_ENV: &str = "CHIO_MCP_RESUME_RECORD_ENVELOPE_FLOOR";
 const SESSION_TOUCH_PERSIST_INTERVAL_MILLIS: u64 = 5_000;
 
 type NotificationTapQueue = Arc<StdMutex<VecDeque<Value>>>;
@@ -252,8 +251,6 @@ struct SessionLifecyclePolicy {
     tombstone_retention_millis: u64,
     /// Bound on a dispatched request's wait for its terminal response.
     request_response_timeout_millis: u64,
-    /// Lowest integrity envelope a session signs its resume record with.
-    resume_envelope_floor: RemoteSessionEnvelope,
 }
 
 impl SessionLifecyclePolicy {
@@ -272,7 +269,6 @@ struct RemoteSessionDiagnosticRecord {
     #[serde(default)]
     ownership: RemoteSessionOwnershipSnapshot,
     terminal_at: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     terminal_reason: Option<TerminalReason>,
 }
 
@@ -292,7 +288,6 @@ struct RemoteSessionResumeRecord {
     peer_capabilities: PeerCapabilities,
     initialize_params: Value,
     issued_capabilities: Vec<CapabilityToken>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     subscriptions: Vec<PersistedSubscription>,
     resume_generation: u64,
     resume_integrity: RemoteSessionIntegrityTag,
@@ -303,8 +298,6 @@ struct RemoteSessionIntegrityTag {
     key_id: String,
     key_version: u64,
     tag: String,
-    #[serde(default, skip_serializing_if = "RemoteSessionEnvelope::is_v2")]
-    envelope: RemoteSessionEnvelope,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -320,8 +313,7 @@ struct RemoteSessionTerminalFence {
     session_id: String,
     terminal_at: u64,
     terminal_state: RemoteSessionState,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    terminal_reason: Option<TerminalReason>,
+    terminal_reason: TerminalReason,
     resume_generation: u64,
     terminal_epoch: u64,
     resume_integrity: RemoteSessionIntegrityTag,
@@ -667,7 +659,6 @@ struct RemoteSession {
     session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
     resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
     resume_generation: AtomicU64,
-    resume_envelope: ResumeEnvelopeRatchet,
     /// Standard resource subscriptions by URI, mapped to their capability id.
     subscriptions: StdMutex<BTreeMap<String, String>>,
     subscription_deadline: StdMutex<session_core_session::SubscriptionDeadline>,
@@ -1061,9 +1052,9 @@ mod session_core_ledger;
 #[path = "session_core/session.rs"]
 mod session_core_session;
 
-#[path = "session_core/envelope.rs"]
-mod session_core_envelope;
-use session_core_envelope::{PersistedSubscription, RemoteSessionEnvelope, ResumeEnvelopeRatchet};
+#[path = "session_core/subscription.rs"]
+mod session_core_subscription;
+use session_core_subscription::PersistedSubscription;
 #[path = "session_core/terminal_reason.rs"]
 mod session_core_terminal_reason;
 use session_core_terminal_reason::{

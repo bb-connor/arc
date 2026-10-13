@@ -235,10 +235,6 @@ async fn restore_retains_records_it_cannot_serve() -> Result<(), Box<dyn std::er
         .is_none());
 
     let mut subscribed = fresh.resume_record()?.ok_or("fresh record")?;
-    assert_eq!(
-        subscribed.resume_integrity.envelope,
-        RemoteSessionEnvelope::V3
-    );
     subscribed.subscriptions = vec![PersistedSubscription::Standard {
         uri: "file:///workspace/notes.txt".into(),
         capability_id: "capability-subscribe".into(),

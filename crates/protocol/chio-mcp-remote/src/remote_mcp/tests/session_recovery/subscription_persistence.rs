@@ -48,7 +48,6 @@ async fn subscription_changes_persist_before_they_take_effect(
     observer.subscribed(URI, "capability-subscribe")?;
     let record = stored(&path, &factory)?;
     assert_eq!(record.subscriptions, expected);
-    assert_eq!(record.resume_integrity.envelope, RemoteSessionEnvelope::V3);
     assert_eq!(session.persisted_subscriptions()?, expected);
 
     let generation = record.resume_generation;
@@ -74,7 +73,6 @@ async fn subscription_changes_persist_before_they_take_effect(
     observer.unsubscribed(URI)?;
     let record = stored(&path, &factory)?;
     assert!(record.subscriptions.is_empty());
-    assert_eq!(record.resume_integrity.envelope, RemoteSessionEnvelope::V3);
     assert!(session.persisted_subscriptions()?.is_empty());
 
     drop((observer, session, factory));

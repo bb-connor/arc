@@ -133,12 +133,6 @@ Hosted session lifecycle tuning now uses these canonical env names:
 - `CHIO_MCP_REQUEST_RESPONSE_TIMEOUT_MILLIS` (default 15 minutes): a
   dispatched request with no terminal response by this bound closes its
   session and receives an outcome-unknown error
-- `CHIO_MCP_RESUME_RECORD_ENVELOPE_FLOOR` (default `v3`): the lowest integrity
-  envelope for signed resume records. Set `v2` only during an upgrade window
-  in which an older binary may still open the session store. A session that
-  has signed or loaded a `v3` record never signs `v2` again, and an older
-  binary treats a `v3` record as malformed and deletes it, so a downgrade
-  loses those sessions rather than restoring them
 
 ## 2. Initial Deployment Procedure
 

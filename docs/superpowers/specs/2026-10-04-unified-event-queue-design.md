@@ -326,6 +326,8 @@ Restored sessions seed sequences from a fresh generation, so ids from an earlier
 
 ## 6. Subscriptions survive restore
 
+As built: Chio is unshipped, so the resume record, terminal fence and terminal tombstone each have one `.v1` integrity schema. The resume record always authenticates its subscription set and the fence always carries its terminal reason. The v2/v3 envelope selection, envelope floor and downgrade handling in A27-A29, and A32's v2 compatibility, do not apply.
+
 Revision 4 persists subscriptions rather than asking clients to re-subscribe, because MCP has no "subscription ended" notification that existing clients understand.
 
 1. **A24. Persisted set.** The resume record gains `subscriptions: Vec<PersistedSubscription>`. Part A covers only standard MCP resource subscriptions, keyed the way the existing session owner keys them: by URI within the session (V3: `chio-kernel/src/kernel/session_ops.rs:319-354`; `chio-mcp-edge/src/runtime/requests.rs:551-582`, `:597-618`). V3 = #1173 at `79d0c8a97`; the seam is unchanged from M:.

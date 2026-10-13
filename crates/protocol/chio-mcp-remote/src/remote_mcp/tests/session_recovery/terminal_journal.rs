@@ -46,7 +46,6 @@ impl Store {
             &self.keyring,
             record,
             TerminalReason::SubscriptionAuthorityLost,
-            RemoteSessionEnvelope::V3,
             2,
             2,
         )
