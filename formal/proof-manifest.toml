@@ -484,9 +484,9 @@ model_kind = "lean"
 relationship = "transliteration"
 rust_source = "crates/core/chio-core-types/src/capability/token.rs"
 rust_symbols = ["CapabilityToken", "CapabilityToken::is_valid_at", "CapabilityToken::is_expired_at"]
-normalized_sha256 = "68e729d7904b165e45044bd50eb9e3c831ce5b4b41c01f00dfd8584b20192098"
+normalized_sha256 = "64080ea14f54f681a53f82875a697a5988c3c8f73c0064af664a652e9231ee8b"
 symbol_sha256 = [
-  { symbol = "CapabilityToken", sha256 = "ccb3f7bb0a72d79e27ccc7d38edc5f61ef2f6d6acee44bf83e8ae80496a2fae3" },
+  { symbol = "CapabilityToken", sha256 = "79b324f68548f452bf5b4b9bce5249266a574e9ddc370819f28ffa280818d621" },
   { symbol = "CapabilityToken::is_valid_at", sha256 = "5f6a6b5921beae84abffed358141eb64d6fd75b961b3c788fdbe8158b970bf18" },
   { symbol = "CapabilityToken::is_expired_at", sha256 = "8155d06ac8056d5d12c2f72e943ec74189da973e69d8d772f9b3dc10eaa92311" },
 ]
