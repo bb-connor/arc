@@ -193,8 +193,11 @@ fn retained_federation_context_is_private_and_bound_to_the_committed_outcome() -
         .map_err(|_| "test lock")?
         .raw_outcome = Some(RawInvocationOutcomeV1::from_persisted(missing)?);
     let (kernel, admissions) = recovered_kernel(&fixture)?;
-    assert!(recover(&kernel, &fixture.request)
-        .is_err_and(|error| error.to_string().contains("outcome.raw_invocation_blob")));
+    assert!(matches!(
+        recover(&kernel, &fixture.request),
+        Err(KernelError::DurableAdmission(message))
+            if message == "binding mismatch: outcome.raw_invocation_blob"
+    ));
     assert_eq!(admissions.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     Ok(())

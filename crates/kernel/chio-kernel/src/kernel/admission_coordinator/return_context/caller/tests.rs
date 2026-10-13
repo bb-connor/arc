@@ -21,6 +21,53 @@ mod participants;
 mod custody;
 
 #[test]
+fn missing_frozen_signer_refuses_return_recording_without_state_changes() -> TestResult {
+    let mut fixture = fixture()?;
+    let now = current_unix_timestamp_ms();
+    let mut context = fixture.kernel.freeze_durable_tool_return_context(
+        &fixture.admission,
+        DurableToolReturnContextInput {
+            request: &fixture.request,
+            matched_grant_index: 0,
+            extra_receipt_metadata: None,
+            pre_invocation_guard_evidence: &[],
+            verified_payee_binding: None,
+            verified_purchase: None,
+            verified_recovery: None,
+            trusted_now_unix_ms: now,
+            security_invocation_context: None,
+            security_release_required: false,
+        },
+    )?;
+    assert!(context.receipt_signing_identity.take().is_some());
+    let operation = fixture.admission.operation.clone();
+    let receipts = fixture.kernel.receipt_log().len();
+    let error = fixture
+        .kernel
+        .record_durable_tool_return(
+            &mut fixture.admission,
+            DurableToolReturnInput {
+                request: &fixture.request,
+                output: &ToolServerOutput::Value(serde_json::json!({"done": true})),
+                reported_cost: None,
+                context: &context,
+                elapsed: std::time::Duration::ZERO,
+                trusted_now_unix_ms: now,
+            },
+        )
+        .err()
+        .ok_or("return without a frozen signer was recorded")?;
+    assert!(
+        matches!(&error, KernelError::DurableAdmission(message)
+            if message == "binding mismatch: raw.receipt_signing_identity"),
+        "unexpected refusal: {error}"
+    );
+    assert_eq!(fixture.admission.operation, operation);
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
+    Ok(())
+}
+
+#[test]
 fn caller_observation_metadata_cannot_be_injected_before_dispatch() -> TestResult {
     let fixture = fixture()?;
     let request = fixture

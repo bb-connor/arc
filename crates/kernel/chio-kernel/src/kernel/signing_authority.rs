@@ -44,18 +44,6 @@ impl ChioKernel {
         })?
     }
 
-    /// Old records remain explicitly unbound. They retain the pre-existing
-    /// current-signer check, never a fabricated admission-time identity.
-    pub(super) fn durable_return_signing_identity(
-        &self,
-        raw: &crate::tool_outcome::RawInvocationOutcomeV1,
-    ) -> Result<crate::tool_outcome::FrozenReceiptSigningIdentityV1, KernelError> {
-        match raw.receipt_signing_identity() {
-            Some(identity) => Ok(identity.clone()),
-            None => self.freeze_receipt_signing_identity(),
-        }
-    }
-
     pub(super) fn require_original_receipt_signer(
         &self,
         identity: &crate::tool_outcome::FrozenReceiptSigningIdentityV1,
@@ -100,7 +88,7 @@ impl ChioKernel {
     /// This configures proposal and ordinary receipt signing, not the separate
     /// capability, child-receipt, session-anchor or checkpoint authorities. It
     /// does not establish witnessed key rotation or qualify an all-artifact PQ
-    /// runtime. The boxed handle is retained for source compatibility.
+    /// runtime.
     ///
     /// # Errors
     ///
