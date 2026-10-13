@@ -135,7 +135,6 @@ pub struct TransportDirectoryEntry {
     /// entry also suppresses its `revocation_signers` from the derived signer
     /// directory, so evicting an operator revokes its oracle signer in the same
     /// bundle.
-    #[serde(default)]
     pub removed: bool,
 }
 
@@ -1454,6 +1453,20 @@ mod tests {
             .remove("revocationSigners")
             .expect("serialized entry carries the field");
         assert!(serde_json::from_value::<TransportDirectoryEntry>(value).is_err());
+    }
+
+    #[test]
+    fn entry_without_removed_field_is_rejected() {
+        let entry = build_entry(&EntrySpec::admitted("did:chio:a", 1, 10));
+        let mut value = serde_json::to_value(&entry).unwrap();
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("removed")
+            .expect("serialized entry carries the field");
+        let error = serde_json::from_value::<TransportDirectoryEntry>(value)
+            .expect_err("entry without removed is refused");
+        assert_eq!(error.to_string(), "missing field `removed`");
     }
 
     #[test]
