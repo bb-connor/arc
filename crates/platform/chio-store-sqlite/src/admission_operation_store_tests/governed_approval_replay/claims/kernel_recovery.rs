@@ -2,7 +2,10 @@ use super::*;
 use chio_kernel::{ChioKernel, KernelConfig};
 
 fn kernel(fixture: &Fixture) -> AnchoredTestResult<ChioKernel> {
-    kernel_with_signer(fixture, Keypair::generate())
+    kernel_with_signer(
+        fixture,
+        super::super::super::retained_request::original_signer()?,
+    )
 }
 
 pub(super) fn kernel_with_signer(

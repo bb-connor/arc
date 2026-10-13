@@ -53,7 +53,7 @@ fn setup(
     AdmissionRecoveryLease,
     DpopReplayCredentialV1,
 )> {
-    let key = Keypair::generate();
+    let key = super::super::retained_request::original_signer()?;
     let (operation, retained) = super::super::retained_request::original_with_intent_and_signer(
         &fixture.fence,
         name,

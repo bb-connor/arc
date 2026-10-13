@@ -36,8 +36,19 @@ pub(super) fn original_with_intent(
     requirements: AdmissionParticipantRequirements,
     governed_intent: Option<chio_core::capability::governance::GovernedTransactionIntent>,
 ) -> TestResult<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)> {
-    let key = Keypair::generate();
-    original_with_intent_and_signer(fence, request_id, requirements, governed_intent, &key)
+    original_with_intent_and_signer(
+        fence,
+        request_id,
+        requirements,
+        governed_intent,
+        &original_signer()?,
+    )
+}
+
+/// Receipt signer frozen into helper-built original requests. A kernel that
+/// recovers these operations must sign with this key.
+pub(super) fn original_signer() -> TestResult<Keypair> {
+    Ok(Keypair::from_seed_hex(&"5a".repeat(32))?)
 }
 
 pub(super) fn original_with_intent_and_signer(

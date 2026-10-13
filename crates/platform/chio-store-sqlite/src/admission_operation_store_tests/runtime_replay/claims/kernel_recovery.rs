@@ -11,7 +11,7 @@ use chio_kernel::{ChioKernel, KernelConfig};
 fn kernel(fixture: &Fixture) -> TestResult<ChioKernel> {
     let mut kernel = ChioKernel::new_with_clock(
         KernelConfig {
-            keypair: Keypair::generate(),
+            keypair: super::super::super::retained_request::original_signer()?,
             ca_public_keys: vec![],
             max_delegation_depth: 5,
             policy_hash: sha256_hex(b"runtime-custody-recovery-test"),
