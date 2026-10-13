@@ -1022,6 +1022,10 @@ pub fn run_episode(seed: u64) -> Result<EpisodeSummary, String> {
         })?;
     }
 
+    match kernel.await_post_effect_evidence() {
+        Ok(()) | Err(KernelError::PostEffectEvidencePending { .. }) => {}
+        Err(error) => return Err(format!("post-effect evidence recovery stopped: {error}")),
+    }
     let receipts = receipt_store.receipts()?;
     oracle_receipt_before_allow(&trace.snapshot()?)?;
     oracle_drop_disposition(

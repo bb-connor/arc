@@ -101,10 +101,11 @@ pub(super) fn fixture() -> TestResult<Fixture> {
         &request.arguments,
         None,
     )?;
+    let post_return_steps = kernel.durable_post_return_plan()?.frozen_steps;
     let original = RetainedToolAdmissionRequestV1::from_admission(
         &request,
         &matching,
-        &[],
+        &post_return_steps,
         None,
         &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
         &kernel.freeze_receipt_signing_identity()?,
@@ -126,7 +127,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
             immutable_tool_request_hash(
                 &request,
                 &matching,
-                &[],
+                &post_return_steps,
                 None,
                 original.authority_profile(),
                 original.frozen_receipt_signing_identity(),
