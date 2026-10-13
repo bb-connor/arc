@@ -171,7 +171,7 @@ fn check_store_identity(
 
 /// The schema version recorded for `store_key`, or `None` when this store has
 /// never stamped one into the database.
-fn read_store_schema_version(
+pub(crate) fn read_store_schema_version(
     conn: &Connection,
     store_key: &str,
 ) -> Result<Option<i32>, SchemaVersionError> {
@@ -220,7 +220,7 @@ fn database_belongs_to_store(
 
 fn user_table_count(conn: &Connection) -> Result<i64, SchemaVersionError> {
     Ok(conn.query_row(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT GLOB 'sqlite_*'",
         [],
         |row| row.get(0),
     )?)
