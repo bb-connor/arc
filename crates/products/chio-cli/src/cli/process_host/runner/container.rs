@@ -11,13 +11,27 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
+use chio_cage::CageEnforcementState;
+use chio_process::{ContainerLaunchFailure, ContainerLaunchRecord, SignedContainerLaunchRecord};
+
 use super::super::state::error;
 use super::child::{self, Outcome, Spawned, Usage};
+use super::container_profile::{self, EffectiveConfig, PROCESS_SOCKET};
 use super::journal::{ContainerWriter, Journal};
 use super::plan::Worker;
 use crate::CliError;
 
 const OWNER: &str = "chio.runner.owner";
+const START_CONFIRMATION_POLLS: u32 = 100;
+const START_CONFIRMATION_INTERVAL: Duration = Duration::from_millis(50);
+
+/// The host authority that signs container launch records and attributes the
+/// confirmed launch to the worker's tool calls.
+pub(super) struct LaunchAuthority {
+    pub key: chio_core::crypto::Keypair,
+    pub clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
+    pub runtime: chio_process::ProcessRuntime,
+}
 
 // The unit suite replaces only the engine executable. All supervision, durable
 // transitions, ownership validation and completion classification remain real.
@@ -110,6 +124,7 @@ async fn control_attempt(arguments: &[&str]) -> Result<Vec<u8>, ControlFailure> 
     let outcome = child::wait_bounded(
         child,
         Vec::new(),
+        None,
         Duration::from_secs(30),
         None,
         Some(65_536),
@@ -275,7 +290,7 @@ pub(super) async fn create(
         "--env=all_proxy=",
         "--env=no_proxy=",
         "--mount",
-        &format!("type=bind,src={socket_text},dst=/run/chio/process.sock,readonly"),
+        &format!("type=bind,src={socket_text},dst={PROCESS_SOCKET},readonly"),
         "--entrypoint",
         &worker.command[0],
         image,
@@ -350,6 +365,20 @@ struct Record {
     started_at: String,
     exit_code: i32,
     oom_killed: bool,
+}
+
+async fn effective_config(id: &str) -> Result<EffectiveConfig, CliError> {
+    let config: EffectiveConfig = decode(
+        &control(&[
+            "container",
+            "inspect",
+            "--format",
+            container_profile::INSPECT_TEMPLATE,
+            id,
+        ])
+        .await?,
+    )?;
+    Ok(config.normalized())
 }
 
 async fn inspect(id: &str) -> Result<Record, CliError> {
@@ -535,6 +564,127 @@ fn attachment_client(reason: &str) -> Option<&'static str> {
 #[path = "container_tests.rs"]
 mod tests;
 
+/// One attempt's launch evidence. Exactly one signed record is committed per
+/// `(process, attempt)`, and the worker bootstrap, which alone carries the
+/// attempt's credential, is written only after a `FullyEnforced` record.
+struct LaunchEvidence<'a> {
+    authority: &'a LaunchAuthority,
+    process: &'a str,
+    attempt: u32,
+    image: &'a str,
+    engine: &'a str,
+    container_id: String,
+    expected: EffectiveConfig,
+}
+
+impl LaunchEvidence<'_> {
+    fn record(
+        &self,
+        state: CageEnforcementState,
+        inspected_config_digest: Option<String>,
+        started_at: Option<String>,
+        failure_class: Option<ContainerLaunchFailure>,
+    ) -> Result<ContainerLaunchRecord, CliError> {
+        let failed_at_unix_ms = match failure_class {
+            Some(_) => Some(self.authority.clock.unix_millis().map_err(error)?.get()),
+            None => None,
+        };
+        Ok(ContainerLaunchRecord {
+            schema: chio_process::CONTAINER_LAUNCH_RECORD_SCHEMA.to_owned(),
+            process_id: self.process.to_owned(),
+            attempt: self.attempt,
+            image_id: self.image.to_owned(),
+            container_id: self.container_id.clone(),
+            engine_identity: self.engine.to_owned(),
+            profile_digest: self.expected.digest()?,
+            inspected_config_digest,
+            state,
+            started_at,
+            failed_at_unix_ms,
+            failure_class,
+        })
+    }
+
+    fn commit(
+        &self,
+        writer: &mut ContainerWriter,
+        record: ContainerLaunchRecord,
+    ) -> Result<SignedContainerLaunchRecord, CliError> {
+        let signed =
+            SignedContainerLaunchRecord::sign(record, &self.authority.key).map_err(error)?;
+        writer.launch_recorded(&signed)?;
+        Ok(signed)
+    }
+
+    fn fail(
+        &self,
+        writer: &mut ContainerWriter,
+        state: CageEnforcementState,
+        failure: ContainerLaunchFailure,
+        inspected_config_digest: Option<String>,
+    ) -> Result<(), CliError> {
+        let record = self.record(state, inspected_config_digest, None, Some(failure))?;
+        self.commit(writer, record).map(|_| ())
+    }
+
+    /// Require the started object to be the exact owned container, running,
+    /// with an engine start time and the configuration inspected before start.
+    async fn confirm_start(&self, lease: &Lease) -> Result<(String, String), CliError> {
+        for _ in 0..START_CONFIRMATION_POLLS {
+            let record = inspect(&self.container_id).await?;
+            owned(lease, &record)?;
+            if record.running {
+                let started = chrono::DateTime::parse_from_rfc3339(&record.started_at)
+                    .is_ok_and(|started| chrono::Datelike::year(&started) > 1);
+                let observed = effective_config(&self.container_id).await?;
+                if !started || observed != self.expected {
+                    return Err(error("started container differs from its inspected launch"));
+                }
+                return Ok((record.started_at, observed.digest()?));
+            }
+            if record.status != "created" {
+                return Err(error("container stopped before its launch was confirmed"));
+            }
+            tokio::time::sleep(START_CONFIRMATION_INTERVAL).await;
+        }
+        Err(error("container start was not confirmed"))
+    }
+
+    async fn confirm_and_release(
+        &self,
+        writer: &mut ContainerWriter,
+        lease: &Lease,
+        release: tokio::sync::oneshot::Sender<()>,
+    ) -> Result<(), CliError> {
+        let (started_at, digest) = match self.confirm_start(lease).await {
+            Ok(confirmed) => confirmed,
+            Err(failure) => {
+                self.fail(
+                    writer,
+                    CageEnforcementState::BootstrapFailed,
+                    ContainerLaunchFailure::StartUnconfirmed,
+                    None,
+                )?;
+                return Err(failure);
+            }
+        };
+        let record = self.record(
+            CageEnforcementState::FullyEnforced,
+            Some(digest),
+            Some(started_at),
+            None,
+        )?;
+        let signed = self.commit(writer, record)?;
+        self.authority
+            .runtime
+            .bind_worker_profile(self.process, signed.worker_profile().map_err(error)?)
+            .map_err(error)?;
+        release
+            .send(())
+            .map_err(|()| error("worker attachment ended before its bootstrap"))
+    }
+}
+
 /// Supervision, including removal on timeout, runs in its own scheduler slot.
 /// Cancelling the task kills the Docker client; the runner then reconciles all
 /// durable container records before releasing its host lock.
@@ -544,22 +694,77 @@ pub(super) async fn run(
     worker: Worker,
     socket: std::path::PathBuf,
     input: Vec<u8>,
+    attempt: u32,
+    authority: std::sync::Arc<LaunchAuthority>,
 ) -> (Result<Outcome, CliError>, Cleanup) {
     let result: Result<Outcome, CliError> = async {
         create(&mut writer, &mut lease, &worker, &socket).await?;
-        let attachment = match attach(&lease) {
-            Ok(spawned) => child::wait_bounded(
+        let image = &worker
+            .container
+            .as_ref()
+            .ok_or_else(|| error("missing container profile"))?
+            .image;
+        let evidence = LaunchEvidence {
+            authority: &authority,
+            process: &worker.process,
+            attempt,
+            image,
+            engine: &lease.engine,
+            container_id: lease
+                .id
+                .clone()
+                .ok_or_else(|| error("container ID not committed"))?,
+            expected: container_profile::fixed(
+                image,
+                rustix::process::getuid().as_raw(),
+                rustix::process::getgid().as_raw(),
+                socket
+                    .to_str()
+                    .ok_or_else(|| error("container socket path must be UTF-8"))?,
+            ),
+        };
+        let observed = effective_config(&evidence.container_id).await?;
+        if observed != evidence.expected {
+            evidence.fail(
+                &mut writer,
+                CageEnforcementState::Rejected,
+                ContainerLaunchFailure::ProfileMismatch,
+                Some(observed.digest()?),
+            )?;
+            return Err(error(
+                "container configuration differs from the fixed worker profile; it was not started",
+            ));
+        }
+        let (release, released) = tokio::sync::oneshot::channel();
+        let spawned = match attach(&lease) {
+            Ok(spawned) => spawned,
+            Err(failure) => {
+                evidence.fail(
+                    &mut writer,
+                    CageEnforcementState::BootstrapFailed,
+                    ContainerLaunchFailure::StartFailed,
+                    None,
+                )?;
+                return observe_attachment(&lease, Err(failure)).await;
+            }
+        };
+        let (attachment, confirmed) = tokio::join!(
+            child::wait_bounded(
                 spawned,
                 input,
+                Some(released),
                 Duration::from_secs(worker.timeout_seconds),
                 None,
                 Some(2 * 1024 * 1024),
-            )
-            .await
-            .map_err(CliError::from),
-            Err(failure) => Err(failure),
-        };
-        observe_attachment(&lease, attachment).await
+            ),
+            evidence.confirm_and_release(&mut writer, &lease, release),
+        );
+        authority
+            .runtime
+            .clear_worker_profile(&worker.process)
+            .map_err(error)?;
+        confirmed?;
+        observe_attachment(&lease, attachment.map_err(CliError::from)).await
     }
     .await;
     let result = result.or_else(|failure| {

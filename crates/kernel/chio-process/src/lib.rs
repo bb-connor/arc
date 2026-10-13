@@ -20,6 +20,7 @@
 
 #![forbid(unsafe_code)]
 
+mod container_launch;
 #[cfg(test)]
 mod integrity_tests;
 #[cfg(feature = "mailboxes")]
@@ -44,6 +45,10 @@ use chio_kernel::{ChioKernel, ToolCallRequest, ToolCallResponse, Verdict};
 use serde::Serialize;
 use serde_json::{json, Value};
 
+pub use container_launch::{
+    ContainerLaunchFailure, ContainerLaunchRecord, LaunchRef, SignedContainerLaunchRecord,
+    WorkerProfile, WorkerProfileKind, CONTAINER_LAUNCH_RECORD_SCHEMA,
+};
 pub use registry::{ChildSubmission, ChildWork, ProcessRegistry, WorkerWait};
 pub use routes::{ProcessLaunchReceipt, ProcessRoute};
 pub use security::ProcessSecurityProfile;
@@ -79,6 +84,7 @@ pub struct ProcessRuntime {
     namespace: String,
     routes: Arc<BTreeMap<String, ProcessRoute>>,
     launch_receipts: Arc<BTreeMap<String, ProcessLaunchReceipt>>,
+    worker_profiles: Arc<Mutex<BTreeMap<String, WorkerProfile>>>,
     security_profile: Option<ProcessSecurityProfile>,
     supplemental_routes: Arc<BTreeMap<String, String>>,
 }
@@ -101,6 +107,7 @@ impl ProcessRuntime {
             namespace,
             routes: Arc::new(BTreeMap::new()),
             launch_receipts: Arc::new(BTreeMap::new()),
+            worker_profiles: Arc::new(Mutex::new(BTreeMap::new())),
             security_profile: None,
             supplemental_routes: Arc::new(BTreeMap::new()),
         })
@@ -190,6 +197,30 @@ impl ProcessRuntime {
         }
         self.launch_receipts = Arc::new(selected);
         Ok(self)
+    }
+
+    /// Bind the host's verified worker-lane profile to the process's current
+    /// launch attempt. Tool receipts attribute it until it is cleared.
+    pub fn bind_worker_profile(
+        &self,
+        process_id: &str,
+        profile: WorkerProfile,
+    ) -> Result<(), ProcessError> {
+        validate_id(process_id)?;
+        self.worker_profiles
+            .lock()
+            .map_err(|_| ProcessError::StorePoisoned)?
+            .insert(process_id.to_owned(), profile);
+        Ok(())
+    }
+
+    /// End the attribution when the profile's launch attempt ends.
+    pub fn clear_worker_profile(&self, process_id: &str) -> Result<(), ProcessError> {
+        self.worker_profiles
+            .lock()
+            .map_err(|_| ProcessError::StorePoisoned)?
+            .remove(process_id);
+        Ok(())
     }
 
     /// Persistent namespace used to bind logical operation and receipt identities.
@@ -460,14 +491,22 @@ impl ProcessRuntime {
                     "operation_key": operation_key, "request_sha256": request_hash,
                     "attempt": attempt}
             });
+            let process_fields = attribution
+                .get_mut("chio_process")
+                .and_then(Value::as_object_mut)
+                .ok_or(ProcessError::Invalid(
+                    "process attribution must be an object",
+                ))?;
             if known_outcome_only {
-                attribution
-                    .get_mut("chio_process")
-                    .and_then(Value::as_object_mut)
-                    .ok_or(ProcessError::Invalid(
-                        "process attribution must be an object",
-                    ))?
-                    .insert("recovery_policy".into(), json!("known_outcome_only"));
+                process_fields.insert("recovery_policy".into(), json!("known_outcome_only"));
+            }
+            if let Some(profile) = self
+                .worker_profiles
+                .lock()
+                .map_err(|_| ProcessError::StorePoisoned)?
+                .get(process_id)
+            {
+                process_fields.insert("worker_profile".into(), serde_json::to_value(profile)?);
             }
             let attribution_fields = attribution.as_object_mut().ok_or(ProcessError::Invalid(
                 "process attribution must be an object",
