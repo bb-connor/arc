@@ -21688,6 +21688,7 @@
       "validate_dispatch_authorization::shared-reader::crates/security/chio-quarantine/src/executor_proof.rs::applying_response_record"
     ],
     "crates/security/chio-quarantine/src/fuzz.rs": [
+      "drive::shared-reader::crates/core/chio-response-model/src/simulation.rs::evaluate_response_simulation",
       "response_lifecycle::shared-reader::crates/security/chio-quarantine/src/fuzz.rs::drive"
     ],
     "crates/security/chio-quarantine/src/rules.rs": [
