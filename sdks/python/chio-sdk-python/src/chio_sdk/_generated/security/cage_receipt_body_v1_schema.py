@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 134bcf5f7a1c21c17db9942de59edf0bc67aa92d820f3d66aa78326a9f8a0110
+# Schema sha256: d6aaec4ed51eb065046d70c889ee0c5ee55ba93a4e4d227df67e0404ba4fd9a5
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
