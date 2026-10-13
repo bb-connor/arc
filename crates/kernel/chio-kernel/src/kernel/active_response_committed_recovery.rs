@@ -144,11 +144,7 @@ impl PreparedActiveResponseAdmission {
             }
         };
         let binding = PreparedActiveResponseDispatchBinding {
-            schema_version: if admission_artifact_fingerprint.is_some() {
-                PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION
-            } else {
-                1
-            },
+            schema_version: PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
             tenant_id: response_plan.tenant_id.clone(),
             action_id: response_plan.action_id.clone(),
             plan_hash: response_plan.plan_hash,
@@ -1012,6 +1008,12 @@ fn validate_prepared_binding(
     ),
     KernelError,
 > {
+    let admission_artifact_fingerprint =
+        binding
+            .admission_artifact_fingerprint
+            .ok_or(KernelError::ResponseDispatchRejected(
+                chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+            ))?;
     binding
         .validate_for_plan(response_plan)
         .map_err(|error| never_committed_denied(error.to_string()))?;
@@ -1049,18 +1051,9 @@ fn validate_prepared_binding(
         &digest_hex(&binding.policy_decision_hash),
         binding.authorized_at_unix_ms,
         &approval,
+        &admission_artifact_fingerprint,
     )
     .map_err(|error| active_response_denied(error.to_string()))?;
-    let expected_dispatch_id = match binding.admission_artifact_fingerprint {
-        Some(fingerprint) => {
-            super::active_response_executor::bind_active_response_dispatch_id_to_artifact(
-                &expected_dispatch_id,
-                &fingerprint,
-            )
-            .map_err(|error| active_response_denied(error.to_string()))?
-        }
-        None => expected_dispatch_id,
-    };
     if expected_dispatch_id != binding.dispatch_id {
         return Err(never_committed_denied(
             "prepared dispatch identifier is not canonical for its durable binding",
@@ -1234,6 +1227,11 @@ fn validate_committed_dispatch(
         ));
     }
     let authorization = committed.authorization();
+    let admission_artifact_fingerprint = authorization.body.admission_artifact_fingerprint.ok_or(
+        KernelError::ResponseDispatchRejected(
+            chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+        ),
+    )?;
     let canonical_authorization = canonical_json_bytes(&authorization.body).map_err(|error| {
         committed_recovery_internal(format!(
             "committed dispatch authorization canonicalization failed: {error}"
@@ -1246,7 +1244,7 @@ fn validate_committed_dispatch(
         || authorization.body_hash.is_zero()
         || !matches!(
             (body.schema_version, body.admission_artifact_fingerprint),
-            (1, None) | (RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION, Some(_))
+            (RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION, Some(_))
         )
         || body.key.tenant_id != expected_plan.tenant_id
         || &body.key.dispatch_id != expected_dispatch_id
@@ -1367,18 +1365,9 @@ fn validate_committed_dispatch(
         &policy_decision_hash,
         body.authorized_at_unix_ms,
         &approval,
+        &admission_artifact_fingerprint,
     )
     .map_err(|error| active_response_denied(error.to_string()))?;
-    let derived_dispatch_id = match body.admission_artifact_fingerprint {
-        Some(fingerprint) => {
-            super::active_response_executor::bind_active_response_dispatch_id_to_artifact(
-                &derived_dispatch_id,
-                &fingerprint,
-            )
-            .map_err(|error| active_response_denied(error.to_string()))?
-        }
-        None => derived_dispatch_id,
-    };
     if &derived_dispatch_id != expected_dispatch_id {
         return Err(committed_recovery_denied(
             "committed dispatch identifier is not the canonical recovery identifier",

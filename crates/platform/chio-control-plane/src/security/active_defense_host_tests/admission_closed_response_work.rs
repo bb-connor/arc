@@ -158,6 +158,7 @@ impl AttestedFindingResponseCoordinator for ExecutingResponseCoordinator {
         _: AttestedFindingAdmissionArtifacts,
     ) -> PortResult<PreparedAttestedFindingResponse> {
         let response_plan = plan.response_plan();
+        let artifact_fingerprint = Digest32::new([0x73; 32]);
         let dispatch_id = chio_kernel::derive_active_response_dispatch_id(
             response_plan,
             &self.identity,
@@ -171,11 +172,6 @@ impl AttestedFindingResponseCoordinator for ExecutingResponseCoordinator {
             &hex::encode(POLICY_DECISION_HASH),
             response_plan.created_at_unix_ms,
             &chio_kernel::ActiveResponseExecutionApproval::Automatic,
-        )
-        .map_err(|_| PortError::integrity_failure())?;
-        let artifact_fingerprint = Digest32::new([0x73; 32]);
-        let dispatch_id = chio_kernel::bind_active_response_dispatch_id_to_artifact(
-            &dispatch_id,
             &artifact_fingerprint,
         )
         .map_err(|_| PortError::integrity_failure())?;

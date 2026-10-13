@@ -125,6 +125,7 @@ pub enum ActiveResponseDispatchIdError {
 }
 
 /// Derive the canonical dispatch identifier shared by the kernel and durable executor.
+#[allow(clippy::too_many_arguments)]
 pub fn derive_active_response_dispatch_id(
     response_plan: &ResponsePlan,
     executor_authority: &ActiveResponseExecutorAuthorityIdentity,
@@ -133,13 +134,14 @@ pub fn derive_active_response_dispatch_id(
     policy_decision_hash: &str,
     authorized_at_unix_ms: u64,
     approval: &ActiveResponseExecutionApproval,
+    admission_artifact_fingerprint: &Digest32,
 ) -> Result<RecordId, ActiveResponseDispatchIdError> {
     if authorized_at_unix_ms < response_plan.created_at_unix_ms
         || authorized_at_unix_ms >= response_plan.expires_at_unix_ms
     {
         return Err(ActiveResponseDispatchIdError::AuthorizationTimeOutsidePlan);
     }
-    dispatch_identity::derive_legacy_dispatch_id(dispatch_identity::DispatchIdentity {
+    dispatch_identity::derive_dispatch_id(dispatch_identity::DispatchIdentity {
         tenant_id: &response_plan.tenant_id,
         action_id: &response_plan.action_id,
         plan_hash: &response_plan.plan_hash,
@@ -150,30 +152,11 @@ pub fn derive_active_response_dispatch_id(
         policy_decision_hash,
         authorized_at_unix_ms,
         approval,
+        admission_artifact_fingerprint,
     })
 }
 
-/// Bind the existing immutable dispatch identity to its exact original artifact.
-/// This pure commitment grants no admission authority.
-pub fn bind_active_response_dispatch_id_to_artifact(
-    legacy_dispatch_id: &RecordId,
-    fingerprint: &Digest32,
-) -> Result<RecordId, ActiveResponseDispatchIdError> {
-    if fingerprint.is_zero() {
-        return Err(ActiveResponseDispatchIdError::InvalidIdentifier(
-            "admission artifact fingerprint is zero".to_string(),
-        ));
-    }
-    let canonical = canonical_json_bytes(&(legacy_dispatch_id, fingerprint))
-        .map_err(|error| ActiveResponseDispatchIdError::Canonicalization(error.to_string()))?;
-    let mut bytes = b"chio.active-response-artifact-dispatch.v2\0".to_vec();
-    bytes.extend_from_slice(&canonical);
-    RecordId::new(format!("active_response_dispatch_{}", sha256_hex(&bytes)))
-        .map_err(|error| ActiveResponseDispatchIdError::InvalidIdentifier(error.to_string()))
-}
-
-/// Derive the original governed identity from durable anchor and compact evidence.
-/// The terminal caller independently validates the signed response window/shape.
+/// Derive the governed dispatch identity from durable anchor and compact evidence.
 pub(in crate::kernel) fn derive_active_response_terminal_dispatch_id(
     binding: &chio_security_types::ResponseExecutionDispatchBinding,
     anchor: &super::active_response_operation_binding::ActiveResponseOperationAnchor,
@@ -185,23 +168,27 @@ pub(in crate::kernel) fn derive_active_response_terminal_dispatch_id(
         admission_operation_version: original_dispatch_version,
         approval_set_hash: anchor.approval_set_hash.clone(),
     };
-    let legacy =
-        dispatch_identity::derive_legacy_dispatch_id(dispatch_identity::DispatchIdentity {
-            tenant_id: &binding.tenant_id,
-            action_id: &binding.action_id,
-            plan_hash: &binding.plan_hash,
-            executor_authority_id: &anchor.executor_authority_id,
-            executor_authority_generation: anchor.executor_authority_generation,
-            authorization_capability_hash: &anchor.authorization_capability_hash,
-            governed_intent_hash: &anchor.governed_intent_hash,
-            policy_decision_hash: &anchor.policy_decision_hash,
-            authorized_at_unix_ms: anchor.authorized_at_unix_ms,
-            approval: &approval,
+    let admission_artifact_fingerprint = anchor
+        .admission_artifact_fingerprint
+        .as_ref()
+        .ok_or_else(|| {
+            ActiveResponseDispatchIdError::InvalidIdentifier(
+                "admission artifact fingerprint is missing".to_string(),
+            )
         })?;
-    match anchor.admission_artifact_fingerprint {
-        Some(fingerprint) => bind_active_response_dispatch_id_to_artifact(&legacy, &fingerprint),
-        None => Ok(legacy),
-    }
+    dispatch_identity::derive_dispatch_id(dispatch_identity::DispatchIdentity {
+        tenant_id: &binding.tenant_id,
+        action_id: &binding.action_id,
+        plan_hash: &binding.plan_hash,
+        executor_authority_id: &anchor.executor_authority_id,
+        executor_authority_generation: anchor.executor_authority_generation,
+        authorization_capability_hash: &anchor.authorization_capability_hash,
+        governed_intent_hash: &anchor.governed_intent_hash,
+        policy_decision_hash: &anchor.policy_decision_hash,
+        authorized_at_unix_ms: anchor.authorized_at_unix_ms,
+        approval: &approval,
+        admission_artifact_fingerprint,
+    })
 }
 
 /// Closed durable result of one committed active-response dispatch.

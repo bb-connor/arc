@@ -76,7 +76,7 @@ pub(super) fn build_active_response_execution_request(
     let admission_artifact_fingerprint =
         super::active_response_artifact::active_response_admission_artifact_fingerprint(request)?;
     let plan_body_hash = digest_hex(&response_plan.plan_hash);
-    let legacy_dispatch_id = derive_active_response_dispatch_id(
+    let dispatch_id = derive_active_response_dispatch_id(
         response_plan,
         &executor_authority,
         &authorization_capability_hash,
@@ -84,14 +84,9 @@ pub(super) fn build_active_response_execution_request(
         policy_decision_hash,
         authorized_at_unix_ms,
         &approval,
+        &admission_artifact_fingerprint,
     )
     .map_err(|error| active_response_denied(error.to_string()))?;
-    let dispatch_id =
-        super::active_response_executor::bind_active_response_dispatch_id_to_artifact(
-            &legacy_dispatch_id,
-            &admission_artifact_fingerprint,
-        )
-        .map_err(|error| active_response_denied(error.to_string()))?;
     ActiveResponseExecutionRequest::from_fresh(
         request.fresh_live_admission(),
         ActiveResponseExecutionRequestParts {
@@ -615,11 +610,8 @@ pub(super) fn validate_active_response_terminal_executor_receipt(
             && *admission_operation_version == expected_dispatch_version
             && digest_hex(approval_set_hash) == persisted_approval_set_hash
     );
-    let expected_dispatch_schema = if anchor.admission_artifact_fingerprint.is_some() {
-        chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
-    } else {
-        1
-    };
+    let expected_dispatch_schema =
+        chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION;
     let expected_dispatch_id =
         super::active_response_executor::derive_active_response_terminal_dispatch_id(
             execution_dispatch,

@@ -1,4 +1,4 @@
-//! Existing-record serialization checks at the private executor boundary.
+//! Stored artifacts bind to the independently validated execution request.
 use super::super::tests::Harness;
 use super::*;
 use chio_core::{canonical_json_bytes, sha256};
@@ -102,8 +102,6 @@ fn reject_other_binding(fingerprint: Option<Digest32>) -> TestResult {
         original.authorization.body.key
     );
     assert_eq!(alternate.initial_work, original.initial_work);
-    // The two stored artifacts are internally coherent. Only their equality
-    // with the independently validated original request can refuse this case.
     harness
         .executor
         .response_executor
@@ -125,52 +123,43 @@ fn existing_dispatch_rejects_other_coherent_artifact_fingerprint() -> TestResult
 }
 
 #[test]
-fn existing_dispatch_rejects_coherent_legacy_downgrade_of_bound_request() -> TestResult {
+fn existing_dispatch_rejects_missing_artifact_fingerprint() -> TestResult {
     reject_other_binding(None)
 }
 
 #[test]
-fn existing_dispatch_accepts_exact_coherent_legacy_request() -> TestResult {
+fn committed_admission_rejects_missing_artifact_fingerprint() -> TestResult {
     let harness = Harness::new();
     let mut raw = harness.governed_request();
     raw.origin = ActiveResponseExecutionOrigin::CommittedAdmission;
     raw.admission_artifact_fingerprint = None;
-    raw.dispatch_id = derive_active_response_dispatch_id(
-        &raw.response_plan,
-        &raw.executor_authority,
-        &raw.authorization_capability_hash,
-        &raw.governed_intent_hash,
-        &raw.policy_decision_hash,
-        raw.authorized_at_unix_ms,
-        &raw.approval,
-    )?;
-    let validated = harness.executor.validate_execution_request(raw.clone())?;
-    let record = commit_without_effects(&harness, &raw)?;
-    assert_eq!(record.authorization.body.schema_version, 1);
-    assert_eq!(
-        record.authorization.body.admission_artifact_fingerprint,
-        None
-    );
+    let result = harness.executor.validate_execution_request(raw);
     assert!(
-        !std::str::from_utf8(record.authorization.canonical_body.as_bytes())?
-            .contains("admission_artifact_fingerprint")
-    );
-    harness
-        .executor
-        .validate_existing_dispatch(&validated, &record)?;
-    assert_eq!(
-        harness
-            .executor
-            .store
-            .load_dispatch(&record.authorization.body.key)?,
-        ResponseDispatchLoadOutcome::Found(Box::new(record.clone()))
+        matches!(
+            result,
+            Err(ActiveResponseExecutorError::DispatchRejectedBeforeCommit(
+                chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+            ))
+        ),
+        "committed admission without an artifact fingerprint must be refused"
     );
     assert_eq!(harness.effect_executions(), 0);
-    let rows: i64 = rusqlite::Connection::open(&harness.database_path)?.query_row(
-        "SELECT COUNT(*) FROM security_response_automatic_preparations",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(rows, 0);
+    Ok(())
+}
+
+#[test]
+fn committed_dispatch_rejects_missing_artifact_fingerprint() -> TestResult {
+    let harness = Harness::new();
+    let mut raw = harness.governed_request();
+    raw.origin = ActiveResponseExecutionOrigin::CommittedDispatch;
+    raw.admission_artifact_fingerprint = None;
+    let result = harness.executor.validate_execution_request(raw);
+    assert!(matches!(
+        result,
+        Err(ActiveResponseExecutorError::DispatchRejectedBeforeCommit(
+            chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+        ))
+    ));
+    assert_eq!(harness.effect_executions(), 0);
     Ok(())
 }

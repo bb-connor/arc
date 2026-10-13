@@ -226,13 +226,9 @@ fn two_kernel_fixture(
         &digest_hex(&policy_decision_hash),
         authorized_at_unix_ms,
         &execution_approval,
-    )
-    .expect("automatic dispatch id");
-    let dispatch_id = crate::bind_active_response_dispatch_id_to_artifact(
-        &dispatch_id,
         &admission_artifact_fingerprint,
     )
-    .expect("artifact-bound dispatch id");
+    .expect("automatic dispatch id");
     let binding = PreparedActiveResponseDispatchBinding {
         schema_version: PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
         tenant_id: response_plan.tenant_id.clone(),
@@ -680,4 +676,20 @@ fn digest_hex(digest: &Digest32) -> String {
         output.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     output
+}
+
+#[test]
+fn automatic_fence_rejects_missing_artifact_fingerprint() {
+    let mut fixture = two_kernel_fixture(None, None);
+    fixture.binding.admission_artifact_fingerprint = None;
+    let result = fixture
+        .termination_kernel
+        .terminate_never_committed_active_response(&fixture.response_plan, &fixture.binding, None);
+    assert!(matches!(
+        result,
+        Err(KernelError::ResponseDispatchRejected(
+            chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+        ))
+    ));
+    assert_eq!(fixture.authority.state(), DurableDispatchState::Open);
 }

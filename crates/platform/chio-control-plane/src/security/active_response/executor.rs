@@ -3,13 +3,12 @@ use super::tests;
 #[cfg(test)]
 use super::PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION;
 use super::{
-    bind_active_response_dispatch_id_to_artifact, committed_readback, decode_lower_hex_digest,
-    decode_response_record, derive_active_response_dispatch_id, digest_is_zero,
-    has_durable_execution_proof, readiness, recovery_id, valid_prefixed_digest_id,
-    validate_lease_duration, ActiveResponseCommittedDispatch, ActiveResponseEffectEvidence,
-    ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
-    ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOrigin,
-    ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
+    committed_readback, decode_lower_hex_digest, decode_response_record,
+    derive_active_response_dispatch_id, digest_is_zero, has_durable_execution_proof, readiness,
+    recovery_id, valid_prefixed_digest_id, validate_lease_duration,
+    ActiveResponseCommittedDispatch, ActiveResponseEffectEvidence, ActiveResponseExecutionApproval,
+    ActiveResponseExecutionEvidence, ActiveResponseExecutionEvidenceParts,
+    ActiveResponseExecutionOrigin, ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
     ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
     ActiveResponseExecutorError, ActiveResponseFailedEffectEvidence, ActiveResponseFailureEvidence,
     ActiveResponseReceiptProofSource, ActiveResponseRequestSource, Arc,
@@ -102,17 +101,13 @@ impl<
             &policy_decision_hash,
             authorized_at_unix_ms,
             &approval,
+            &artifact_fingerprint,
         )
         .map_err(|error| {
             ActiveResponseExecutorError::RejectedBeforeCommit(format!(
                 "automatic test dispatch identifier is invalid: {error}"
             ))
         })?;
-        let dispatch_id =
-            bind_active_response_dispatch_id_to_artifact(&dispatch_id, &artifact_fingerprint)
-                .map_err(|error| {
-                    ActiveResponseExecutorError::RejectedBeforeCommit(error.to_string())
-                })?;
         let request = RawActiveResponseExecutionRequest {
             dispatch_id,
             request_id: response_plan.action_id.as_str().to_string(),
@@ -289,6 +284,11 @@ impl<
                 "dispatch-committed resume requires governed approval",
             ));
         }
+        let admission_artifact_fingerprint = raw.admission_artifact_fingerprint.ok_or(
+            ActiveResponseExecutorError::DispatchRejectedBeforeCommit(
+                chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+            ),
+        )?;
         let expected_dispatch_id = derive_active_response_dispatch_id(
             &raw.response_plan,
             &raw.executor_authority,
@@ -297,20 +297,9 @@ impl<
             &raw.policy_decision_hash,
             raw.authorized_at_unix_ms,
             &raw.approval,
+            &admission_artifact_fingerprint,
         )
         .map_err(|_| reject("active-response dispatch identifier derivation failed"))?;
-        let expected_dispatch_id = match raw.admission_artifact_fingerprint {
-            Some(fingerprint) => {
-                bind_active_response_dispatch_id_to_artifact(&expected_dispatch_id, &fingerprint)
-                    .map_err(|_| reject("bound dispatch identifier derivation failed"))?
-            }
-            None if raw.origin != ActiveResponseExecutionOrigin::Fresh => expected_dispatch_id,
-            None => {
-                return Err(ActiveResponseExecutorError::DispatchRejectedBeforeCommit(
-                    chio_security_types::DispatchRejection::UnboundArtifactPreparation,
-                ))
-            }
-        };
         if expected_dispatch_id != raw.dispatch_id {
             return Err(reject(
                 "active-response dispatch identifier is not canonical for the request",
@@ -781,6 +770,11 @@ impl<
     ) -> Result<(), ActiveResponseExecutorError> {
         let reject =
             |reason: &str| ActiveResponseExecutorError::RejectedBeforeCommit(reason.to_string());
+        let admission_artifact_fingerprint = binding.admission_artifact_fingerprint.ok_or(
+            ActiveResponseExecutorError::DispatchRejectedBeforeCommit(
+                chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+            ),
+        )?;
         binding
             .validate_for_plan(response_plan)
             .map_err(|_| reject("automatic active-response dispatch fence binding is invalid"))?;
@@ -806,15 +800,9 @@ impl<
             &hex::encode(binding.policy_decision_hash.as_bytes()),
             binding.authorized_at_unix_ms,
             &ActiveResponseExecutionApproval::Automatic,
+            &admission_artifact_fingerprint,
         )
         .map_err(|_| reject("automatic active-response dispatch fence id derivation failed"))?;
-        let expected_dispatch_id = match binding.admission_artifact_fingerprint {
-            Some(fingerprint) => {
-                bind_active_response_dispatch_id_to_artifact(&expected_dispatch_id, &fingerprint)
-                    .map_err(|_| reject("bound fence identifier derivation failed"))?
-            }
-            None => expected_dispatch_id,
-        };
         if expected_dispatch_id != binding.dispatch_id {
             return Err(reject(
                 "automatic active-response dispatch fence id is not canonical for the binding",

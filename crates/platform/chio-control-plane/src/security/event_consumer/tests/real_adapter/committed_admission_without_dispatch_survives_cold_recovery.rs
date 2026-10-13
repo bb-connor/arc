@@ -28,7 +28,11 @@ fn committed_admission_without_dispatch_survives_cold_recovery() {
             // The committed authorization must precede the store's trusted
             // clock. The executor clock deliberately models later recovery.
             authorized_at_unix_ms: plan.created_at_unix_ms,
-            response_plan: plan.clone(),
+            admission_request: fixture
+                .artifacts
+                .clone()
+                .into_admission_request(plan.clone())
+                .unwrap_or_else(|error| panic!("committed admission request: {error}")),
         },
         &approval_set,
     )

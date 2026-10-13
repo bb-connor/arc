@@ -40,16 +40,14 @@ pub fn execution_request(fixture: ExecutionRequestFixture) -> ActiveResponseExec
 }
 
 pub struct CommittedAdmissionFixture {
-    pub response_plan: ResponsePlan,
+    pub admission_request: super::super::ActiveResponseAdmissionRequest,
     pub executor_authority: ActiveResponseExecutorAuthorityIdentity,
     pub governed_intent_hash: String,
     pub policy_decision_hash: String,
     pub authorized_at_unix_ms: u64,
 }
 
-/// Seed the durable boundary left by an older binary, without constructing a
-/// fresh admission or an execution permit. Recovery must still verify the real
-/// operation, approval reservation and anchor before it can prepare a dispatch.
+/// Seed a committed admission with its exact authorization artifact.
 pub fn seed_committed_admission(
     kernel: &super::super::ChioKernel,
     fixture: CommittedAdmissionFixture,
@@ -59,14 +57,20 @@ pub fn seed_committed_admission(
     Box<dyn std::error::Error>,
 > {
     use super::super::active_response_operation_binding::{
-        active_response_dispatch_operation_version, build_active_response_operation_anchor,
+        active_response_dispatch_operation_version,
+        bind_active_response_operation_request_hash_to_artifact,
+        build_active_response_operation_anchor,
         derive_active_response_operation_request_binding_hash,
     };
     use crate::security_admission_operation::{
         AdmissionDispatchState, AdmissionOperation, AdmissionOperationKind,
         AdmissionOperationState, PreparedAdmissionOperation,
     };
-    let plan = &fixture.response_plan;
+    let plan = fixture.admission_request.response_plan();
+    let fingerprint =
+        super::super::active_response_artifact::active_response_admission_artifact_fingerprint(
+            &fixture.admission_request,
+        )?;
     plan.require_live_execution()?;
     let policy_hash = chio_core::Hash::from_bytes(*plan.policy_hash.as_bytes()).to_hex();
     let plan_body_hash = chio_core::Hash::from_bytes(*plan.plan_hash.as_bytes()).to_hex();
@@ -79,14 +83,17 @@ pub fn seed_committed_admission(
         request_id: plan.action_id.as_str().to_owned(),
         capability_id: plan.operator_capability.capability_id.as_str().to_owned(),
         authorization_capability_hash: authorization_capability_hash.clone(),
-        request_binding_hash: derive_active_response_operation_request_binding_hash(
-            &plan_body_hash,
-            fixture.executor_authority.authority_id(),
-            fixture.executor_authority.generation(),
-            &authorization_capability_hash,
-            &fixture.governed_intent_hash,
-            approval_set.approval_set_hash(),
-            &policy_hash,
+        request_binding_hash: bind_active_response_operation_request_hash_to_artifact(
+            &derive_active_response_operation_request_binding_hash(
+                &plan_body_hash,
+                fixture.executor_authority.authority_id(),
+                fixture.executor_authority.generation(),
+                &authorization_capability_hash,
+                &fixture.governed_intent_hash,
+                approval_set.approval_set_hash(),
+                &policy_hash,
+            )?,
+            Some(fingerprint),
         )?,
         policy_hash,
         broker_attempt_id: None,
@@ -100,7 +107,7 @@ pub fn seed_committed_admission(
         .as_ref()
         .ok_or("operation store")?;
     operations.create_prepared(operation.clone())?;
-    let anchor = build_active_response_operation_anchor(
+    let mut anchor = build_active_response_operation_anchor(
         plan,
         &fixture.executor_authority,
         fixture.authorized_at_unix_ms,
@@ -109,6 +116,7 @@ pub fn seed_committed_admission(
         &fixture.policy_decision_hash,
         approval_set.approval_set_hash(),
     )?;
+    anchor.admission_artifact_fingerprint = Some(fingerprint);
     kernel.journal_active_response_operation_anchor(&operation, anchor, approval_set)
         .map_err(|error| match error {
             super::super::admission_cleanup::ActiveResponseOperationAnchorJournalError::Conflict =>
@@ -153,13 +161,14 @@ pub fn seed_committed_admission(
         &fixture.policy_decision_hash,
         fixture.authorized_at_unix_ms,
         &approval,
+        &fingerprint,
     )?;
     super::super::PreparedActiveResponseAdmission::Governed(
         super::super::GovernedActiveResponseReservation {
             operation: Box::new(committed),
             approval_set: Box::new(approval_set.clone()),
             policy_decision_hash: fixture.policy_decision_hash,
-            admission_artifact_fingerprint: None,
+            admission_artifact_fingerprint: Some(fingerprint),
             authorization_capability_hash,
             governed_intent_hash: fixture.governed_intent_hash,
             executor_authority_id: fixture.executor_authority.authority_id().to_owned(),

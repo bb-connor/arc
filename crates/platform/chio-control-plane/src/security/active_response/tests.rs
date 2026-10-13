@@ -773,11 +773,9 @@ fn raw_request(
         &policy_decision_hash,
         authorized_at_unix_ms,
         &approval,
+        &digest(35),
     )
     .unwrap_or_else(|error| panic!("derive active-response dispatch id: {error}"));
-    let dispatch_id =
-        super::bind_active_response_dispatch_id_to_artifact(&dispatch_id, &digest(35))
-            .unwrap_or_else(|error| panic!("bind active-response artifact: {error}"));
     RawActiveResponseExecutionRequest {
         dispatch_id,
         request_id: plan.action_id.as_str().to_string(),
@@ -1880,6 +1878,25 @@ mod automatic_fence_boundary {
             ActiveResponseExecutorError::RejectedBeforeCommit(_)
         ));
         assert_eq!(store.dispatch_load_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(store.fence_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn automatic_fence_rejects_missing_artifact_fingerprint_before_store_access() {
+        let (identity, plan, mut binding) = automatic_binding_fixture();
+        binding.schema_version = 1;
+        binding.admission_artifact_fingerprint = None;
+        let store = Arc::new(FakeFenceStore::new(
+            p::AutomaticResponseDispatchFenceOutcome::Fenced(fence_record(&binding)),
+        ));
+        let executor = executor(identity, Arc::clone(&store));
+        let error = require_error(executor.fence_uncommitted_automatic_dispatch(&plan, &binding));
+        assert!(matches!(
+            error,
+            ActiveResponseExecutorError::DispatchRejectedBeforeCommit(
+                chio_security_types::DispatchRejection::UnboundArtifactPreparation
+            )
+        ));
         assert_eq!(store.fence_calls.load(Ordering::SeqCst), 0);
     }
 
