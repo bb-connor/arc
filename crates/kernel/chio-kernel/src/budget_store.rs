@@ -73,7 +73,6 @@ impl BudgetUsageRecord {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BudgetMutationKind {
-    IncrementInvocation,
     ReserveInvocation,
     AuthorizeExposure,
     CaptureInvocation,
@@ -89,7 +88,6 @@ pub enum BudgetMutationKind {
 impl BudgetMutationKind {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::IncrementInvocation => "increment_invocation",
             Self::ReserveInvocation => "reserve_invocation",
             Self::AuthorizeExposure => "authorize_exposure",
             Self::CaptureInvocation => "capture_invocation",
@@ -105,7 +103,6 @@ impl BudgetMutationKind {
 
     pub fn parse(value: &str) -> Option<Self> {
         match value {
-            "increment_invocation" => Some(Self::IncrementInvocation),
             "reserve_invocation" => Some(Self::ReserveInvocation),
             "authorize_exposure" => Some(Self::AuthorizeExposure),
             "capture_invocation" => Some(Self::CaptureInvocation),
@@ -134,8 +131,8 @@ pub struct BudgetAuthorizeHoldRequest {
     pub requested_exposure_units: u64,
     pub max_cost_per_invocation: Option<u64>,
     pub max_total_cost_units: Option<u64>,
-    pub hold_id: Option<String>,
-    pub event_id: Option<String>,
+    pub hold_id: String,
+    pub event_id: String,
     pub authority: Option<BudgetEventAuthority>,
 }
 
@@ -211,7 +208,7 @@ impl BudgetAuthorizeHoldRequest {
                 .any(|quota| quota.key == expected_key && quota.max_invocations == max_invocations)
             {
                 return Err(BudgetStoreError::Invariant(
-                    "legacy max_invocations must match the structured grant quota".to_string(),
+                    "max_invocations must match the structured grant quota".to_string(),
                 ));
             }
         }
@@ -220,23 +217,7 @@ impl BudgetAuthorizeHoldRequest {
 
     fn validate_composite(&self) -> Result<Vec<BudgetInvocationQuota>, BudgetStoreError> {
         let quotas = self.validated_invocation_quotas()?;
-        validate_optional_budget_identity(
-            self.hold_id.as_deref(),
-            self.event_id.as_deref(),
-            "budget authorization",
-        )?;
-        let durable = !quotas.is_empty()
-            || self.cumulative_approval.is_some()
-            || self.admission_binding.is_some();
-        if durable
-            && (self.hold_id.as_deref().is_none_or(str::is_empty)
-                || self.event_id.as_deref().is_none_or(str::is_empty))
-        {
-            return Err(BudgetStoreError::Invariant(
-                "composite budget authorization requires non-empty hold_id and event_id"
-                    .to_string(),
-            ));
-        }
+        validate_required_budget_identity(&self.hold_id, &self.event_id, "budget authorization")?;
         let composite = !self.invocation_quotas.is_empty() || self.cumulative_approval.is_some();
         if composite && self.admission_binding.is_none() {
             return Err(BudgetStoreError::Invariant(
@@ -320,8 +301,8 @@ pub struct BudgetReleaseHoldRequest {
     pub capability_id: String,
     pub grant_index: usize,
     pub released_exposure_units: u64,
-    pub hold_id: Option<String>,
-    pub event_id: Option<String>,
+    pub hold_id: String,
+    pub event_id: String,
     pub authority: Option<BudgetEventAuthority>,
 }
 
@@ -330,8 +311,8 @@ pub struct BudgetReverseHoldRequest {
     pub capability_id: String,
     pub grant_index: usize,
     pub reversed_exposure_units: u64,
-    pub hold_id: Option<String>,
-    pub event_id: Option<String>,
+    pub hold_id: String,
+    pub event_id: String,
     pub expected_cumulative_approval_state: Option<BudgetCumulativeApprovalState>,
     pub authority: Option<BudgetEventAuthority>,
 }
@@ -406,21 +387,6 @@ pub struct BudgetCancelCapturedBeforeDispatchRequest {
     pub authority: Option<BudgetEventAuthority>,
 }
 
-fn validate_optional_budget_identity(
-    hold_id: Option<&str>,
-    event_id: Option<&str>,
-    transition: &str,
-) -> Result<(), BudgetStoreError> {
-    match (hold_id, event_id) {
-        (None, None) => Ok(()),
-        (None, Some(event_id)) if !event_id.is_empty() => Ok(()),
-        (Some(hold_id), Some(event_id)) if !hold_id.is_empty() && !event_id.is_empty() => Ok(()),
-        _ => Err(BudgetStoreError::Invariant(format!(
-            "{transition} requires non-empty identifiers and any hold_id requires an event_id"
-        ))),
-    }
-}
-
 fn validate_required_budget_identity(
     hold_id: &str,
     event_id: &str,
@@ -452,41 +418,25 @@ impl BudgetCancelCapturedBeforeDispatchRequest {
 
 impl BudgetReverseHoldRequest {
     pub fn validate(&self) -> Result<(), BudgetStoreError> {
-        validate_optional_budget_identity(
-            self.hold_id.as_deref(),
-            self.event_id.as_deref(),
-            "budget reversal",
-        )
+        validate_required_budget_identity(&self.hold_id, &self.event_id, "budget reversal")
     }
 }
 
 impl BudgetReleaseHoldRequest {
     pub fn validate(&self) -> Result<(), BudgetStoreError> {
-        validate_optional_budget_identity(
-            self.hold_id.as_deref(),
-            self.event_id.as_deref(),
-            "budget release",
-        )
+        validate_required_budget_identity(&self.hold_id, &self.event_id, "budget release")
     }
 }
 
 impl BudgetReconcileHoldRequest {
     pub fn validate(&self) -> Result<(), BudgetStoreError> {
-        validate_optional_budget_identity(
-            self.hold_id.as_deref(),
-            self.event_id.as_deref(),
-            "budget reconciliation",
-        )
+        validate_required_budget_identity(&self.hold_id, &self.event_id, "budget reconciliation")
     }
 }
 
 impl BudgetCaptureHoldRequest {
     pub fn validate(&self) -> Result<(), BudgetStoreError> {
-        validate_optional_budget_identity(
-            self.hold_id.as_deref(),
-            self.event_id.as_deref(),
-            "monetary capture",
-        )
+        validate_required_budget_identity(&self.hold_id, &self.event_id, "monetary capture")
     }
 }
 
@@ -502,8 +452,8 @@ pub struct BudgetReconcileHoldRequest {
     pub grant_index: usize,
     pub exposed_cost_units: u64,
     pub realized_spend_units: u64,
-    pub hold_id: Option<String>,
-    pub event_id: Option<String>,
+    pub hold_id: String,
+    pub event_id: String,
     pub authority: Option<BudgetEventAuthority>,
 }
 
@@ -513,13 +463,13 @@ pub struct BudgetCaptureHoldRequest {
     pub grant_index: usize,
     pub exposed_cost_units: u64,
     pub realized_spend_units: u64,
-    pub hold_id: Option<String>,
-    pub event_id: Option<String>,
+    pub hold_id: String,
+    pub event_id: String,
     pub authority: Option<BudgetEventAuthority>,
 }
 
 /// Cleanup custody derived from the current authorization call.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BudgetHoldCleanupCustody {
     /// This call acquired authorization under the store's mutation boundary.
@@ -527,7 +477,6 @@ pub enum BudgetHoldCleanupCustody {
     /// This call read back an authorization acquired by an earlier call.
     Replayed,
     /// The backend cannot prove whether this call acquired the authorization.
-    #[default]
     Unknown,
 }
 
@@ -669,24 +618,8 @@ pub struct BudgetHoldSnapshot {
 }
 
 pub trait BudgetStore: Send + Sync {
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError>;
-
-    /// Atomically check monetary budget limits and record provisional exposure if within bounds.
-    ///
-    /// Checks:
-    /// 1. `invocation_count < max_invocations` (if set)
-    /// 2. `cost_units <= max_cost_per_invocation` (if set)
-    /// 3. `(total_cost_exposed + total_cost_realized_spend + cost_units)
-    ///    <= max_total_cost_units` (if set)
-    ///
-    /// On pass: increments `invocation_count` by 1 and `total_cost_exposed` by
-    /// `cost_units`, allocates a new replication seq, returns `Ok(true)`.
-    /// On any limit exceeded: rolls back, returns `Ok(false)`.
+    /// Atomically check every grant, quota, and monetary limit and, on pass,
+    /// open the hold with its invocation reservation and provisional exposure.
     ///
     // SAFETY: HA overrun bound = max_cost_per_invocation x node_count
     // In a split-brain scenario, each HA node may independently approve up to
@@ -694,192 +627,50 @@ pub trait BudgetStore: Send + Sync {
     // propagates the updated total. The maximum possible overrun is therefore
     // bounded by max_cost_per_invocation multiplied by the number of active
     // nodes in the HA cluster.
-    fn try_charge_cost(
+    fn authorize_budget_hold(
         &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError>;
+        request: BudgetAuthorizeHoldRequest,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError>;
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    fn try_charge_cost_with_ids(
+    fn capture_invocation_reservations(
         &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<bool, BudgetStoreError> {
-        if hold_id.is_some() || event_id.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "budget store does not support idempotent hold/event charging".to_string(),
-            ));
-        }
-        self.try_charge_cost(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-        )
-    }
+        request: BudgetCaptureInvocationRequest,
+    ) -> Result<BudgetInvocationCaptureDecision, BudgetStoreError>;
 
-    /// Apply a charge under the caller's durable hold/event identity and
-    /// authority fence. Implementations must preserve all three values or
-    /// return an explicit unsupported error. This method is required so a
-    /// backend upgrade cannot compile successfully and fail only on live calls.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    fn try_charge_cost_with_ids_and_authority(
+    fn authorize_cumulative_approval(
         &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<bool, BudgetStoreError>;
+        request: BudgetAuthorizeCumulativeApprovalRequest,
+    ) -> Result<BudgetCumulativeApprovalAuthorizationDecision, BudgetStoreError>;
 
-    /// Reverse a previously applied provisional exposure for a pre-execution denial path.
-    fn reverse_charge_cost(
+    fn cancel_captured_before_dispatch(
         &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError>;
+        request: BudgetCancelCapturedBeforeDispatchRequest,
+    ) -> Result<BudgetCapturedBeforeDispatchCancellationDecision, BudgetStoreError>;
 
-    fn reverse_charge_cost_with_ids(
+    /// Return an authorized, never-dispatched hold's invocation reservation and
+    /// provisional exposure.
+    fn reverse_budget_hold(
         &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        if hold_id.is_some() || event_id.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "budget store does not support idempotent hold/event reversal".to_string(),
-            ));
-        }
-        self.reverse_charge_cost(capability_id, grant_index, cost_units)
-    }
+        request: BudgetReverseHoldRequest,
+    ) -> Result<BudgetReverseHoldDecision, BudgetStoreError>;
 
-    /// Reverse a charge under the exact durable identity and authority fence.
-    fn reverse_charge_cost_with_ids_and_authority(
+    /// Release provisional exposure without changing the invocation count.
+    fn release_budget_hold(
         &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError>;
+        request: BudgetReleaseHoldRequest,
+    ) -> Result<BudgetReleaseHoldDecision, BudgetStoreError>;
 
-    /// Release a previously exposed monetary amount without changing invocation count.
-    ///
-    /// This is used when the kernel needs to release provisional exposure without
-    /// realizing any spend in the budget store itself.
-    fn reduce_charge_cost(
+    /// Release a captured hold's remaining exposure and record realized spend.
+    /// `realized_spend_units` must not exceed `exposed_cost_units`.
+    fn reconcile_budget_hold(
         &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError>;
+        request: BudgetReconcileHoldRequest,
+    ) -> Result<BudgetReconcileHoldDecision, BudgetStoreError>;
 
-    fn reduce_charge_cost_with_ids(
+    fn capture_budget_hold(
         &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        if hold_id.is_some() || event_id.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "budget store does not support idempotent hold/event release".to_string(),
-            ));
-        }
-        self.reduce_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    /// Release exposure under the exact durable identity and authority fence.
-    fn reduce_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError>;
-
-    /// Atomically release provisional exposure and record realized spend.
-    ///
-    /// This removes `exposed_cost_units` from `total_cost_exposed` and adds
-    /// `realized_cost_units` to `total_cost_realized_spend` without changing
-    /// invocation count. `realized_cost_units` must not exceed
-    /// `exposed_cost_units`.
-    fn settle_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-    ) -> Result<(), BudgetStoreError>;
-
-    fn settle_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        if hold_id.is_some() || event_id.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "budget store does not support idempotent hold/event settlement".to_string(),
-            ));
-        }
-        self.settle_charge_cost(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-        )
-    }
-
-    /// Reconcile exposure and spend under the exact durable identity and
-    /// authority fence.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    fn settle_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError>;
+        request: BudgetCaptureHoldRequest,
+    ) -> Result<BudgetCaptureHoldDecision, BudgetStoreError>;
 
     fn list_usages(
         &self,
@@ -895,41 +686,25 @@ pub trait BudgetStore: Send + Sync {
 
     fn get_invocation_quota_usage(
         &self,
-        _key: &BudgetQuotaKey,
-    ) -> Result<Option<BudgetInvocationQuotaUsage>, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "invocation quota usage is unavailable for this backend".to_string(),
-        ))
-    }
+        key: &BudgetQuotaKey,
+    ) -> Result<Option<BudgetInvocationQuotaUsage>, BudgetStoreError>;
 
     fn get_cumulative_approval_account_usage(
         &self,
-        _key: &BudgetCumulativeApprovalAccountKey,
-    ) -> Result<Option<BudgetCumulativeApprovalAccountUsage>, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "cumulative approval account usage is unavailable for this backend".to_string(),
-        ))
-    }
+        key: &BudgetCumulativeApprovalAccountKey,
+    ) -> Result<Option<BudgetCumulativeApprovalAccountUsage>, BudgetStoreError>;
 
     fn get_cumulative_approval_operation_usage(
         &self,
-        _operation_id: &str,
-    ) -> Result<Option<BudgetCumulativeApprovalUsage>, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "cumulative approval operation usage is unavailable for this backend".to_string(),
-        ))
-    }
+        operation_id: &str,
+    ) -> Result<Option<BudgetCumulativeApprovalUsage>, BudgetStoreError>;
 
     fn list_mutation_events(
         &self,
-        _limit: usize,
-        _capability_id: Option<&str>,
-        _grant_index: Option<usize>,
-    ) -> Result<Vec<BudgetMutationRecord>, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "budget mutation events unavailable for this backend".to_string(),
-        ))
-    }
+        limit: usize,
+        capability_id: Option<&str>,
+        grant_index: Option<usize>,
+    ) -> Result<Vec<BudgetMutationRecord>, BudgetStoreError>;
 
     fn budget_guarantee_level(&self) -> BudgetGuaranteeLevel {
         BudgetGuaranteeLevel::SingleNodeAtomic
@@ -943,215 +718,39 @@ pub trait BudgetStore: Send + Sync {
         BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual
     }
 
-    fn capture_invocation_reservations(
-        &self,
-        _request: BudgetCaptureInvocationRequest,
-    ) -> Result<BudgetInvocationCaptureDecision, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "invocation capture is not supported by this budget store".to_string(),
-        ))
-    }
-
-    fn authorize_cumulative_approval(
-        &self,
-        _request: BudgetAuthorizeCumulativeApprovalRequest,
-    ) -> Result<BudgetCumulativeApprovalAuthorizationDecision, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "cumulative approval attachment is not supported by this budget store".to_string(),
-        ))
-    }
-
-    fn cancel_captured_before_dispatch(
-        &self,
-        _request: BudgetCancelCapturedBeforeDispatchRequest,
-    ) -> Result<BudgetCapturedBeforeDispatchCancellationDecision, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "captured-before-dispatch cancellation is not supported by this budget store"
-                .to_string(),
-        ))
-    }
-
-    fn authorize_budget_hold(
-        &self,
-        request: BudgetAuthorizeHoldRequest,
-    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
-        request.validate()?;
-        if !request.invocation_quotas.is_empty()
-            || request.cumulative_approval.is_some()
-            || request.admission_binding.is_some()
-        {
-            return Err(BudgetStoreError::Invariant(
-                "composite budget authorization is not supported by this budget store".to_string(),
-            ));
-        }
-        let allowed = self.try_charge_cost_with_ids_and_authority(
-            &request.capability_id,
-            request.grant_index,
-            request.max_invocations,
-            request.requested_exposure_units,
-            request.max_cost_per_invocation,
-            request.max_total_cost_units,
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            request.authority.as_ref(),
-        )?;
-        let usage = self.get_usage(&request.capability_id, request.grant_index)?;
-        let committed_cost_units_after = usage
-            .as_ref()
-            .map(BudgetUsageRecord::committed_cost_units)
-            .transpose()?
-            .unwrap_or(0);
-        let invocation_count_after = usage.as_ref().map_or(0, |usage| usage.invocation_count);
-        let metadata = budget_commit_metadata(
-            self,
-            request.authority,
-            allowed
-                .then(|| usage.as_ref().map(|usage| usage.seq))
-                .flatten(),
-            request.event_id,
-            None,
-        );
-
-        if allowed {
-            Ok(BudgetAuthorizeHoldDecision::Authorized(
-                BudgetHoldAuthorizationRecord {
-                    cleanup_custody: BudgetHoldCleanupCustody::Unknown,
-                    hold_id: request.hold_id,
-                    admission_binding: request.admission_binding,
-                    authorized_exposure_units: request.requested_exposure_units,
-                    committed_cost_units_after,
-                    invocation_count_after,
-                    invocation_quota_usages: Vec::new(),
-                    cumulative_approval: None,
-                    invocation_state: BudgetInvocationState::Authorized,
-                    monetary_state: if request.requested_exposure_units == 0 {
-                        BudgetMonetaryState::None
-                    } else {
-                        BudgetMonetaryState::Exposed
-                    },
-                    metadata,
-                },
-            ))
-        } else {
-            Ok(BudgetAuthorizeHoldDecision::Denied(DeniedBudgetHold {
-                hold_id: request.hold_id,
-                admission_binding: request.admission_binding,
-                attempted_exposure_units: request.requested_exposure_units,
-                committed_cost_units_after,
-                invocation_count_after,
-                invocation_quota_usages: Vec::new(),
-                cumulative_approval: None,
-                invocation_state: BudgetInvocationState::Denied,
-                monetary_state: BudgetMonetaryState::None,
-                metadata,
-            }))
-        }
-    }
-
-    fn reverse_budget_hold(
-        &self,
-        _request: BudgetReverseHoldRequest,
-    ) -> Result<BudgetReverseHoldDecision, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "budget store does not support truthful rich reversal projections".to_string(),
-        ))
-    }
-
-    fn release_budget_hold(
-        &self,
-        _request: BudgetReleaseHoldRequest,
-    ) -> Result<BudgetReleaseHoldDecision, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "budget store does not support truthful rich release projections".to_string(),
-        ))
-    }
-
-    fn reconcile_budget_hold(
-        &self,
-        _request: BudgetReconcileHoldRequest,
-    ) -> Result<BudgetReconcileHoldDecision, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "budget store does not support truthful rich reconciliation projections".to_string(),
-        ))
-    }
-
-    fn capture_budget_hold(
-        &self,
-        _request: BudgetCaptureHoldRequest,
-    ) -> Result<BudgetCaptureHoldDecision, BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "budget store does not support a distinct monetary capture transition".to_string(),
-        ))
-    }
-
     fn reap_orphaned_holds(
         &self,
         realized_by_hold: &std::collections::HashMap<String, u64>,
-    ) -> Result<(usize, usize), BudgetStoreError> {
-        let _ = realized_by_hold;
-        Ok((0, 0))
-    }
+    ) -> Result<(usize, usize), BudgetStoreError>;
 
-    fn count_open_holds(&self) -> Result<usize, BudgetStoreError> {
-        Ok(0)
-    }
+    fn count_open_holds(&self) -> Result<usize, BudgetStoreError>;
 
+    /// `None` means the backend cannot enumerate holds by reservation shape.
     fn list_open_delegated_reserved_hold_ids(
         &self,
-    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
-        Ok(None)
-    }
+    ) -> Result<Option<Vec<String>>, BudgetStoreError>;
 
+    /// `None` means the backend cannot enumerate holds by request prefix.
     fn request_id_has_reserved_hold(
         &self,
         request_id: &str,
-    ) -> Result<Option<bool>, BudgetStoreError> {
-        let _ = request_id;
-        Ok(None)
-    }
+    ) -> Result<Option<bool>, BudgetStoreError>;
 
     /// Authoritative recovery lookup. `None` means the store established that
-    /// the hold is absent; unsupported or unavailable reads must return an error.
-    fn get_budget_hold(
-        &self,
-        hold_id: &str,
-    ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
-        let _ = hold_id;
-        Err(BudgetStoreError::Invariant(
-            "budget store does not support authoritative hold lookup".to_owned(),
-        ))
-    }
+    /// the hold is absent; unavailable reads must return an error.
+    fn get_budget_hold(&self, hold_id: &str)
+        -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError>;
 
     fn mark_hold_reserved(
         &self,
-        _hold_id: &str,
-        _reserved_until_unix_secs: i64,
-        _currency: &str,
-        _payment_reference: Option<&str>,
-        _envelope: &ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "budget store does not support durable monetary hold reservation".to_string(),
-        ))
-    }
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+        currency: &str,
+        payment_reference: Option<&str>,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError>;
 
-    fn reserve_invocation_hold(
-        &self,
-        _hold_id: &str,
-        _capability_id: &str,
-        _grant_index: usize,
-        _reserved_until_unix_secs: i64,
-        _envelope: &ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        Err(BudgetStoreError::Invariant(
-            "budget store does not support durable invocation hold reservation".to_string(),
-        ))
-    }
-
-    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
-        let _ = now_unix_secs;
-        Ok(0)
-    }
+    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError>;
 }
 
 fn checked_committed_cost_units(
@@ -1199,25 +798,25 @@ mod tests {
             requested_exposure_units: 0,
             max_cost_per_invocation: None,
             max_total_cost_units: None,
-            hold_id: Some("hold-structured-validation".to_string()),
-            event_id: Some("event-structured-validation".to_string()),
+            hold_id: "hold-structured-validation".to_string(),
+            event_id: "event-structured-validation".to_string(),
             authority: None,
         };
         assert_eq!(request.validate_composite().unwrap().len(), 1);
-        request.hold_id = None;
+        request.hold_id = String::new();
         assert!(matches!(
             request.validate_composite(),
             Err(BudgetStoreError::Invariant(_))
         ));
 
-        request.hold_id = Some("hold-structured-validation".to_string());
-        request.event_id = None;
+        request.hold_id = "hold-structured-validation".to_string();
+        request.event_id = String::new();
         assert!(matches!(
             request.validate_composite(),
             Err(BudgetStoreError::Invariant(_))
         ));
 
-        request.event_id = Some("event-structured-validation".to_string());
+        request.event_id = "event-structured-validation".to_string();
         assert_eq!(request.validate_composite().unwrap().len(), 1);
     }
 
@@ -1254,27 +853,7 @@ mod tests {
     }
 
     #[test]
-    fn unlimited_legacy_authorization_remains_unstructured() {
-        let request = BudgetAuthorizeHoldRequest {
-            capability_id: "cap-unlimited-legacy".to_string(),
-            grant_index: 0,
-            max_invocations: None,
-            invocation_quotas: Vec::new(),
-            cumulative_approval: None,
-            admission_binding: None,
-            requested_exposure_units: 0,
-            max_cost_per_invocation: None,
-            max_total_cost_units: None,
-            hold_id: None,
-            event_id: None,
-            authority: None,
-        };
-
-        assert!(request.validate_composite().unwrap().is_empty());
-    }
-
-    #[test]
-    fn rich_budget_identities_must_be_paired_and_non_empty() {
+    fn budget_identities_must_be_non_empty() {
         let mut authorization = BudgetAuthorizeHoldRequest {
             capability_id: "cap-identity-validation".to_string(),
             grant_index: 0,
@@ -1285,22 +864,20 @@ mod tests {
             requested_exposure_units: 10,
             max_cost_per_invocation: Some(10),
             max_total_cost_units: Some(10),
-            hold_id: Some(String::new()),
-            event_id: Some(String::new()),
+            hold_id: String::new(),
+            event_id: String::new(),
             authority: None,
         };
         assert!(matches!(
             authorization.validate(),
             Err(BudgetStoreError::Invariant(_))
         ));
-        authorization.hold_id = Some("hold:identity-validation".to_string());
-        authorization.event_id = None;
+        authorization.hold_id = "hold:identity-validation".to_string();
         assert!(matches!(
             authorization.validate(),
             Err(BudgetStoreError::Invariant(_))
         ));
-        authorization.hold_id = None;
-        authorization.event_id = Some("event:identity-validation".to_string());
+        authorization.event_id = "event:identity-validation".to_string();
         assert!(authorization.validate().is_ok());
 
         assert!(matches!(
@@ -1351,8 +928,8 @@ mod tests {
                 requested_exposure_units: 100,
                 max_cost_per_invocation: Some(100),
                 max_total_cost_units: Some(1_000),
-                hold_id: Some("hold-budget-1".to_string()),
-                event_id: Some("hold-budget-1:authorize".to_string()),
+                hold_id: "hold-budget-1".to_string(),
+                event_id: "hold-budget-1:authorize".to_string(),
                 authority: Some(authority.clone()),
             })
             .unwrap();
@@ -1391,8 +968,8 @@ mod tests {
                 grant_index: 0,
                 exposed_cost_units: 100,
                 realized_spend_units: 75,
-                hold_id: Some("hold-budget-1".to_string()),
-                event_id: Some("hold-budget-1:reconcile".to_string()),
+                hold_id: "hold-budget-1".to_string(),
+                event_id: "hold-budget-1:reconcile".to_string(),
                 authority: Some(authority.clone()),
             })
             .unwrap();
@@ -1446,8 +1023,8 @@ mod tests {
                 requested_exposure_units: 150,
                 max_cost_per_invocation: Some(100),
                 max_total_cost_units: Some(1_000),
-                hold_id: Some("hold-budget-deny".to_string()),
-                event_id: Some("hold-budget-deny:authorize".to_string()),
+                hold_id: "hold-budget-deny".to_string(),
+                event_id: "hold-budget-deny:authorize".to_string(),
                 authority: Some(authority.clone()),
             })
             .unwrap();

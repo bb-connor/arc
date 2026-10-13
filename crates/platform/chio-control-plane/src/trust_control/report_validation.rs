@@ -40,22 +40,6 @@ where
     authority_admission::run_authority_commit(state, commit).await
 }
 
-pub(crate) fn budget_visibility_matches(
-    allowed: bool,
-    invocation_count: Option<u32>,
-    max_invocations: Option<u32>,
-) -> bool {
-    match (allowed, invocation_count, max_invocations) {
-        (true, Some(_), _) => true,
-        (true, None, _) => false,
-        (false, Some(count), Some(max)) => count >= max,
-        (false, Some(_), None) => true,
-        (false, None, Some(0)) => true,
-        (false, None, Some(_)) => false,
-        (false, None, None) => false,
-    }
-}
-
 pub(crate) fn normalize_cluster_url(value: &str) -> Result<String, CliError> {
     let normalized = value.trim().trim_end_matches('/');
     if normalized.is_empty() {

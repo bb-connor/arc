@@ -173,12 +173,8 @@ impl SqliteBudgetStore {
         }
         let quotas = normalized_quotas(&request)?;
         validate_composite_sqlite_range(&request, &quotas)?;
-        let hold_id = request.hold_id.as_deref().ok_or_else(|| {
-            BudgetStoreError::Invariant("composite budget hold_id is missing".to_string())
-        })?;
-        let event_id = request.event_id.as_deref().ok_or_else(|| {
-            BudgetStoreError::Invariant("composite budget event_id is missing".to_string())
-        })?;
+        let hold_id = request.hold_id.as_str();
+        let event_id = request.event_id.as_str();
         let admission = request.admission_binding.as_ref().ok_or_else(|| {
             BudgetStoreError::Invariant("composite admission binding is missing".to_string())
         })?;
@@ -505,7 +501,7 @@ impl SqliteBudgetStore {
         };
         let event = self.append_mutation_event(
             &transaction,
-            Some(event_id),
+            event_id,
             Some(hold_id),
             request.authority.as_ref(),
             &request.capability_id,
@@ -610,12 +606,8 @@ impl SqliteBudgetStore {
             chio_kernel::admission_operation::dpop_claim::DpopReplayClaimPhase::Dispatch,
         )
         .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-        let hold_id = request.hold_id.as_deref().ok_or_else(|| {
-            BudgetStoreError::Invariant("combined authorization omitted hold_id".into())
-        })?;
-        let event_id = request.event_id.as_deref().ok_or_else(|| {
-            BudgetStoreError::Invariant("combined authorization omitted event_id".into())
-        })?;
+        let hold_id = request.hold_id.as_str();
+        let event_id = request.event_id.as_str();
         let operation_id = binding.operation.binding().operation_id().as_str();
         if admission.operation_id != operation_id
             || binding.operation.binding().capability_id().as_str() != request.capability_id

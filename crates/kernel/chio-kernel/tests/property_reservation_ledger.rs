@@ -2,8 +2,12 @@
 
 use std::collections::HashMap;
 
-use chio_kernel::budget_store::{BudgetCaptureInvocationRequest, BudgetInvocationCaptureDecision};
-use chio_kernel::{BudgetStore, InMemoryBudgetStore};
+use chio_kernel::budget_store::{
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest,
+    BudgetInvocationCaptureDecision, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
+    BudgetReverseHoldRequest,
+};
+use chio_kernel::{BudgetStore, BudgetStoreError, InMemoryBudgetStore};
 use chio_kernel_core::{BudgetRegistry, InMemoryBudgetRegistry};
 use proptest::prelude::*;
 use proptest::test_runner::{Config as ProptestConfig, FileFailurePersistence};
@@ -99,7 +103,7 @@ fn assert_store_conservation(
                     assert!(old.is_none());
                 }
             }
-            "authorize_exposure" | "increment_invocation" => {
+            "authorize_exposure" => {
                 if event.allowed == Some(true) {
                     invocations += 1;
                 }
@@ -196,6 +200,29 @@ fn assert_store_conservation(
     }
 }
 
+fn authorize(
+    store: &InMemoryBudgetStore,
+    hold_id: &str,
+    amount: u64,
+) -> Result<bool, BudgetStoreError> {
+    store
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+            capability_id: CAPABILITY_ID.to_string(),
+            grant_index: GRANT_INDEX,
+            max_invocations: None,
+            invocation_quotas: Vec::new(),
+            cumulative_approval: None,
+            admission_binding: None,
+            requested_exposure_units: amount,
+            max_cost_per_invocation: None,
+            max_total_cost_units: None,
+            hold_id: hold_id.to_string(),
+            event_id: format!("{hold_id}:authorize"),
+            authority: None,
+        })
+        .map(|decision| matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)))
+}
+
 fn terminal_hold(
     store: &InMemoryBudgetStore,
     open: &mut Vec<OpenHold>,
@@ -207,15 +234,19 @@ fn terminal_hold(
         return;
     };
     match class {
-        TerminalClass::Released => store
-            .reverse_charge_cost_with_ids(
-                CAPABILITY_ID,
-                GRANT_INDEX,
-                hold.remaining,
-                Some(&hold.id),
-                Some(&format!("{}:reverse", hold.id)),
-            )
-            .expect("open hold reverses exactly once"),
+        TerminalClass::Released => {
+            store
+                .reverse_budget_hold(BudgetReverseHoldRequest {
+                    capability_id: CAPABILITY_ID.to_string(),
+                    grant_index: GRANT_INDEX,
+                    reversed_exposure_units: hold.remaining,
+                    hold_id: hold.id.clone(),
+                    event_id: format!("{}:reverse", hold.id),
+                    expected_cumulative_approval_state: None,
+                    authority: None,
+                })
+                .expect("open hold reverses exactly once");
+        }
         TerminalClass::Committed => {
             let capture = store
                 .capture_invocation_reservations(BudgetCaptureInvocationRequest {
@@ -232,14 +263,15 @@ fn terminal_hold(
                 BudgetInvocationCaptureDecision::Captured(_)
             ));
             store
-                .settle_charge_cost_with_ids(
-                    CAPABILITY_ID,
-                    GRANT_INDEX,
-                    hold.remaining,
-                    u64::from(realized_hint).min(hold.remaining),
-                    Some(&hold.id),
-                    Some(&format!("{}:reconcile", hold.id)),
-                )
+                .reconcile_budget_hold(BudgetReconcileHoldRequest {
+                    capability_id: CAPABILITY_ID.to_string(),
+                    grant_index: GRANT_INDEX,
+                    exposed_cost_units: hold.remaining,
+                    realized_spend_units: u64::from(realized_hint).min(hold.remaining),
+                    hold_id: hold.id.clone(),
+                    event_id: format!("{}:reconcile", hold.id),
+                    authority: None,
+                })
                 .expect("open dispatch-captured hold reconciles exactly once");
         }
     }
@@ -250,18 +282,8 @@ fn terminal_hold(
 #[should_panic(expected = "terminal history has no matching concrete disposition")]
 fn omitted_release_is_detected_by_terminal_history_replay() {
     let store = InMemoryBudgetStore::new();
-    let allowed = store
-        .try_charge_cost_with_ids(
-            CAPABILITY_ID,
-            GRANT_INDEX,
-            None,
-            8,
-            None,
-            None,
-            Some("omitted-release-hold"),
-            Some("omitted-release-hold:authorize"),
-        )
-        .expect("bounded authorization succeeds");
+    let allowed =
+        authorize(&store, "omitted-release-hold", 8).expect("bounded authorization succeeds");
     assert!(allowed);
     let terminal_history =
         HashMap::from([("omitted-release-hold".to_string(), TerminalClass::Released)]);
@@ -291,17 +313,7 @@ proptest! {
                 ReservationOp::Authorize(amount) => {
                     next_hold += 1;
                     let hold_id = format!("reservation-hold-{next_hold}");
-                    let allowed = store
-                        .try_charge_cost_with_ids(
-                            CAPABILITY_ID,
-                            GRANT_INDEX,
-                            None,
-                            u64::from(amount),
-                            None,
-                            None,
-                            Some(&hold_id),
-                            Some(&format!("{hold_id}:authorize")),
-                        )
+                    let allowed = authorize(&store, &hold_id, u64::from(amount))
                         .expect("bounded authorization cannot overflow");
                     assert!(allowed);
                     open.push(OpenHold {
@@ -321,13 +333,14 @@ proptest! {
                         let released = u64::from(amount).min(hold.remaining);
                         if released > 0 {
                             store
-                                .reduce_charge_cost_with_ids(
-                                CAPABILITY_ID,
-                                GRANT_INDEX,
-                                released,
-                                Some(&hold.id),
-                                Some(&format!("{}:release:{operation_index}", hold.id)),
-                            )
+                                .release_budget_hold(BudgetReleaseHoldRequest {
+                                    capability_id: CAPABILITY_ID.to_string(),
+                                    grant_index: GRANT_INDEX,
+                                    released_exposure_units: released,
+                                    hold_id: hold.id.clone(),
+                                    event_id: format!("{}:release:{operation_index}", hold.id),
+                                    authority: None,
+                                })
                                 .expect("release is bounded by outstanding exposure");
                             hold.remaining -= released;
                         }

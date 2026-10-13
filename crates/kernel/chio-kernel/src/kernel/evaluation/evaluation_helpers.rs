@@ -649,8 +649,7 @@ impl ChioKernel {
                             "admission_may_be_retained": true,
                             "cleanup_mutation_kind": match denial.budget_mutation {
                                 PreExecutionBudgetMutation::Charge(_) => "charge",
-                                PreExecutionBudgetMutation::Invocation { .. }
-                                | PreExecutionBudgetMutation::InvocationHold(_) => "invocation",
+                                PreExecutionBudgetMutation::InvocationHold(_) => "invocation",
                                 PreExecutionBudgetMutation::None => "none",
                             },
                             "cleanup_capability_id": denial.cap.id,
@@ -1010,8 +1009,7 @@ impl ChioKernel {
                             "admission_may_be_retained": true,
                             "cleanup_mutation_kind": match budget_mutation {
                                 PreExecutionBudgetMutation::Charge(_) => "charge",
-                                PreExecutionBudgetMutation::Invocation { .. }
-                                | PreExecutionBudgetMutation::InvocationHold(_) => "invocation",
+                                PreExecutionBudgetMutation::InvocationHold(_) => "invocation",
                                 PreExecutionBudgetMutation::None => "none",
                             },
                             "cleanup_capability_id": cap.id,
@@ -1181,30 +1179,16 @@ impl ChioKernel {
         );
 
         // A retained nonce belongs to a durable operation whose reservation the
-        // admission authority governs; only a minted nonce stamps a legacy hold.
+        // admission authority governs; only a minted nonce stamps its hold.
         let reserved_hold = match (&nonce, budget_mutation) {
             (PreflightNonceSource::Durable(_), _) => None,
-            (PreflightNonceSource::Mint, PreExecutionBudgetMutation::Charge(charge)) => {
-                Some(ReservedHoldStamp::Monetary {
-                    charge,
-                    payment_reference: reserved_payment_reference,
-                })
-            }
-            (PreflightNonceSource::Mint, PreExecutionBudgetMutation::InvocationHold(charge)) => {
-                Some(ReservedHoldStamp::Monetary {
-                    charge,
-                    payment_reference: reserved_payment_reference,
-                })
-            }
             (
                 PreflightNonceSource::Mint,
-                PreExecutionBudgetMutation::Invocation { grant_index },
-            ) => Some(ReservedHoldStamp::Invocation {
-                hold_id: format!(
-                    "budget-hold:{}:{}:{}",
-                    request.request_id, request.capability.id, grant_index
-                ),
-                grant_index: *grant_index,
+                PreExecutionBudgetMutation::Charge(charge)
+                | PreExecutionBudgetMutation::InvocationHold(charge),
+            ) => Some(ReservedHoldStamp {
+                charge,
+                payment_reference: reserved_payment_reference,
             }),
             (PreflightNonceSource::Mint, PreExecutionBudgetMutation::None) => None,
         };

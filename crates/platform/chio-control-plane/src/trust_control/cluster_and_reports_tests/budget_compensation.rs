@@ -19,8 +19,8 @@ fn budget_authorize_compensation_tracks_the_authorize_generation(
         cost_units: 60,
         max_cost_per_invocation: Some(100),
         max_total_cost_units: Some(500),
-        hold_id: Some("hold-compensation".to_string()),
-        event_id: Some("hold-compensation:authorize".to_string()),
+        hold_id: "hold-compensation".to_string(),
+        event_id: "hold-compensation:authorize".to_string(),
     };
     let authorize_request = |request: &TryChargeCostRequest| BudgetAuthorizeHoldRequest {
         capability_id: request.capability_id.clone(),
@@ -60,8 +60,8 @@ fn budget_authorize_compensation_tracks_the_authorize_generation(
         requested_exposure_units: 40,
         max_cost_per_invocation: payload.max_cost_per_invocation,
         max_total_cost_units: payload.max_total_cost_units,
-        hold_id: Some("hold-intervening".to_string()),
-        event_id: Some("hold-intervening:authorize".to_string()),
+        hold_id: "hold-intervening".to_string(),
+        event_id: "hold-intervening:authorize".to_string(),
         authority: None,
     })?;
     assert!(matches!(
@@ -97,8 +97,8 @@ fn budget_authorize_compensation_tracks_the_authorize_generation(
         cost_units: payload.cost_units,
         max_cost_per_invocation: payload.max_cost_per_invocation,
         max_total_cost_units: payload.max_total_cost_units,
-        hold_id: Some("hold-compensation-retry".to_string()),
-        event_id: Some("hold-compensation-retry:authorize".to_string()),
+        hold_id: "hold-compensation-retry".to_string(),
+        event_id: "hold-compensation-retry:authorize".to_string(),
     };
     let retried = match store.authorize_budget_hold(authorize_request(&retry_payload))? {
         BudgetAuthorizeHoldDecision::Authorized(authorized) => authorized,

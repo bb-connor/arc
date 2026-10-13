@@ -10,7 +10,7 @@ use super::cluster::{
 use super::report_rendering::{
     forward_post_to_leader, json_response_with_leader_visibility_and_budget_commit,
 };
-use super::report_validation::{budget_visibility_matches, validate_service_auth};
+use super::report_validation::validate_service_auth;
 use super::*;
 use chio_log_redact::redacted;
 
@@ -28,19 +28,14 @@ fn budget_internal_error(error: &BudgetStoreError, public_message: &'static str)
     plain_http_error(status, public_message)
 }
 
-fn validate_budget_request_identity(
-    hold_id: Option<&str>,
-    event_id: Option<&str>,
-) -> Result<(), Response> {
-    match (hold_id, event_id) {
-        (None, None) => Ok(()),
-        (None, Some(event_id)) if !event_id.is_empty() => Ok(()),
-        (Some(hold_id), Some(event_id)) if !hold_id.is_empty() && !event_id.is_empty() => Ok(()),
-        _ => Err(plain_http_error(
+fn validate_budget_request_identity(hold_id: &str, event_id: &str) -> Result<(), Response> {
+    if hold_id.is_empty() || event_id.is_empty() {
+        return Err(plain_http_error(
             StatusCode::BAD_REQUEST,
-            "budget holdId requires a non-empty eventId and supplied identifiers must be non-empty",
-        )),
+            "budget holdId and eventId must be non-empty",
+        ));
     }
+    Ok(())
 }
 
 pub(crate) async fn handle_list_budgets(
@@ -83,75 +78,6 @@ pub(crate) async fn handle_list_budgets(
     .into_response()
 }
 
-pub(crate) async fn handle_try_increment_budget(
-    State(state): State<TrustServiceState>,
-    headers: HeaderMap,
-    Json(payload): Json<TryIncrementBudgetRequest>,
-) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
-    match forward_post_to_leader(&state, BUDGET_INCREMENT_PATH, &payload).await {
-        Ok(Some(response)) => return response,
-        Ok(None) => {}
-        Err(response) => return response,
-    }
-    let store = match state.budget_store() {
-        Ok(store) => store,
-        Err(response) => return response,
-    };
-    let allowed = match store.try_increment(
-        &payload.capability_id,
-        payload.grant_index,
-        payload.max_invocations,
-    ) {
-        Ok(allowed) => allowed,
-        Err(error) => {
-            return budget_internal_error(&error, "budget increment failed");
-        }
-    };
-    respond_after_leader_visible_write(
-        &state,
-        "budget state was not visible on the leader after write",
-        || {
-            let invocation_count = store
-                .get_usage(&payload.capability_id, payload.grant_index)
-                .map(|usage| usage.map(|usage| usage.invocation_count))
-                .map_err(|error| budget_internal_error(&error, "budget usage lookup failed"))?;
-            if budget_visibility_matches(allowed, invocation_count, payload.max_invocations) {
-                Ok(Some(TryIncrementBudgetResponse {
-                    capability_id: payload.capability_id.clone(),
-                    grant_index: payload.grant_index,
-                    allowed,
-                    invocation_count,
-                    budget_authority: budget_authority_metadata_view(
-                        &state,
-                        None,
-                        budget_authority_guarantee_level(&state, None),
-                    ),
-                }))
-            } else {
-                Ok(None)
-            }
-        },
-    )
-}
-
-/// Mint a unique event_id for a budget write whose caller omitted `eventId`, so
-/// the mutation event is stored under a KNOWN id and `budget_write_token` can look
-/// up THIS write's exact event_seq instead of falling back to the authority MAX
-/// (which a concurrent same-authority write to another capability can raise,
-/// making the quorum wait target a later event and spuriously roll back / 503 a
-/// write that itself reached quorum).
-///
-/// Uniqueness: a process-local monotonic counter + wall-clock nanos + pid, so it
-/// cannot collide with a concurrent write or a caller-supplied id. An omitted
-/// `eventId` already carries NO idempotency guarantee (the store would otherwise
-/// auto-generate one internally), so minting it here changes no retry semantics.
-fn generated_budget_event_id() -> String {
-    format!("cluster-budget-write-{}", uuid::Uuid::new_v4())
-}
-
 /// Build the quorum-witness token for a budget write from its origin authority
 /// and THIS write's own event_seq.
 ///
@@ -162,28 +88,23 @@ fn generated_budget_event_id() -> String {
 /// commit (or a retry while later same-origin events exist) raises that MAX
 /// above this write's seq, so the quorum wait would target a later event and
 /// `handle_try_charge_cost` would roll back a write that itself reached quorum.
-/// The handlers now always mint an event_id when the
-/// caller omitted one (`generated_budget_event_id`), so the by-id lookup is
-/// precise; the authority-MAX fallback remains only as a defensive path (row not
-/// found) and can only OVER-target the seq (wait longer), never under-target it,
-/// so the witness still never over-counts (fail-closed). A single-node write (no
-/// authority) carries an unclustered token, and the quorum wait short-circuits.
+/// The authority-MAX fallback (row not found) can only OVER-target the seq (wait
+/// longer), never under-target it, so the witness never over-counts
+/// (fail-closed). A single-node write (no authority) carries an unclustered
+/// token, and the quorum wait short-circuits.
 fn budget_write_token(
     store: &SqliteBudgetStore,
     authority: Option<&BudgetEventAuthority>,
-    event_id: Option<&str>,
+    event_id: &str,
 ) -> Result<BudgetWriteToken, Response> {
     let http_error = |error: BudgetStoreError| {
         budget_internal_error(&error, "budget write witness lookup failed")
     };
     match authority {
         Some(current) => {
-            let stored = match event_id {
-                Some(event_id) => store
-                    .mutation_event_witness_for_event_id(event_id)
-                    .map_err(http_error)?,
-                None => None,
-            };
+            let stored = store
+                .mutation_event_witness_for_event_id(event_id)
+                .map_err(http_error)?;
             let (event_seq, origin_id, budget_term) = match stored {
                 // Existing event with a stored authority: use ITS origin + term so
                 // an idempotent retry after leadership moved targets the ORIGINAL
@@ -195,7 +116,7 @@ fn budget_write_token(
                 ),
                 // Existing event with a legacy null authority: use the current lease.
                 Some((seq, None, _)) => (seq, current.authority_id.clone(), current.lease_epoch),
-                // No stored event (or no event_id): fall back to the authority MAX
+                // No stored event: fall back to the authority MAX
                 // under the current lease. Over-targets (waits longer), never
                 // under-targets, so the witness still never over-counts.
                 None => {
@@ -227,9 +148,7 @@ pub(crate) async fn handle_try_charge_cost(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    if let Err(response) =
-        validate_budget_request_identity(payload.hold_id.as_deref(), payload.event_id.as_deref())
-    {
+    if let Err(response) = validate_budget_request_identity(&payload.hold_id, &payload.event_id) {
         return response;
     }
     match forward_post_to_leader(&state, BUDGET_AUTHORIZE_EXPOSURE_PATH, &payload).await {
@@ -245,11 +164,7 @@ pub(crate) async fn handle_try_charge_cost(
         Ok(store) => store,
         Err(response) => return response,
     };
-    let effective_event_id = payload
-        .event_id
-        .clone()
-        .unwrap_or_else(generated_budget_event_id);
-    let replayed_event = match store.mutation_event_for_event_id(&effective_event_id) {
+    let replayed_event = match store.mutation_event_for_event_id(&payload.event_id) {
         Ok(event) => event.is_some(),
         Err(error) => {
             return budget_internal_error(&error, "budget authorization replay lookup failed")
@@ -262,98 +177,7 @@ pub(crate) async fn handle_try_charge_cost(
     // authority; it never admits a new mutation.
     let replay_under = authority.as_ref().filter(|_| replayed_event);
     let mut cleanup_custody = chio_kernel::budget_store::BudgetHoldCleanupCustody::Unknown;
-    let (already_captured, admission, denied) = if payload.hold_id.is_none() {
-        let charged = match replay_under {
-            Some(current) => store.replay_cost_charge(
-                &BudgetAuthorizeHoldRequest {
-                    capability_id: payload.capability_id.clone(),
-                    grant_index: payload.grant_index,
-                    max_invocations: payload.max_invocations,
-                    invocation_quotas: Vec::new(),
-                    cumulative_approval: None,
-                    admission_binding: None,
-                    requested_exposure_units: payload.cost_units,
-                    max_cost_per_invocation: payload.max_cost_per_invocation,
-                    max_total_cost_units: payload.max_total_cost_units,
-                    hold_id: None,
-                    event_id: Some(effective_event_id.clone()),
-                    authority: authority.clone(),
-                },
-                current,
-            ),
-            None => store.try_charge_cost_with_ids_and_authority(
-                &payload.capability_id,
-                payload.grant_index,
-                payload.max_invocations,
-                payload.cost_units,
-                payload.max_cost_per_invocation,
-                payload.max_total_cost_units,
-                None,
-                Some(&effective_event_id),
-                authority.as_ref(),
-            ),
-        };
-        let allowed = match charged {
-            Ok(allowed) => allowed,
-            Err(error) => return budget_internal_error(&error, "budget authorization failed"),
-        };
-        let event = match store.mutation_event_for_event_id(&effective_event_id) {
-            Ok(Some(event)) => event,
-            Ok(None) => {
-                return plain_http_error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "budget authorization did not retain its event identity",
-                )
-            }
-            Err(error) => {
-                return budget_internal_error(&error, "budget authorization event lookup failed")
-            }
-        };
-        let committed_cost_units_after = match event
-            .total_cost_exposed_after
-            .checked_add(event.total_cost_realized_spend_after)
-        {
-            Some(committed) => committed,
-            None => {
-                return budget_internal_error(
-                    &BudgetStoreError::Overflow("committed budget cost overflowed u64".to_string()),
-                    "budget authorization projection failed",
-                )
-            }
-        };
-        let metadata = BudgetCommitMetadata {
-            authority: event.authority,
-            guarantee_level: store.budget_guarantee_level(),
-            budget_profile: store.budget_authority_profile(),
-            metering_profile: store.budget_metering_profile(),
-            budget_commit_index: Some(event.event_seq),
-            event_id: Some(event.event_id),
-            recorded_at_unix_seconds: u64::try_from(event.recorded_at).ok(),
-        };
-        if allowed {
-            (
-                false,
-                Some((
-                    metadata,
-                    event.exposure_units,
-                    event.realized_spend_units,
-                    event.invocation_count_after,
-                    committed_cost_units_after,
-                )),
-                None,
-            )
-        } else {
-            (
-                false,
-                None,
-                Some((
-                    metadata,
-                    event.invocation_count_after,
-                    committed_cost_units_after,
-                )),
-            )
-        }
-    } else {
+    let (already_captured, admission, denied) = {
         let request = BudgetAuthorizeHoldRequest {
             capability_id: payload.capability_id.clone(),
             grant_index: payload.grant_index,
@@ -365,7 +189,7 @@ pub(crate) async fn handle_try_charge_cost(
             max_cost_per_invocation: payload.max_cost_per_invocation,
             max_total_cost_units: payload.max_total_cost_units,
             hold_id: payload.hold_id.clone(),
-            event_id: Some(effective_event_id),
+            event_id: payload.event_id.clone(),
             authority: authority.clone(),
         };
         let decision = match replay_under {
@@ -408,14 +232,13 @@ pub(crate) async fn handle_try_charge_cost(
             BudgetAuthorizeHoldDecision::ApprovalRequired(_) => {
                 return plain_http_error(
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "legacy budget endpoint received an unsupported cumulative approval decision",
+                    "budget exposure endpoint received an unsupported cumulative approval decision",
                 )
             }
             BudgetAuthorizeHoldDecision::Denied(denied) => (
                 false,
                 None,
                 Some((
-                    denied.metadata,
                     denied.invocation_count_after,
                     denied.committed_cost_units_after,
                 )),
@@ -439,7 +262,7 @@ pub(crate) async fn handle_try_charge_cost(
                 )
             }
         };
-        let write = match budget_write_token(&store, authority.as_ref(), Some(&event_id)) {
+        let write = match budget_write_token(&store, authority.as_ref(), &event_id) {
             Ok(write) => write,
             Err(response) => return response,
         };
@@ -449,14 +272,13 @@ pub(crate) async fn handle_try_charge_cost(
                 cleanup_custody,
                 capability_id: payload.capability_id.clone(),
                 grant_index: payload.grant_index,
-                allowed: !already_captured,
                 decision: if already_captured {
                     BudgetAuthorizeExposureDecision::AlreadyCaptured
                 } else {
                     BudgetAuthorizeExposureDecision::Authorized
                 },
                 hold_id: payload.hold_id.clone(),
-                event_id: Some(event_id),
+                event_id,
                 exposure_units: Some(exposure_units),
                 realized_spend_units: Some(realized_spend_units),
                 mutation_invocation_count_after: Some(mutation_invocation_count_after),
@@ -514,9 +336,7 @@ pub(crate) async fn handle_try_charge_cost(
             }
         };
         json_response_with_leader_visibility_and_budget_commit(&state, response, budget_commit)
-    } else if let Some((denied_metadata, invocation_count_after, committed_cost_units_after)) =
-        denied
-    {
+    } else if let Some((invocation_count_after, committed_cost_units_after)) = denied {
         respond_after_leader_visible_write(
             &state,
             "budget exposure state was not visible on the leader after write",
@@ -528,10 +348,9 @@ pub(crate) async fn handle_try_charge_cost(
                     cleanup_custody,
                     capability_id: payload.capability_id.clone(),
                     grant_index: payload.grant_index,
-                    allowed: false,
                     decision: BudgetAuthorizeExposureDecision::Denied,
                     hold_id: payload.hold_id.clone(),
-                    event_id: denied_metadata.event_id.clone(),
+                    event_id: payload.event_id.clone(),
                     exposure_units: None,
                     realized_spend_units: None,
                     mutation_invocation_count_after: Some(invocation_count_after),
@@ -564,9 +383,7 @@ pub(crate) async fn handle_reverse_charge_cost(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    if let Err(response) =
-        validate_budget_request_identity(payload.hold_id.as_deref(), payload.event_id.as_deref())
-    {
+    if let Err(response) = validate_budget_request_identity(&payload.hold_id, &payload.event_id) {
         return response;
     }
     match forward_post_to_leader(&state, BUDGET_RELEASE_EXPOSURE_PATH, &payload).await {
@@ -578,68 +395,39 @@ pub(crate) async fn handle_reverse_charge_cost(
         Ok(store) => store,
         Err(response) => return response,
     };
-    let authority = match resolve_budget_hold_authority(&state, &store, payload.hold_id.as_deref())
-    {
+    let authority = match resolve_budget_hold_authority(&state, &store, &payload.hold_id) {
         Ok(authority) => authority,
         Err(response) => return response,
     };
-    // Mint an event_id when omitted so the witness waits on this reverse's exact
-    // event_seq, not the authority MAX.
-    let effective_event_id = payload
-        .event_id
-        .clone()
-        .unwrap_or_else(generated_budget_event_id);
-    let mutation = if let Some(hold_id) = payload.hold_id.as_deref() {
-        match store.reverse_budget_hold(BudgetReverseHoldRequest {
-            capability_id: payload.capability_id.clone(),
-            grant_index: payload.grant_index,
-            reversed_exposure_units: payload.cost_units,
-            hold_id: Some(hold_id.to_string()),
-            event_id: Some(effective_event_id.clone()),
-            expected_cumulative_approval_state: None,
-            authority: authority.clone(),
-        }) {
-            Ok(mutation) => Some(mutation),
-            Err(error) => return budget_internal_error(&error, "budget exposure release failed"),
-        }
-    } else {
-        if let Err(error) = store.reverse_charge_cost_with_ids_and_authority(
-            &payload.capability_id,
-            payload.grant_index,
-            payload.cost_units,
-            None,
-            Some(effective_event_id.as_str()),
-            authority.as_ref(),
-        ) {
-            return budget_internal_error(&error, "budget exposure release failed");
-        }
-        None
+    let mutation = match store.reverse_budget_hold(BudgetReverseHoldRequest {
+        capability_id: payload.capability_id.clone(),
+        grant_index: payload.grant_index,
+        reversed_exposure_units: payload.cost_units,
+        hold_id: payload.hold_id.clone(),
+        event_id: payload.event_id.clone(),
+        expected_cumulative_approval_state: None,
+        authority: authority.clone(),
+    }) {
+        Ok(mutation) => mutation,
+        Err(error) => return budget_internal_error(&error, "budget exposure release failed"),
     };
-    let structured_projection = if let Some(mutation) = mutation {
-        let grant_index = match u32::try_from(payload.grant_index) {
-            Ok(grant_index) => grant_index,
-            Err(error) => return structured_projection_error(error),
-        };
-        match structured_mutation_projection(
-            &store,
-            Some(&payload.capability_id),
-            Some(grant_index),
-            payload.hold_id.clone().unwrap_or_default(),
-            effective_event_id.clone(),
-            StructuredBudgetMutationDecisionView::AppliedOrAlreadyApplied,
-            mutation,
-        ) {
-            Ok(projection) => projection,
-            Err(response) => return response,
-        }
-    } else {
-        None
+    let grant_index = match u32::try_from(payload.grant_index) {
+        Ok(grant_index) => grant_index,
+        Err(error) => return structured_projection_error(error),
     };
-    let write = match budget_write_token(
+    let structured_projection = match structured_mutation_projection(
         &store,
-        authority.as_ref(),
-        Some(effective_event_id.as_str()),
+        Some(&payload.capability_id),
+        Some(grant_index),
+        payload.hold_id.clone(),
+        payload.event_id.clone(),
+        StructuredBudgetMutationDecisionView::AppliedOrAlreadyApplied,
+        mutation,
     ) {
+        Ok(projection) => projection,
+        Err(response) => return response,
+    };
+    let write = match budget_write_token(&store, authority.as_ref(), &payload.event_id) {
         Ok(write) => write,
         Err(response) => return response,
     };
@@ -663,7 +451,7 @@ pub(crate) async fn handle_reverse_charge_cost(
                     capability_id: payload.capability_id.clone(),
                     grant_index: payload.grant_index,
                     hold_id: payload.hold_id.clone(),
-                    event_id: Some(effective_event_id.clone()),
+                    event_id: payload.event_id.clone(),
                     invocation_count: Some(usage.invocation_count),
                     total_cost_exposed: Some(usage.total_cost_exposed),
                     total_cost_realized_spend: Some(usage.total_cost_realized_spend),
@@ -703,7 +491,7 @@ pub(crate) async fn handle_capture_invocation(
         Ok(store) => store,
         Err(response) => return response,
     };
-    let authority = match resolve_budget_hold_authority(&state, &store, Some(&payload.hold_id)) {
+    let authority = match resolve_budget_hold_authority(&state, &store, &payload.hold_id) {
         Ok(authority) => authority,
         Err(response) => return response,
     };
@@ -775,7 +563,7 @@ pub(crate) async fn handle_capture_invocation(
         Ok(authority) => authority,
         Err(response) => return response,
     };
-    let write = match budget_write_token(&store, authority.as_ref(), Some(&event_id)) {
+    let write = match budget_write_token(&store, authority.as_ref(), &event_id) {
         Ok(write) => write,
         Err(response) => return response,
     };
@@ -814,9 +602,7 @@ pub(crate) async fn handle_reduce_charge_cost(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    if let Err(response) =
-        validate_budget_request_identity(payload.hold_id.as_deref(), payload.event_id.as_deref())
-    {
+    if let Err(response) = validate_budget_request_identity(&payload.hold_id, &payload.event_id) {
         return response;
     }
     let released_exposure_units = payload.release_units();
@@ -829,17 +615,10 @@ pub(crate) async fn handle_reduce_charge_cost(
         Ok(store) => store,
         Err(response) => return response,
     };
-    let authority = match resolve_budget_hold_authority(&state, &store, payload.hold_id.as_deref())
-    {
+    let authority = match resolve_budget_hold_authority(&state, &store, &payload.hold_id) {
         Ok(authority) => authority,
         Err(response) => return response,
     };
-    // Mint an event_id when omitted so the witness waits on this reconcile's exact
-    // event_seq, not the authority MAX.
-    let effective_event_id = payload
-        .event_id
-        .clone()
-        .unwrap_or_else(generated_budget_event_id);
     let lifecycle_amounts =
         match (payload.exposure_units, payload.realized_spend_units) {
             (None, None) => None,
@@ -850,83 +629,48 @@ pub(crate) async fn handle_reduce_charge_cost(
                 "budget lifecycle request must provide both exposure and realized spend or neither",
             ),
         };
-    let mutation = if let Some(hold_id) = payload.hold_id.as_deref() {
-        let result = match lifecycle_amounts {
-            None => store.release_budget_hold(BudgetReleaseHoldRequest {
+    let result = match lifecycle_amounts {
+        None => store.release_budget_hold(BudgetReleaseHoldRequest {
+            capability_id: payload.capability_id.clone(),
+            grant_index: payload.grant_index,
+            released_exposure_units,
+            hold_id: payload.hold_id.clone(),
+            event_id: payload.event_id.clone(),
+            authority: authority.clone(),
+        }),
+        Some((exposed_cost_units, realized_spend_units)) => {
+            store.reconcile_budget_hold(BudgetReconcileHoldRequest {
                 capability_id: payload.capability_id.clone(),
                 grant_index: payload.grant_index,
-                released_exposure_units,
-                hold_id: Some(hold_id.to_string()),
-                event_id: Some(effective_event_id.clone()),
+                exposed_cost_units,
+                realized_spend_units,
+                hold_id: payload.hold_id.clone(),
+                event_id: payload.event_id.clone(),
                 authority: authority.clone(),
-            }),
-            Some((exposed_cost_units, realized_spend_units)) => {
-                store.reconcile_budget_hold(BudgetReconcileHoldRequest {
-                    capability_id: payload.capability_id.clone(),
-                    grant_index: payload.grant_index,
-                    exposed_cost_units,
-                    realized_spend_units,
-                    hold_id: Some(hold_id.to_string()),
-                    event_id: Some(effective_event_id.clone()),
-                    authority: authority.clone(),
-                })
-            }
-        };
-        match result {
-            Ok(mutation) => Some(mutation),
-            Err(error) => return budget_internal_error(&error, "budget reconciliation failed"),
+            })
         }
-    } else {
-        let result = match lifecycle_amounts {
-            Some((exposure_units, realized_spend_units)) => store
-                .settle_charge_cost_with_ids_and_authority(
-                    &payload.capability_id,
-                    payload.grant_index,
-                    exposure_units,
-                    realized_spend_units,
-                    None,
-                    Some(effective_event_id.as_str()),
-                    authority.as_ref(),
-                ),
-            None => store.reduce_charge_cost_with_ids_and_authority(
-                &payload.capability_id,
-                payload.grant_index,
-                released_exposure_units,
-                None,
-                Some(effective_event_id.as_str()),
-                authority.as_ref(),
-            ),
-        };
-        if let Err(error) = result {
-            return budget_internal_error(&error, "budget reconciliation failed");
-        }
-        None
     };
-    let structured_projection = if let Some(mutation) = mutation {
-        let grant_index = match u32::try_from(payload.grant_index) {
-            Ok(grant_index) => grant_index,
-            Err(error) => return structured_projection_error(error),
-        };
-        match structured_mutation_projection(
-            &store,
-            Some(&payload.capability_id),
-            Some(grant_index),
-            payload.hold_id.clone().unwrap_or_default(),
-            effective_event_id.clone(),
-            StructuredBudgetMutationDecisionView::AppliedOrAlreadyApplied,
-            mutation,
-        ) {
-            Ok(projection) => projection,
-            Err(response) => return response,
-        }
-    } else {
-        None
+    let mutation = match result {
+        Ok(mutation) => mutation,
+        Err(error) => return budget_internal_error(&error, "budget reconciliation failed"),
     };
-    let write = match budget_write_token(
+    let grant_index = match u32::try_from(payload.grant_index) {
+        Ok(grant_index) => grant_index,
+        Err(error) => return structured_projection_error(error),
+    };
+    let structured_projection = match structured_mutation_projection(
         &store,
-        authority.as_ref(),
-        Some(effective_event_id.as_str()),
+        Some(&payload.capability_id),
+        Some(grant_index),
+        payload.hold_id.clone(),
+        payload.event_id.clone(),
+        StructuredBudgetMutationDecisionView::AppliedOrAlreadyApplied,
+        mutation,
     ) {
+        Ok(projection) => projection,
+        Err(response) => return response,
+    };
+    let write = match budget_write_token(&store, authority.as_ref(), &payload.event_id) {
         Ok(write) => write,
         Err(response) => return response,
     };
@@ -950,7 +694,7 @@ pub(crate) async fn handle_reduce_charge_cost(
                     capability_id: payload.capability_id.clone(),
                     grant_index: payload.grant_index,
                     hold_id: payload.hold_id.clone(),
-                    event_id: Some(effective_event_id.clone()),
+                    event_id: payload.event_id.clone(),
                     invocation_count: Some(usage.invocation_count),
                     total_cost_exposed: Some(usage.total_cost_exposed),
                     total_cost_realized_spend: Some(usage.total_cost_realized_spend),
@@ -1172,7 +916,7 @@ fn lifecycle_budget_authority_metadata(
 fn resolve_budget_hold_authority(
     state: &TrustServiceState,
     store: &SqliteBudgetStore,
-    hold_id: Option<&str>,
+    hold_id: &str,
 ) -> Result<Option<BudgetEventAuthority>, Response> {
     if let Some(authority_store) = state.joint_authority_store.as_ref() {
         let fence = authority_store.mutation_fence();
@@ -1182,16 +926,14 @@ fn resolve_budget_hold_authority(
             lease_epoch: fence.owner_epoch,
         }));
     }
-    if let Some(hold_id) = hold_id {
-        match store.hold_authority(hold_id) {
-            Ok(Some(authority)) => return Ok(Some(authority)),
-            Ok(None) => {}
-            Err(error) => {
-                return Err(budget_internal_error(
-                    &error,
-                    "budget hold authority lookup failed",
-                ));
-            }
+    match store.hold_authority(hold_id) {
+        Ok(Some(authority)) => return Ok(Some(authority)),
+        Ok(None) => {}
+        Err(error) => {
+            return Err(budget_internal_error(
+                &error,
+                "budget hold authority lookup failed",
+            ));
         }
     }
     current_budget_event_authority(state)

@@ -178,174 +178,38 @@ fn unlimited_grant_guard_denial_does_not_reverse_budget_store() {
     }
 
     impl BudgetStore for NoopUnlimitedBudgetStore {
-        fn try_increment(
+        fn reverse_budget_hold(
             &self,
-            capability_id: &str,
-            grant_index: usize,
-            max_invocations: Option<u32>,
-        ) -> Result<bool, BudgetStoreError> {
-            if max_invocations.is_none() {
-                return Ok(true);
-            }
-            self.inner
-                .try_increment(capability_id, grant_index, max_invocations)
-        }
-
-        fn try_charge_cost(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            max_invocations: Option<u32>,
-            cost_units: u64,
-            max_cost_per_invocation: Option<u64>,
-            max_total_cost_units: Option<u64>,
-        ) -> Result<bool, BudgetStoreError> {
-            self.inner.try_charge_cost(
-                capability_id,
-                grant_index,
-                max_invocations,
-                cost_units,
-                max_cost_per_invocation,
-                max_total_cost_units,
-            )
-        }
-
-        fn reverse_charge_cost(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            cost_units: u64,
-        ) -> Result<(), BudgetStoreError> {
+            request: crate::budget_store::BudgetReverseHoldRequest,
+        ) -> Result<crate::budget_store::BudgetReverseHoldDecision, BudgetStoreError> {
             self.reverse_calls.fetch_add(1, Ordering::SeqCst);
-            self.inner
-                .reverse_charge_cost(capability_id, grant_index, cost_units)
+            self.inner.reverse_budget_hold(request)
         }
 
-        fn reduce_charge_cost(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            cost_units: u64,
-        ) -> Result<(), BudgetStoreError> {
-            self.inner
-                .reduce_charge_cost(capability_id, grant_index, cost_units)
-        }
-
-        fn settle_charge_cost(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            exposed_cost_units: u64,
-            realized_cost_units: u64,
-        ) -> Result<(), BudgetStoreError> {
-            self.inner.settle_charge_cost(
-                capability_id,
-                grant_index,
-                exposed_cost_units,
-                realized_cost_units,
-            )
-        }
-
-        fn try_charge_cost_with_ids_and_authority(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            max_invocations: Option<u32>,
-            cost_units: u64,
-            max_cost_per_invocation: Option<u64>,
-            max_total_cost_units: Option<u64>,
-            hold_id: Option<&str>,
-            event_id: Option<&str>,
-            authority: Option<&crate::budget_store::BudgetEventAuthority>,
-        ) -> Result<bool, BudgetStoreError> {
-            self.inner.try_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                max_invocations,
-                cost_units,
-                max_cost_per_invocation,
-                max_total_cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-        }
-
-        fn reverse_charge_cost_with_ids_and_authority(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            cost_units: u64,
-            hold_id: Option<&str>,
-            event_id: Option<&str>,
-            authority: Option<&crate::budget_store::BudgetEventAuthority>,
-        ) -> Result<(), BudgetStoreError> {
-            self.inner.reverse_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-        }
-
-        fn reduce_charge_cost_with_ids_and_authority(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            cost_units: u64,
-            hold_id: Option<&str>,
-            event_id: Option<&str>,
-            authority: Option<&crate::budget_store::BudgetEventAuthority>,
-        ) -> Result<(), BudgetStoreError> {
-            self.inner.reduce_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-        }
-
-        fn settle_charge_cost_with_ids_and_authority(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-            exposed_cost_units: u64,
-            realized_cost_units: u64,
-            hold_id: Option<&str>,
-            event_id: Option<&str>,
-            authority: Option<&crate::budget_store::BudgetEventAuthority>,
-        ) -> Result<(), BudgetStoreError> {
-            self.inner.settle_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                exposed_cost_units,
-                realized_cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-        }
-
-        fn list_usages(
-            &self,
-            limit: usize,
-            capability_id: Option<&str>,
-        ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
-            self.inner.list_usages(limit, capability_id)
-        }
-
-        fn get_usage(
-            &self,
-            capability_id: &str,
-            grant_index: usize,
-        ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
-            self.inner.get_usage(capability_id, grant_index)
-        }
-    }
+    delegate_budget_store_methods!(
+        inner;
+        authorize_budget_hold,
+        capture_invocation_reservations,
+        authorize_cumulative_approval,
+        cancel_captured_before_dispatch,
+        release_budget_hold,
+        reconcile_budget_hold,
+        capture_budget_hold,
+        list_usages,
+        get_usage,
+        get_invocation_quota_usage,
+        get_cumulative_approval_account_usage,
+        get_cumulative_approval_operation_usage,
+        list_mutation_events,
+        reap_orphaned_holds,
+        count_open_holds,
+        list_open_delegated_reserved_hold_ids,
+        request_id_has_reserved_hold,
+        get_budget_hold,
+        mark_hold_reserved,
+        reap_expired_reserved_holds,
+    );
+}
 
     let mut kernel = make_kernel(make_config());
     let budget_store = std::sync::Arc::new(NoopUnlimitedBudgetStore::new());

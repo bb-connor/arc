@@ -120,8 +120,8 @@ fn authorize_request(index: usize) -> BudgetAuthorizeHoldRequest {
         requested_exposure_units: 100,
         max_cost_per_invocation: Some(100),
         max_total_cost_units: Some(100),
-        hold_id: Some(format!("bench-hold-{index}")),
-        event_id: Some(format!("bench-authorize-{index}")),
+        hold_id: format!("bench-hold-{index}"),
+        event_id: format!("bench-authorize-{index}"),
         authority: Some(bench_authority()),
     }
 }
@@ -131,8 +131,8 @@ fn release_request(index: usize) -> BudgetReleaseHoldRequest {
         capability_id: bench_capability(index),
         grant_index: 0,
         released_exposure_units: 100,
-        hold_id: Some(format!("bench-hold-{index}")),
-        event_id: Some(format!("bench-release-{index}")),
+        hold_id: format!("bench-hold-{index}"),
+        event_id: format!("bench-release-{index}"),
         authority: Some(bench_authority()),
     }
 }
@@ -192,8 +192,8 @@ fn bench_budget_charge_release(c: &mut Criterion) {
                     capability_id: bench_capability(index),
                     grant_index: 0,
                     reversed_exposure_units: 100,
-                    hold_id: Some(format!("bench-hold-{index}")),
-                    event_id: Some(format!("bench-reverse-{index}")),
+                    hold_id: format!("bench-hold-{index}"),
+                    event_id: format!("bench-reverse-{index}"),
                     expected_cumulative_approval_state: None,
                     authority: Some(bench_authority()),
                 })

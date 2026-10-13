@@ -7,7 +7,7 @@ fn capability_budget_report_reads_all_matching_rows_before_display_limit(
     let receipts = SqliteReceiptStore::open(directory.path().join("receipts.db"))?;
     let budgets = SqliteBudgetStore::open(directory.path().join("budgets.db"))?;
     for (capability, grant) in [("cap-a", 0), ("cap-a", 1), ("cap-b", 0)] {
-        assert!(budgets.try_increment(capability, grant, None)?);
+        assert!(budgets.authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: (capability).to_string(), grant_index: grant, max_invocations: None, invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: 0, max_cost_per_invocation: None, max_total_cost_units: None, hold_id: format!("hold-{capability}-{grant}").to_string(), event_id: format!("hold-{capability}-{grant}:authorize").to_string(), authority: None }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))?);
     }
     let query = OperatorReportQuery {
         capability_id: Some("cap-a".to_owned()),

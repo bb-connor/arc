@@ -355,8 +355,8 @@ fn budget_authorization_request(
         requested_exposure_units: EXPOSURE_UNITS,
         max_cost_per_invocation: Some(EXPOSURE_UNITS),
         max_total_cost_units: Some(EXPOSURE_UNITS * 2),
-        hold_id: Some(format!("hold-{identity}")),
-        event_id: Some(format!("authorize-{identity}")),
+        hold_id: format!("hold-{identity}"),
+        event_id: format!("authorize-{identity}"),
         authority: Some(BudgetEventAuthority {
             authority_id: fixture.fence.store_uuid.clone(),
             lease_id: fixture.fence.lease_id.clone(),
@@ -472,7 +472,15 @@ fn credit_account_provisioning_authorization_and_replay_are_exact() -> CreditAut
         &fixture.fence,
         now + 5,
     )?;
-    assert_eq!(replayed.0, decision);
+    let BudgetAuthorizeHoldDecision::Authorized(mut expected) = decision else {
+        return Err("credit budget authorization was not authorized".into());
+    };
+    assert_eq!(
+        expected.cleanup_custody,
+        chio_kernel::budget_store::BudgetHoldCleanupCustody::Fresh
+    );
+    expected.cleanup_custody = chio_kernel::budget_store::BudgetHoldCleanupCustody::Replayed;
+    assert_eq!(replayed.0, BudgetAuthorizeHoldDecision::Authorized(expected));
     assert_eq!(replayed.1, authorized);
     let reservation = fixture
         .store

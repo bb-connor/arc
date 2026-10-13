@@ -514,8 +514,8 @@ pub(super) fn validate_payment_reconcile_binding(
     if budget.capability_id != journal.capability_id
         || budget.grant_index != grant_index
         || budget.exposed_cost_units != journal.amount_units
-        || budget.hold_id.as_deref() != Some(hold_id)
-        || budget.event_id.as_deref() != Some(format!("{hold_id}:reconcile").as_str())
+        || budget.hold_id != hold_id
+        || budget.event_id != format!("{hold_id}:reconcile")
     {
         return Err(AdmissionPaymentJournalError::Invariant(
             "budget reconciliation does not match the payment journal".to_owned(),

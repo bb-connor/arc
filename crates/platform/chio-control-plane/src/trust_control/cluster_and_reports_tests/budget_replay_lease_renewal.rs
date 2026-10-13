@@ -28,16 +28,8 @@ fn request(case: &str, event: &str, cost_units: u64) -> TryChargeCostRequest {
         cost_units,
         max_cost_per_invocation: Some(200),
         max_total_cost_units: Some(1_000),
-        hold_id: Some(format!("hold-replay-{case}-{event}")),
-        event_id: Some(format!("replay-{case}:{event}")),
-    }
-}
-
-/// A charge with no hold, identified by its event id alone.
-fn no_hold_request(case: &str, event: &str, cost_units: u64) -> TryChargeCostRequest {
-    TryChargeCostRequest {
-        hold_id: None,
-        ..request(case, event, cost_units)
+        hold_id: format!("hold-replay-{case}-{event}"),
+        event_id: format!("replay-{case}:{event}"),
     }
 }
 
@@ -54,20 +46,10 @@ fn authorized(case: &str, payload: &TryChargeCostRequest) -> ReplayFixture {
         .test_unwrap();
     let store = SqliteBudgetStore::open(&budget_db).test_unwrap();
     assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            &payload.capability_id,
-            payload.grant_index,
-            payload.max_invocations,
-            payload.cost_units,
-            payload.max_cost_per_invocation,
-            payload.max_total_cost_units,
-            payload.hold_id.as_deref(),
-            payload.event_id.as_deref(),
-            Some(&original),
-        )
+        .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: (&payload.capability_id).to_string(), grant_index: payload.grant_index, max_invocations: payload.max_invocations, invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: payload.cost_units, max_cost_per_invocation: payload.max_cost_per_invocation, max_total_cost_units: payload.max_total_cost_units, hold_id: payload.hold_id.clone(), event_id: payload.event_id.clone(), authority: Some(original.clone()) }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
         .test_unwrap());
     let original_seq = store
-        .mutation_event_for_event_id(payload.event_id.as_deref().test_unwrap())
+        .mutation_event_for_event_id(&payload.event_id)
         .test_unwrap()
         .test_unwrap()
         .event_seq;
@@ -116,10 +98,7 @@ fn budget_rows(budget_db: &std::path::Path, payload: &TryChargeCostRequest) -> B
         store
             .list_mutation_events(32, Some(&payload.capability_id), Some(0))
             .test_unwrap(),
-        payload
-            .hold_id
-            .as_deref()
-            .and_then(|hold_id| store.budget_hold_snapshot(hold_id).test_unwrap()),
+        store.budget_hold_snapshot(&payload.hold_id).test_unwrap(),
     )
 }
 
@@ -147,23 +126,13 @@ async fn assert_retry_replays_after_renewal(request_for: RequestFor, case: &str)
     // lease alone cannot replay the original event.
     let ordinary = SqliteBudgetStore::open(&fixture.budget_db)
         .test_unwrap()
-        .try_charge_cost_with_ids_and_authority(
-            &payload.capability_id,
-            payload.grant_index,
-            payload.max_invocations,
-            payload.cost_units,
-            payload.max_cost_per_invocation,
-            payload.max_total_cost_units,
-            payload.hold_id.as_deref(),
-            payload.event_id.as_deref(),
-            Some(&renewed),
-        );
+        .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: (&payload.capability_id).to_string(), grant_index: payload.grant_index, max_invocations: payload.max_invocations, invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: payload.cost_units, max_cost_per_invocation: payload.max_cost_per_invocation, max_total_cost_units: payload.max_total_cost_units, hold_id: payload.hold_id.clone(), event_id: payload.event_id.clone(), authority: Some(renewed.clone()) }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)));
     assert!(matches!(
         &ordinary,
         Err(BudgetStoreError::Invariant(message))
             if *message == format!(
                 "budget event_id `{}` authority metadata does not match the original mutation",
-                payload.event_id.as_deref().test_unwrap()
+                &payload.event_id
             )
     ));
     assert_eq!(budget_rows(&fixture.budget_db, &payload), before);
@@ -171,7 +140,7 @@ async fn assert_retry_replays_after_renewal(request_for: RequestFor, case: &str)
     let (status, body) = charge(&fixture.state, request_for(case, "authorize", 100)).await;
 
     assert_eq!(status, StatusCode::OK, "replay refused: {body}");
-    assert_eq!(body["allowed"], json!(true));
+    assert_eq!(body["decision"], json!("authorized"));
     assert_eq!(body["budgetCommit"]["quorumCommitted"], json!(true));
     assert_eq!(
         body["budgetCommit"]["commitIndex"],
@@ -198,18 +167,13 @@ async fn retried_authorization_replays_under_its_original_lease_after_renewal() 
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn retried_charge_without_hold_replays_under_its_original_lease_after_renewal() {
-    assert_retry_replays_after_renewal(no_hold_request, "renewal-no-hold").await;
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_new_authorization_after_renewal_is_admitted_under_the_renewed_lease() {
     let payload = request("new-event", "authorize", 100);
     let fixture = authorized("new-event", &payload);
     let renewed = renew_lease(&fixture.state);
     let fresh = TryChargeCostRequest {
-        hold_id: Some("hold-replay-new-event-fresh".to_string()),
-        event_id: Some("replay-new-event:fresh".to_string()),
+        hold_id: "hold-replay-new-event-fresh".to_string(),
+        event_id: "replay-new-event:fresh".to_string(),
         ..request("new-event", "authorize", 100)
     };
     let fresh_seq = fixture.original_seq + 1;
@@ -262,11 +226,6 @@ async fn a_conflicting_payload_under_the_original_event_id_stays_refused_after_r
     assert_conflict_refused_after_renewal(request, "conflict").await;
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_conflicting_charge_without_hold_stays_refused_after_renewal() {
-    assert_conflict_refused_after_renewal(no_hold_request, "conflict-no-hold").await;
-}
-
 /// An event admitted by another authority is never replayed by this leader.
 async fn assert_foreign_authority_refused(request_for: RequestFor, case: &str) {
     let payload = request_for(case, "authorize", 100);
@@ -283,17 +242,7 @@ async fn assert_foreign_authority_refused(request_for: RequestFor, case: &str) {
     };
     assert!(SqliteBudgetStore::open(&budget_db)
         .test_unwrap()
-        .try_charge_cost_with_ids_and_authority(
-            &payload.capability_id,
-            payload.grant_index,
-            payload.max_invocations,
-            payload.cost_units,
-            payload.max_cost_per_invocation,
-            payload.max_total_cost_units,
-            payload.hold_id.as_deref(),
-            payload.event_id.as_deref(),
-            Some(&foreign),
-        )
+        .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: (&payload.capability_id).to_string(), grant_index: payload.grant_index, max_invocations: payload.max_invocations, invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: payload.cost_units, max_cost_per_invocation: payload.max_cost_per_invocation, max_total_cost_units: payload.max_total_cost_units, hold_id: payload.hold_id.clone(), event_id: payload.event_id.clone(), authority: Some(foreign.clone()) }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
         .test_unwrap());
     let before = budget_rows(&budget_db, &payload);
 
@@ -308,11 +257,6 @@ async fn assert_foreign_authority_refused(request_for: RequestFor, case: &str) {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn an_authorization_admitted_by_another_authority_is_never_replayed() {
     assert_foreign_authority_refused(request, "cross-authority").await;
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_charge_without_hold_admitted_by_another_authority_is_never_replayed() {
-    assert_foreign_authority_refused(no_hold_request, "cross-authority-no-hold").await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -25,31 +25,6 @@ impl SqliteBudgetStore {
         self.authorize_budget_hold_atomic(request, Some(current))
     }
 
-    /// The replay counterpart of `try_charge_cost_with_ids_and_authority`. A
-    /// charge is recorded through the same atomic authorization with the
-    /// charge path's own checks (no hold identity required), so its replay
-    /// takes exactly those checks, in replay-only mode, under the same rules.
-    pub fn replay_cost_charge(
-        &self,
-        request: &BudgetAuthorizeHoldRequest,
-        current: &BudgetEventAuthority,
-    ) -> Result<bool, BudgetStoreError> {
-        if !request.invocation_quotas.is_empty()
-            || request.cumulative_approval.is_some()
-            || request.admission_binding.is_some()
-        {
-            return Err(BudgetStoreError::Invariant(
-                "budget charge replay supports only standalone charges".to_string(),
-            ));
-        }
-        self.require_standalone_mutation("unbound charge")?;
-        validate_budget_grant_index(request.grant_index)?;
-        Ok(matches!(
-            self.authorize_budget_hold_atomic(request, Some(current))?,
-            BudgetAuthorizeHoldDecision::Authorized(_)
-        ))
-    }
-
     /// `replay_under` selects replay-only mode: the original event must already
     /// exist and is validated against its own authority, which must be
     /// replayable under that lease.
@@ -70,23 +45,17 @@ impl SqliteBudgetStore {
         }
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
-        Self::reject_legacy_admission_after_composite_history(
+        Self::reject_unbound_admission_after_composite_history(
             &transaction,
             &request.capability_id,
             request.grant_index,
         )?;
-        let request_event = match request.event_id.as_deref() {
-            Some(event_id) => Self::load_mutation_event(&transaction, event_id)?,
-            None => None,
-        };
+        let event_id = request.event_id.as_str();
+        let hold_id = request.hold_id.as_str();
+        let request_event = Self::load_mutation_event(&transaction, event_id)?;
         let replay_authority = match replay_under {
             None => None,
             Some(current) => {
-                let event_id = request.event_id.as_deref().ok_or_else(|| {
-                    BudgetStoreError::Invariant(
-                        "budget authorization replay is missing its event id".to_string(),
-                    )
-                })?;
                 let original = request_event.as_ref().ok_or_else(|| {
                     BudgetStoreError::Invariant(format!(
                         "budget event_id `{event_id}` has no authorization to replay"
@@ -105,11 +74,11 @@ impl SqliteBudgetStore {
         };
         let existing = Self::existing_event_allowed(
             &transaction,
-            request.event_id.as_deref(),
+            event_id,
             BudgetMutationKind::AuthorizeExposure,
             &request.capability_id,
             request.grant_index,
-            request.hold_id.as_deref(),
+            Some(hold_id),
             authority,
             request.requested_exposure_units,
             0,
@@ -122,66 +91,50 @@ impl SqliteBudgetStore {
                 "budget authorization replay found no original authorization".to_string(),
             ));
         }
-        if existing.is_none() {
-            if let Some(hold_id) = request.hold_id.as_deref() {
-                if Self::load_hold(&transaction, hold_id)?.is_some() {
-                    return Err(BudgetStoreError::Invariant(format!(
-                        "budget hold `{hold_id}` exists without the requested authorization event"
-                    )));
-                }
-            }
+        if existing.is_none() && Self::load_hold(&transaction, hold_id)?.is_some() {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` exists without the requested authorization event"
+            )));
         }
 
-        if let Some(hold_id) = request.hold_id.as_deref() {
-            if let Some(hold) = Self::load_hold(&transaction, hold_id)? {
-                Self::validate_authorize_hold(
-                    &transaction,
-                    request,
-                    &hold,
-                    request_event.as_ref(),
-                )?;
-                if hold.invocation_captured {
-                    let current_authorize_event_id = transaction
-                        .query_row(
-                            r#"
-                            SELECT event_id FROM budget_mutation_events
-                            WHERE hold_id = ?1 AND kind = ?2
-                            ORDER BY event_seq DESC LIMIT 1
-                            "#,
-                            params![hold_id, BudgetMutationKind::AuthorizeExposure.as_str()],
-                            |row| row.get::<_, String>(0),
-                        )
-                        .optional()?
-                        .ok_or_else(|| {
-                            BudgetStoreError::Invariant(format!(
-                                "captured budget hold `{hold_id}` has no authorization event"
-                            ))
-                        })?;
-                    if request.event_id.as_deref() != Some(current_authorize_event_id.as_str()) {
-                        transaction.rollback()?;
-                        return Err(BudgetStoreError::Invariant(format!(
-                            "budget hold `{hold_id}` authorization event is not current"
-                        )));
-                    }
-                    let capture = Self::load_current_capture_event(&transaction, hold_id)?;
-                    let decision = Self::captured_authorize_decision(self, hold, capture)?;
-                    transaction.commit()?;
-                    return Ok(decision);
-                }
-                if hold.disposition != HoldDisposition::Open {
+        if let Some(hold) = Self::load_hold(&transaction, hold_id)? {
+            Self::validate_authorize_hold(&transaction, request, &hold, request_event.as_ref())?;
+            if hold.invocation_captured {
+                let current_authorize_event_id = transaction
+                    .query_row(
+                        r#"
+                        SELECT event_id FROM budget_mutation_events
+                        WHERE hold_id = ?1 AND kind = ?2
+                        ORDER BY event_seq DESC LIMIT 1
+                        "#,
+                        params![hold_id, BudgetMutationKind::AuthorizeExposure.as_str()],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .optional()?
+                    .ok_or_else(|| {
+                        BudgetStoreError::Invariant(format!(
+                            "captured budget hold `{hold_id}` has no authorization event"
+                        ))
+                    })?;
+                if event_id != current_authorize_event_id {
+                    transaction.rollback()?;
                     return Err(BudgetStoreError::Invariant(format!(
-                        "budget hold `{hold_id}` cannot be reopened by authorization"
+                        "budget hold `{hold_id}` authorization event is not current"
                     )));
                 }
+                let capture = Self::load_current_capture_event(&transaction, hold_id)?;
+                let decision = Self::captured_authorize_decision(self, hold, capture)?;
+                transaction.commit()?;
+                return Ok(decision);
+            }
+            if hold.disposition != HoldDisposition::Open {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "budget hold `{hold_id}` cannot be reopened by authorization"
+                )));
             }
         }
 
         if existing.is_some() {
-            let event_id = request.event_id.as_deref().ok_or_else(|| {
-                BudgetStoreError::Invariant(
-                    "idempotent budget authorization is missing its event id".to_string(),
-                )
-            })?;
             let event = Self::load_mutation_event(&transaction, event_id)?.ok_or_else(|| {
                 BudgetStoreError::Invariant(
                     "budget authorization event disappeared during transaction".to_string(),
@@ -278,16 +231,14 @@ impl SqliteBudgetStore {
                         "budget authorization compare-and-set failed".into(),
                     ));
                 }
-                if let Some(hold_id) = request.hold_id.as_deref() {
-                    self.create_hold(
-                        &transaction,
-                        hold_id,
-                        &request.capability_id,
-                        request.grant_index,
-                        request.requested_exposure_units,
-                        request.authority.as_ref(),
-                    )?;
-                }
+                self.create_hold(
+                    &transaction,
+                    hold_id,
+                    &request.capability_id,
+                    request.grant_index,
+                    request.requested_exposure_units,
+                    request.authority.as_ref(),
+                )?;
                 (
                     Some(event_seq),
                     invocation_count_after,
@@ -299,8 +250,8 @@ impl SqliteBudgetStore {
             };
         let event = self.append_mutation_event(
             &transaction,
-            request.event_id.as_deref(),
-            request.hold_id.as_deref(),
+            event_id,
+            Some(hold_id),
             request.authority.as_ref(),
             &request.capability_id,
             request.grant_index,

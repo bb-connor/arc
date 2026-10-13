@@ -44,8 +44,8 @@ pub(super) fn compensate(
             requested_exposure_units: 0,
             max_cost_per_invocation: None,
             max_total_cost_units: None,
-            hold_id: Some(hold_id.into()),
-            event_id: Some(format!("{hold_id}-authorize")),
+            hold_id: hold_id.into(),
+            event_id: format!("{hold_id}-authorize"),
             authority: Some(authority.clone()),
         })?,
         BudgetAuthorizeHoldDecision::Authorized(_)
@@ -84,8 +84,8 @@ pub(super) fn compensate(
         capability_id: capability_id.into(),
         grant_index: 0,
         reversed_exposure_units: 0,
-        hold_id: Some(hold_id.into()),
-        event_id: Some(format!("{hold_id}-reverse")),
+        hold_id: hold_id.into(),
+        event_id: format!("{hold_id}-reverse"),
         expected_cumulative_approval_state: None,
         authority: Some(authority),
     })?;

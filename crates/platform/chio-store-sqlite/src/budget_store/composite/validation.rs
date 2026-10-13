@@ -46,8 +46,8 @@ pub(super) fn validate_stored_composite_binding(
         requested_exposure_units: 0,
         max_cost_per_invocation: None,
         max_total_cost_units: None,
-        hold_id: Some(hold_id.to_string()),
-        event_id: Some(event_id.to_string()),
+        hold_id: hold_id.to_string(),
+        event_id: event_id.to_string(),
         authority: None,
     }
     .validate()

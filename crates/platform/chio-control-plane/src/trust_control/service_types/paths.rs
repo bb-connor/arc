@@ -126,7 +126,6 @@ pub(crate) const REVOCATIONS_PATH: &str = "/v1/revocations";
 pub(crate) const TOOL_RECEIPTS_PATH: &str = "/v1/receipts/tools";
 pub(crate) const CHILD_RECEIPTS_PATH: &str = "/v1/receipts/children";
 pub(crate) const BUDGETS_PATH: &str = "/v1/budgets";
-pub(crate) const BUDGET_INCREMENT_PATH: &str = "/v1/budgets/increment";
 pub(crate) const BUDGET_AUTHORIZE_EXPOSURE_PATH: &str = "/v1/budgets/authorize-exposure";
 pub(crate) const BUDGET_CAPTURE_INVOCATION_PATH: &str = "/v1/budgets/capture-invocation";
 pub(crate) const BUDGET_RELEASE_EXPOSURE_PATH: &str = "/v1/budgets/release-exposure";

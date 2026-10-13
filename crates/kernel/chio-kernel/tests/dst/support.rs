@@ -15,7 +15,7 @@ use chio_core::session::{
     CreateMessageResult, OperationContext, RequestId, RootDefinition, ToolCallOperation,
 };
 use chio_kernel::admission_operation::DurableAdmissionMode;
-use chio_kernel::budget_store::{BudgetEventAuthority, BudgetMutationKind, BudgetMutationRecord};
+use chio_kernel::budget_store::{BudgetMutationKind, BudgetMutationRecord};
 use chio_kernel::{
     BudgetStore, BudgetStoreError, BudgetUsageRecord, ChioKernel, InMemoryBudgetStore,
     KernelConfig, KernelError, NestedFlowBridge, NestedFlowClient, PeerCapabilities, ReceiptStore,
@@ -301,243 +301,6 @@ impl FaultingBudgetStore {
 }
 
 impl BudgetStore for FaultingBudgetStore {
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.mutation("try_increment")?;
-        self.inner
-            .try_increment(capability_id, grant_index, max_invocations)
-    }
-
-    fn try_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.mutation("try_charge_cost")?;
-        self.inner.try_charge_cost(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-        )
-    }
-
-    fn try_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.mutation("try_charge_cost_with_ids")?;
-        self.inner.try_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            hold_id,
-            event_id,
-        )
-    }
-
-    fn try_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.mutation("try_charge_cost_with_ids_and_authority")?;
-        self.inner.try_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            hold_id,
-            event_id,
-            authority,
-        )
-    }
-
-    fn reverse_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("reverse_charge_cost")?;
-        self.inner
-            .reverse_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn reverse_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("reverse_charge_cost_with_ids")?;
-        self.inner.reverse_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            cost_units,
-            hold_id,
-            event_id,
-        )
-    }
-
-    fn reverse_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("reverse_charge_cost_with_ids_and_authority")?;
-        self.inner.reverse_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            cost_units,
-            hold_id,
-            event_id,
-            authority,
-        )
-    }
-
-    fn reduce_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("reduce_charge_cost")?;
-        self.inner
-            .reduce_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn reduce_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("reduce_charge_cost_with_ids")?;
-        self.inner.reduce_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            cost_units,
-            hold_id,
-            event_id,
-        )
-    }
-
-    fn reduce_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("reduce_charge_cost_with_ids_and_authority")?;
-        self.inner.reduce_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            cost_units,
-            hold_id,
-            event_id,
-            authority,
-        )
-    }
-
-    fn settle_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("settle_charge_cost")?;
-        self.inner.settle_charge_cost(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-        )
-    }
-
-    fn settle_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("settle_charge_cost_with_ids")?;
-        self.inner.settle_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-            hold_id,
-            event_id,
-        )
-    }
-
-    fn settle_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("settle_charge_cost_with_ids_and_authority")?;
-        self.inner.settle_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-            hold_id,
-            event_id,
-            authority,
-        )
-    }
-
     fn list_usages(
         &self,
         limit: usize,
@@ -723,24 +486,6 @@ impl BudgetStore for FaultingBudgetStore {
         )
     }
 
-    fn reserve_invocation_hold(
-        &self,
-        hold_id: &str,
-        capability_id: &str,
-        grant_index: usize,
-        reserved_until_unix_secs: i64,
-        envelope: &chio_kernel::budget_store::ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        self.mutation("reserve_invocation_hold")?;
-        self.inner.reserve_invocation_hold(
-            hold_id,
-            capability_id,
-            grant_index,
-            reserved_until_unix_secs,
-            envelope,
-        )
-    }
-
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
         self.mutation("reap_expired_reserved_holds")?;
         self.inner.reap_expired_reserved_holds(now_unix_secs)
@@ -759,8 +504,8 @@ pub fn assert_wrapped_budget_replay_outcome() -> Result<(), String> {
         requested_exposure_units: 1,
         max_cost_per_invocation: Some(1),
         max_total_cost_units: Some(1),
-        hold_id: Some("dst-replay-hold".to_string()),
-        event_id: Some("dst-replay-event".to_string()),
+        hold_id: "dst-replay-hold".to_string(),
+        event_id: "dst-replay-event".to_string(),
         authority: None,
     };
 
@@ -818,8 +563,8 @@ pub fn assert_wrapped_budget_hold_sweep() -> Result<(), String> {
             requested_exposure_units: 10,
             max_cost_per_invocation: Some(10),
             max_total_cost_units: Some(10),
-            hold_id: Some("dst-hold-sweep-hold".to_string()),
-            event_id: Some("dst-hold-sweep-authorize".to_string()),
+            hold_id: "dst-hold-sweep-hold".to_string(),
+            event_id: "dst-hold-sweep-authorize".to_string(),
             authority: None,
         })
         .map_err(|error| format!("authorize wrapped hold-sweep hold: {error}"))?;
@@ -1317,11 +1062,6 @@ pub fn oracle_conservation(
 
     for event in &events {
         match event.kind {
-            BudgetMutationKind::IncrementInvocation if event.allowed == Some(true) => {
-                invocations = invocations
-                    .checked_add(1)
-                    .ok_or_else(|| "invocation count overflow".to_string())?;
-            }
             BudgetMutationKind::AuthorizeExposure if event.allowed == Some(true) => {
                 invocations = invocations
                     .checked_add(1)
@@ -1419,8 +1159,7 @@ pub fn oracle_conservation(
                 released += u128::from(event.exposure_units - event.realized_spend_units);
                 consume_hold(event, &mut holds, &mut unnamed_outstanding, true)?;
             }
-            BudgetMutationKind::IncrementInvocation
-            | BudgetMutationKind::ReserveInvocation
+            BudgetMutationKind::ReserveInvocation
             | BudgetMutationKind::AuthorizeExposure
             | BudgetMutationKind::AuthorizeCumulativeApproval => {}
         }

@@ -185,14 +185,14 @@ impl SelectionFixture {
         request
             .invocation_quotas
             .sort_by(|left, right| left.key.cmp(&right.key));
-        request.hold_id = Some(format!(
+        request.hold_id = format!(
             "selector-hold:{}",
             operation.binding().operation_id().as_str()
-        ));
-        request.event_id = Some(format!(
+        );
+        request.event_id = format!(
             "selector-authorize:{}",
             operation.binding().operation_id().as_str()
-        ));
+        );
         let binding = request.admission_binding.as_mut().ok_or("budget binding")?;
         binding
             .authorization_artifact_digests
@@ -225,8 +225,8 @@ impl SelectionFixture {
             .as_mut()
             .ok_or("binding")?
             .operation_id = identity.budget_operation_id().as_str().into();
-        request.hold_id = Some(identity.hold_id().as_str().into());
-        request.event_id = Some(identity.authorization_event_id().as_str().into());
+        request.hold_id = identity.hold_id().as_str().into();
+        request.event_id = identity.authorization_event_id().as_str().into();
         let command = nonce_command(
             &self.fixture.store,
             &self.fixture.fence,
@@ -328,7 +328,7 @@ impl SelectionFixture {
                 grant_index: request.grant_index,
                 reversed_exposure_units: 0,
                 hold_id: request.hold_id,
-                event_id: request.event_id.map(|event| format!("{event}:reverse")),
+                event_id: format!("{}:reverse", request.event_id),
                 expected_cumulative_approval_state: None,
                 authority: request.authority,
             })?;
@@ -385,7 +385,7 @@ fn nonce_and_executable_hold_select_the_one_authenticated_parent_without_mutatio
     assert_eq!(selected.operation, operation);
     assert_eq!(
         selected.custody.ok_or("selected physical custody")?.hold_id,
-        fixture.budget(&operation)?.hold_id.ok_or("hold")?
+        fixture.budget(&operation)?.hold_id
     );
     assert_eq!(fixture.counts()?, before);
     Ok(())

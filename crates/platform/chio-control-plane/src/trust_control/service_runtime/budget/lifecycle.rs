@@ -82,11 +82,7 @@ impl RemoteBudgetStore {
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
         remote_budget_grant_index(request.grant_index)?;
         request.validate()?;
-        let (hold_id, event_id) = required_remote_hold_event(
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            "reversal",
-        )?;
+        let (hold_id, event_id) = (request.hold_id.as_str(), request.event_id.as_str());
         let expected_cumulative_approval_state = request.expected_cumulative_approval_state;
         let wire = StructuredBudgetFencedReverseRequest {
             schema: STRUCTURED_BUDGET_REQUEST_SCHEMA.to_string(),
@@ -149,11 +145,7 @@ impl RemoteBudgetStore {
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
         remote_budget_grant_index(request.grant_index)?;
         request.validate()?;
-        let (hold_id, event_id) = required_remote_hold_event(
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            "release",
-        )?;
+        let (hold_id, event_id) = (request.hold_id.as_str(), request.event_id.as_str());
         if request.released_exposure_units == 0 {
             return Err(structured_budget_error(
                 "zero-unit remote monetary release is not a state transition",
@@ -212,11 +204,7 @@ impl RemoteBudgetStore {
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
         remote_budget_grant_index(request.grant_index)?;
         request.validate()?;
-        let (hold_id, event_id) = required_remote_hold_event(
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            "reconciliation",
-        )?;
+        let (hold_id, event_id) = (request.hold_id.as_str(), request.event_id.as_str());
         if request.exposed_cost_units == 0 {
             return Err(structured_budget_error(
                 "zero-unit remote budget reconciliation is not a state transition",
@@ -251,11 +239,7 @@ impl RemoteBudgetStore {
                 "zero-unit remote budget reconciliation is not a state transition",
             ));
         }
-        let (hold_id, event_id) = required_remote_hold_event(
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            "reconciliation",
-        )?;
+        let (hold_id, event_id) = (request.hold_id.as_str(), request.event_id.as_str());
         let (decision, mutation, usage) = self.validate_structured_mutation_response(
             &request.capability_id,
             request.grant_index,
@@ -299,11 +283,7 @@ impl RemoteBudgetStore {
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
         remote_budget_grant_index(request.grant_index)?;
         request.validate()?;
-        let (hold_id, event_id) = required_remote_hold_event(
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            "monetary capture",
-        )?;
+        let (hold_id, event_id) = (request.hold_id.as_str(), request.event_id.as_str());
         if request.exposed_cost_units == 0 {
             return Err(structured_budget_error(
                 "zero-unit remote monetary capture is not a state transition",

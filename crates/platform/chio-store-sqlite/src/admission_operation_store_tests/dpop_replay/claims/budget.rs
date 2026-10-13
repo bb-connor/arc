@@ -32,8 +32,8 @@ pub(super) fn authorization(
         requested_exposure_units: 0,
         max_cost_per_invocation: None,
         max_total_cost_units: None,
-        hold_id: Some("dpop-budget-hold".into()),
-        event_id: Some("dpop-budget-authorize".into()),
+        hold_id: "dpop-budget-hold".into(),
+        event_id: "dpop-budget-authorize".into(),
         authority: Some(BudgetEventAuthority {
             authority_id: fixture.fence.store_uuid.clone(),
             lease_id: fixture.fence.lease_id.clone(),
@@ -140,7 +140,7 @@ fn real_capture_checks_new_authority_but_acknowledges_expired_dispatch_history(
         let capture = BudgetCaptureInvocationRequest {
             capability_id: request.capability_id.clone(),
             grant_index: 0,
-            hold_id: request.hold_id.clone().ok_or("hold missing")?,
+            hold_id: request.hold_id.clone(),
             event_id: "dpop-budget-capture".into(),
             trusted_time: None,
             authority: request.authority.clone(),

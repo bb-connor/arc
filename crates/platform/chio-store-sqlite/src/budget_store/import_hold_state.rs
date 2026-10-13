@@ -97,7 +97,6 @@ impl SqliteBudgetStore {
         }
 
         let applied = match record.kind {
-            BudgetMutationKind::IncrementInvocation => Ok(()),
             BudgetMutationKind::AuthorizeExposure => {
                 if record.allowed == Some(true) {
                     Self::upsert_hold(
@@ -345,9 +344,6 @@ impl SqliteBudgetStore {
         hold: Option<&SqliteBudgetHold>,
     ) -> Result<(), BudgetStoreError> {
         let Some(hold) = hold else {
-            if matches!(record.kind, BudgetMutationKind::IncrementInvocation) {
-                return Ok(());
-            }
             return Err(BudgetStoreError::Invariant(format!(
                 "missing budget hold `{}` while importing `{}` event",
                 record.hold_id.as_deref().unwrap_or(""),
@@ -379,10 +375,7 @@ impl SqliteBudgetStore {
         record: &BudgetMutationRecord,
         hold: Option<&SqliteBudgetHold>,
     ) -> Result<(), BudgetStoreError> {
-        if record.kind == BudgetMutationKind::IncrementInvocation
-            || (record.kind == BudgetMutationKind::AuthorizeExposure
-                && record.allowed == Some(false))
-        {
+        if record.kind == BudgetMutationKind::AuthorizeExposure && record.allowed == Some(false) {
             return Ok(());
         }
         let hold = hold.ok_or_else(|| {

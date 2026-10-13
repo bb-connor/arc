@@ -12,6 +12,10 @@ use chio_core::{
         },
     },
 };
+use chio_kernel::budget_store::{
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetReleaseHoldRequest,
+    BudgetReverseHoldRequest,
+};
 use chio_kernel::{BudgetStore, BudgetStoreError, InMemoryBudgetStore};
 use proptest::prelude::*;
 use proptest::test_runner::Config as ProptestConfig;
@@ -24,9 +28,16 @@ const MAX_TOTAL_COST: Option<u64> = Some(128);
 
 #[derive(Debug, Clone)]
 enum BudgetOp {
-    Charge(u16),
-    Reduce(u16),
-    Reverse(u16),
+    Authorize(u16),
+    Release(u8, u16),
+    Reverse(u8),
+}
+
+#[derive(Debug, Clone)]
+struct HoldModel {
+    remaining: u64,
+    exposed: bool,
+    reversed: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -34,9 +45,13 @@ struct BudgetModel {
     present: bool,
     invocation_count: u32,
     committed_cost_units: u64,
-    reversible_invocations: u32,
+    holds: Vec<HoldModel>,
     seq: u64,
     next_seq: u64,
+}
+
+fn hold_id(index: usize) -> String {
+    format!("hold-{index}")
 }
 
 impl BudgetModel {
@@ -46,85 +61,58 @@ impl BudgetModel {
         event_seq
     }
 
-    fn try_charge_cost(
-        &mut self,
-        cost_units: u64,
-        max_invocations: Option<u32>,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost: Option<u64>,
-    ) -> Result<bool, &'static str> {
-        if let Some(max) = max_invocations {
-            if self.invocation_count >= max {
-                self.allocate_event_seq();
-                return Ok(false);
-            }
-        }
-
-        if let Some(max) = max_cost_per_invocation {
-            if cost_units > max {
-                self.allocate_event_seq();
-                return Ok(false);
-            }
-        }
-
+    fn authorize(&mut self, cost_units: u64) -> Result<bool, &'static str> {
         let new_total = self
             .committed_cost_units
             .checked_add(cost_units)
             .ok_or("overflow")?;
-        if let Some(max_total) = max_total_cost {
-            if new_total > max_total {
-                self.allocate_event_seq();
-                return Ok(false);
-            }
+        let allowed = MAX_INVOCATIONS.is_none_or(|max| self.invocation_count < max)
+            && MAX_COST_PER_INVOCATION.is_none_or(|max| cost_units <= max)
+            && MAX_TOTAL_COST.is_none_or(|max| new_total <= max);
+        let event_seq = self.allocate_event_seq();
+        if !allowed {
+            return Ok(false);
         }
-
         self.invocation_count = self.invocation_count.saturating_add(1);
         self.committed_cost_units = new_total;
-        self.reversible_invocations = self
-            .reversible_invocations
-            .checked_add(1)
-            .ok_or("overflow")?;
+        self.holds.push(HoldModel {
+            remaining: cost_units,
+            exposed: cost_units > 0,
+            reversed: false,
+        });
         self.present = true;
-        self.seq = self.allocate_event_seq();
+        self.seq = event_seq;
         Ok(true)
     }
 
-    fn reverse_charge_cost(&mut self, cost_units: u64) -> Result<(), &'static str> {
-        if !self.present {
+    fn release(&mut self, index: usize, cost_units: u64) -> Result<(), &'static str> {
+        if cost_units == 0 {
             return Err("invariant");
         }
-        if self.invocation_count == 0 {
+        let hold = self.holds.get_mut(index).ok_or("invariant")?;
+        if hold.reversed || !hold.exposed || hold.remaining < cost_units {
             return Err("invariant");
         }
-        if self.committed_cost_units < cost_units {
-            return Err("invariant");
+        hold.remaining -= cost_units;
+        if hold.remaining == 0 {
+            hold.exposed = false;
         }
-        if self.reversible_invocations == 0 {
-            return Err("invariant");
-        }
-
-        self.reversible_invocations -= 1;
-        self.invocation_count -= 1;
         self.committed_cost_units -= cost_units;
         self.seq = self.allocate_event_seq();
         Ok(())
     }
 
-    fn reduce_charge_cost(&mut self, cost_units: u64) -> Result<(), &'static str> {
-        if cost_units == 0 {
+    fn reverse(&mut self, index: usize) -> Result<(), &'static str> {
+        let hold = self.holds.get_mut(index).ok_or("invariant")?;
+        if hold.reversed {
             return Err("invariant");
         }
-        if !self.present {
-            return Err("invariant");
-        }
-        if self.committed_cost_units < cost_units {
-            return Err("invariant");
-        }
-        if self.reversible_invocations == 0 {
-            return Err("invariant");
-        }
-
-        self.committed_cost_units -= cost_units;
+        let remaining = hold.remaining;
+        hold.reversed = true;
+        hold.remaining = 0;
+        hold.exposed = false;
+        self.invocation_count -= 1;
+        self.committed_cost_units -= remaining;
         self.seq = self.allocate_event_seq();
         Ok(())
     }
@@ -132,10 +120,35 @@ impl BudgetModel {
 
 fn budget_op_strategy() -> impl Strategy<Value = BudgetOp> {
     prop_oneof![
-        (0u16..64).prop_map(BudgetOp::Charge),
-        (0u16..64).prop_map(BudgetOp::Reduce),
-        (0u16..64).prop_map(BudgetOp::Reverse),
+        (0u16..64).prop_map(BudgetOp::Authorize),
+        (any::<u8>(), 0u16..64).prop_map(|(hold, units)| BudgetOp::Release(hold, units)),
+        any::<u8>().prop_map(BudgetOp::Reverse),
     ]
+}
+
+fn pick_hold(model: &BudgetModel, pick: u8) -> usize {
+    usize::from(pick) % (model.holds.len() + 1)
+}
+
+fn authorize_request(index: usize, cost_units: u64, max_total: Option<u64>) -> BudgetAuthorizeHoldRequest {
+    BudgetAuthorizeHoldRequest {
+        capability_id: CAPABILITY_ID.to_string(),
+        grant_index: GRANT_INDEX,
+        max_invocations: MAX_INVOCATIONS,
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units: cost_units,
+        max_cost_per_invocation: MAX_COST_PER_INVOCATION,
+        max_total_cost_units: max_total,
+        hold_id: hold_id(index),
+        event_id: format!("{}:authorize", hold_id(index)),
+        authority: None,
+    }
+}
+
+fn authorized(decision: Result<BudgetAuthorizeHoldDecision, BudgetStoreError>) -> Result<bool, BudgetStoreError> {
+    decision.map(|decision| matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)))
 }
 
 fn error_kind(error: &BudgetStoreError) -> &'static str {
@@ -163,12 +176,12 @@ fn assert_charge_result_matches(
     }
 }
 
-fn assert_unit_result_matches(
-    actual: Result<(), BudgetStoreError>,
+fn assert_unit_result_matches<T: std::fmt::Debug>(
+    actual: Result<T, BudgetStoreError>,
     expected: Result<(), &'static str>,
 ) {
     match (actual, expected) {
-        (Ok(()), Ok(())) => {}
+        (Ok(_), Ok(())) => {}
         (Err(actual), Err(expected)) => assert_eq!(error_kind(&actual), expected),
         (actual, expected) => {
             panic!("mutation result mismatch: actual={actual:?}, expected={expected:?}")
@@ -323,41 +336,53 @@ proptest! {
         let store = InMemoryBudgetStore::new();
         let mut model = BudgetModel::default();
 
-        for operation in operations {
+        let mut attempts = 0usize;
+        for (step, operation) in operations.into_iter().enumerate() {
             match operation {
-                BudgetOp::Charge(cost_units) => {
-                    let actual = store.try_charge_cost(
-                        CAPABILITY_ID,
-                        GRANT_INDEX,
-                        MAX_INVOCATIONS,
+                BudgetOp::Authorize(cost_units) => {
+                    let index = attempts;
+                    attempts += 1;
+                    let actual = authorized(store.authorize_budget_hold(authorize_request(
+                        index,
                         u64::from(cost_units),
-                        MAX_COST_PER_INVOCATION,
                         MAX_TOTAL_COST,
-                    );
-                    let expected = model.try_charge_cost(
-                        u64::from(cost_units),
-                        MAX_INVOCATIONS,
-                        MAX_COST_PER_INVOCATION,
-                        MAX_TOTAL_COST,
-                    );
+                    )));
+                    let expected = model.authorize(u64::from(cost_units));
+                    if expected != Ok(true) {
+                        model.holds.push(HoldModel {
+                            remaining: 0,
+                            exposed: false,
+                            reversed: true,
+                        });
+                    }
                     assert_charge_result_matches(actual, expected);
                 }
-                BudgetOp::Reduce(cost_units) => {
-                    let actual = store.reduce_charge_cost(
-                        CAPABILITY_ID,
-                        GRANT_INDEX,
-                        u64::from(cost_units),
-                    );
-                    let expected = model.reduce_charge_cost(u64::from(cost_units));
+                BudgetOp::Release(pick, cost_units) => {
+                    let index = pick_hold(&model, pick);
+                    let actual = store.release_budget_hold(BudgetReleaseHoldRequest {
+                        capability_id: CAPABILITY_ID.to_string(),
+                        grant_index: GRANT_INDEX,
+                        released_exposure_units: u64::from(cost_units),
+                        hold_id: hold_id(index),
+                        event_id: format!("{}:release:{step}", hold_id(index)),
+                        authority: None,
+                    });
+                    let expected = model.release(index, u64::from(cost_units));
                     assert_unit_result_matches(actual, expected);
                 }
-                BudgetOp::Reverse(cost_units) => {
-                    let actual = store.reverse_charge_cost(
-                        CAPABILITY_ID,
-                        GRANT_INDEX,
-                        u64::from(cost_units),
-                    );
-                    let expected = model.reverse_charge_cost(u64::from(cost_units));
+                BudgetOp::Reverse(pick) => {
+                    let index = pick_hold(&model, pick);
+                    let remaining = model.holds.get(index).map_or(0, |hold| hold.remaining);
+                    let actual = store.reverse_budget_hold(BudgetReverseHoldRequest {
+                        capability_id: CAPABILITY_ID.to_string(),
+                        grant_index: GRANT_INDEX,
+                        reversed_exposure_units: remaining,
+                        hold_id: hold_id(index),
+                        event_id: format!("{}:reverse:{step}", hold_id(index)),
+                        expected_cumulative_approval_state: None,
+                        authority: None,
+                    });
+                    let expected = model.reverse(index);
                     assert_unit_result_matches(actual, expected);
                 }
             }
@@ -375,24 +400,14 @@ proptest! {
         let first_charge = u64::MAX - u64::from(slack);
         let second_charge = u64::from(slack) + u64::from(overflow_by);
 
-        let accepted = store.try_charge_cost(
-            CAPABILITY_ID,
-            GRANT_INDEX,
-            Some(4),
-            first_charge,
-            None,
-            Some(u64::MAX),
-        ).unwrap();
+        let mut first = authorize_request(0, first_charge, Some(u64::MAX));
+        first.max_cost_per_invocation = None;
+        let accepted = authorized(store.authorize_budget_hold(first)).unwrap();
         prop_assert!(accepted);
 
-        let overflow = store.try_charge_cost(
-            CAPABILITY_ID,
-            GRANT_INDEX,
-            Some(4),
-            second_charge,
-            None,
-            Some(u64::MAX),
-        );
+        let mut second = authorize_request(1, second_charge, Some(u64::MAX));
+        second.max_cost_per_invocation = None;
+        let overflow = store.authorize_budget_hold(second);
         prop_assert!(matches!(overflow, Err(BudgetStoreError::Overflow(_))));
 
         let usage = store.get_usage(CAPABILITY_ID, GRANT_INDEX).unwrap().unwrap();

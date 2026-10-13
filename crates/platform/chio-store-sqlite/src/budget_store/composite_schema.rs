@@ -845,17 +845,6 @@ fn backfill_legacy_event_lifecycle(
             }
         });
         let lifecycle = match (kind, hold_id.as_deref()) {
-            (BudgetMutationKind::IncrementInvocation, _) => (
-                outcome,
-                BudgetInvocationState::Absent,
-                if allowed == Some(true) {
-                    BudgetInvocationState::Captured
-                } else {
-                    BudgetInvocationState::Denied
-                },
-                BudgetMonetaryState::None,
-                BudgetMonetaryState::None,
-            ),
             (BudgetMutationKind::AuthorizeExposure, Some(hold_id)) => {
                 let invocation_after = if allowed == Some(false) {
                     BudgetInvocationState::Denied

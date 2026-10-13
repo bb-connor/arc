@@ -71,8 +71,8 @@ fn budget_custody_readback_distinguishes_absent_unheld_and_reversed_operations(
             capability_id: "shared-capability".into(),
             grant_index: 0,
             reversed_exposure_units: 0,
-            hold_id: Some(capture.hold_id),
-            event_id: Some("reverse-shared-hold".into()),
+            hold_id: capture.hold_id,
+            event_id: "reverse-shared-hold".into(),
             expected_cumulative_approval_state: None,
             authority: capture.authority,
         })?;

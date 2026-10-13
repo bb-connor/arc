@@ -67,7 +67,7 @@ fn structured_lifecycle_budget_store(
         ));
     }
     let store = state.budget_store()?;
-    let authority = resolve_budget_hold_authority(state, &store, Some(hold_id))?;
+    let authority = resolve_budget_hold_authority(state, &store, hold_id)?;
     Ok((store, authority))
 }
 
@@ -429,8 +429,8 @@ pub(crate) async fn handle_structured_budget_reverse(
         capability_id: payload.capability_id.clone(),
         grant_index,
         reversed_exposure_units: payload.reversed_exposure_units,
-        hold_id: Some(payload.hold_id.clone()),
-        event_id: Some(payload.event_id.clone()),
+        hold_id: payload.hold_id.clone(),
+        event_id: payload.event_id.clone(),
         expected_cumulative_approval_state: payload
             .expected_cumulative_approval_state
             .map(Into::into),
@@ -482,8 +482,8 @@ pub(crate) async fn handle_structured_budget_release(
         capability_id: payload.capability_id.clone(),
         grant_index,
         released_exposure_units: payload.released_exposure_units,
-        hold_id: Some(payload.hold_id.clone()),
-        event_id: Some(payload.event_id.clone()),
+        hold_id: payload.hold_id.clone(),
+        event_id: payload.event_id.clone(),
         authority,
     };
     if let Err(error) = request.validate() {
@@ -533,8 +533,8 @@ pub(crate) async fn handle_structured_budget_reconcile(
         grant_index,
         exposed_cost_units: payload.exposed_cost_units,
         realized_spend_units: payload.realized_spend_units,
-        hold_id: Some(payload.hold_id.clone()),
-        event_id: Some(payload.event_id.clone()),
+        hold_id: payload.hold_id.clone(),
+        event_id: payload.event_id.clone(),
         authority,
     };
     if let Err(error) = request.validate() {
@@ -584,8 +584,8 @@ pub(crate) async fn handle_structured_budget_capture_spend(
         grant_index,
         exposed_cost_units: payload.exposed_cost_units,
         realized_spend_units: payload.realized_spend_units,
-        hold_id: Some(payload.hold_id.clone()),
-        event_id: Some(payload.event_id.clone()),
+        hold_id: payload.hold_id.clone(),
+        event_id: payload.event_id.clone(),
         authority,
     };
     if let Err(error) = request.validate() {

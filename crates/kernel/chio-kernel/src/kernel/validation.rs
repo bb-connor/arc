@@ -1155,10 +1155,7 @@ impl ChioKernel {
                 }
             }
 
-            if has_monetary
-                || (nonce_preflight && grant.max_invocations.is_some())
-                || durable_admission.is_some()
-            {
+            if has_monetary || grant.max_invocations.is_some() || durable_admission.is_some() {
                 // Use worst-case max_cost_per_invocation as the pre-execution debit.
                 let cost_units = grant
                     .max_cost_per_invocation
@@ -1274,8 +1271,8 @@ impl ChioKernel {
                     requested_exposure_units: cost_units,
                     max_cost_per_invocation: max_per,
                     max_total_cost_units: max_total,
-                    hold_id: Some(budget_hold_id.clone()),
-                    event_id: Some(authorize_event_id),
+                    hold_id: budget_hold_id.clone(),
+                    event_id: authorize_event_id,
                     authority: Some(authority.clone()),
                 };
                 let decision = if let Some(admission) = durable_admission.as_deref_mut() {
@@ -1473,24 +1470,10 @@ impl ChioKernel {
                     }
                 }
             } else {
-                if grant.max_invocations.is_none() {
-                    return Ok(BudgetAdmissionOutcome::Authorized {
-                        grant_index: matching.index,
-                        mutation: Box::new(PreExecutionBudgetMutation::None),
-                    });
-                }
-
-                if self.with_budget_store(|store| {
-                    Ok(store.try_increment(&cap.id, matching.index, grant.max_invocations)?)
-                })? {
-                    return Ok(BudgetAdmissionOutcome::Authorized {
-                        grant_index: matching.index,
-                        mutation: Box::new(PreExecutionBudgetMutation::Invocation {
-                            grant_index: matching.index,
-                        }),
-                    });
-                }
-                saw_exhausted_budget = true;
+                return Ok(BudgetAdmissionOutcome::Authorized {
+                    grant_index: matching.index,
+                    mutation: Box::new(PreExecutionBudgetMutation::None),
+                });
             }
         }
 
@@ -1522,8 +1505,8 @@ impl ChioKernel {
                 capability_id: capability_id.to_string(),
                 grant_index: charge.grant_index,
                 reversed_exposure_units: charge.cost_charged,
-                hold_id: Some(charge.budget_hold_id.clone()),
-                event_id: Some(charge.reverse_event_id()),
+                hold_id: charge.budget_hold_id.clone(),
+                event_id: charge.reverse_event_id(),
                 expected_cumulative_approval_state: None,
                 authority,
             })?)
@@ -1599,12 +1582,6 @@ impl ChioKernel {
             PreExecutionBudgetMutation::InvocationHold(hold) => {
                 self.reverse_budget_charge(&cap.id, hold).map(Some)
             }
-            PreExecutionBudgetMutation::Invocation { grant_index } => {
-                self.with_budget_store(|store| {
-                    Ok(store.reverse_charge_cost(&cap.id, *grant_index, 0)?)
-                })?;
-                Ok(None)
-            }
             PreExecutionBudgetMutation::None => Ok(None),
         }
     }
@@ -1622,8 +1599,8 @@ impl ChioKernel {
                 grant_index: charge.grant_index,
                 exposed_cost_units: charge.cost_charged,
                 realized_spend_units: realized_cost_units.min(charge.cost_charged),
-                hold_id: Some(charge.budget_hold_id.clone()),
-                event_id: Some(charge.reconcile_event_id()),
+                hold_id: charge.budget_hold_id.clone(),
+                event_id: charge.reconcile_event_id(),
                 authority,
             })?)
         })

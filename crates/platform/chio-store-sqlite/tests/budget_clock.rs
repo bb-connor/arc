@@ -1,3 +1,4 @@
+use chio_kernel::budget_store::{BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest};
 use chio_kernel::{BudgetStore, BudgetStoreError, InMemoryBudgetStore};
 use chio_security_types::clock::{Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis};
 use chio_store_sqlite::SqliteBudgetStore;
@@ -44,10 +45,29 @@ impl Clock for TestClock {
     }
 }
 
+fn authorize(store: &dyn BudgetStore, hold_id: &str) -> Result<bool, BudgetStoreError> {
+    let decision = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+        capability_id: "clocked".to_string(),
+        grant_index: 0,
+        max_invocations: Some(10),
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units: 0,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        hold_id: hold_id.to_string(),
+        event_id: format!("{hold_id}:authorize"),
+        authority: None,
+    })?;
+    Ok(matches!(
+        decision,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ))
+}
+
 fn assert_refusal_preserves_usage(store: &dyn BudgetStore, clock: &TestClock) {
-    assert!(store
-        .try_increment("clocked", 0, Some(10))
-        .test_expect("initial increment"));
+    assert!(authorize(store, "hold-1").test_expect("initial increment"));
     let before = store
         .get_usage("clocked", 0)
         .test_expect("usage")
@@ -65,7 +85,7 @@ fn assert_refusal_preserves_usage(store: &dyn BudgetStore, clock: &TestClock) {
             _ => unreachable!(),
         }
         assert!(
-            matches!(store.try_increment("clocked", 0, Some(10)), Err(BudgetStoreError::Clock(actual)) if actual == error)
+            matches!(authorize(store, "hold-2"), Err(BudgetStoreError::Clock(actual)) if actual == error)
         );
         clock.recover();
         assert_eq!(
@@ -73,9 +93,7 @@ fn assert_refusal_preserves_usage(store: &dyn BudgetStore, clock: &TestClock) {
             Some(before.clone())
         );
     }
-    assert!(store
-        .try_increment("clocked", 0, Some(10))
-        .test_expect("retry"));
+    assert!(authorize(store, "hold-2").test_expect("retry"));
     assert_eq!(
         store
             .get_usage("clocked", 0)
@@ -118,9 +136,7 @@ fn sqlite_clock_failure_after_sequence_allocation_rolls_back_every_table() {
     let path = directory.path().join("rollback.sqlite");
     let clock = Arc::new(TestClock::new());
     let store = SqliteBudgetStore::open_with_clock(&path, clock.clone()).test_expect("store");
-    assert!(store
-        .try_increment("clocked", 0, Some(10))
-        .test_expect("initial"));
+    assert!(authorize(&store, "hold-1").test_expect("initial"));
     let before = store.get_usage("clocked", 0).test_expect("usage");
     let before_events = store
         .list_mutation_events(100, None, None)
@@ -128,7 +144,7 @@ fn sqlite_clock_failure_after_sequence_allocation_rolls_back_every_table() {
     // Read at begin_write and before the usage write; refuse at event publication.
     clock.fail_after(2);
     assert!(matches!(
-        store.try_increment("clocked", 0, Some(10)),
+        authorize(&store, "hold-2"),
         Err(BudgetStoreError::Clock(ClockError::Unavailable))
     ));
     clock.recover();
@@ -141,9 +157,7 @@ fn sqlite_clock_failure_after_sequence_allocation_rolls_back_every_table() {
     );
     drop(store);
     let reopened = SqliteBudgetStore::open_with_clock(&path, clock).test_expect("reopen");
-    assert!(reopened
-        .try_increment("clocked", 0, Some(10))
-        .test_expect("retry"));
+    assert!(authorize(&reopened, "hold-2").test_expect("retry"));
     assert_eq!(
         reopened
             .get_usage("clocked", 0)
@@ -161,18 +175,14 @@ fn sqlite_clock_failure_denies_cached_mutation_replay() {
     let store =
         SqliteBudgetStore::open_with_clock(directory.path().join("retry.sqlite"), clock.clone())
             .test_expect("store");
-    assert!(store
-        .try_increment_with_event_id("clocked", 0, Some(10), Some("event"))
-        .test_expect("initial"));
+    assert!(authorize(&store, "event").test_expect("initial"));
     clock.fail_after(0);
     assert!(matches!(
-        store.try_increment_with_event_id("clocked", 0, Some(10), Some("event")),
+        authorize(&store, "event"),
         Err(BudgetStoreError::Clock(ClockError::Unavailable))
     ));
     clock.recover();
-    assert!(store
-        .try_increment_with_event_id("clocked", 0, Some(10), Some("event"))
-        .test_expect("retry"));
+    assert!(authorize(&store, "event").test_expect("retry"));
     assert_eq!(
         store
             .get_usage("clocked", 0)
@@ -233,8 +243,8 @@ fn serving_owner_injects_one_clock_and_fence_into_every_budget_handle() {
         requested_exposure_units: 10,
         max_cost_per_invocation: Some(10),
         max_total_cost_units: Some(100),
-        hold_id: Some("clocked-hold".into()),
-        event_id: Some("clocked-event".into()),
+        hold_id: "clocked-hold".into(),
+        event_id: "clocked-event".into(),
         authority: Some(BudgetEventAuthority {
             authority_id: fence.store_uuid,
             lease_id: fence.lease_id,

@@ -210,7 +210,7 @@ fn expected_authorization_outcome(
     allowed: Option<bool>,
 ) -> Result<Option<BudgetAuthorizationOutcome>, String> {
     let outcome = match kind {
-        BudgetMutationKind::IncrementInvocation | BudgetMutationKind::AuthorizeExposure => {
+        BudgetMutationKind::AuthorizeExposure => {
             match allowed {
                 Some(true) => BudgetAuthorizationOutcome::Authorized,
                 Some(false) => BudgetAuthorizationOutcome::Denied,
@@ -249,14 +249,6 @@ fn expected_invocation_transition(
     has_hold: bool,
 ) -> (BudgetInvocationState, BudgetInvocationState) {
     match kind {
-        BudgetMutationKind::IncrementInvocation => (
-            BudgetInvocationState::Absent,
-            if allowed == Some(true) {
-                BudgetInvocationState::Captured
-            } else {
-                BudgetInvocationState::Denied
-            },
-        ),
         BudgetMutationKind::ReserveInvocation | BudgetMutationKind::AuthorizeExposure => (
             BudgetInvocationState::Absent,
             if allowed == Some(false) {
@@ -307,9 +299,6 @@ fn expected_monetary_transition(
 ) -> Result<(BudgetMonetaryState, BudgetMonetaryState), String> {
     let has_exposure = exposure_units > 0;
     let transition = match kind {
-        BudgetMutationKind::IncrementInvocation => {
-            (BudgetMonetaryState::None, BudgetMonetaryState::None)
-        }
         BudgetMutationKind::ReserveInvocation | BudgetMutationKind::AuthorizeExposure => (
             BudgetMonetaryState::None,
             if allowed != Some(false) && has_exposure {
@@ -373,8 +362,7 @@ fn validate_transition(
     realized_spend_units: u64,
 ) -> Result<(), String> {
     let amounts_valid = match kind {
-        BudgetMutationKind::IncrementInvocation
-        | BudgetMutationKind::AuthorizeCumulativeApproval => {
+        BudgetMutationKind::AuthorizeCumulativeApproval => {
             exposure_units == 0 && realized_spend_units == 0
         }
         BudgetMutationKind::ReserveInvocation
@@ -458,7 +446,7 @@ mod tests {
         realized_spend_units: u64,
     }
 
-    fn lifecycle_cases() -> [LifecycleCase; 11] {
+    fn lifecycle_cases() -> [LifecycleCase; 10] {
         use BudgetAuthorizationOutcome::{ApprovalRequired, Authorized, Denied};
         use BudgetInvocationState::{
             Absent, Authorized as InvocationAuthorized, Captured, Denied as InvocationDenied,
@@ -469,18 +457,6 @@ mod tests {
             Reversed as MoneyReversed,
         };
         [
-            LifecycleCase {
-                kind: BudgetMutationKind::IncrementInvocation,
-                allowed: Some(true),
-                authorization_outcome: Some(Authorized),
-                invocation_before: Absent,
-                invocation_after: Captured,
-                monetary_before: NoMoney,
-                monetary_after: NoMoney,
-                has_hold: false,
-                exposure_units: 0,
-                realized_spend_units: 0,
-            },
             LifecycleCase {
                 kind: BudgetMutationKind::ReserveInvocation,
                 allowed: None,

@@ -85,7 +85,7 @@ pub(crate) fn verify_preflight_hold(
     )?
     .ok_or_else(|| BudgetStoreError::Invariant("nonce preflight lost its authorization".into()))?;
     let request = load_authorization_request(connection, &event)?;
-    if request.hold_id.as_deref() != Some(identity.hold_id().as_str())
+    if request.hold_id != identity.hold_id().as_str()
         || request.capability_id != hold.capability_id
         || request.grant_index != hold.grant_index
         || request.admission_binding.as_ref().is_none_or(|binding| {

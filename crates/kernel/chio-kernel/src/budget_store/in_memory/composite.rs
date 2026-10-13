@@ -25,61 +25,6 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
-    fn ensure_latest_usage_event(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        event_seq: u64,
-        transition: &str,
-    ) -> Result<(), BudgetStoreError> {
-        let grant_index = u32::try_from(grant_index)
-            .map_err(|_| BudgetStoreError::Invariant("grant_index does not fit u32".to_string()))?;
-        if self.events.iter().any(|event| {
-            event.capability_id == capability_id
-                && event.grant_index == grant_index
-                && event.event_seq > event_seq
-                && event.usage_seq.is_some()
-        }) {
-            return Err(BudgetStoreError::Invariant(format!(
-                "unheld budget {transition} event was superseded by a later usage transition"
-            )));
-        }
-        Ok(())
-    }
-
-    fn grant_quota_for_legacy_mutation(
-        &self,
-        capability_id: &str,
-        grant_index: u32,
-        current_invocation_count: u32,
-        declared_maximum: Option<u32>,
-    ) -> Result<Option<BudgetInvocationQuota>, BudgetStoreError> {
-        let key = BudgetQuotaKey::grant(capability_id, grant_index);
-        if let Some(existing) = self.invocation_quotas.get(&key) {
-            if declared_maximum.is_some_and(|maximum| maximum != existing.max_invocations) {
-                return Err(BudgetStoreError::Invariant(
-                    "grant quota maximum changed".to_string(),
-                ));
-            }
-            return Ok(Some(BudgetInvocationQuota {
-                key,
-                max_invocations: existing.max_invocations,
-            }));
-        }
-        let Some(max_invocations) = declared_maximum else {
-            return Ok(None);
-        };
-        if current_invocation_count != 0 {
-            return Err(BudgetStoreError::Invariant(
-                "cannot define a grant quota after untracked invocations".to_string(),
-            ));
-        }
-        Ok(Some(BudgetInvocationQuota {
-            key,
-            max_invocations,
-        }))
-    }
-
     fn invocation_quota_usages(
         &self,
         quotas: &[BudgetInvocationQuota],
@@ -220,30 +165,29 @@ impl InMemoryBudgetStoreInner {
                 "nonce preflight budget identity requires its owning participant".into(),
             ));
         }
-        let legacy = request.admission_binding.is_none()
+        let unbound = request.admission_binding.is_none()
             && request.invocation_quotas.is_empty()
             && request.cumulative_approval.is_none();
         let mutation = BudgetMutationRequest::AuthorizeComposite(Box::new(request.clone()));
-        if let Some(existing) = self.duplicate_mutation(request.event_id.as_deref(), &mutation)? {
+        if let Some(existing) = self.duplicate_mutation(&request.event_id, &mutation)? {
             return Ok(existing.record);
         }
-        if legacy && self.has_composite_history(&request.capability_id, request.grant_index) {
+        if unbound && self.has_composite_history(&request.capability_id, request.grant_index) {
             return Err(BudgetStoreError::Invariant(
-                "legacy budget authorization cannot bypass structured admission history"
+                "unbound budget authorization cannot bypass structured admission history"
                     .to_string(),
             ));
         }
-        if let Some(hold_id) = request.hold_id.as_deref() {
-            if let Some(existing) = self.hold_authorizations.get(hold_id) {
-                let detail = if existing == &mutation {
-                    "is missing its original event tombstone"
-                } else {
-                    "was reused for a different authorization"
-                };
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget hold `{hold_id}` {detail}"
-                )));
-            }
+        if let Some(existing) = self.hold_authorizations.get(&request.hold_id) {
+            let detail = if existing == &mutation {
+                "is missing its original event tombstone"
+            } else {
+                "was reused for a different authorization"
+            };
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{}` {detail}",
+                request.hold_id
+            )));
         }
         if let Some(operation_id) = request
             .admission_binding
@@ -268,7 +212,7 @@ impl InMemoryBudgetStoreInner {
         if self.invocation_quotas.contains_key(&grant_quota_key)
             && !quotas.iter().any(|quota| quota.key == grant_quota_key)
         {
-            if legacy {
+            if unbound {
                 let maximum = self
                     .invocation_quotas
                     .get(&grant_quota_key)
@@ -390,22 +334,6 @@ impl InMemoryBudgetStoreInner {
                     "total_cost_exposed + requested exposure overflowed u64".to_string(),
                 )
             })?;
-        let next_legacy_reversible = if allowed && request.hold_id.is_none() {
-            Some(
-                self.legacy_reversible_invocations
-                    .get(&primary_key)
-                    .copied()
-                    .unwrap_or(0)
-                    .checked_add(1)
-                    .ok_or_else(|| {
-                        BudgetStoreError::Overflow(
-                            "legacy reversible invocation count overflowed u32".to_string(),
-                        )
-                    })?,
-            )
-        } else {
-            None
-        };
         let event_seq = self.next_seq.checked_add(1).ok_or_else(|| {
             BudgetStoreError::Overflow("budget event sequence overflowed u64".to_string())
         })?;
@@ -430,10 +358,6 @@ impl InMemoryBudgetStoreInner {
             entry.total_cost_exposed = next_exposure;
             entry.updated_at = recorded_at;
             entry.seq = event_seq;
-            if let Some(next_legacy_reversible) = next_legacy_reversible {
-                self.legacy_reversible_invocations
-                    .insert(primary_key.clone(), next_legacy_reversible);
-            }
 
             for quota in &quotas {
                 let quota_state = self.invocation_quotas.get_mut(&quota.key).ok_or_else(|| {
@@ -494,10 +418,9 @@ impl InMemoryBudgetStoreInner {
                 })
                 .transpose()?;
 
-            if let Some(hold_id) = request.hold_id.as_deref() {
-                self.holds.insert(
-                    hold_id.to_string(),
-                    BudgetHoldState {
+            self.holds.insert(
+                request.hold_id.clone(),
+                BudgetHoldState {
                         capability_id: request.capability_id.clone(),
                         grant_index: request.grant_index,
                         admission_binding: request.admission_binding.clone(),
@@ -505,7 +428,6 @@ impl InMemoryBudgetStoreInner {
                         remaining_exposure_units: request.requested_exposure_units,
                         invocation_state: BudgetInvocationState::Authorized,
                         invocation_quotas: quotas.clone(),
-                        legacy_captured_invocation_quota: None,
                         captured_cancellation_allowed: request.cumulative_approval.is_some()
                             || (request.invocation_quotas.is_empty()
                                 && request.admission_binding.is_none()),
@@ -522,7 +444,6 @@ impl InMemoryBudgetStoreInner {
                         reserved_envelope: ReservedHoldEnvelope::default(),
                     },
                 );
-            }
         }
 
         let invocation_quota_usages = self.invocation_quota_usages(&quotas)?;
@@ -580,7 +501,7 @@ impl InMemoryBudgetStoreInner {
         };
         let record = BudgetMutationRecord {
             event_id: String::new(),
-            hold_id: request.hold_id.clone(),
+            hold_id: Some(request.hold_id.clone()),
             admission_binding: request.admission_binding.clone(),
             capability_id: request.capability_id.clone(),
             grant_index,
@@ -639,12 +560,10 @@ impl InMemoryBudgetStoreInner {
             total_cost_realized_spend_after: current.total_cost_realized_spend,
             authority: request.authority.clone(),
         };
-        self.append_mutation(request.event_id.as_deref(), mutation.clone(), record);
+        self.append_mutation(&request.event_id, mutation.clone(), record);
         if allowed {
-            if let Some(hold_id) = request.hold_id.as_deref() {
-                self.hold_authorizations
-                    .insert(hold_id.to_string(), mutation.clone());
-            }
+            self.hold_authorizations
+                .insert(request.hold_id.clone(), mutation.clone());
             if let Some(operation_id) = request
                 .admission_binding
                 .as_ref()
@@ -666,7 +585,7 @@ impl InMemoryBudgetStoreInner {
         request.validate()?;
         let mutation =
             BudgetMutationRequest::AuthorizeCumulativeApproval(Box::new(request.clone()));
-        if let Some(existing) = self.duplicate_mutation(Some(&request.event_id), &mutation)? {
+        if let Some(existing) = self.duplicate_mutation(&request.event_id, &mutation)? {
             let hold = self.holds.get(&request.hold_id).ok_or_else(|| {
                 BudgetStoreError::Invariant(format!(
                     "unknown cumulative approval hold `{}`",
@@ -848,7 +767,7 @@ impl InMemoryBudgetStoreInner {
             total_cost_realized_spend_after: usage.total_cost_realized_spend,
             authority: request.authority.clone(),
         };
-        self.append_mutation(Some(&request.event_id), mutation, record);
+        self.append_mutation(&request.event_id, mutation, record);
         self.events
             .last()
             .cloned()
@@ -862,18 +781,10 @@ impl InMemoryBudgetStoreInner {
 
     fn duplicate_mutation(
         &self,
-        event_id: Option<&str>,
+        event_id: &str,
         request: &BudgetMutationRequest,
     ) -> Result<Option<RecordedBudgetMutation>, BudgetStoreError> {
-        let Some(event_id) = event_id else {
-            return Ok(None);
-        };
-        if event_id.starts_with("local-budget-event-") {
-            return Err(BudgetStoreError::Invariant(
-                "explicit budget event_id uses the reserved local event namespace".to_string(),
-            ));
-        }
-        let Some(existing) = self.explicit_events.get(event_id) else {
+        let Some(existing) = self.events_by_id.get(event_id) else {
             return Ok(None);
         };
         if &existing.request != request {
@@ -886,19 +797,14 @@ impl InMemoryBudgetStoreInner {
 
     fn append_mutation(
         &mut self,
-        explicit_event_id: Option<&str>,
+        event_id: &str,
         request: BudgetMutationRequest,
         mut record: BudgetMutationRecord,
     ) {
-        let event_id = explicit_event_id
-            .map(ToOwned::to_owned)
-            .unwrap_or_else(|| format!("local-budget-event-{}", record.event_seq));
-        record.event_id = event_id.clone();
+        record.event_id = event_id.to_string();
         self.events.push(record.clone());
-        if explicit_event_id.is_some() {
-            self.explicit_events
-                .insert(event_id, RecordedBudgetMutation { request, record });
-        }
+        self.events_by_id
+            .insert(event_id.to_string(), RecordedBudgetMutation { request, record });
     }
 
     fn validate_hold(

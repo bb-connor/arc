@@ -330,8 +330,8 @@ fn verified_predispatch_projection_releases_reserved_credit_atomically(
             capability_id: CAPABILITY_ID.to_owned(),
             grant_index: 0,
             reversed_exposure_units: EXPOSURE_UNITS,
-            hold_id: Some("hold-terminal-release".to_owned()),
-            event_id: Some("authorize-terminal-release:rollback:recovery".to_owned()),
+            hold_id: "hold-terminal-release".to_owned(),
+            event_id: "authorize-terminal-release:rollback:recovery".to_owned(),
             expected_cumulative_approval_state: None,
             authority: Some(BudgetEventAuthority {
                 authority_id: fixture.fence.store_uuid.clone(),

@@ -1383,15 +1383,17 @@ pub(super) fn load_authorization_request(
         requested_exposure_units: event.exposure_units,
         max_cost_per_invocation: event.max_cost_per_invocation,
         max_total_cost_units: event.max_total_cost_units,
-        hold_id: event.hold_id.clone(),
-        event_id: Some(event.event_id.clone()),
+        hold_id: event.hold_id.clone().ok_or_else(|| {
+            BudgetStoreError::Invariant("stored authorization lost hold_id".to_string())
+        })?,
+        event_id: event.event_id.clone(),
         authority: event.authority.clone(),
     };
     validate_stored_composite_binding(
         &request.capability_id,
         request.grant_index,
-        request.hold_id.as_deref().unwrap_or(""),
-        request.event_id.as_deref().unwrap_or(""),
+        &request.hold_id,
+        &request.event_id,
         request.admission_binding.as_ref().ok_or_else(|| {
             BudgetStoreError::Invariant("stored authorization lost admission binding".to_string())
         })?,
@@ -1578,7 +1580,7 @@ pub(super) fn authorization_decision(
         budget_profile: store.budget_authority_profile(),
         metering_profile: store.budget_metering_profile(),
         budget_commit_index: Some(event_seq),
-        event_id: request.event_id.clone(),
+        event_id: Some(request.event_id.clone()),
         recorded_at_unix_seconds: u64::try_from(recorded_at).ok(),
     };
     let committed_cost_units_after = usage.committed_cost_units()?;
@@ -1591,7 +1593,7 @@ pub(super) fn authorization_decision(
     match outcome {
         BudgetAuthorizationOutcome::Denied => {
             Ok(BudgetAuthorizeHoldDecision::Denied(DeniedBudgetHold {
-                hold_id: request.hold_id,
+                hold_id: Some(request.hold_id),
                 admission_binding: request.admission_binding,
                 attempted_exposure_units: request.requested_exposure_units,
                 committed_cost_units_after,
@@ -1605,9 +1607,7 @@ pub(super) fn authorization_decision(
         }
         BudgetAuthorizationOutcome::ApprovalRequired => Ok(
             BudgetAuthorizeHoldDecision::ApprovalRequired(ApprovalRequiredBudgetHold {
-                hold_id: request.hold_id.ok_or_else(|| {
-                    BudgetStoreError::Invariant("approval-required hold lost hold_id".to_string())
-                })?,
+                hold_id: request.hold_id,
                 admission_binding: request.admission_binding.ok_or_else(|| {
                     BudgetStoreError::Invariant(
                         "approval-required hold lost admission binding".to_string(),
@@ -1630,7 +1630,7 @@ pub(super) fn authorization_decision(
         BudgetAuthorizationOutcome::Authorized => Ok(BudgetAuthorizeHoldDecision::Authorized(
             BudgetHoldAuthorizationRecord {
                 cleanup_custody,
-                hold_id: request.hold_id,
+                hold_id: Some(request.hold_id),
                 admission_binding: request.admission_binding,
                 authorized_exposure_units: request.requested_exposure_units,
                 committed_cost_units_after,

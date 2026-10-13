@@ -11,19 +11,46 @@ This example consumes a local invocation allowance and checks that its limit
 survives reopening. It creates only a temporary database.
 
 ```rust
+use chio_kernel::budget_store::{BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest};
 use chio_kernel::BudgetStore;
 use chio_store_sqlite::SqliteBudgetStore;
+
+fn invocation(hold_id: &str) -> BudgetAuthorizeHoldRequest {
+    BudgetAuthorizeHoldRequest {
+        capability_id: "local-capability".to_string(),
+        grant_index: 0,
+        max_invocations: Some(1),
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units: 0,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        hold_id: hold_id.to_string(),
+        event_id: format!("{hold_id}:authorize"),
+        authority: None,
+    }
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("budget.sqlite3");
     let store = SqliteBudgetStore::open(&path)?;
-    assert!(store.try_increment("local-capability", 0, Some(1))?);
-    assert!(!store.try_increment("local-capability", 0, Some(1))?);
+    assert!(matches!(
+        store.authorize_budget_hold(invocation("hold-1"))?,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    assert!(matches!(
+        store.authorize_budget_hold(invocation("hold-2"))?,
+        BudgetAuthorizeHoldDecision::Denied(_)
+    ));
     drop(store);
 
     let reopened = SqliteBudgetStore::open(&path)?;
-    assert!(!reopened.try_increment("local-capability", 0, Some(1))?);
+    assert!(matches!(
+        reopened.authorize_budget_hold(invocation("hold-3"))?,
+        BudgetAuthorizeHoldDecision::Denied(_)
+    ));
     Ok(())
 }
 ```
@@ -72,9 +99,9 @@ qualified durable sink identity.
 - Receipt connection initialization verifies WAL, FULL synchronization,
   foreign keys, and a busy timeout of at least five seconds on every pooled
   connection. `wait_for_writer_ready` waits for the writer's verified seed.
-- `SqliteBudgetStore::try_increment_with_event_id` checks and updates its
-  counter and mutation event inside one immediate transaction. Budget hold
-  authorization, capture, release, and settlement have separate typed methods.
+- Budget hold authorization, capture, release, reversal, and settlement each
+  check and update usage, the hold, and its mutation event inside one
+  immediate transaction.
 - Internal `SecurityStateWriteTransaction` and `ScopedMutation` compose
   selected flow and declassification mutations inside one owned transaction;
   failed mutations drop that owner and roll back its uncommitted work.

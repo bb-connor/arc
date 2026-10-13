@@ -346,8 +346,8 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
                 requested_exposure_units: 100,
                 max_cost_per_invocation: Some(100),
                 max_total_cost_units: Some(500),
-                hold_id: Some(hold_id.to_string()),
-                event_id: Some(format!("{hold_id}:authorize")),
+                hold_id: hold_id.to_string(),
+                event_id: format!("{hold_id}:authorize"),
                 authority: None,
             })
         };
@@ -415,8 +415,8 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
             capability_id: "legacy-rich".to_string(),
             grant_index: 0,
             released_exposure_units: 25,
-            hold_id: Some(release_hold.to_string()),
-            event_id: Some(format!("{release_hold}:release")),
+            hold_id: release_hold.to_string(),
+            event_id: format!("{release_hold}:release"),
             authority: None,
         })?;
         assert!(release.admission_binding.is_none());
@@ -431,8 +431,8 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
             capability_id: "legacy-rich".to_string(),
             grant_index: 0,
             reversed_exposure_units: 100,
-            hold_id: Some(reverse_hold.to_string()),
-            event_id: Some(format!("{reverse_hold}:reverse")),
+            hold_id: reverse_hold.to_string(),
+            event_id: format!("{reverse_hold}:reverse"),
             expected_cumulative_approval_state: None,
             authority: None,
         })?;
@@ -457,8 +457,8 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
             grant_index: 0,
             exposed_cost_units: 100,
             realized_spend_units: 75,
-            hold_id: Some(reconcile_hold.to_string()),
-            event_id: Some(format!("{reconcile_hold}:reconcile")),
+            hold_id: reconcile_hold.to_string(),
+            event_id: format!("{reconcile_hold}:reconcile"),
             authority: None,
         })?;
         assert!(reconcile.admission_binding.is_none());
@@ -489,8 +489,8 @@ async fn versioned_rich_lifecycle_does_not_mutate_legacy_cluster_follower(
             requested_exposure_units: 10,
             max_cost_per_invocation: Some(10),
             max_total_cost_units: Some(10),
-            hold_id: Some("cluster-hold".to_string()),
-            event_id: Some("cluster-hold:authorize".to_string()),
+            hold_id: "cluster-hold".to_string(),
+            event_id: "cluster-hold:authorize".to_string(),
             authority: None,
         })?,
         BudgetAuthorizeHoldDecision::Authorized(_)
@@ -575,8 +575,8 @@ async fn live_structured_denial_has_no_invented_usage_sequence_or_cache_mutation
             requested_exposure_units: 10,
             max_cost_per_invocation: Some(10),
             max_total_cost_units: Some(20),
-            hold_id: Some(hold_id.to_string()),
-            event_id: Some(format!("{hold_id}:authorize")),
+            hold_id: hold_id.to_string(),
+            event_id: format!("{hold_id}:authorize"),
             authority: None,
         };
         assert!(matches!(
@@ -698,8 +698,8 @@ async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
         requested_exposure_units: 10,
         max_cost_per_invocation: Some(10),
         max_total_cost_units: Some(10),
-        hold_id: Some(hold_id.to_string()),
-        event_id: Some("joint-hold:authorize".to_string()),
+        hold_id: hold_id.to_string(),
+        event_id: "joint-hold:authorize".to_string(),
         authority: Some(authority),
     })?;
     assert!(matches!(
@@ -816,8 +816,8 @@ async fn v1_lifecycle_uses_current_joint_epoch_after_restart(
             requested_exposure_units: 10,
             max_cost_per_invocation: Some(10),
             max_total_cost_units: Some(10),
-            hold_id: Some(hold_id.to_string()),
-            event_id: Some("restart-hold:authorize".to_string()),
+            hold_id: hold_id.to_string(),
+            event_id: "restart-hold:authorize".to_string(),
             authority: Some(BudgetEventAuthority {
                 authority_id: first_fence.store_uuid.clone(),
                 lease_id: first_fence.lease_id,

@@ -495,8 +495,8 @@ fn handle_action(
                         })?,
                         exposed_cost_units: request.budget_reconcile.exposed_cost_units,
                         realized_spend_units: request.budget_reconcile.realized_spend_units,
-                        hold_id: Some(hold_id.clone()),
-                        event_id: Some(event_id.clone()),
+                        hold_id: hold_id.clone(),
+                        event_id: event_id.clone(),
                         authority: Some(BudgetEventAuthority {
                             authority_id: request.authority_id,
                             lease_id: request.authority_lease_id,

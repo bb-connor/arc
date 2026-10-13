@@ -7,7 +7,7 @@ fn cluster_replication_heads_reports_heads_without_materializing() {
     {
         let store = SqliteBudgetStore::open(&budget_db).test_unwrap();
         store
-            .try_charge_cost("cap-heads", 0, Some(5), 3, None, None)
+            .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: ("cap-heads").to_string(), grant_index: 0, max_invocations: Some(5), invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: 3, max_cost_per_invocation: None, max_total_cost_units: None, hold_id: "hold-heads".to_string(), event_id: "hold-heads:authorize".to_string(), authority: None }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
             .test_unwrap();
         let revocations = SqliteRevocationStore::open(&revocation_db).test_unwrap();
         revocations

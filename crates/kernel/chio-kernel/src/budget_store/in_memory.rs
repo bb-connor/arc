@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use super::{
-    budget_commit_metadata, checked_committed_cost_units, validate_optional_budget_identity,
+    budget_commit_metadata, checked_committed_cost_units,
     ApprovalRequiredBudgetHold, BudgetAdmissionBinding, BudgetAuthorizationOutcome,
     BudgetAuthorizeCumulativeApprovalRequest, BudgetAuthorizeHoldDecision,
     BudgetAuthorizeHoldRequest, BudgetCancelCapturedBeforeDispatchRequest,
@@ -32,7 +32,6 @@ struct BudgetHoldState {
     remaining_exposure_units: u64,
     invocation_state: BudgetInvocationState,
     invocation_quotas: Vec<BudgetInvocationQuota>,
-    legacy_captured_invocation_quota: Option<BudgetInvocationQuota>,
     captured_cancellation_allowed: bool,
     cumulative_approval: Option<BudgetCumulativeApprovalHoldState>,
     monetary_state: BudgetMonetaryState,
@@ -67,21 +66,6 @@ struct BudgetCumulativeApprovalAccountState {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum BudgetMutationRequest {
-    Increment {
-        capability_id: String,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    },
-    Authorize {
-        capability_id: String,
-        grant_index: usize,
-        hold_id: Option<String>,
-        cost_units: u64,
-        max_invocations: Option<u32>,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        authority: Option<BudgetEventAuthority>,
-    },
     AuthorizeComposite(Box<BudgetAuthorizeHoldRequest>),
     AuthorizeCumulativeApproval(Box<BudgetAuthorizeCumulativeApprovalRequest>),
     CaptureInvocation {
@@ -100,7 +84,7 @@ enum BudgetMutationRequest {
     Reverse {
         capability_id: String,
         grant_index: usize,
-        hold_id: Option<String>,
+        hold_id: String,
         cost_units: u64,
         expected_cumulative_approval_state: Option<BudgetCumulativeApprovalState>,
         authority: Option<BudgetEventAuthority>,
@@ -108,14 +92,14 @@ enum BudgetMutationRequest {
     Release {
         capability_id: String,
         grant_index: usize,
-        hold_id: Option<String>,
+        hold_id: String,
         cost_units: u64,
         authority: Option<BudgetEventAuthority>,
     },
     Reconcile {
         capability_id: String,
         grant_index: usize,
-        hold_id: Option<String>,
+        hold_id: String,
         exposed_cost_units: u64,
         realized_cost_units: u64,
         authority: Option<BudgetEventAuthority>,
@@ -166,13 +150,13 @@ impl InMemoryBudgetStore {
     fn recorded_mutation_decision(
         &self,
         inner: &InMemoryBudgetStoreInner,
-        event_id: Option<&str>,
+        event_id: &str,
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
-        let event = match event_id {
-            Some(event_id) => inner.events.iter().find(|event| event.event_id == event_id),
-            None => inner.events.last(),
-        }
-        .cloned()
+        let event = inner
+            .events
+            .iter()
+            .find(|event| event.event_id == event_id)
+            .cloned()
         .ok_or_else(|| {
             BudgetStoreError::Invariant(
                 "mutation event disappeared while building decision".to_string(),
@@ -209,12 +193,11 @@ struct InMemoryBudgetStoreInner {
     now: i64,
     counts: HashMap<(String, usize), BudgetUsageRecord>,
     events: Vec<BudgetMutationRecord>,
-    explicit_events: HashMap<String, RecordedBudgetMutation>,
+    events_by_id: HashMap<String, RecordedBudgetMutation>,
     holds: HashMap<String, BudgetHoldState>,
     hold_authorizations: HashMap<String, BudgetMutationRequest>,
     operation_authorizations: HashMap<String, BudgetMutationRequest>,
     invocation_quotas: HashMap<BudgetQuotaKey, BudgetInvocationQuotaState>,
-    legacy_reversible_invocations: HashMap<(String, usize), u32>,
     cumulative_approval_accounts:
         HashMap<BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalAccountState>,
     next_seq: u64,

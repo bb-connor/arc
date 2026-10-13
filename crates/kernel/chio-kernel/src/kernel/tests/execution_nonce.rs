@@ -156,130 +156,6 @@ pub(super) struct StampFailingBudgetStore {
 }
 
 impl BudgetStore for StampFailingBudgetStore {
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.inner
-            .try_increment(capability_id, grant_index, max_invocations)
-    }
-
-    fn try_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.inner.try_charge_cost(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-        )
-    }
-
-    fn reverse_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner
-            .reverse_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn reduce_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner
-            .reduce_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn settle_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner.settle_charge_cost(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-        )
-    }
-
-    delegate_authority_fenced_budget_methods!(inner);
-
-    fn list_usages(
-        &self,
-        limit: usize,
-        capability_id: Option<&str>,
-    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
-        self.inner.list_usages(limit, capability_id)
-    }
-
-    fn get_usage(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
-        self.inner.get_usage(capability_id, grant_index)
-    }
-
-    fn authorize_budget_hold(
-        &self,
-        request: crate::budget_store::BudgetAuthorizeHoldRequest,
-    ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, BudgetStoreError> {
-        self.inner.authorize_budget_hold(request)
-    }
-
-    fn reverse_budget_hold(
-        &self,
-        request: crate::budget_store::BudgetReverseHoldRequest,
-    ) -> Result<crate::budget_store::BudgetReverseHoldDecision, BudgetStoreError> {
-        self.inner.reverse_budget_hold(request)
-    }
-
-    fn capture_invocation_reservations(
-        &self,
-        request: crate::budget_store::BudgetCaptureInvocationRequest,
-    ) -> Result<crate::budget_store::BudgetInvocationCaptureDecision, BudgetStoreError> {
-        self.inner.capture_invocation_reservations(request)
-    }
-
-    fn reconcile_budget_hold(
-        &self,
-        request: crate::budget_store::BudgetReconcileHoldRequest,
-    ) -> Result<crate::budget_store::BudgetReconcileHoldDecision, BudgetStoreError> {
-        self.inner.reconcile_budget_hold(request)
-    }
-
-    fn release_budget_hold(
-        &self,
-        request: crate::budget_store::BudgetReleaseHoldRequest,
-    ) -> Result<crate::budget_store::BudgetReleaseHoldDecision, BudgetStoreError> {
-        self.inner.release_budget_hold(request)
-    }
-
-    fn get_budget_hold(
-        &self,
-        hold_id: &str,
-    ) -> Result<Option<crate::budget_store::BudgetHoldSnapshot>, BudgetStoreError> {
-        self.inner.get_budget_hold(hold_id)
-    }
-
     fn mark_hold_reserved(
         &self,
         hold_id: &str,
@@ -302,9 +178,29 @@ impl BudgetStore for StampFailingBudgetStore {
         )
     }
 
-    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
-        self.inner.reap_expired_reserved_holds(now_unix_secs)
-    }
+    delegate_budget_store_methods!(
+        inner;
+        authorize_budget_hold,
+        capture_invocation_reservations,
+        authorize_cumulative_approval,
+        cancel_captured_before_dispatch,
+        reverse_budget_hold,
+        release_budget_hold,
+        reconcile_budget_hold,
+        capture_budget_hold,
+        list_usages,
+        get_usage,
+        get_invocation_quota_usage,
+        get_cumulative_approval_account_usage,
+        get_cumulative_approval_operation_usage,
+        list_mutation_events,
+        reap_orphaned_holds,
+        count_open_holds,
+        list_open_delegated_reserved_hold_ids,
+        request_id_has_reserved_hold,
+        get_budget_hold,
+        reap_expired_reserved_holds,
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -446,59 +342,6 @@ impl PartialReapBudgetStore {
 }
 
 impl BudgetStore for PartialReapBudgetStore {
-    fn try_increment(
-        &self,
-        _capability_id: &str,
-        _grant_index: usize,
-        _max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError> {
-        Ok(true)
-    }
-
-    fn try_charge_cost(
-        &self,
-        _capability_id: &str,
-        _grant_index: usize,
-        _max_invocations: Option<u32>,
-        _cost_units: u64,
-        _max_cost_per_invocation: Option<u64>,
-        _max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError> {
-        Ok(true)
-    }
-
-    fn reverse_charge_cost(
-        &self,
-        _capability_id: &str,
-        _grant_index: usize,
-        _cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        Ok(())
-    }
-
-    fn reduce_charge_cost(
-        &self,
-        _capability_id: &str,
-        _grant_index: usize,
-        _cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        Ok(())
-    }
-
-    fn settle_charge_cost(
-        &self,
-        _capability_id: &str,
-        _grant_index: usize,
-        _exposed_cost_units: u64,
-        _realized_cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        Ok(())
-    }
-
-    reject_authority_fenced_budget_methods!(
-        "partial reaper store does not support authority-fenced budget mutations"
-    );
-
     fn list_usages(
         &self,
         _limit: usize,
@@ -556,4 +399,25 @@ impl BudgetStore for PartialReapBudgetStore {
             "reap failed after settling one hold (test double)".to_string(),
         ))
     }
+
+    unsupported_budget_store_methods!(
+        "partial reaper store does not model this budget operation";
+        authorize_budget_hold,
+        capture_invocation_reservations,
+        authorize_cumulative_approval,
+        cancel_captured_before_dispatch,
+        reverse_budget_hold,
+        release_budget_hold,
+        reconcile_budget_hold,
+        capture_budget_hold,
+        get_invocation_quota_usage,
+        get_cumulative_approval_account_usage,
+        get_cumulative_approval_operation_usage,
+        list_mutation_events,
+        reap_orphaned_holds,
+        count_open_holds,
+        list_open_delegated_reserved_hold_ids,
+        request_id_has_reserved_hold,
+        mark_hold_reserved,
+    );
 }

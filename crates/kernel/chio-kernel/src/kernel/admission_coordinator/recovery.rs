@@ -112,8 +112,8 @@ impl ChioKernel {
             capability_id: snapshot.capability_id.clone(),
             grant_index: snapshot.grant_index,
             reversed_exposure_units: snapshot.remaining_exposure_units,
-            hold_id: Some(hold_id.clone()),
-            event_id: Some(format!("{hold_id}:authorize:rollback:recovery")),
+            hold_id: hold_id.clone(),
+            event_id: format!("{hold_id}:authorize:rollback:recovery"),
             expected_cumulative_approval_state: None,
             authority: Some(authority),
         };

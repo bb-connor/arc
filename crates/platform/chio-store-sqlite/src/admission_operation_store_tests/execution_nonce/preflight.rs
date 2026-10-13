@@ -24,8 +24,8 @@ pub(super) fn own_and_clean(
         .as_mut()
         .ok_or("binding")?
         .operation_id = identity.budget_operation_id().as_str().into();
-    request.hold_id = Some(identity.hold_id().as_str().into());
-    request.event_id = Some(identity.authorization_event_id().as_str().into());
+    request.hold_id = identity.hold_id().as_str().into();
+    request.event_id = identity.authorization_event_id().as_str().into();
     let command = nonce_command(
         &fixture.store,
         &fixture.fence,
@@ -52,7 +52,7 @@ pub(super) fn own_and_clean(
             grant_index: request.grant_index,
             reversed_exposure_units: 0,
             hold_id: request.hold_id,
-            event_id: Some(format!("{}:reverse", identity.hold_id().as_str())),
+            event_id: format!("{}:reverse", identity.hold_id().as_str()),
             expected_cumulative_approval_state: None,
             authority: request.authority,
         })?;
@@ -74,8 +74,8 @@ fn request(fixture: &NonceFixture) -> TestResult<BudgetAuthorizeHoldRequest> {
         .as_mut()
         .ok_or("binding")?
         .operation_id = identity.budget_operation_id().as_str().into();
-    request.hold_id = Some(identity.hold_id().as_str().into());
-    request.event_id = Some(identity.authorization_event_id().as_str().into());
+    request.hold_id = identity.hold_id().as_str().into();
+    request.event_id = identity.authorization_event_id().as_str().into();
     Ok(request)
 }
 
@@ -134,7 +134,7 @@ fn reverse(fixture: &NonceFixture, exposure: u64) -> TestResult {
             grant_index: request.grant_index,
             reversed_exposure_units: exposure,
             hold_id: request.hold_id,
-            event_id: Some(format!("{}:reverse", identity(fixture)?.hold_id().as_str())),
+            event_id: format!("{}:reverse", identity(fixture)?.hold_id().as_str()),
             expected_cumulative_approval_state: None,
             authority: request.authority,
         })?;
@@ -290,7 +290,7 @@ fn durable_nonce_preflight_cannot_capture_invocations_or_money() -> TestResult {
             capability_id: request.capability_id,
             grant_index: request.grant_index,
             hold_id: request.hold_id,
-            event_id: Some("preflight-spend".into()),
+            event_id: "preflight-spend".into(),
             exposed_cost_units: 5,
             realized_spend_units: 5,
             authority: request.authority,

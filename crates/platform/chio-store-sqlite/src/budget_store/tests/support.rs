@@ -113,3 +113,120 @@ pub(super) fn install_empty_legacy_payment_journal(
     transaction.execute_batch(include_str!("../composite_schema/payment/legacy_v11.sql"))?;
     transaction.commit()
 }
+
+/// `(max_invocations, cost_units, max_cost_per_invocation, max_total_cost_units)`.
+pub(super) type ChargeLimits = (Option<u32>, u64, Option<u64>, Option<u64>);
+
+pub(super) fn charge(
+    store: &dyn BudgetStore,
+    capability_id: &str,
+    grant_index: usize,
+    limits: ChargeLimits,
+    hold_id: &str,
+    event_id: &str,
+    authority: Option<&BudgetEventAuthority>,
+) -> Result<bool, BudgetStoreError> {
+    let (max_invocations, cost_units, max_cost_per_invocation, max_total_cost_units) = limits;
+    let decision = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+        capability_id: capability_id.to_string(),
+        grant_index,
+        max_invocations,
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units: cost_units,
+        max_cost_per_invocation,
+        max_total_cost_units,
+        hold_id: hold_id.to_string(),
+        event_id: event_id.to_string(),
+        authority: authority.cloned(),
+    })?;
+    Ok(matches!(
+        decision,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ))
+}
+
+pub(super) fn capture(
+    store: &dyn BudgetStore,
+    capability_id: &str,
+    grant_index: usize,
+    hold_id: &str,
+    authority: Option<&BudgetEventAuthority>,
+) -> Result<(), BudgetStoreError> {
+    store
+        .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: capability_id.to_string(),
+            grant_index,
+            hold_id: hold_id.to_string(),
+            event_id: format!("{hold_id}:capture-invocation"),
+            trusted_time: None,
+            authority: authority.cloned(),
+        })
+        .map(|_| ())
+}
+
+pub(super) fn reverse(
+    store: &dyn BudgetStore,
+    capability_id: &str,
+    grant_index: usize,
+    cost_units: u64,
+    hold_id: &str,
+    event_id: &str,
+    authority: Option<&BudgetEventAuthority>,
+) -> Result<(), BudgetStoreError> {
+    store
+        .reverse_budget_hold(BudgetReverseHoldRequest {
+            capability_id: capability_id.to_string(),
+            grant_index,
+            reversed_exposure_units: cost_units,
+            hold_id: hold_id.to_string(),
+            event_id: event_id.to_string(),
+            expected_cumulative_approval_state: None,
+            authority: authority.cloned(),
+        })
+        .map(|_| ())
+}
+
+pub(super) fn release(
+    store: &dyn BudgetStore,
+    capability_id: &str,
+    grant_index: usize,
+    cost_units: u64,
+    hold_id: &str,
+    event_id: &str,
+    authority: Option<&BudgetEventAuthority>,
+) -> Result<(), BudgetStoreError> {
+    store
+        .release_budget_hold(BudgetReleaseHoldRequest {
+            capability_id: capability_id.to_string(),
+            grant_index,
+            released_exposure_units: cost_units,
+            hold_id: hold_id.to_string(),
+            event_id: event_id.to_string(),
+            authority: authority.cloned(),
+        })
+        .map(|_| ())
+}
+
+pub(super) fn reconcile(
+    store: &dyn BudgetStore,
+    capability_id: &str,
+    grant_index: usize,
+    (exposed_cost_units, realized_spend_units): (u64, u64),
+    hold_id: &str,
+    event_id: &str,
+    authority: Option<&BudgetEventAuthority>,
+) -> Result<(), BudgetStoreError> {
+    store
+        .reconcile_budget_hold(BudgetReconcileHoldRequest {
+            capability_id: capability_id.to_string(),
+            grant_index,
+            exposed_cost_units,
+            realized_spend_units,
+            hold_id: hold_id.to_string(),
+            event_id: event_id.to_string(),
+            authority: authority.cloned(),
+        })
+        .map(|_| ())
+}

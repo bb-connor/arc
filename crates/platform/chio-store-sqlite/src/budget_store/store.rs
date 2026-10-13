@@ -1,7 +1,5 @@
 #![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
-mod invocations;
-use chio_kernel_core::budget_increment_admits;
 
 /// Budget-store schema revision. Bump on every schema-affecting change.
 pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 12;
@@ -853,9 +851,9 @@ impl SqliteBudgetStore {
         Self::validate_supported_import_record(&normalized)?;
         let record = &normalized;
         if let Some(hold_id) = record.hold_id.as_deref() {
-            Self::reject_structured_hold_from_legacy_writer(
+            Self::reject_structured_hold_from_unbound_writer(
                 transaction,
-                Some(hold_id),
+                hold_id,
                 "budget mutation import",
             )?;
         }
@@ -1180,23 +1178,6 @@ impl SqliteBudgetStore {
         Ok(events)
     }
 
-    fn generated_event_id(
-        &self,
-        transaction: &rusqlite::Transaction<'_>,
-    ) -> Result<String, BudgetStoreError> {
-        let count =
-            transaction.query_row("SELECT COUNT(*) FROM budget_mutation_events", [], |row| {
-                row.get::<_, i64>(0)
-            })?;
-        Ok(format!(
-            "sqlite-budget-event-{}-{}",
-            self.unix_now()?,
-            count.checked_add(1).filter(|_| count >= 0).ok_or_else(|| {
-                BudgetStoreError::Overflow("budget event number exceeds SQLite range".into())
-            })?
-        ))
-    }
-
     pub(super) fn load_hold(
         transaction: &rusqlite::Transaction<'_>,
         hold_id: &str,
@@ -1271,34 +1252,6 @@ impl SqliteBudgetStore {
                     WHERE capability_id = ?1
                       AND grant_index = ?2
                       AND invocation_captured = 1
-                )
-                "#,
-            )?
-            .query_row(
-                params![
-                    capability_id,
-                    crate::integer::checked::<_, i64>(grant_index)?
-                ],
-                |row| row.get(0),
-            )
-            .map_err(Into::into)
-    }
-
-    pub(super) fn has_live_hold(
-        transaction: &rusqlite::Transaction<'_>,
-        capability_id: &str,
-        grant_index: usize,
-    ) -> Result<bool, BudgetStoreError> {
-        transaction
-            .prepare_cached(
-                r#"
-                SELECT EXISTS(
-                    SELECT 1
-                    FROM budget_authorization_holds
-                    WHERE capability_id = ?1
-                      AND grant_index = ?2
-                      AND invocation_count_debited = 1
-                      AND disposition != 'reversed'
                 )
                 "#,
             )?
@@ -1617,64 +1570,13 @@ impl SqliteBudgetStore {
         }
     }
 
-    fn existing_increment_allowed(
-        transaction: &rusqlite::Transaction<'_>,
-        event_id: Option<&str>,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<Option<bool>, BudgetStoreError> {
-        let Some(event_id) = event_id else {
-            return Ok(None);
-        };
-        let existing = transaction
-            .query_row(
-                r#"
-                SELECT capability_id, grant_index, kind, allowed, max_invocations
-                FROM budget_mutation_events
-                WHERE event_id = ?1
-                "#,
-                params![event_id],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        budget_usize_from_row(row, 1, "grant_index")?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, Option<i64>>(3)?,
-                        optional_budget_u32_from_row(row, 4, "max_invocations")?,
-                    ))
-                },
-            )
-            .optional()?;
-        let Some((
-            existing_capability_id,
-            existing_grant_index,
-            existing_kind,
-            existing_allowed,
-            existing_max_invocations,
-        )) = existing
-        else {
-            return Ok(None);
-        };
-        let mutation_matches = existing_capability_id == capability_id
-            && existing_grant_index == grant_index
-            && existing_kind == BudgetMutationKind::IncrementInvocation.as_str()
-            && existing_max_invocations == max_invocations;
-        if !mutation_matches {
-            return Err(BudgetStoreError::Invariant(format!(
-                "budget event_id `{event_id}` was reused for a different mutation"
-            )));
-        }
-        Ok(Some(existing_allowed.unwrap_or(0) > 0))
-    }
-
     #[allow(
         clippy::too_many_arguments,
         reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
     )]
     pub(super) fn existing_event_allowed(
         transaction: &rusqlite::Transaction<'_>,
-        event_id: Option<&str>,
+        event_id: &str,
         kind: BudgetMutationKind,
         capability_id: &str,
         grant_index: usize,
@@ -1686,9 +1588,6 @@ impl SqliteBudgetStore {
         max_cost_per_invocation: Option<u64>,
         max_total_cost_units: Option<u64>,
     ) -> Result<Option<Option<bool>>, BudgetStoreError> {
-        let Some(event_id) = event_id else {
-            return Ok(None);
-        };
         let existing = transaction
             .query_row(
                 r#"
@@ -1773,7 +1672,7 @@ impl SqliteBudgetStore {
     pub(super) fn append_mutation_event(
         &self,
         transaction: &rusqlite::Transaction<'_>,
-        event_id: Option<&str>,
+        event_id: &str,
         hold_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
         capability_id: &str,
@@ -1792,10 +1691,7 @@ impl SqliteBudgetStore {
         total_cost_realized_spend_after: u64,
     ) -> Result<BudgetMutationRecord, BudgetStoreError> {
         validate_budget_grant_index(grant_index)?;
-        let event_id = match event_id {
-            Some(event_id) => event_id.to_string(),
-            None => self.generated_event_id(transaction)?,
-        };
+        let event_id = event_id.to_string();
         let recorded_at = self.unix_now()?;
         let (
             authorization_outcome,

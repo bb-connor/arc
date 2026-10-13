@@ -209,28 +209,10 @@ mod deltas_tests {
         let db = temp_budget_db("event-time-budget-page");
         let store = SqliteBudgetStore::open(&db).test_unwrap();
         assert!(store
-            .try_charge_cost_with_ids(
-                "cap-page",
-                0,
-                None,
-                10,
-                Some(10),
-                Some(100),
-                Some("hold-1"),
-                Some("hold-1:authorize"),
-            )
+            .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: ("cap-page").to_string(), grant_index: 0, max_invocations: None, invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: 10, max_cost_per_invocation: Some(10), max_total_cost_units: Some(100), hold_id: "hold-1".to_string(), event_id: "hold-1:authorize".to_string(), authority: None }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
             .test_unwrap());
         assert!(store
-            .try_charge_cost_with_ids(
-                "cap-page",
-                0,
-                None,
-                10,
-                Some(10),
-                Some(100),
-                Some("hold-2"),
-                Some("hold-2:authorize"),
-            )
+            .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: ("cap-page").to_string(), grant_index: 0, max_invocations: None, invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: 10, max_cost_per_invocation: Some(10), max_total_cost_units: Some(100), hold_id: "hold-2".to_string(), event_id: "hold-2:authorize".to_string(), authority: None }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
             .test_unwrap());
 
         let page = collect_budget_mutation_event_views_after_seq(&store, 0, 1).test_unwrap();
@@ -263,16 +245,7 @@ mod deltas_tests {
         let db = temp_budget_db("capture-usage-timestamp");
         let store = SqliteBudgetStore::open(&db).test_unwrap();
         assert!(store
-            .try_charge_cost_with_ids(
-                "cap-capture-time",
-                0,
-                None,
-                10,
-                Some(10),
-                Some(100),
-                Some("hold-capture-time"),
-                Some("hold-capture-time:authorize"),
-            )
+            .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: ("cap-capture-time").to_string(), grant_index: 0, max_invocations: None, invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: 10, max_cost_per_invocation: Some(10), max_total_cost_units: Some(100), hold_id: "hold-capture-time".to_string(), event_id: "hold-capture-time:authorize".to_string(), authority: None }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
             .test_unwrap());
         let authorized_usage = store
             .get_usage("cap-capture-time", 0)

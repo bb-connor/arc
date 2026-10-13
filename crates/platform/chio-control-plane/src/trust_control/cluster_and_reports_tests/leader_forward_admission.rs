@@ -699,7 +699,7 @@ impl PublicForwardLeader {
                 }),
             )
             .route(REVOCATIONS_PATH, post(Self::privileged_write))
-            .route(BUDGET_INCREMENT_PATH, post(Self::privileged_write));
+            .route(BUDGET_AUTHORIZE_EXPOSURE_PATH, post(Self::privileged_write));
         let server = std::thread::spawn(move || {
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -807,13 +807,18 @@ async fn final_f10_public_forward_preserves_authenticated_revocation_and_budget_
         }),
     )
     .await;
-    let budget = handle_try_increment_budget(
+    let budget = handle_try_charge_cost(
         State(state.clone()),
         headers,
-        Json(TryIncrementBudgetRequest {
+        Json(TryChargeCostRequest {
             capability_id: "active-capability".to_string(),
             grant_index: 0,
             max_invocations: Some(1),
+            cost_units: 0,
+            max_cost_per_invocation: None,
+            max_total_cost_units: None,
+            hold_id: "active-capability-hold".to_string(),
+            event_id: "active-capability-hold:authorize".to_string(),
         }),
     )
     .await;

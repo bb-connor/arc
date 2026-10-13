@@ -573,8 +573,8 @@ fn persist_receivable(
             requested_exposure_units: amount.units,
             max_cost_per_invocation: Some(amount.units),
             max_total_cost_units: Some(amount.units),
-            hold_id: Some(hold_id.clone()),
-            event_id: Some(format!("factor-source-authorize-{suffix}")),
+            hold_id: hold_id.clone(),
+            event_id: format!("factor-source-authorize-{suffix}"),
             authority: Some(BudgetEventAuthority {
                 authority_id: fixture.fence.store_uuid.clone(),
                 lease_id: fixture.fence.lease_id.clone(),

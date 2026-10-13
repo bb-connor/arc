@@ -130,12 +130,6 @@ impl SqliteBudgetStore {
         let max_cost_fields_absent =
             event.max_cost_per_invocation.is_none() && event.max_total_cost_units.is_none();
         let valid = match event.kind {
-            BudgetMutationKind::IncrementInvocation => {
-                !has_hold
-                    && event.exposure_units == 0
-                    && event.realized_spend_units == 0
-                    && max_cost_fields_absent
-            }
             BudgetMutationKind::AuthorizeExposure => event.realized_spend_units == 0,
             BudgetMutationKind::ReserveInvocation => {
                 let valid_outcome = matches!(
@@ -560,8 +554,7 @@ fn usage_mutation_exists(
 fn event_mutates_usage(event: &BudgetMutationRecord) -> bool {
     matches!(
         event.kind,
-        BudgetMutationKind::IncrementInvocation
-            | BudgetMutationKind::ReserveInvocation
+        BudgetMutationKind::ReserveInvocation
             | BudgetMutationKind::AuthorizeExposure
             | BudgetMutationKind::CancelCapturedBeforeDispatch
             | BudgetMutationKind::ReverseInvocation
@@ -621,11 +614,6 @@ fn expected_usage_after(
     };
 
     match event.kind {
-        BudgetMutationKind::IncrementInvocation if event.allowed == Some(true) => Ok((
-            checked_add_u32(before.0, 1, "invocation count")?,
-            before.1,
-            before.2,
-        )),
         BudgetMutationKind::AuthorizeExposure if event.allowed == Some(true) => Ok((
             checked_add_u32(before.0, 1, "invocation count")?,
             checked_add_u64(before.1, event.exposure_units, "exposed cost")?,
@@ -644,11 +632,7 @@ fn expected_usage_after(
                 before.2,
             ))
         }
-        BudgetMutationKind::IncrementInvocation | BudgetMutationKind::AuthorizeExposure
-            if event.allowed == Some(false) =>
-        {
-            Ok(before)
-        }
+        BudgetMutationKind::AuthorizeExposure if event.allowed == Some(false) => Ok(before),
         BudgetMutationKind::ReserveInvocation
             if event.authorization_outcome == Some(BudgetAuthorizationOutcome::Denied) =>
         {

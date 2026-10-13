@@ -2,16 +2,6 @@
 use super::*;
 
 impl BudgetStore for InMemoryBudgetStore {
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.lock_inner()?
-            .try_increment(capability_id, grant_index, max_invocations)
-    }
-
     fn capture_invocation_reservations(
         &self,
         request: BudgetCaptureInvocationRequest,
@@ -140,235 +130,6 @@ impl BudgetStore for InMemoryBudgetStore {
         })
     }
 
-    fn try_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.lock_inner()?.try_charge_cost(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-        )
-    }
-
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    fn try_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.lock_inner()?.try_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            hold_id,
-            event_id,
-        )
-    }
-
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    fn try_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.lock_inner()?.try_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            hold_id,
-            event_id,
-            authority,
-        )
-    }
-
-    fn reverse_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .reverse_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn reverse_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?.reverse_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            cost_units,
-            hold_id,
-            event_id,
-        )
-    }
-
-    fn reverse_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .reverse_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-    }
-
-    fn reduce_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .reduce_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn reduce_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?.reduce_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            cost_units,
-            hold_id,
-            event_id,
-        )
-    }
-
-    fn reduce_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .reduce_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-    }
-
-    fn settle_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?.settle_charge_cost(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-        )
-    }
-
-    fn settle_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?.settle_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-            hold_id,
-            event_id,
-        )
-    }
-
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    fn settle_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.lock_inner()?
-            .settle_charge_cost_with_ids_and_authority(
-                capability_id,
-                grant_index,
-                exposed_cost_units,
-                realized_cost_units,
-                hold_id,
-                event_id,
-                authority,
-            )
-    }
-
     fn list_usages(
         &self,
         limit: usize,
@@ -432,33 +193,30 @@ impl BudgetStore for InMemoryBudgetStore {
         } else {
             crate::budget_store::BudgetHoldCleanupCustody::Replayed
         };
-        if request.hold_id.as_deref().is_some_and(|hold_id| {
-            inner
-                .holds
-                .get(hold_id)
-                .is_some_and(|hold| hold.invocation_state == BudgetInvocationState::Reversed)
-        }) {
+        if inner
+            .holds
+            .get(&request.hold_id)
+            .is_some_and(|hold| hold.invocation_state == BudgetInvocationState::Reversed)
+        {
             return Err(BudgetStoreError::Invariant(
                 "budget authorization replay references a terminally reversed hold".to_string(),
             ));
         }
-        if let Some((hold_id, capture)) = request.hold_id.as_deref().and_then(|hold_id| {
-            let hold = inner.holds.get(hold_id)?;
-            if hold.invocation_state != BudgetInvocationState::Captured {
-                return None;
-            }
-            inner
-                .events
-                .iter()
-                .find(|event| {
-                    event.hold_id.as_deref() == Some(hold_id)
+        let captured = inner
+            .holds
+            .get(&request.hold_id)
+            .filter(|hold| hold.invocation_state == BudgetInvocationState::Captured)
+            .and_then(|_| {
+                inner.events.iter().find(|event| {
+                    event.hold_id.as_deref() == Some(request.hold_id.as_str())
                         && event.kind == BudgetMutationKind::CaptureInvocation
                 })
-                .map(|capture| (hold_id.to_string(), capture.clone()))
-        }) {
+            })
+            .cloned();
+        if let Some(capture) = captured {
             return Ok(BudgetAuthorizeHoldDecision::AlreadyCaptured(
                 BudgetHoldMutationDecision {
-                    hold_id: Some(hold_id),
+                    hold_id: Some(request.hold_id),
                     admission_binding: capture.admission_binding,
                     exposure_units: capture.exposure_units,
                     realized_spend_units: capture.realized_spend_units,
@@ -481,16 +239,7 @@ impl BudgetStore for InMemoryBudgetStore {
                 },
             ));
         }
-        if let Some(hold_id) = request.hold_id.as_deref() {
-            inner.ensure_latest_hold_event(hold_id, event.event_seq, "authorization")?;
-        } else {
-            inner.ensure_latest_usage_event(
-                &request.capability_id,
-                request.grant_index,
-                event.event_seq,
-                "authorization",
-            )?;
-        }
+        inner.ensure_latest_hold_event(&request.hold_id, event.event_seq, "authorization")?;
         let committed_cost_units_after = checked_committed_cost_units(
             event.total_cost_exposed_after,
             event.total_cost_realized_spend_after,
@@ -574,16 +323,8 @@ impl BudgetStore for InMemoryBudgetStore {
     ) -> Result<BudgetReverseHoldDecision, BudgetStoreError> {
         request.validate()?;
         let mut inner = self.lock_inner()?;
-        inner.reverse_charge_cost_with_expected_state(
-            &request.capability_id,
-            request.grant_index,
-            request.reversed_exposure_units,
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            request.authority.as_ref(),
-            request.expected_cumulative_approval_state,
-        )?;
-        self.recorded_mutation_decision(&inner, request.event_id.as_deref())
+        inner.reverse_hold(&request)?;
+        self.recorded_mutation_decision(&inner, &request.event_id)
     }
 
     fn release_budget_hold(
@@ -592,15 +333,8 @@ impl BudgetStore for InMemoryBudgetStore {
     ) -> Result<BudgetReleaseHoldDecision, BudgetStoreError> {
         request.validate()?;
         let mut inner = self.lock_inner()?;
-        inner.reduce_charge_cost_with_ids_and_authority(
-            &request.capability_id,
-            request.grant_index,
-            request.released_exposure_units,
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            request.authority.as_ref(),
-        )?;
-        self.recorded_mutation_decision(&inner, request.event_id.as_deref())
+        inner.release_hold(&request)?;
+        self.recorded_mutation_decision(&inner, &request.event_id)
     }
 
     fn reconcile_budget_hold(
@@ -609,16 +343,8 @@ impl BudgetStore for InMemoryBudgetStore {
     ) -> Result<BudgetReconcileHoldDecision, BudgetStoreError> {
         request.validate()?;
         let mut inner = self.lock_inner()?;
-        inner.settle_charge_cost_with_ids_and_authority(
-            &request.capability_id,
-            request.grant_index,
-            request.exposed_cost_units,
-            request.realized_spend_units,
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            request.authority.as_ref(),
-        )?;
-        self.recorded_mutation_decision(&inner, request.event_id.as_deref())
+        inner.reconcile_hold(&request)?;
+        self.recorded_mutation_decision(&inner, &request.event_id)
     }
 
     fn capture_budget_hold(
@@ -628,7 +354,7 @@ impl BudgetStore for InMemoryBudgetStore {
         request.validate()?;
         let mut inner = self.lock_inner()?;
         inner.capture_budget_hold(&request)?;
-        self.recorded_mutation_decision(&inner, request.event_id.as_deref())
+        self.recorded_mutation_decision(&inner, &request.event_id)
     }
 
     fn reap_orphaned_holds(
@@ -665,8 +391,8 @@ impl BudgetStore for InMemoryBudgetStore {
                         grant_index: hold.grant_index,
                         exposed_cost_units: hold.remaining_exposure_units,
                         realized_spend_units: (*realized).min(hold.remaining_exposure_units),
-                        hold_id: Some(hold_id.clone()),
-                        event_id: Some(format!("{hold_id}:reap-reconcile")),
+                        hold_id: hold_id.clone(),
+                        event_id: format!("{hold_id}:reap-reconcile"),
                         authority: hold.authority,
                     })?;
                 }
@@ -678,8 +404,8 @@ impl BudgetStore for InMemoryBudgetStore {
                     capability_id: hold.capability_id,
                     grant_index: hold.grant_index,
                     reversed_exposure_units: hold.remaining_exposure_units,
-                    hold_id: Some(hold_id.clone()),
-                    event_id: Some(format!("{hold_id}:reap-reverse")),
+                    hold_id: hold_id.clone(),
+                    event_id: format!("{hold_id}:reap-reverse"),
                     authority: hold.authority,
                     expected_cumulative_approval_state: None,
                 })?;
@@ -789,34 +515,6 @@ impl BudgetStore for InMemoryBudgetStore {
         Ok(())
     }
 
-    fn reserve_invocation_hold(
-        &self,
-        hold_id: &str,
-        capability_id: &str,
-        grant_index: usize,
-        reserved_until_unix_secs: i64,
-        envelope: &ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        let mut inner = self.lock_inner()?;
-        let hold = inner.holds.get_mut(hold_id).ok_or_else(|| {
-            BudgetStoreError::Invariant(format!("budget hold `{hold_id}` not found"))
-        })?;
-        if hold.capability_id != capability_id
-            || hold.grant_index != grant_index
-            || hold.authorized_exposure_units != 0
-            || !hold_is_open(hold)
-        {
-            return Err(BudgetStoreError::Invariant(format!(
-                "budget hold `{hold_id}` is not an open invocation authorization"
-            )));
-        }
-        hold.reserved_until = Some(reserved_until_unix_secs);
-        hold.reserved_currency = None;
-        hold.reserved_payment_reference = None;
-        hold.reserved_envelope = envelope.clone();
-        Ok(())
-    }
-
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
         let hold_ids = {
             let inner = self.lock_inner()?;
@@ -850,8 +548,8 @@ impl BudgetStore for InMemoryBudgetStore {
                     grant_index: hold.grant_index,
                     exposed_cost_units: hold.remaining_exposure_units,
                     realized_spend_units: hold.remaining_exposure_units,
-                    hold_id: Some(hold_id.clone()),
-                    event_id: Some(format!("{hold_id}:ttl-reap-settle")),
+                    hold_id: hold_id.clone(),
+                    event_id: format!("{hold_id}:ttl-reap-settle"),
                     authority: hold.authority,
                 })?;
             }

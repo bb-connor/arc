@@ -556,16 +556,8 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
                 "remote payment settlement requires budget authority".to_owned(),
             )
         })?;
-        let hold_id = budget_reconcile.hold_id.clone().ok_or_else(|| {
-            AdmissionPaymentJournalError::Invariant(
-                "remote payment settlement requires hold_id".to_owned(),
-            )
-        })?;
-        let event_id = budget_reconcile.event_id.clone().ok_or_else(|| {
-            AdmissionPaymentJournalError::Invariant(
-                "remote payment settlement requires event_id".to_owned(),
-            )
-        })?;
+        let hold_id = budget_reconcile.hold_id.clone();
+        let event_id = budget_reconcile.event_id.clone();
         let grant_index = u32::try_from(budget_reconcile.grant_index).map_err(|_| {
             AdmissionPaymentJournalError::Invariant(
                 "remote payment settlement grant index overflowed".to_owned(),
@@ -643,11 +635,7 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
                 "remote combined authorization omitted its authority".to_owned(),
             )
         })?;
-        let hold_id = request.hold_id.clone().ok_or_else(|| {
-            AdmissionBudgetAuthorizationError::Invariant(
-                "remote combined authorization omitted hold_id".to_owned(),
-            )
-        })?;
+        let hold_id = request.hold_id.clone();
         if request.admission_binding.as_ref().is_none_or(|binding| {
             binding.operation_id != operation.binding().operation_id().as_str()
         }) {

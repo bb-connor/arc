@@ -37,8 +37,8 @@ fn real_nonce_preflight_requires_fresh_claim_but_recovers_and_cleans_expired_his
             .as_mut()
             .ok_or("binding absent")?
             .operation_id = identity.budget_operation_id().as_str().into();
-        request.hold_id = Some(identity.hold_id().as_str().into());
-        request.event_id = Some(identity.authorization_event_id().as_str().into());
+        request.hold_id = identity.hold_id().as_str().into();
+        request.event_id = identity.authorization_event_id().as_str().into();
         if already_authorized {
             let (decision, updated) = fixture.store.authorize_execution_nonce_preflight(
                 &operation,
@@ -90,7 +90,7 @@ fn real_nonce_preflight_requires_fresh_claim_but_recovers_and_cleans_expired_his
                     grant_index: request.grant_index,
                     reversed_exposure_units: 0,
                     hold_id: request.hold_id,
-                    event_id: Some(format!("{}:reverse", identity.hold_id().as_str())),
+                    event_id: format!("{}:reverse", identity.hold_id().as_str()),
                     expected_cumulative_approval_state: None,
                     authority: request.authority,
                 })?;

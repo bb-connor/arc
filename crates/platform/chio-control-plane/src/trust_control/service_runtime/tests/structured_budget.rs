@@ -44,8 +44,8 @@ fn composite_request() -> Result<BudgetAuthorizeHoldRequest, Box<dyn std::error:
         requested_exposure_units: 100,
         max_cost_per_invocation: Some(100),
         max_total_cost_units: Some(500),
-        hold_id: Some("hold-composite".to_string()),
-        event_id: Some("hold-composite:authorize".to_string()),
+        hold_id: "hold-composite".to_string(),
+        event_id: "hold-composite:authorize".to_string(),
         authority: None,
     })
 }
@@ -112,17 +112,11 @@ fn structured_authorize_body(
     let response = StructuredBudgetAuthorizeResponse::from_core(
         request.capability_id.clone(),
         u32::try_from(request.grant_index)?,
-        request
-            .hold_id
-            .clone()
-            .ok_or_else(|| std::io::Error::other("missing test hold"))?,
-        request
-            .event_id
-            .clone()
-            .ok_or_else(|| std::io::Error::other("missing test event"))?,
+        request.hold_id.clone(),
+        request.event_id.clone(),
         BudgetAuthorizeHoldDecision::Authorized(BudgetHoldAuthorizationRecord {
             cleanup_custody: chio_kernel::budget_store::BudgetHoldCleanupCustody::Fresh,
-            hold_id: request.hold_id.clone(),
+            hold_id: Some(request.hold_id.clone()),
             admission_binding: request.admission_binding.clone(),
             authorized_exposure_units: request.requested_exposure_units,
             committed_cost_units_after: 100,
@@ -189,20 +183,14 @@ fn structured_denied_authorize_body(
         .first()
         .cloned()
         .ok_or_else(|| std::io::Error::other("missing test quota"))?;
-    let event_id = request
-        .event_id
-        .clone()
-        .ok_or_else(|| std::io::Error::other("missing test event"))?;
+    let event_id = request.event_id.clone();
     let response = StructuredBudgetAuthorizeResponse::from_core(
         request.capability_id.clone(),
         u32::try_from(request.grant_index)?,
-        request
-            .hold_id
-            .clone()
-            .ok_or_else(|| std::io::Error::other("missing test hold"))?,
+        request.hold_id.clone(),
         event_id.clone(),
         BudgetAuthorizeHoldDecision::Denied(DeniedBudgetHold {
-            hold_id: request.hold_id.clone(),
+            hold_id: Some(request.hold_id.clone()),
             admission_binding: request.admission_binding.clone(),
             attempted_exposure_units: request.requested_exposure_units,
             committed_cost_units_after: 0,
@@ -241,7 +229,7 @@ fn structured_reconcile_body(
         "hold-composite:reconcile".to_string(),
         StructuredBudgetMutationDecisionView::AppliedOrAlreadyApplied,
         BudgetHoldMutationDecision {
-            hold_id: request.hold_id.clone(),
+            hold_id: Some(request.hold_id.clone()),
             admission_binding: request.admission_binding.clone(),
             exposure_units: 100,
             realized_spend_units: 75,
@@ -289,14 +277,11 @@ fn structured_mutation_body(
     let response = StructuredBudgetMutationResponse::from_core(
         request.capability_id.clone(),
         u32::try_from(request.grant_index)?,
-        request
-            .hold_id
-            .clone()
-            .ok_or_else(|| std::io::Error::other("missing test hold"))?,
+        request.hold_id.clone(),
         request_event_id.to_string(),
         decision,
         BudgetHoldMutationDecision {
-            hold_id: request.hold_id.clone(),
+            hold_id: Some(request.hold_id.clone()),
             admission_binding: request.admission_binding.clone(),
             exposure_units,
             realized_spend_units,
@@ -383,11 +368,16 @@ fn remote_budget_store_round_trips_exact_structured_authorization(
 }
 
 #[test]
-fn remote_authorization_preserves_current_call_custody_and_defaults_to_unknown(
+fn remote_authorization_preserves_current_call_custody_and_requires_it(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use chio_kernel::budget_store::BudgetHoldCleanupCustody;
 
-    for custody in [Some(BudgetHoldCleanupCustody::Replayed), None] {
+    for custody in [
+        Some(BudgetHoldCleanupCustody::Fresh),
+        Some(BudgetHoldCleanupCustody::Replayed),
+        Some(BudgetHoldCleanupCustody::Unknown),
+        None,
+    ] {
         let request = composite_request()?;
         let mut body: serde_json::Value =
             serde_json::from_str(&structured_authorize_body(&request)?)?;
@@ -401,12 +391,15 @@ fn remote_authorization_preserves_current_call_custody_and_defaults_to_unknown(
         }
         let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
         let store = build_remote_budget_store(&server.url, "secret")?;
-        let BudgetAuthorizeHoldDecision::Authorized(authorized) =
-            store.authorize_budget_hold(request)?
-        else {
+        let result = store.authorize_budget_hold(request);
+        let Some(custody) = custody else {
+            assert!(result.is_err());
+            continue;
+        };
+        let BudgetAuthorizeHoldDecision::Authorized(authorized) = result? else {
             return Err(std::io::Error::other("structured authorization was denied").into());
         };
-        assert_eq!(authorized.cleanup_custody, custody.unwrap_or_default());
+        assert_eq!(authorized.cleanup_custody, custody);
         assert_eq!(authorized.authorized_exposure_units, 100);
         assert_eq!(authorized.committed_cost_units_after, 100);
         assert_eq!(authorized.metadata.budget_commit_index, Some(7));
@@ -677,8 +670,8 @@ fn all_rich_lifecycle_methods_fail_before_mutation_after_restart_on_old_server(
             grant_index: 0,
             exposed_cost_units: 100,
             realized_spend_units: 75,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:capture-spend".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:capture-spend".to_string(),
             authority: None,
         })
         .is_err());
@@ -687,8 +680,8 @@ fn all_rich_lifecycle_methods_fail_before_mutation_after_restart_on_old_server(
             capability_id: "cap-composite".to_string(),
             grant_index: 0,
             reversed_exposure_units: 100,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:fenced-reverse".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:fenced-reverse".to_string(),
             expected_cumulative_approval_state: Some(
                 BudgetCumulativeApprovalState::PendingApproval,
             ),
@@ -719,8 +712,8 @@ fn all_rich_lifecycle_methods_fail_before_mutation_after_restart_on_old_server(
             capability_id: "cap-composite".to_string(),
             grant_index: 0,
             reversed_exposure_units: 100,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:reverse".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:reverse".to_string(),
             expected_cumulative_approval_state: None,
             authority: None,
         })
@@ -730,8 +723,8 @@ fn all_rich_lifecycle_methods_fail_before_mutation_after_restart_on_old_server(
             capability_id: "cap-composite".to_string(),
             grant_index: 0,
             released_exposure_units: 25,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:release".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:release".to_string(),
             authority: None,
         })
         .is_err());
@@ -741,8 +734,8 @@ fn all_rich_lifecycle_methods_fail_before_mutation_after_restart_on_old_server(
             grant_index: 0,
             exposed_cost_units: 100,
             realized_spend_units: 75,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:reconcile".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:reconcile".to_string(),
             authority: None,
         })
         .is_err());
@@ -796,8 +789,8 @@ fn structured_reconcile_uses_durable_server_state_after_client_restart(
         grant_index: 0,
         exposed_cost_units: 100,
         realized_spend_units: 75,
-        hold_id: Some("hold-composite".to_string()),
-        event_id: Some("hold-composite:reconcile".to_string()),
+        hold_id: "hold-composite".to_string(),
+        event_id: "hold-composite:reconcile".to_string(),
         authority: None,
     })?;
     assert_eq!(mutation.invocation_state, BudgetInvocationState::Captured);
@@ -839,13 +832,13 @@ fn remote_budget_store_rejects_invalid_composite_identity_before_network_io(
         requested_exposure_units: 10,
         max_cost_per_invocation: Some(10),
         max_total_cost_units: Some(10),
-        hold_id: Some("hold-composite".to_string()),
-        event_id: None,
+        hold_id: "hold-composite".to_string(),
+        event_id: String::new(),
         authority: None,
     });
     assert!(partial_identity
         .as_ref()
-        .is_err_and(|error| error.to_string().contains("non-empty identifiers")));
+        .is_err_and(|error| error.to_string().contains("non-empty hold_id and event_id")));
 
     let empty_capture = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
         capability_id: "cap-composite".to_string(),
@@ -875,8 +868,8 @@ fn remote_budget_store_rejects_invalid_composite_identity_before_network_io(
             capability_id: "cap-composite".to_string(),
             grant_index: 0,
             released_exposure_units: 0,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:release-zero".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:release-zero".to_string(),
             authority: None,
         })
         .is_err_and(|error| error.to_string().contains("zero-unit")));
@@ -886,8 +879,8 @@ fn remote_budget_store_rejects_invalid_composite_identity_before_network_io(
             grant_index: 0,
             exposed_cost_units: 0,
             realized_spend_units: 0,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:reconcile-zero".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:reconcile-zero".to_string(),
             authority: None,
         })
         .is_err_and(|error| error.to_string().contains("zero-unit")));
@@ -897,8 +890,8 @@ fn remote_budget_store_rejects_invalid_composite_identity_before_network_io(
             grant_index: 0,
             exposed_cost_units: 0,
             realized_spend_units: 0,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:capture-zero".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:capture-zero".to_string(),
             authority: None,
         })
         .is_err_and(|error| error.to_string().contains("zero-unit")));
@@ -1255,8 +1248,8 @@ fn remote_budget_store_rejects_structured_reconcile_mismatch_without_poisoning_c
             grant_index: 0,
             exposed_cost_units: 100,
             realized_spend_units: 75,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:reconcile".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:reconcile".to_string(),
             authority: None,
         });
         let cached = store
@@ -1293,8 +1286,8 @@ fn remote_budget_store_rejects_v1_shape_on_versioned_lifecycle_endpoint(
         grant_index: 0,
         exposed_cost_units: 100,
         realized_spend_units: 75,
-        hold_id: Some("hold-composite".to_string()),
-        event_id: Some("hold-composite:reconcile".to_string()),
+        hold_id: "hold-composite".to_string(),
+        event_id: "hold-composite:reconcile".to_string(),
         authority: None,
     });
     let cached = store
@@ -1341,8 +1334,8 @@ fn remote_budget_store_rejects_structured_reconcile_identity_substitution_withou
             grant_index: 0,
             exposed_cost_units: 100,
             realized_spend_units: 75,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:reconcile".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:reconcile".to_string(),
             authority: None,
         });
         let cached = store
@@ -1440,8 +1433,8 @@ fn remote_budget_store_rejects_nonterminal_monetary_lifecycle_states(
             capability_id: "cap-composite".to_string(),
             grant_index: 0,
             released_exposure_units: 25,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:release".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:release".to_string(),
             authority: None,
         })
         .is_err());
@@ -1468,8 +1461,8 @@ fn remote_budget_store_rejects_nonterminal_monetary_lifecycle_states(
             grant_index: 0,
             exposed_cost_units: 100,
             realized_spend_units: 75,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:reconcile-none".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:reconcile-none".to_string(),
             authority: None,
         })
         .is_err());
@@ -1496,8 +1489,8 @@ fn remote_budget_store_rejects_nonterminal_monetary_lifecycle_states(
             grant_index: 0,
             exposed_cost_units: 100,
             realized_spend_units: 75,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:capture-none".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:capture-none".to_string(),
             authority: None,
         })
         .is_err());
@@ -1550,8 +1543,8 @@ fn remote_budget_store_rejects_structured_reverse_substitution_without_poisoning
             capability_id: "cap-composite".to_string(),
             grant_index: 0,
             reversed_exposure_units: 100,
-            hold_id: Some("hold-composite".to_string()),
-            event_id: Some("hold-composite:reverse".to_string()),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:reverse".to_string(),
             expected_cumulative_approval_state: None,
             authority: None,
         });
@@ -1596,8 +1589,8 @@ fn fenced_reverse_requires_returned_cumulative_state_without_poisoning_cache(
         capability_id: "cap-composite".to_string(),
         grant_index: 0,
         reversed_exposure_units: 100,
-        hold_id: Some("hold-composite".to_string()),
-        event_id: Some("hold-composite:fenced-reverse".to_string()),
+        hold_id: "hold-composite".to_string(),
+        event_id: "hold-composite:fenced-reverse".to_string(),
         expected_cumulative_approval_state: Some(BudgetCumulativeApprovalState::PendingApproval),
         authority: None,
     });

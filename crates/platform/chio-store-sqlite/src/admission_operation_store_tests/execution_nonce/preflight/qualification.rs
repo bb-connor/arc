@@ -242,11 +242,11 @@ fn durable_nonce_preflight_rejects_changed_parent_request_and_grant_bindings() -
                 request.grant_index = 1;
                 let identity =
                     AdmissionNoncePreflightIdentityV1::for_operation(&fixture.operation, 1)?;
-                request.hold_id = Some(identity.hold_id().as_str().into());
-                request.event_id = Some(identity.authorization_event_id().as_str().into());
+                request.hold_id = identity.hold_id().as_str().into();
+                request.event_id = identity.authorization_event_id().as_str().into();
             }
-            2 => request.hold_id = Some("foreign-hold".into()),
-            3 => request.event_id = Some("foreign-event".into()),
+            2 => request.hold_id = "foreign-hold".into(),
+            3 => request.event_id = "foreign-event".into(),
             4 => request
                 .admission_binding
                 .as_mut()

@@ -58,6 +58,7 @@ mod schema;
 mod snapshot;
 mod store;
 mod trait_impl;
+mod unbound;
 
 pub use reaper::ReapSummary;
 pub use snapshot::{

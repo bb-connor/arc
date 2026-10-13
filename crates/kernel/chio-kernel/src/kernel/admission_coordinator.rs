@@ -1439,11 +1439,7 @@ impl ChioKernel {
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
         let expected = admission.operation.clone();
-        let hold_id = request.hold_id.clone().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "combined durable authorization omitted its budget hold identity".to_owned(),
-            )
-        })?;
+        let hold_id = request.hold_id.clone();
         if request.authority.as_ref() != Some(&runtime.authority()) {
             return Err(KernelError::DurableAdmission(
                 "combined durable authorization authority does not match the admission fence"

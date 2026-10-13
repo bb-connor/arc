@@ -132,8 +132,41 @@ fn authorize_request(
         requested_exposure_units,
         max_cost_per_invocation: None,
         max_total_cost_units: None,
-        hold_id: Some(format!("hold:{operation_id}")),
-        event_id: Some(format!("event:{operation_id}:authorize")),
+        hold_id: format!("hold:{operation_id}"),
+        event_id: format!("event:{operation_id}:authorize"),
+        authority: None,
+    }
+}
+
+fn unbound_request(
+    name: &str,
+    max_invocations: Option<u32>,
+    requested_exposure_units: u64,
+) -> BudgetAuthorizeHoldRequest {
+    BudgetAuthorizeHoldRequest {
+        capability_id: CAPABILITY_ID.to_string(),
+        grant_index: GRANT_INDEX,
+        max_invocations,
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        hold_id: format!("hold:{name}"),
+        event_id: format!("event:{name}:authorize"),
+        authority: None,
+    }
+}
+
+fn unbound_reverse(name: &str, reversed_exposure_units: u64) -> BudgetReverseHoldRequest {
+    BudgetReverseHoldRequest {
+        capability_id: CAPABILITY_ID.to_string(),
+        grant_index: GRANT_INDEX,
+        reversed_exposure_units,
+        hold_id: format!("hold:{name}"),
+        event_id: format!("event:{name}:reverse"),
+        expected_cumulative_approval_state: None,
         authority: None,
     }
 }
@@ -314,8 +347,8 @@ fn composite_authorization_reserves_and_captures_every_quota() {
             grant_index: GRANT_INDEX,
             exposed_cost_units: 100,
             realized_spend_units: 75,
-            hold_id: Some("hold:reserve-all".to_string()),
-            event_id: Some("event:reserve-all:reconcile".to_string()),
+            hold_id: "hold:reserve-all".to_string(),
+            event_id: "event:reserve-all:reconcile".to_string(),
             authority: None,
         })
         .expect("reconcile captured composite hold");
@@ -389,81 +422,63 @@ fn supplemental_capture_missing_time_can_retry_without_state_change() {
 }
 
 #[test]
-fn legacy_increment_reverse_restores_grant_quota_and_allows_retry() {
+fn unbound_invocation_reverse_restores_grant_quota_and_allows_retry() {
     let store = InMemoryBudgetStore::new();
     let key = BudgetQuotaKey::grant(CAPABILITY_ID, GRANT_INDEX as u32);
 
-    assert!(store
-        .try_increment(CAPABILITY_ID, GRANT_INDEX, Some(1))
-        .expect("increment within grant quota"));
-    assert_usage(&quota_usage(&store, &key), 0, 1);
+    expect_authorized(
+        store
+            .authorize_budget_hold(unbound_request("unbound-retry-first", Some(1), 0))
+            .expect("authorize within grant quota"),
+    );
+    assert_usage(&quota_usage(&store, &key), 1, 0);
 
     store
-        .reverse_charge_cost(CAPABILITY_ID, GRANT_INDEX, 0)
-        .expect("reverse legacy zero-cost invocation");
+        .reverse_budget_hold(unbound_reverse("unbound-retry-first", 0))
+        .expect("reverse zero-cost invocation");
     assert_usage(&quota_usage(&store, &key), 0, 0);
 
-    assert!(store
-        .try_increment(CAPABILITY_ID, GRANT_INDEX, None)
-        .expect("retry within existing grant quota"));
-    assert_usage(&quota_usage(&store, &key), 0, 1);
+    expect_authorized(
+        store
+            .authorize_budget_hold(unbound_request("unbound-retry-second", None, 0))
+            .expect("retry within existing grant quota"),
+    );
+    assert_usage(&quota_usage(&store, &key), 1, 0);
 }
 
 #[test]
-fn denied_legacy_calls_do_not_define_quota_maxima() {
-    let increment_store = InMemoryBudgetStore::new();
-    let key = BudgetQuotaKey::grant(CAPABILITY_ID, GRANT_INDEX as u32);
-    assert!(!increment_store
-        .try_increment(CAPABILITY_ID, GRANT_INDEX, Some(0))
-        .expect("deny zero-maximum increment"));
-    assert!(increment_store
-        .get_invocation_quota_usage(&key)
-        .expect("query denied increment quota")
-        .is_none());
-    assert!(increment_store
-        .try_increment(CAPABILITY_ID, GRANT_INDEX, Some(1))
-        .expect("define quota after denied increment"));
-
-    let charge_store = InMemoryBudgetStore::new();
-    assert!(!charge_store
-        .try_charge_cost(CAPABILITY_ID, GRANT_INDEX, Some(0), 0, None, None)
-        .expect("deny zero-maximum charge"));
-    assert!(charge_store
-        .get_invocation_quota_usage(&key)
-        .expect("query denied charge quota")
-        .is_none());
-    assert!(charge_store
-        .try_charge_cost(CAPABILITY_ID, GRANT_INDEX, Some(1), 0, None, None)
-        .expect("define quota after denied charge"));
-}
-
-#[test]
-fn raw_legacy_mutations_reject_invalid_and_reserved_identities() {
+fn denied_unbound_authorization_does_not_define_quota_maximum() {
     let store = InMemoryBudgetStore::new();
+    let key = BudgetQuotaKey::grant(CAPABILITY_ID, GRANT_INDEX as u32);
+    expect_denied(
+        store
+            .authorize_budget_hold(unbound_request("zero-maximum", Some(0), 0))
+            .expect("deny zero-maximum authorization"),
+    );
+    assert!(store
+        .get_invocation_quota_usage(&key)
+        .expect("query denied quota")
+        .is_none());
+    expect_authorized(
+        store
+            .authorize_budget_hold(unbound_request("quota-after-denial", Some(1), 0))
+            .expect("define quota after denied authorization"),
+    );
+}
+
+#[test]
+fn empty_budget_identities_are_rejected_before_state_changes() {
+    let store = InMemoryBudgetStore::new();
+    let mut missing_hold = unbound_request("empty-hold", None, 10);
+    missing_hold.hold_id = String::new();
     assert!(matches!(
-        store.try_charge_cost_with_ids(
-            CAPABILITY_ID,
-            GRANT_INDEX,
-            None,
-            10,
-            None,
-            None,
-            Some("hold:partial-id"),
-            None,
-        ),
+        store.authorize_budget_hold(missing_hold),
         Err(BudgetStoreError::Invariant(_))
     ));
+    let mut missing_event = unbound_request("empty-event", None, 10);
+    missing_event.event_id = String::new();
     assert!(matches!(
-        store.try_charge_cost_with_ids(
-            CAPABILITY_ID,
-            GRANT_INDEX,
-            None,
-            10,
-            None,
-            None,
-            None,
-            Some(""),
-        ),
+        store.authorize_budget_hold(missing_event),
         Err(BudgetStoreError::Invariant(_))
     ));
     assert!(store
@@ -471,149 +486,64 @@ fn raw_legacy_mutations_reject_invalid_and_reserved_identities() {
         .expect("query invalid authorization usage")
         .is_none());
 
-    assert!(store
-        .try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 10, None, None)
-        .expect("create unheld legacy exposure"));
+    expect_authorized(
+        store
+            .authorize_budget_hold(unbound_request("identity-checks", None, 10))
+            .expect("authorize unbound hold"),
+    );
+    let mut reverse = unbound_reverse("identity-checks", 10);
+    reverse.event_id = String::new();
     assert!(matches!(
-        store.reverse_charge_cost_with_ids(
-            CAPABILITY_ID,
-            GRANT_INDEX,
-            10,
-            Some("hold:partial-reverse"),
-            None,
-        ),
+        store.reverse_budget_hold(reverse),
         Err(BudgetStoreError::Invariant(_))
     ));
     assert!(matches!(
-        store.reduce_charge_cost_with_ids(CAPABILITY_ID, GRANT_INDEX, 1, None, Some(""),),
+        store.release_budget_hold(BudgetReleaseHoldRequest {
+            capability_id: CAPABILITY_ID.to_string(),
+            grant_index: GRANT_INDEX,
+            released_exposure_units: 1,
+            hold_id: String::new(),
+            event_id: "event:identity-checks:release".to_string(),
+            authority: None,
+        }),
         Err(BudgetStoreError::Invariant(_))
     ));
     assert!(matches!(
-        store.settle_charge_cost_with_ids(
-            CAPABILITY_ID,
-            GRANT_INDEX,
-            10,
-            5,
-            Some("hold:partial-settle"),
-            None,
-        ),
-        Err(BudgetStoreError::Invariant(_))
-    ));
-
-    assert!(matches!(
-        store.try_charge_cost_with_ids(
-            "cap-reserved-event",
-            GRANT_INDEX,
-            None,
-            0,
-            None,
-            None,
-            None,
-            Some("local-budget-event-99"),
-        ),
+        store.reconcile_budget_hold(BudgetReconcileHoldRequest {
+            capability_id: CAPABILITY_ID.to_string(),
+            grant_index: GRANT_INDEX,
+            exposed_cost_units: 10,
+            realized_spend_units: 5,
+            hold_id: "hold:identity-checks".to_string(),
+            event_id: String::new(),
+            authority: None,
+        }),
         Err(BudgetStoreError::Invariant(_))
     ));
 }
 
 #[test]
-fn unstructured_rich_authorization_remains_reversible() {
+fn unbound_authorization_is_reversible_and_cannot_replay_after_reversal() {
     let store = InMemoryBudgetStore::new();
-    let request = BudgetAuthorizeHoldRequest {
-        capability_id: CAPABILITY_ID.to_string(),
-        grant_index: GRANT_INDEX,
-        max_invocations: None,
-        invocation_quotas: Vec::new(),
-        cumulative_approval: None,
-        admission_binding: None,
-        requested_exposure_units: 25,
-        max_cost_per_invocation: None,
-        max_total_cost_units: None,
-        hold_id: None,
-        event_id: None,
-        authority: None,
-    };
+    let request = unbound_request("unbound-reversible", None, 25);
     expect_authorized(
         store
             .authorize_budget_hold(request.clone())
-            .expect("authorize unstructured rich request"),
+            .expect("authorize unbound request"),
     );
     let reversed = store
-        .reverse_budget_hold(BudgetReverseHoldRequest {
-            capability_id: CAPABILITY_ID.to_string(),
-            grant_index: GRANT_INDEX,
-            reversed_exposure_units: 25,
-            hold_id: None,
-            event_id: None,
-            expected_cumulative_approval_state: None,
-            authority: None,
-        })
-        .expect("reverse unstructured rich request");
+        .reverse_budget_hold(unbound_reverse("unbound-reversible", 25))
+        .expect("reverse unbound request");
     assert_eq!(reversed.committed_cost_units_after, 0);
     assert_eq!(reversed.invocation_count_after, 0);
-
-    let event_store = InMemoryBudgetStore::new();
-    let mut authorization = request;
-    authorization.event_id = Some("event:unstructured-rich:authorize".to_string());
-    expect_authorized(
-        event_store
-            .authorize_budget_hold(authorization.clone())
-            .expect("authorize event-only unstructured request"),
-    );
-    event_store
-        .reverse_budget_hold(BudgetReverseHoldRequest {
-            capability_id: CAPABILITY_ID.to_string(),
-            grant_index: GRANT_INDEX,
-            reversed_exposure_units: 25,
-            hold_id: None,
-            event_id: Some("event:unstructured-rich:reverse".to_string()),
-            expected_cumulative_approval_state: None,
-            authority: None,
-        })
-        .expect("reverse event-only unstructured request");
     assert!(matches!(
-        event_store.authorize_budget_hold(authorization),
-        Err(BudgetStoreError::Invariant(_))
-    ));
-
-    let raw_store = InMemoryBudgetStore::new();
-    assert!(raw_store
-        .try_charge_cost_with_ids(
-            CAPABILITY_ID,
-            GRANT_INDEX,
-            None,
-            25,
-            None,
-            None,
-            None,
-            Some("event:unstructured-raw:authorize"),
-        )
-        .expect("authorize raw event-only request"));
-    raw_store
-        .reverse_charge_cost_with_ids(
-            CAPABILITY_ID,
-            GRANT_INDEX,
-            25,
-            None,
-            Some("event:unstructured-raw:reverse"),
-        )
-        .expect("reverse raw event-only request");
-    assert!(matches!(
-        raw_store.try_charge_cost_with_ids(
-            CAPABILITY_ID,
-            GRANT_INDEX,
-            None,
-            25,
-            None,
-            None,
-            None,
-            Some("event:unstructured-raw:authorize"),
-        ),
+        store.authorize_budget_hold(request),
         Err(BudgetStoreError::Invariant(_))
     ));
 }
 
 #[test]
-fn legacy_charge_cannot_bypass_or_redefine_structured_grant_maximum() {
+fn unbound_authorization_cannot_bypass_or_redefine_structured_grant_maximum() {
     let store = InMemoryBudgetStore::new();
     let quota = grant_quota(1);
     expect_authorized(
@@ -627,11 +557,11 @@ fn legacy_charge_cannot_bypass_or_redefine_structured_grant_maximum() {
     );
 
     assert!(matches!(
-        store.try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 0, None, None),
+        store.authorize_budget_hold(unbound_request("grant-max-bypass", None, 0)),
         Err(BudgetStoreError::Invariant(_))
     ));
     assert!(matches!(
-        store.try_charge_cost(CAPABILITY_ID, GRANT_INDEX, Some(2), 0, None, None),
+        store.authorize_budget_hold(unbound_request("grant-max-redefine", Some(2), 0)),
         Err(BudgetStoreError::Invariant(_))
     ));
     let usage = quota_usage(&store, &quota.key);
@@ -640,23 +570,23 @@ fn legacy_charge_cannot_bypass_or_redefine_structured_grant_maximum() {
 }
 
 #[test]
-fn legacy_admission_cannot_skip_a_live_composite_quota() {
+fn unbound_admission_cannot_skip_a_live_composite_quota() {
     let store = InMemoryBudgetStore::new();
     let quotas = canonical_quotas(vec![
         grant_quota(2),
         quota(
             BudgetQuotaProfile::AggregateCapabilityInvocation,
-            "aggregate:legacy-bypass",
+            "aggregate:unbound-bypass",
             2,
         ),
     ]);
     expect_authorized(
         store
-            .authorize_budget_hold(authorize_request("legacy-bypass", quotas.clone(), 0))
+            .authorize_budget_hold(authorize_request("unbound-bypass", quotas.clone(), 0))
             .expect("authorize composite hold"),
     );
     assert!(matches!(
-        store.try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 0, None, None),
+        store.authorize_budget_hold(unbound_request("unbound-bypass-attempt", None, 0)),
         Err(BudgetStoreError::Invariant(_))
     ));
     for quota in quotas {
@@ -708,19 +638,19 @@ fn composite_admission_cannot_omit_an_existing_grant_quota() {
 }
 
 #[test]
-fn direct_legacy_authorization_inherits_legacy_quota_and_rejects_structured_history() {
-    let legacy_store = InMemoryBudgetStore::new();
-    assert!(legacy_store
-        .try_charge_cost(CAPABILITY_ID, GRANT_INDEX, Some(2), 0, None, None)
-        .expect("define legacy quota"));
-    let mut legacy = authorize_request("legacy-quota-inheritance", Vec::new(), 0);
-    legacy.admission_binding = None;
+fn unbound_authorization_inherits_grant_quota_and_rejects_structured_history() {
+    let unbound_store = InMemoryBudgetStore::new();
     expect_authorized(
-        legacy_store
-            .authorize_budget_hold(legacy)
-            .expect("inherit existing legacy grant quota"),
+        unbound_store
+            .authorize_budget_hold(unbound_request("define-grant-quota", Some(2), 0))
+            .expect("define grant quota"),
     );
-    assert_usage(&quota_usage(&legacy_store, &grant_quota(2).key), 1, 1);
+    expect_authorized(
+        unbound_store
+            .authorize_budget_hold(unbound_request("inherit-grant-quota", None, 0))
+            .expect("inherit existing grant quota"),
+    );
+    assert_usage(&quota_usage(&unbound_store, &grant_quota(2).key), 2, 0);
 
     let structured_store = InMemoryBudgetStore::new();
     expect_authorized(
@@ -729,21 +659,17 @@ fn direct_legacy_authorization_inherits_legacy_quota_and_rejects_structured_hist
                 "structured-history-owner",
                 vec![quota(
                     BudgetQuotaProfile::AggregateCapabilityInvocation,
-                    "aggregate:direct-legacy-bypass",
+                    "aggregate:direct-unbound-bypass",
                     2,
                 )],
                 0,
             ))
             .expect("authorize structured history"),
     );
-    let mut bypass = authorize_request("direct-legacy-bypass", Vec::new(), 0);
+    let mut bypass = authorize_request("direct-unbound-bypass", Vec::new(), 0);
     bypass.admission_binding = None;
     assert!(matches!(
         structured_store.authorize_budget_hold(bypass),
-        Err(BudgetStoreError::Invariant(_))
-    ));
-    assert!(matches!(
-        structured_store.try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 1, Some(0), None,),
         Err(BudgetStoreError::Invariant(_))
     ));
     assert_eq!(
@@ -757,61 +683,13 @@ fn direct_legacy_authorization_inherits_legacy_quota_and_rejects_structured_hist
 }
 
 #[test]
-fn unheld_legacy_terminals_cannot_mutate_after_structured_history() {
-    let prepared_store = || {
-        let store = InMemoryBudgetStore::new();
-        assert!(store
-            .try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 10, None, None)
-            .expect("create legacy reversible charge"));
-        expect_authorized(
-            store
-                .authorize_budget_hold(authorize_request(
-                    "structured-terminal-boundary",
-                    vec![quota(
-                        BudgetQuotaProfile::AggregateCapabilityInvocation,
-                        "aggregate:terminal-boundary",
-                        1,
-                    )],
-                    0,
-                ))
-                .expect("authorize structured boundary"),
-        );
-        store
-            .reverse_budget_hold(BudgetReverseHoldRequest {
-                capability_id: CAPABILITY_ID.to_string(),
-                grant_index: GRANT_INDEX,
-                reversed_exposure_units: 0,
-                hold_id: Some("hold:structured-terminal-boundary".to_string()),
-                event_id: Some("event:structured-terminal-boundary:reverse".to_string()),
-                expected_cumulative_approval_state: None,
-                authority: None,
-            })
-            .expect("terminalize structured hold");
-        store
-    };
-
-    assert!(matches!(
-        prepared_store().reverse_charge_cost(CAPABILITY_ID, GRANT_INDEX, 10),
-        Err(BudgetStoreError::Invariant(_))
-    ));
-    assert!(matches!(
-        prepared_store().reduce_charge_cost(CAPABILITY_ID, GRANT_INDEX, 10),
-        Err(BudgetStoreError::Invariant(_))
-    ));
-    assert!(matches!(
-        prepared_store().settle_charge_cost(CAPABILITY_ID, GRANT_INDEX, 10, 5),
-        Err(BudgetStoreError::Invariant(_))
-    ));
-}
-
-#[test]
-fn legacy_admission_cannot_bypass_denied_or_reversed_composite_history() {
+fn unbound_admission_cannot_bypass_denied_or_reversed_composite_history() {
     let denied_store = InMemoryBudgetStore::new();
     let mut denied_request = authorize_request(
-        "legacy-after-denial",
+        "structured-before-denial",
         vec![quota(
             BudgetQuotaProfile::AggregateCapabilityInvocation,
-            "aggregate:legacy-after-denial",
+            "aggregate:structured-before-denial",
             1,
         )],
         1,
@@ -823,7 +701,7 @@ fn legacy_admission_cannot_bypass_denied_or_reversed_composite_history() {
             .expect("record denied composite authorization"),
     );
     assert!(matches!(
-        denied_store.try_increment(CAPABILITY_ID, GRANT_INDEX, None),
+        denied_store.authorize_budget_hold(unbound_request("unbound-after-denial", None, 0)),
         Err(BudgetStoreError::Invariant(_))
     ));
 
@@ -831,10 +709,10 @@ fn legacy_admission_cannot_bypass_denied_or_reversed_composite_history() {
     expect_authorized(
         reversed_store
             .authorize_budget_hold(authorize_request(
-                "legacy-after-reverse",
+                "structured-before-reverse",
                 vec![quota(
                     BudgetQuotaProfile::AggregateCapabilityInvocation,
-                    "aggregate:legacy-after-reverse",
+                    "aggregate:structured-before-reverse",
                     1,
                 )],
                 0,
@@ -846,72 +724,16 @@ fn legacy_admission_cannot_bypass_denied_or_reversed_composite_history() {
             capability_id: CAPABILITY_ID.to_string(),
             grant_index: GRANT_INDEX,
             reversed_exposure_units: 0,
-            hold_id: Some("hold:legacy-after-reverse".to_string()),
-            event_id: Some("event:legacy-after-reverse:terminal".to_string()),
+            hold_id: "hold:structured-before-reverse".to_string(),
+            event_id: "event:structured-before-reverse:terminal".to_string(),
             expected_cumulative_approval_state: None,
             authority: None,
         })
         .expect("reverse composite hold");
     assert!(matches!(
-        reversed_store.try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 0, None, None),
+        reversed_store.authorize_budget_hold(unbound_request("unbound-after-reverse", None, 0)),
         Err(BudgetStoreError::Invariant(_))
     ));
-}
-
-#[test]
-fn no_hold_legacy_mutations_cannot_touch_live_composite_hold() {
-    let store = InMemoryBudgetStore::new();
-    let quota = grant_quota(1);
-    expect_authorized(
-        store
-            .authorize_budget_hold(authorize_request(
-                "no-hold-mutation",
-                vec![quota.clone()],
-                25,
-            ))
-            .expect("authorize live composite hold"),
-    );
-    let usage_before = store
-        .get_usage(CAPABILITY_ID, GRANT_INDEX)
-        .expect("query usage")
-        .expect("authorized usage");
-    let quota_before = quota_usage(&store, &quota.key);
-
-    assert!(matches!(
-        store.reverse_charge_cost(CAPABILITY_ID, GRANT_INDEX, 25),
-        Err(BudgetStoreError::Invariant(_))
-    ));
-    assert_eq!(
-        store
-            .get_usage(CAPABILITY_ID, GRANT_INDEX)
-            .expect("query usage after reverse"),
-        Some(usage_before.clone())
-    );
-    assert_eq!(quota_usage(&store, &quota.key), quota_before);
-
-    assert!(matches!(
-        store.reduce_charge_cost(CAPABILITY_ID, GRANT_INDEX, 25),
-        Err(BudgetStoreError::Invariant(_))
-    ));
-    assert_eq!(
-        store
-            .get_usage(CAPABILITY_ID, GRANT_INDEX)
-            .expect("query usage after release"),
-        Some(usage_before.clone())
-    );
-    assert_eq!(quota_usage(&store, &quota.key), quota_before);
-
-    assert!(matches!(
-        store.settle_charge_cost(CAPABILITY_ID, GRANT_INDEX, 25, 10),
-        Err(BudgetStoreError::Invariant(_))
-    ));
-    assert_eq!(
-        store
-            .get_usage(CAPABILITY_ID, GRANT_INDEX)
-            .expect("query usage after reconcile"),
-        Some(usage_before)
-    );
-    assert_eq!(quota_usage(&store, &quota.key), quota_before);
 }
 
 #[test]
@@ -941,8 +763,8 @@ fn held_monetary_settlement_requires_dispatch_capture_without_poisoning_state() 
                 grant_index: GRANT_INDEX,
                 exposed_cost_units: 25,
                 realized_spend_units: 10,
-                hold_id: Some(format!("hold:{operation_id}")),
-                event_id: Some(event_id.clone()),
+                hold_id: format!("hold:{operation_id}"),
+                event_id: event_id.clone(),
                 authority: None,
             })
         } else {
@@ -951,8 +773,8 @@ fn held_monetary_settlement_requires_dispatch_capture_without_poisoning_state() 
                 grant_index: GRANT_INDEX,
                 exposed_cost_units: 25,
                 realized_spend_units: 10,
-                hold_id: Some(format!("hold:{operation_id}")),
-                event_id: Some(event_id.clone()),
+                hold_id: format!("hold:{operation_id}"),
+                event_id: event_id.clone(),
                 authority: None,
             })
         };
@@ -986,8 +808,8 @@ fn held_monetary_settlement_requires_dispatch_capture_without_poisoning_state() 
                     grant_index: GRANT_INDEX,
                     exposed_cost_units: 25,
                     realized_spend_units: 10,
-                    hold_id: Some(format!("hold:{operation_id}")),
-                    event_id: Some(event_id),
+                    hold_id: format!("hold:{operation_id}"),
+                    event_id: event_id,
                     authority: None,
                 })
                 .expect("capture monetary spend after dispatch capture")
@@ -998,8 +820,8 @@ fn held_monetary_settlement_requires_dispatch_capture_without_poisoning_state() 
                     grant_index: GRANT_INDEX,
                     exposed_cost_units: 25,
                     realized_spend_units: 10,
-                    hold_id: Some(format!("hold:{operation_id}")),
-                    event_id: Some(event_id),
+                    hold_id: format!("hold:{operation_id}"),
+                    event_id: event_id,
                     authority: None,
                 })
                 .expect("reconcile spend after dispatch capture")
@@ -1024,8 +846,8 @@ fn zero_unit_monetary_mutations_cannot_cross_captured_composite_fence() {
             capability_id: CAPABILITY_ID.to_string(),
             grant_index: GRANT_INDEX,
             released_exposure_units: 0,
-            hold_id: Some("hold:zero-release".to_string()),
-            event_id: Some("event:zero-release:release".to_string()),
+            hold_id: "hold:zero-release".to_string(),
+            event_id: "event:zero-release:release".to_string(),
             authority: None,
         })
     });
@@ -1036,8 +858,8 @@ fn zero_unit_monetary_mutations_cannot_cross_captured_composite_fence() {
             grant_index: GRANT_INDEX,
             exposed_cost_units: 0,
             realized_spend_units: 0,
-            hold_id: Some("hold:zero-reconcile".to_string()),
-            event_id: Some("event:zero-reconcile:reconcile".to_string()),
+            hold_id: "hold:zero-reconcile".to_string(),
+            event_id: "event:zero-reconcile:reconcile".to_string(),
             authority: None,
         })
     });
@@ -1048,8 +870,8 @@ fn zero_unit_monetary_mutations_cannot_cross_captured_composite_fence() {
             grant_index: GRANT_INDEX,
             exposed_cost_units: 0,
             realized_spend_units: 0,
-            hold_id: Some("hold:zero-capture".to_string()),
-            event_id: Some("event:zero-capture:capture-money".to_string()),
+            hold_id: "hold:zero-capture".to_string(),
+            event_id: "event:zero-capture:capture-money".to_string(),
             authority: None,
         })
     });
@@ -1135,7 +957,7 @@ fn exhausted_member_denies_without_reserving_other_quotas_or_exposure() {
         vec![private_with_new_maximum.clone()],
         0,
     );
-    retry.event_id = Some("event:denied-composite:retry".to_string());
+    retry.event_id = "event:denied-composite:retry".to_string();
     expect_authorized(
         store
             .authorize_budget_hold(retry)
@@ -1173,7 +995,7 @@ fn exact_authorization_replay_is_stable_and_identifier_reuse_fails_closed() {
     ));
 
     let mut reused_hold = request;
-    reused_hold.event_id = Some("event:replay:different".to_string());
+    reused_hold.event_id = "event:replay:different".to_string();
     assert!(matches!(
         store.authorize_budget_hold(reused_hold),
         Err(BudgetStoreError::Invariant(_))
@@ -1246,8 +1068,8 @@ fn authorization_replay_fails_after_release_or_approval_attachment() {
             capability_id: CAPABILITY_ID.to_string(),
             grant_index: GRANT_INDEX,
             released_exposure_units: 10,
-            hold_id: Some("hold:authorization-after-release".to_string()),
-            event_id: Some("event:authorization-after-release:release".to_string()),
+            hold_id: "hold:authorization-after-release".to_string(),
+            event_id: "event:authorization-after-release:release".to_string(),
             authority: None,
         })
         .expect("partially release hold");
@@ -1320,32 +1142,28 @@ fn capture_event_identity_includes_trusted_time() {
 }
 
 #[test]
-fn partially_released_legacy_capture_cancels_remaining_exposure() {
+fn partially_released_unbound_capture_cancels_remaining_exposure() {
     let store = InMemoryBudgetStore::new();
     let key = BudgetQuotaKey::grant(CAPABILITY_ID, GRANT_INDEX as u32);
-    assert!(store
-        .try_charge_cost_with_ids(
-            CAPABILITY_ID,
-            GRANT_INDEX,
-            Some(1),
-            100,
-            Some(100),
-            Some(100),
-            Some("hold:partial-cancel"),
-            Some("event:partial-cancel:authorize"),
-        )
-        .expect("authorize legacy hold"));
+    let mut authorization = unbound_request("partial-cancel", Some(1), 100);
+    authorization.max_cost_per_invocation = Some(100);
+    authorization.max_total_cost_units = Some(100);
+    expect_authorized(
+        store
+            .authorize_budget_hold(authorization)
+            .expect("authorize unbound hold"),
+    );
     let release = BudgetReleaseHoldRequest {
         capability_id: CAPABILITY_ID.to_string(),
         grant_index: GRANT_INDEX,
         released_exposure_units: 40,
-        hold_id: Some("hold:partial-cancel".to_string()),
-        event_id: Some("event:partial-cancel:release".to_string()),
+        hold_id: "hold:partial-cancel".to_string(),
+        event_id: "event:partial-cancel:release".to_string(),
         authority: None,
     };
     store
         .release_budget_hold(release.clone())
-        .expect("partially release legacy hold");
+        .expect("partially release unbound hold");
     store
         .capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: CAPABILITY_ID.to_string(),
@@ -1355,7 +1173,7 @@ fn partially_released_legacy_capture_cancels_remaining_exposure() {
             trusted_time: None,
             authority: None,
         })
-        .expect("capture legacy invocation");
+        .expect("capture unbound invocation");
     assert!(matches!(
         store.release_budget_hold(release),
         Err(BudgetStoreError::Invariant(_))
@@ -1369,7 +1187,7 @@ fn partially_released_legacy_capture_cancels_remaining_exposure() {
     };
     let cancelled = match store
         .cancel_captured_before_dispatch(cancellation.clone())
-        .expect("cancel captured legacy invocation")
+        .expect("cancel captured unbound invocation")
     {
         BudgetCapturedBeforeDispatchCancellationDecision::Cancelled(cancelled) => cancelled,
         other => panic!("expected fresh cancellation, got {other:?}"),
@@ -1561,8 +1379,8 @@ fn reversing_composite_hold_restores_every_reservation_and_exposure() {
             capability_id: CAPABILITY_ID.to_string(),
             grant_index: GRANT_INDEX,
             reversed_exposure_units: 50,
-            hold_id: Some("hold:reverse".to_string()),
-            event_id: Some("event:reverse:terminal".to_string()),
+            hold_id: "hold:reverse".to_string(),
+            event_id: "event:reverse:terminal".to_string(),
             expected_cumulative_approval_state: None,
             authority: None,
         })
@@ -1829,8 +1647,8 @@ fn pending_approval_timeout_and_attachment_have_one_cas_winner() {
                 capability_id: CAPABILITY_ID.to_string(),
                 grant_index: GRANT_INDEX,
                 reversed_exposure_units: 0,
-                hold_id: Some("hold:approval-timeout-race".to_string()),
-                event_id: Some("event:approval-timeout-race:timeout".to_string()),
+                hold_id: "hold:approval-timeout-race".to_string(),
+                event_id: "event:approval-timeout-race:timeout".to_string(),
                 expected_cumulative_approval_state: Some(
                     BudgetCumulativeApprovalState::PendingApproval,
                 ),
@@ -1872,8 +1690,8 @@ fn zero_exposure_invocation_reverse_preserves_released_monetary_state() {
             capability_id: CAPABILITY_ID.to_string(),
             grant_index: GRANT_INDEX,
             released_exposure_units: 50,
-            hold_id: Some("hold:orthogonal-reverse".to_string()),
-            event_id: Some("event:orthogonal-reverse:release".to_string()),
+            hold_id: "hold:orthogonal-reverse".to_string(),
+            event_id: "event:orthogonal-reverse:release".to_string(),
             authority: None,
         })
         .expect("release monetary exposure");
@@ -1884,8 +1702,8 @@ fn zero_exposure_invocation_reverse_preserves_released_monetary_state() {
             capability_id: CAPABILITY_ID.to_string(),
             grant_index: GRANT_INDEX,
             reversed_exposure_units: 0,
-            hold_id: Some("hold:orthogonal-reverse".to_string()),
-            event_id: Some("event:orthogonal-reverse:reverse".to_string()),
+            hold_id: "hold:orthogonal-reverse".to_string(),
+            event_id: "event:orthogonal-reverse:reverse".to_string(),
             expected_cumulative_approval_state: None,
             authority: None,
         })
@@ -1913,8 +1731,8 @@ fn fully_released_monetary_hold_cannot_capture_invocation() {
             capability_id: CAPABILITY_ID.to_string(),
             grant_index: GRANT_INDEX,
             released_exposure_units: 50,
-            hold_id: Some("hold:release-before-capture".to_string()),
-            event_id: Some("event:release-before-capture:release".to_string()),
+            hold_id: "hold:release-before-capture".to_string(),
+            event_id: "event:release-before-capture:release".to_string(),
             authority: None,
         })
         .expect("release full exposure before capture");

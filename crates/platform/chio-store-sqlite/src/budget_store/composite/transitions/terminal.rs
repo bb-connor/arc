@@ -7,12 +7,8 @@ impl SqliteBudgetStore {
         request: BudgetReleaseHoldRequest,
     ) -> Result<BudgetReleaseHoldDecision, BudgetStoreError> {
         request.validate()?;
-        let hold_id = request.hold_id.as_deref().ok_or_else(|| {
-            BudgetStoreError::Invariant("composite release requires hold_id".to_string())
-        })?;
-        let event_id = request.event_id.as_deref().ok_or_else(|| {
-            BudgetStoreError::Invariant("composite release requires event_id".to_string())
-        })?;
+        let hold_id = request.hold_id.as_str();
+        let event_id = request.event_id.as_str();
         if request.released_exposure_units == 0 {
             return Err(BudgetStoreError::Invariant(
                 "zero-unit monetary release is not a state transition".to_string(),
@@ -118,7 +114,7 @@ impl SqliteBudgetStore {
         }
         let event = self.append_mutation_event(
             &transaction,
-            Some(event_id),
+            event_id,
             Some(hold_id),
             request.authority.as_ref(),
             &request.capability_id,
@@ -186,12 +182,8 @@ impl SqliteBudgetStore {
         request: BudgetReverseHoldRequest,
     ) -> Result<BudgetReverseHoldDecision, BudgetStoreError> {
         request.validate()?;
-        let hold_id = request.hold_id.as_deref().ok_or_else(|| {
-            BudgetStoreError::Invariant("composite reversal requires hold_id".to_string())
-        })?;
-        let event_id = request.event_id.as_deref().ok_or_else(|| {
-            BudgetStoreError::Invariant("composite reversal requires event_id".to_string())
-        })?;
+        let hold_id = request.hold_id.as_str();
+        let event_id = request.event_id.as_str();
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
         self.validate_joint_authority(request.authority.as_ref())?;
@@ -374,7 +366,7 @@ impl SqliteBudgetStore {
         }
         let event = self.append_mutation_event(
             &transaction,
-            Some(event_id),
+            event_id,
             Some(hold_id),
             request.authority.as_ref(),
             &request.capability_id,
@@ -607,7 +599,7 @@ impl SqliteBudgetStore {
         }
         let event = self.append_mutation_event(
             &transaction,
-            Some(&request.event_id),
+            &request.event_id,
             Some(&request.hold_id),
             request.authority.as_ref(),
             &request.capability_id,
@@ -816,7 +808,7 @@ impl SqliteBudgetStore {
         }
         let event = self.append_mutation_event(
             transaction,
-            Some(event_id),
+            event_id,
             Some(hold_id),
             authority,
             capability_id,
@@ -882,14 +874,8 @@ impl SqliteBudgetStore {
             request.grant_index,
             request.exposed_cost_units,
             request.realized_spend_units,
-            request.hold_id.as_deref().ok_or_else(|| {
-                BudgetStoreError::Invariant("composite reconciliation requires hold_id".to_string())
-            })?,
-            request.event_id.as_deref().ok_or_else(|| {
-                BudgetStoreError::Invariant(
-                    "composite reconciliation requires event_id".to_string(),
-                )
-            })?,
+            request.hold_id.as_str(),
+            request.event_id.as_str(),
             request.authority.as_ref(),
             BudgetMutationKind::ReconcileSpend,
             BudgetMonetaryState::Reconciled,
@@ -906,14 +892,8 @@ impl SqliteBudgetStore {
             request.grant_index,
             request.exposed_cost_units,
             request.realized_spend_units,
-            request.hold_id.as_deref().ok_or_else(|| {
-                BudgetStoreError::Invariant("composite reconciliation requires hold_id".to_string())
-            })?,
-            request.event_id.as_deref().ok_or_else(|| {
-                BudgetStoreError::Invariant(
-                    "composite reconciliation requires event_id".to_string(),
-                )
-            })?,
+            request.hold_id.as_str(),
+            request.event_id.as_str(),
             request.authority.as_ref(),
             BudgetMutationKind::ReconcileSpend,
             BudgetMonetaryState::Reconciled,
@@ -930,16 +910,8 @@ impl SqliteBudgetStore {
             request.grant_index,
             request.exposed_cost_units,
             request.realized_spend_units,
-            request.hold_id.as_deref().ok_or_else(|| {
-                BudgetStoreError::Invariant(
-                    "composite monetary capture requires hold_id".to_string(),
-                )
-            })?,
-            request.event_id.as_deref().ok_or_else(|| {
-                BudgetStoreError::Invariant(
-                    "composite monetary capture requires event_id".to_string(),
-                )
-            })?,
+            request.hold_id.as_str(),
+            request.event_id.as_str(),
             request.authority.as_ref(),
             BudgetMutationKind::CaptureSpend,
             BudgetMonetaryState::Captured,

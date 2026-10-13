@@ -124,8 +124,8 @@ pub(crate) fn bind_nonce_preflight_tx(
         || original
             .retained_matching_grant(request.grant_index)
             .is_none()
-        || request.hold_id.as_deref() != Some(identity.hold_id().as_str())
-        || request.event_id.as_deref() != Some(identity.authorization_event_id().as_str())
+        || request.hold_id != identity.hold_id().as_str()
+        || request.event_id != identity.authorization_event_id().as_str()
         || admission.operation_id != identity.budget_operation_id().as_str()
         || !admission
             .revocation_set

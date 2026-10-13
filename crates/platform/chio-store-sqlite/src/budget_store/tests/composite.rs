@@ -59,8 +59,8 @@ fn authorize_request(id: &str, exposure: u64, maximum: u32) -> BudgetAuthorizeHo
         requested_exposure_units: exposure,
         max_cost_per_invocation: Some(exposure.max(1)),
         max_total_cost_units: Some(1_000),
-        hold_id: Some(format!("hold-{id}")),
-        event_id: Some(format!("event-{id}-authorize")),
+        hold_id: format!("hold-{id}"),
+        event_id: format!("event-{id}-authorize"),
         authority: None,
     }
 }
@@ -122,8 +122,8 @@ fn reverse_request(id: &str, exposure: u64) -> BudgetReverseHoldRequest {
         capability_id: "cap-composite".to_string(),
         grant_index: 0,
         reversed_exposure_units: exposure,
-        hold_id: Some(format!("hold-{id}")),
-        event_id: Some(format!("event-{id}-reverse")),
+        hold_id: format!("hold-{id}"),
+        event_id: format!("event-{id}-reverse"),
         expected_cumulative_approval_state: None,
         authority: None,
     }
@@ -217,8 +217,8 @@ fn denied_candidate_does_not_claim_the_operation_authorization_slot() {
 
     let mut authorized = denied.clone();
     authorized.max_cost_per_invocation = Some(10);
-    authorized.hold_id = Some("hold-candidate-fallback".to_string());
-    authorized.event_id = Some("event-candidate-fallback-authorize".to_string());
+    authorized.hold_id = "hold-candidate-fallback".to_string();
+    authorized.event_id = "event-candidate-fallback-authorize".to_string();
     assert!(matches!(
         store
             .authorize_budget_hold(owned(&store, authorized))
@@ -228,8 +228,8 @@ fn denied_candidate_does_not_claim_the_operation_authorization_slot() {
 
     let mut conflicting = denied;
     conflicting.max_cost_per_invocation = Some(10);
-    conflicting.hold_id = Some("hold-candidate-conflict".to_string());
-    conflicting.event_id = Some("event-candidate-conflict-authorize".to_string());
+    conflicting.hold_id = "hold-candidate-conflict".to_string();
+    conflicting.event_id = "event-candidate-conflict-authorize".to_string();
     assert!(store
         .authorize_budget_hold(owned(&store, conflicting))
         .is_err());
@@ -272,8 +272,8 @@ fn v6_operation_authorization_index_migrates_to_ignore_denials() {
     let store = reopen(&path);
     let mut authorized = denied;
     authorized.max_cost_per_invocation = Some(10);
-    authorized.hold_id = Some("hold-candidate-migration-fallback".to_string());
-    authorized.event_id = Some("event-candidate-migration-fallback".to_string());
+    authorized.hold_id = "hold-candidate-migration-fallback".to_string();
+    authorized.event_id = "event-candidate-migration-fallback".to_string();
     assert!(matches!(
         store
             .authorize_budget_hold(owned(&store, authorized))
@@ -370,8 +370,8 @@ fn composite_authorize_capture_and_settlement_survive_response_loss_and_restart(
                         grant_index: 0,
                         exposed_cost_units: 10,
                         realized_spend_units: 7,
-                        hold_id: Some(format!("hold-{id}")),
-                        event_id: Some(format!("event-{id}-capture-spend")),
+                        hold_id: format!("hold-{id}"),
+                        event_id: format!("event-{id}-capture-spend"),
                         authority: None,
                     },
                 ))
@@ -385,8 +385,8 @@ fn composite_authorize_capture_and_settlement_survive_response_loss_and_restart(
                         grant_index: 0,
                         exposed_cost_units: 10,
                         realized_spend_units: 7,
-                        hold_id: Some(format!("hold-{id}")),
-                        event_id: Some(format!("event-{id}-reconcile")),
+                        hold_id: format!("hold-{id}"),
+                        event_id: format!("event-{id}-reconcile"),
                         authority: None,
                     },
                 ))
@@ -420,8 +420,8 @@ fn composite_release_and_reverse_restore_durable_reservations() {
                 capability_id: "cap-composite".to_string(),
                 grant_index: 0,
                 released_exposure_units: 4,
-                hold_id: Some("hold-release".to_string()),
-                event_id: Some("event-release-partial".to_string()),
+                hold_id: "hold-release".to_string(),
+                event_id: "event-release-partial".to_string(),
                 authority: None,
             },
         ))
@@ -842,8 +842,8 @@ fn v10_payment_journal_migrates_to_accept_pre_authorization_cancellation() {
                     requested_exposure_units: 10,
                     max_cost_per_invocation: Some(10),
                     max_total_cost_units: Some(1_000),
-                    hold_id: Some(format!("hold-{id}")),
-                    event_id: Some(format!("event-{id}-authorize")),
+                    hold_id: format!("hold-{id}"),
+                    event_id: format!("event-{id}-authorize"),
                     authority: None,
                     invocation_quotas: Vec::new(),
                     cumulative_approval: None,
@@ -1091,9 +1091,25 @@ fn provision_refuses_populated_legacy_budget_state() {
     let database = path.join("authority.sqlite3");
     {
         let legacy = SqliteBudgetStore::open(&database).expect("open legacy store");
-        assert!(legacy
-            .try_increment("cap-composite", 0, Some(2))
-            .expect("legacy increment"));
+        assert!(matches!(
+            legacy
+                .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                    capability_id: "cap-composite".to_string(),
+                    grant_index: 0,
+                    max_invocations: Some(2),
+                    invocation_quotas: Vec::new(),
+                    cumulative_approval: None,
+                    admission_binding: None,
+                    requested_exposure_units: 0,
+                    max_cost_per_invocation: None,
+                    max_total_cost_units: None,
+                    hold_id: "legacy-hold".to_string(),
+                    event_id: "legacy-hold:authorize".to_string(),
+                    authority: None,
+                })
+                .expect("legacy authorization"),
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ));
     }
     fs::set_permissions(&database, fs::Permissions::from_mode(0o600))
         .expect("secure legacy database mode");
@@ -1105,7 +1121,7 @@ fn provision_refuses_populated_legacy_budget_state() {
     assert!(
         error
             .to_string()
-            .contains("baseline refuses nonempty safety table `budget_mutation_events`"),
+            .contains("baseline refuses nonempty safety table `budget_authorization_holds`"),
         "unexpected provisioning error: {error}"
     );
     let _ = fs::remove_dir_all(path);

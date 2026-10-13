@@ -81,8 +81,8 @@ impl SqliteBudgetStore {
                             grant_index: crate::integer::checked::<_, usize>(grant_index)?,
                             exposed_cost_units: exposure,
                             realized_spend_units: realized.min(exposure),
-                            hold_id: Some(hold_id.clone()),
-                            event_id: Some(format!("{hold_id}:reap-reconcile")),
+                            hold_id: hold_id.clone(),
+                            event_id: format!("{hold_id}:reap-reconcile"),
                             authority,
                         })?;
                     }
@@ -95,8 +95,8 @@ impl SqliteBudgetStore {
                             grant_index: crate::integer::checked::<_, usize>(grant_index)?,
                             exposed_cost_units: exposure,
                             realized_spend_units: exposure,
-                            hold_id: Some(hold_id.clone()),
-                            event_id: Some(format!("{hold_id}:reap-unknown-outcome")),
+                            hold_id: hold_id.clone(),
+                            event_id: format!("{hold_id}:reap-unknown-outcome"),
                             authority,
                         })?;
                     }
@@ -107,8 +107,8 @@ impl SqliteBudgetStore {
                         capability_id: capability_id.clone(),
                         grant_index: crate::integer::checked::<_, usize>(grant_index)?,
                         reversed_exposure_units: exposure,
-                        hold_id: Some(hold_id.clone()),
-                        event_id: Some(format!("{hold_id}:reap-reverse")),
+                        hold_id: hold_id.clone(),
+                        event_id: format!("{hold_id}:reap-reverse"),
                         authority,
                         expected_cumulative_approval_state: None,
                     })?;
@@ -178,8 +178,8 @@ impl SqliteBudgetStore {
                     grant_index: crate::integer::checked::<_, usize>(grant_index)?,
                     exposed_cost_units: remaining,
                     realized_spend_units: remaining,
-                    hold_id: Some(hold_id.clone()),
-                    event_id: Some(format!("{hold_id}:ttl-reap-settle")),
+                    hold_id: hold_id.clone(),
+                    event_id: format!("{hold_id}:ttl-reap-settle"),
                     authority,
                 })?;
             }
@@ -263,56 +263,6 @@ impl SqliteBudgetStore {
         if affected == 0 {
             return Err(BudgetStoreError::Invariant(format!(
                 "cannot mark budget hold `{hold_id}` reserved: missing or not open"
-            )));
-        }
-        Ok(())
-    }
-
-    /// Adopt an already-debited invocation into a durable zero-exposure reserved
-    /// hold, stamped with the TTL deadline and no currency. The invocation was
-    /// already counted by `try_increment`, so this only records the open hold
-    /// (never touching the invocation count); reversing it by hold id returns the
-    /// invocation, while reconciling or reaping it keeps the invocation consumed.
-    /// Fails closed when a hold already exists under the id.
-    pub fn reserve_invocation_hold(
-        &self,
-        hold_id: &str,
-        capability_id: &str,
-        grant_index: usize,
-        reserved_until_unix_secs: i64,
-        envelope: &ReservedHoldEnvelope,
-    ) -> Result<(), BudgetStoreError> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
-        let updated = connection.execute(
-            "UPDATE budget_authorization_holds \
-             SET reserved_until = ?4, reserved_currency = NULL, \
-                 reserved_payment_reference = NULL, reserved_budget_total = ?5, \
-                 reserved_delegation_depth = ?6, reserved_root_budget_holder = ?7, \
-                 updated_at = ?8 \
-             WHERE hold_id = ?1 AND capability_id = ?2 AND grant_index = ?3 \
-                 AND authorized_exposure_units = 0 AND remaining_exposure_units = 0 \
-                 AND invocation_count_debited = 1 AND invocation_captured = 0 \
-                 AND disposition = 'open'",
-            params![
-                hold_id,
-                capability_id,
-                crate::integer::checked::<_, i64>(grant_index)?,
-                reserved_until_unix_secs,
-                envelope
-                    .budget_total
-                    .map(crate::integer::checked::<_, i64>)
-                    .transpose()?,
-                crate::integer::checked::<_, i64>(envelope.delegation_depth)?,
-                envelope.root_budget_holder,
-                self.unix_now()?,
-            ],
-        )?;
-        if updated == 0 {
-            return Err(BudgetStoreError::Invariant(format!(
-                "budget hold `{hold_id}` is not an open invocation authorization"
             )));
         }
         Ok(())
@@ -513,8 +463,8 @@ mod tests {
                 requested_exposure_units: 0,
                 max_cost_per_invocation: None,
                 max_total_cost_units: None,
-                hold_id: Some(hold_id.to_string()),
-                event_id: Some(format!("{hold_id}:authorize")),
+                hold_id: hold_id.to_string(),
+                event_id: format!("{hold_id}:authorize"),
                 authority: None,
                 invocation_quotas: Vec::new(),
                 cumulative_approval: None,
@@ -554,8 +504,8 @@ mod tests {
                 requested_exposure_units: 100,
                 max_cost_per_invocation: Some(100),
                 max_total_cost_units: Some(1000),
-                hold_id: Some(hold_id.to_string()),
-                event_id: Some(format!("{hold_id}:authorize")),
+                hold_id: hold_id.to_string(),
+                event_id: format!("{hold_id}:authorize"),
                 authority,
                 invocation_quotas: Vec::new(),
                 cumulative_approval: None,
@@ -613,8 +563,8 @@ mod tests {
                 grant_index: 0,
                 exposed_cost_units: 100,
                 realized_spend_units: 40,
-                hold_id: Some("hold-done".to_string()),
-                event_id: Some("hold-done:reconcile".to_string()),
+                hold_id: "hold-done".to_string(),
+                event_id: "hold-done:reconcile".to_string(),
                 authority: None,
             })
             .unwrap();
@@ -881,21 +831,19 @@ mod tests {
     }
 
     #[test]
-    fn reserve_invocation_hold_is_reversible_and_returns_the_invocation() {
+    fn reserved_invocation_hold_is_reversible_and_returns_the_invocation() {
         use chio_kernel::budget_store::{
             BudgetHoldDispositionView, BudgetReverseHoldRequest, BudgetStore,
         };
 
         let store = open_temp_store();
-        // Debit the single invocation exactly as the reserve path does, then adopt
-        // it into a durable zero-exposure reserved hold.
         authorize_invocation(&store, "hold-inv", "cap-inv");
         store
-            .reserve_invocation_hold(
+            .mark_hold_reserved(
                 "hold-inv",
-                "cap-inv",
-                0,
                 4_242,
+                "USD",
+                None,
                 &ReservedHoldEnvelope {
                     budget_total: None,
                     delegation_depth: 1,
@@ -909,10 +857,7 @@ mod tests {
         assert_eq!(snapshot.remaining_exposure_units, 0);
         assert_eq!(snapshot.disposition, BudgetHoldDispositionView::Open);
         assert_eq!(snapshot.reserved_until, Some(4_242));
-        assert_eq!(
-            snapshot.reserved_currency, None,
-            "an invocation reservation records no currency"
-        );
+        assert_eq!(snapshot.reserved_currency.as_deref(), Some("USD"));
         assert_eq!(
             snapshot.reserved_budget_total, None,
             "an invocation reservation carries no monetary ceiling"
@@ -938,8 +883,8 @@ mod tests {
                 capability_id: "cap-inv".to_string(),
                 grant_index: 0,
                 reversed_exposure_units: snapshot.remaining_exposure_units,
-                hold_id: Some("hold-inv".to_string()),
-                event_id: Some("hold-inv:reverse".to_string()),
+                hold_id: "hold-inv".to_string(),
+                event_id: "hold-inv:reverse".to_string(),
                 authority: snapshot.authority,
                 expected_cumulative_approval_state: None,
             })
@@ -962,13 +907,13 @@ mod tests {
             BudgetHoldDispositionView::Reversed
         );
 
-        // A duplicate reserve under the same id fails closed.
+        // Reserving a terminal hold fails closed.
         assert!(store
-            .reserve_invocation_hold(
+            .mark_hold_reserved(
                 "hold-inv",
-                "cap-inv",
-                0,
                 9_000,
+                "USD",
+                None,
                 &ReservedHoldEnvelope::default()
             )
             .is_err());
@@ -981,11 +926,11 @@ mod tests {
         let store = open_temp_store();
         authorize_invocation(&store, "hold-inv", "cap-inv");
         store
-            .reserve_invocation_hold(
+            .mark_hold_reserved(
                 "hold-inv",
-                "cap-inv",
-                0,
                 100,
+                "USD",
+                None,
                 &ReservedHoldEnvelope::default(),
             )
             .unwrap();
@@ -1119,8 +1064,8 @@ mod tests {
                 grant_index: 0,
                 exposed_cost_units: 100,
                 realized_spend_units: 40,
-                hold_id: Some("hold-c-closed".to_string()),
-                event_id: Some("hold-c-closed:reconcile".to_string()),
+                hold_id: "hold-c-closed".to_string(),
+                event_id: "hold-c-closed:reconcile".to_string(),
                 authority: None,
             })
             .unwrap();

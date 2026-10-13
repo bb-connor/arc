@@ -90,8 +90,8 @@ fn request(exposure: u64, composite: bool) -> BudgetAuthorizeHoldRequest {
         requested_exposure_units: exposure,
         max_cost_per_invocation: None,
         max_total_cost_units: None,
-        hold_id: Some("hold".into()),
-        event_id: Some("authorize".into()),
+        hold_id: "hold".into(),
+        event_id: "authorize".into(),
         authority: None,
     };
     if composite {
@@ -129,8 +129,8 @@ fn release(amount: u64, event: &str) -> BudgetReleaseHoldRequest {
         capability_id: "checked".into(),
         grant_index: 0,
         released_exposure_units: amount,
-        hold_id: Some("hold".into()),
-        event_id: Some(event.into()),
+        hold_id: "hold".into(),
+        event_id: event.into(),
         authority: None,
     }
 }
@@ -163,8 +163,8 @@ fn settle(
             grant_index: 0,
             exposed_cost_units: exposed,
             realized_spend_units: realized,
-            hold_id: Some("hold".into()),
-            event_id: Some("settle".into()),
+            hold_id: "hold".into(),
+            event_id: "settle".into(),
             authority,
         })
         .map(|_| ())
@@ -251,8 +251,8 @@ fn refused_sql_writes_roll_back_every_budget_participant_and_reopen() {
                         capability_id: "checked".into(),
                         grant_index: 0,
                         reversed_exposure_units: 10,
-                        hold_id: Some("hold".into()),
-                        event_id: Some("reverse".into()),
+                        hold_id: "hold".into(),
+                        event_id: "reverse".into(),
                         authority: authority(&store),
                         expected_cumulative_approval_state: None,
                     })
@@ -372,8 +372,8 @@ fn memory_preserves_unsigned_ceiling_and_refuses_overflow_atomically() {
         .list_mutation_events(10, Some("checked"), Some(0))
         .test_expect("events");
     let mut next = request(3, false);
-    next.hold_id = Some("overflow-hold".into());
-    next.event_id = Some("overflow-event".into());
+    next.hold_id = "overflow-hold".into();
+    next.event_id = "overflow-event".into();
     assert!(matches!(
         store.authorize_budget_hold(next),
         Err(BudgetStoreError::Overflow(_))

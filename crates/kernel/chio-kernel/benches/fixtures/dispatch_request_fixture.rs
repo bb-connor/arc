@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 
 use chio_core::capability::{
@@ -13,6 +13,7 @@ use chio_core::receipt::{
     metadata::GuardEvidence,
 };
 use chio_core::session::{OperationContext, RequestId, SessionId};
+use chio_kernel::budget_store::{BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest};
 use chio_kernel::{
     capability_matches_request, BudgetStore, ChioKernel, Guard, GuardContext, GuardDecision,
     InMemoryBudgetStore, InMemoryRevocationStore, KernelConfig, KernelError, NestedFlowBridge,
@@ -37,6 +38,7 @@ pub struct DispatchAllowFixture {
     signed_receipt: ChioReceipt,
     receipt_log: RefCell<ReceiptLog>,
     budget_store: InMemoryBudgetStore,
+    budget_hold_seq: Cell<u64>,
     revocation_store: InMemoryRevocationStore,
     revoked_capability_id: String,
     guard_request: ToolCallRequest,
@@ -115,6 +117,7 @@ impl DispatchAllowFixture {
             signed_receipt: receipt.clone(),
             receipt_log,
             budget_store,
+            budget_hold_seq: Cell::new(0),
             revocation_store,
             revoked_capability_id,
             guard_request,
@@ -252,11 +255,25 @@ impl DispatchAllowFixture {
     }
 
     pub fn budget_decrement_once(&self) -> bool {
+        let seq = self.budget_hold_seq.get();
+        self.budget_hold_seq.set(seq.wrapping_add(1));
         match self
             .budget_store
-            .try_increment(&self.request.capability.id, 0, None)
-        {
-            Ok(allowed) => allowed,
+            .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                capability_id: self.request.capability.id.clone(),
+                grant_index: 0,
+                max_invocations: None,
+                invocation_quotas: Vec::new(),
+                cumulative_approval: None,
+                admission_binding: None,
+                requested_exposure_units: 0,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+                hold_id: format!("bench-hold-{seq}"),
+                event_id: format!("bench-hold-{seq}:authorize"),
+                authority: None,
+            }) {
+            Ok(decision) => matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)),
             Err(error) => panic!("budget decrement benchmark failed: {error}"),
         }
     }

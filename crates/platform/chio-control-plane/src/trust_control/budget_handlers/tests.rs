@@ -1,40 +1,13 @@
-use super::{budget_internal_error, generated_budget_event_id, validate_budget_request_identity};
+use super::{budget_internal_error, validate_budget_request_identity};
 use axum::body::to_bytes;
 use axum::http::StatusCode;
 use chio_kernel::budget_store::BudgetStoreError;
 use chio_test_support::prelude::*;
-use std::collections::HashSet;
 
 #[test]
-fn generated_budget_event_id_is_unique_per_call() {
-    // Each omitted-eventId write must get a distinct id so the mutation event
-    // is stored under a known, unique key and the witness can look up THIS
-    // write's exact event_seq.
-    let first = generated_budget_event_id();
-    let second = generated_budget_event_id();
-    assert_ne!(first, second, "consecutive ids must differ");
-    assert!(first.starts_with("cluster-budget-write-"));
-    // A tight burst (same wall-clock nanos possible) is still all-distinct via
-    // the monotonic counter.
-    let ids: HashSet<String> = (0..10_000).map(|_| generated_budget_event_id()).collect();
-    assert_eq!(ids.len(), 10_000, "all minted ids must be unique");
-}
-
-#[test]
-fn optional_budget_identity_rejects_partial_or_empty_values() {
-    for (hold_id, event_id) in [
-        (None, None),
-        (None, Some("event-only")),
-        (Some("hold"), Some("hold:event")),
-    ] {
-        assert!(validate_budget_request_identity(hold_id, event_id).is_ok());
-    }
-    for (hold_id, event_id) in [
-        (Some("hold"), None),
-        (Some(""), Some("event")),
-        (Some("hold"), Some("")),
-        (None, Some("")),
-    ] {
+fn budget_identity_rejects_empty_values() {
+    assert!(validate_budget_request_identity("hold", "hold:event").is_ok());
+    for (hold_id, event_id) in [("", "event"), ("hold", ""), ("", "")] {
         let response = match validate_budget_request_identity(hold_id, event_id) {
             Ok(()) => panic!("invalid budget identity was accepted"),
             Err(response) => response,

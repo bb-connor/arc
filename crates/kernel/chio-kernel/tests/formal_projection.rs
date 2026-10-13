@@ -5,6 +5,7 @@ use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     kinds::TrustLevel, metadata::GuardEvidence,
 };
+use chio_kernel::budget_store::{BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest};
 use chio_kernel::dpop::DpopNonceStore;
 use chio_kernel::{BudgetStore, InMemoryBudgetStore, InMemoryRevocationStore, RevocationStore};
 use serde_json::json;
@@ -107,16 +108,31 @@ fn revocation_snapshot_projection_denies_token_and_ancestor() {
 #[test]
 fn budget_snapshot_projection_preserves_single_node_bounds() {
     let store = InMemoryBudgetStore::new();
+    let authorize = |hold: &str, units: u64| {
+        matches!(
+            store
+                .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                    capability_id: "cap-budget".to_string(),
+                    grant_index: 0,
+                    max_invocations: Some(2),
+                    invocation_quotas: Vec::new(),
+                    cumulative_approval: None,
+                    admission_binding: None,
+                    requested_exposure_units: units,
+                    max_cost_per_invocation: Some(50),
+                    max_total_cost_units: Some(100),
+                    hold_id: hold.to_string(),
+                    event_id: format!("{hold}:authorize"),
+                    authority: None,
+                })
+                .test_unwrap(),
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        )
+    };
 
-    assert!(store
-        .try_charge_cost("cap-budget", 0, Some(2), 40, Some(50), Some(100))
-        .test_unwrap());
-    assert!(store
-        .try_charge_cost("cap-budget", 0, Some(2), 50, Some(50), Some(100))
-        .test_unwrap());
-    assert!(!store
-        .try_charge_cost("cap-budget", 0, Some(2), 1, Some(50), Some(100))
-        .test_unwrap());
+    assert!(authorize("hold-1", 40));
+    assert!(authorize("hold-2", 50));
+    assert!(!authorize("hold-3", 1));
 
     let usage = store.get_usage("cap-budget", 0).test_unwrap().test_unwrap();
     let projection = BudgetProjection {

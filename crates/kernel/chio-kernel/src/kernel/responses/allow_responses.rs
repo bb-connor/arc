@@ -1,22 +1,13 @@
 use super::*;
 
-pub(crate) enum ReservedHoldStamp<'a> {
-    Monetary {
-        charge: &'a BudgetChargeResult,
-        payment_reference: Option<String>,
-    },
-    Invocation {
-        hold_id: String,
-        grant_index: usize,
-    },
+pub(crate) struct ReservedHoldStamp<'a> {
+    pub(crate) charge: &'a BudgetChargeResult,
+    pub(crate) payment_reference: Option<String>,
 }
 
 impl ReservedHoldStamp<'_> {
     fn hold_id(&self) -> &str {
-        match self {
-            Self::Monetary { charge, .. } => charge.budget_hold_id.as_str(),
-            Self::Invocation { hold_id, .. } => hold_id.as_str(),
-        }
+        self.charge.budget_hold_id.as_str()
     }
 }
 
@@ -235,66 +226,33 @@ impl ChioKernel {
 
         if let (Some(stamp), Some(nonce)) = (reserved_hold.as_ref(), execution_nonce.as_ref()) {
             let reserved_until = nonce.expires_at();
-            match stamp {
-                ReservedHoldStamp::Monetary {
-                    charge,
-                    payment_reference,
-                } => {
-                    let envelope = crate::budget_store::ReservedHoldEnvelope {
-                        budget_total: charge.budget_total,
-                        delegation_depth: crate::receipt_support::checked_receipt_count(
-                            cap.delegation_chain.len(),
-                            "delegation depth",
-                        )?,
-                        root_budget_holder: cap.issuer.to_hex(),
-                    };
-                    if let Err(error) = self.with_budget_store(|store| {
-                        Ok(store.mark_hold_reserved(
-                            charge.budget_hold_id.as_str(),
-                            reserved_until,
-                            charge.currency.as_str(),
-                            payment_reference.as_deref(),
-                            &envelope,
-                        )?)
-                    }) {
-                        self.reverse_budget_charge(&cap.id, charge)?;
-                        self.release_admitted_capability_budget(cap)
-                            .map_err(KernelError::DelegationInvalid)?;
-                        return Err(error);
-                    }
-                    self.record_reserved_sibling_share(charge.budget_hold_id.as_str(), cap);
-                }
-                ReservedHoldStamp::Invocation {
-                    hold_id,
-                    grant_index,
-                } => {
-                    let envelope = crate::budget_store::ReservedHoldEnvelope {
-                        budget_total: None,
-                        delegation_depth: crate::receipt_support::checked_receipt_count(
-                            cap.delegation_chain.len(),
-                            "delegation depth",
-                        )?,
-                        root_budget_holder: cap.issuer.to_hex(),
-                    };
-                    if let Err(error) = self.with_budget_store(|store| {
-                        Ok(store.reserve_invocation_hold(
-                            hold_id,
-                            &cap.id,
-                            *grant_index,
-                            reserved_until,
-                            &envelope,
-                        )?)
-                    }) {
-                        self.with_budget_store(|store| {
-                            Ok(store.reverse_charge_cost(&cap.id, *grant_index, 0)?)
-                        })?;
-                        self.release_admitted_capability_budget(cap)
-                            .map_err(KernelError::DelegationInvalid)?;
-                        return Err(error);
-                    }
-                    self.record_reserved_sibling_share(hold_id, cap);
-                }
+            let ReservedHoldStamp {
+                charge,
+                payment_reference,
+            } = stamp;
+            let envelope = crate::budget_store::ReservedHoldEnvelope {
+                budget_total: charge.budget_total,
+                delegation_depth: crate::receipt_support::checked_receipt_count(
+                    cap.delegation_chain.len(),
+                    "delegation depth",
+                )?,
+                root_budget_holder: cap.issuer.to_hex(),
+            };
+            if let Err(error) = self.with_budget_store(|store| {
+                Ok(store.mark_hold_reserved(
+                    charge.budget_hold_id.as_str(),
+                    reserved_until,
+                    charge.currency.as_str(),
+                    payment_reference.as_deref(),
+                    &envelope,
+                )?)
+            }) {
+                self.reverse_budget_charge(&cap.id, charge)?;
+                self.release_admitted_capability_budget(cap)
+                    .map_err(KernelError::DelegationInvalid)?;
+                return Err(error);
             }
+            self.record_reserved_sibling_share(charge.budget_hold_id.as_str(), cap);
         }
 
         if let Err(error) = self.record_chio_receipt_with_federation(request, &receipt) {

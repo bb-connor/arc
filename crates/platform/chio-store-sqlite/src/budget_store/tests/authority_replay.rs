@@ -29,8 +29,8 @@ fn authorize_request(
         requested_exposure_units: 100,
         max_cost_per_invocation: Some(100),
         max_total_cost_units: Some(100),
-        hold_id: Some(case_hold(case)),
-        event_id: Some(format!("{case}:authorize")),
+        hold_id: case_hold(case),
+        event_id: format!("{case}:authorize"),
         authority,
     }
 }
@@ -112,8 +112,8 @@ fn sqlite_rich_replays_require_the_persisted_authority_after_reopen(
             capability_id: case_capability("reverse"),
             grant_index: 0,
             reversed_exposure_units: 100,
-            hold_id: Some(case_hold("reverse")),
-            event_id: Some("reverse:reverse".to_string()),
+            hold_id: case_hold("reverse"),
+            event_id: "reverse:reverse".to_string(),
             expected_cumulative_approval_state: None,
             authority: Some(expected.clone()),
         })?;
@@ -121,8 +121,8 @@ fn sqlite_rich_replays_require_the_persisted_authority_after_reopen(
             capability_id: case_capability("release"),
             grant_index: 0,
             released_exposure_units: 100,
-            hold_id: Some(case_hold("release")),
-            event_id: Some("release:release".to_string()),
+            hold_id: case_hold("release"),
+            event_id: "release:release".to_string(),
             authority: Some(expected.clone()),
         })?;
         store.capture_invocation_reservations(capture_request(
@@ -134,8 +134,8 @@ fn sqlite_rich_replays_require_the_persisted_authority_after_reopen(
             grant_index: 0,
             exposed_cost_units: 100,
             realized_spend_units: 75,
-            hold_id: Some(case_hold("reconcile")),
-            event_id: Some("reconcile:reconcile".to_string()),
+            hold_id: case_hold("reconcile"),
+            event_id: "reconcile:reconcile".to_string(),
             authority: Some(expected.clone()),
         })?;
         store.capture_invocation_reservations(capture_request("cancel", Some(expected.clone())))?;
@@ -165,8 +165,8 @@ fn sqlite_rich_replays_require_the_persisted_authority_after_reopen(
                 capability_id: case_capability("reverse"),
                 grant_index: 0,
                 reversed_exposure_units: 100,
-                hold_id: Some(case_hold("reverse")),
-                event_id: Some("reverse:reverse".to_string()),
+                hold_id: case_hold("reverse"),
+                event_id: "reverse:reverse".to_string(),
                 expected_cumulative_approval_state: None,
                 authority,
             })
@@ -178,8 +178,8 @@ fn sqlite_rich_replays_require_the_persisted_authority_after_reopen(
                 capability_id: case_capability("release"),
                 grant_index: 0,
                 released_exposure_units: 100,
-                hold_id: Some(case_hold("release")),
-                event_id: Some("release:release".to_string()),
+                hold_id: case_hold("release"),
+                event_id: "release:release".to_string(),
                 authority,
             })
             .map(|_| ())
@@ -191,8 +191,8 @@ fn sqlite_rich_replays_require_the_persisted_authority_after_reopen(
                 grant_index: 0,
                 exposed_cost_units: 100,
                 realized_spend_units: 75,
-                hold_id: Some(case_hold("reconcile")),
-                event_id: Some("reconcile:reconcile".to_string()),
+                hold_id: case_hold("reconcile"),
+                event_id: "reconcile:reconcile".to_string(),
                 authority,
             })
             .map(|_| ())
@@ -227,8 +227,8 @@ fn sqlite_held_reconciliation_requires_invocation_capture() -> Result<(), Box<dy
         grant_index: 0,
         exposed_cost_units: 100,
         realized_spend_units: 75,
-        hold_id: Some(case_hold(case)),
-        event_id: Some(format!("{case}:reconcile")),
+        hold_id: case_hold(case),
+        event_id: format!("{case}:reconcile"),
         authority: Some(expected.clone()),
     };
     let error = store
@@ -349,91 +349,6 @@ fn sqlite_renewed_lease_replays_an_authorization_under_its_original_authority(
         "budget event_id `missing:authorize` has no authorization to replay",
     )?;
     let (usage, events, hold, _) = rich_state(&store, "missing")?;
-    assert!(usage.is_none() && events.is_empty() && hold.is_none());
-
-    let _ = fs::remove_file(path);
-    Ok(())
-}
-
-#[test]
-fn sqlite_renewed_lease_replays_a_charge_without_hold_through_the_charge_path(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-renewed-lease-charge-replay");
-    let store = SqliteBudgetStore::open(&path)?;
-    let original = authority("budget-primary", "budget-primary#term-2", 2);
-    let renewed = authority("budget-primary", "budget-primary#term-3", 3);
-    let charge_request = |case: &str| BudgetAuthorizeHoldRequest {
-        hold_id: None,
-        ..authorize_request(case, Some(renewed.clone()))
-    };
-    let charge = |case: &str, admitted: &BudgetEventAuthority| {
-        let request = charge_request(case);
-        store.try_charge_cost_with_ids_and_authority(
-            &request.capability_id,
-            request.grant_index,
-            request.max_invocations,
-            request.requested_exposure_units,
-            request.max_cost_per_invocation,
-            request.max_total_cost_units,
-            None,
-            request.event_id.as_deref(),
-            Some(admitted),
-        )
-    };
-    let refused = |case: &str, request: &BudgetAuthorizeHoldRequest, expected: &str| {
-        let before = rich_state(&store, case)?;
-        let error = store
-            .replay_cost_charge(request, &renewed)
-            .expect_err("an unreplayable charge must fail closed");
-        assert!(
-            matches!(&error, BudgetStoreError::Invariant(message) if message == expected),
-            "unexpected charge replay refusal: {error}"
-        );
-        assert_eq!(rich_state(&store, case)?, before);
-        Ok::<(), Box<dyn std::error::Error>>(())
-    };
-    assert!(charge("charge", &original)?);
-    assert!(charge("charge-conflict", &original)?);
-    assert!(charge(
-        "charge-foreign",
-        &authority("budget-standby", "budget-standby#term-2", 2)
-    )?);
-
-    // The ordinary charge path keeps the exact-authority contract.
-    let before = rich_state(&store, "charge")?;
-    let error = charge("charge", &renewed)
-        .expect_err("an ordinary charge under another lease must fail closed");
-    assert!(matches!(&error, BudgetStoreError::Invariant(message)
-        if message == "budget event_id `charge:authorize` authority metadata does not match the original mutation"));
-    assert_eq!(rich_state(&store, "charge")?, before);
-
-    // The charge replay returns the original admission and changes nothing.
-    assert!(store.replay_cost_charge(&charge_request("charge"), &renewed)?);
-    assert_eq!(rich_state(&store, "charge")?, before);
-    let replayed = store
-        .mutation_event_for_event_id("charge:authorize")?
-        .ok_or_else(|| std::io::Error::other("replayed charge event missing"))?;
-    assert_eq!(replayed.authority, Some(original));
-    assert_eq!(replayed.hold_id, None);
-
-    let mut conflicting = charge_request("charge-conflict");
-    conflicting.requested_exposure_units = 90;
-    refused(
-        "charge-conflict",
-        &conflicting,
-        "budget event_id `charge-conflict:authorize` was reused for a different mutation",
-    )?;
-    refused(
-        "charge-foreign",
-        &charge_request("charge-foreign"),
-        "budget event_id `charge-foreign:authorize` authority metadata does not match the original mutation",
-    )?;
-    refused(
-        "charge-missing",
-        &charge_request("charge-missing"),
-        "budget event_id `charge-missing:authorize` has no authorization to replay",
-    )?;
-    let (usage, events, hold, _) = rich_state(&store, "charge-missing")?;
     assert!(usage.is_none() && events.is_empty() && hold.is_none());
 
     let _ = fs::remove_file(path);

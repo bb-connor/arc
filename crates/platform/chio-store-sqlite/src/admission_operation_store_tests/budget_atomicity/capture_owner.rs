@@ -284,8 +284,8 @@ fn authorize_with_revocations(
             requested_exposure_units: 0,
             max_cost_per_invocation: None,
             max_total_cost_units: None,
-            hold_id: Some("shared-hold".into()),
-            event_id: Some("authorize-shared-hold".into()),
+            hold_id: "shared-hold".into(),
+            event_id: "authorize-shared-hold".into(),
             authority: Some(authority.clone()),
         })?,
         BudgetAuthorizeHoldDecision::Authorized(_)

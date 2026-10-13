@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use chio_kernel::budget_store::BudgetMutationRecord;
-use chio_kernel::{BudgetStore, BudgetUsageRecord, InMemoryBudgetStore};
+use chio_kernel::budget_store::{
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetMutationRecord,
+};
+use chio_kernel::{BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore};
 use chio_kernel_core::{
     budget_charge_admits, budget_increment_admits, BudgetAdmissionProjectionError,
 };
@@ -13,6 +15,53 @@ use rusqlite::params;
 use chio_test_support::prelude::*;
 
 static NEXT_DATABASE_ID: AtomicU64 = AtomicU64::new(0);
+static NEXT_HOLD_ID: AtomicU64 = AtomicU64::new(0);
+
+fn authorize(
+    store: &(impl BudgetStore + ?Sized),
+    capability_id: &str,
+    max_invocations: Option<u32>,
+    cost_units: u64,
+    max_cost_per_invocation: Option<u64>,
+    max_total_cost_units: Option<u64>,
+) -> Result<bool, BudgetStoreError> {
+    let hold = format!("equivalence-hold-{}", NEXT_HOLD_ID.fetch_add(1, Ordering::Relaxed));
+    authorize_hold(
+        store,
+        &hold,
+        capability_id,
+        max_invocations,
+        cost_units,
+        max_cost_per_invocation,
+        max_total_cost_units,
+    )
+}
+
+fn authorize_hold(
+    store: &(impl BudgetStore + ?Sized),
+    hold: &str,
+    capability_id: &str,
+    max_invocations: Option<u32>,
+    cost_units: u64,
+    max_cost_per_invocation: Option<u64>,
+    max_total_cost_units: Option<u64>,
+) -> Result<bool, BudgetStoreError> {
+    let decision = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+        capability_id: capability_id.to_string(),
+        grant_index: 0,
+        max_invocations,
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units: cost_units,
+        max_cost_per_invocation,
+        max_total_cost_units,
+        hold_id: hold.to_string(),
+        event_id: format!("{hold}:authorize"),
+        authority: None,
+    })?;
+    Ok(matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)))
+}
 
 struct SqliteFixture {
     store: Option<SqliteBudgetStore>,
@@ -98,13 +147,9 @@ fn seed_usage(
         return;
     }
 
-    assert!(store
-        .try_charge_cost("cap", 0, max_invocations, committed_cost_units, None, None,)
-        .test_unwrap());
+    assert!(authorize(store, "cap", max_invocations, committed_cost_units, None, None).test_unwrap());
     for _ in 1..invocation_count {
-        assert!(store
-            .try_charge_cost("cap", 0, max_invocations, 0, None, None)
-            .test_unwrap());
+        assert!(authorize(store, "cap", max_invocations, 0, None, None).test_unwrap());
     }
 }
 
@@ -138,7 +183,7 @@ fn assert_mutation_shape_eq(left: &[BudgetMutationRecord], right: &[BudgetMutati
 
 proptest! {
     #[test]
-    fn in_memory_increment_calls_exact_projection(
+    fn in_memory_invocation_authorization_calls_exact_projection(
         invocation_count in 0_u8..8,
         max_invocations in proptest::option::of(0_u32..10),
     ) {
@@ -148,9 +193,7 @@ proptest! {
         let store = InMemoryBudgetStore::new();
         seed_usage(&store, invocation_count, 0, max_invocations);
 
-        let actual = store
-            .try_increment("cap", 0, max_invocations)
-            .test_unwrap();
+        let actual = authorize(&store, "cap", max_invocations, 0, None, None).test_unwrap();
         let expected = budget_increment_admits(u32::from(invocation_count), max_invocations);
 
         prop_assert_eq!(actual, expected);
@@ -181,10 +224,9 @@ proptest! {
             max_invocations,
         );
 
-        let actual = store
-            .try_charge_cost(
+        let actual = authorize(
+                &store,
                 "cap",
-                0,
                 max_invocations,
                 cost_units,
                 max_cost_per_invocation,
@@ -209,7 +251,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(32))]
 
     #[test]
-    fn sqlite_increment_calls_exact_projection(
+    fn sqlite_invocation_authorization_calls_exact_projection(
         invocation_count in 0_u8..8,
         max_invocations in proptest::option::of(0_u32..10),
     ) {
@@ -220,9 +262,7 @@ proptest! {
         let store = sqlite.store();
         seed_usage(store, invocation_count, 0, max_invocations);
 
-        let actual = store
-            .try_increment("cap", 0, max_invocations)
-            .test_unwrap();
+        let actual = authorize(store, "cap", max_invocations, 0, None, None).test_unwrap();
         let expected = budget_increment_admits(u32::from(invocation_count), max_invocations);
 
         prop_assert_eq!(actual, expected);
@@ -254,10 +294,9 @@ proptest! {
             max_invocations,
         );
 
-        let actual = store
-            .try_charge_cost(
+        let actual = authorize(
+                store,
                 "cap",
-                0,
                 max_invocations,
                 cost_units,
                 max_cost_per_invocation,
@@ -286,19 +325,15 @@ fn sqlite_and_in_memory_share_decisions_and_mutation_shape() {
 
     for store in [&memory as &dyn BudgetStore, sqlite as &dyn BudgetStore] {
         assert_eq!(
-            store
-                .try_charge_cost("cap", 0, Some(3), 100, Some(200), Some(250))
-                .test_unwrap(),
+            authorize_hold(store, "shape-1", "cap", Some(3), 100, Some(200), Some(250)).test_unwrap(),
             budget_charge_admits(0, 0, 100, Some(3), Some(200), Some(250)).test_unwrap()
         );
         assert_eq!(
-            store
-                .try_charge_cost("cap", 0, Some(3), 175, Some(200), Some(250))
-                .test_unwrap(),
+            authorize_hold(store, "shape-2", "cap", Some(3), 175, Some(200), Some(250)).test_unwrap(),
             budget_charge_admits(1, 100, 175, Some(3), Some(200), Some(250)).test_unwrap()
         );
         assert_eq!(
-            store.try_increment("cap", 0, Some(3)).test_unwrap(),
+            authorize_hold(store, "shape-3", "cap", Some(3), 0, None, None).test_unwrap(),
             budget_increment_admits(1, Some(3))
         );
     }
@@ -338,9 +373,7 @@ fn sqlite_saturated_counter_calls_exact_projection_without_mutation() {
     });
     let sqlite = sqlite.store();
 
-    let actual = sqlite
-        .try_increment("saturated", 0, Some(u32::MAX))
-        .test_unwrap();
+    let actual = authorize(sqlite, "saturated", Some(u32::MAX), 0, None, None).test_unwrap();
     assert_eq!(actual, budget_increment_admits(u32::MAX, Some(u32::MAX)));
 
     let usage = sqlite.get_usage("saturated", 0).test_unwrap().test_unwrap();
@@ -375,9 +408,7 @@ fn sqlite_uncapped_saturated_counter_fails_closed_without_mutation() {
     let events_before = sqlite
         .list_mutation_events(10, Some("uncapped-saturated"), Some(0))
         .test_unwrap();
-    let error = sqlite
-        .try_increment("uncapped-saturated", 0, None)
-        .test_unwrap_err();
+    let error = authorize(sqlite, "uncapped-saturated", None, 0, None, None).test_unwrap_err();
     assert_eq!(
         error.to_string(),
         "budget arithmetic overflow: invocation count overflowed u32"
@@ -402,20 +433,16 @@ fn in_memory_total_cost_overflow_keeps_state_and_event_history_unchanged() {
     );
 
     let store = InMemoryBudgetStore::new();
-    assert!(store
-        .try_charge_cost("overflow", 0, None, u64::MAX, None, None)
-        .test_unwrap());
+    assert!(authorize(&store, "overflow", None, u64::MAX, None, None).test_unwrap());
     let before = store.get_usage("overflow", 0).test_unwrap().test_unwrap();
     let events_before = store
         .list_mutation_events(10, Some("overflow"), Some(0))
         .test_unwrap();
 
-    let error = store
-        .try_charge_cost("overflow", 0, None, 1, None, Some(u64::MAX))
-        .test_unwrap_err();
+    let error = authorize(&store, "overflow", None, 1, None, Some(u64::MAX)).test_unwrap_err();
     assert_eq!(
         error.to_string(),
-        "budget arithmetic overflow: authorized exposure + cost_units overflowed u64"
+        "budget arithmetic overflow: authorized exposure + requested exposure overflowed u64"
     );
 
     assert_eq!(
@@ -436,9 +463,7 @@ fn sqlite_signed_storage_boundary_keeps_state_and_event_history_unchanged() {
     let store = sqlite.store();
     let signed_max = i64::MAX as u64;
 
-    assert!(store
-        .try_charge_cost("storage-boundary", 0, None, signed_max, None, None)
-        .test_unwrap());
+    assert!(authorize(store, "storage-boundary", None, signed_max, None, None).test_unwrap());
     let before = store
         .get_usage("storage-boundary", 0)
         .test_unwrap()
@@ -447,9 +472,7 @@ fn sqlite_signed_storage_boundary_keeps_state_and_event_history_unchanged() {
         .list_mutation_events(10, Some("storage-boundary"), Some(0))
         .test_unwrap();
 
-    let error = store
-        .try_charge_cost("storage-boundary", 0, None, 1, None, None)
-        .test_unwrap_err();
+    let error = authorize(store, "storage-boundary", None, 1, None, None).test_unwrap_err();
     assert_eq!(
         error.to_string(),
         format!(

@@ -27,8 +27,8 @@ fn authorize_request() -> BudgetAuthorizeHoldRequest {
         requested_exposure_units: 100,
         max_cost_per_invocation: Some(100),
         max_total_cost_units: Some(1_000),
-        hold_id: Some("hold-cleanup-custody".to_string()),
-        event_id: Some("hold-cleanup-custody:authorize".to_string()),
+        hold_id: "hold-cleanup-custody".to_string(),
+        event_id: "hold-cleanup-custody:authorize".to_string(),
         authority: None,
     }
 }

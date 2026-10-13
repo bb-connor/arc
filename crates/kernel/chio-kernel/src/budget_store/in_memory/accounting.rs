@@ -79,27 +79,22 @@ impl InMemoryBudgetStoreInner {
         self.prepare_accounting(
             &hold.invocation_quotas,
             hold.cumulative_approval.as_ref(),
-            |_| Transition::Capture,
+            Transition::Capture,
             Transition::Capture,
         )
     }
 
     pub(super) fn prepare_reversal_accounting(
         &self,
-        quotas: &[BudgetInvocationQuota],
-        hold: Option<&BudgetHoldState>,
+        hold: &BudgetHoldState,
         cancels_captured: bool,
     ) -> Result<PreparedAccounting, BudgetStoreError> {
-        let cumulative = hold.and_then(|hold| hold.cumulative_approval.as_ref());
+        let cumulative = hold.cumulative_approval.as_ref();
         self.prepare_accounting(
-            quotas,
+            &hold.invocation_quotas,
             cumulative,
-            |quota| Transition::Reverse {
-                captured: hold.is_none()
-                    || cancels_captured
-                    || hold.is_some_and(|hold| {
-                        hold.legacy_captured_invocation_quota.as_ref() == Some(quota)
-                    }),
+            Transition::Reverse {
+                captured: cancels_captured,
             },
             Transition::Reverse {
                 captured: cumulative.is_some_and(|participant| {
@@ -113,7 +108,7 @@ impl InMemoryBudgetStoreInner {
         &self,
         quotas: &[BudgetInvocationQuota],
         participant: Option<&BudgetCumulativeApprovalHoldState>,
-        quota_transition: impl Fn(&BudgetInvocationQuota) -> Transition,
+        quota_transition: Transition,
         cumulative_transition: Transition,
     ) -> Result<PreparedAccounting, BudgetStoreError> {
         let quotas = quotas
@@ -129,7 +124,7 @@ impl InMemoryBudgetStoreInner {
                 }
                 Ok((
                     quota.key.clone(),
-                    quota_transition(quota).quota(state.clone())?,
+                    quota_transition.quota(state.clone())?,
                 ))
             })
             .collect::<Result<_, BudgetStoreError>>()?;

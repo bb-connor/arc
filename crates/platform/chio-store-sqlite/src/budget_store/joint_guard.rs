@@ -19,18 +19,15 @@ impl SqliteBudgetStore {
         }
         transaction.rollback()?;
         Err(BudgetStoreError::Invariant(format!(
-            "joint sqlite authority rejects legacy {operation} mutation"
+            "joint sqlite authority rejects {operation} mutation"
         )))
     }
 
-    pub(super) fn reject_structured_hold_from_legacy_writer(
+    pub(super) fn reject_structured_hold_from_unbound_writer(
         transaction: &rusqlite::Transaction<'_>,
-        hold_id: Option<&str>,
+        hold_id: &str,
         operation: &str,
     ) -> Result<(), BudgetStoreError> {
-        let Some(hold_id) = hold_id else {
-            return Ok(());
-        };
         type Row = (
             String,
             Option<String>,
@@ -89,7 +86,7 @@ impl SqliteBudgetStore {
         match row {
             None => Ok(()),
             Some(row) if row.0 == "composite_v1" => Err(BudgetStoreError::Invariant(format!(
-                "legacy {operation} cannot mutate structured budget hold `{hold_id}`"
+                "unbound {operation} cannot mutate structured budget hold `{hold_id}`"
             ))),
             Some(row)
                 if row.0 == "legacy"
@@ -115,7 +112,7 @@ impl SqliteBudgetStore {
         }
     }
 
-    pub(super) fn reject_legacy_admission_after_composite_history(
+    pub(super) fn reject_unbound_admission_after_composite_history(
         transaction: &rusqlite::Transaction<'_>,
         capability_id: &str,
         grant_index: usize,
@@ -136,7 +133,7 @@ impl SqliteBudgetStore {
         )?;
         if exists {
             return Err(BudgetStoreError::Invariant(format!(
-                "legacy budget admission is disabled after structured history for `{capability_id}` grant {grant_index}"
+                "unbound budget admission is disabled after structured history for `{capability_id}` grant {grant_index}"
             )));
         }
         Ok(())

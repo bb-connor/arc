@@ -1,7 +1,11 @@
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chio_kernel::budget_store::BudgetEventAuthority;
+use chio_kernel::budget_store::{
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetEventAuthority,
+    BudgetReleaseHoldDecision, BudgetReleaseHoldRequest,
+};
+use chio_kernel::BudgetStoreError;
 use chio_kernel::{BudgetStore, RevocationRecord};
 use chio_store_sqlite::{SqliteBudgetStore, SqliteCapabilityAuthority, SqliteRevocationStore};
 
@@ -37,6 +41,56 @@ fn authority(authority_id: &str, lease_id: &str, lease_epoch: u64) -> BudgetEven
         lease_id: lease_id.to_string(),
         lease_epoch,
     }
+}
+
+struct Charge<'a> {
+    capability_id: &'a str,
+    max_invocations: Option<u32>,
+    cost_units: u64,
+    max_cost_per_invocation: u64,
+    max_total_cost_units: u64,
+    hold_id: &'a str,
+    event_id: &'a str,
+    authority: Option<&'a BudgetEventAuthority>,
+}
+
+fn authorize(store: &SqliteBudgetStore, charge: Charge<'_>) -> Result<bool, BudgetStoreError> {
+    let decision = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+        capability_id: charge.capability_id.to_string(),
+        grant_index: 0,
+        max_invocations: charge.max_invocations,
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units: charge.cost_units,
+        max_cost_per_invocation: Some(charge.max_cost_per_invocation),
+        max_total_cost_units: Some(charge.max_total_cost_units),
+        hold_id: charge.hold_id.to_string(),
+        event_id: charge.event_id.to_string(),
+        authority: charge.authority.cloned(),
+    })?;
+    Ok(matches!(
+        decision,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ))
+}
+
+fn release(
+    store: &SqliteBudgetStore,
+    capability_id: &str,
+    units: u64,
+    hold_id: &str,
+    event_id: &str,
+    authority: Option<&BudgetEventAuthority>,
+) -> Result<BudgetReleaseHoldDecision, BudgetStoreError> {
+    store.release_budget_hold(BudgetReleaseHoldRequest {
+        capability_id: capability_id.to_string(),
+        grant_index: 0,
+        released_exposure_units: units,
+        hold_id: hold_id.to_string(),
+        event_id: event_id.to_string(),
+        authority: authority.cloned(),
+    })
 }
 
 #[test]
@@ -113,12 +167,34 @@ fn sqlite_budget_and_revocation_paths_cover_limits_and_ordering() {
     let revocation_store =
         SqliteRevocationStore::open(&revocation_path).test_expect("open revocation store");
 
-    assert!(budget_store
-        .try_charge_cost("cap-1", 0, Some(2), 5, Some(10), Some(10))
-        .test_expect("charge within limits"));
-    assert!(!budget_store
-        .try_charge_cost("cap-1", 0, Some(2), 6, Some(5), Some(10))
-        .test_expect("per-invocation cap should fail closed"));
+    assert!(authorize(
+        &budget_store,
+        Charge {
+            capability_id: "cap-1",
+            max_invocations: Some(2),
+            cost_units: 5,
+            max_cost_per_invocation: 10,
+            max_total_cost_units: 10,
+            hold_id: "hold-1",
+            event_id: "hold-1:authorize",
+            authority: None,
+        },
+    )
+    .test_expect("charge within limits"));
+    assert!(!authorize(
+        &budget_store,
+        Charge {
+            capability_id: "cap-1",
+            max_invocations: Some(2),
+            cost_units: 6,
+            max_cost_per_invocation: 5,
+            max_total_cost_units: 10,
+            hold_id: "hold-2",
+            event_id: "hold-2:authorize",
+            authority: None,
+        },
+    )
+    .test_expect("per-invocation cap should fail closed"));
 
     let charged = budget_store
         .get_usage("cap-1", 0)
@@ -132,8 +208,7 @@ fn sqlite_budget_and_revocation_paths_cover_limits_and_ordering() {
         5
     );
 
-    budget_store
-        .reduce_charge_cost("cap-1", 0, 3)
+    release(&budget_store, "cap-1", 3, "hold-1", "hold-1:release", None)
         .test_expect("reduce charged budget");
     let reduced = budget_store
         .get_usage("cap-1", 0)
@@ -196,19 +271,20 @@ fn sqlite_budget_hold_authority_metadata_persists_across_reopen() {
 
     {
         let store = SqliteBudgetStore::open(&path).test_expect("open budget store");
-        assert!(store
-            .try_charge_cost_with_ids_and_authority(
-                "cap-lease",
-                0,
-                Some(10),
-                100,
-                Some(200),
-                Some(1000),
-                Some(hold_id),
-                Some(authorize_event_id),
-                Some(&initial),
-            )
-            .test_expect("authorize hold with lease metadata"));
+        assert!(authorize(
+            &store,
+            Charge {
+                capability_id: "cap-lease",
+                max_invocations: Some(10),
+                cost_units: 100,
+                max_cost_per_invocation: 200,
+                max_total_cost_units: 1000,
+                hold_id: hold_id,
+                event_id: authorize_event_id,
+                authority: Some(&initial),
+            },
+        )
+        .test_expect("authorize hold with lease metadata"));
     }
 
     {
@@ -219,44 +295,41 @@ fn sqlite_budget_hold_authority_metadata_persists_across_reopen() {
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].authority.as_ref(), Some(&initial));
 
-        let error = store
-            .reduce_charge_cost_with_ids_and_authority(
-                "cap-lease",
-                0,
-                25,
-                Some(hold_id),
-                Some("hold-cap-lease-0:release-missing"),
-                None,
-            )
-            .test_expect_err("missing lease metadata should fail closed");
+        let error = release(
+            &store,
+            "cap-lease",
+            25,
+            hold_id,
+            "hold-cap-lease-0:release-missing",
+            None,
+        )
+        .test_expect_err("missing lease metadata should fail closed");
         assert!(error
             .to_string()
             .contains("requires authority lease metadata"));
 
-        let advanced_error = store
-            .reduce_charge_cost_with_ids_and_authority(
-                "cap-lease",
-                0,
-                25,
-                Some(hold_id),
-                Some(release_event_id),
-                Some(&advanced),
-            )
-            .test_expect_err("advanced lease metadata should fail closed");
+        let advanced_error = release(
+            &store,
+            "cap-lease",
+            25,
+            hold_id,
+            release_event_id,
+            Some(&advanced),
+        )
+        .test_expect_err("advanced lease metadata should fail closed");
         assert!(advanced_error
             .to_string()
             .contains("advanced beyond the open lease"));
 
-        store
-            .reduce_charge_cost_with_ids_and_authority(
-                "cap-lease",
-                0,
-                25,
-                Some(hold_id),
-                Some(release_event_id),
-                Some(&initial),
-            )
-            .test_expect("release hold with matching lease metadata");
+        release(
+            &store,
+            "cap-lease",
+            25,
+            hold_id,
+            release_event_id,
+            Some(&initial),
+        )
+        .test_expect("release hold with matching lease metadata");
 
         let usage = store
             .get_usage("cap-lease", 0)
@@ -285,36 +358,38 @@ fn sqlite_budget_authorize_idempotency_persists_across_reopen() {
 
     {
         let store = SqliteBudgetStore::open(&path).test_expect("open budget store");
-        assert!(store
-            .try_charge_cost_with_ids_and_authority(
-                "cap-idempotent",
-                0,
-                Some(10),
-                100,
-                Some(200),
-                Some(1000),
-                Some(hold_id),
-                Some(authorize_event_id),
-                Some(&authority),
-            )
-            .test_expect("authorize hold before reopen"));
+        assert!(authorize(
+            &store,
+            Charge {
+                capability_id: "cap-idempotent",
+                max_invocations: Some(10),
+                cost_units: 100,
+                max_cost_per_invocation: 200,
+                max_total_cost_units: 1000,
+                hold_id: hold_id,
+                event_id: authorize_event_id,
+                authority: Some(&authority),
+            },
+        )
+        .test_expect("authorize hold before reopen"));
     }
 
     {
         let store = SqliteBudgetStore::open(&path).test_expect("reopen budget store");
-        assert!(store
-            .try_charge_cost_with_ids_and_authority(
-                "cap-idempotent",
-                0,
-                Some(10),
-                100,
-                Some(200),
-                Some(1000),
-                Some(hold_id),
-                Some(authorize_event_id),
-                Some(&authority),
-            )
-            .test_expect("replay identical authorize after reopen"));
+        assert!(authorize(
+            &store,
+            Charge {
+                capability_id: "cap-idempotent",
+                max_invocations: Some(10),
+                cost_units: 100,
+                max_cost_per_invocation: 200,
+                max_total_cost_units: 1000,
+                hold_id: hold_id,
+                event_id: authorize_event_id,
+                authority: Some(&authority),
+            },
+        )
+        .test_expect("replay identical authorize after reopen"));
 
         let usage = store
             .get_usage("cap-idempotent", 0)

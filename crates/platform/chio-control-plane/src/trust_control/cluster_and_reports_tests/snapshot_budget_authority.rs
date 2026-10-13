@@ -132,17 +132,7 @@ fn snapshot_preserves_exact_budget_origin_heads_and_next_delta() {
     };
     let source_store = SqliteBudgetStore::open(&source_budget_db).test_unwrap();
     assert!(source_store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-snapshot",
-            0,
-            Some(20),
-            9,
-            Some(100),
-            Some(1_000),
-            Some("hold-snapshot"),
-            Some("hold-snapshot:authorize"),
-            Some(&authority),
-        )
+        .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: ("cap-snapshot").to_string(), grant_index: 0, max_invocations: Some(20), invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: 9, max_cost_per_invocation: Some(100), max_total_cost_units: Some(1_000), hold_id: "hold-snapshot".to_string(), event_id: "hold-snapshot:authorize".to_string(), authority: Some(authority.clone()) }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
         .test_unwrap());
 
     let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
@@ -169,14 +159,7 @@ fn snapshot_preserves_exact_budget_origin_heads_and_next_delta() {
     assert_eq!(installed_cursor.seq, 1);
 
     source_store
-        .reduce_charge_cost_with_ids_and_authority(
-            "cap-snapshot",
-            0,
-            4,
-            Some("hold-snapshot"),
-            Some("hold-snapshot:release"),
-            Some(&authority),
-        )
+        .release_budget_hold(chio_kernel::budget_store::BudgetReleaseHoldRequest { capability_id: ("cap-snapshot").to_string(), grant_index: 0, released_exposure_units: 4, hold_id: "hold-snapshot".to_string(), event_id: "hold-snapshot:release".to_string(), authority: Some(authority.clone()) }).map(|_| ())
         .test_unwrap();
     let next_snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
     let response = BudgetDeltaResponse {
@@ -232,17 +215,7 @@ fn snapshot_rejects_forged_budget_origin_head_without_partial_import() {
         lease_epoch: 1,
     };
     assert!(source_store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-forged-origin",
-            0,
-            Some(1),
-            1,
-            Some(1),
-            Some(1),
-            Some("hold-forged-origin"),
-            Some("hold-forged-origin:authorize"),
-            Some(&authority),
-        )
+        .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: ("cap-forged-origin").to_string(), grant_index: 0, max_invocations: Some(1), invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: 1, max_cost_per_invocation: Some(1), max_total_cost_units: Some(1), hold_id: "hold-forged-origin".to_string(), event_id: "hold-forged-origin:authorize".to_string(), authority: Some(authority.clone()) }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
         .test_unwrap());
     let mut snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
     snapshot.budget_origin_ack_heads[0].event_seq = 2;
@@ -291,17 +264,7 @@ fn snapshot_rejects_local_only_history_without_promoting_peer_state() {
     };
     let source_store = SqliteBudgetStore::open(&source_budget_db).test_unwrap();
     assert!(source_store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-local-history-1",
-            0,
-            Some(1),
-            1,
-            Some(1),
-            Some(1),
-            Some("hold-local-history-1"),
-            Some("hold-local-history-1:authorize"),
-            Some(&authority),
-        )
+        .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: ("cap-local-history-1").to_string(), grant_index: 0, max_invocations: Some(1), invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: 1, max_cost_per_invocation: Some(1), max_total_cost_units: Some(1), hold_id: "hold-local-history-1".to_string(), event_id: "hold-local-history-1:authorize".to_string(), authority: Some(authority.clone()) }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
         .test_unwrap());
     let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
 

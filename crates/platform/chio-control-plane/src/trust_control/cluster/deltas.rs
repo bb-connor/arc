@@ -1379,16 +1379,7 @@ fn budget_authorize_compensation_event_id(
     payload: &TryChargeCostRequest,
     authorize_event_seq: u64,
 ) -> String {
-    if let Some(event_id) = payload.event_id.as_deref() {
-        return format!("{event_id}:rollback:{authorize_event_seq}");
-    }
-    if let Some(hold_id) = payload.hold_id.as_deref() {
-        return format!("{hold_id}:rollback:{authorize_event_seq}");
-    }
-    format!(
-        "rollback:{}:{}:{}",
-        payload.capability_id, payload.grant_index, authorize_event_seq
-    )
+    format!("{}:rollback:{authorize_event_seq}", payload.event_id)
 }
 
 pub(crate) fn rollback_budget_authorize_exposure(
@@ -1403,15 +1394,15 @@ pub(crate) fn rollback_budget_authorize_exposure(
             response.status()
         ))
     })?;
-    let rollback_event_id = budget_authorize_compensation_event_id(payload, authorize_event_seq);
-    store.reverse_charge_cost_with_ids_and_authority(
-        &payload.capability_id,
-        payload.grant_index,
-        payload.cost_units,
-        payload.hold_id.as_deref(),
-        Some(&rollback_event_id),
-        authority,
-    )?;
+    store.reverse_budget_hold(BudgetReverseHoldRequest {
+        capability_id: payload.capability_id.clone(),
+        grant_index: payload.grant_index,
+        reversed_exposure_units: payload.cost_units,
+        hold_id: payload.hold_id.clone(),
+        event_id: budget_authorize_compensation_event_id(payload, authorize_event_seq),
+        expected_cumulative_approval_state: None,
+        authority: authority.cloned(),
+    })?;
     Ok(())
 }
 

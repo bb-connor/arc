@@ -69,8 +69,8 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
         requested_exposure_units: 125,
         max_cost_per_invocation: Some(125),
         max_total_cost_units: Some(125),
-        hold_id: Some(hold_id.to_owned()),
-        event_id: Some(event_id.to_owned()),
+        hold_id: hold_id.to_owned(),
+        event_id: event_id.to_owned(),
         authority: Some(authority),
     };
     let journal = PaymentJournalRecord {
@@ -387,8 +387,8 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
         grant_index: 0,
         exposed_cost_units: 125,
         realized_spend_units: 75,
-        hold_id: Some(hold_id.to_owned()),
-        event_id: Some(format!("{hold_id}:reconcile")),
+        hold_id: hold_id.to_owned(),
+        event_id: format!("{hold_id}:reconcile"),
         authority: Some(settlement_authority),
     };
     {
@@ -435,7 +435,7 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
                 params![
                     hold_id,
                     operation.binding().operation_id().as_str(),
-                    reconcile.event_id.as_deref()
+                    reconcile.event_id.as_str()
                 ],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
@@ -568,8 +568,8 @@ fn combined_budget_capture_and_dispatch_commit_is_atomic_and_exactly_replayable(
                 requested_exposure_units: 10,
                 max_cost_per_invocation: Some(10),
                 max_total_cost_units: Some(10),
-                hold_id: Some(hold_id.to_owned()),
-                event_id: Some("authorize-combined-capture".to_owned()),
+                hold_id: hold_id.to_owned(),
+                event_id: "authorize-combined-capture".to_owned(),
                 authority: Some(authority.clone()),
             })
             .expect("authorize combined capture hold"),
@@ -744,8 +744,8 @@ fn combined_authorization_request(
         requested_exposure_units: 125,
         max_cost_per_invocation: Some(125),
         max_total_cost_units: Some(125),
-        hold_id: Some(hold_id.to_owned()),
-        event_id: Some(event_id.to_owned()),
+        hold_id: hold_id.to_owned(),
+        event_id: event_id.to_owned(),
         authority: Some(authority),
     };
     let journal = PaymentJournalRecord {
@@ -1101,8 +1101,8 @@ fn pre_dispatch_compensation_requires_the_executable_hold_to_be_reversed() {
         requested_exposure_units: 0,
         max_cost_per_invocation: None,
         max_total_cost_units: None,
-        hold_id: Some("hold-compensated".to_owned()),
-        event_id: Some("authorize-compensated".to_owned()),
+        hold_id: "hold-compensated".to_owned(),
+        event_id: "authorize-compensated".to_owned(),
         authority: Some(authority.clone()),
     };
     let authorization_lease = claim(&fixture, &operation, "compensation-worker", begun_at + 3);
@@ -1168,8 +1168,8 @@ fn pre_dispatch_compensation_requires_the_executable_hold_to_be_reversed() {
             capability_id: "capability-compensated-hold".to_owned(),
             grant_index: 0,
             reversed_exposure_units: 0,
-            hold_id: Some("hold-compensated".to_owned()),
-            event_id: Some("authorize-compensated:rollback:recovery".to_owned()),
+            hold_id: "hold-compensated".to_owned(),
+            event_id: "authorize-compensated:rollback:recovery".to_owned(),
             expected_cumulative_approval_state: None,
             authority: Some(authority),
         })

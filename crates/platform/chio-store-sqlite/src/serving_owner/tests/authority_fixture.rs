@@ -88,8 +88,8 @@ pub(super) fn structured_request(
         requested_exposure_units: 10,
         max_cost_per_invocation: Some(10),
         max_total_cost_units: Some(10),
-        hold_id: Some("hold-structured".to_string()),
-        event_id: Some("event-structured".to_string()),
+        hold_id: "hold-structured".to_string(),
+        event_id: "event-structured".to_string(),
         authority,
     }
 }

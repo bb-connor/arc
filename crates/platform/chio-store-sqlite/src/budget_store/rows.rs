@@ -149,17 +149,6 @@ pub(super) fn appended_event_lifecycle(
         }
     });
     Ok(match kind {
-        BudgetMutationKind::IncrementInvocation => (
-            authorization_outcome,
-            BudgetInvocationState::Absent,
-            if allowed == Some(true) {
-                BudgetInvocationState::Captured
-            } else {
-                BudgetInvocationState::Denied
-            },
-            BudgetMonetaryState::None,
-            BudgetMonetaryState::None,
-        ),
         BudgetMutationKind::AuthorizeExposure | BudgetMutationKind::ReserveInvocation => (
             authorization_outcome,
             BudgetInvocationState::Absent,
@@ -264,19 +253,6 @@ pub(super) fn validate_legacy_event_lifecycle(
         }
     });
     let valid = match record.kind {
-        BudgetMutationKind::IncrementInvocation => {
-            record.allowed.is_some()
-                && record.authorization_outcome == expected_outcome
-                && record.invocation_state_before == BudgetInvocationState::Absent
-                && record.invocation_state_after
-                    == if record.allowed == Some(true) {
-                        BudgetInvocationState::Captured
-                    } else {
-                        BudgetInvocationState::Denied
-                    }
-                && record.monetary_state_before == BudgetMonetaryState::None
-                && record.monetary_state_after == BudgetMonetaryState::None
-        }
         BudgetMutationKind::AuthorizeExposure => {
             record.allowed.is_some()
                 && record.authorization_outcome == expected_outcome

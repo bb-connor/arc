@@ -615,14 +615,8 @@ impl StructuredBudgetAuthorizeRequest {
             requested_exposure_units: request.requested_exposure_units,
             max_cost_per_invocation: request.max_cost_per_invocation,
             max_total_cost_units: request.max_total_cost_units,
-            hold_id: request
-                .hold_id
-                .clone()
-                .ok_or_else(|| "structured budget authorization requires hold_id".to_string())?,
-            event_id: request
-                .event_id
-                .clone()
-                .ok_or_else(|| "structured budget authorization requires event_id".to_string())?,
+            hold_id: request.hold_id.clone(),
+            event_id: request.event_id.clone(),
         })
     }
 
@@ -646,8 +640,8 @@ impl StructuredBudgetAuthorizeRequest {
             requested_exposure_units: self.requested_exposure_units,
             max_cost_per_invocation: self.max_cost_per_invocation,
             max_total_cost_units: self.max_total_cost_units,
-            hold_id: Some(self.hold_id),
-            event_id: Some(self.event_id),
+            hold_id: self.hold_id,
+            event_id: self.event_id,
             authority,
         })
     }
@@ -892,7 +886,6 @@ impl StructuredBudgetProjectionContractView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct StructuredBudgetAuthorizeResponse {
-    #[serde(default)]
     pub(crate) cleanup_custody: chio_kernel::budget_store::BudgetHoldCleanupCustody,
     pub(crate) schema: String,
     pub(crate) capability_id: String,

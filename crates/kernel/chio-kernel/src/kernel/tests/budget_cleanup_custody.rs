@@ -3,95 +3,6 @@ use crate::budget_store::{BudgetHoldAuthorizationRecord, BudgetHoldCleanupCustod
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-/// A bool-returning backend that inherits the default rich authorization method.
-struct LegacyBudgetStore {
-    inner: InMemoryBudgetStore,
-}
-
-impl BudgetStore for LegacyBudgetStore {
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.inner
-            .try_increment(capability_id, grant_index, max_invocations)
-    }
-
-    fn try_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.inner.try_charge_cost(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-        )
-    }
-
-    fn reverse_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner
-            .reverse_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn reduce_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner
-            .reduce_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn settle_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner.settle_charge_cost(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-        )
-    }
-
-    delegate_authority_fenced_budget_methods!(inner);
-
-    fn list_usages(
-        &self,
-        limit: usize,
-        capability_id: Option<&str>,
-    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
-        self.inner.list_usages(limit, capability_id)
-    }
-
-    fn get_usage(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
-        self.inner.get_usage(capability_id, grant_index)
-    }
-}
-
 fn authorize_request(capability_id: &str) -> BudgetAuthorizeHoldRequest {
     BudgetAuthorizeHoldRequest {
         capability_id: capability_id.to_string(),
@@ -103,8 +14,8 @@ fn authorize_request(capability_id: &str) -> BudgetAuthorizeHoldRequest {
         requested_exposure_units: 100,
         max_cost_per_invocation: Some(100),
         max_total_cost_units: Some(1_000),
-        hold_id: Some("cleanup-custody-hold".to_string()),
-        event_id: Some("cleanup-custody-hold:authorize".to_string()),
+        hold_id: "cleanup-custody-hold".to_string(),
+        event_id: "cleanup-custody-hold:authorize".to_string(),
         authority: None,
     }
 }
@@ -133,13 +44,8 @@ fn charge(record: BudgetHoldAuthorizationRecord) -> BudgetChargeResult {
     }
 }
 
-fn exercise_cleanup(replay: bool, legacy: bool) -> TestResult {
+fn exercise_cleanup(replay: bool) -> TestResult {
     let mut kernel = make_kernel(make_monetary_config());
-    if legacy {
-        kernel.set_budget_store(Box::new(LegacyBudgetStore {
-            inner: InMemoryBudgetStore::new(),
-        }));
-    }
     let agent = make_keypair();
     let cap = kernel.issue_capability(
         &agent.public_key(),
@@ -154,12 +60,8 @@ fn exercise_cleanup(replay: bool, legacy: bool) -> TestResult {
     let record = if replay {
         let replayed = authorized(kernel.budget_store.as_ref(), budget_request)?;
         let mut expected = first;
-        expected.cleanup_custody = if legacy {
-            BudgetHoldCleanupCustody::Unknown
-        } else {
-            assert_eq!(expected.cleanup_custody, BudgetHoldCleanupCustody::Fresh);
-            BudgetHoldCleanupCustody::Replayed
-        };
+        assert_eq!(expected.cleanup_custody, BudgetHoldCleanupCustody::Fresh);
+        expected.cleanup_custody = BudgetHoldCleanupCustody::Replayed;
         assert_eq!(
             replayed, expected,
             "replay preserves every persisted decision field"
@@ -168,9 +70,7 @@ fn exercise_cleanup(replay: bool, legacy: bool) -> TestResult {
     } else {
         first
     };
-    let expected_custody = if legacy {
-        BudgetHoldCleanupCustody::Unknown
-    } else if replay {
+    let expected_custody = if replay {
         BudgetHoldCleanupCustody::Replayed
     } else {
         BudgetHoldCleanupCustody::Fresh
@@ -227,18 +127,10 @@ fn exercise_cleanup(replay: bool, legacy: bool) -> TestResult {
 
 #[test]
 fn fresh_ordinary_authorization_can_release_and_reverse() -> TestResult {
-    exercise_cleanup(false, false)
+    exercise_cleanup(false)
 }
 
 #[test]
 fn replayed_ordinary_authorization_retains_budget_and_payment() -> TestResult {
-    exercise_cleanup(true, false)
-}
-
-#[test]
-fn default_backend_never_claims_fresh_cleanup_custody() -> TestResult {
-    for replay in [false, true] {
-        exercise_cleanup(replay, true)?;
-    }
-    Ok(())
+    exercise_cleanup(true)
 }

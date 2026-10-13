@@ -52,8 +52,8 @@ pub(super) fn budget_request_with_ids(
         requested_exposure_units: 0,
         max_cost_per_invocation: None,
         max_total_cost_units: None,
-        hold_id: Some(hold_id.into()),
-        event_id: Some(event_id.into()),
+        hold_id: hold_id.into(),
+        event_id: event_id.into(),
         authority: Some(authority(fixture)),
     }
 }
@@ -132,8 +132,8 @@ pub(super) fn release(fixture: &NonceFixture) -> TestResult {
             capability_id: fixture.operation.binding().capability_id().as_str().into(),
             grant_index: 0,
             reversed_exposure_units: 0,
-            hold_id: Some("nonce-hold".into()),
-            event_id: Some("nonce-reverse".into()),
+            hold_id: "nonce-hold".into(),
+            event_id: "nonce-reverse".into(),
             expected_cumulative_approval_state: None,
             authority: Some(authority(&fixture.fixture)),
         })?;

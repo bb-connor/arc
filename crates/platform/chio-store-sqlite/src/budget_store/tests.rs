@@ -16,9 +16,36 @@ fn sqlite_budget_store_persists_across_reopen() {
     let path = unique_db_path("chio-budgets");
     {
         let store = SqliteBudgetStore::open(&path).unwrap();
-        assert!(store.try_increment("cap-1", 0, Some(2)).unwrap());
-        assert!(store.try_increment("cap-1", 0, Some(2)).unwrap());
-        assert!(!store.try_increment("cap-1", 0, Some(2)).unwrap());
+        assert!(charge(
+            &store,
+            "cap-1",
+            0,
+            (Some(2), 0, None, None),
+            "cap-1-hold-1",
+            "cap-1-hold-1:authorize",
+            None
+        )
+        .unwrap());
+        assert!(charge(
+            &store,
+            "cap-1",
+            0,
+            (Some(2), 0, None, None),
+            "cap-1-hold-2",
+            "cap-1-hold-2:authorize",
+            None
+        )
+        .unwrap());
+        assert!(!charge(
+            &store,
+            "cap-1",
+            0,
+            (Some(2), 0, None, None),
+            "cap-1-hold-3",
+            "cap-1-hold-3:authorize",
+            None
+        )
+        .unwrap());
     }
 
     let reopened = SqliteBudgetStore::open(&path).unwrap();
@@ -82,18 +109,16 @@ fn budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite() {
     let authorize_event_id = "hold-cap-1-0:authorize";
     let reconcile_event_id = "hold-cap-1-0:reconcile";
 
-    assert!(store
-        .try_charge_cost_with_ids(
-            "cap-1",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(authorize_event_id),
-        )
-        .unwrap());
+    assert!(charge(
+        &store,
+        "cap-1",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        hold_id,
+        authorize_event_id,
+        None
+    )
+    .unwrap());
     store
         .capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: "cap-1".to_string(),
@@ -104,12 +129,26 @@ fn budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite() {
             authority: None,
         })
         .unwrap();
-    store
-        .settle_charge_cost_with_ids("cap-1", 0, 100, 75, Some(hold_id), Some(reconcile_event_id))
-        .unwrap();
-    store
-        .settle_charge_cost_with_ids("cap-1", 0, 100, 75, Some(hold_id), Some(reconcile_event_id))
-        .unwrap();
+    reconcile(
+        &store,
+        "cap-1",
+        0,
+        (100, 75),
+        hold_id,
+        reconcile_event_id,
+        None,
+    )
+    .unwrap();
+    reconcile(
+        &store,
+        "cap-1",
+        0,
+        (100, 75),
+        hold_id,
+        reconcile_event_id,
+        None,
+    )
+    .unwrap();
 
     let usage = store.get_usage("cap-1", 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 1);
@@ -133,54 +172,30 @@ fn budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite() {
 }
 
 #[test]
-fn budget_store_reduce_charge_cost_allows_zero_invocation_release_sqlite() {
-    let path = unique_db_path("chio-reduce-charge-zero-invocations");
-    let store = SqliteBudgetStore::open(&path).unwrap();
-    install_usage_anchor(&store, &usage_record("cap-zero", 0, 0, 10, 10, 40, 0));
-
-    store.reduce_charge_cost("cap-zero", 0, 25).unwrap();
-
-    let usage = store.get_usage("cap-zero", 0).unwrap().unwrap();
-    assert_eq!(usage.invocation_count, 0);
-    assert_usage_totals(&usage, 15, 0);
-
-    let events = store
-        .list_mutation_events(10, Some("cap-zero"), Some(0))
-        .unwrap();
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0].kind, BudgetMutationKind::ReleaseExposure);
-    assert_eq!(events[0].invocation_count_after, 0);
-    assert_eq!(events[0].total_cost_exposed_after, 15);
-
-    let _ = fs::remove_file(path);
-}
-
-#[test]
 fn budget_store_list_mutation_events_preserves_append_order_sqlite() {
     let path = unique_db_path("chio-budget-event-order");
     let store = SqliteBudgetStore::open(&path).unwrap();
 
-    assert!(store
-        .try_charge_cost_with_ids(
-            "cap-order",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some("hold-cap-order-0"),
-            Some("z-authorize"),
-        )
-        .unwrap());
-    store
-        .reduce_charge_cost_with_ids(
-            "cap-order",
-            0,
-            25,
-            Some("hold-cap-order-0"),
-            Some("a-release"),
-        )
-        .unwrap();
+    assert!(charge(
+        &store,
+        "cap-order",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        "hold-cap-order-0",
+        "z-authorize",
+        None
+    )
+    .unwrap());
+    release(
+        &store,
+        "cap-order",
+        0,
+        25,
+        "hold-cap-order-0",
+        "a-release",
+        None,
+    )
+    .unwrap();
 
     let events = store
         .list_mutation_events(10, Some("cap-order"), Some(0))
@@ -205,70 +220,67 @@ fn budget_store_hold_authority_requires_exact_lease_inmemory() {
     let advanced = authority("budget-primary", "lease-7", 8);
     let stale = authority("budget-primary", "lease-7", 6);
 
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(authorize_event_id),
-            Some(&initial),
-        )
-        .unwrap());
+    assert!(charge(
+        &store,
+        "cap-lease",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        hold_id,
+        authorize_event_id,
+        Some(&initial)
+    )
+    .unwrap());
 
-    let missing = store
-        .reduce_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            25,
-            Some(hold_id),
-            Some("hold-cap-lease-0:release-missing"),
-            None,
-        )
-        .expect_err("missing lease metadata should fail closed");
+    let missing = release(
+        &store,
+        "cap-lease",
+        0,
+        25,
+        hold_id,
+        "hold-cap-lease-0:release-missing",
+        None,
+    )
+    .expect_err("missing lease metadata should fail closed");
     assert!(missing
         .to_string()
         .contains("requires authority lease metadata"));
 
-    let stale_error = store
-        .reduce_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            25,
-            Some(hold_id),
-            Some("hold-cap-lease-0:release-stale"),
-            Some(&stale),
-        )
-        .expect_err("stale lease epoch should fail closed");
+    let stale_error = release(
+        &store,
+        "cap-lease",
+        0,
+        25,
+        hold_id,
+        "hold-cap-lease-0:release-stale",
+        Some(&stale),
+    )
+    .expect_err("stale lease epoch should fail closed");
     assert!(stale_error.to_string().contains("lease epoch regressed"));
 
-    let advanced_error = store
-        .reduce_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            25,
-            Some(hold_id),
-            Some(release_event_id),
-            Some(&advanced),
-        )
-        .expect_err("advanced lease epoch should fail closed");
+    let advanced_error = release(
+        &store,
+        "cap-lease",
+        0,
+        25,
+        hold_id,
+        release_event_id,
+        Some(&advanced),
+    )
+    .expect_err("advanced lease epoch should fail closed");
     assert!(advanced_error
         .to_string()
         .contains("advanced beyond the open lease"));
 
-    store
-        .reduce_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            25,
-            Some(hold_id),
-            Some(release_event_id),
-            Some(&initial),
-        )
-        .unwrap();
+    release(
+        &store,
+        "cap-lease",
+        0,
+        25,
+        hold_id,
+        release_event_id,
+        Some(&initial),
+    )
+    .unwrap();
     store
         .capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: "cap-lease".to_string(),
@@ -279,17 +291,16 @@ fn budget_store_hold_authority_requires_exact_lease_inmemory() {
             authority: Some(initial.clone()),
         })
         .unwrap();
-    store
-        .settle_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            75,
-            75,
-            Some(hold_id),
-            Some(reconcile_event_id),
-            Some(&initial),
-        )
-        .unwrap();
+    reconcile(
+        &store,
+        "cap-lease",
+        0,
+        (75, 75),
+        hold_id,
+        reconcile_event_id,
+        Some(&initial),
+    )
+    .unwrap();
 
     let usage = store.get_usage("cap-lease", 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 1);
@@ -313,63 +324,51 @@ fn budget_store_event_id_retry_rejects_authority_rollover_sqlite() {
     let initial = authority("budget-primary", "lease-7", 7);
     let changed = authority("budget-primary", "lease-8", 8);
 
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&initial),
-        )
-        .unwrap());
+    assert!(charge(
+        &store,
+        "cap-lease",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        hold_id,
+        event_id,
+        Some(&initial)
+    )
+    .unwrap());
 
-    let error = store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&changed),
-        )
-        .expect_err("exact replay must preserve the original authority");
+    let error = charge(
+        &store,
+        "cap-lease",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        hold_id,
+        event_id,
+        Some(&changed),
+    )
+    .expect_err("exact replay must preserve the original authority");
     assert!(error
         .to_string()
         .contains("authority metadata does not match the original mutation"));
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&initial),
-        )
-        .unwrap());
+    assert!(charge(
+        &store,
+        "cap-lease",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        hold_id,
+        event_id,
+        Some(&initial)
+    )
+    .unwrap());
 
-    let error = store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            Some(10),
-            101,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&initial),
-        )
-        .expect_err("reused event id with a different mutation should fail closed");
+    let error = charge(
+        &store,
+        "cap-lease",
+        0,
+        (Some(10), 101, Some(200), Some(1000)),
+        hold_id,
+        event_id,
+        Some(&initial),
+    )
+    .expect_err("reused event id with a different mutation should fail closed");
     assert!(error
         .to_string()
         .contains("was reused for a different mutation"));
@@ -397,58 +396,49 @@ fn budget_store_compensated_identity_is_terminal_and_fresh_identity_succeeds_sql
     let initial = authority("budget-primary", "lease-7", 7);
     let changed = authority("budget-primary", "lease-8", 8);
 
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&initial),
-        )
-        .unwrap());
-    store
-        .reverse_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            100,
-            Some(hold_id),
-            Some(rollback_event_id),
-            Some(&initial),
-        )
-        .unwrap();
+    assert!(charge(
+        &store,
+        "cap-lease",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        hold_id,
+        event_id,
+        Some(&initial)
+    )
+    .unwrap());
+    reverse(
+        &store,
+        "cap-lease",
+        0,
+        100,
+        hold_id,
+        rollback_event_id,
+        Some(&initial),
+    )
+    .unwrap();
 
-    let error = store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&initial),
-        )
-        .expect_err("compensated authorization identity must remain terminal");
+    let error = charge(
+        &store,
+        "cap-lease",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        hold_id,
+        event_id,
+        Some(&initial),
+    )
+    .expect_err("compensated authorization identity must remain terminal");
     assert!(error.to_string().contains("cannot be reopened"));
 
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some("hold-cap-lease-1"),
-            Some("hold-cap-lease-1:authorize"),
-            Some(&changed),
-        )
-        .unwrap());
+    assert!(charge(
+        &store,
+        "cap-lease",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        "hold-cap-lease-1",
+        "hold-cap-lease-1:authorize",
+        Some(&changed)
+    )
+    .unwrap());
 
     let usage = store.get_usage("cap-lease", 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 1);
@@ -479,21 +469,26 @@ fn import_mutation_record_keeps_duplicate_release_events_idempotent_sqlite() {
     let authorize_event_id = "hold-cap-import-0:authorize";
     let release_event_id = "hold-cap-import-0:release";
 
-    assert!(store
-        .try_charge_cost_with_ids(
-            "cap-import",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(authorize_event_id),
-        )
-        .unwrap());
-    store
-        .reduce_charge_cost_with_ids("cap-import", 0, 100, Some(hold_id), Some(release_event_id))
-        .unwrap();
+    assert!(charge(
+        &store,
+        "cap-import",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        hold_id,
+        authorize_event_id,
+        None
+    )
+    .unwrap());
+    release(
+        &store,
+        "cap-import",
+        0,
+        100,
+        hold_id,
+        release_event_id,
+        None,
+    )
+    .unwrap();
 
     let release_record = store
         .list_mutation_events(10, Some("cap-import"), Some(0))
@@ -536,18 +531,16 @@ fn import_snapshot_records_replay_is_idempotent_when_peer_cursor_is_lost_sqlite(
     let target_path = unique_db_path("chio-budget-import-replay-target");
     let source = SqliteBudgetStore::open(&source_path).unwrap();
 
-    assert!(source
-        .try_charge_cost_with_ids(
-            "cap-import-replay",
-            0,
-            Some(5),
-            25,
-            Some(50),
-            Some(250),
-            Some("hold-import-replay-0"),
-            Some("hold-import-replay-0:authorize"),
-        )
-        .unwrap());
+    assert!(charge(
+        &source,
+        "cap-import-replay",
+        0,
+        (Some(5), 25, Some(50), Some(250)),
+        "hold-import-replay-0",
+        "hold-import-replay-0:authorize",
+        None
+    )
+    .unwrap());
     let usage = source
         .get_usage("cap-import-replay", 0)
         .unwrap()
@@ -1028,19 +1021,16 @@ fn snapshot_export_is_consistent_while_another_connection_commits() {
         writer_started.wait();
         let authority = authority("http://origin", "http://origin#term-1", 1);
         for index in 0..64 {
-            assert!(writer
-                .try_charge_cost_with_ids_and_authority(
-                    "cap-concurrent-snapshot",
-                    0,
-                    Some(64),
-                    1,
-                    Some(1),
-                    Some(64),
-                    Some(&format!("hold-concurrent-{index}")),
-                    Some(&format!("event-concurrent-{index}")),
-                    Some(&authority),
-                )
-                .unwrap());
+            assert!(charge(
+                &writer,
+                "cap-concurrent-snapshot",
+                0,
+                (Some(64), 1, Some(1), Some(64)),
+                &format!("hold-concurrent-{index}"),
+                &format!("event-concurrent-{index}"),
+                Some(&authority)
+            )
+            .unwrap());
         }
         writer_done.store(true, Ordering::Release);
     });
@@ -1100,19 +1090,16 @@ fn migration_anchor_does_not_bootstrap_coverage_over_later_events() {
             )
             .unwrap();
         assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);
-        assert!(store
-            .try_charge_cost_with_ids_and_authority(
-                "cap-after-snapshot",
-                0,
-                Some(2),
-                1,
-                None,
-                None,
-                None,
-                Some("snapshot-head-45"),
-                Some(&authority("http://origin", "http://origin#term-1", 1,)),
-            )
-            .unwrap());
+        assert!(charge(
+            &store,
+            "cap-after-snapshot",
+            0,
+            (Some(2), 1, None, None),
+            "snapshot-head-45-hold",
+            "snapshot-head-45",
+            Some(&authority("http://origin", "http://origin#term-1", 1,))
+        )
+        .unwrap());
         assert_eq!(store.max_mutation_event_seq().unwrap(), 45);
     }
 
@@ -1129,18 +1116,16 @@ fn import_snapshot_records_duplicate_event_rejects_peer_transport_sequence_injec
     let target_path = unique_db_path("chio-budget-import-transport-target");
     let source = SqliteBudgetStore::open(&source_path).unwrap();
 
-    assert!(source
-        .try_charge_cost_with_ids(
-            "cap-import-transport",
-            0,
-            Some(10),
-            25,
-            Some(100),
-            Some(500),
-            Some("hold-import-transport-0"),
-            Some("hold-import-transport-0:authorize"),
-        )
-        .unwrap());
+    assert!(charge(
+        &source,
+        "cap-import-transport",
+        0,
+        (Some(10), 25, Some(100), Some(500)),
+        "hold-import-transport-0",
+        "hold-import-transport-0:authorize",
+        None
+    )
+    .unwrap());
     let usage = source
         .get_usage("cap-import-transport", 0)
         .unwrap()
@@ -1188,19 +1173,16 @@ fn import_snapshot_records_rolls_back_usage_rows_when_mutation_conflicts_sqlite(
     let initial_authority = authority("budget-primary", "lease-1", 1);
     let conflicting_authority = authority("budget-primary", "lease-2", 2);
 
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-import",
-            0,
-            Some(10),
-            25,
-            Some(100),
-            Some(500),
-            Some("hold-cap-import-atomic-0"),
-            Some("hold-cap-import-atomic-0:authorize"),
-            Some(&initial_authority),
-        )
-        .unwrap());
+    assert!(charge(
+        &store,
+        "cap-import",
+        0,
+        (Some(10), 25, Some(100), Some(500)),
+        "hold-cap-import-atomic-0",
+        "hold-cap-import-atomic-0:authorize",
+        Some(&initial_authority)
+    )
+    .unwrap());
 
     let mut conflicting_event = store
         .list_mutation_events(10, Some("cap-import"), Some(0))
@@ -1235,34 +1217,28 @@ fn budget_store_open_hold_rejects_missing_authorize_event_sqlite() {
     let event_id = "hold-cap-recover-0:authorize";
     let authority = authority("budget-primary", "lease-7", 7);
 
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-recover",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&authority),
-        )
-        .unwrap());
+    assert!(charge(
+        &store,
+        "cap-recover",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        hold_id,
+        event_id,
+        Some(&authority)
+    )
+    .unwrap());
     store.delete_mutation_event(event_id).unwrap();
 
-    let error = store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-recover",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&authority),
-        )
-        .expect_err("an open hold without its authorization event must fail closed");
+    let error = charge(
+        &store,
+        "cap-recover",
+        0,
+        (Some(10), 100, Some(200), Some(1000)),
+        hold_id,
+        event_id,
+        Some(&authority),
+    )
+    .expect_err("an open hold without its authorization event must fail closed");
     assert!(error.to_string().contains("authorization event"));
 
     let events = store
@@ -1334,26 +1310,36 @@ fn concurrent_charge_overrun_bound() {
     let node_b = SqliteBudgetStore::open(&path_b).unwrap();
 
     // Both nodes independently approve an invocation of max_per_invocation
-    let approved_a = node_a
-        .try_charge_cost(
-            "cap-split",
-            0,
+    let approved_a = charge(
+        &node_a,
+        "cap-split",
+        0,
+        (
             None,
             max_per_invocation,
             Some(max_per_invocation),
             Some(total_budget),
-        )
-        .unwrap();
-    let approved_b = node_b
-        .try_charge_cost(
-            "cap-split",
-            0,
+        ),
+        "cap-split-hold-1",
+        "cap-split-hold-1:authorize",
+        None,
+    )
+    .unwrap();
+    let approved_b = charge(
+        &node_b,
+        "cap-split",
+        0,
+        (
             None,
             max_per_invocation,
             Some(max_per_invocation),
             Some(total_budget),
-        )
-        .unwrap();
+        ),
+        "cap-split-hold-2",
+        "cap-split-hold-2:authorize",
+        None,
+    )
+    .unwrap();
 
     // Both nodes approved (split-brain; each sees a fresh slate)
     assert!(approved_a, "node A should approve");
@@ -1385,9 +1371,16 @@ fn concurrent_charge_overrun_bound() {
 fn budget_store_zero_max_total_denies_any_charge_inmemory() {
     // A grant with max_total_cost = 0 must deny even a charge of 1 unit.
     let store = InMemoryBudgetStore::new();
-    let ok = store
-        .try_charge_cost("cap-zero-budget", 0, None, 1, None, Some(0))
-        .unwrap();
+    let ok = charge(
+        &store,
+        "cap-zero-budget",
+        0,
+        (None, 1, None, Some(0)),
+        "cap-zero-budget-hold",
+        "cap-zero-budget-hold:authorize",
+        None,
+    )
+    .unwrap();
     assert!(
         !ok,
         "any charge against a zero-unit total budget must be denied"
@@ -1403,9 +1396,16 @@ fn budget_store_zero_max_total_denies_any_charge_inmemory() {
 fn budget_store_zero_max_total_denies_any_charge_sqlite() {
     let path = unique_db_path("chio-zero-budget-sqlite");
     let store = SqliteBudgetStore::open(&path).unwrap();
-    let ok = store
-        .try_charge_cost("cap-zero-budget", 0, None, 1, None, Some(0))
-        .unwrap();
+    let ok = charge(
+        &store,
+        "cap-zero-budget",
+        0,
+        (None, 1, None, Some(0)),
+        "cap-zero-budget-hold",
+        "cap-zero-budget-hold:authorize",
+        None,
+    )
+    .unwrap();
     assert!(
         !ok,
         "any charge against a zero-unit total budget must be denied"
@@ -1423,9 +1423,16 @@ fn budget_store_zero_cost_invocation_succeeds_and_records_zero_inmemory() {
     // A zero-cost invocation against a monetary grant should succeed and
     // record cost_charged = 0.
     let store = InMemoryBudgetStore::new();
-    let ok = store
-        .try_charge_cost("cap-zero-cost", 0, None, 0, None, Some(1000))
-        .unwrap();
+    let ok = charge(
+        &store,
+        "cap-zero-cost",
+        0,
+        (None, 0, None, Some(1000)),
+        "cap-zero-cost-hold",
+        "cap-zero-cost-hold:authorize",
+        None,
+    )
+    .unwrap();
     assert!(
         ok,
         "zero-cost invocation should succeed when budget is available"
@@ -1440,9 +1447,16 @@ fn budget_store_zero_cost_invocation_succeeds_and_records_zero_inmemory() {
 fn budget_store_zero_cost_invocation_succeeds_and_records_zero_sqlite() {
     let path = unique_db_path("chio-zero-cost-sqlite");
     let store = SqliteBudgetStore::open(&path).unwrap();
-    let ok = store
-        .try_charge_cost("cap-zero-cost", 0, None, 0, None, Some(1000))
-        .unwrap();
+    let ok = charge(
+        &store,
+        "cap-zero-cost",
+        0,
+        (None, 0, None, Some(1000)),
+        "cap-zero-cost-hold",
+        "cap-zero-cost-hold:authorize",
+        None,
+    )
+    .unwrap();
     assert!(
         ok,
         "zero-cost invocation should succeed when budget is available"
@@ -1501,8 +1515,8 @@ fn reap_orphaned_holds_is_reachable_through_budget_store_trait() {
             requested_exposure_units: 100,
             max_cost_per_invocation: Some(100),
             max_total_cost_units: Some(500),
-            hold_id: Some("hold-orphan-trait".to_string()),
-            event_id: Some("hold-orphan-trait:authorize".to_string()),
+            hold_id: "hold-orphan-trait".to_string(),
+            event_id: "hold-orphan-trait:authorize".to_string(),
             authority: None,
             invocation_quotas: Vec::new(),
             cumulative_approval: None,
@@ -1561,8 +1575,8 @@ fn open_hold_stays_reserved_without_reap() {
             requested_exposure_units: 100,
             max_cost_per_invocation: Some(100),
             max_total_cost_units: Some(500),
-            hold_id: Some("hold-noreap".to_string()),
-            event_id: Some("hold-noreap:authorize".to_string()),
+            hold_id: "hold-noreap".to_string(),
+            event_id: "hold-noreap:authorize".to_string(),
             authority: None,
             invocation_quotas: Vec::new(),
             cumulative_approval: None,
@@ -1593,7 +1607,15 @@ fn max_mutation_event_seq_reports_head() -> Result<(), Box<dyn std::error::Error
     let store = SqliteBudgetStore::open(&path)?;
     assert_eq!(store.max_mutation_event_seq()?, 0);
     // A single authorize charge allocates event_seq 1.
-    store.try_charge_cost("cap-a", 0, Some(5), 3, None, None)?;
+    charge(
+        &store,
+        "cap-a",
+        0,
+        (Some(5), 3, None, None),
+        "cap-a-hold",
+        "cap-a-hold:authorize",
+        None,
+    )?;
     assert_eq!(store.max_mutation_event_seq()?, 1);
     let _ = fs::remove_file(&path);
     Ok(())
@@ -2334,15 +2356,13 @@ fn mutation_event_witness_returns_stored_origin_authority() -> Result<(), Box<dy
     let path = unique_db_path("chio-stored-witness");
     let store = SqliteBudgetStore::open(&path)?;
     let old_leader = authority("http://old-leader", "http://old-leader#term-3", 3);
-    store.try_charge_cost_with_ids_and_authority(
+    charge(
+        &store,
         "cap",
         0,
-        Some(10),
-        5,
-        None,
-        None,
-        None,
-        Some("evt-1"),
+        (Some(10), 5, None, None),
+        "evt-1-hold",
+        "evt-1",
         Some(&old_leader),
     )?;
 

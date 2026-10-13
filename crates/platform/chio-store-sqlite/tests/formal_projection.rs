@@ -10,10 +10,33 @@ use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     kinds::TrustLevel,
 };
+use chio_kernel::budget_store::{BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest};
 use chio_kernel::{BudgetStore, ReceiptStore, RevocationStore};
 use chio_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore, SqliteRevocationStore};
 
 use chio_test_support::prelude::*;
+
+fn charge(store: &SqliteBudgetStore, hold_id: &str, event_id: &str, cost_units: u64) -> bool {
+    matches!(
+        store
+            .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                capability_id: "cap-budget".to_string(),
+                grant_index: 0,
+                max_invocations: None,
+                invocation_quotas: Vec::new(),
+                cumulative_approval: None,
+                admission_binding: None,
+                requested_exposure_units: cost_units,
+                max_cost_per_invocation: Some(100),
+                max_total_cost_units: Some(100),
+                hold_id: hold_id.to_string(),
+                event_id: event_id.to_string(),
+                authority: None,
+            })
+            .test_unwrap(),
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    )
+}
 
 fn temp_path(prefix: &str) -> std::path::PathBuf {
     let nonce = SystemTime::now()
@@ -132,12 +155,8 @@ fn sqlite_budget_projection_atomic_commits_do_not_overspend() {
     let path = temp_path("formal-budget-projection");
     let store = SqliteBudgetStore::open(&path).test_unwrap();
 
-    assert!(store
-        .try_charge_cost("cap-budget", 0, None, 70, Some(100), Some(100))
-        .test_unwrap());
-    assert!(!store
-        .try_charge_cost("cap-budget", 0, None, 40, Some(100), Some(100))
-        .test_unwrap());
+    assert!(charge(&store, "hold-1", "event-1", 70));
+    assert!(!charge(&store, "hold-2", "event-2", 40));
 
     let usage = store.get_usage("cap-budget", 0).test_unwrap().test_unwrap();
     assert_eq!(usage.invocation_count, 1);
@@ -149,30 +168,8 @@ fn sqlite_budget_projection_idempotent_retry_does_not_double_charge() {
     let path = temp_path("formal-budget-idempotent");
     let store = SqliteBudgetStore::open(&path).test_unwrap();
 
-    assert!(store
-        .try_charge_cost_with_ids(
-            "cap-budget",
-            0,
-            None,
-            25,
-            Some(100),
-            Some(100),
-            Some("hold-1"),
-            Some("event-1"),
-        )
-        .test_unwrap());
-    assert!(store
-        .try_charge_cost_with_ids(
-            "cap-budget",
-            0,
-            None,
-            25,
-            Some(100),
-            Some(100),
-            Some("hold-1"),
-            Some("event-1"),
-        )
-        .test_unwrap());
+    assert!(charge(&store, "hold-1", "event-1", 25));
+    assert!(charge(&store, "hold-1", "event-1", 25));
 
     let usage = store.get_usage("cap-budget", 0).test_unwrap().test_unwrap();
     assert_eq!(usage.invocation_count, 1);

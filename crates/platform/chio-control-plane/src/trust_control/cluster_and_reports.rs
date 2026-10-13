@@ -1162,23 +1162,13 @@ mod cluster_and_reports_tests {
             cost_units: 100,
             max_cost_per_invocation: Some(200),
             max_total_cost_units: Some(1_000),
-            hold_id: Some("hold-replayed-quorum".to_string()),
-            event_id: Some("event-replayed-quorum".to_string()),
+            hold_id: "hold-replayed-quorum".to_string(),
+            event_id: "event-replayed-quorum".to_string(),
         };
         {
             let store = SqliteBudgetStore::open(&budget_db).test_unwrap();
             let allowed = store
-                .try_charge_cost_with_ids_and_authority(
-                    &payload.capability_id,
-                    payload.grant_index,
-                    payload.max_invocations,
-                    payload.cost_units,
-                    payload.max_cost_per_invocation,
-                    payload.max_total_cost_units,
-                    payload.hold_id.as_deref(),
-                    payload.event_id.as_deref(),
-                    Some(&authority),
-                )
+                .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: (&payload.capability_id).to_string(), grant_index: payload.grant_index, max_invocations: payload.max_invocations, invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: payload.cost_units, max_cost_per_invocation: payload.max_cost_per_invocation, max_total_cost_units: payload.max_total_cost_units, hold_id: payload.hold_id.clone(), event_id: payload.event_id.clone(), authority: Some(authority.clone()) }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
                 .test_unwrap();
             assert!(allowed);
         }
@@ -1371,12 +1361,6 @@ mod cluster_and_reports_tests {
 
         update_peer_delta_records(&state, "https://node-b", 1);
         assert!(peer_should_force_snapshot(&state, "https://node-b"));
-
-        assert!(budget_visibility_matches(true, Some(1), Some(2)));
-        assert!(!budget_visibility_matches(true, None, Some(2)));
-        assert!(budget_visibility_matches(false, Some(2), Some(2)));
-        assert!(budget_visibility_matches(false, Some(1), None));
-        assert!(!budget_visibility_matches(false, None, Some(3)));
     }
 
     #[test]
@@ -1778,19 +1762,10 @@ mod cluster_and_reports_tests {
         {
             let budget_store = SqliteBudgetStore::open(&source_budget_db).test_unwrap();
             budget_store
-                .try_charge_cost_with_ids(
-                    "cap-1",
-                    0,
-                    Some(4),
-                    9,
-                    Some(9),
-                    Some(32),
-                    Some("hold-1"),
-                    Some("hold-1:authorize"),
-                )
+                .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: ("cap-1").to_string(), grant_index: 0, max_invocations: Some(4), invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: 9, max_cost_per_invocation: Some(9), max_total_cost_units: Some(32), hold_id: "hold-1".to_string(), event_id: "hold-1:authorize".to_string(), authority: None }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
                 .test_unwrap();
             budget_store
-                .reduce_charge_cost_with_ids("cap-1", 0, 4, Some("hold-1"), Some("hold-1:release"))
+                .release_budget_hold(chio_kernel::budget_store::BudgetReleaseHoldRequest { capability_id: ("cap-1").to_string(), grant_index: 0, released_exposure_units: 4, hold_id: "hold-1".to_string(), event_id: "hold-1:release".to_string(), authority: None }).map(|_| ())
                 .test_unwrap();
         }
 
@@ -1942,16 +1917,7 @@ mod cluster_and_reports_tests {
         {
             let budget_store = SqliteBudgetStore::open(&source_budget_db).test_unwrap();
             let allowed = budget_store
-                .try_charge_cost_with_ids(
-                    "cap-denied-only",
-                    0,
-                    Some(1),
-                    25,
-                    Some(50),
-                    Some(10),
-                    Some("cap-denied-only-hold-1"),
-                    Some("cap-denied-only-hold-1:authorize"),
-                )
+                .authorize_budget_hold(chio_kernel::budget_store::BudgetAuthorizeHoldRequest { capability_id: ("cap-denied-only").to_string(), grant_index: 0, max_invocations: Some(1), invocation_quotas: Vec::new(), cumulative_approval: None, admission_binding: None, requested_exposure_units: 25, max_cost_per_invocation: Some(50), max_total_cost_units: Some(10), hold_id: "cap-denied-only-hold-1".to_string(), event_id: "cap-denied-only-hold-1:authorize".to_string(), authority: None }).map(|decision| matches!(decision, chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)))
                 .test_unwrap();
             assert!(!allowed);
             assert!(budget_store

@@ -49,21 +49,6 @@ fn remote_budget_grant_index(grant_index: usize) -> Result<u32, BudgetStoreError
         .map_err(|_| BudgetStoreError::Invariant("grant_index exceeds u32 range".to_string()))
 }
 
-fn validate_remote_optional_budget_identity(
-    hold_id: Option<&str>,
-    event_id: Option<&str>,
-    transition: &str,
-) -> Result<(), BudgetStoreError> {
-    match (hold_id, event_id) {
-        (None, None) => Ok(()),
-        (None, Some(event_id)) if !event_id.is_empty() => Ok(()),
-        (Some(hold_id), Some(event_id)) if !hold_id.is_empty() && !event_id.is_empty() => Ok(()),
-        _ => Err(BudgetStoreError::Invariant(format!(
-            "remote budget {transition} requires non-empty identifiers and any hold_id requires an event_id"
-        ))),
-    }
-}
-
 fn validate_remote_budget_identity(
     capability_id: &str,
     grant_index: usize,
@@ -77,63 +62,6 @@ fn validate_remote_budget_identity(
         )));
     }
     Ok(())
-}
-
-fn validate_remote_budget_transition_identity(
-    request_hold_id: Option<&str>,
-    request_event_id: Option<&str>,
-    response_hold_id: Option<&str>,
-    response_event_id: Option<&str>,
-    transition: &str,
-    require_exact: bool,
-) -> Result<(), BudgetStoreError> {
-    let changed = if require_exact {
-        response_hold_id != request_hold_id || response_event_id != request_event_id
-    } else {
-        response_hold_id.is_some() && response_hold_id != request_hold_id
-            || request_event_id.is_some()
-                && response_event_id.is_some()
-                && response_event_id != request_event_id
-    };
-    if changed {
-        return Err(BudgetStoreError::Invariant(format!(
-            "remote budget {transition} response changed or omitted the request hold/event identity"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_remote_authorize_decision(
-    decision: BudgetAuthorizeExposureDecision,
-    allowed: bool,
-) -> Result<(), BudgetStoreError> {
-    if matches!(
-        (decision, allowed),
-        (BudgetAuthorizeExposureDecision::Authorized, true)
-            | (BudgetAuthorizeExposureDecision::Denied, false)
-            | (BudgetAuthorizeExposureDecision::AlreadyCaptured, false)
-    ) {
-        Ok(())
-    } else {
-        Err(BudgetStoreError::Invariant(
-            "remote budget authorization decision contradicted its allowed flag".to_string(),
-        ))
-    }
-}
-
-fn required_remote_hold_event<'a>(
-    hold_id: Option<&'a str>,
-    event_id: Option<&'a str>,
-    transition: &str,
-) -> Result<(&'a str, &'a str), BudgetStoreError> {
-    match (hold_id, event_id) {
-        (Some(hold_id), Some(event_id)) if !hold_id.is_empty() && !event_id.is_empty() => {
-            Ok((hold_id, event_id))
-        }
-        _ => Err(BudgetStoreError::Invariant(format!(
-            "structured remote budget {transition} requires non-empty hold_id and event_id"
-        ))),
-    }
 }
 
 fn structured_budget_error(error: impl Into<String>) -> BudgetStoreError {
@@ -172,518 +100,6 @@ impl BudgetStore for RemoteBudgetStore {
         BudgetGuaranteeLevel::AdvisoryPosthoc
     }
 
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError> {
-        remote_budget_grant_index(grant_index)?;
-        let response = self
-            .client
-            .try_increment_budget(capability_id, grant_index, max_invocations)
-            .map_err(into_budget_store_error)?;
-        validate_remote_budget_identity(
-            capability_id,
-            grant_index,
-            &response.capability_id,
-            response.grant_index,
-            "increment",
-        )?;
-        self.cache_usage(
-            capability_id,
-            grant_index,
-            response_budget_commit_index(response.budget_authority.as_ref(), None),
-            response.invocation_count,
-            None,
-            None,
-        )?;
-        Ok(response.allowed)
-    }
-
-    fn try_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError> {
-        remote_budget_grant_index(grant_index)?;
-        let response = self
-            .client
-            .try_charge_cost(
-                capability_id,
-                grant_index,
-                max_invocations,
-                cost_units,
-                max_cost_per_invocation,
-                max_total_cost_units,
-            )
-            .map_err(into_budget_store_error)?;
-        validate_remote_budget_identity(
-            capability_id,
-            grant_index,
-            &response.capability_id,
-            response.grant_index,
-            "authorization",
-        )?;
-        validate_remote_authorize_decision(response.decision, response.allowed)?;
-        self.cache_usage(
-            capability_id,
-            grant_index,
-            response_budget_commit_index(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-            ),
-            response.invocation_count,
-            response.total_cost_exposed,
-            response.total_cost_realized_spend,
-        )?;
-        Ok(response.allowed)
-    }
-
-    fn try_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<bool, BudgetStoreError> {
-        remote_budget_grant_index(grant_index)?;
-        validate_remote_optional_budget_identity(hold_id, event_id, "authorization")?;
-        let response = self
-            .client
-            .try_charge_cost_with_ids(
-                capability_id,
-                grant_index,
-                max_invocations,
-                cost_units,
-                max_cost_per_invocation,
-                max_total_cost_units,
-                hold_id,
-                event_id,
-            )
-            .map_err(into_budget_store_error)?;
-        validate_remote_budget_identity(
-            capability_id,
-            grant_index,
-            &response.capability_id,
-            response.grant_index,
-            "authorization",
-        )?;
-        validate_remote_authorize_decision(response.decision, response.allowed)?;
-        validate_remote_budget_transition_identity(
-            hold_id,
-            event_id,
-            response.hold_id.as_deref(),
-            response.event_id.as_deref(),
-            "authorization",
-            false,
-        )?;
-        if !matches!(
-            response.decision,
-            BudgetAuthorizeExposureDecision::AlreadyCaptured
-        ) && event_id.is_some()
-            && response.event_id.as_deref() != event_id
-        {
-            return Err(BudgetStoreError::Invariant(
-                "remote budget authorization response changed the request event identity"
-                    .to_string(),
-            ));
-        }
-        self.cache_usage(
-            capability_id,
-            grant_index,
-            response_budget_commit_index(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-            ),
-            response.invocation_count,
-            response.total_cost_exposed,
-            response.total_cost_realized_spend,
-        )?;
-        Ok(response.allowed)
-    }
-
-    fn reverse_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        remote_budget_grant_index(grant_index)?;
-        let response = self
-            .client
-            .reverse_charge_cost(capability_id, grant_index, cost_units)
-            .map_err(into_budget_store_error)?;
-        validate_remote_budget_identity(
-            capability_id,
-            grant_index,
-            &response.capability_id,
-            response.grant_index,
-            "reversal",
-        )?;
-        self.cache_usage(
-            capability_id,
-            grant_index,
-            response_budget_commit_index(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-            ),
-            response.invocation_count,
-            response.total_cost_exposed,
-            response.total_cost_realized_spend,
-        )?;
-        Ok(())
-    }
-
-    fn reverse_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        remote_budget_grant_index(grant_index)?;
-        validate_remote_optional_budget_identity(hold_id, event_id, "reversal")?;
-        let response = self
-            .client
-            .reverse_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
-            .map_err(into_budget_store_error)?;
-        validate_remote_budget_identity(
-            capability_id,
-            grant_index,
-            &response.capability_id,
-            response.grant_index,
-            "reversal",
-        )?;
-        validate_remote_budget_transition_identity(
-            hold_id,
-            event_id,
-            response.hold_id.as_deref(),
-            response.event_id.as_deref(),
-            "reversal",
-            false,
-        )?;
-        self.cache_usage(
-            capability_id,
-            grant_index,
-            response_budget_commit_index(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-            ),
-            response.invocation_count,
-            response.total_cost_exposed,
-            response.total_cost_realized_spend,
-        )?;
-        Ok(())
-    }
-
-    fn reduce_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        remote_budget_grant_index(grant_index)?;
-        let response = self
-            .client
-            .reduce_charge_cost(capability_id, grant_index, cost_units)
-            .map_err(into_budget_store_error)?;
-        validate_remote_budget_identity(
-            capability_id,
-            grant_index,
-            &response.capability_id,
-            response.grant_index,
-            "release",
-        )?;
-        if response
-            .released_exposure_units
-            .is_some_and(|released| released != cost_units)
-        {
-            return Err(BudgetStoreError::Invariant(
-                "remote budget release response changed the released exposure".to_string(),
-            ));
-        }
-        self.cache_usage(
-            capability_id,
-            grant_index,
-            response_budget_commit_index(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-            ),
-            response.invocation_count,
-            response.total_cost_exposed,
-            response.total_cost_realized_spend,
-        )?;
-        Ok(())
-    }
-
-    fn reduce_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        remote_budget_grant_index(grant_index)?;
-        validate_remote_optional_budget_identity(hold_id, event_id, "release")?;
-        let response = self
-            .client
-            .reduce_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
-            .map_err(into_budget_store_error)?;
-        validate_remote_budget_identity(
-            capability_id,
-            grant_index,
-            &response.capability_id,
-            response.grant_index,
-            "release",
-        )?;
-        validate_remote_budget_transition_identity(
-            hold_id,
-            event_id,
-            response.hold_id.as_deref(),
-            response.event_id.as_deref(),
-            "release",
-            false,
-        )?;
-        if response
-            .released_exposure_units
-            .is_some_and(|released| released != cost_units)
-        {
-            return Err(BudgetStoreError::Invariant(
-                "remote budget release response changed the released exposure".to_string(),
-            ));
-        }
-        self.cache_usage(
-            capability_id,
-            grant_index,
-            response_budget_commit_index(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-            ),
-            response.invocation_count,
-            response.total_cost_exposed,
-            response.total_cost_realized_spend,
-        )?;
-        Ok(())
-    }
-
-    fn settle_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        remote_budget_grant_index(grant_index)?;
-        let released_exposure_units = exposed_cost_units
-            .checked_sub(realized_cost_units)
-            .ok_or_else(|| {
-                BudgetStoreError::Invariant(
-                    "realized spend cannot exceed exposed cost during reconciliation".to_string(),
-                )
-            })?;
-        let response = self
-            .client
-            .reconcile_budget_spend(
-                capability_id,
-                grant_index,
-                exposed_cost_units,
-                realized_cost_units,
-            )
-            .map_err(into_budget_store_error)?;
-        validate_remote_budget_identity(
-            capability_id,
-            grant_index,
-            &response.capability_id,
-            response.grant_index,
-            "reconciliation",
-        )?;
-        if response
-            .released_exposure_units
-            .is_some_and(|released| released != released_exposure_units)
-        {
-            return Err(BudgetStoreError::Invariant(
-                "remote budget reconciliation response changed the released exposure".to_string(),
-            ));
-        }
-        self.cache_usage(
-            capability_id,
-            grant_index,
-            response_budget_commit_index(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-            ),
-            response.invocation_count,
-            response.total_cost_exposed,
-            response.total_cost_realized_spend,
-        )?;
-        Ok(())
-    }
-
-    fn settle_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        remote_budget_grant_index(grant_index)?;
-        validate_remote_optional_budget_identity(hold_id, event_id, "reconciliation")?;
-        let released_exposure_units = exposed_cost_units
-            .checked_sub(realized_cost_units)
-            .ok_or_else(|| {
-                BudgetStoreError::Invariant(
-                    "realized spend cannot exceed exposed cost during reconciliation".to_string(),
-                )
-            })?;
-        let response = self
-            .client
-            .reconcile_budget_spend_with_ids(
-                capability_id,
-                grant_index,
-                exposed_cost_units,
-                realized_cost_units,
-                hold_id,
-                event_id,
-            )
-            .map_err(into_budget_store_error)?;
-        validate_remote_budget_identity(
-            capability_id,
-            grant_index,
-            &response.capability_id,
-            response.grant_index,
-            "reconciliation",
-        )?;
-        validate_remote_budget_transition_identity(
-            hold_id,
-            event_id,
-            response.hold_id.as_deref(),
-            response.event_id.as_deref(),
-            "reconciliation",
-            false,
-        )?;
-        if response
-            .released_exposure_units
-            .is_some_and(|released| released != released_exposure_units)
-        {
-            return Err(BudgetStoreError::Invariant(
-                "remote budget reconciliation response changed the released exposure".to_string(),
-            ));
-        }
-        self.cache_usage(
-            capability_id,
-            grant_index,
-            response_budget_commit_index(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-            ),
-            response.invocation_count,
-            response.total_cost_exposed,
-            response.total_cost_realized_spend,
-        )?;
-        Ok(())
-    }
-
-    fn try_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<bool, BudgetStoreError> {
-        if authority.is_some() {
-            return Err(structured_budget_error(
-                "remote budget store does not support authority-fenced charging",
-            ));
-        }
-        self.try_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            hold_id,
-            event_id,
-        )
-    }
-
-    fn reverse_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        if authority.is_some() {
-            return Err(structured_budget_error(
-                "remote budget store does not support authority-fenced reversal",
-            ));
-        }
-        self.reverse_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
-    }
-
-    fn reduce_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        if authority.is_some() {
-            return Err(structured_budget_error(
-                "remote budget store does not support authority-fenced release",
-            ));
-        }
-        self.reduce_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
-    }
-
-    fn settle_charge_cost_with_ids_and_authority(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        if authority.is_some() {
-            return Err(structured_budget_error(
-                "remote budget store does not support authority-fenced settlement",
-            ));
-        }
-        self.settle_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-            hold_id,
-            event_id,
-        )
-    }
-
     fn authorize_budget_hold(
         &self,
         request: BudgetAuthorizeHoldRequest,
@@ -699,16 +115,16 @@ impl BudgetStore for RemoteBudgetStore {
         }
         let response = self
             .client
-            .try_charge_cost_with_ids(
-                &request.capability_id,
-                request.grant_index,
-                request.max_invocations,
-                request.requested_exposure_units,
-                request.max_cost_per_invocation,
-                request.max_total_cost_units,
-                request.hold_id.as_deref(),
-                request.event_id.as_deref(),
-            )
+            .authorize_budget_exposure(&TryChargeCostRequest {
+                capability_id: request.capability_id.clone(),
+                grant_index: request.grant_index,
+                max_invocations: request.max_invocations,
+                cost_units: request.requested_exposure_units,
+                max_cost_per_invocation: request.max_cost_per_invocation,
+                max_total_cost_units: request.max_total_cost_units,
+                hold_id: request.hold_id.clone(),
+                event_id: request.event_id.clone(),
+            })
             .map_err(into_budget_store_error)?;
         validate_remote_budget_identity(
             &request.capability_id,
@@ -723,46 +139,18 @@ impl BudgetStore for RemoteBudgetStore {
                     .to_string(),
             ));
         }
-        validate_remote_authorize_decision(response.decision, response.allowed)?;
-        if matches!(
-            response.decision,
-            BudgetAuthorizeExposureDecision::AlreadyCaptured
-        ) && request.hold_id.is_none()
-        {
-            return Err(BudgetStoreError::Invariant(
-                "captured remote authorization replay requires a hold identity".to_string(),
-            ));
-        }
-        let event_id = match response.decision {
-            BudgetAuthorizeExposureDecision::AlreadyCaptured => {
-                let Some(event_id) = response.event_id.clone().filter(|event_id| !event_id.is_empty())
-                else {
-                    return Err(BudgetStoreError::Invariant(
-                        "captured remote authorization replay omitted non-empty capture event identity"
-                            .to_string(),
-                    ));
-                };
-                Some(event_id)
-            }
+        let event_id_matches = match response.decision {
+            BudgetAuthorizeExposureDecision::AlreadyCaptured => !response.event_id.is_empty(),
             BudgetAuthorizeExposureDecision::Authorized
-            | BudgetAuthorizeExposureDecision::Denied => {
-                match request.event_id.as_deref() {
-                    Some(request_event_id)
-                        if response.event_id.as_deref() == Some(request_event_id) =>
-                    {
-                        request.event_id.clone()
-                    }
-                    None => response.event_id.clone().filter(|event_id| !event_id.is_empty()),
-                    _ => None,
-                }
-            }
-        }
-        .ok_or_else(|| {
-            BudgetStoreError::Invariant(
+            | BudgetAuthorizeExposureDecision::Denied => response.event_id == request.event_id,
+        };
+        if !event_id_matches {
+            return Err(BudgetStoreError::Invariant(
                 "remote budget authorization response changed or omitted the request event identity"
                     .to_string(),
-            )
-        })?;
+            ));
+        }
+        let event_id = response.event_id.clone();
         let mutation_invocation_count_after =
             response.mutation_invocation_count_after.ok_or_else(|| {
                 BudgetStoreError::Invariant(
@@ -854,7 +242,7 @@ impl BudgetStore for RemoteBudgetStore {
             BudgetAuthorizeExposureDecision::Authorized => {
                 BudgetAuthorizeHoldDecision::Authorized(BudgetHoldAuthorizationRecord {
                     cleanup_custody: response.cleanup_custody,
-                    hold_id: request.hold_id,
+                    hold_id: Some(request.hold_id),
                     admission_binding: None,
                     authorized_exposure_units: request.requested_exposure_units,
                     committed_cost_units_after: mutation_committed_cost_units_after,
@@ -872,7 +260,7 @@ impl BudgetStore for RemoteBudgetStore {
             }
             BudgetAuthorizeExposureDecision::Denied => {
                 BudgetAuthorizeHoldDecision::Denied(DeniedBudgetHold {
-                    hold_id: request.hold_id,
+                    hold_id: Some(request.hold_id),
                     admission_binding: None,
                     attempted_exposure_units: request.requested_exposure_units,
                     committed_cost_units_after: mutation_committed_cost_units_after,
@@ -892,7 +280,7 @@ impl BudgetStore for RemoteBudgetStore {
                     )
                 })?;
                 BudgetAuthorizeHoldDecision::AlreadyCaptured(BudgetHoldMutationDecision {
-                    hold_id: request.hold_id,
+                    hold_id: Some(request.hold_id),
                     admission_binding: None,
                     exposure_units,
                     realized_spend_units,
@@ -1023,6 +411,77 @@ impl BudgetStore for RemoteBudgetStore {
         operation_id: &str,
     ) -> Result<Option<BudgetCumulativeApprovalUsage>, BudgetStoreError> {
         self.get_cumulative_approval_operation_usage_remote(operation_id)
+    }
+
+    fn get_invocation_quota_usage(
+        &self,
+        _key: &BudgetQuotaKey,
+    ) -> Result<Option<BudgetInvocationQuotaUsage>, BudgetStoreError> {
+        Err(structured_budget_error(
+            "remote budget authority does not expose invocation quota usage",
+        ))
+    }
+
+    fn get_cumulative_approval_account_usage(
+        &self,
+        _key: &BudgetCumulativeApprovalAccountKey,
+    ) -> Result<Option<chio_kernel::budget_store::BudgetCumulativeApprovalAccountUsage>, BudgetStoreError> {
+        Err(structured_budget_error(
+            "remote budget authority does not expose cumulative approval account usage",
+        ))
+    }
+
+    fn list_mutation_events(
+        &self,
+        _limit: usize,
+        _capability_id: Option<&str>,
+        _grant_index: Option<usize>,
+    ) -> Result<Vec<BudgetMutationRecord>, BudgetStoreError> {
+        Err(structured_budget_error(
+            "remote budget authority does not expose mutation events",
+        ))
+    }
+
+    /// The remote authority reaps its own holds; this client owns none.
+    fn reap_orphaned_holds(
+        &self,
+        _realized_by_hold: &HashMap<String, u64>,
+    ) -> Result<(usize, usize), BudgetStoreError> {
+        Ok((0, 0))
+    }
+
+    fn count_open_holds(&self) -> Result<usize, BudgetStoreError> {
+        Ok(0)
+    }
+
+    fn list_open_delegated_reserved_hold_ids(
+        &self,
+    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
+        Ok(None)
+    }
+
+    fn request_id_has_reserved_hold(
+        &self,
+        _request_id: &str,
+    ) -> Result<Option<bool>, BudgetStoreError> {
+        Ok(None)
+    }
+
+    fn mark_hold_reserved(
+        &self,
+        _hold_id: &str,
+        _reserved_until_unix_secs: i64,
+        _currency: &str,
+        _payment_reference: Option<&str>,
+        _envelope: &chio_kernel::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        Err(structured_budget_error(
+            "remote budget authority does not support durable hold reservation",
+        ))
+    }
+
+    fn reap_expired_reserved_holds(&self, _now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        Ok(0)
     }
 }
 

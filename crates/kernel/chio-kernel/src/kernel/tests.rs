@@ -149,7 +149,7 @@ mod support_monetary;
 #[path = "tests/support_tool_approval.rs"]
 mod support_tool_approval;
 use support::budget_store_impls::{
-    delegate_authority_fenced_budget_methods, reject_authority_fenced_budget_methods,
+    delegate_budget_store_methods, unsupported_budget_store_methods,
 };
 use support_monetary::{
     attach_governed_call_chain_continuation_token, attach_governed_upstream_call_chain_proof,

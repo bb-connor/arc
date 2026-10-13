@@ -29,8 +29,8 @@ fn hold_mutations_validate_one_snapshot_and_preserve_replay(
                 requested_exposure_units: 100,
                 max_cost_per_invocation: Some(100),
                 max_total_cost_units: Some(200),
-                hold_id: Some("hold".into()),
-                event_id: Some("authorize".into()),
+                hold_id: "hold".into(),
+                event_id: "authorize".into(),
                 authority: Some(owner.clone()),
             })?,
             BudgetAuthorizeHoldDecision::Authorized(_)
@@ -51,31 +51,38 @@ fn hold_mutations_validate_one_snapshot_and_preserve_replay(
         );
         SQL.with_borrow_mut(Vec::clear);
         let mutate = || match action {
-            "reverse" => store.reverse_charge_cost_with_ids_and_authority(
-                "cap",
-                0,
-                100,
-                Some("hold"),
-                Some("finish"),
-                Some(&owner),
-            ),
-            "release" => store.reduce_charge_cost_with_ids_and_authority(
-                "cap",
-                0,
-                100,
-                Some("hold"),
-                Some("finish"),
-                Some(&owner),
-            ),
-            _ => store.settle_charge_cost_with_ids_and_authority(
-                "cap",
-                0,
-                100,
-                40,
-                Some("hold"),
-                Some("finish"),
-                Some(&owner),
-            ),
+            "reverse" => store
+                .reverse_budget_hold(BudgetReverseHoldRequest {
+                    capability_id: "cap".into(),
+                    grant_index: 0,
+                    reversed_exposure_units: 100,
+                    hold_id: "hold".into(),
+                    event_id: "finish".into(),
+                    expected_cumulative_approval_state: None,
+                    authority: Some(owner.clone()),
+                })
+                .map(|_| ()),
+            "release" => store
+                .release_budget_hold(BudgetReleaseHoldRequest {
+                    capability_id: "cap".into(),
+                    grant_index: 0,
+                    released_exposure_units: 100,
+                    hold_id: "hold".into(),
+                    event_id: "finish".into(),
+                    authority: Some(owner.clone()),
+                })
+                .map(|_| ()),
+            _ => store
+                .reconcile_budget_hold(BudgetReconcileHoldRequest {
+                    capability_id: "cap".into(),
+                    grant_index: 0,
+                    exposed_cost_units: 100,
+                    realized_spend_units: 40,
+                    hold_id: "hold".into(),
+                    event_id: "finish".into(),
+                    authority: Some(owner.clone()),
+                })
+                .map(|_| ()),
         };
         mutate()?;
         let loads = SQL.with_borrow(|statements| {
@@ -114,6 +121,23 @@ fn hold_mutations_validate_one_snapshot_and_preserve_replay(
     Ok(())
 }
 
+fn invocation_request(capability_id: &str, hold_id: &str) -> BudgetAuthorizeHoldRequest {
+    BudgetAuthorizeHoldRequest {
+        capability_id: capability_id.into(),
+        grant_index: 0,
+        max_invocations: Some(3),
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units: 0,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        hold_id: hold_id.into(),
+        event_id: format!("{hold_id}:authorize"),
+        authority: None,
+    }
+}
+
 #[test]
 fn cached_budget_reads_rebind_parameters_and_observe_external_commits(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -126,8 +150,12 @@ fn cached_budget_reads_rebind_parameters_and_observe_external_commits(
     let path = directory.path().join("budget.db");
     let store = SqliteBudgetStore::open(&path)?;
     let writer = SqliteBudgetStore::open(&path)?;
-    assert!(writer.try_increment("cap-a", 0, Some(3))?);
-    assert!(writer.try_increment("cap-b", 0, Some(3))?);
+    for (capability_id, hold_id) in [("cap-a", "hold-a-1"), ("cap-b", "hold-b-1")] {
+        assert!(matches!(
+            writer.authorize_budget_hold(invocation_request(capability_id, hold_id))?,
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ));
+    }
     let compilations = Arc::new(AtomicUsize::new(0));
     let observed = Arc::clone(&compilations);
     store
@@ -159,7 +187,10 @@ fn cached_budget_reads_rebind_parameters_and_observe_external_commits(
         "cap-b"
     );
     assert!(store.get_usage("absent", 0)?.is_none());
-    assert!(writer.try_increment("cap-a", 0, Some(3))?);
+    assert!(matches!(
+        writer.authorize_budget_hold(invocation_request("cap-a", "hold-a-2"))?,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
     assert_eq!(
         store
             .get_usage("cap-a", 0)?

@@ -9,6 +9,7 @@ use chio_core::sha256_hex;
 use chio_kernel::budget_store::{
     BudgetAdmissionBinding, BudgetAuthorizationOutcome, BudgetAuthorizeCumulativeApprovalRequest,
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest,
+    BudgetHoldCleanupCustody,
     BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalAuthorizationDecision,
     BudgetCumulativeApprovalRequest, BudgetEventAuthority, BudgetInvocationCaptureDecision,
     BudgetInvocationQuota, BudgetInvocationState, BudgetQuotaKey, BudgetQuotaProfile,
@@ -21,6 +22,33 @@ use tempfile::TempDir;
 use super::*;
 
 type AdmissionProjection = (i64, Vec<(String, i64)>, Vec<(i64, String)>);
+
+fn replayed(decision: BudgetAuthorizeHoldDecision) -> BudgetAuthorizeHoldDecision {
+    match decision {
+        BudgetAuthorizeHoldDecision::Authorized(mut record) => {
+            record.cleanup_custody = BudgetHoldCleanupCustody::Replayed;
+            BudgetAuthorizeHoldDecision::Authorized(record)
+        }
+        other => other,
+    }
+}
+
+fn unbound_invocation(capability_id: &str, hold_id: &str) -> BudgetAuthorizeHoldRequest {
+    BudgetAuthorizeHoldRequest {
+        capability_id: capability_id.to_string(),
+        grant_index: 0,
+        max_invocations: Some(1),
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units: 0,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        hold_id: hold_id.to_string(),
+        event_id: format!("{hold_id}:authorize"),
+        authority: None,
+    }
+}
 
 fn fixture() -> (TempDir, PathBuf, PathBuf) {
     let temp = tempfile::tempdir().expect("tempdir");
@@ -483,9 +511,12 @@ fn baseline_verification_rejects_live_projection_tampering() {
 fn initial_provision_refuses_nonempty_legacy_authority_state() {
     let (_temp, database, lock_root) = fixture();
     let legacy = SqliteBudgetStore::open(&database).expect("legacy budget store");
-    assert!(legacy
-        .try_increment("legacy-capability", 0, Some(1))
-        .expect("legacy usage mutation"));
+    assert!(matches!(
+        legacy
+            .authorize_budget_hold(unbound_invocation("legacy-capability", "legacy-hold-1"))
+            .expect("legacy usage mutation"),
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
     drop(legacy);
     fs::set_permissions(&database, fs::Permissions::from_mode(0o600))
         .expect("secure database mode");
@@ -514,9 +545,12 @@ fn initial_provision_refuses_nonempty_legacy_authority_state() {
     );
 
     let legacy = SqliteBudgetStore::open(&database).expect("legacy budget store still opens");
-    assert!(!legacy
-        .try_increment("legacy-capability", 0, Some(1))
-        .expect("legacy usage survives the refusal"));
+    assert!(matches!(
+        legacy
+            .authorize_budget_hold(unbound_invocation("legacy-capability", "legacy-hold-2"))
+            .expect("legacy usage survives the refusal"),
+        BudgetAuthorizeHoldDecision::Denied(_)
+    ));
     drop(legacy);
     fs::set_permissions(&database, fs::Permissions::from_mode(0o600))
         .expect("secure database mode");
@@ -728,7 +762,7 @@ fn stale_serving_epoch_fences_budget_and_revocation_access() {
         .expect("advance epoch");
 
     assert!(matches!(
-        budget.try_increment("cap", 0, Some(1)),
+        budget.authorize_budget_hold(unbound_invocation("cap", "fenced-hold")),
         Err(BudgetStoreError::Fenced {
             expected_epoch: 1,
             actual_epoch: Some(2),
@@ -814,7 +848,7 @@ fn joint_authorization_replay_uses_stored_revocation_head() {
         budget
             .authorize_budget_hold(request)
             .expect("replay at newer revocation head"),
-        original
+        replayed(original)
     );
 }
 
@@ -1072,8 +1106,8 @@ fn revoked_leaf_or_ancestor_is_atomically_denied_without_reservations() {
             .commit;
         let mut request = structured_request(Some(active.clone()));
         request.capability_id = capability_id.to_string();
-        request.hold_id = Some(format!("hold-revoked-{suffix}"));
-        request.event_id = Some(format!("event-revoked-{suffix}"));
+        request.hold_id = format!("hold-revoked-{suffix}");
+        request.event_id = format!("event-revoked-{suffix}");
         let admission = request
             .admission_binding
             .as_mut()
@@ -1098,11 +1132,11 @@ fn revoked_leaf_or_ancestor_is_atomically_denied_without_reservations() {
             .expect("quota lookup")
             .is_none());
         assert!(budget
-            .hold_authority(request.hold_id.as_deref().expect("hold id"))
+            .hold_authority(&request.hold_id)
             .expect("hold lookup")
             .is_none());
         let event = budget
-            .mutation_event_for_event_id(request.event_id.as_deref().expect("event id"))
+            .mutation_event_for_event_id(&request.event_id)
             .expect("event lookup")
             .expect("denial event");
         assert_eq!(
@@ -1155,7 +1189,7 @@ fn authorization_then_revocation_replays_the_serialized_authorization() {
         budget
             .authorize_budget_hold(request)
             .expect("exact serialized replay"),
-        authorized
+        replayed(authorized)
     );
 }
 
@@ -1187,7 +1221,7 @@ fn denied_authorization_tombstones_the_hold_identity() {
 
     let mut reuse = structured_request(Some(active));
     reuse.capability_id = "cap-other".to_string();
-    reuse.event_id = Some("event-other".to_string());
+    reuse.event_id = "event-other".to_string();
     let admission = reuse.admission_binding.as_mut().expect("admission binding");
     admission.operation_id = "operation-other".to_string();
     admission.revocation_set =
@@ -1236,7 +1270,7 @@ fn joint_hold_lifecycle_and_event_replays_survive_owner_epoch_rotation() {
             .budget_store()
             .authorize_budget_hold(authorization)
             .expect("cross-epoch authorization replay"),
-        first_decision
+        replayed(first_decision)
     );
     let mut capture = BudgetCaptureInvocationRequest {
         capability_id: "cap-structured".to_string(),
@@ -1271,8 +1305,8 @@ fn joint_hold_lifecycle_and_event_replays_survive_owner_epoch_rotation() {
         grant_index: 0,
         exposed_cost_units: 10,
         realized_spend_units: 7,
-        hold_id: Some("hold-structured".to_string()),
-        event_id: Some("event-structured-reconcile".to_string()),
+        hold_id: "hold-structured".to_string(),
+        event_id: "event-structured-reconcile".to_string(),
         authority: Some(third_authority),
     };
     let reconciled = third
@@ -1343,7 +1377,7 @@ fn joint_cumulative_approval_survives_owner_epoch_rotation() {
         capability_id: authorization.capability_id.clone(),
         grant_index: authorization.grant_index,
         operation_id,
-        hold_id: authorization.hold_id.clone().expect("hold id"),
+        hold_id: authorization.hold_id.clone(),
         admission_binding: authorization
             .admission_binding
             .clone()
@@ -1478,8 +1512,8 @@ fn revocations_do_not_create_budget_replication_holes() {
         let capability_id = format!("cap-{suffix}");
         let mut request = structured_request(Some(active.clone()));
         request.capability_id = capability_id.clone();
-        request.hold_id = Some(format!("hold-{suffix}"));
-        request.event_id = Some(format!("event-{suffix}"));
+        request.hold_id = format!("hold-{suffix}");
+        request.event_id = format!("event-{suffix}");
         let admission = request
             .admission_binding
             .as_mut()

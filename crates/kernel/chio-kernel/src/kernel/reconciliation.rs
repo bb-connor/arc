@@ -283,8 +283,8 @@ impl ChioKernel {
                         grant_index: hold.grant_index,
                         exposed_cost_units: exposed,
                         realized_spend_units: realized,
-                        hold_id: Some(hold.hold_id.clone()),
-                        event_id: Some(format!("{}:reconcile", hold.hold_id)),
+                        hold_id: hold.hold_id.clone(),
+                        event_id: format!("{}:reconcile", hold.hold_id),
                         authority: hold.authority.clone(),
                     })?
                 };

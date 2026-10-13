@@ -1,80 +1,21 @@
 impl InMemoryBudgetStoreInner {
-    fn reverse_charge_cost(
-        &mut self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.reverse_charge_cost_with_ids(capability_id, grant_index, cost_units, None, None)
-    }
-
-    fn reverse_charge_cost_with_ids(
-        &mut self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.reverse_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            cost_units,
-            hold_id,
-            event_id,
-            None,
-        )
-    }
-
-    fn reverse_charge_cost_with_ids_and_authority(
-        &mut self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.reverse_charge_cost_with_expected_state(
-            capability_id,
-            grant_index,
-            cost_units,
-            hold_id,
-            event_id,
-            authority,
-            None,
-        )
-    }
-
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
-    fn reverse_charge_cost_with_expected_state(
-        &mut self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-        expected_cumulative_approval_state: Option<BudgetCumulativeApprovalState>,
-    ) -> Result<(), BudgetStoreError> {
-        validate_optional_budget_identity(hold_id, event_id, "budget reversal")?;
-        let request = BudgetMutationRequest::Reverse {
-            capability_id: capability_id.to_string(),
-            grant_index,
-            hold_id: hold_id.map(ToOwned::to_owned),
-            cost_units,
-            expected_cumulative_approval_state,
-            authority: authority.cloned(),
-        };
-        self.reverse_charge_cost_with_mutation(
-            capability_id,
-            grant_index,
-            cost_units,
-            hold_id,
-            event_id,
-            authority,
-            expected_cumulative_approval_state,
-            request,
+    fn reverse_hold(&mut self, request: &BudgetReverseHoldRequest) -> Result<(), BudgetStoreError> {
+        self.reverse_hold_with_mutation(
+            &request.capability_id,
+            request.grant_index,
+            request.reversed_exposure_units,
+            &request.hold_id,
+            &request.event_id,
+            request.authority.as_ref(),
+            request.expected_cumulative_approval_state,
+            BudgetMutationRequest::Reverse {
+                capability_id: request.capability_id.clone(),
+                grant_index: request.grant_index,
+                hold_id: request.hold_id.clone(),
+                cost_units: request.reversed_exposure_units,
+                expected_cumulative_approval_state: request.expected_cumulative_approval_state,
+                authority: request.authority.clone(),
+            },
             BudgetMutationKind::ReverseExposure,
             false,
         )?;
@@ -82,13 +23,13 @@ impl InMemoryBudgetStoreInner {
     }
 
     #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
-    fn reverse_charge_cost_with_mutation(
+    fn reverse_hold_with_mutation(
         &mut self,
         capability_id: &str,
         grant_index: usize,
         cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
+        hold_id: &str,
+        event_id: &str,
         authority: Option<&BudgetEventAuthority>,
         expected_cumulative_approval_state: Option<BudgetCumulativeApprovalState>,
         request: BudgetMutationRequest,
@@ -98,16 +39,7 @@ impl InMemoryBudgetStoreInner {
         let grant_index_u32 = u32::try_from(grant_index)
             .map_err(|_| BudgetStoreError::Invariant("grant_index does not fit u32".to_string()))?;
         if let Some(existing) = self.duplicate_mutation(event_id, &request)? {
-            if let Some(hold_id) = hold_id {
-                self.ensure_latest_hold_event(hold_id, existing.record.event_seq, "reversal")?;
-            } else {
-                self.ensure_latest_usage_event(
-                    capability_id,
-                    grant_index,
-                    existing.record.event_seq,
-                    "reversal",
-                )?;
-            }
+            self.ensure_latest_hold_event(hold_id, existing.record.event_seq, "reversal")?;
             return Ok((
                 false,
                 existing.record.event_seq,
@@ -122,169 +54,104 @@ impl InMemoryBudgetStoreInner {
                 },
             ));
         }
-        let hold_snapshot = hold_id
-            .map(|hold_id| {
-                self.validate_hold(hold_id, capability_id, grant_index)
-                    .cloned()
-            })
-            .transpose()?;
-        if let Some((hold_id, hold)) = hold_id.zip(hold_snapshot.as_ref()) {
-            if hold.remaining_exposure_units != cost_units {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget hold `{hold_id}` does not match reverse amount"
-                )));
-            }
-            let expected_state = if cancels_captured_before_dispatch {
-                BudgetInvocationState::Captured
+        let hold = self
+            .validate_hold(hold_id, capability_id, grant_index)?
+            .clone();
+        if hold.remaining_exposure_units != cost_units {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` does not match reverse amount"
+            )));
+        }
+        let expected_state = if cancels_captured_before_dispatch {
+            BudgetInvocationState::Captured
+        } else {
+            BudgetInvocationState::Authorized
+        };
+        if hold.invocation_state != expected_state {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` invocation state cannot be reversed"
+            )));
+        }
+        if cancels_captured_before_dispatch && !hold.captured_cancellation_allowed {
+            return Err(BudgetStoreError::Invariant(
+                "captured composite invocation reservations are terminal".to_string(),
+            ));
+        }
+        if cost_units > 0 && hold.monetary_state != BudgetMonetaryState::Exposed {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` monetary exposure is not reversible"
+            )));
+        }
+        for quota in &hold.invocation_quotas {
+            let state = self.invocation_quotas.get(&quota.key).ok_or_else(|| {
+                BudgetStoreError::Invariant("missing reserved invocation quota".to_string())
+            })?;
+            let reversible_invocations = if cancels_captured_before_dispatch {
+                state.captured_invocations
             } else {
-                BudgetInvocationState::Authorized
+                state.reserved_invocations
             };
-            if hold.invocation_state != expected_state {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget hold `{hold_id}` invocation state cannot be reversed"
-                )));
-            }
-            if cancels_captured_before_dispatch && !hold.captured_cancellation_allowed {
+            if state.max_invocations != quota.max_invocations || reversible_invocations == 0 {
                 return Err(BudgetStoreError::Invariant(
-                    "captured composite invocation reservations are terminal".to_string(),
-                ));
-            }
-            if cost_units > 0 && hold.monetary_state != BudgetMonetaryState::Exposed {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget hold `{hold_id}` monetary exposure is not reversible"
-                )));
-            }
-            for quota in &hold.invocation_quotas {
-                let state = self.invocation_quotas.get(&quota.key).ok_or_else(|| {
-                    BudgetStoreError::Invariant("missing reserved invocation quota".to_string())
-                })?;
-                let reversible_invocations = if cancels_captured_before_dispatch {
-                    state.captured_invocations
-                } else {
-                    state.reserved_invocations
-                };
-                if state.max_invocations != quota.max_invocations || reversible_invocations == 0 {
-                    return Err(BudgetStoreError::Invariant(
-                        "invocation quota reservation does not match its hold".to_string(),
-                    ));
-                }
-            }
-            if let Some(quota) = &hold.legacy_captured_invocation_quota {
-                let state = self.invocation_quotas.get(&quota.key).ok_or_else(|| {
-                    BudgetStoreError::Invariant(
-                        "missing captured legacy invocation quota".to_string(),
-                    )
-                })?;
-                if state.max_invocations != quota.max_invocations || state.captured_invocations == 0
-                {
-                    return Err(BudgetStoreError::Invariant(
-                        "legacy invocation quota does not match its hold".to_string(),
-                    ));
-                }
-            }
-            if let Some(participant) = &hold.cumulative_approval {
-                if expected_cumulative_approval_state
-                    .is_some_and(|expected| participant.state != expected)
-                {
-                    return Err(BudgetStoreError::Invariant(format!(
-                        "budget hold `{hold_id}` cumulative approval state changed"
-                    )));
-                }
-                if !(matches!(
-                    participant.state,
-                    BudgetCumulativeApprovalState::PendingApproval
-                        | BudgetCumulativeApprovalState::Authorized
-                ) || cancels_captured_before_dispatch
-                    && participant.state == BudgetCumulativeApprovalState::Captured)
-                {
-                    return Err(BudgetStoreError::Invariant(
-                        "cumulative approval participant is terminal".to_string(),
-                    ));
-                }
-                let account = self
-                    .cumulative_approval_accounts
-                    .get(&participant.request.account_key)
-                    .ok_or_else(|| {
-                        BudgetStoreError::Invariant(
-                            "missing cumulative approval account".to_string(),
-                        )
-                    })?;
-                let reversible_authorized_units =
-                    if participant.state == BudgetCumulativeApprovalState::Captured {
-                        account.captured_authorized_units
-                    } else {
-                        account.reserved_authorized_units
-                    };
-                if reversible_authorized_units < participant.request.requested_authorized.units {
-                    return Err(BudgetStoreError::Invariant(
-                        "cumulative approval reservation is incomplete".to_string(),
-                    ));
-                }
-                account.version.checked_add(1).ok_or_else(|| {
-                    BudgetStoreError::Overflow(
-                        "cumulative approval account version overflowed u64".to_string(),
-                    )
-                })?;
-            } else if expected_cumulative_approval_state.is_some() {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget hold `{hold_id}` has no cumulative approval participant"
-                )));
-            }
-            Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
-        } else if !cancels_captured_before_dispatch {
-            if self.has_composite_history(capability_id, grant_index) {
-                return Err(BudgetStoreError::Invariant(
-                    "cannot reverse an unheld invocation after structured admission history"
-                        .to_string(),
-                ));
-            }
-            if self.holds.values().any(|hold| {
-                hold.capability_id == capability_id
-                    && hold.grant_index == grant_index
-                    && matches!(
-                        hold.invocation_state,
-                        BudgetInvocationState::Authorized | BudgetInvocationState::Captured
-                    )
-            }) {
-                return Err(BudgetStoreError::Invariant(
-                    "cannot reverse an unheld invocation while a live budget hold exists"
-                        .to_string(),
-                ));
-            }
-            let legacy_reversible = self
-                .legacy_reversible_invocations
-                .get(&(capability_id.to_string(), grant_index))
-                .copied()
-                .unwrap_or(0);
-            if legacy_reversible == 0 {
-                return Err(BudgetStoreError::Invariant(
-                    "no reversible unheld invocation exists".to_string(),
+                    "invocation quota reservation does not match its hold".to_string(),
                 ));
             }
         }
-
-        let affected_quotas = if let Some(hold) = &hold_snapshot {
-            let mut quotas = hold.invocation_quotas.clone();
-            if let Some(quota) = &hold.legacy_captured_invocation_quota {
-                quotas.push(quota.clone());
+        if let Some(participant) = &hold.cumulative_approval {
+            if expected_cumulative_approval_state
+                .is_some_and(|expected| participant.state != expected)
+            {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "budget hold `{hold_id}` cumulative approval state changed"
+                )));
             }
-            quotas
-        } else {
-            let key = BudgetQuotaKey::grant(capability_id, grant_index_u32);
-            self.invocation_quotas
-                .get(&key)
-                .map(|state| {
-                    vec![BudgetInvocationQuota {
-                        key,
-                        max_invocations: state.max_invocations,
-                    }]
-                })
-                .unwrap_or_default()
-        };
+            if !(matches!(
+                participant.state,
+                BudgetCumulativeApprovalState::PendingApproval
+                    | BudgetCumulativeApprovalState::Authorized
+            ) || cancels_captured_before_dispatch
+                && participant.state == BudgetCumulativeApprovalState::Captured)
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "cumulative approval participant is terminal".to_string(),
+                ));
+            }
+            let account = self
+                .cumulative_approval_accounts
+                .get(&participant.request.account_key)
+                .ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "missing cumulative approval account".to_string(),
+                    )
+                })?;
+            let reversible_authorized_units =
+                if participant.state == BudgetCumulativeApprovalState::Captured {
+                    account.captured_authorized_units
+                } else {
+                    account.reserved_authorized_units
+                };
+            if reversible_authorized_units < participant.request.requested_authorized.units {
+                return Err(BudgetStoreError::Invariant(
+                    "cumulative approval reservation is incomplete".to_string(),
+                ));
+            }
+            account.version.checked_add(1).ok_or_else(|| {
+                BudgetStoreError::Overflow(
+                    "cumulative approval account version overflowed u64".to_string(),
+                )
+            })?;
+        } else if expected_cumulative_approval_state.is_some() {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` has no cumulative approval participant"
+            )));
+        }
+        Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
+
+        let affected_quotas = hold.invocation_quotas.clone();
         let invocation_quota_usages_before = self.invocation_quota_usages(&affected_quotas)?;
-        let cumulative_before = hold_snapshot
+        let cumulative_before = hold
+            .cumulative_approval
             .as_ref()
-            .and_then(|hold| hold.cumulative_approval.as_ref())
             .map(|participant| {
                 self.cumulative_approval_accounts
                     .get(&participant.request.account_key)
@@ -314,11 +181,7 @@ impl InMemoryBudgetStoreInner {
         let next_seq = self.next_seq.checked_add(1).ok_or_else(|| {
             BudgetStoreError::Overflow("budget event sequence overflowed u64".to_string())
         })?;
-        let accounting = self.prepare_reversal_accounting(
-            &affected_quotas,
-            hold_snapshot.as_ref(),
-            cancels_captured_before_dispatch,
-        )?;
+        let accounting = self.prepare_reversal_accounting(&hold, cancels_captured_before_dispatch)?;
         {
             let entry = self.counts.get_mut(&key).ok_or_else(|| {
                 BudgetStoreError::Invariant("missing charged budget row".to_string())
@@ -348,79 +211,54 @@ impl InMemoryBudgetStoreInner {
             total_cost_realized_spend_after = entry.total_cost_realized_spend;
             seq = entry.seq;
         }
-        let invocation_quota_usages;
-        let invocation_quota_mutations;
-        let mut cumulative_approval = None;
-        let mut cumulative_approval_mutation = None;
         accounting.apply(self);
-        if let Some((hold_id, hold_snapshot)) = hold_id.zip(hold_snapshot.as_ref()) {
-            invocation_quota_usages = self.invocation_quota_usages(&affected_quotas)?;
-            invocation_quota_mutations = Self::invocation_quota_mutations(
-                &invocation_quota_usages_before,
-                &invocation_quota_usages,
-            )?;
-            cumulative_approval = hold_snapshot
-                .cumulative_approval
-                .as_ref()
-                .map(|participant| {
-                    self.cumulative_approval_usage(
-                        &participant.request,
-                        BudgetCumulativeApprovalState::ReversedBeforeDispatch,
-                    )
-                })
-                .transpose()?;
-            cumulative_approval_mutation = cumulative_before
-                .as_ref()
-                .map(|(reserved, captured, version, participant)| {
-                    self.cumulative_approval_mutation(
-                        &participant.request,
-                        Some(participant.state),
-                        BudgetCumulativeApprovalState::ReversedBeforeDispatch,
-                        (*reserved, *captured, *version),
-                    )
-                })
-                .transpose()?;
-            let Some(hold) = self.holds.get_mut(hold_id) else {
-                return Err(BudgetStoreError::Invariant(
-                    "validated hold missing during reverse_charge_cost".to_string(),
-                ));
-            };
-            hold.remaining_exposure_units = 0;
-            hold.invocation_state = BudgetInvocationState::Reversed;
-            if cost_units > 0 {
-                hold.monetary_state = BudgetMonetaryState::Reversed;
-            }
-            if let Some(participant) = hold.cumulative_approval.as_mut() {
-                participant.state = BudgetCumulativeApprovalState::ReversedBeforeDispatch;
-            }
-            hold.authority = authority.cloned().or_else(|| hold.authority.clone());
-        } else {
-            let legacy_reversible = self
-                .legacy_reversible_invocations
-                .get_mut(&(capability_id.to_string(), grant_index))
-                .ok_or_else(|| {
-                    BudgetStoreError::Invariant(
-                        "validated reversible invocation disappeared".to_string(),
-                    )
-                })?;
-            *legacy_reversible = InvocationCount::new(*legacy_reversible)
-                .try_sub(InvocationCount::new(1))?
-                .get();
-            invocation_quota_usages = self.invocation_quota_usages(&affected_quotas)?;
-            invocation_quota_mutations = Self::invocation_quota_mutations(
-                &invocation_quota_usages_before,
-                &invocation_quota_usages,
-            )?;
+        let invocation_quota_usages = self.invocation_quota_usages(&affected_quotas)?;
+        let invocation_quota_mutations = Self::invocation_quota_mutations(
+            &invocation_quota_usages_before,
+            &invocation_quota_usages,
+        )?;
+        let cumulative_approval = hold
+            .cumulative_approval
+            .as_ref()
+            .map(|participant| {
+                self.cumulative_approval_usage(
+                    &participant.request,
+                    BudgetCumulativeApprovalState::ReversedBeforeDispatch,
+                )
+            })
+            .transpose()?;
+        let cumulative_approval_mutation = cumulative_before
+            .as_ref()
+            .map(|(reserved, captured, version, participant)| {
+                self.cumulative_approval_mutation(
+                    &participant.request,
+                    Some(participant.state),
+                    BudgetCumulativeApprovalState::ReversedBeforeDispatch,
+                    (*reserved, *captured, *version),
+                )
+            })
+            .transpose()?;
+        let Some(stored_hold) = self.holds.get_mut(hold_id) else {
+            return Err(BudgetStoreError::Invariant(
+                "validated hold missing during reversal".to_string(),
+            ));
+        };
+        stored_hold.remaining_exposure_units = 0;
+        stored_hold.invocation_state = BudgetInvocationState::Reversed;
+        if cost_units > 0 {
+            stored_hold.monetary_state = BudgetMonetaryState::Reversed;
         }
+        if let Some(participant) = stored_hold.cumulative_approval.as_mut() {
+            participant.state = BudgetCumulativeApprovalState::ReversedBeforeDispatch;
+        }
+        stored_hold.authority = authority.cloned().or_else(|| stored_hold.authority.clone());
         self.append_mutation(
             event_id,
             request,
             BudgetMutationRecord {
                 event_id: String::new(),
-                hold_id: hold_id.map(ToOwned::to_owned),
-                admission_binding: hold_snapshot
-                    .as_ref()
-                    .and_then(|hold| hold.admission_binding.clone()),
+                hold_id: Some(hold_id.to_string()),
+                admission_binding: hold.admission_binding.clone(),
                 capability_id: capability_id.to_string(),
                 grant_index: grant_index_u32,
                 kind: if cancels_captured_before_dispatch || invocation_quota_usages.is_empty() {
@@ -430,34 +268,14 @@ impl InMemoryBudgetStoreInner {
                 },
                 allowed: cancels_captured_before_dispatch.then_some(true),
                 authorization_outcome: None,
-                invocation_state_before: hold_snapshot
-                    .as_ref()
-                    .map_or(BudgetInvocationState::Authorized, |hold| {
-                        hold.invocation_state
-                    }),
+                invocation_state_before: hold.invocation_state,
                 invocation_state_after: BudgetInvocationState::Reversed,
-                monetary_state_before: hold_snapshot.as_ref().map_or(
-                    if cost_units == 0 {
-                        BudgetMonetaryState::None
-                    } else {
-                        BudgetMonetaryState::Exposed
-                    },
-                    |hold| hold.monetary_state,
-                ),
-                monetary_state_after: hold_snapshot.as_ref().map_or(
-                    if cost_units == 0 {
-                        BudgetMonetaryState::None
-                    } else {
-                        BudgetMonetaryState::Reversed
-                    },
-                    |hold| {
-                        if cost_units == 0 {
-                            hold.monetary_state
-                        } else {
-                            BudgetMonetaryState::Reversed
-                        }
-                    },
-                ),
+                monetary_state_before: hold.monetary_state,
+                monetary_state_after: if cost_units == 0 {
+                    hold.monetary_state
+                } else {
+                    BudgetMonetaryState::Reversed
+                },
                 recorded_at: self.now,
                 event_seq: seq,
                 usage_seq: Some(seq),
@@ -471,9 +289,9 @@ impl InMemoryBudgetStoreInner {
                 invocation_quota_mutations,
                 cumulative_approval,
                 cumulative_approval_mutation,
-                cumulative_approval_set_digest: hold_snapshot
+                cumulative_approval_set_digest: hold
+                    .cumulative_approval
                     .as_ref()
-                    .and_then(|hold| hold.cumulative_approval.as_ref())
                     .and_then(|participant| participant.approval_set_digest.clone()),
                 total_cost_exposed_after,
                 total_cost_realized_spend_after,
@@ -506,12 +324,12 @@ impl InMemoryBudgetStoreInner {
                 BudgetStoreError::Invariant(format!("unknown budget hold `{}`", request.hold_id))
             })?
             .remaining_exposure_units;
-        self.reverse_charge_cost_with_mutation(
+        self.reverse_hold_with_mutation(
             &request.capability_id,
             request.grant_index,
             cost_units,
-            Some(&request.hold_id),
-            Some(&request.event_id),
+            &request.hold_id,
+            &request.event_id,
             request.authority.as_ref(),
             None,
             BudgetMutationRequest::CancelCapturedBeforeDispatch {
@@ -525,43 +343,13 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    fn reduce_charge_cost(
-        &mut self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.reduce_charge_cost_with_ids(capability_id, grant_index, cost_units, None, None)
-    }
-
-    fn reduce_charge_cost_with_ids(
-        &mut self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.reduce_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            cost_units,
-            hold_id,
-            event_id,
-            None,
-        )
-    }
-
-    fn reduce_charge_cost_with_ids_and_authority(
-        &mut self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        validate_optional_budget_identity(hold_id, event_id, "budget release")?;
+    fn release_hold(&mut self, request: &BudgetReleaseHoldRequest) -> Result<(), BudgetStoreError> {
+        let capability_id = request.capability_id.as_str();
+        let grant_index = request.grant_index;
+        let cost_units = request.released_exposure_units;
+        let hold_id = request.hold_id.as_str();
+        let event_id = request.event_id.as_str();
+        let authority = request.authority.as_ref();
         let grant_index_u32 = u32::try_from(grant_index)
             .map_err(|_| BudgetStoreError::Invariant("grant_index does not fit u32".to_string()))?;
         if cost_units == 0 {
@@ -569,81 +357,38 @@ impl InMemoryBudgetStoreInner {
                 "zero-unit monetary release is not a state transition".to_string(),
             ));
         }
-        let request = BudgetMutationRequest::Release {
+        let mutation = BudgetMutationRequest::Release {
             capability_id: capability_id.to_string(),
             grant_index,
-            hold_id: hold_id.map(ToOwned::to_owned),
+            hold_id: hold_id.to_string(),
             cost_units,
             authority: authority.cloned(),
         };
-        if let Some(existing) = self.duplicate_mutation(event_id, &request)? {
-            if let Some(hold_id) = hold_id {
-                let hold = self.validate_hold(hold_id, capability_id, grant_index)?;
-                Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
-                self.ensure_latest_hold_event(hold_id, existing.record.event_seq, "release")?;
-            } else {
-                self.ensure_latest_usage_event(
-                    capability_id,
-                    grant_index,
-                    existing.record.event_seq,
-                    "release",
-                )?;
-            }
+        if let Some(existing) = self.duplicate_mutation(event_id, &mutation)? {
+            let hold = self.validate_hold(hold_id, capability_id, grant_index)?;
+            Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
+            self.ensure_latest_hold_event(hold_id, existing.record.event_seq, "release")?;
             return Ok(());
         }
-        let hold_snapshot = hold_id
-            .map(|hold_id| {
-                self.validate_hold(hold_id, capability_id, grant_index)
-                    .cloned()
-            })
-            .transpose()?;
-        if let Some((hold_id, hold)) = hold_id.zip(hold_snapshot.as_ref()) {
-            if hold.remaining_exposure_units < cost_units {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget hold `{hold_id}` cannot release more than remaining exposure"
-                )));
-            }
-            if hold.monetary_state != BudgetMonetaryState::Exposed {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget hold `{hold_id}` monetary exposure is not releasable"
-                )));
-            }
-            if hold.invocation_state != BudgetInvocationState::Authorized {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget hold `{hold_id}` crossed the dispatch commitment fence"
-                )));
-            }
-            Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
-        } else {
-            if self.has_composite_history(capability_id, grant_index) {
-                return Err(BudgetStoreError::Invariant(
-                    "cannot release unheld exposure after structured admission history".to_string(),
-                ));
-            }
-            if self.holds.values().any(|hold| {
-                hold.capability_id == capability_id
-                    && hold.grant_index == grant_index
-                    && matches!(
-                        hold.invocation_state,
-                        BudgetInvocationState::Authorized | BudgetInvocationState::Captured
-                    )
-            }) {
-                return Err(BudgetStoreError::Invariant(
-                    "cannot release unheld exposure while a live budget hold exists".to_string(),
-                ));
-            }
-            if self
-                .legacy_reversible_invocations
-                .get(&(capability_id.to_string(), grant_index))
-                .copied()
-                .unwrap_or(0)
-                == 0
-            {
-                return Err(BudgetStoreError::Invariant(
-                    "no releasable unheld monetary invocation exists".to_string(),
-                ));
-            }
+        let hold = self
+            .validate_hold(hold_id, capability_id, grant_index)?
+            .clone();
+        if hold.remaining_exposure_units < cost_units {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` cannot release more than remaining exposure"
+            )));
         }
+        if hold.monetary_state != BudgetMonetaryState::Exposed {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` monetary exposure is not releasable"
+            )));
+        }
+        if hold.invocation_state != BudgetInvocationState::Authorized {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` crossed the dispatch commitment fence"
+            )));
+        }
+        Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
 
         let key = (capability_id.to_string(), grant_index);
         let (
@@ -678,53 +423,39 @@ impl InMemoryBudgetStoreInner {
             total_cost_realized_spend_after = entry.total_cost_realized_spend;
             seq = entry.seq;
         }
-        if let Some(hold_id) = hold_id {
-            let Some(hold) = self.holds.get_mut(hold_id) else {
-                return Err(BudgetStoreError::Invariant(
-                    "validated hold missing during release_charge_cost".to_string(),
-                ));
-            };
-            hold.remaining_exposure_units = ExposureUnits::new(hold.remaining_exposure_units)
+        let Some(stored_hold) = self.holds.get_mut(hold_id) else {
+            return Err(BudgetStoreError::Invariant(
+                "validated hold missing during release".to_string(),
+            ));
+        };
+        stored_hold.remaining_exposure_units =
+            ExposureUnits::new(stored_hold.remaining_exposure_units)
                 .try_sub(ExposureUnits::new(cost_units))?
                 .get();
-            if hold.remaining_exposure_units == 0 {
-                hold.monetary_state = BudgetMonetaryState::Released;
-            }
-            hold.authority = authority.cloned().or_else(|| hold.authority.clone());
+        if stored_hold.remaining_exposure_units == 0 {
+            stored_hold.monetary_state = BudgetMonetaryState::Released;
         }
+        stored_hold.authority = authority.cloned().or_else(|| stored_hold.authority.clone());
         self.append_mutation(
             event_id,
-            request,
+            mutation,
             BudgetMutationRecord {
                 event_id: String::new(),
-                hold_id: hold_id.map(ToOwned::to_owned),
-                admission_binding: hold_snapshot
-                    .as_ref()
-                    .and_then(|hold| hold.admission_binding.clone()),
+                hold_id: Some(hold_id.to_string()),
+                admission_binding: hold.admission_binding.clone(),
                 capability_id: capability_id.to_string(),
                 grant_index: grant_index_u32,
                 kind: BudgetMutationKind::ReleaseExposure,
                 allowed: None,
                 authorization_outcome: None,
-                invocation_state_before: hold_snapshot
-                    .as_ref()
-                    .map_or(BudgetInvocationState::Absent, |hold| hold.invocation_state),
-                invocation_state_after: hold_snapshot
-                    .as_ref()
-                    .map_or(BudgetInvocationState::Absent, |hold| hold.invocation_state),
-                monetary_state_before: hold_snapshot
-                    .as_ref()
-                    .map_or(BudgetMonetaryState::Exposed, |hold| hold.monetary_state),
-                monetary_state_after: hold_snapshot.as_ref().map_or(
-                    BudgetMonetaryState::Released,
-                    |hold| {
-                        if hold.remaining_exposure_units == cost_units {
-                            BudgetMonetaryState::Released
-                        } else {
-                            BudgetMonetaryState::Exposed
-                        }
-                    },
-                ),
+                invocation_state_before: hold.invocation_state,
+                invocation_state_after: hold.invocation_state,
+                monetary_state_before: hold.monetary_state,
+                monetary_state_after: if hold.remaining_exposure_units == cost_units {
+                    BudgetMonetaryState::Released
+                } else {
+                    BudgetMonetaryState::Exposed
+                },
                 recorded_at: self.now,
                 event_seq: seq,
                 usage_seq: Some(seq),
@@ -734,23 +465,19 @@ impl InMemoryBudgetStoreInner {
                 max_cost_per_invocation: None,
                 max_total_cost_units: None,
                 invocation_count_after,
-                invocation_quota_usages: hold_snapshot
-                    .as_ref()
-                    .map(|hold| self.invocation_quota_usages(&hold.invocation_quotas))
-                    .transpose()?
-                    .unwrap_or_default(),
+                invocation_quota_usages: self.invocation_quota_usages(&hold.invocation_quotas)?,
                 invocation_quota_mutations: Vec::new(),
-                cumulative_approval: hold_snapshot
+                cumulative_approval: hold
+                    .cumulative_approval
                     .as_ref()
-                    .and_then(|hold| hold.cumulative_approval.as_ref())
                     .map(|participant| {
                         self.cumulative_approval_usage(&participant.request, participant.state)
                     })
                     .transpose()?,
                 cumulative_approval_mutation: None,
-                cumulative_approval_set_digest: hold_snapshot
+                cumulative_approval_set_digest: hold
+                    .cumulative_approval
                     .as_ref()
-                    .and_then(|hold| hold.cumulative_approval.as_ref())
                     .and_then(|participant| participant.approval_set_digest.clone()),
                 total_cost_exposed_after,
                 total_cost_realized_spend_after,
@@ -760,69 +487,25 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
-    fn settle_charge_cost(
+    fn reconcile_hold(
         &mut self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
+        request: &BudgetReconcileHoldRequest,
     ) -> Result<(), BudgetStoreError> {
-        self.settle_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-            None,
-            None,
-        )
-    }
-
-    fn settle_charge_cost_with_ids(
-        &mut self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<(), BudgetStoreError> {
-        self.settle_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-            hold_id,
-            event_id,
-            None,
-        )
-    }
-
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
-    fn settle_charge_cost_with_ids_and_authority(
-        &mut self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-        authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        self.settle_charge_cost_with_mutation(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-            hold_id,
-            event_id,
-            authority,
+        self.settle_hold_with_mutation(
+            &request.capability_id,
+            request.grant_index,
+            request.exposed_cost_units,
+            request.realized_spend_units,
+            &request.hold_id,
+            &request.event_id,
+            request.authority.as_ref(),
             BudgetMutationRequest::Reconcile {
-                capability_id: capability_id.to_string(),
-                grant_index,
-                hold_id: hold_id.map(ToOwned::to_owned),
-                exposed_cost_units,
-                realized_cost_units,
-                authority: authority.cloned(),
+                capability_id: request.capability_id.clone(),
+                grant_index: request.grant_index,
+                hold_id: request.hold_id.clone(),
+                exposed_cost_units: request.exposed_cost_units,
+                realized_cost_units: request.realized_spend_units,
+                authority: request.authority.clone(),
             },
             BudgetMutationKind::ReconcileSpend,
             BudgetMonetaryState::Reconciled,
@@ -830,20 +513,19 @@ impl InMemoryBudgetStoreInner {
     }
 
     #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
-    fn settle_charge_cost_with_mutation(
+    fn settle_hold_with_mutation(
         &mut self,
         capability_id: &str,
         grant_index: usize,
         exposed_cost_units: u64,
         realized_cost_units: u64,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
+        hold_id: &str,
+        event_id: &str,
         authority: Option<&BudgetEventAuthority>,
         request: BudgetMutationRequest,
         mutation_kind: BudgetMutationKind,
         terminal_state: BudgetMonetaryState,
     ) -> Result<(), BudgetStoreError> {
-        validate_optional_budget_identity(hold_id, event_id, "budget settlement")?;
         let grant_index_u32 = u32::try_from(grant_index)
             .map_err(|_| BudgetStoreError::Invariant("grant_index does not fit u32".to_string()))?;
         if realized_cost_units > exposed_cost_units {
@@ -857,73 +539,30 @@ impl InMemoryBudgetStoreInner {
             ));
         }
         if let Some(existing) = self.duplicate_mutation(event_id, &request)? {
-            if let Some(hold_id) = hold_id {
-                let hold = self.validate_hold(hold_id, capability_id, grant_index)?;
-                Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
-                self.ensure_latest_hold_event(hold_id, existing.record.event_seq, "settlement")?;
-            } else {
-                self.ensure_latest_usage_event(
-                    capability_id,
-                    grant_index,
-                    existing.record.event_seq,
-                    "settlement",
-                )?;
-            }
+            let hold = self.validate_hold(hold_id, capability_id, grant_index)?;
+            Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
+            self.ensure_latest_hold_event(hold_id, existing.record.event_seq, "settlement")?;
             return Ok(());
         }
-        let hold_snapshot = hold_id
-            .map(|hold_id| {
-                self.validate_hold(hold_id, capability_id, grant_index)
-                    .cloned()
-            })
-            .transpose()?;
-        if let Some((hold_id, hold)) = hold_id.zip(hold_snapshot.as_ref()) {
-            if hold.invocation_state != BudgetInvocationState::Captured {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget hold `{hold_id}` invocation is not dispatch-captured"
-                )));
-            }
-            if hold.remaining_exposure_units != exposed_cost_units {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget hold `{hold_id}` does not match reconciled exposure"
-                )));
-            }
-            if hold.monetary_state != BudgetMonetaryState::Exposed {
-                return Err(BudgetStoreError::Invariant(format!(
-                    "budget hold `{hold_id}` monetary exposure is not reconcilable"
-                )));
-            }
-            Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
-        } else {
-            if self.has_composite_history(capability_id, grant_index) {
-                return Err(BudgetStoreError::Invariant(
-                    "cannot settle unheld exposure after structured admission history".to_string(),
-                ));
-            }
-            if self.holds.values().any(|hold| {
-                hold.capability_id == capability_id
-                    && hold.grant_index == grant_index
-                    && matches!(
-                        hold.invocation_state,
-                        BudgetInvocationState::Authorized | BudgetInvocationState::Captured
-                    )
-            }) {
-                return Err(BudgetStoreError::Invariant(
-                    "cannot settle unheld exposure while a live budget hold exists".to_string(),
-                ));
-            }
-            if self
-                .legacy_reversible_invocations
-                .get(&(capability_id.to_string(), grant_index))
-                .copied()
-                .unwrap_or(0)
-                == 0
-            {
-                return Err(BudgetStoreError::Invariant(
-                    "no settleable unheld monetary invocation exists".to_string(),
-                ));
-            }
+        let hold = self
+            .validate_hold(hold_id, capability_id, grant_index)?
+            .clone();
+        if hold.invocation_state != BudgetInvocationState::Captured {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` invocation is not dispatch-captured"
+            )));
         }
+        if hold.remaining_exposure_units != exposed_cost_units {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` does not match reconciled exposure"
+            )));
+        }
+        if hold.monetary_state != BudgetMonetaryState::Exposed {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` monetary exposure is not reconcilable"
+            )));
+        }
+        Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
 
         let key = (capability_id.to_string(), grant_index);
         let (
@@ -967,46 +606,29 @@ impl InMemoryBudgetStoreInner {
             total_cost_realized_spend_after = entry.total_cost_realized_spend;
             seq = entry.seq;
         }
-        if let Some(hold_id) = hold_id {
-            let Some(hold) = self.holds.get_mut(hold_id) else {
-                return Err(BudgetStoreError::Invariant(
-                    "validated hold missing during settle_charge_cost".to_string(),
-                ));
-            };
-            hold.remaining_exposure_units = 0;
-            hold.monetary_state = terminal_state;
-            hold.authority = authority.cloned().or_else(|| hold.authority.clone());
-        } else if let Some(legacy_reversible) = self
-            .legacy_reversible_invocations
-            .get_mut(&(capability_id.to_string(), grant_index))
-        {
-            *legacy_reversible = InvocationCount::new(*legacy_reversible)
-                .try_sub(InvocationCount::new(1))?
-                .get();
-        }
+        let Some(stored_hold) = self.holds.get_mut(hold_id) else {
+            return Err(BudgetStoreError::Invariant(
+                "validated hold missing during settlement".to_string(),
+            ));
+        };
+        stored_hold.remaining_exposure_units = 0;
+        stored_hold.monetary_state = terminal_state;
+        stored_hold.authority = authority.cloned().or_else(|| stored_hold.authority.clone());
         self.append_mutation(
             event_id,
             request,
             BudgetMutationRecord {
                 event_id: String::new(),
-                hold_id: hold_id.map(ToOwned::to_owned),
-                admission_binding: hold_snapshot
-                    .as_ref()
-                    .and_then(|hold| hold.admission_binding.clone()),
+                hold_id: Some(hold_id.to_string()),
+                admission_binding: hold.admission_binding.clone(),
                 capability_id: capability_id.to_string(),
                 grant_index: grant_index_u32,
                 kind: mutation_kind,
                 allowed: None,
                 authorization_outcome: None,
-                invocation_state_before: hold_snapshot
-                    .as_ref()
-                    .map_or(BudgetInvocationState::Absent, |hold| hold.invocation_state),
-                invocation_state_after: hold_snapshot
-                    .as_ref()
-                    .map_or(BudgetInvocationState::Absent, |hold| hold.invocation_state),
-                monetary_state_before: hold_snapshot
-                    .as_ref()
-                    .map_or(BudgetMonetaryState::Exposed, |hold| hold.monetary_state),
+                invocation_state_before: hold.invocation_state,
+                invocation_state_after: hold.invocation_state,
+                monetary_state_before: hold.monetary_state,
                 monetary_state_after: terminal_state,
                 recorded_at: self.now,
                 event_seq: seq,
@@ -1017,23 +639,19 @@ impl InMemoryBudgetStoreInner {
                 max_cost_per_invocation: None,
                 max_total_cost_units: None,
                 invocation_count_after,
-                invocation_quota_usages: hold_snapshot
-                    .as_ref()
-                    .map(|hold| self.invocation_quota_usages(&hold.invocation_quotas))
-                    .transpose()?
-                    .unwrap_or_default(),
+                invocation_quota_usages: self.invocation_quota_usages(&hold.invocation_quotas)?,
                 invocation_quota_mutations: Vec::new(),
-                cumulative_approval: hold_snapshot
+                cumulative_approval: hold
+                    .cumulative_approval
                     .as_ref()
-                    .and_then(|hold| hold.cumulative_approval.as_ref())
                     .map(|participant| {
                         self.cumulative_approval_usage(&participant.request, participant.state)
                     })
                     .transpose()?,
                 cumulative_approval_mutation: None,
-                cumulative_approval_set_digest: hold_snapshot
+                cumulative_approval_set_digest: hold
+                    .cumulative_approval
                     .as_ref()
-                    .and_then(|hold| hold.cumulative_approval.as_ref())
                     .and_then(|participant| participant.approval_set_digest.clone()),
                 total_cost_exposed_after,
                 total_cost_realized_spend_after,
@@ -1047,13 +665,13 @@ impl InMemoryBudgetStoreInner {
         &mut self,
         request: &BudgetCaptureHoldRequest,
     ) -> Result<(), BudgetStoreError> {
-        self.settle_charge_cost_with_mutation(
+        self.settle_hold_with_mutation(
             &request.capability_id,
             request.grant_index,
             request.exposed_cost_units,
             request.realized_spend_units,
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
+            &request.hold_id,
+            &request.event_id,
             request.authority.as_ref(),
             BudgetMutationRequest::CaptureMonetary(request.clone()),
             BudgetMutationKind::CaptureSpend,

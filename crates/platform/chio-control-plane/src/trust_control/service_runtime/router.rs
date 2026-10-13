@@ -318,7 +318,6 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
                 .layer(DefaultBodyLimit::max(RECEIPT_APPEND_MAX_BODY_BYTES)),
         )
         .route(BUDGETS_PATH, get(handle_list_budgets))
-        .route(BUDGET_INCREMENT_PATH, post(handle_try_increment_budget))
         .route(BUDGET_AUTHORIZE_EXPOSURE_PATH, post(handle_try_charge_cost))
         .route(
             BUDGET_CAPTURE_INVOCATION_PATH,

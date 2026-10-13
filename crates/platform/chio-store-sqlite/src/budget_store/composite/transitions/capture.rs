@@ -463,7 +463,7 @@ impl SqliteBudgetStore {
         }
         let event = self.append_mutation_event(
             &transaction,
-            Some(&request.event_id),
+            &request.event_id,
             Some(&request.hold_id),
             request.authority.as_ref(),
             &request.capability_id,

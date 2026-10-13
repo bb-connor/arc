@@ -39,96 +39,6 @@ impl CommittingCaptureErrorBudgetStore {
 }
 
 impl crate::budget_store::BudgetStore for CommittingCaptureErrorBudgetStore {
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, crate::budget_store::BudgetStoreError> {
-        self.inner
-            .try_increment(capability_id, grant_index, max_invocations)
-    }
-
-    fn try_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, crate::budget_store::BudgetStoreError> {
-        self.inner.try_charge_cost(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-        )
-    }
-
-    fn reverse_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), crate::budget_store::BudgetStoreError> {
-        self.inner
-            .reverse_charge_cost(capability_id, grant_index, cost_units)?;
-        if self.failure == PostCommitBudgetFailure::Reverse {
-            return Err(crate::budget_store::BudgetStoreError::Io(
-                std::io::Error::other("reverse acknowledgement lost"),
-            ));
-        }
-        Ok(())
-    }
-
-    fn reduce_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), crate::budget_store::BudgetStoreError> {
-        self.inner
-            .reduce_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn settle_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-    ) -> Result<(), crate::budget_store::BudgetStoreError> {
-        self.inner.settle_charge_cost(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-        )
-    }
-
-    delegate_authority_fenced_budget_methods!(inner);
-
-    fn list_usages(
-        &self,
-        limit: usize,
-        capability_id: Option<&str>,
-    ) -> Result<Vec<crate::budget_store::BudgetUsageRecord>, crate::budget_store::BudgetStoreError>
-    {
-        self.inner.list_usages(limit, capability_id)
-    }
-
-    fn get_usage(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-    ) -> Result<Option<crate::budget_store::BudgetUsageRecord>, crate::budget_store::BudgetStoreError>
-    {
-        self.inner.get_usage(capability_id, grant_index)
-    }
-
     fn list_mutation_events(
         &self,
         limit: usize,
@@ -138,16 +48,6 @@ impl crate::budget_store::BudgetStore for CommittingCaptureErrorBudgetStore {
     {
         self.inner
             .list_mutation_events(limit, capability_id, grant_index)
-    }
-
-    fn authorize_budget_hold(
-        &self,
-        request: crate::budget_store::BudgetAuthorizeHoldRequest,
-    ) -> Result<
-        crate::budget_store::BudgetAuthorizeHoldDecision,
-        crate::budget_store::BudgetStoreError,
-    > {
-        self.inner.authorize_budget_hold(request)
     }
 
     fn reverse_budget_hold(
@@ -197,6 +97,27 @@ impl crate::budget_store::BudgetStore for CommittingCaptureErrorBudgetStore {
             Ok(decision)
         }
     }
+
+    delegate_budget_store_methods!(
+        inner;
+        authorize_budget_hold,
+        authorize_cumulative_approval,
+        release_budget_hold,
+        reconcile_budget_hold,
+        capture_budget_hold,
+        list_usages,
+        get_usage,
+        get_invocation_quota_usage,
+        get_cumulative_approval_account_usage,
+        get_cumulative_approval_operation_usage,
+        reap_orphaned_holds,
+        count_open_holds,
+        list_open_delegated_reserved_hold_ids,
+        request_id_has_reserved_hold,
+        get_budget_hold,
+        mark_hold_reserved,
+        reap_expired_reserved_holds,
+    );
 }
 
 #[derive(Clone, Copy)]

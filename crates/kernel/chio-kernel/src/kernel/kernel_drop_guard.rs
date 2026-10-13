@@ -269,38 +269,23 @@ impl<'a> PostAdmissionDropGuard<'a> {
             }
         }
 
-        // 2. Invocation-only budget reversal. A non-monetary grant
-        //    with `max_invocations` incremented the invocation counter at
-        //    admission; reverse it so a never-dispatched call does not
-        //    permanently consume a slot. Reuse the same primitive the
-        //    pre-dispatch denial path uses, gated on the Invocation variant so
-        //    a Charge (handled above) is not reversed twice.
-        if matches!(
-            self.budget_mutation,
-            PreExecutionBudgetMutation::Invocation { .. }
-                | PreExecutionBudgetMutation::InvocationHold(_)
-        ) {
-            match self
-                .kernel
-                .reverse_pre_execution_budget_mutation(self.cap, self.budget_mutation)
-            {
-                Ok(_) => {}
-                Err(error) => {
-                    let reason = redacted!(&error).to_string();
-                    warn!(
-                        request_id = %self.request.request_id,
-                        reason = %redacted!(&error),
-                        "failed to reverse dropped pre-dispatch invocation budget"
-                    );
-                    faults.push(PreDispatchCleanupFault {
-                        step: "invocation_reversal",
-                        reason,
-                        hold_ids: self.budget_mutation.durable_hold_result().map_or_else(
-                            || vec![self.cap.id.clone()],
-                            |hold| vec![hold.budget_hold_id.clone()],
-                        ),
-                    });
-                }
+        // 2. Invocation-only budget reversal. A non-monetary grant with
+        //    `max_invocations` reserved an invocation hold at admission;
+        //    reverse it so a never-dispatched call does not permanently
+        //    consume a slot. A Charge is handled above.
+        if let PreExecutionBudgetMutation::InvocationHold(hold) = self.budget_mutation {
+            if let Err(error) = self.kernel.reverse_budget_charge(&self.cap.id, hold) {
+                let reason = redacted!(&error).to_string();
+                warn!(
+                    request_id = %self.request.request_id,
+                    reason = %redacted!(&error),
+                    "failed to reverse dropped pre-dispatch invocation budget"
+                );
+                faults.push(PreDispatchCleanupFault {
+                    step: "invocation_reversal",
+                    reason,
+                    hold_ids: vec![hold.budget_hold_id.clone()],
+                });
             }
         }
 
