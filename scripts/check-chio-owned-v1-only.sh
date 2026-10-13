@@ -195,17 +195,6 @@ while IFS= read -r line; do
     continue
   fi
 
-  # The Cargo feature `delegation_v2` is retained as a backward-compat
-  # alias for external manifests; documentation and the Cargo.toml line
-  # that defines the alias are intentional and not remnants.
-  if [[ "$text" =~ feature\ \`delegation_v2\`|features\ =\ \[\"delegation_v2\"\]|delegation_v2\ =\ \[ ]]; then
-    continue
-  fi
-  if [[ "$text" =~ delegation_v2 ]] && \
-     [[ "$path" == "crates/core/chio-core-types/Cargo.toml" ]]; then
-    continue
-  fi
-
   # The launch disclosure surface intentionally ships a v2 BBS projection
   # manifest so typed message classes and per-slot sensitivity are explicit.
   # Keep this exemption limited to that exact manifest schema and its constants.
