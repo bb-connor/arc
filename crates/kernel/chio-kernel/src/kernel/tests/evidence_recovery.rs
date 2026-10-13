@@ -583,3 +583,22 @@ fn clock_callback_panic_does_not_poison_recovery_authority_fence() {
     assert!(kernel.read_authority_time().is_ok());
     assert_eq!(state.append_calls.load(Ordering::SeqCst), 1);
 }
+
+#[test]
+fn awaiting_retained_evidence_reports_a_failed_flush_then_returns_after_persistence() {
+    let (kernel, receipt, state) = fixture();
+    let id = receipt.id.clone();
+    retain(&kernel, receipt);
+    assert!(matches!(
+        kernel.await_post_effect_evidence(),
+        Err(KernelError::PostEffectEvidencePending { buffered: 1 })
+    ));
+    state.barrier_open.store(true, Ordering::SeqCst);
+    let mut outcome = kernel.await_post_effect_evidence();
+    while matches!(outcome, Err(KernelError::PostEffectEvidencePending { .. })) {
+        outcome = kernel.await_post_effect_evidence();
+    }
+    assert!(outcome.is_ok(), "{outcome:?}");
+    assert!(kernel.ensure_post_effect_evidence_latch_clear().is_ok());
+    assert_eq!(kernel.receipt_log().get(0).unwrap().id, id);
+}

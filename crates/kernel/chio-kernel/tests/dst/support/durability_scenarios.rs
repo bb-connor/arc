@@ -246,14 +246,10 @@ pub fn run_child_flush_mutation(seed: u64, suppress_child_append: bool) -> Resul
         server_starts.load(Ordering::SeqCst) == 1,
         "nested mutation never reached the tool server",
     )?;
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-    let parent_receipts = loop {
-        let receipts = receipt_store.receipts()?;
-        if !receipts.is_empty() || std::time::Instant::now() >= deadline {
-            break receipts;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    };
+    kernel
+        .await_post_effect_evidence()
+        .map_err(|error| format!("dropped nested evidence was not persisted: {error}"))?;
+    let parent_receipts = receipt_store.receipts()?;
     require(
         parent_receipts.len() == 1 && parent_receipts[0].is_cancelled(),
         "nested drop did not persist its parent cancellation",

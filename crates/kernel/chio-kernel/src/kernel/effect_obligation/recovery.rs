@@ -80,9 +80,12 @@ struct BufferedRecord {
 pub(super) struct EvidenceQueue {
     records: Mutex<VecDeque<BufferedRecord>>,
     wake: Condvar,
+    settled: Condvar,
     pending: AtomicUsize,
+    failed_attempts: AtomicU64,
     producers: AtomicUsize,
     stopping: AtomicBool,
+    worker_exited: AtomicBool,
 }
 
 pub(super) struct EvidenceProducer {
@@ -122,9 +125,12 @@ impl EvidenceQueue {
         Arc::new(Self {
             records: Mutex::new(VecDeque::new()),
             wake: Condvar::new(),
+            settled: Condvar::new(),
             pending: AtomicUsize::new(0),
+            failed_attempts: AtomicU64::new(0),
             producers: AtomicUsize::new(0),
             stopping: AtomicBool::new(false),
+            worker_exited: AtomicBool::new(false),
         })
     }
 
@@ -158,6 +164,54 @@ impl EvidenceQueue {
 
     fn pending(&self) -> usize {
         self.pending.load(Ordering::Acquire)
+    }
+
+    /// Wake every drain waiter after a flush attempt settles or the worker
+    /// exits. The records lock orders the notification after the state change.
+    fn notify_settled(&self) {
+        let _records = self
+            .records
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        self.settled.notify_all();
+    }
+
+    /// Block until every retained record is persisted. A failed flush attempt
+    /// or a stopped worker returns at once; recovery keeps retrying.
+    pub(super) fn await_drained(&self) -> Result<(), KernelError> {
+        let mut records = self
+            .records
+            .lock()
+            .map_err(|_| KernelError::Internal("post-effect evidence queue poisoned".into()))?;
+        let failures = self.failed_attempts.load(Ordering::Acquire);
+        loop {
+            let buffered = self.pending();
+            if buffered == 0 {
+                return Ok(());
+            }
+            if self.failed_attempts.load(Ordering::Acquire) != failures {
+                return Err(KernelError::PostEffectEvidencePending { buffered });
+            }
+            if self.worker_exited.load(Ordering::Acquire) {
+                return Err(KernelError::Internal(
+                    "post-effect evidence worker stopped".into(),
+                ));
+            }
+            records = self
+                .settled
+                .wait(records)
+                .map_err(|_| KernelError::Internal("post-effect evidence queue poisoned".into()))?;
+        }
+    }
+}
+
+/// Marks worker exit, including an unwind, for drain waiters.
+struct WorkerExit(Arc<EvidenceQueue>);
+
+impl Drop for WorkerExit {
+    fn drop(&mut self) {
+        self.0.worker_exited.store(true, Ordering::Release);
+        self.0.notify_settled();
     }
 }
 
@@ -197,9 +251,12 @@ impl EvidenceRecovery {
         let queue = Arc::new(EvidenceQueue {
             records: Mutex::new(records),
             wake: Condvar::new(),
+            settled: Condvar::new(),
             pending: AtomicUsize::new(0),
+            failed_attempts: AtomicU64::new(0),
             producers: AtomicUsize::new(0),
             stopping: AtomicBool::new(false),
+            worker_exited: AtomicBool::new(false),
         });
         let worker_queue = Arc::clone(&queue);
         let resources = Arc::new(resources);
@@ -234,6 +291,10 @@ impl EvidenceRecovery {
             && same(&self.resources.trace_observer, &next.trace_observer)
             && self.resources.append_budget == next.append_budget
             && self.resources.settlement_observation == next.settlement_observation
+    }
+
+    pub(super) fn queue(&self) -> Arc<EvidenceQueue> {
+        Arc::clone(&self.queue)
     }
 
     pub(super) fn is_idle(&self) -> bool {
@@ -305,6 +366,7 @@ impl Drop for EvidenceRecovery {
 }
 
 fn recover(queue: Arc<EvidenceQueue>, resources: Arc<EvidenceRecoveryResources>) {
+    let _exit = WorkerExit(Arc::clone(&queue));
     let mut retry = RETRY_MIN;
     loop {
         let mut records = queue
@@ -336,6 +398,7 @@ fn recover(queue: Arc<EvidenceQueue>, resources: Arc<EvidenceRecoveryResources>)
         if matches!(result, Ok(Ok(()))) {
             queue.pending.fetch_sub(1, Ordering::AcqRel);
             drop(record);
+            queue.notify_settled();
             retry = RETRY_MIN;
             continue;
         }
@@ -344,6 +407,8 @@ fn recover(queue: Arc<EvidenceQueue>, resources: Arc<EvidenceRecoveryResources>)
             .lock()
             .unwrap_or_else(|error| error.into_inner());
         records.push_back(record);
+        queue.failed_attempts.fetch_add(1, Ordering::AcqRel);
+        queue.settled.notify_all();
         let _waiting = queue
             .wake
             .wait_timeout_while(records, retry, |_| true)

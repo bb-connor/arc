@@ -25,6 +25,22 @@ impl ChioKernel {
         Ok(())
     }
 
+    /// Block until this kernel's retained post-effect evidence is persisted.
+    /// Returns the pending error as soon as a flush attempt fails; supervised
+    /// recovery keeps retrying and new dispatch stays closed meanwhile.
+    pub fn await_post_effect_evidence(&self) -> Result<(), KernelError> {
+        let queue = self
+            .post_effect_evidence
+            .lock()
+            .map_err(|_| KernelError::Internal("post-effect evidence owner poisoned".into()))?
+            .as_ref()
+            .map(EvidenceRecovery::queue);
+        match queue {
+            Some(queue) => queue.await_drained(),
+            None => Ok(()),
+        }
+    }
+
     pub(in crate::kernel) fn invalidate_idle_post_effect_evidence_worker(
         &mut self,
     ) -> Result<(), KernelError> {
