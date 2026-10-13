@@ -2451,7 +2451,7 @@ fn transparency_anchored_fixture(
 
     let log_id = transparency_checkpoint_log_id();
     let mut inclusion_artifact = json!({
-        "schema": "chio.transparency.inclusion-proof.v2",
+        "schema": "chio.transparency.receipt-inclusion-proof.v1",
         "proof_id": "transparency-proof-governed-action",
         "log_id": log_id,
         "artifact_ref": subject_sha256,
@@ -2570,7 +2570,7 @@ fn standalone_minimal_passport_promotes_verified_transparency_anchor() {
 }
 
 #[test]
-fn standalone_minimal_passport_rejects_v2_anchor_without_checkpoint_statement() {
+fn standalone_minimal_passport_rejects_receipt_anchor_without_checkpoint_statement() {
     let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
         transparency_anchored_fixture(|artifact| {
             let object = artifact
@@ -2581,7 +2581,7 @@ fn standalone_minimal_passport_rejects_v2_anchor_without_checkpoint_statement() 
 
     let error =
         verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
-            .test_expect_err("a v2 inclusion proof without its signed anchor must deny");
+            .test_expect_err("a receipt inclusion proof without its signed anchor must deny");
 
     assert!(
         matches!(&error, chio_transaction_passport::TransactionPassportError::Input(source) if source.code() == "urn:chio:error:attest:signed-json-invalid-shape")
@@ -2590,7 +2590,7 @@ fn standalone_minimal_passport_rejects_v2_anchor_without_checkpoint_statement() 
 }
 
 #[test]
-fn standalone_minimal_passport_requires_the_complete_v2_inclusion_envelope() {
+fn standalone_minimal_passport_requires_the_complete_receipt_inclusion_envelope() {
     for field in ["proof_id", "log_id", "checkpoint", "verified_at"] {
         let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
             transparency_anchored_fixture(|artifact| {
@@ -2611,7 +2611,7 @@ fn standalone_minimal_passport_requires_the_complete_v2_inclusion_envelope() {
 }
 
 #[test]
-fn standalone_minimal_passport_rejects_unknown_v2_inclusion_envelope_fields() {
+fn standalone_minimal_passport_rejects_unknown_receipt_inclusion_envelope_fields() {
     let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
         transparency_anchored_fixture(|artifact| {
             artifact["smuggled"] = json!("field");
@@ -2629,7 +2629,7 @@ fn standalone_minimal_passport_rejects_unknown_v2_inclusion_envelope_fields() {
 }
 
 #[test]
-fn standalone_minimal_passport_keeps_registered_v1_proofs_at_preview() {
+fn standalone_minimal_passport_keeps_selective_disclosure_proofs_at_preview() {
     let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
         transparency_anchored_fixture(|artifact| {
             artifact["schema"] = json!("chio.transparency.inclusion-proof.v1");
@@ -2637,7 +2637,9 @@ fn standalone_minimal_passport_keeps_registered_v1_proofs_at_preview() {
 
     let error =
         verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
-            .test_expect_err("registered v1 proof hashing must not qualify as an RFC 6962 anchor");
+            .test_expect_err(
+                "selective-disclosure proof hashing must not qualify as an RFC 6962 anchor",
+            );
 
     assert!(
         error

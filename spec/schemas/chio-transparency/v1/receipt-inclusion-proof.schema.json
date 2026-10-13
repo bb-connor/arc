@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.world/schemas/chio-transparency/v2/inclusion-proof.schema.json",
+  "$id": "https://chio.world/schemas/chio-transparency/v1/receipt-inclusion-proof.schema.json",
   "title": "Chio Checkpoint-Anchored Transparency Inclusion Proof",
   "type": "object",
   "additionalProperties": false,
@@ -19,7 +19,7 @@
     "checkpoint_statement"
   ],
   "properties": {
-    "schema": { "const": "chio.transparency.inclusion-proof.v2" },
+    "schema": { "const": "chio.transparency.receipt-inclusion-proof.v1" },
     "proof_id": { "type": "string", "minLength": 1 },
     "log_id": {
       "type": "string",
