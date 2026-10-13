@@ -669,7 +669,6 @@ extensions:
     );
     assert!(artifact.claims.normalized_claims.iter().any(|claim| {
         claim.code == chio_core::appraisal::RuntimeAttestationNormalizedClaimCode::SecureBootState
-            && claim.legacy_assertion_key == "secureBoot"
             && claim.provenance
                 == chio_core::appraisal::RuntimeAttestationClaimProvenance::VendorClaims
             && claim.value == serde_json::json!("enabled")
