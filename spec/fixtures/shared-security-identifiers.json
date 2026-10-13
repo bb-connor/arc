@@ -1,9 +1,9 @@
 [
   {
     "kind": "schema",
-    "identity": "chio.active-response-policy-authority.v2",
+    "identity": "chio.active-response-policy-authority.v1",
     "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
-    "sha256": "24098e239d3b01065e2e30a9b9e77dc700ad8d36fbfcff7d1b70ba4a515d5915"
+    "sha256": "a30db582aa8de7e6934e9dab24653d1a3993d752cd6a624a8db91488557a37a2"
   },
   {
     "kind": "schema",
