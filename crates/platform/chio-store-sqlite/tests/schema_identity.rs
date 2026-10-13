@@ -1,6 +1,8 @@
 use chio_store_sqlite::{check_current_schema, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID};
 use rusqlite::Connection;
 
+type CatalogRow = (String, String, String, Option<String>);
+
 #[test]
 fn single_schema_refuses_populated_unstamped_database_with_sqlite_prefix(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -79,9 +81,7 @@ fn single_schema_refuses_unrecognized_stamped_database_with_sqlite_prefix(
     Ok(())
 }
 
-fn catalog(
-    connection: &Connection,
-) -> rusqlite::Result<Vec<(String, String, String, Option<String>)>> {
+fn catalog(connection: &Connection) -> rusqlite::Result<Vec<CatalogRow>> {
     connection
         .prepare("SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name")?
         .query_map([], |row| {
