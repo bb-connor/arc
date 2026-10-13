@@ -36,7 +36,7 @@ const BROKER_AUDIT_RUNNER_AUTHORIZATION_DIGEST_DOMAIN: &[u8] =
 const BROKER_AUDIT_PROJECTION_DOMAIN: &[u8] = b"chio.broker-audit-wire-projection.v1\0";
 const BROKER_AUDIT_AUTHORITY_CONTEXT_DOMAIN: &str = "chio.broker-audit-authority-context.v1\0";
 const BROKER_AUDIT_TRUSTED_CONFIGURATION_DOMAIN: &[u8] =
-    b"chio.broker-audit-trusted-configuration.v2\0";
+    b"chio.broker-audit-trusted-configuration.v1\0";
 const BROKER_AUDIT_GOVERNED_INTENT_SCHEMA: &str = "chio.broker-audit-intent.v1";
 const BROKER_AUDIT_GOVERNED_INTENT_DOMAIN: &[u8] = b"chio.broker-audit-intent.v1\0";
 const BROKER_AUDIT_REFERENCE_DIGEST_DOMAIN: &[u8] = b"chio.broker-audit-reference-request.v1\0";

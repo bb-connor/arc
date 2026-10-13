@@ -449,7 +449,7 @@ pub(super) fn run_fake_upstream_helper() {
     let body_sha256 = body_digest(&request.body);
     let request_sha256 = hex::encode(Sha256::digest(&request.raw));
     let report = UpstreamBoundaryReport {
-        schema: "chio.process-boundary-upstream-report.v2".to_string(),
+        schema: "chio.process-boundary-upstream-report.v1".to_string(),
         method: request.method,
         path_and_query: request.path_and_query,
         http_version: request.http_version,
