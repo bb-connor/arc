@@ -20,6 +20,8 @@ use super::workload_identity::*;
 
 #[path = "tests/governed_intents.rs"]
 mod governed_intents;
+#[path = "tests/token_signing_input.rs"]
+mod token_signing_input;
 
 fn make_grant(server: &str, tool: &str, ops: Vec<Operation>) -> ToolGrant {
     ToolGrant {
@@ -90,50 +92,6 @@ fn capability_token_signature_verification() {
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
     assert!(token.verify_signature().unwrap());
-}
-
-#[test]
-fn plain_body_signature_is_refused() -> Result<()> {
-    let kp = Keypair::generate();
-    let body = CapabilityTokenBody {
-        id: "cap-plain-body".to_string(),
-        issuer: kp.public_key(),
-        subject: Keypair::generate().public_key(),
-        scope: make_scope(vec![make_grant(
-            "srv-a",
-            "file_read",
-            vec![Operation::Invoke],
-        )]),
-        issued_at: 1000,
-        expires_at: 2000,
-        delegation_chain: vec![],
-        aggregate_invocation_budget: None,
-    };
-    let (signature, _bytes) = kp.sign_canonical(&body)?;
-    let token = CapabilityToken {
-        schema: CHIO_CAPABILITY_SCHEMA.to_string(),
-        id: body.id,
-        issuer: body.issuer,
-        subject: body.subject,
-        scope: body.scope,
-        issued_at: body.issued_at,
-        expires_at: body.expires_at,
-        delegation_chain: body.delegation_chain,
-        algorithm: None,
-        caveats: Vec::new(),
-        scope_attenuations: None,
-        attenuation_proof: None,
-        budget_share_bps: None,
-        aggregate_invocation_budget: None,
-        signature,
-    };
-
-    assert!(!token.verify_signature()?);
-    assert!(matches!(
-        token.verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical),
-        Ok(false)
-    ));
-    Ok(())
 }
 
 #[test]

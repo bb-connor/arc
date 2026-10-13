@@ -21,8 +21,8 @@ assert!(MIGRATOR.iter().all(|migration| !migration.sql.is_empty()));
 ```
 
 Applying the ledger requires a database connection and a migration role.
-The adapter's `PostgresFindingMarketMigrator` owns role validation,
-legacy-ledger bridging, and its outer advisory lock.
+The adapter's `PostgresFindingMarketMigrator` owns role validation and its
+outer advisory lock.
 
 ## Guarantees
 
@@ -30,17 +30,17 @@ legacy-ledger bridging, and its outer advisory lock.
   deployments read this embedded ledger without loading SQL from disk.
 - `MIGRATOR` includes schema, RLS policies, guarded job transitions,
   domain projections, replication state, and admission accounting.
-- Migration 0016 rejects retained unauthenticated delivery state before
-  installing the kernel-receipt delivery contract.
+- The only delivery contract is the kernel-receipt authenticated delivery
+  schema.
 
 ## Status
 
-Implemented embedded ledger with 24 numbered SQL migrations. This crate has
+Implemented embedded ledger with one baseline SQL migration. This crate has
 one public static and no connection constructor, application-specific role
 checker, or dedicated unit tests. SQLx supplies migration execution machinery.
 Database integration tests live in `chio-finding-market-store-postgres`.
-Executing migrations changes schema and can reject incompatible retained data;
-inspect those requirements before applying them to an existing database.
+A database whose ledger differs from the embedded baseline in version or
+checksum is refused rather than migrated.
 
 ## Related
 

@@ -1,21 +1,11 @@
 //! Hierarchical budget governance for enterprise fleet management.
 //!
-//! A tree-structured budget policy model that sits above the flat
-//! [`crate::budget::BudgetPolicy`]. Parents cap children at
+//! A tree-structured budget policy model. Parents cap children at
 //! every level -- organization, department, team, agent -- and draft spend
 //! is evaluated against every ancestor node. A tree is authoritative over
 //! the shape and limits of budgets; it is storage-agnostic. Callers supply
 //! a [`SpendSnapshot`] that represents current spend per node per window,
 //! and the tree renders a fail-closed [`BudgetDecision`].
-//!
-//! # Relationship to [`crate::budget`]
-//!
-//! The flat [`crate::budget::BudgetEnforcer`] evaluates a single policy
-//! scoped per-session, per-agent, or per-tool. Hierarchical governance
-//! does not replace it. Instead, a [`BudgetTree`] expresses organizational
-//! structure (org -> department -> team -> agent) where each node has its
-//! own caps and window. The two coexist: the flat enforcer is per-grant,
-//! while the tree is per-organization.
 //!
 //! # Persistence boundary
 //!

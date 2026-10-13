@@ -18,7 +18,13 @@ import jakarta.servlet.ServletRequest
 import jakarta.servlet.ServletResponse
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import world.chio.sdk.ChioClient
+import world.chio.sdk.ChioErrorCodes
+import world.chio.sdk.ChioErrorResponse
+import world.chio.sdk.ChioHttpRequest
+import world.chio.sdk.EvaluateResponse
 import world.chio.sdk.Hashing.sha256Hex
+import java.time.Duration
 import java.util.UUID
 
 private fun capabilityIdFromToken(rawToken: String?): String? {
@@ -60,7 +66,7 @@ data class ChioFilterConfig(
 class ChioFilter(
     private val config: ChioFilterConfig = ChioFilterConfig(),
 ) : Filter {
-    private val client = ChioSidecarClient(config.sidecarUrl, config.timeoutSeconds)
+    private val client = ChioClient(config.sidecarUrl, Duration.ofSeconds(config.timeoutSeconds))
     private val objectMapper = jacksonObjectMapper()
 
     override fun init(filterConfig: FilterConfig?) {
@@ -133,7 +139,7 @@ class ChioFilter(
         // Evaluate against sidecar.
         val result: EvaluateResponse
         try {
-            result = client.evaluate(chioRequest, capabilityToken)
+            result = client.evaluateHttpRequest(chioRequest, capabilityToken)
         } catch (e: Exception) {
             writeJsonError(
                 httpResponse,
@@ -165,7 +171,7 @@ class ChioFilter(
 
         val receiptValid =
             try {
-                client.verifyReceipt(result.receipt)
+                client.verifyHttpReceipt(result.receipt).authorizes(result.receipt)
             } catch (_: Exception) {
                 false
             }

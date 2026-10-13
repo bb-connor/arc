@@ -23,9 +23,9 @@
 //! `Ok(VerifiedAttestation)` after a partial verification.
 
 mod bundle_verify;
-mod compat;
 mod core;
 mod identity;
+mod material;
 mod parse;
 mod policy;
 mod validators;

@@ -290,6 +290,22 @@ test("capability parser rejects non-object JSON", () => {
   }
 });
 
+test("capability parser rejects a token without the v1 schema", () => {
+  for (const payload of [
+    '{"id":"cap"}',
+    '{"id":"cap","schema":"chio.capability.v2"}',
+  ]) {
+    assert.throws(
+      () => parseCapabilityJson(payload),
+      (error: unknown) =>
+        error instanceof ChioInvariantError &&
+        error.code === "json" &&
+        error.message === 'capability schema must be "chio.capability.v1"',
+      payload,
+    );
+  }
+});
+
 test("manifest vectors match the TS manifest helpers", async () => {
   const fixture = await readJson("tests/bindings/vectors/manifest/v1.json") as {
     cases: Array<{

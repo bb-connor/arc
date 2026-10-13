@@ -292,8 +292,9 @@ impl ProductionResponseSimulator {
             .snapshots
             .capture(plan)
             .map_err(registered_port_error)?;
-        let evaluation = chio_quarantine::simulation::evaluate_response_simulation(plan, &snapshot)
-            .map_err(registered_port_error)?;
+        let evaluation =
+            chio_response_model::simulation::evaluate_response_simulation(plan, &snapshot)
+                .map_err(registered_port_error)?;
         let report = ResponseSimulationReport {
             schema: RESPONSE_SIMULATION_SCHEMA.to_owned(),
             configuration_digest: self.configuration_digest,

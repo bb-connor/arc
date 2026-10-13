@@ -32,7 +32,6 @@ parser. Select the strict raw-text entry point at an untrusted signing boundary.
 | `fips`  | No | Enables AWS-LC-backed P-256/P-384 backends and requires `std`. |
 | `pq`  | No | Enables `fips204` and ML-DSA-65/hybrid signing types. |
 | `delegation`  | No | Compatibility no-op; recursive delegation is always compiled. |
-| `delegation_v2`  | No | Compatibility feature `delegation_v2` enables `delegation`. |
 
 Backend availability alone does not establish a deployment's certification.
 WASM builds enable `getrandom/js` through a target-specific dependency.

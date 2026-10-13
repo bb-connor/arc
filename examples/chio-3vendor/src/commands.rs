@@ -252,11 +252,10 @@ fn write_authority_input_dir(
         issuance_request_json(&authority_issuance_request_for_package(package)?)?,
     )
     .map_err(|error| ChioPackageError::Json(error.to_string()))?;
-    fs::write(
-        dir.join("local-signing-keys.json"),
-        signing_keys_json(&authority_signing_keys_document())?,
-    )
-    .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+    write_private_file(
+        &dir.join("local-signing-keys.json"),
+        signing_keys_json(&authority_signing_keys_document())?.as_bytes(),
+    )?;
     fs::write(
         dir.join("peer-pins.json"),
         peer_pins_json(&peer_pins_document_for_package(package))?,
@@ -279,6 +278,31 @@ fn write_authority_input_dir(
         revocation_publication_request_json(&revocation_publication_request(Vec::new()))?,
     )
     .map_err(|error| ChioPackageError::Json(error.to_string()))
+}
+
+/// Writes signing-key material as a fresh, singly linked file readable only by
+/// its owner, replacing any existing entry at `path` rather than writing
+/// through it.
+fn write_private_file(path: &std::path::Path, contents: &[u8]) -> Result<(), ChioPackageError> {
+    use std::io::Write as _;
+
+    match fs::symlink_metadata(path) {
+        Ok(_) => {
+            fs::remove_file(path).map_err(|error| ChioPackageError::Json(error.to_string()))?
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(ChioPackageError::Json(error.to_string())),
+    }
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let mut file = options
+        .open(path)
+        .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+    file.write_all(contents)
+        .and_then(|()| file.sync_all())
+        .map_err(|error| ChioPackageError::Json(error.to_string()))
 }
 
 fn write_pheromone_fixtures(
@@ -884,7 +908,10 @@ fn write_json<T: serde::Serialize>(path: PathBuf, value: &T) -> Result<(), ChioP
 
 #[cfg(test)]
 mod tests {
-    use super::{run_with_args, write_json, ChioPackageError, Command};
+    use super::{
+        fresh_proof_package, run_with_args, write_authority_input_dir, write_json,
+        ChioPackageError, Command,
+    };
     use serde_json::json;
     use std::fs;
     use std::path::PathBuf;
@@ -933,6 +960,38 @@ mod tests {
             }
             _ => panic!("expected sign-transit-policy command"),
         }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn authority_input_signing_keys_are_private_and_singly_linked() -> Result<(), ChioPackageError>
+    {
+        use std::os::unix::fs::MetadataExt as _;
+
+        let dir = unique_dir("chio-three-vendor-authority-input")?;
+        let package = fresh_proof_package()?;
+        fs::create_dir_all(&dir).map_err(|error| ChioPackageError::Json(error.to_string()))?;
+        let keys = dir.join("local-signing-keys.json");
+        let alias = dir.join("alias.json");
+        fs::write(&keys, "{}\n").map_err(|error| ChioPackageError::Json(error.to_string()))?;
+        fs::hard_link(&keys, &alias).map_err(|error| ChioPackageError::Json(error.to_string()))?;
+
+        let result = write_authority_input_dir(&package, dir.clone());
+        let metadata = fs::symlink_metadata(&keys);
+        let alias_contents = fs::read_to_string(&alias);
+        let _ = fs::remove_dir_all(&dir);
+
+        result?;
+        let metadata = metadata.map_err(|error| ChioPackageError::Json(error.to_string()))?;
+        assert!(metadata.file_type().is_file());
+        assert_eq!(metadata.mode() & 0o777, 0o600);
+        assert_eq!(metadata.nlink(), 1);
+        assert_eq!(
+            alias_contents.map_err(|error| ChioPackageError::Json(error.to_string()))?,
+            "{}\n",
+            "the previous link must not receive the key material"
+        );
         Ok(())
     }
 

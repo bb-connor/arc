@@ -185,6 +185,7 @@ def make_configured_runtime(
 def sample_capability(capability_id: str = "cap-test-12345678") -> dict[str, Any]:
     """Wire-shape fixture only. This token has no cryptographic authority."""
     return {
+        "schema": "chio.capability.v1",
         "id": capability_id, "subject": "bb" * 32, "issuer": "cc" * 32,
         "issued_at": 1, "expires_at": 4_000_000_000,
         "scope": {"grants": []}, "signature": "dd" * 64,

@@ -2,8 +2,6 @@ use super::*;
 
 #[path = "real_adapter/kernel_review.rs"]
 mod kernel_review;
-#[path = "real_adapter/legacy_commit.rs"]
-mod legacy_commit;
 #[path = "real_adapter/reservation_ownership.rs"]
 mod reservation_ownership;
 use crate::security::event_consumer::tests::*;

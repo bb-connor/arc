@@ -1,10 +1,11 @@
+use chio_core_types::{canonical_json_bytes, sha256};
 use chio_security_types::ports::{
-    CreateOutcome, RecordId, ResponseCasRequest, ResponseEffectCasRequest, ResponseEffectKey,
-    ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord, ResponseReceiptCursor,
-    ResponseReceiptCursorCasRequest, ResponseScheduledMutationCasRequest, ResponseSchedulerStore,
-    ResponseStore, ScheduledWork, SchedulerClaimRequest, SchedulerHealthAckRequest,
-    SchedulerLeaseReleaseRequest, SchedulerLeaseRenewRequest, SchedulerRetryRequest,
-    SchedulerRetryState, SchedulerWorkKey,
+    CanonicalBody, CreateOutcome, Digest32, RecordId, ResponseCasRequest, ResponseEffectCasRequest,
+    ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord,
+    ResponseReceiptCursor, ResponseReceiptCursorCasRequest, ResponseScheduledMutationCasRequest,
+    ResponseSchedulerStore, ResponseStore, ScheduledWork, SchedulerClaimRequest,
+    SchedulerHealthAckRequest, SchedulerLeaseReleaseRequest, SchedulerLeaseRenewRequest,
+    SchedulerRetryRequest, SchedulerRetryState, SchedulerWorkKey,
 };
 use chio_security_types::ports::{PortError, PortResult};
 use std::collections::BTreeMap;
@@ -44,6 +45,23 @@ impl TestResponseStore {
 
     fn state(&self) -> PortResult<MutexGuard<'_, State>> {
         self.state.lock().map_err(|_| PortError::unavailable())
+    }
+
+    #[allow(dead_code)]
+    pub fn rewrite_effect_journals(&self, edit: impl Fn(&mut serde_json::Value)) -> PortResult<()> {
+        let mut state = self.state()?;
+        for record in state.effects.values_mut() {
+            let mut journal: serde_json::Value =
+                serde_json::from_slice(record.canonical_body.as_bytes())
+                    .map_err(|_| PortError::invalid_data())?;
+            edit(&mut journal);
+            let canonical =
+                canonical_json_bytes(&journal).map_err(|_| PortError::invalid_data())?;
+            record.body_hash = Digest32::new(*sha256(&canonical).as_bytes());
+            record.canonical_body =
+                CanonicalBody::new(canonical).map_err(|_| PortError::invalid_data())?;
+        }
+        Ok(())
     }
 }
 

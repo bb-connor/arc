@@ -39,7 +39,8 @@ fn drive(data: &[u8]) -> TestResult<LifecycleTrace> {
             observed: ResponseExecutionMode::DryRun
         })
     ));
-    let evaluation = simulation::evaluate_response_simulation(&dry, &snapshot)?;
+    let evaluation =
+        chio_response_model::simulation::evaluate_response_simulation(&dry, &snapshot)?;
     // Rollback must retain every other owner's contribution in all five ports.
     for (before, after) in snapshot
         .states

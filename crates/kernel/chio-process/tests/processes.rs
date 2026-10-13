@@ -152,9 +152,9 @@ fn incompatible_journal_versions_cannot_gain_preparation_authority() -> Result {
     assert_eq!(
         database.query_row("SELECT version FROM process_runtime", [], |row| row
             .get::<_, u32>(0))?,
-        2
+        1
     );
-    database.execute("UPDATE process_runtime SET version = 1", [])?;
+    database.execute("UPDATE process_runtime SET version = 2", [])?;
     drop(database);
     assert!(matches!(
         ProcessRuntime::open(&path, kernel),

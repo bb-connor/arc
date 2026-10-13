@@ -277,7 +277,7 @@ different names for the same bytes.
 ## `chio.transparency.inclusion-proof.v1` (3 declarations, 3 crates)
 
 - `crates/core/chio-core-types/src/signed_artifact.rs:237` `CHIO_TRANSPARENCY_INCLUSION_PROOF_V1_SCHEMA`
-- `crates/platform/chio-transaction-passport/src/minimal.rs:796` `TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V1_ID`
+- `crates/platform/chio-transaction-passport/src/minimal.rs:796` `TRANSPARENCY_INCLUSION_PROOF_SCHEMA_ID`
 - `crates/trust/chio-selective-disclosure/src/lib.rs:102` `TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V1`
 
 ## `chio-finding/v1/challenge.schema.json` (2 declarations, 2 crates)
@@ -290,7 +290,7 @@ different names for the same bytes.
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs:33` `FINDING_SCHEMA_LABEL`
 - `crates/products/chio-cli/src/cli/dispatch/finding/verify.rs:34` `FINDING_SCHEMA_LABEL`
 
-## `chio.active-response-policy-authority.v2` (2 declarations, 2 crates)
+## `chio.active-response-policy-authority.v1` (2 declarations, 2 crates)
 
 - `crates/platform/chio-control-plane/src/security/active_response_authority.rs:38` `ACTIVE_RESPONSE_AUTHORITY_SCHEMA`
 - `crates/security/chio-active-response-authority/src/config.rs:23` `ACTIVE_RESPONSE_AUTHORITY_PROTOCOL`
@@ -1030,10 +1030,10 @@ different names for the same bytes.
 - `crates/core/chio-core-types/src/signed_artifact.rs:188` `CHIO_TRANSACTION_VERIFIER_REPORT_V1_SCHEMA`
 - `crates/platform/chio-transaction-passport/src/ids.rs:5` `TRANSACTION_VERIFIER_REPORT_SCHEMA_ID`
 
-## `chio.transparency.inclusion-proof.v2` (2 declarations, 2 crates)
+## `chio.transparency.receipt-inclusion-proof.v1` (2 declarations, 2 crates)
 
-- `crates/core/chio-core-types/src/signed_artifact.rs:239` `CHIO_TRANSPARENCY_INCLUSION_PROOF_V2_SCHEMA`
-- `crates/platform/chio-transaction-passport/src/minimal.rs:797` `TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V2_ID`
+- `crates/core/chio-core-types/src/signed_artifact.rs:239` `CHIO_TRANSPARENCY_RECEIPT_INCLUSION_PROOF_V1_SCHEMA`
+- `crates/platform/chio-transaction-passport/src/minimal.rs:797` `RECEIPT_INCLUSION_PROOF_SCHEMA_ID`
 
 ## `chio.trust.key-state.v1` (2 declarations, 2 crates)
 

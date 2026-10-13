@@ -9,13 +9,13 @@ use chio_core_types::receipt::{
 fn persisted_thin_unknown_receipts_remain_original_evidence_not_redispatch_authority(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let key = Keypair::from_seed(&[71; 32]);
-    // Historical fixture: this is the thin metadata contract before the repair.
-    // Sign once, persist, and exercise only the loaded original evidence below.
+    // A receipt carrying only a retained state, without the dispatch binding,
+    // is signed once, persisted, and exercised only as loaded evidence.
     let receipt = ChioReceipt::sign(
         ChioReceiptBody {
             id: String::new(),
             timestamp: 1_710_000_000,
-            capability_id: "legacy-capability".into(),
+            capability_id: "thin-capability".into(),
             tool_server: "tools".into(),
             tool_name: "read".into(),
             action: ToolCallAction::from_parameters(json!({}))?,
@@ -30,7 +30,7 @@ fn persisted_thin_unknown_receipts_remain_original_evidence_not_redispatch_autho
             redaction_mode: Default::default(),
             actor_chain: Vec::new(),
             content_hash: sha256_hex(b"null"),
-            policy_hash: sha256_hex(b"legacy-policy"),
+            policy_hash: sha256_hex(b"thin-policy"),
             evidence: Vec::new(),
             metadata: Some(
                 json!({"admission_operation": {"retained_state": "outcome_unknown_after_dispatch"}}),
@@ -44,12 +44,12 @@ fn persisted_thin_unknown_receipts_remain_original_evidence_not_redispatch_autho
     )?;
     let original = serde_json::to_vec(&receipt)?;
     let directory = tempfile::tempdir()?;
-    let path = directory.path().join("legacy-receipt.json");
+    let path = directory.path().join("thin-receipt.json");
     std::fs::write(&path, &original)?;
     let loaded = serde_json::from_slice::<ChioReceipt>(&std::fs::read(&path)?)?;
     assert!(loaded.verify_signature()?);
     let response = ToolCallResponse {
-        request_id: "legacy-request".into(),
+        request_id: "thin-request".into(),
         verdict: Verdict::Deny,
         output: None,
         reason: Some("retained unknown outcome".into()),
@@ -59,7 +59,7 @@ fn persisted_thin_unknown_receipts_remain_original_evidence_not_redispatch_autho
     };
     assert!(
         !outcome_unknown(&response),
-        "thin historical metadata cannot authorize a fresh attempt"
+        "thin metadata cannot authorize a fresh attempt"
     );
     assert_eq!(serde_json::to_vec(&response.receipt)?, original);
     assert_eq!(std::fs::read(path)?, original);

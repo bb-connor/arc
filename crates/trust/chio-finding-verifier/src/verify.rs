@@ -65,8 +65,7 @@ pub const FINDING_BOND_STORE_SNAPSHOT_SCHEMA_V1: &str = "chio.finding.bond-store
 
 /// Fresh, independently authenticated revocation standing for every
 /// receipt, checkpoint, runtime-attestation, or appraisal signer a verifier
-/// may accept during this evaluation. The historical type name is retained
-/// for input compatibility.
+/// may accept during this evaluation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct FindingCheckpointSignerStatusTrust {
@@ -110,8 +109,8 @@ pub struct FindingVerifierTrustRoots {
     /// Trusted-time freshness policy applied to the portable status proof.
     pub status_freshness_policy: Option<FindingStatusFreshnessPolicy>,
     /// Current authenticated standing for the profile-pinned receipt and
-    /// checkpoint signers. The historical field name is retained for input
-    /// compatibility. Missing or stale standing denies the affected evidence.
+    /// checkpoint signers. Missing or stale standing denies the affected
+    /// evidence.
     pub checkpoint_signer_status: Option<FindingCheckpointSignerStatusTrust>,
     /// Venue trusted time for the evaluation stamp.
     pub trusted_time: u64,

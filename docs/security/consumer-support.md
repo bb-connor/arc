@@ -411,8 +411,8 @@ The [compliance and product-truth review](../reviews/2026-10-01-compliance-produ
 - **EV3, Medium.** `mcp wrap` persists no per-call decision receipts.
 - **EV14, Low, interface containment.** Wrap rejects explicit global `--receipt-db`
   before startup and no longer adds the unbound `_meta.chio_verified` marker.
-  The legacy `--self-test-attestation` flag remains recognized but explicitly
-  refuses because receipt-bound verification is unavailable. This containment
+  Wrap has no attestation self-test flag because receipt-bound verification
+  is unavailable. This containment
   does not implement durable per-call receipts or close EV3. See the
   [CLI migration contract](../../crates/products/chio-cli/README.md#global-flags).
 - **KG18, Low.** Strict mode builds its server from the child's own `tools/list` and ignores the

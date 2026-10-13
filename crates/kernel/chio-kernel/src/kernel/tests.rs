@@ -21,7 +21,6 @@ use crate::execution_nonce::{
     mint_execution_nonce, verify_execution_nonce, ExecutionNonceConfig, ExecutionNonceError,
     InMemoryExecutionNonceStore, NonceBinding,
 };
-use crate::governed_active_response::GovernedActiveResponseRequest;
 use crate::operator_report::ComplianceReport;
 use crate::receipt_store::{QualifiedAdmissionProjectionStore, ReceiptStore, ReceiptStoreError};
 use crate::threshold_approval::ThresholdApprovalRequirementResolver;
@@ -33,9 +32,8 @@ use crate::tool_outcome::{
 };
 use chio_core::capability::features::CapabilityNegotiation;
 use chio_core::capability::governance::{
-    GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedTransactionIntentBody,
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody, ACTIVE_RESPONSE_PLAN_TOOL_NAME,
-    ACTIVE_RESPONSE_SERVER_ID, GOVERNED_RESPONSE_PLAN_SCHEMA, THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+    GovernedTransactionIntentBody, ThresholdApprovalProposal, ThresholdApprovalProposalBody,
+    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_core::capability::threshold_approval::{
     ThresholdApprovalRequirement, ThresholdApproverIdentity,
@@ -283,9 +281,7 @@ use federation_cosign::{handshake_and_pin, CountingRejectingCosigner, FailingApp
 mod durable_admission;
 #[path = "tests/revocation_durability.rs"]
 mod revocation_durability;
-use durable_admission::{
-    admission_test_fence, durable_admission_fixture, TestAdmissionOperationStore,
-};
+use durable_admission::{durable_admission_fixture, TestAdmissionOperationStore};
 #[path = "tests/durable_admission_url_elicitation_support.rs"]
 mod durable_admission_url_elicitation_support;
 use durable_admission_url_elicitation_support::DurableUrlElicitationServer;

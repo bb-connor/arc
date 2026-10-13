@@ -117,7 +117,7 @@ fn frame_over(
 }
 
 /// A membership admitting `AUTHOR` to both treaties the tests exercise, so the
-/// treaty-party gate is a no-op for the pre-existing authenticity tests (which
+/// treaty-party gate is a no-op for the authenticity tests (which
 /// isolate signature / origin / binding failures). The dedicated membership
 /// tests below use a membership that does NOT admit the author.
 fn party_membership() -> StaticTreatyMembership {
@@ -424,7 +424,7 @@ fn oversized_frame_is_rejected_before_broadcast() {
 
 #[test]
 fn frame_from_a_foreign_treaty_is_rejected_on_this_swarm() {
-    // F2 (fail-open fix): a frame minted for treaty-beta, carrying a fully
+    // A frame minted for treaty-beta, carrying a fully
     // VALID deposit self-signature, is injected onto the alpha swarm. Routing
     // separation alone does not stop this (a globally-admitted operator can
     // compute the non-secret beta TopicId), so the RECEIVE side must bind the
@@ -470,10 +470,10 @@ fn frame_from_a_foreign_treaty_is_rejected_on_this_swarm() {
 
 #[test]
 fn lane_verifies_a_real_chio_pheromone_deposit_signature() {
-    // F3 guard: pin this lane's hand-copied signing preimage (clear
-    // cost_commitment + canonical JSON) to the NORMATIVE signer. We build a
-    // real deposit with chio_pheromone::sign_deposit and assert this lane's
-    // verify_deposit_self_signature accepts it. If chio_pheromone changes its
+    // Pins this lane's hand-copied signing preimage (clear cost_commitment +
+    // canonical JSON) to the NORMATIVE signer: a real deposit built with
+    // chio_pheromone::sign_deposit must be accepted by this lane's
+    // verify_deposit_self_signature. If chio_pheromone changes its
     // canonicalization (deposit_signature_body / canonical_json), this test
     // fails loudly here instead of the copy silently diverging and rejecting
     // otherwise-valid deposits.
@@ -669,7 +669,7 @@ async fn concurrent_sender_enforces_treaty_and_size_checks() {
 
 #[test]
 fn receive_rejects_a_non_party_origin_frame() {
-    // ITEM 1 receive side: a frame with a fully VALID deposit self-signature and
+    // Receive side: a frame with a fully VALID deposit self-signature and
     // a resolvable origin key is still rejected if the origin kernel is NOT a
     // party to the frame's treaty, so a non-party that joined the swarm anyway
     // cannot inject an accepted frame.
@@ -716,11 +716,11 @@ fn receive_accepts_a_party_origin_frame() {
 
 #[test]
 fn raw_decode_rejects_a_foreign_treaty_frame() {
-    // ITEM 2: the raw next_payload decode path is now BOUND to the joined
+    // The raw next_payload decode path is BOUND to the joined
     // treaty. A frame minted for treaty-beta - with a fully VALID deposit
     // self-signature AND an origin that is a party to beta - is still rejected
     // when decoded on the alpha swarm (expected_treaty = TREATY_ALPHA), so a raw
-    // receive loop can no longer accept a foreign-treaty payload.
+    // receive loop cannot accept a foreign-treaty payload.
     let author = Keypair::from_seed(&[7; 32]);
     let beta_frame = signed_direct_frame(&author, AUTHOR, "did:chio:hub", "treaty-beta", NAMESPACE);
     let policy = live_policy(NAMESPACE);
@@ -805,7 +805,7 @@ async fn topic_bound_decoder_rejects_a_foreign_treaty_frame() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn subscribe_rejects_a_non_party_local_operator() {
-    // ITEM 1 join side: a globally-admitted operator that is NOT a party to the
+    // Join side: a globally-admitted operator that is NOT a party to the
     // treaty is rejected BEFORE the swarm is joined, so treaty traffic never
     // reaches a non-party even though it can compute the (non-secret) topic id.
     let endpoint = Endpoint::builder(presets::Minimal)

@@ -16,7 +16,7 @@ mod credentials;
 mod nonces;
 mod prepared;
 
-pub(crate) const JOURNAL_VERSION: u32 = 2;
+pub(crate) const JOURNAL_VERSION: u32 = 1;
 
 pub(crate) struct Store {
     connection: Connection,

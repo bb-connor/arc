@@ -22,7 +22,7 @@ use chio_cpp_kernel_ffi::{
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    assert_eq!(chio_kernel_ffi_abi_version(), 2);
+    assert_eq!(chio_kernel_ffi_abi_version(), 1);
     let issuer = Keypair::from_seed(&[9; 32]);
     let subject = Keypair::from_seed(&[10; 32]);
     let token = CapabilityToken::sign(CapabilityTokenBody {

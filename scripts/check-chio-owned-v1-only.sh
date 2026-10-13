@@ -195,17 +195,6 @@ while IFS= read -r line; do
     continue
   fi
 
-  # The Cargo feature `delegation_v2` is retained as a backward-compat
-  # alias for external manifests; documentation and the Cargo.toml line
-  # that defines the alias are intentional and not remnants.
-  if [[ "$text" =~ feature\ \`delegation_v2\`|features\ =\ \[\"delegation_v2\"\]|delegation_v2\ =\ \[ ]]; then
-    continue
-  fi
-  if [[ "$text" =~ delegation_v2 ]] && \
-     [[ "$path" == "crates/core/chio-core-types/Cargo.toml" ]]; then
-    continue
-  fi
-
   # The launch disclosure surface intentionally ships a v2 BBS projection
   # manifest so typed message classes and per-slot sensitivity are explicit.
   # Keep this exemption limited to that exact manifest schema and its constants.
@@ -266,11 +255,11 @@ while IFS= read -r line; do
     continue
   fi
 
-  # Checkpoint statements, consistency proofs, checkpoint-anchored inclusion
+  # Checkpoint statements, consistency proofs, anchor inclusion
   # proofs, and bundles containing those proofs are security-interpreted
   # formats. Their v2 schemas prevent rolling readers from applying legacy v1
   # semantics to new commitments, paths, and hash constructions.
-  if [[ "$text" =~ chio\.checkpoint_(statement|consistency_proof)\.v2|chio\.(anchor-inclusion-proof|anchor-proof-bundle|transparency\.inclusion-proof)\.v2|CHECKPOINT_(CONSISTENCY_PROOF_)?SCHEMA_V2|CHIO_CHECKPOINT_STATEMENT_SCHEMA_V2|CHIO_ANCHOR_PROOF_BUNDLE_(SCHEMA_)?V2|(ANCHOR|TRANSPARENCY)_INCLUSION_PROOF_(SCHEMA_V2|V2_SCHEMA) ]]; then
+  if [[ "$text" =~ chio\.checkpoint_(statement|consistency_proof)\.v2|chio\.(anchor-inclusion-proof|anchor-proof-bundle)\.v2|CHECKPOINT_(CONSISTENCY_PROOF_)?SCHEMA_V2|CHIO_CHECKPOINT_STATEMENT_SCHEMA_V2|CHIO_ANCHOR_PROOF_BUNDLE_(SCHEMA_)?V2|ANCHOR_INCLUSION_PROOF_(SCHEMA_V2|V2_SCHEMA) ]]; then
     continue
   fi
 

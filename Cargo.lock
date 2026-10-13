@@ -3285,6 +3285,7 @@ dependencies = [
  "chio-policy",
  "chio-quarantine",
  "chio-reputation",
+ "chio-response-model",
  "chio-revocation-oracle",
  "chio-risk-comptroller",
  "chio-runtime-core",

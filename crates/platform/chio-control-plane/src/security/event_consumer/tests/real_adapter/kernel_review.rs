@@ -446,3 +446,6 @@ mod authority_outages;
 
 #[path = "kernel_review/active_response_residual.rs"]
 mod active_response_residual;
+
+#[path = "kernel_review/authorization_refusals.rs"]
+mod authorization_refusals;

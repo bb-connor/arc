@@ -214,7 +214,7 @@ async fn reopen_requires_original_route_and_preserves_completed_receipt_without_
 }
 
 #[tokio::test]
-async fn route_absence_denies_before_effect_and_legacy_binding_cannot_gain_a_route() -> Result {
+async fn route_absence_denies_before_effect_and_unrouted_binding_cannot_gain_a_route() -> Result {
     let dir = tempfile::tempdir()?;
     let effects = Arc::new(AtomicUsize::new(0));
     let kernel = kernel(dir.path(), effects.clone())?;

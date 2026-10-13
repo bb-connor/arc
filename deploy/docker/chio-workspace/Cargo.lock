@@ -3005,6 +3005,7 @@ dependencies = [
  "chio-policy",
  "chio-quarantine",
  "chio-reputation",
+ "chio-response-model",
  "chio-revocation-oracle",
  "chio-risk-comptroller",
  "chio-runtime-core",
@@ -4217,6 +4218,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
+ "chio-cage-plan",
  "chio-core-types",
  "chio-kernel",
  "chio-manifest",

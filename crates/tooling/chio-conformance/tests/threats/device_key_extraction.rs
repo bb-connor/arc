@@ -6,7 +6,7 @@
 
 use std::error::Error;
 
-use chio_custody_hw::attestation::google_root::play_integrity_jwks_json;
+use chio_custody_hw::attestation::google_root::play_integrity_pinned_jwks_json;
 use chio_custody_hw::{
     verify_app_attest, verify_play_integrity, AppAttestVerificationInput, AttestationError,
     PlayIntegrityVerificationInput,
@@ -46,7 +46,7 @@ fn device_key_extraction_is_rejected_by_key_and_device_binding() -> Result<(), B
         expected_nonce: NONCE,
         expected_package_name: PACKAGE,
         expected_audience: AUDIENCE,
-        jwks_json: &play_integrity_jwks_json(),
+        jwks_json: &play_integrity_pinned_jwks_json(),
         allow_caller_supplied_jwks: false,
     })
     .err()
