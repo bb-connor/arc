@@ -468,7 +468,7 @@ fn constraint_matches(
             "unsupported capability constraint requires grant-specific enforcement".to_string(),
         )),
 
-        // RTC-08: evaluate the model-routing constraint against
+        // Evaluate the model-routing constraint against
         // request-carried `model_metadata`. The separate provenance class
         // rides on the metadata for receipt and audit surfaces; routing
         // checks compare the concrete model identity and safety tier only.

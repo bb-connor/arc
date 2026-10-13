@@ -98,8 +98,7 @@ identity with `--control-authority-public-key` where the edge requires it.
 path gates tool names using `ManifestVerdictGate`; `--strict-execution-nonce`
 uses `KernelMediatedMcpTransport` and the default runtime guard profile. Its
 velocity thresholds are unlimited and its advisory detector roster is empty.
-Successful wrap results carry no receipt-bound verification marker, and
-`--self-test-attestation` returns an unsupported error.
+Successful wrap results carry no receipt-bound verification marker.
 
 ## Status
 

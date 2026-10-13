@@ -75,41 +75,6 @@ pub struct CreateSignedCrossIssuerMigrationArgs {
     pub expires_at: Option<u64>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct CrossIssuerTrustPackPolicy {
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub allowed_issuers: BTreeSet<String>,
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub allowed_profile_families: BTreeSet<String>,
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub allowed_entry_kinds: BTreeSet<CrossIssuerPortfolioEntryKind>,
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub allowed_migration_ids: BTreeSet<String>,
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
-    pub allowed_certification_refs: BTreeSet<String>,
-    #[serde(default)]
-    pub require_active_lifecycle: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SignedCrossIssuerTrustPackBody {
-    pub schema: String,
-    pub pack_id: String,
-    pub verifier: String,
-    pub signer_public_key: PublicKey,
-    pub created_at: u64,
-    pub expires_at: u64,
-    pub policy: CrossIssuerTrustPackPolicy,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SignedCrossIssuerTrustPack {
-    pub body: SignedCrossIssuerTrustPackBody,
-    pub signature: Signature,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -144,43 +109,6 @@ pub struct CrossIssuerPortfolioVerification {
     pub entry_results: Vec<CrossIssuerPortfolioEntryVerification>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct CrossIssuerPortfolioEntryEvaluation {
-    pub entry_id: String,
-    pub passport_id: String,
-    pub accepted: bool,
-    pub subject: String,
-    pub profile_family: String,
-    pub source_kind: CrossIssuerPortfolioEntryKind,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub issuers: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub migration_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub lifecycle_state: Option<PassportLifecycleState>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub reasons: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct CrossIssuerPortfolioEvaluation {
-    pub schema: String,
-    pub portfolio_id: String,
-    pub subject: String,
-    pub trust_pack_id: String,
-    pub verifier: String,
-    pub accepted: bool,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub activated_entry_ids: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub activated_issuers: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub portfolio_reasons: Vec<String>,
-    pub evaluated_at: u64,
-    pub entry_results: Vec<CrossIssuerPortfolioEntryEvaluation>,
-}
 
 pub fn create_signed_cross_issuer_migration(
     signer: &Keypair,
@@ -251,63 +179,6 @@ pub fn verify_signed_cross_issuer_migration(
     Ok(())
 }
 
-pub fn create_signed_cross_issuer_trust_pack(
-    signer: &Keypair,
-    pack_id: impl Into<String>,
-    verifier: impl Into<String>,
-    created_at: u64,
-    expires_at: u64,
-    policy: CrossIssuerTrustPackPolicy,
-) -> Result<SignedCrossIssuerTrustPack, CredentialError> {
-    let body = SignedCrossIssuerTrustPackBody {
-        schema: CROSS_ISSUER_TRUST_PACK_SCHEMA.to_string(),
-        pack_id: pack_id.into(),
-        verifier: verifier.into(),
-        signer_public_key: signer.public_key(),
-        created_at,
-        expires_at,
-        policy,
-    };
-    verify_signed_cross_issuer_trust_pack_body(&body)?;
-    let (signature, _) = signer.sign_canonical(&body)?;
-    Ok(SignedCrossIssuerTrustPack { body, signature })
-}
-
-pub fn verify_signed_cross_issuer_trust_pack(
-    pack: &SignedCrossIssuerTrustPack,
-    now: u64,
-    trust: &CrossIssuerTrustRegistryV2,
-) -> Result<(), CredentialError> {
-    verify_signed_cross_issuer_trust_pack_body(&pack.body)?;
-    if now < pack.body.created_at {
-        return Err(CredentialError::InvalidCrossIssuerTrustPack(format!(
-            "cross-issuer trust pack `{}` is not yet valid",
-            pack.body.pack_id
-        )));
-    }
-    if now > pack.body.expires_at {
-        return Err(CredentialError::InvalidCrossIssuerTrustPack(format!(
-            "cross-issuer trust pack `{}` has expired",
-            pack.body.pack_id
-        )));
-    }
-    let trusted_key = trust
-        .legacy_verifier_key(&pack.body.verifier, &pack.body.signer_public_key)
-        .map_err(|_| {
-            CredentialError::InvalidCrossIssuerTrustPack(format!(
-                "cross-issuer trust pack `{}` signer is not locally trusted",
-                pack.body.pack_id
-            ))
-        })?;
-    let signed = trusted_key.verify(&canonical_json_bytes(&pack.body)?, &pack.signature);
-    if !signed {
-        return Err(CredentialError::InvalidCrossIssuerTrustPack(format!(
-            "cross-issuer trust pack `{}` signature verification failed",
-            pack.body.pack_id
-        )));
-    }
-    Ok(())
-}
 
 pub fn verify_cross_issuer_portfolio(
     portfolio: &CrossIssuerPortfolio,
@@ -449,14 +320,6 @@ pub fn verify_cross_issuer_portfolio(
     })
 }
 
-pub fn evaluate_cross_issuer_portfolio(
-    _portfolio: &CrossIssuerPortfolio,
-    _now: u64,
-    _trust_pack: &SignedCrossIssuerTrustPack,
-) -> Result<CrossIssuerPortfolioEvaluation, CredentialError> {
-    Err(CredentialError::UnsupportedLegacyCrossIssuerV1)
-}
-
 fn validate_cross_issuer_portfolio_entry(
     entry: &CrossIssuerPortfolioEntry,
 ) -> Result<(), CredentialError> {
@@ -594,78 +457,6 @@ fn verify_signed_cross_issuer_migration_body(
     Ok(())
 }
 
-fn verify_signed_cross_issuer_trust_pack_body(
-    body: &SignedCrossIssuerTrustPackBody,
-) -> Result<(), CredentialError> {
-    if body.schema != CROSS_ISSUER_TRUST_PACK_SCHEMA {
-        return Err(CredentialError::InvalidCrossIssuerTrustPack(format!(
-            "cross-issuer trust-pack schema must be {CROSS_ISSUER_TRUST_PACK_SCHEMA}"
-        )));
-    }
-    if body.pack_id.trim().is_empty() {
-        return Err(CredentialError::InvalidCrossIssuerTrustPack(
-            "cross-issuer trust packs must include a non-empty pack_id".to_string(),
-        ));
-    }
-    if body.verifier.trim().is_empty() {
-        return Err(CredentialError::InvalidCrossIssuerTrustPack(format!(
-            "cross-issuer trust pack `{}` must include a non-empty verifier",
-            body.pack_id
-        )));
-    }
-    if body.created_at > body.expires_at {
-        return Err(CredentialError::InvalidCrossIssuerTrustPack(format!(
-            "cross-issuer trust pack `{}` must not expire before it is created",
-            body.pack_id
-        )));
-    }
-    body.policy.validate(&body.pack_id)
-}
-
-impl CrossIssuerTrustPackPolicy {
-    pub fn validate(&self, pack_id: &str) -> Result<(), CredentialError> {
-        validate_non_empty_string_set(
-            &self.allowed_issuers,
-            "allowed_issuers",
-            pack_id,
-            CredentialError::InvalidCrossIssuerTrustPack,
-        )?;
-        validate_non_empty_string_set(
-            &self.allowed_profile_families,
-            "allowed_profile_families",
-            pack_id,
-            CredentialError::InvalidCrossIssuerTrustPack,
-        )?;
-        validate_non_empty_string_set(
-            &self.allowed_migration_ids,
-            "allowed_migration_ids",
-            pack_id,
-            CredentialError::InvalidCrossIssuerTrustPack,
-        )?;
-        validate_non_empty_string_set(
-            &self.allowed_certification_refs,
-            "allowed_certification_refs",
-            pack_id,
-            CredentialError::InvalidCrossIssuerTrustPack,
-        )
-    }
-}
-
-fn validate_non_empty_string_set(
-    values: &BTreeSet<String>,
-    field: &str,
-    id: &str,
-    error: fn(String) -> CredentialError,
-) -> Result<(), CredentialError> {
-    for value in values {
-        if value.trim().is_empty() {
-            return Err(error(format!(
-                "`{field}` for `{id}` cannot contain empty values"
-            )));
-        }
-    }
-    Ok(())
-}
 
 fn validate_sorted_unique_strings(
     values: &[String],

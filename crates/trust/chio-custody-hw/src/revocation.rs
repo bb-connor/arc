@@ -693,17 +693,11 @@ mod sqlite {
 
             // Persist the edge AND any newly-revoked cascade leaves inside a
             // SINGLE `BEGIN IMMEDIATE` transaction so the edge and the leaves
-            // commit together or not at all. Previously the edge ran in its
-            // own autocommit statement and the leaves opened a separate
-            // transaction; a leaf-persist failure after the edge committed
-            // left the edge durably on disk with no matching cascade leaf,
-            // and `rebuild_cache` does NOT re-run the late-child cascade on
-            // reopen (it only replays persisted leaves), so a child
-            // registered after its parent was revoked could silently outlive
-            // the revoked parent (fail-open on the kill switch). Wrapping
-            // both writes in one transaction (mirroring the single-txn
-            // staging used by `revoke_credential`) closes that gap. The
-            // in-RAM cache is mutated ONLY after COMMIT succeeds, so on any
+            // commit together or not at all. `rebuild_cache` replays only
+            // persisted leaves and does not re-run the late-child cascade on
+            // reopen, so an edge persisted without its cascade leaf would let
+            // a child registered under a revoked parent outlive that parent.
+            // The in-RAM cache is mutated ONLY after COMMIT succeeds, so on any
             // error the rollback leaves the durable store and the cache
             // byte-identical to their pre-call state.
             let staged_subjects: &[String] = match &staged {
@@ -1009,15 +1003,11 @@ mod sqlite {
 
         #[test]
         fn durable_register_dependency_is_atomic_on_midpersist_failure() {
-            // Regression for the kill-switch atomicity bug: when a late child
-            // is registered under an ALREADY-revoked parent, the edge insert
-            // and the cascade-leaf insert MUST commit together or not at all.
-            // Previously the edge ran in its own autocommit statement and the
-            // leaves opened a separate transaction; a leaf-persist failure
-            // after the edge committed left the edge durably on disk with no
-            // matching cascade leaf. On reopen `rebuild_cache` replays only
+            // When a late child is registered under an ALREADY-revoked
+            // parent, the edge insert and the cascade-leaf insert MUST commit
+            // together or not at all. On reopen `rebuild_cache` replays only
             // persisted leaves and does NOT re-run the late-child cascade, so
-            // the child would silently outlive its revoked parent (fail-open).
+            // a lone edge would let the child outlive its revoked parent.
             //
             // We force a failure MID-`persist_edge_and_leaves` (edge insert
             // succeeds, leaf insert fails) by dropping the leaves table after
@@ -1312,7 +1302,7 @@ mod tests {
 
     #[test]
     fn cascade_rolls_back_when_a_subject_becomes_unstageable() {
-        // Defense in depth: even though register_dependency now validates
+        // Defense in depth: even though register_dependency validates
         // subjects up-front, the staging path itself must still be
         // all-or-nothing. A subject that the oracle rejects at insert time
         // aborts the WHOLE staged batch, leaving neither the root nor any

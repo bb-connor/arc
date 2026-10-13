@@ -252,19 +252,13 @@ impl From<ContentHashMismatch> for Error {
 /// into a sign call for content `B` -- the recomputed hash is fixed at
 /// construction and the body's claim is checked against it.
 ///
-/// # Seam note (follow-up: full `evaluate()` -> `sign()` binding)
+/// # Content binding
 ///
-/// In the present change the handle is built from canonical content bytes that
-/// the producer supplies via [`ReceiptSigningHandle::from_content`] /
-/// [`ReceiptSigningHandle::from_canonical_bytes`]. The intended end state is
-/// that `evaluate()` *returns* the handle (so the only way to obtain one is to
-/// have actually run an evaluation, and the bytes are the evaluator's own
-/// canonical output rather than anything the caller chose). Threading the
-/// handle out of `chio-kernel-core::evaluate` and through every adapter's
-/// receipt-construction path is a larger change tracked as a follow-up
-/// (follow-up seam). The hash-recompute + refuse-on-mismatch guarantee in this
-/// type already closes the render-A / sign-B regression regardless of that
-/// follow-up, because the signer never trusts the caller's `content_hash`.
+/// The handle is built from canonical content bytes that the producer supplies
+/// via [`ReceiptSigningHandle::from_content`] /
+/// [`ReceiptSigningHandle::from_canonical_bytes`]. The signer recomputes the
+/// hash over those bytes and refuses a mismatch, so it never trusts the
+/// caller's `content_hash` and a render-A / sign-B receipt cannot be signed.
 ///
 /// # Debug redaction
 ///

@@ -119,7 +119,7 @@ pub enum NotAuthoritativeReason {
     /// different version than the consumer requires.
     MissingOrWrongMediatedSpendProfile,
     /// The receipt's guarantee level is weaker than the operator-configured
-    /// floor (R4 truthfulness). Unrelated to `TrustLevel::Mediated`.
+    /// floor. Unrelated to `TrustLevel::Mediated`.
     GuaranteeLevelBelowFloor {
         minimum: String,
         actual: String,
@@ -252,7 +252,7 @@ pub fn is_authoritative_spend_receipt(
     Ok(())
 }
 
-/// R4 guarantee-level truthfulness: refuse a receipt claiming a guarantee level
+/// Guarantee-level truthfulness: refuse a receipt claiming a guarantee level
 /// stronger than the operator's configured floor. Levels are ordered
 /// advisory_posthoc < single_node_atomic < partition_escrowed < ha_linearizable.
 #[must_use]

@@ -129,8 +129,8 @@ impl OrgAddressBook for HashMap<String, EndpointAddr> {
 /// is pinned to the same issuer-signed snapshot the admission gate authorized on.
 /// The key pinned here MUST agree with that binding; a pinned key that lags the
 /// signed directory is refused before signing (fail-closed on mismatch/lag). The
-/// passport key is deliberately NOT the ed25519 transport `EndpointId` (Option B:
-/// a non-ed25519 passport cannot be an `EndpointId`).
+/// passport key is NOT the ed25519 transport `EndpointId`: a non-ed25519 passport
+/// cannot be an `EndpointId`.
 pub trait PinnedPassportKeys: Send + Sync {
     /// The pinned passport public key for a peer `kernel_id`, or `None` when the
     /// peer is not a co-signing counterparty.
@@ -533,7 +533,7 @@ impl IrohBilateralCoSigner {
 /// Bound one peer-dependent client await by the phase's timeout, mirroring the
 /// accept-side [`AcceptLimiter::bounded`]. On timeout this fails closed with a
 /// [`BilateralCoSigningError::TransportFailure`] so an Org A that accepts but never
-/// replies can no longer hang the caller forever.
+/// replies cannot hang the caller.
 async fn client_bounded<T, F>(
     limits: &AcceptLimitConfig,
     phase: AcceptPhase,
@@ -557,8 +557,8 @@ impl BilateralCoSigningProtocol for IrohBilateralCoSigner {
         &self,
         request: &chio_federation::bilateral::CoSigningRequest,
     ) -> Result<chio_federation::bilateral::CoSigningResponse, BilateralCoSigningError> {
-        // This lane implements the DSSE PAE profile only; the legacy detached
-        // CoSigningBody profile is out of scope and rejected fail-closed.
+        // This lane implements the DSSE PAE profile only; the detached
+        // CoSigningBody profile is rejected fail-closed.
         let _ = request;
         Err(BilateralCoSigningError::UnsupportedSchema(
             chio_federation::bilateral::BILATERAL_COSIGNING_SCHEMA.to_string(),
@@ -656,8 +656,7 @@ impl BilateralCoSignHandler {
     }
 
     /// Override the default accept-hardening bounds (per-phase timeouts + the
-    /// in-flight concurrency cap). The [`Default`] preserves the historical
-    /// (generous) behavior; the wiring can tune it in one place.
+    /// in-flight concurrency cap). The [`Default`] is generous; the wiring can tune it in one place.
     #[must_use]
     pub fn with_accept_limits(mut self, config: AcceptLimitConfig) -> Self {
         self.limiter = AcceptLimiter::new(config);
@@ -1297,7 +1296,7 @@ mod tests {
         // The happy path of the directory-bound key: when the pinned map AGREES
         // with the verified directory's current binding for Org B, a request
         // signed with that key is co-signed. Pure (no network) proof that
-        // verification now flows through the directory snapshot.
+        // verification flows through the directory snapshot.
         let org_a = Peer::new(ORIGIN_KERNEL, 10, 1);
         let org_b = Peer::new(TOOL_HOST_KERNEL, 11, 2);
         let gate = DirectoryGate::new(verified_directory(&[&org_a, &org_b]));

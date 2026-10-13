@@ -45,14 +45,8 @@ pub enum CredentialError {
     #[error("passport schema must be {PASSPORT_SCHEMA}")]
     InvalidPassportSchema,
 
-    #[error("unsupported versioned passport schema: {0}")]
-    UnsupportedVersionedPassportSchema(String),
-
-    #[error("invalid versioned passport: {0}")]
-    InvalidVersionedPassport(String),
-
-    #[error("passport v2 cannot be downgraded without losing data")]
-    PassportDowngradeWouldLoseData,
+    #[error("unsupported financial agent passport schema: {0}")]
+    UnsupportedFinancialPassportSchema(String),
 
     #[error("unsupported financial credential schema: {0}")]
     UnsupportedFinancialCredentialSchema(String),
@@ -66,8 +60,8 @@ pub enum CredentialError {
     #[error("financial credential authority denied: {0}")]
     FinancialAuthority(String),
 
-    #[error("legacy cross-issuer v1 activation is unsupported")]
-    UnsupportedLegacyCrossIssuerV1,
+    #[error("financial credential evaluation rejects reputation credentials")]
+    FinancialEvaluationRejectsReputationCredential,
 
     #[error("settlement reliability proof substrate is unavailable")]
     FinancialReliabilityProofSubstrateUnavailable,
@@ -226,9 +220,6 @@ pub enum CredentialError {
 
     #[error("invalid cross-issuer portfolio contract: {0}")]
     InvalidCrossIssuerPortfolio(String),
-
-    #[error("invalid cross-issuer trust pack: {0}")]
-    InvalidCrossIssuerTrustPack(String),
 
     #[error("invalid cross-issuer migration record: {0}")]
     InvalidCrossIssuerMigration(String),

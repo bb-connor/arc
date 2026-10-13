@@ -24,19 +24,19 @@ fn active_key<'a, T: HasTrustStatus>(
     reason: &str,
 ) -> Result<&'a T, CredentialError> {
     match entry {
-        Some(entry) if entry.trust_status() == TrustedKeyStatusV2::Active => Ok(entry),
+        Some(entry) if entry.trust_status() == TrustedKeyStatus::Active => Ok(entry),
         _ => Err(authority_error(reason)),
     }
 }
 
 trait HasTrustStatus {
-    fn trust_status(&self) -> TrustedKeyStatusV2;
+    fn trust_status(&self) -> TrustedKeyStatus;
 }
 
 macro_rules! impl_trust_status {
     ($($type:ty),+ $(,)?) => {
         $(impl HasTrustStatus for $type {
-            fn trust_status(&self) -> TrustedKeyStatusV2 {
+            fn trust_status(&self) -> TrustedKeyStatus {
                 self.status
             }
         })+
@@ -44,13 +44,12 @@ macro_rules! impl_trust_status {
 }
 
 impl_trust_status!(
-    IssuerTrustKeyV2,
-    VerifierTrustKeyV2,
-    MigrationAttesterTrustKeyV2,
-    LifecycleResolverTrustKeyV2,
-    LifecycleGenerationAnchorTrustKeyV2,
-    LifecycleHighWaterTrustKeyV2,
-    LegacyIssuanceAnchorAuthorityTrustKeyV2,
+    IssuerTrustKey,
+    VerifierTrustKey,
+    MigrationAttesterTrustKey,
+    LifecycleResolverTrustKey,
+    LifecycleGenerationAnchorTrustKey,
+    LifecycleHighWaterTrustKey,
 );
 
 pub(in crate::financial_authority) fn validate_epoch(

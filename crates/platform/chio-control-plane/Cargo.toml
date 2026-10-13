@@ -58,6 +58,7 @@ chio-metrics-spec = { workspace = true }
 chio-guards = { workspace = true }
 chio-policy = { workspace = true }
 chio-quarantine = { workspace = true }
+chio-response-model = { workspace = true }
 chio-reputation = { workspace = true }
 chio-conformance = { workspace = true }
 chio-mcp-adapter = { workspace = true }

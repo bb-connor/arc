@@ -35,8 +35,7 @@ use std::sync::{Mutex, PoisonError};
 use chio_revocation_oracle::{EpochRoot, RootSignature, SignedEpochRoot};
 use serde::{Deserialize, Serialize};
 
-/// Wire schema identifier for [`RevocationRootGossip`]. Versioned so future
-/// gossip envelopes can be introduced without ambiguity.
+/// Wire schema identifier for [`RevocationRootGossip`].
 pub const REVOCATION_ROOT_GOSSIP_SCHEMA: &str = "chio.federation-revocation-root-gossip.v1";
 
 /// A single signed revocation-oracle epoch root, gossiped from one bilateral

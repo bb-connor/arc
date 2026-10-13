@@ -5,10 +5,6 @@
 //! serialization point is the store itself - the receipt-writer actor when one
 //! is attached, statement atomicity plus the busy-timeout otherwise - not any
 //! in-process lock, so the race coverage has to run against the real store.
-//! (A prior loom stand-in for this protocol modeled each SQL statement as an
-//! atomic step, which made every assertion true by construction; loom cannot
-//! falsify cross-process database serialization, so it was replaced by this
-//! test.)
 //!
 //! Invariants driven under contention, all of which the callers rely on:
 //!

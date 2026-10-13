@@ -266,44 +266,56 @@ struct RoutePlanningHints {
     disallow_projected_protocols: bool,
 }
 
+/// Route hints carried under `chioControlPlane` in a governed intent context.
+/// Unknown members are refused so a misspelled restriction can never be
+/// dropped silently.
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct ControlPlaneRouteHints {
+    #[serde(default)]
+    preferred_target_protocol: Option<String>,
+    #[serde(default)]
+    allow_native_fallback: bool,
+    #[serde(default)]
+    disallow_projected_protocols: bool,
+}
+
 fn route_planning_hints(
     governed_intent: Option<&GovernedTransactionIntent>,
 ) -> Result<RoutePlanningHints, BridgeError> {
     let Some(context) = governed_intent.and_then(|intent| intent.context.as_ref()) else {
         return Ok(RoutePlanningHints::default());
     };
-    let Some(control_plane) = context
-        .get("chioControlPlane")
-        .or_else(|| context.get("chio_control_plane"))
-    else {
+    if context.get("chio_control_plane").is_some() {
+        return Err(BridgeError::InvalidRequest(
+            "governed intent context key `chio_control_plane` is not recognized; route hints belong under `chioControlPlane`".to_string(),
+        ));
+    }
+    let Some(control_plane) = context.get("chioControlPlane") else {
         return Ok(RoutePlanningHints::default());
     };
-    let Some(object) = control_plane.as_object() else {
+    if !control_plane.is_object() {
         return Err(BridgeError::InvalidRequest(
-            "governed intent arcControlPlane context must be an object".to_string(),
+            "governed intent chioControlPlane context must be an object".to_string(),
         ));
-    };
+    }
+    let hints = ControlPlaneRouteHints::deserialize(control_plane).map_err(|error| {
+        BridgeError::InvalidRequest(format!(
+            "governed intent chioControlPlane context is invalid: {error}"
+        ))
+    })?;
 
-    let preferred_target_protocol = object
-        .get("preferredTargetProtocol")
-        .or_else(|| object.get("preferred_target_protocol"))
-        .and_then(Value::as_str)
+    let preferred_target_protocol = hints
+        .preferred_target_protocol
+        .as_deref()
         .map(parse_discovery_protocol)
         .transpose()
         .map_err(BridgeError::InvalidRequest)?;
 
     Ok(RoutePlanningHints {
         preferred_target_protocol,
-        allow_native_fallback: object
-            .get("allowNativeFallback")
-            .or_else(|| object.get("allow_native_fallback"))
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
-        disallow_projected_protocols: object
-            .get("disallowProjectedProtocols")
-            .or_else(|| object.get("disallow_projected_protocols"))
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
+        allow_native_fallback: hints.allow_native_fallback,
+        disallow_projected_protocols: hints.disallow_projected_protocols,
     })
 }
 

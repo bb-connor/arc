@@ -11,6 +11,19 @@ use super::types::{
 use super::MailboxConfig;
 use crate::{digest, ProcessError};
 
+const MESSAGE_COLUMNS: [&str; 10] = [
+    "channel",
+    "sequence",
+    "message_key",
+    "payload_hash",
+    "payload",
+    "payload_bytes",
+    "sender",
+    "claimant",
+    "claim_generation",
+    "lease_expires_at",
+];
+
 pub(super) struct MailboxStore {
     connection: Connection,
 }
@@ -30,22 +43,14 @@ impl MailboxStore {
         connection.pragma_update(None, "foreign_keys", "ON")?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute_batch(include_str!("store.sql"))?;
-        // Files created before sender attestation gain the column; their existing
-        // messages remain unattested and are reported with a null sender. Files
-        // created before delivery leases gain the claim columns unclaimed.
         let columns = tx
-            .prepare("PRAGMA table_info(mailbox_messages)")?
-            .query_map([], |row| row.get::<_, String>(1))?
+            .prepare("SELECT name FROM pragma_table_info('mailbox_messages') ORDER BY cid")?
+            .query_map([], |row| row.get::<_, String>(0))?
             .collect::<Result<Vec<_>, _>>()?;
-        if !columns.iter().any(|column| column == "sender") {
-            tx.execute_batch("ALTER TABLE mailbox_messages ADD COLUMN sender TEXT")?;
-        }
-        if !columns.iter().any(|column| column == "claimant") {
-            tx.execute_batch(
-                "ALTER TABLE mailbox_messages ADD COLUMN claimant TEXT;
-                ALTER TABLE mailbox_messages ADD COLUMN claim_generation INTEGER NOT NULL DEFAULT 0 CHECK (claim_generation >= 0);
-                ALTER TABLE mailbox_messages ADD COLUMN lease_expires_at INTEGER",
-            )?;
+        if columns != MESSAGE_COLUMNS {
+            return Err(ProcessError::Configuration(
+                "mailbox store layout does not match this runtime",
+            ));
         }
         let config_hash = digest(&config)?;
         tx.execute("INSERT OR IGNORE INTO mailbox_runtime(singleton, version, authority, kernel_key, configuration_hash)

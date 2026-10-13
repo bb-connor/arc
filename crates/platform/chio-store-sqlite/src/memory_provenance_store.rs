@@ -81,14 +81,13 @@ pub struct SqliteMemoryProvenanceStore {
     pool: Pool<SqliteConnectionManager>,
 }
 
-/// Memory-provenance-store schema revision. Bump on every schema-affecting change.
-const MEMORY_PROVENANCE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Memory-provenance-store schema version; a database stamped otherwise is refused.
+const MEMORY_PROVENANCE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const MEMORY_PROVENANCE_STORE_SCHEMA_KEY: &str = "memory_provenance";
-/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
-/// memory-provenance database rather than reject it as foreign.
-const MEMORY_PROVENANCE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["chio_memory_provenance"];
+/// Tables that identify a populated memory-provenance database as this store's.
+const MEMORY_PROVENANCE_STORE_ANCHOR_TABLES: &[&str] = &["chio_memory_provenance"];
 
 impl SqliteMemoryProvenanceStore {
     /// Open the store at the given path, creating the parent directory
@@ -126,11 +125,11 @@ impl SqliteMemoryProvenanceStore {
             .pool
             .get()
             .map_err(|error| SqliteMemoryProvenanceStoreError(format!("pool acquire: {error}")))?;
-        crate::check_schema_version(
+        crate::check_current_schema(
             &conn,
             MEMORY_PROVENANCE_STORE_SCHEMA_KEY,
             MEMORY_PROVENANCE_STORE_SUPPORTED_SCHEMA_VERSION,
-            MEMORY_PROVENANCE_STORE_LEGACY_ANCHOR_TABLES,
+            MEMORY_PROVENANCE_STORE_ANCHOR_TABLES,
         )
         .map_err(|error| SqliteMemoryProvenanceStoreError(error.to_string()))?;
         conn.execute_batch(

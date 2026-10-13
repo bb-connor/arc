@@ -19,8 +19,8 @@
 //! symbolic `String` construction exceeds the PR budget. The encoder unit
 //! tests in `chio-core-types` check that step over every byte value.
 //! Noncollision is the audited ASSUME-SHA256 assumption, not a concrete proof.
-//! The original input and flip-position domain and inequality are preserved
-//! as an unproved opt-in obligation in `kani_crypto_research`.
+//! The input and flip-position domain and inequality are an unproved opt-in
+//! obligation in `kani_crypto_research`.
 //!
 //! `ModelCard::validate` and `ModelCard::from_canonical_json` build
 //! arbitrary-length `String` and `BTreeSet<String>` payloads through
@@ -120,7 +120,7 @@ fn fixture_card(issued_at: DateTime<Utc>, expires_at: DateTime<Utc>) -> ModelCar
 /// Real SHA-256 determinism and lowercase hex shape over every four-byte input,
 /// checked on the 64 wire bytes that `weights_hash_of` renders. The bytes-to-`String`
 /// step is covered by the `chio-core-types` encoder unit tests, not by this proof.
-/// Noncollision relies on ASSUME-SHA256; the original inequality is unproved research.
+/// Noncollision relies on ASSUME-SHA256; the inequality is unproved (`kani_crypto_research`).
 /// Production entry: `chio_core_types::sha256_hex_bytes`, the fixed-buffer encoding of
 /// `chio_weights::card::weights_hash_of`.
 #[kani::proof]
@@ -152,7 +152,7 @@ pub fn public_weights_hash_hex_bytes_determinism_and_shape() {
     }
 
     // Noncollision is ASSUME-SHA256, not an assertion proved by this harness.
-    // The original four-byte noncollision obligation remains in kani_crypto_research.
+    // The four-byte noncollision obligation lives in kani_crypto_research.
     kani::cover!(true, "public_weights_hash_hex_bytes_determinism_and_shape");
 }
 
@@ -235,9 +235,8 @@ pub fn public_model_card_require_live_fail_closed() {
 #[kani::unwind(8)]
 pub fn public_weights_error_urn_is_stable() {
     // Symbolic axis: variant selector. Each value picks one of the
-    // eight inhabitable variants (the enum is `#[non_exhaustive]`
-    // for forward-compatibility, but the local `match` is
-    // exhaustive over today's variants). The `tool-banned` URN is
+    // eight inhabitable variants (the enum is `#[non_exhaustive]`; the
+    // local `match` is exhaustive over its current variants). The `tool-banned` URN is
     // pinned alongside the others to keep coverage exhaustive.
     let pick: u8 = kani::any();
     kani::assume(pick < 8);

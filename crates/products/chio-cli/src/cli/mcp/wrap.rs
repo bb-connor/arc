@@ -89,7 +89,7 @@ pub(crate) struct McpWrapArgs {
         long,
         value_name = "PATH",
         requires = "cage_policy_signer",
-        conflicts_with_all = ["tools_fixture", "e2e_fixture", "self_test_attestation"]
+        conflicts_with_all = ["tools_fixture", "e2e_fixture"]
     )]
     pub(crate) cage_policy: Option<std::path::PathBuf>,
 
@@ -125,11 +125,6 @@ pub(crate) struct McpWrapArgs {
     /// child.
     #[arg(long)]
     pub(crate) e2e_fixture: Option<std::path::PathBuf>,
-
-    /// Legacy attestation self-test flag. Refuses because wrap does not
-    /// provide receipt-bound verification.
-    #[arg(long)]
-    pub(crate) self_test_attestation: Option<String>,
 
     /// Execute allowed tool calls through a kernel path that mints and
     /// presents strict execution nonces before invoking the wrapped server.

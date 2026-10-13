@@ -3,7 +3,7 @@ use super::*;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum CrossIssuerLifecycleStatusV2 {
+pub enum CrossIssuerLifecycleStatus {
     Active,
     Suspended,
     Superseded,
@@ -12,14 +12,14 @@ pub enum CrossIssuerLifecycleStatusV2 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LifecycleSourceIndexLeafV2 {
+pub struct LifecycleSourceIndexLeaf {
     pub source_passport_id: String,
     pub result_digest: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct IssuerLifecycleCheckpointV2 {
+pub struct IssuerLifecycleCheckpoint {
     pub schema: String,
     pub resolver_identity: String,
     pub signer_key_id: String,
@@ -34,12 +34,12 @@ pub struct IssuerLifecycleCheckpointV2 {
     pub checkpoint_digest: String,
 }
 
-pub type SignedIssuerLifecycleCheckpointV2 =
-    chio_core::receipt::lineage::SignedExportEnvelope<IssuerLifecycleCheckpointV2>;
+pub type SignedIssuerLifecycleCheckpoint =
+    chio_core::receipt::lineage::SignedExportEnvelope<IssuerLifecycleCheckpoint>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct CrossIssuerLifecycleResultV2 {
+pub struct CrossIssuerLifecycleResult {
     pub schema: String,
     pub resolver_identity: String,
     pub signer_key_id: String,
@@ -47,28 +47,28 @@ pub struct CrossIssuerLifecycleResultV2 {
     pub issuer_did: String,
     pub store_generation: u64,
     pub status_version: u64,
-    pub status: CrossIssuerLifecycleStatusV2,
+    pub status: CrossIssuerLifecycleStatus,
     pub source_passport_id: String,
     pub source_manifest_digest: String,
     pub effective_at: u64,
     pub trusted_clock_high_water: u64,
-    pub source_index_leaf: LifecycleSourceIndexLeafV2,
+    pub source_index_leaf: LifecycleSourceIndexLeaf,
     pub source_index_proof: chio_core::MerkleProof,
     pub result_digest: String,
 }
 
-pub type SignedCrossIssuerLifecycleResultV2 =
-    chio_core::receipt::lineage::SignedExportEnvelope<CrossIssuerLifecycleResultV2>;
+pub type SignedCrossIssuerLifecycleResult =
+    chio_core::receipt::lineage::SignedExportEnvelope<CrossIssuerLifecycleResult>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SinglePassportLifecycleSnapshotInputV2 {
+pub struct SinglePassportLifecycleSnapshotInput {
     pub resolver_identity: String,
     pub signer_key_id: String,
     pub signer_key_epoch: u64,
     pub issuer_did: String,
     pub store_generation: u64,
     pub status_version: u64,
-    pub status: CrossIssuerLifecycleStatusV2,
+    pub status: CrossIssuerLifecycleStatus,
     pub source_passport_id: String,
     pub source_manifest_digest: String,
     pub effective_at: u64,
@@ -77,14 +77,14 @@ pub struct SinglePassportLifecycleSnapshotInputV2 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SinglePassportLifecycleSnapshotV2 {
-    pub checkpoint: SignedIssuerLifecycleCheckpointV2,
-    pub result: SignedCrossIssuerLifecycleResultV2,
+pub struct SinglePassportLifecycleSnapshot {
+    pub checkpoint: SignedIssuerLifecycleCheckpoint,
+    pub result: SignedCrossIssuerLifecycleResult,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct IssuerLifecycleGenerationPinV2 {
+pub struct IssuerLifecycleGenerationPin {
     pub schema: String,
     pub anchor_id: String,
     pub signer_key_epoch: u64,
@@ -100,18 +100,18 @@ pub struct IssuerLifecycleGenerationPinV2 {
     pub pin_digest: String,
 }
 
-pub type SignedIssuerLifecycleGenerationPinV2 =
-    chio_core::receipt::lineage::SignedExportEnvelope<IssuerLifecycleGenerationPinV2>;
+pub type SignedIssuerLifecycleGenerationPin =
+    chio_core::receipt::lineage::SignedExportEnvelope<IssuerLifecycleGenerationPin>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LifecycleCheckpointPinCandidateV2 {
+pub struct LifecycleCheckpointPinCandidate {
     pub resolver_identity: String,
     pub issuer_did: String,
     pub source_passport_id: String,
     pub store_generation: u64,
     pub status_version: u64,
-    pub status: CrossIssuerLifecycleStatusV2,
+    pub status: CrossIssuerLifecycleStatus,
     pub result_digest: String,
     pub checkpoint_digest: String,
     pub generation_pin_digest: String,
@@ -120,7 +120,7 @@ pub struct LifecycleCheckpointPinCandidateV2 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LifecycleCheckpointPinV2 {
+pub struct LifecycleCheckpointPin {
     pub schema: String,
     pub store_id: String,
     pub signer_key_epoch: u64,
@@ -129,7 +129,7 @@ pub struct LifecycleCheckpointPinV2 {
     pub source_passport_id: String,
     pub store_generation: u64,
     pub status_version: u64,
-    pub status: CrossIssuerLifecycleStatusV2,
+    pub status: CrossIssuerLifecycleStatus,
     pub result_digest: String,
     pub checkpoint_digest: String,
     pub generation_pin_digest: String,
@@ -139,8 +139,8 @@ pub struct LifecycleCheckpointPinV2 {
     pub pin_digest: String,
 }
 
-pub type SignedLifecycleCheckpointPinV2 =
-    chio_core::receipt::lineage::SignedExportEnvelope<LifecycleCheckpointPinV2>;
+pub type SignedLifecycleCheckpointPin =
+    chio_core::receipt::lineage::SignedExportEnvelope<LifecycleCheckpointPin>;
 
 pub use chio_security_types::clock::Clock;
 
@@ -150,7 +150,7 @@ pub trait CrossIssuerLifecycleResolver {
         resolver_identity: &str,
         issuer_did: &str,
         now: u64,
-    ) -> Result<SignedIssuerLifecycleCheckpointV2, FinancialAuthorityAvailabilityError>;
+    ) -> Result<SignedIssuerLifecycleCheckpoint, FinancialAuthorityAvailabilityError>;
 
     fn passport_result(
         &self,
@@ -158,25 +158,25 @@ pub trait CrossIssuerLifecycleResolver {
         issuer_did: &str,
         source_passport_id: &str,
         now: u64,
-    ) -> Result<SignedCrossIssuerLifecycleResultV2, FinancialAuthorityAvailabilityError>;
+    ) -> Result<SignedCrossIssuerLifecycleResult, FinancialAuthorityAvailabilityError>;
 }
 
 pub trait CrossIssuerLifecycleGenerationAnchor {
     fn compare_and_swap(
         &self,
-        checkpoint: &SignedIssuerLifecycleCheckpointV2,
-    ) -> Result<SignedIssuerLifecycleGenerationPinV2, FinancialAuthorityAvailabilityError>;
+        checkpoint: &SignedIssuerLifecycleCheckpoint,
+    ) -> Result<SignedIssuerLifecycleGenerationPin, FinancialAuthorityAvailabilityError>;
 }
 
 pub trait CrossIssuerLifecycleHighWaterStore {
     fn compare_and_swap(
         &self,
-        candidate: &LifecycleCheckpointPinCandidateV2,
-    ) -> Result<SignedLifecycleCheckpointPinV2, FinancialAuthorityAvailabilityError>;
+        candidate: &LifecycleCheckpointPinCandidate,
+    ) -> Result<SignedLifecycleCheckpointPin, FinancialAuthorityAvailabilityError>;
 }
 
 #[derive(Debug, Clone)]
-pub struct VerifiedCrossIssuerLifecycleV2 {
+pub struct VerifiedCrossIssuerLifecycle {
     generation: u64,
     status_version: u64,
     result_digest: String,
@@ -186,7 +186,7 @@ pub struct VerifiedCrossIssuerLifecycleV2 {
     source_index_proof_digest: String,
 }
 
-impl VerifiedCrossIssuerLifecycleV2 {
+impl VerifiedCrossIssuerLifecycle {
     #[must_use]
     pub const fn generation(&self) -> u64 {
         self.generation
@@ -225,7 +225,7 @@ impl VerifiedCrossIssuerLifecycleV2 {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct LifecycleResultDigestPreimageV2<'a> {
+struct LifecycleResultDigestPreimage<'a> {
     schema: &'a str,
     resolver_identity: &'a str,
     signer_key_id: &'a str,
@@ -233,7 +233,7 @@ struct LifecycleResultDigestPreimageV2<'a> {
     issuer_did: &'a str,
     store_generation: u64,
     status_version: u64,
-    status: CrossIssuerLifecycleStatusV2,
+    status: CrossIssuerLifecycleStatus,
     source_passport_id: &'a str,
     source_manifest_digest: &'a str,
     effective_at: u64,
@@ -242,7 +242,7 @@ struct LifecycleResultDigestPreimageV2<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct LifecycleCheckpointDigestPreimageV2<'a> {
+struct LifecycleCheckpointDigestPreimage<'a> {
     schema: &'a str,
     resolver_identity: &'a str,
     signer_key_id: &'a str,
@@ -257,7 +257,7 @@ struct LifecycleCheckpointDigestPreimageV2<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct LifecycleGenerationPinDigestPreimageV2<'a> {
+struct LifecycleGenerationPinDigestPreimage<'a> {
     schema: &'a str,
     anchor_id: &'a str,
     signer_key_epoch: u64,
@@ -273,7 +273,7 @@ struct LifecycleGenerationPinDigestPreimageV2<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct LifecycleCheckpointPinDigestPreimageV2<'a> {
+struct LifecycleCheckpointPinDigestPreimage<'a> {
     schema: &'a str,
     store_id: &'a str,
     signer_key_epoch: u64,
@@ -282,7 +282,7 @@ struct LifecycleCheckpointPinDigestPreimageV2<'a> {
     source_passport_id: &'a str,
     store_generation: u64,
     status_version: u64,
-    status: CrossIssuerLifecycleStatusV2,
+    status: CrossIssuerLifecycleStatus,
     result_digest: &'a str,
     checkpoint_digest: &'a str,
     generation_pin_digest: &'a str,
@@ -290,14 +290,14 @@ struct LifecycleCheckpointPinDigestPreimageV2<'a> {
     previous_pin_digest: Option<&'a str>,
 }
 
-pub fn sign_single_passport_lifecycle_snapshot_v2(
+pub fn sign_single_passport_lifecycle_snapshot(
     signer: &Keypair,
-    input: SinglePassportLifecycleSnapshotInputV2,
-) -> Result<SinglePassportLifecycleSnapshotV2, CredentialError> {
+    input: SinglePassportLifecycleSnapshotInput,
+) -> Result<SinglePassportLifecycleSnapshot, CredentialError> {
     validate_snapshot_input(&input)?;
     let result_digest = authority_digest(
         LIFECYCLE_RESULT_DIGEST_DOMAIN,
-        &LifecycleResultDigestPreimageV2 {
+        &LifecycleResultDigestPreimage {
             schema: FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1,
             resolver_identity: &input.resolver_identity,
             signer_key_id: &input.signer_key_id,
@@ -312,13 +312,13 @@ pub fn sign_single_passport_lifecycle_snapshot_v2(
             trusted_clock_high_water: input.trusted_clock_high_water,
         },
     )?;
-    let leaf = LifecycleSourceIndexLeafV2 {
+    let leaf = LifecycleSourceIndexLeaf {
         source_passport_id: input.source_passport_id.clone(),
         result_digest: result_digest.clone(),
     };
     let leaf_bytes = canonical_json_bytes(&leaf)?;
     let tree = chio_core::MerkleTree::from_leaves(&[leaf_bytes])?;
-    let mut checkpoint = IssuerLifecycleCheckpointV2 {
+    let mut checkpoint = IssuerLifecycleCheckpoint {
         schema: FINANCIAL_ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V1.to_string(),
         resolver_identity: input.resolver_identity.clone(),
         signer_key_id: input.signer_key_id.clone(),
@@ -332,8 +332,8 @@ pub fn sign_single_passport_lifecycle_snapshot_v2(
         checkpoint_digest: String::new(),
     };
     checkpoint.checkpoint_digest = recompute_lifecycle_checkpoint_digest(&checkpoint)?;
-    let checkpoint = SignedIssuerLifecycleCheckpointV2::sign(checkpoint, signer)?;
-    let result = CrossIssuerLifecycleResultV2 {
+    let checkpoint = SignedIssuerLifecycleCheckpoint::sign(checkpoint, signer)?;
+    let result = CrossIssuerLifecycleResult {
         schema: FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1.to_string(),
         resolver_identity: input.resolver_identity,
         signer_key_id: input.signer_key_id,
@@ -350,23 +350,23 @@ pub fn sign_single_passport_lifecycle_snapshot_v2(
         source_index_proof: tree.inclusion_proof(0)?,
         result_digest,
     };
-    Ok(SinglePassportLifecycleSnapshotV2 {
+    Ok(SinglePassportLifecycleSnapshot {
         checkpoint,
-        result: SignedCrossIssuerLifecycleResultV2::sign(result, signer)?,
+        result: SignedCrossIssuerLifecycleResult::sign(result, signer)?,
     })
 }
 
-pub fn sign_issuer_lifecycle_generation_pin_v2(
+pub fn sign_issuer_lifecycle_generation_pin(
     signer: &Keypair,
     anchor_id: &str,
     signer_key_epoch: u64,
-    checkpoint: &SignedIssuerLifecycleCheckpointV2,
+    checkpoint: &SignedIssuerLifecycleCheckpoint,
     previous_pin_digest: Option<&str>,
-) -> Result<SignedIssuerLifecycleGenerationPinV2, CredentialError> {
+) -> Result<SignedIssuerLifecycleGenerationPin, CredentialError> {
     validate_text("generationPin.anchorId", anchor_id)?;
     validate_epoch("generationPin.signerKeyEpoch", signer_key_epoch)?;
     validate_optional_digest("generationPin.previousPinDigest", previous_pin_digest)?;
-    let mut body = IssuerLifecycleGenerationPinV2 {
+    let mut body = IssuerLifecycleGenerationPin {
         schema: FINANCIAL_ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V1.to_string(),
         anchor_id: anchor_id.to_string(),
         signer_key_epoch,
@@ -382,21 +382,21 @@ pub fn sign_issuer_lifecycle_generation_pin_v2(
     };
     validate_generation_pin_body(&body, false)?;
     body.pin_digest = recompute_generation_pin_digest(&body)?;
-    Ok(SignedIssuerLifecycleGenerationPinV2::sign(body, signer)?)
+    Ok(SignedIssuerLifecycleGenerationPin::sign(body, signer)?)
 }
 
-pub fn sign_lifecycle_checkpoint_pin_v2(
+pub fn sign_lifecycle_checkpoint_pin(
     signer: &Keypair,
     store_id: &str,
     signer_key_epoch: u64,
-    candidate: &LifecycleCheckpointPinCandidateV2,
+    candidate: &LifecycleCheckpointPinCandidate,
     previous_pin_digest: Option<&str>,
-) -> Result<SignedLifecycleCheckpointPinV2, CredentialError> {
+) -> Result<SignedLifecycleCheckpointPin, CredentialError> {
     validate_text("checkpointPin.storeId", store_id)?;
     validate_epoch("checkpointPin.signerKeyEpoch", signer_key_epoch)?;
     validate_checkpoint_pin_candidate(candidate)?;
     validate_optional_digest("checkpointPin.previousPinDigest", previous_pin_digest)?;
-    let mut body = LifecycleCheckpointPinV2 {
+    let mut body = LifecycleCheckpointPin {
         schema: FINANCIAL_LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V1.to_string(),
         store_id: store_id.to_string(),
         signer_key_epoch,
@@ -415,21 +415,21 @@ pub fn sign_lifecycle_checkpoint_pin_v2(
     };
     validate_checkpoint_pin_body(&body, false)?;
     body.pin_digest = recompute_checkpoint_pin_digest(&body)?;
-    Ok(SignedLifecycleCheckpointPinV2::sign(body, signer)?)
+    Ok(SignedLifecycleCheckpointPin::sign(body, signer)?)
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn resolve_cross_issuer_lifecycle_v2(
+pub fn resolve_cross_issuer_lifecycle(
     resolver_identity: &str,
     issuer_did: &str,
     source_passport_id: &str,
     source_manifest_digest: &str,
-    trust: &CrossIssuerTrustRegistryV2,
+    trust: &CrossIssuerTrustRegistry,
     resolver: &dyn CrossIssuerLifecycleResolver,
     generation_anchor: &dyn CrossIssuerLifecycleGenerationAnchor,
     high_water: &dyn CrossIssuerLifecycleHighWaterStore,
     clock: &dyn Clock,
-) -> Result<VerifiedCrossIssuerLifecycleV2, CredentialError> {
+) -> Result<VerifiedCrossIssuerLifecycle, CredentialError> {
     validate_text("lifecycle.resolverIdentity", resolver_identity)?;
     DidChio::from_str(issuer_did)?;
     validate_digest("lifecycle.sourcePassportId", source_passport_id)?;
@@ -458,7 +458,7 @@ pub fn resolve_cross_issuer_lifecycle_v2(
         trust,
         now,
     )?;
-    let candidate = LifecycleCheckpointPinCandidateV2 {
+    let candidate = LifecycleCheckpointPinCandidate {
         resolver_identity: resolver_identity.to_string(),
         issuer_did: issuer_did.to_string(),
         source_passport_id: source_passport_id.to_string(),
@@ -474,12 +474,12 @@ pub fn resolve_cross_issuer_lifecycle_v2(
         .compare_and_swap(&candidate)
         .map_err(|error| availability_error("lifecycle high-water store", error))?;
     verify_checkpoint_pin(&checkpoint_pin, &candidate, trust)?;
-    if result.body.status != CrossIssuerLifecycleStatusV2::Active {
+    if result.body.status != CrossIssuerLifecycleStatus::Active {
         return Err(authority_error(
             "cross-issuer lifecycle status is not active",
         ));
     }
-    Ok(VerifiedCrossIssuerLifecycleV2 {
+    Ok(VerifiedCrossIssuerLifecycle {
         generation: result.body.store_generation,
         status_version: result.body.status_version,
         result_digest: result.body.result_digest.clone(),
@@ -491,10 +491,10 @@ pub fn resolve_cross_issuer_lifecycle_v2(
 }
 
 fn verify_lifecycle_checkpoint(
-    checkpoint: &SignedIssuerLifecycleCheckpointV2,
+    checkpoint: &SignedIssuerLifecycleCheckpoint,
     resolver_identity: &str,
     issuer_did: &str,
-    trust: &CrossIssuerTrustRegistryV2,
+    trust: &CrossIssuerTrustRegistry,
     now: u64,
 ) -> Result<(), CredentialError> {
     validate_lifecycle_checkpoint_body(&checkpoint.body)?;
@@ -520,9 +520,9 @@ fn verify_lifecycle_checkpoint(
 }
 
 fn verify_generation_pin(
-    pin: &SignedIssuerLifecycleGenerationPinV2,
-    checkpoint: &SignedIssuerLifecycleCheckpointV2,
-    trust: &CrossIssuerTrustRegistryV2,
+    pin: &SignedIssuerLifecycleGenerationPin,
+    checkpoint: &SignedIssuerLifecycleCheckpoint,
+    trust: &CrossIssuerTrustRegistry,
 ) -> Result<(), CredentialError> {
     validate_generation_pin_body(&pin.body, true)?;
     if pin.body.resolver_identity != checkpoint.body.resolver_identity
@@ -548,11 +548,11 @@ fn verify_generation_pin(
 }
 
 fn verify_lifecycle_result(
-    result: &SignedCrossIssuerLifecycleResultV2,
-    checkpoint: &SignedIssuerLifecycleCheckpointV2,
+    result: &SignedCrossIssuerLifecycleResult,
+    checkpoint: &SignedIssuerLifecycleCheckpoint,
     source_passport_id: &str,
     source_manifest_digest: &str,
-    trust: &CrossIssuerTrustRegistryV2,
+    trust: &CrossIssuerTrustRegistry,
     now: u64,
 ) -> Result<String, CredentialError> {
     validate_lifecycle_result_body(&result.body)?;
@@ -599,9 +599,9 @@ fn verify_lifecycle_result(
 }
 
 fn verify_checkpoint_pin(
-    pin: &SignedLifecycleCheckpointPinV2,
-    candidate: &LifecycleCheckpointPinCandidateV2,
-    trust: &CrossIssuerTrustRegistryV2,
+    pin: &SignedLifecycleCheckpointPin,
+    candidate: &LifecycleCheckpointPinCandidate,
+    trust: &CrossIssuerTrustRegistry,
 ) -> Result<(), CredentialError> {
     validate_checkpoint_pin_body(&pin.body, true)?;
     if pin.body.resolver_identity != candidate.resolver_identity
@@ -630,7 +630,7 @@ fn verify_checkpoint_pin(
 }
 
 fn validate_snapshot_input(
-    input: &SinglePassportLifecycleSnapshotInputV2,
+    input: &SinglePassportLifecycleSnapshotInput,
 ) -> Result<(), CredentialError> {
     validate_text("lifecycle.resolverIdentity", &input.resolver_identity)?;
     validate_text("lifecycle.signerKeyId", &input.signer_key_id)?;
@@ -658,7 +658,7 @@ fn validate_snapshot_input(
 }
 
 fn validate_lifecycle_checkpoint_body(
-    body: &IssuerLifecycleCheckpointV2,
+    body: &IssuerLifecycleCheckpoint,
 ) -> Result<(), CredentialError> {
     if body.schema != FINANCIAL_ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V1 {
         return Err(authority_error("lifecycle checkpoint schema is invalid"));
@@ -682,7 +682,7 @@ fn validate_lifecycle_checkpoint_body(
 }
 
 fn validate_lifecycle_result_body(
-    body: &CrossIssuerLifecycleResultV2,
+    body: &CrossIssuerLifecycleResult,
 ) -> Result<(), CredentialError> {
     if body.schema != FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1 {
         return Err(authority_error("lifecycle result schema is invalid"));
@@ -718,7 +718,7 @@ fn validate_lifecycle_result_body(
 }
 
 fn validate_generation_pin_body(
-    body: &IssuerLifecycleGenerationPinV2,
+    body: &IssuerLifecycleGenerationPin,
     require_digest: bool,
 ) -> Result<(), CredentialError> {
     if body.schema != FINANCIAL_ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V1 {
@@ -749,7 +749,7 @@ fn validate_generation_pin_body(
 }
 
 fn validate_checkpoint_pin_candidate(
-    candidate: &LifecycleCheckpointPinCandidateV2,
+    candidate: &LifecycleCheckpointPinCandidate,
 ) -> Result<(), CredentialError> {
     validate_text(
         "checkpointPin.resolverIdentity",
@@ -778,7 +778,7 @@ fn validate_checkpoint_pin_candidate(
 }
 
 fn validate_checkpoint_pin_body(
-    body: &LifecycleCheckpointPinV2,
+    body: &LifecycleCheckpointPin,
     require_digest: bool,
 ) -> Result<(), CredentialError> {
     if body.schema != FINANCIAL_LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V1 {
@@ -788,7 +788,7 @@ fn validate_checkpoint_pin_body(
     }
     validate_text("checkpointPin.storeId", &body.store_id)?;
     validate_epoch("checkpointPin.signerKeyEpoch", body.signer_key_epoch)?;
-    validate_checkpoint_pin_candidate(&LifecycleCheckpointPinCandidateV2 {
+    validate_checkpoint_pin_candidate(&LifecycleCheckpointPinCandidate {
         resolver_identity: body.resolver_identity.clone(),
         issuer_did: body.issuer_did.clone(),
         source_passport_id: body.source_passport_id.clone(),
@@ -811,11 +811,11 @@ fn validate_checkpoint_pin_body(
 }
 
 fn recompute_lifecycle_checkpoint_digest(
-    body: &IssuerLifecycleCheckpointV2,
+    body: &IssuerLifecycleCheckpoint,
 ) -> Result<String, CredentialError> {
     authority_digest(
         LIFECYCLE_CHECKPOINT_DIGEST_DOMAIN,
-        &LifecycleCheckpointDigestPreimageV2 {
+        &LifecycleCheckpointDigestPreimage {
             schema: &body.schema,
             resolver_identity: &body.resolver_identity,
             signer_key_id: &body.signer_key_id,
@@ -831,11 +831,11 @@ fn recompute_lifecycle_checkpoint_digest(
 }
 
 fn recompute_lifecycle_result_digest(
-    body: &CrossIssuerLifecycleResultV2,
+    body: &CrossIssuerLifecycleResult,
 ) -> Result<String, CredentialError> {
     authority_digest(
         LIFECYCLE_RESULT_DIGEST_DOMAIN,
-        &LifecycleResultDigestPreimageV2 {
+        &LifecycleResultDigestPreimage {
             schema: &body.schema,
             resolver_identity: &body.resolver_identity,
             signer_key_id: &body.signer_key_id,
@@ -853,11 +853,11 @@ fn recompute_lifecycle_result_digest(
 }
 
 fn recompute_generation_pin_digest(
-    body: &IssuerLifecycleGenerationPinV2,
+    body: &IssuerLifecycleGenerationPin,
 ) -> Result<String, CredentialError> {
     authority_digest(
         LIFECYCLE_GENERATION_PIN_DIGEST_DOMAIN,
-        &LifecycleGenerationPinDigestPreimageV2 {
+        &LifecycleGenerationPinDigestPreimage {
             schema: &body.schema,
             anchor_id: &body.anchor_id,
             signer_key_epoch: body.signer_key_epoch,
@@ -874,11 +874,11 @@ fn recompute_generation_pin_digest(
 }
 
 fn recompute_checkpoint_pin_digest(
-    body: &LifecycleCheckpointPinV2,
+    body: &LifecycleCheckpointPin,
 ) -> Result<String, CredentialError> {
     authority_digest(
         LIFECYCLE_CHECKPOINT_PIN_DIGEST_DOMAIN,
-        &LifecycleCheckpointPinDigestPreimageV2 {
+        &LifecycleCheckpointPinDigestPreimage {
             schema: &body.schema,
             store_id: &body.store_id,
             signer_key_epoch: body.signer_key_epoch,

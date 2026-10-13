@@ -34,7 +34,7 @@
 //! At accept time the handler (1) REJECTS at the admission gate any transport
 //! `EndpointId` not bound to an admitted kernel (defense in depth), (2) asserts
 //! each frame's `signer_id` is pinned to the SAME authenticated `EndpointId`
-//! (transport origin pin, now structurally guaranteed by the derived directory),
+//! (transport origin pin, structurally guaranteed by the derived directory),
 //! and (3) signature-verifies the [`SignedEpochRoot`] against the bound verifying
 //! key (authenticity). All three are mandatory and independent (ADAPTER-SPEC 5
 //! "feeds the verifier, not replaces it"; blueprint B.4).
@@ -478,8 +478,7 @@ impl RevocationHandler {
     }
 
     /// Override the default accept-hardening bounds (per-phase timeouts + the
-    /// in-flight concurrency cap). The [`Default`] preserves the historical
-    /// (generous) behavior; the wiring can tune it in one place.
+    /// in-flight concurrency cap). The [`Default`] is generous; the wiring can tune it in one place.
     #[must_use]
     pub fn with_accept_limits(mut self, config: AcceptLimitConfig) -> Self {
         self.limiter = AcceptLimiter::new(config);
@@ -849,7 +848,7 @@ impl ProtocolHandler for RevocationHandler {
         let _permit = match self.limiter.admit_peer(&conn.remote_id()).await {
             Ok(permit) => permit,
             Err(error) => {
-                // OBSERVE-ONLY: the slowloris saturation shed is now countable.
+                // OBSERVE-ONLY: count the slowloris saturation shed.
                 crate::metrics::record_lane_frame(
                     crate::metrics::LANE_REVOCATION,
                     crate::metrics::LANE_OUTCOME_BUSY,
@@ -1027,7 +1026,7 @@ pub async fn request_manifest_catchup_over_iroh_with_limits(
 /// Bound one peer-dependent client await by the phase's timeout, mirroring the
 /// accept-side [`AcceptLimiter::bounded`] and the pheromone client. On timeout this
 /// fails closed with [`RevocationLaneError::AcceptLimit`] (`accept_timeout`) so a
-/// peer that accepts but never replies can no longer hang the caller forever.
+/// peer that accepts but never replies cannot hang the caller.
 async fn client_bounded<T, F>(
     limits: &AcceptLimitConfig,
     phase: AcceptPhase,

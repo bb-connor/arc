@@ -36,6 +36,7 @@ separate live contracts from reference material and historical roadmaps.
 - [Homebrew](install/homebrew.md) - Homebrew tap and formula
 - [Publishing](install/PUBLISHING.md) - release publishing workflow
 - [Verify](install/VERIFY.md) - verifying downloaded artifacts
+- [Format Stability](release/FORMAT_STABILITY.md) - what previews promise about formats
 
 ## Release
 
@@ -47,6 +48,7 @@ The primary live release documents. Auditors and operators start here.
 - [GA Checklist](release/GA_CHECKLIST.md) - general-availability readiness
 - [Partner Proof](release/PARTNER_PROOF.md) - partner-facing proof of capability
 - [Risk Register](release/RISK_REGISTER.md) - tracked release risks
+- [Format Stability](release/FORMAT_STABILITY.md) - the v1 rule for Chio-owned formats, preview compatibility and open deprecation decisions
 - [Operations Runbook](release/OPERATIONS_RUNBOOK.md) - bounded-release operating procedures
 - [Observability](release/OBSERVABILITY.md) - metrics, logs, and alerting surface
 - [Compliance Evidence Export Plan](release/COMPLIANCE_EVIDENCE_EXPORT_PLAN.md)

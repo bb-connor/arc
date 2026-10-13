@@ -1281,7 +1281,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `.dst/harnesses.toml`: `02c022579994294816ab40683c211766ef131b18a6cd13c2c5692f91fd62f1a1`
 - `.kani/harnesses.toml`: `8884d5096d74290cd924005dbc4000ea7897e65532cd35d845bcf2081a23b089`
 - `.loom/harnesses.toml`: `07b7f087e6e7f484c16be0d7cd079def72dcc35e536e02bf241337fc915b562b`
-- `Cargo.lock`: `83c6cb7f2a00a2c4471dc85a943df8bdf735d106445db1804e2beae271040bc4`
+- `Cargo.lock`: `c0c24faadb741b25971a0922e22bdac2b3922a4101a590474c92378eaad535e4`
 - `Cargo.toml`: `8ca68537318bf69310e4549b78c530d7e4947e985d9a9352ccba1db59908e637`
 - `audits/evidence/mutants/chio-weights/2026-05-08.json`: `452aaf5734039a489967a629ec3c6b1b9d1351e06ec1f8e76c136ae389477ca7`
 - `audits/mutation/per-crate-configs/chio-anchor.toml`: `9d5a1f0e850ddadc3e621dd67282bb36460e13d3cb6e1af06a3fc03597af8ec3`

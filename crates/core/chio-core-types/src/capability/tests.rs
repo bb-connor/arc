@@ -579,7 +579,7 @@ fn chain_binding_disabled_does_not_reject_v1_tokens() {
 
 #[test]
 fn plain_delegated_token_without_attenuation_proof_verifies_and_skips_chain_binding() {
-    // Regression: a plain pass-through delegation that introduces no
+    // A plain pass-through delegation that introduces no
     // new attenuation must not trigger the chain-binding requirement.
     // The leaf token is signed by its issuer, each `DelegationLink`
     // carries its own signature, and the chain connectivity invariants
@@ -2939,19 +2939,15 @@ fn delegate_rejects_step_not_reflected_in_child() {
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
 
-/// attenuation correctness regression: a wildcard
-/// step TARGET must cover concrete child grants when checking that a declared
+/// Attenuation correctness: a wildcard step TARGET must cover concrete child grants when checking that a declared
 /// removal is reflected in the child.
 ///
 /// A `*:*` parent delegates a concrete `srv-a:tool-x` child while declaring
 /// `RemoveOperation { server_id: "*", tool_name: "*", operation: Invoke }`. The
 /// parent-side step check accepts this (the `*:*` parent grant holds Invoke),
 /// but the child still grants Invoke on the concrete tool, so the declared
-/// removal is NOT truly reflected. Before the fix the reflection check used a
-/// one-way matcher that only matched when the GRANT was wildcard, so the
-/// concrete child grant never matched the wildcard step target and the
-/// under-declared link was signed. With the child-side matcher the wildcard
-/// step target covers the concrete child grant and the link is rejected
+/// removal is NOT truly reflected. The child-side matcher lets the wildcard
+/// step target cover the concrete child grant, so the link is rejected
 /// fail-closed.
 #[cfg(feature = "delegation")]
 #[test]
@@ -2994,7 +2990,7 @@ fn delegate_rejects_wildcard_remove_operation_step_not_reflected_in_concrete_chi
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
 
-/// Companion to the regression above: a wildcard step TARGET that IS truly
+/// Companion to the case above: a wildcard step TARGET that IS truly
 /// reflected in the concrete child must be accepted. Here the parent `*:*` grant
 /// holds `ReadResult`, the step declares its wildcard removal, and the concrete
 /// child drops `ReadResult` (keeps Invoke), so the removal is genuinely
@@ -3043,7 +3039,7 @@ fn delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child()
     assert_eq!(receipt.link.attenuations.len(), 1);
 }
 
-/// Attenuation correctness regression: the mirror of the wildcard-step case. A
+/// Attenuation correctness: the mirror of the wildcard-step case. A
 /// CONCRETE step TARGET must cover a WILDCARD child grant
 /// when checking that a declared removal is reflected in the child.
 ///

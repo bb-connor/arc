@@ -58,8 +58,8 @@ was decided and shipped; it does not revise the original design rationale.
   b"chio.iroh.revocation-signer-endorsement.v1"` (`identity.rs:65`) built by
   `revocation_signer_endorsement_preimage` (`identity.rs:101`) - each committing
   to its tag plus `kernel_id` plus the endorsed field(s), so the two kinds are
-  non-cross-replayable. The peer-directory bundle schema was bumped to
-  `...peer-directory-bundle.v2` (`identity.rs:49`). The revocation-signer (oracle)
+  non-cross-replayable. The peer-directory bundle schema is
+  `...peer-directory-bundle.v1` (`identity.rs:38`). The revocation-signer (oracle)
   endorsement is IMPLEMENTED in-tree, not a future item.
 
 ## Context

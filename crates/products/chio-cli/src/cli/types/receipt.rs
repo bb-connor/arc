@@ -130,7 +130,6 @@ pub(crate) enum ReceiptCommands {
     /// only). Ed25519 signature verification is NOT performed: the CLI
     /// does not carry the org A / org B passport public keys, so the
     /// trace makes no cryptographic-verification claim.
-    /// `--explain-bilateral` is retained as an alias.
     Explain {
         /// Receipt ID. Use a sentinel (e.g. `bilateral`) when reading a
         /// bilateral artifact via `--input-file`; the receipt_id is
@@ -151,7 +150,7 @@ pub(crate) enum ReceiptCommands {
         /// verification. For real verification, use the kernel-resident
         /// `chio_federation::bilateral_dsse::verify_dsse_envelope`
         /// against pinned passport keys.
-        #[arg(long, alias = "explain-bilateral", default_value_t = false)]
+        #[arg(long, default_value_t = false)]
         inspect_bilateral: bool,
         /// Tenant read boundary for the explanation. The reading path fails
         /// closed when neither `--tenant` nor `--admin-all` is supplied.

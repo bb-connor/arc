@@ -15,7 +15,7 @@
 //! because that type binds `(kernel_id, passport public_key, https:// endpoint)`
 //! and has neither an iroh `EndpointId` field nor a per-entry
 //! passport-over-transport endorsement (ADR-0014 "Existing Transport Versus
-//! Iroh"). Option B (ADAPTER-SPEC section 5) requires both.
+//! Iroh"). The split-key binding (ADAPTER-SPEC section 5) requires both.
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -34,14 +34,8 @@ use crate::lanes::revocation::SignerBinding;
 use crate::lanes::revocation::VerifiedSignerDirectory;
 
 /// Schema pin for the adapter's issuer-signed transport-directory bundle.
-///
-/// Bumped to `v2` for the domain-separated endorsement preimages
-/// ([`transport_endorsement_preimage`], [`revocation_signer_endorsement_preimage`])
-/// and the additive [`TransportDirectoryEntry::revocation_signers`] binding. Both
-/// are pre-deployment wire-format changes (there is no v1 deployment to migrate),
-/// and the bump keeps the rollback / version story honest.
 pub const TRANSPORT_DIRECTORY_BUNDLE_SCHEMA: &str =
-    "chio.federation.transport.iroh.peer-directory-bundle.v2";
+    "chio.federation.transport.iroh.peer-directory-bundle.v1";
 
 /// Domain-separation context for the passport-over-transport endorsement. The
 /// passport signs [`transport_endorsement_preimage`] (this tag, the entry
@@ -106,7 +100,7 @@ pub fn revocation_signer_endorsement_preimage(
     buf
 }
 
-/// A single Option B binding: a long-term passport key cross-linked to a
+/// A single split-key binding: a long-term passport key cross-linked to a
 /// rotatable ed25519 transport `EndpointId` by a passport-signed endorsement.
 ///
 /// (ADAPTER-SPEC section 5: "the passport signing key stays the long-term
@@ -119,8 +113,8 @@ pub struct TransportDirectoryEntry {
     /// Operator identity string (`did:chio:...`) at the federation layer.
     pub kernel_id: String,
     /// Long-term operator passport key (any [`chio_core_types::SigningAlgorithm`]).
-    /// Retained as the algorithm-agnostic auth key; NOT collapsed into the
-    /// transport key (Option B is mandatory for non-Ed25519 passports).
+    /// The algorithm-agnostic auth key; NOT collapsed into the transport key,
+    /// which a non-Ed25519 passport cannot be.
     pub passport_public_key: PublicKey,
     /// Rotatable ed25519 transport `EndpointId` that iroh dials and authenticates.
     pub transport_endpoint_id: EndpointId,
@@ -130,19 +124,17 @@ pub struct TransportDirectoryEntry {
     /// identity, domain-separated so it can never be replayed as an oracle
     /// endorsement.
     pub passport_endorsement: Signature,
-    /// Additive per-entry oracle revocation-signer bindings (Option B for the
-    /// revocation lane). Each binds `signer_id -> oracle_public_key` to this
-    /// operator via a domain-separated passport endorsement; the transport origin
-    /// is this entry's `transport_endpoint_id`, so the origin pin is structural.
-    /// `#[serde(default)]` keeps a signer-less (v1-style) entry wire-compatible.
-    #[serde(default)]
+    /// Per-entry oracle revocation-signer bindings. Each binds
+    /// `signer_id -> oracle_public_key` to this operator via a domain-separated
+    /// passport endorsement; the transport origin is this entry's
+    /// `transport_endpoint_id`, so the origin pin is structural. An empty list
+    /// admits no signer for this operator.
     pub revocation_signers: Vec<RevocationSignerEntry>,
     /// Issuer-signed tombstone. A removed entry never resolves (fail-closed),
     /// mirroring `PeerDirectory::peer` rejecting `removed_peer_ids`. A removed
     /// entry also suppresses its `revocation_signers` from the derived signer
     /// directory, so evicting an operator revokes its oracle signer in the same
     /// bundle.
-    #[serde(default)]
     pub removed: bool,
 }
 
@@ -197,11 +189,9 @@ pub struct TransportDirectoryDocument {
     pub local_kernel_id: String,
     /// The per-operator transport bindings.
     pub peers: Vec<TransportDirectoryEntry>,
-    /// Additive per-treaty party sets (the treaty-membership substrate the
-    /// fan-out lane gates on). `#[serde(default)]` keeps a treaty-less directory
-    /// (the pre-existing shape) wire-compatible: a directory that binds no party
-    /// sets simply admits nobody to any treaty (fail-closed).
-    #[serde(default)]
+    /// Per-treaty party sets (the treaty-membership substrate the fan-out lane
+    /// gates on). A directory that binds no party sets admits nobody to any
+    /// treaty (fail-closed).
     pub treaties: Vec<TransportTreatyEntry>,
 }
 
@@ -546,7 +536,7 @@ impl TransportDirectoryBundleDocument {
     /// [`VerifiedDirectory`] the admission gate is constructed from.
     ///
     /// Checks, in order, all fail-closed (mirrors
-    /// `PeerDirectoryBundleDocument::verify` plus the Option B endorsements):
+    /// `PeerDirectoryBundleDocument::verify` plus the passport endorsements):
     /// 1. schema pins,
     /// 2. rollback gate: `version` strictly above the floor AND
     ///    `previous_version_sha256` chains onto the expected predecessor,
@@ -1301,7 +1291,7 @@ mod tests {
 
     #[test]
     fn transport_key_rotation_end_to_end() {
-        // Option B's premise: the passport is the long-term operator identity,
+        // Split-key premise: the passport is the long-term operator identity,
         // and the ed25519 transport EndpointId rotates INDEPENDENTLY of it. Alice
         // keeps the same passport (seed 1) across the rotation and swaps her
         // transport endpoint from E_old to E_new.
@@ -1445,9 +1435,8 @@ mod tests {
 
     #[test]
     fn signerless_bundle_yields_empty_signer_directory() {
-        // A v1-style entry (no revocation_signers) verifies and admits no signer,
-        // fail-closed: a deployment that has not provisioned oracle bindings simply
-        // has an empty signer directory.
+        // An entry with no revocation signers verifies and admits no signer
+        // (fail-closed).
         let (bundle, trust) = signed_bundle(&[EntrySpec::admitted("did:chio:a", 1, 10)]);
         let directory = bundle.verify_bundle(&trust).expect("verifies");
         assert!(directory.signer_directory().is_empty());
@@ -1455,9 +1444,7 @@ mod tests {
     }
 
     #[test]
-    fn revocation_signers_field_defaults_when_absent_on_the_wire() {
-        // Back-compat: a wire entry that predates the field (no `revocationSigners`
-        // key) deserializes with an empty vec via `#[serde(default)]`.
+    fn entry_without_revocation_signers_field_is_rejected() {
         let entry = build_entry(&EntrySpec::admitted("did:chio:a", 1, 10));
         let mut value = serde_json::to_value(&entry).unwrap();
         value
@@ -1465,9 +1452,21 @@ mod tests {
             .unwrap()
             .remove("revocationSigners")
             .expect("serialized entry carries the field");
-        let decoded: TransportDirectoryEntry = serde_json::from_value(value).unwrap();
-        assert!(decoded.revocation_signers.is_empty());
-        assert_eq!(decoded, entry);
+        assert!(serde_json::from_value::<TransportDirectoryEntry>(value).is_err());
+    }
+
+    #[test]
+    fn entry_without_removed_field_is_rejected() {
+        let entry = build_entry(&EntrySpec::admitted("did:chio:a", 1, 10));
+        let mut value = serde_json::to_value(&entry).unwrap();
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("removed")
+            .expect("serialized entry carries the field");
+        let error = serde_json::from_value::<TransportDirectoryEntry>(value)
+            .expect_err("entry without removed is refused");
+        assert_eq!(error.to_string(), "missing field `removed`");
     }
 
     #[test]
@@ -1653,20 +1652,12 @@ mod tests {
     }
 
     #[test]
-    fn directory_document_without_treaties_field_deserializes_back_compat() {
-        // A pre-existing directory document (no `treaties` key) still deserializes:
-        // the field is additive (`#[serde(default)]`), so an older bundle stays
-        // wire-compatible and simply admits nobody to any treaty (fail-closed).
+    fn directory_document_without_treaties_field_is_rejected() {
         let json = format!(
             r#"{{"schema":"{schema}","localKernelId":"did:chio:local","peers":[]}}"#,
             schema = TRANSPORT_DIRECTORY_BUNDLE_SCHEMA
         );
-        let doc: TransportDirectoryDocument =
-            serde_json::from_str(&json).expect("a treaty-less directory document deserializes");
-        assert!(
-            doc.treaties.is_empty(),
-            "an omitted treaties field defaults to empty"
-        );
+        assert!(serde_json::from_str::<TransportDirectoryDocument>(&json).is_err());
     }
 
     #[test]

@@ -316,9 +316,9 @@ fn chio_deny_reason_structured() {
 }
 
 #[test]
-fn chio_deny_reason_fallback_core_module() {
+fn core_module_nul_string_is_not_a_deny_reason() {
     // WAT module WITHOUT chio_deny_reason export.
-    // Has a NUL-terminated string at offset 65536 (core-module deny-reason ABI: "core-module reason\0").
+    // A NUL-terminated string at offset 65536 is ignored: the deny verdict stands and carries no reason.
     let wat = r#"
             (module
                 (import "chio" "log" (func $log (param i32 i32 i32)))
@@ -340,11 +340,7 @@ fn chio_deny_reason_fallback_core_module() {
     let result = backend.evaluate(&req).unwrap();
     match &result {
         GuardVerdict::Deny { reason } => {
-            assert_eq!(
-                reason.as_deref(),
-                Some("core-module reason"),
-                "expected core-module deny reason from offset 64K"
-            );
+            assert_eq!(*reason, None, "no chio_deny_reason export means no reason");
         }
         _ => panic!("expected Deny verdict, got: {result:?}"),
     }
@@ -562,7 +558,6 @@ fn memory_growth_within_limit_works() {
 #[test]
 fn deny_no_reason_at_all() {
     // WAT module without chio_deny_reason and no string at offset 64K.
-    // Memory is zeroed so read_deny_reason will find a NUL at position 0.
     let wat = r#"
             (module
                 (import "chio" "log" (func $log (param i32 i32 i32)))

@@ -1,4 +1,4 @@
-//! Cosign-bundle gating regression under all `crypto_floor` settings.
+//! Cosign-bundle gating under all `crypto_floor` settings.
 //!
 //! Hybrid signing on receipts, capability tokens, and the session
 //! compliance certificate must not affect this path. The cosign bundle
@@ -20,7 +20,7 @@ use chio_guard_registry::{
 };
 
 /// Mirror of the kernel-side `KernelCryptoFloor` enum, defined locally so
-/// the regression test is self-contained (chio-guard-registry has no
+/// the test is self-contained (chio-guard-registry has no
 /// dependency on chio-kernel and must not gain one).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CryptoFloorScenario {
@@ -46,7 +46,7 @@ const ALL_FLOORS: [CryptoFloorScenario; 3] = [
 ];
 
 /// Mock verifier that reports a successful cosign-bundle verification
-/// regardless of input. The cosign verifier is the surface T6 protects;
+/// regardless of input. The cosign verifier is the surface under test;
 /// `chio-attest-verify::SigstoreVerifier` is exercised by the rest of
 /// `tests/cosign_verify_paths.rs` and is not re-tested here.
 struct AlwaysOkBundleVerifier;

@@ -214,16 +214,15 @@ fn passport_with_trust_tier_roundtrips_through_serde() {
 }
 
 #[test]
-fn passport_without_trust_tier_on_wire_still_deserializes() {
+fn passport_without_trust_tier_on_wire_decodes_as_none() {
     let passport = sample_passport(5, 6);
     let mut json_value: serde_json::Value =
         serde_json::to_value(&passport).expect("serialize passport");
-    // Simulate a pre-20.1 passport: strip the field entirely.
     if let Some(object) = json_value.as_object_mut() {
         object.remove("trustTier");
     }
     let decoded: AgentPassport =
-        serde_json::from_value(json_value).expect("deserialize legacy passport");
+        serde_json::from_value(json_value).expect("deserialize passport without trust tier");
     assert!(decoded.trust_tier.is_none());
     assert_eq!(decoded.subject, passport.subject);
 }

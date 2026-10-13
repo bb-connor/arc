@@ -111,7 +111,7 @@ pub struct TrustServiceConfig {
     /// lowering it here actually tightens that guard rather than being silently
     /// overridden by the compiled-in default.
     pub memory_budget: chio_kernel::MemoryBudgetConfig,
-    /// Cognition-market authority roster (plan D9). `None` keeps every
+    /// Cognition-market authority roster. `None` keeps every
     /// finding surface at 409; the field exists only under the ship-dark
     /// feature.
     pub finding_market: Option<super::finding_market_config::FindingMarketConfig>,

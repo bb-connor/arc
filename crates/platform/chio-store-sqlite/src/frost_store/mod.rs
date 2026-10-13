@@ -24,7 +24,7 @@ mod signer;
 use schema::FROST_STORE_SCHEMA;
 
 const FROST_STORE_SCHEMA_KEY: &str = "frost";
-pub(crate) const FROST_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+pub(crate) const FROST_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const FROST_STORE_SCHEMA_ANCHORS: &[&str] = &[
     "frost_ceremonies",
     "chio_serving_owner",
@@ -484,25 +484,27 @@ impl SqliteFrostStore {
 }
 
 pub(crate) fn initialize_frost_schema(connection: &mut Connection) -> Result<(), FrostStoreError> {
-    crate::check_schema_version(
-        connection,
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(sqlite_error)?;
+    let state = crate::check_current_schema(
+        &transaction,
         FROST_STORE_SCHEMA_KEY,
         FROST_STORE_SUPPORTED_SCHEMA_VERSION,
         FROST_STORE_SCHEMA_ANCHORS,
     )
     .map_err(|error| FrostStoreError::InvalidState(error.to_string()))?;
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(FROST_STORE_SCHEMA)
-        .map_err(sqlite_error)?;
-    crate::stamp_schema_version(
-        &transaction,
-        FROST_STORE_SCHEMA_KEY,
-        FROST_STORE_SUPPORTED_SCHEMA_VERSION,
-    )
-    .map_err(|error| FrostStoreError::InvalidState(error.to_string()))?;
+    if state == crate::SchemaState::Unstamped {
+        transaction
+            .execute_batch(FROST_STORE_SCHEMA)
+            .map_err(sqlite_error)?;
+        crate::stamp_schema_version(
+            &transaction,
+            FROST_STORE_SCHEMA_KEY,
+            FROST_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| FrostStoreError::InvalidState(error.to_string()))?;
+    }
     verify_frost_store_invariants(&transaction)?;
     transaction.commit().map_err(sqlite_error)
 }
@@ -586,3 +588,36 @@ pub(super) fn secret_kind_name(secret: &FrostCeremonySecret) -> &'static str {
     reason = "Test and proof fixtures deliberately fail on violated setup invariants."
 )]
 mod connection_recovery;
+
+#[cfg(test)]
+mod schema_tests {
+    use rusqlite::Connection;
+
+    use super::{initialize_frost_schema, FROST_STORE_SCHEMA_KEY};
+
+    #[test]
+    fn obsolete_frost_schema_is_refused_without_rewriting() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let mut connection = Connection::open_in_memory()?;
+        initialize_frost_schema(&mut connection)?;
+        crate::stamp_schema_version(&connection, FROST_STORE_SCHEMA_KEY, 0)?;
+        let error = initialize_frost_schema(&mut connection)
+            .err()
+            .ok_or("an obsolete frost schema opened")?;
+        assert_eq!(
+            error.to_string(),
+            super::FrostStoreError::InvalidState(
+                "database schema version 0 is not the current schema version 1; refusing to open"
+                    .to_string()
+            )
+            .to_string()
+        );
+        let version: i32 = connection.query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key = ?1",
+            [FROST_STORE_SCHEMA_KEY],
+            |row| row.get(0),
+        )?;
+        assert_eq!(version, 0);
+        Ok(())
+    }
+}

@@ -1,6 +1,6 @@
 //! `chio.finding.challenge-verifier-profile.v1`: the reusable,
 //! governance-signed trust profile every recipe commits before a Finding
-//! is authored (ARCHITECTURE F1 prerequisite).
+//! is authored.
 //!
 //! The profile carries role and trust policy ONLY. It has no field that
 //! could name a Finding, recipe, listing, report, or backing: a
