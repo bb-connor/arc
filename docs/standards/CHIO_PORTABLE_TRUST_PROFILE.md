@@ -206,7 +206,7 @@ The profile does not cover:
   Chio has an explicit mapping contract, and must not raise normalized
   assurance above raw `attested` before explicit `trusted_verifiers` policy is
   applied
-- Chio now also defines one bounded verifier-metadata layer over that appraisal
+- Chio defines one bounded verifier-metadata layer over that appraisal
   boundary:
   one signed `chio.runtime-attestation.verifier-descriptor.v1`,
   one signed `chio.runtime-attestation.reference-values.v1`,
@@ -223,18 +223,17 @@ The profile does not cover:
 - `trusted_verifiers` rules may additionally constrain verifier family and a
   bounded set of normalized assertion/value pairs; this profile does not
   standardize vendor claim vocabularies beyond those explicit Chio rule fields
-- Chio now also defines one bounded cross-issuer composition layer over
+- Chio defines one bounded cross-issuer composition layer over
   existing passport artifacts:
   one `chio.cross-issuer-portfolio.v1`,
-  one signed `chio.cross-issuer-trust-pack.v1`,
+  one signed `chio.financial.cross-issuer-trust-pack.v1`,
   and one signed `chio.cross-issuer-migration.v1`
 - cross-issuer migration remains explicit and time-bounded; consumers must not
   infer subject continuity from overlapping display claims, issuer names, or
   discovery metadata alone
-- trust packs may activate issuers, profile families, entry kinds,
-  certification references, migration ids, and active-lifecycle requirements,
-  but they must not manufacture a universal cross-issuer trust score
-- Chio now also defines one bounded public discovery layer over those issuer
+- trust packs may activate issuers, credential families, profile families,
+  source kinds, and certification references, but they must not manufacture a universal cross-issuer trust score
+- Chio defines one bounded public discovery layer over those issuer
   and verifier surfaces:
   one signed `chio.public-issuer-discovery.v1`,
   one signed `chio.public-verifier-discovery.v1`,
@@ -245,7 +244,7 @@ The profile does not cover:
 - stale, unsigned, malformed, contradictory, or incomplete public discovery
   artifacts must fail closed and must not be treated as local trust-admission
   signals
-- Chio now also defines one bounded public identity-network overlay over those
+- Chio defines one bounded public identity-network overlay over those
   existing passport, projected credential, discovery, and verifier surfaces:
   one `chio.public-identity-profile.v1`,
   one `chio.public-wallet-directory-entry.v1`,

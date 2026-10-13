@@ -17,10 +17,10 @@ fn decision(
     signer: &Keypair,
     verifier_id: &str,
     signer_key_epoch: u64,
-) -> TestResult<SignedEntryActivationDecisionV2> {
-    Ok(sign_entry_activation_decision_v2(
+) -> TestResult<SignedEntryActivationDecision> {
+    Ok(sign_entry_activation_decision(
         signer,
-        EntryActivationDecisionInputV2 {
+        EntryActivationDecisionInput {
             pack_id: "pack-1".to_string(),
             verifier_id: verifier_id.to_string(),
             signer_key_id: "verifier-key".to_string(),
@@ -29,7 +29,7 @@ fn decision(
             source_passport_id: digest(1),
             source_manifest_digest: digest(2),
             presentation_digest: digest(3),
-            credential_bindings: vec![EntryActivationCredentialBindingV2 {
+            credential_bindings: vec![EntryActivationCredentialBinding {
                 credential_id: digest(4),
                 family: FinancialCredentialFamilyV1::PremiumHistory,
                 envelope_digest: digest(5),
@@ -41,7 +41,7 @@ fn decision(
             lifecycle_evidence_digest: digest(6),
             lifecycle_pin_digest: digest(7),
             migration_envelope_digests: Vec::new(),
-            decision: EntryActivationDispositionV2::Activate,
+            decision: EntryActivationDisposition::Activate,
             reason: "locally admitted".to_string(),
             decided_at: NOW,
         },
@@ -52,18 +52,18 @@ fn verifier_registry(
     verifier: &Keypair,
     verifier_id: &str,
     epoch: u64,
-    status: TrustedKeyStatusV2,
-) -> TestResult<CrossIssuerTrustRegistryV2> {
-    Ok(CrossIssuerTrustRegistryV2::new(
-        CrossIssuerTrustRegistryConfigV2 {
-            verifier_keys: vec![VerifierTrustKeyV2 {
+    status: TrustedKeyStatus,
+) -> TestResult<CrossIssuerTrustRegistry> {
+    Ok(CrossIssuerTrustRegistry::new(
+        CrossIssuerTrustRegistryConfig {
+            verifier_keys: vec![VerifierTrustKey {
                 verifier_id: verifier_id.to_string(),
                 signer_key_id: "verifier-key".to_string(),
                 signer_key_epoch: epoch,
                 public_key: verifier.public_key(),
                 status,
             }],
-            ..CrossIssuerTrustRegistryConfigV2::default()
+            ..CrossIssuerTrustRegistryConfig::default()
         },
     )?)
 }
@@ -72,17 +72,17 @@ fn pack(
     signer: &Keypair,
     verifier_id: &str,
     epoch: u64,
-) -> TestResult<SignedCrossIssuerTrustPackV2> {
-    Ok(sign_cross_issuer_trust_pack_v2(
+) -> TestResult<SignedFinancialCrossIssuerTrustPack> {
+    Ok(sign_financial_cross_issuer_trust_pack(
         signer,
-        CrossIssuerTrustPackInputV2 {
+        FinancialCrossIssuerTrustPackInput {
             pack_id: "pack-1".to_string(),
             verifier_id: verifier_id.to_string(),
             signer_key_id: "verifier-key".to_string(),
             signer_key_epoch: epoch,
             created_at: NOW - 10,
             expires_at: NOW + 100,
-            policy: CrossIssuerTrustPackPolicyV2::default(),
+            policy: FinancialCrossIssuerTrustPackPolicy::default(),
             decisions: vec![decision(signer, verifier_id, epoch)?],
         },
     )?)
@@ -92,11 +92,11 @@ fn pack(
 fn self_consistent_unregistered_trust_pack_never_roots_authority() -> TestResult {
     let trusted = Keypair::from_seed(&[62; 32]);
     let attacker = Keypair::from_seed(&[63; 32]);
-    let registry = verifier_registry(&trusted, "verifier-a", 4, TrustedKeyStatusV2::Active)?;
+    let registry = verifier_registry(&trusted, "verifier-a", 4, TrustedKeyStatus::Active)?;
     let attacker_pack = pack(&attacker, "verifier-a", 4)?;
 
     assert!(matches!(
-        verify_signed_cross_issuer_trust_pack_v2(&attacker_pack, &registry, NOW),
+        verify_financial_cross_issuer_trust_pack(&attacker_pack, &registry, NOW),
         Err(CredentialError::FinancialAuthority(reason))
             if reason.contains("trusted verifier key")
     ));
@@ -107,18 +107,18 @@ fn self_consistent_unregistered_trust_pack_never_roots_authority() -> TestResult
 fn unknown_or_inactive_verifier_epoch_is_rejected() -> TestResult {
     let verifier = Keypair::from_seed(&[64; 32]);
     let signed = pack(&verifier, "verifier-a", 5)?;
-    let unknown = verifier_registry(&verifier, "verifier-a", 4, TrustedKeyStatusV2::Active)?;
-    let inactive = verifier_registry(&verifier, "verifier-a", 5, TrustedKeyStatusV2::Inactive)?;
+    let unknown = verifier_registry(&verifier, "verifier-a", 4, TrustedKeyStatus::Active)?;
+    let inactive = verifier_registry(&verifier, "verifier-a", 5, TrustedKeyStatus::Inactive)?;
 
     for registry in [&unknown, &inactive] {
         assert!(matches!(
-            verify_signed_cross_issuer_trust_pack_v2(&signed, registry, NOW),
+            verify_financial_cross_issuer_trust_pack(&signed, registry, NOW),
             Err(CredentialError::FinancialAuthority(_))
         ));
     }
-    let active = verifier_registry(&verifier, "verifier-a", 5, TrustedKeyStatusV2::Active)?;
+    let active = verifier_registry(&verifier, "verifier-a", 5, TrustedKeyStatus::Active)?;
     assert!(
-        verify_signed_cross_issuer_trust_pack_v2(&signed, &active, signed.body.expires_at,)
+        verify_financial_cross_issuer_trust_pack(&signed, &active, signed.body.expires_at,)
             .is_err()
     );
     Ok(())
@@ -129,15 +129,15 @@ fn manifest_authority_resolves_independently_to_one_active_local_key() -> TestRe
     let issuer = Keypair::from_seed(&[74; 32]);
     let issuer_did = did(&issuer)?;
     let verification_method = DidChio::from_str(&issuer_did)?.verification_method_id();
-    let registry = CrossIssuerTrustRegistryV2::new(CrossIssuerTrustRegistryConfigV2 {
-        issuer_keys: vec![IssuerTrustKeyV2 {
+    let registry = CrossIssuerTrustRegistry::new(CrossIssuerTrustRegistryConfig {
+        issuer_keys: vec![IssuerTrustKey {
             issuer_did: issuer_did.clone(),
             verification_method: verification_method.clone(),
             key_epoch: 9,
             public_key: issuer.public_key(),
-            status: TrustedKeyStatusV2::Active,
+            status: TrustedKeyStatus::Active,
         }],
-        ..CrossIssuerTrustRegistryConfigV2::default()
+        ..CrossIssuerTrustRegistryConfig::default()
     })?;
 
     assert_eq!(
@@ -150,24 +150,24 @@ fn manifest_authority_resolves_independently_to_one_active_local_key() -> TestRe
         .manifest_issuer_key(&issuer_did, &Keypair::from_seed(&[75; 32]).public_key())
         .is_err());
 
-    let ambiguous = CrossIssuerTrustRegistryV2::new(CrossIssuerTrustRegistryConfigV2 {
+    let ambiguous = CrossIssuerTrustRegistry::new(CrossIssuerTrustRegistryConfig {
         issuer_keys: vec![
-            IssuerTrustKeyV2 {
+            IssuerTrustKey {
                 issuer_did: issuer_did.clone(),
                 verification_method: verification_method.clone(),
                 key_epoch: 9,
                 public_key: issuer.public_key(),
-                status: TrustedKeyStatusV2::Active,
+                status: TrustedKeyStatus::Active,
             },
-            IssuerTrustKeyV2 {
+            IssuerTrustKey {
                 issuer_did: issuer_did.clone(),
                 verification_method,
                 key_epoch: 10,
                 public_key: issuer.public_key(),
-                status: TrustedKeyStatusV2::Active,
+                status: TrustedKeyStatus::Active,
             },
         ],
-        ..CrossIssuerTrustRegistryConfigV2::default()
+        ..CrossIssuerTrustRegistryConfig::default()
     })?;
     assert!(ambiguous
         .manifest_issuer_key(&issuer_did, &issuer.public_key())
@@ -191,16 +191,16 @@ impl chio_security_types::clock::Clock for FixedClock {
 }
 
 struct ResolverFixture {
-    checkpoint: RefCell<Option<SignedIssuerLifecycleCheckpointV2>>,
-    result: RefCell<Option<SignedCrossIssuerLifecycleResultV2>>,
+    checkpoint: RefCell<Option<SignedIssuerLifecycleCheckpoint>>,
+    result: RefCell<Option<SignedCrossIssuerLifecycleResult>>,
     unavailable: RefCell<bool>,
 }
 
 impl ResolverFixture {
     fn set(
         &self,
-        checkpoint: SignedIssuerLifecycleCheckpointV2,
-        result: SignedCrossIssuerLifecycleResultV2,
+        checkpoint: SignedIssuerLifecycleCheckpoint,
+        result: SignedCrossIssuerLifecycleResult,
     ) {
         *self.checkpoint.borrow_mut() = Some(checkpoint);
         *self.result.borrow_mut() = Some(result);
@@ -213,7 +213,7 @@ impl CrossIssuerLifecycleResolver for ResolverFixture {
         _resolver_identity: &str,
         _issuer_did: &str,
         _now: u64,
-    ) -> Result<SignedIssuerLifecycleCheckpointV2, FinancialAuthorityAvailabilityError> {
+    ) -> Result<SignedIssuerLifecycleCheckpoint, FinancialAuthorityAvailabilityError> {
         if *self.unavailable.borrow() {
             return Err(FinancialAuthorityAvailabilityError::Unavailable);
         }
@@ -229,7 +229,7 @@ impl CrossIssuerLifecycleResolver for ResolverFixture {
         _issuer_did: &str,
         _source_passport_id: &str,
         _now: u64,
-    ) -> Result<SignedCrossIssuerLifecycleResultV2, FinancialAuthorityAvailabilityError> {
+    ) -> Result<SignedCrossIssuerLifecycleResult, FinancialAuthorityAvailabilityError> {
         if *self.unavailable.borrow() {
             return Err(FinancialAuthorityAvailabilityError::Unavailable);
         }
@@ -244,15 +244,15 @@ struct GenerationAnchorFixture {
     signer: Keypair,
     anchor_id: String,
     key_epoch: u64,
-    current: RefCell<Option<SignedIssuerLifecycleGenerationPinV2>>,
+    current: RefCell<Option<SignedIssuerLifecycleGenerationPin>>,
     unavailable: RefCell<bool>,
 }
 
 impl CrossIssuerLifecycleGenerationAnchor for GenerationAnchorFixture {
     fn compare_and_swap(
         &self,
-        checkpoint: &SignedIssuerLifecycleCheckpointV2,
-    ) -> Result<SignedIssuerLifecycleGenerationPinV2, FinancialAuthorityAvailabilityError> {
+        checkpoint: &SignedIssuerLifecycleCheckpoint,
+    ) -> Result<SignedIssuerLifecycleGenerationPin, FinancialAuthorityAvailabilityError> {
         if *self.unavailable.borrow() {
             return Err(FinancialAuthorityAvailabilityError::Unavailable);
         }
@@ -270,7 +270,7 @@ impl CrossIssuerLifecycleGenerationAnchor for GenerationAnchorFixture {
                 return Ok(previous.clone());
             }
         }
-        let pin = sign_issuer_lifecycle_generation_pin_v2(
+        let pin = sign_issuer_lifecycle_generation_pin(
             &self.signer,
             &self.anchor_id,
             self.key_epoch,
@@ -287,15 +287,15 @@ struct HighWaterFixture {
     signer: Keypair,
     store_id: String,
     key_epoch: u64,
-    current: RefCell<Option<SignedLifecycleCheckpointPinV2>>,
+    current: RefCell<Option<SignedLifecycleCheckpointPin>>,
     unavailable: RefCell<bool>,
 }
 
 impl CrossIssuerLifecycleHighWaterStore for HighWaterFixture {
     fn compare_and_swap(
         &self,
-        candidate: &LifecycleCheckpointPinCandidateV2,
-    ) -> Result<SignedLifecycleCheckpointPinV2, FinancialAuthorityAvailabilityError> {
+        candidate: &LifecycleCheckpointPinCandidate,
+    ) -> Result<SignedLifecycleCheckpointPin, FinancialAuthorityAvailabilityError> {
         if *self.unavailable.borrow() {
             return Err(FinancialAuthorityAvailabilityError::Unavailable);
         }
@@ -317,7 +317,7 @@ impl CrossIssuerLifecycleHighWaterStore for HighWaterFixture {
                 return Ok(previous.clone());
             }
         }
-        let pin = sign_lifecycle_checkpoint_pin_v2(
+        let pin = sign_lifecycle_checkpoint_pin(
             &self.signer,
             &self.store_id,
             self.key_epoch,
@@ -338,7 +338,7 @@ struct LifecycleFixture {
     resolver: ResolverFixture,
     generation_anchor: GenerationAnchorFixture,
     high_water: HighWaterFixture,
-    trust: CrossIssuerTrustRegistryV2,
+    trust: CrossIssuerTrustRegistry,
 }
 
 impl LifecycleFixture {
@@ -348,34 +348,34 @@ impl LifecycleFixture {
         let anchor_key = Keypair::from_seed(&[67; 32]);
         let high_water_key = Keypair::from_seed(&[68; 32]);
         let issuer_did = did(&issuer)?;
-        let trust = CrossIssuerTrustRegistryV2::new(CrossIssuerTrustRegistryConfigV2 {
-            issuer_keys: vec![IssuerTrustKeyV2 {
+        let trust = CrossIssuerTrustRegistry::new(CrossIssuerTrustRegistryConfig {
+            issuer_keys: vec![IssuerTrustKey {
                 issuer_did: issuer_did.clone(),
                 verification_method: DidChio::from_str(&issuer_did)?.verification_method_id(),
                 key_epoch: 3,
                 public_key: issuer.public_key(),
-                status: TrustedKeyStatusV2::Active,
+                status: TrustedKeyStatus::Active,
             }],
-            lifecycle_resolver_keys: vec![LifecycleResolverTrustKeyV2 {
+            lifecycle_resolver_keys: vec![LifecycleResolverTrustKey {
                 resolver_identity: "resolver-a".to_string(),
                 signer_key_id: "resolver-key".to_string(),
                 signer_key_epoch: 2,
                 public_key: resolver_key.public_key(),
-                status: TrustedKeyStatusV2::Active,
+                status: TrustedKeyStatus::Active,
             }],
-            lifecycle_generation_anchor_keys: vec![LifecycleGenerationAnchorTrustKeyV2 {
+            lifecycle_generation_anchor_keys: vec![LifecycleGenerationAnchorTrustKey {
                 anchor_id: "anchor-a".to_string(),
                 signer_key_epoch: 4,
                 public_key: anchor_key.public_key(),
-                status: TrustedKeyStatusV2::Active,
+                status: TrustedKeyStatus::Active,
             }],
-            lifecycle_high_water_keys: vec![LifecycleHighWaterTrustKeyV2 {
+            lifecycle_high_water_keys: vec![LifecycleHighWaterTrustKey {
                 store_id: "high-water-a".to_string(),
                 signer_key_epoch: 5,
                 public_key: high_water_key.public_key(),
-                status: TrustedKeyStatusV2::Active,
+                status: TrustedKeyStatus::Active,
             }],
-            ..CrossIssuerTrustRegistryConfigV2::default()
+            ..CrossIssuerTrustRegistryConfig::default()
         })?;
         Ok(Self {
             resolver_key: resolver_key.clone(),
@@ -409,12 +409,12 @@ impl LifecycleFixture {
         &self,
         generation: u64,
         version: u64,
-        status: CrossIssuerLifecycleStatusV2,
+        status: CrossIssuerLifecycleStatus,
         predecessor_checkpoint_digest: Option<String>,
     ) -> TestResult {
-        let snapshot = sign_single_passport_lifecycle_snapshot_v2(
+        let snapshot = sign_single_passport_lifecycle_snapshot(
             &self.resolver_key,
-            SinglePassportLifecycleSnapshotInputV2 {
+            SinglePassportLifecycleSnapshotInput {
                 resolver_identity: "resolver-a".to_string(),
                 signer_key_id: "resolver-key".to_string(),
                 signer_key_epoch: 2,
@@ -433,8 +433,8 @@ impl LifecycleFixture {
         Ok(())
     }
 
-    fn resolve(&self) -> Result<VerifiedCrossIssuerLifecycleV2, CredentialError> {
-        resolve_cross_issuer_lifecycle_v2(
+    fn resolve(&self) -> Result<VerifiedCrossIssuerLifecycle, CredentialError> {
+        resolve_cross_issuer_lifecycle(
             "resolver-a",
             &self.issuer_did,
             &self.source_passport_id,
@@ -453,7 +453,7 @@ fn verified_financial_set_fixture() -> TestResult<VerifiedFinancialCredentialSet
         source_passport_id: digest(1),
         source_manifest_digest: digest(2),
         presentation_digest: digest(3),
-        credentials: vec![VerifiedFinancialCredentialBindingV2 {
+        credentials: vec![VerifiedFinancialCredentialBinding {
             credential_id: digest(4),
             family: FinancialCredentialFamilyV1::PremiumHistory,
             issuer: did(&Keypair::from_seed(&[61; 32]))?,
@@ -544,7 +544,7 @@ fn policy_resolution_pins_exact_pointer_generation_scope_and_time() -> TestResul
 #[test]
 fn revocation_is_pinned_before_denial_and_stale_active_cannot_reopen() -> TestResult {
     let fixture = LifecycleFixture::new()?;
-    fixture.set_status(1, 10, CrossIssuerLifecycleStatusV2::Active, None)?;
+    fixture.set_status(1, 10, CrossIssuerLifecycleStatus::Active, None)?;
     fixture.resolve()?;
     let predecessor = fixture
         .generation_anchor
@@ -552,7 +552,7 @@ fn revocation_is_pinned_before_denial_and_stale_active_cannot_reopen() -> TestRe
         .borrow()
         .as_ref()
         .map(|pin| pin.body.checkpoint_digest.clone());
-    fixture.set_status(2, 11, CrossIssuerLifecycleStatusV2::Revoked, predecessor)?;
+    fixture.set_status(2, 11, CrossIssuerLifecycleStatus::Revoked, predecessor)?;
     assert!(matches!(
         fixture.resolve(),
         Err(CredentialError::FinancialAuthority(reason)) if reason.contains("not active")
@@ -564,9 +564,9 @@ fn revocation_is_pinned_before_denial_and_stale_active_cannot_reopen() -> TestRe
             .borrow()
             .as_ref()
             .map(|pin| pin.body.status),
-        Some(CrossIssuerLifecycleStatusV2::Revoked)
+        Some(CrossIssuerLifecycleStatus::Revoked)
     );
-    fixture.set_status(1, 10, CrossIssuerLifecycleStatusV2::Active, None)?;
+    fixture.set_status(1, 10, CrossIssuerLifecycleStatus::Active, None)?;
     assert!(matches!(
         fixture.resolve(),
         Err(CredentialError::FinancialAuthority(reason)) if reason.contains("generation anchor")
@@ -577,11 +577,11 @@ fn revocation_is_pinned_before_denial_and_stale_active_cannot_reopen() -> TestRe
 #[test]
 fn generation_rollback_and_same_generation_conflict_deny_before_lookup() -> TestResult {
     let fixture = LifecycleFixture::new()?;
-    fixture.set_status(2, 10, CrossIssuerLifecycleStatusV2::Active, None)?;
+    fixture.set_status(2, 10, CrossIssuerLifecycleStatus::Active, None)?;
     fixture.resolve()?;
-    fixture.set_status(1, 11, CrossIssuerLifecycleStatusV2::Active, None)?;
+    fixture.set_status(1, 11, CrossIssuerLifecycleStatus::Active, None)?;
     assert!(fixture.resolve().is_err());
-    fixture.set_status(2, 12, CrossIssuerLifecycleStatusV2::Active, None)?;
+    fixture.set_status(2, 12, CrossIssuerLifecycleStatus::Active, None)?;
     assert!(fixture.resolve().is_err());
     Ok(())
 }
@@ -589,7 +589,7 @@ fn generation_rollback_and_same_generation_conflict_deny_before_lookup() -> Test
 #[test]
 fn resolver_and_high_water_outage_fail_closed() -> TestResult {
     let fixture = LifecycleFixture::new()?;
-    fixture.set_status(1, 10, CrossIssuerLifecycleStatusV2::Active, None)?;
+    fixture.set_status(1, 10, CrossIssuerLifecycleStatus::Active, None)?;
     *fixture.resolver.unavailable.borrow_mut() = true;
     assert!(fixture.resolve().is_err());
     *fixture.resolver.unavailable.borrow_mut() = false;
@@ -603,27 +603,27 @@ fn migration_envelope_substitution_is_rejected() -> TestResult {
     let attester = Keypair::from_seed(&[69; 32]);
     let verifier = Keypair::from_seed(&[70; 32]);
     let verifier_id = "verifier-a";
-    let registry = CrossIssuerTrustRegistryV2::new(CrossIssuerTrustRegistryConfigV2 {
-        verifier_keys: verifier_registry(&verifier, verifier_id, 4, TrustedKeyStatusV2::Active)?
+    let registry = CrossIssuerTrustRegistry::new(CrossIssuerTrustRegistryConfig {
+        verifier_keys: verifier_registry(&verifier, verifier_id, 4, TrustedKeyStatus::Active)?
             .verifier_keys(),
-        migration_attester_keys: vec![MigrationAttesterTrustKeyV2 {
+        migration_attester_keys: vec![MigrationAttesterTrustKey {
             attester_id: "attester-a".to_string(),
             signer_key_id: "migration-key".to_string(),
             signer_key_epoch: 9,
             public_key: attester.public_key(),
-            status: TrustedKeyStatusV2::Active,
+            status: TrustedKeyStatus::Active,
         }],
-        activation_metadata: vec![IssuerActivationMetadataV2 {
+        activation_metadata: vec![IssuerActivationMetadata {
             issuer_did: did(&Keypair::from_seed(&[61; 32]))?,
             profile_family: "financial".to_string(),
             source_kind: CrossIssuerPortfolioEntryKind::Imported,
             certification_refs: vec!["cert-1".to_string()],
         }],
-        ..CrossIssuerTrustRegistryConfigV2::default()
+        ..CrossIssuerTrustRegistryConfig::default()
     })?;
-    let migration_a = sign_cross_issuer_migration_v2(
+    let migration_a = sign_financial_cross_issuer_migration(
         &attester,
-        CrossIssuerMigrationInputV2 {
+        FinancialCrossIssuerMigrationInput {
             migration_id: "migration-a".to_string(),
             attester_id: "attester-a".to_string(),
             signer_key_id: "migration-key".to_string(),
@@ -639,9 +639,9 @@ fn migration_envelope_substitution_is_rejected() -> TestResult {
             expires_at: Some(NOW + 100),
         },
     )?;
-    let migration_b = sign_cross_issuer_migration_v2(
+    let migration_b = sign_financial_cross_issuer_migration(
         &attester,
-        CrossIssuerMigrationInputV2 {
+        FinancialCrossIssuerMigrationInput {
             migration_id: "migration-b".to_string(),
             ..migration_a.body.clone().into_input()
         },
@@ -649,23 +649,23 @@ fn migration_envelope_substitution_is_rejected() -> TestResult {
     let mut activation = decision(&verifier, verifier_id, 4)?;
     activation.body.migration_envelope_digests = vec![signed_envelope_digest(&migration_a)?];
     activation =
-        sign_entry_activation_decision_v2(&verifier, activation.body.clone().into_input())?;
-    let signed_pack = sign_cross_issuer_trust_pack_v2(
+        sign_entry_activation_decision(&verifier, activation.body.clone().into_input())?;
+    let signed_pack = sign_financial_cross_issuer_trust_pack(
         &verifier,
-        CrossIssuerTrustPackInputV2 {
+        FinancialCrossIssuerTrustPackInput {
             pack_id: "pack-1".to_string(),
             verifier_id: verifier_id.to_string(),
             signer_key_id: "verifier-key".to_string(),
             signer_key_epoch: 4,
             created_at: NOW - 10,
             expires_at: NOW + 100,
-            policy: CrossIssuerTrustPackPolicyV2::default(),
+            policy: FinancialCrossIssuerTrustPackPolicy::default(),
             decisions: vec![activation.clone()],
         },
     )?;
 
     assert!(matches!(
-        verify_entry_activation_decision_v2(
+        verify_entry_activation_decision(
             &signed_pack,
             &activation,
             &verified_financial_set_fixture()?,
@@ -677,12 +677,4 @@ fn migration_envelope_substitution_is_rejected() -> TestResult {
             if reason.contains("migration")
     ));
     Ok(())
-}
-
-#[test]
-fn v1_production_activation_is_unconditionally_unsupported() {
-    assert!(matches!(
-        reject_legacy_cross_issuer_v1_activation(),
-        Err(CredentialError::UnsupportedLegacyCrossIssuerV1)
-    ));
 }

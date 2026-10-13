@@ -4507,7 +4507,7 @@ Chio issues these portable-trust schema identifiers:
 | Presentation challenge | `chio.agent-passport-presentation-challenge.v1` |
 | Presentation response | `chio.agent-passport-presentation-response.v1` |
 | Cross-issuer portfolio | `chio.cross-issuer-portfolio.v1` |
-| Cross-issuer trust pack | `chio.cross-issuer-trust-pack.v1` |
+| Cross-issuer trust pack | `chio.financial.cross-issuer-trust-pack.v1` |
 | Cross-issuer migration | `chio.cross-issuer-migration.v1` |
 
 The current shipped semantics are:

@@ -1,15 +1,9 @@
-//! Proptest invariants for the Agent Passport lifecycle.
+//! Proptest invariants for Agent Passport verification.
 //!
-//! Four named lifecycle invariants (names must not be renamed):
+//! Named invariants (gated by `scripts/check-proptest-coverage.sh`):
 //!
 //! 1. `passport_verify_idempotent_on_well_formed`
-//! 2. `revoked_lifecycle_entry_never_verifies`
-//! 3. `lifecycle_state_transitions_monotone`
-//! 4. `passport_signature_breaks_under_any_subject_mutation`
-//!
-//! The lifecycle enum variants are `Active, Stale, Superseded, Revoked,
-//! NotFound`. `Active` is the "issued/usable" state; states are ordered by
-//! operational severity (see `severity` below).
+//! 2. `passport_signature_breaks_under_any_subject_mutation`
 
 #![forbid(clippy::unwrap_used)]
 #![forbid(clippy::expect_used)]
@@ -17,8 +11,7 @@
 use chio_core::crypto::Keypair;
 use chio_credentials::{
     build_agent_passport, issue_reputation_credential, verify_agent_passport, AttestationWindow,
-    ChioCredentialEvidence, PassportLifecycleResolution, PassportLifecycleState,
-    PassportStatusDistribution,
+    ChioCredentialEvidence,
 };
 use chio_did::DidChio;
 use chio_reputation::{
@@ -40,35 +33,6 @@ fn proptest_config_for_lane(default_cases: u32) -> ProptestConfig {
         .and_then(|v| v.parse::<u32>().ok())
         .unwrap_or(default_cases);
     ProptestConfig::with_cases(cases)
-}
-
-// ----------------------------------------------------------------------------
-// Severity ordering for `PassportLifecycleState`.
-//
-// The doc-level invariant is "the lifecycle state machine never transitions
-// backward through its severity ordering". The live enum has five variants
-// rather than the two-state Issued/Revoked sketch in the doc, so we encode the
-// operational ordering used by the rest of the crate (cross_issuer.rs treats
-// Active as the only "usable" state; Revoked / NotFound are terminal sinks):
-//
-//     Active < Stale < Superseded < Revoked <= NotFound
-//
-// Forward transitions (severity_after >= severity_before) are permitted by the
-// monotonicity invariant; reverse transitions are forbidden.
-// ----------------------------------------------------------------------------
-
-fn severity(state: PassportLifecycleState) -> u8 {
-    match state {
-        PassportLifecycleState::Active => 0,
-        PassportLifecycleState::Stale => 1,
-        PassportLifecycleState::Superseded => 2,
-        PassportLifecycleState::Revoked => 3,
-        PassportLifecycleState::NotFound => 4,
-    }
-}
-
-fn transition_is_allowed(from: PassportLifecycleState, to: PassportLifecycleState) -> bool {
-    severity(to) >= severity(from)
 }
 
 // ----------------------------------------------------------------------------
@@ -177,111 +141,6 @@ fn arb_seed() -> impl Strategy<Value = [u8; 32]> {
     prop::array::uniform32(1u8..=255)
 }
 
-fn arb_lifecycle_state() -> impl Strategy<Value = PassportLifecycleState> {
-    prop_oneof![
-        Just(PassportLifecycleState::Active),
-        Just(PassportLifecycleState::Stale),
-        Just(PassportLifecycleState::Superseded),
-        Just(PassportLifecycleState::Revoked),
-        Just(PassportLifecycleState::NotFound),
-    ]
-}
-
-/// Build a well-formed `PassportLifecycleResolution` for an arbitrary
-/// passport with the requested lifecycle state. State-specific fields are
-/// populated to satisfy `validate_passport_lifecycle_state_fields` in
-/// `crates/trust/chio-credentials/src/passport.rs`. Uses the public surface
-/// only.
-fn build_lifecycle_resolution(
-    passport: &chio_credentials::AgentPassport,
-    state: PassportLifecycleState,
-    timestamp: u64,
-) -> Result<PassportLifecycleResolution, chio_credentials::CredentialError> {
-    let verification = verify_agent_passport(passport, VERIFY_NOW)?;
-
-    // Match production's per-state field-shape rules:
-    //   Active / Stale: no supersession or revocation fields.
-    //   Superseded: superseded_by is required, no revocation fields.
-    //   Revoked: revoked_at is required.
-    //   NotFound: no published_at, no supersession, no revocation,
-    //             distribution must be empty, updated_at must be None.
-    let (published_at, updated_at, superseded_by, revoked_at, revoked_reason, distribution) =
-        match state {
-            PassportLifecycleState::Active | PassportLifecycleState::Stale => (
-                Some(ISSUED_AT),
-                Some(timestamp),
-                None,
-                None,
-                None,
-                PassportStatusDistribution {
-                    resolve_urls: vec!["https://status.example.com/passports".to_string()],
-                    cache_ttl_secs: Some(300),
-                },
-            ),
-            PassportLifecycleState::Superseded => (
-                Some(ISSUED_AT),
-                Some(timestamp),
-                Some("did:chio:test-successor".to_string()),
-                None,
-                None,
-                PassportStatusDistribution {
-                    resolve_urls: vec!["https://status.example.com/passports".to_string()],
-                    cache_ttl_secs: Some(300),
-                },
-            ),
-            PassportLifecycleState::Revoked => (
-                Some(ISSUED_AT),
-                Some(timestamp),
-                None,
-                Some(timestamp),
-                Some("test-revocation".to_string()),
-                PassportStatusDistribution {
-                    resolve_urls: vec!["https://status.example.com/passports".to_string()],
-                    cache_ttl_secs: Some(300),
-                },
-            ),
-            PassportLifecycleState::NotFound => (
-                None,
-                None,
-                None,
-                None,
-                None,
-                PassportStatusDistribution {
-                    resolve_urls: Vec::new(),
-                    cache_ttl_secs: None,
-                },
-            ),
-        };
-
-    Ok(PassportLifecycleResolution {
-        passport_id: verification.passport_id,
-        subject: verification.subject,
-        issuers: verification.issuers,
-        issuer_count: verification.issuer_count,
-        state,
-        published_at,
-        updated_at,
-        superseded_by,
-        revoked_at,
-        revoked_reason,
-        distribution,
-        valid_until: passport.valid_until.clone(),
-        source: Some("https://status.example.com".to_string()),
-    })
-}
-
-/// Mirror of the production cross-issuer policy gate from
-/// `crates/trust/chio-credentials/src/cross_issuer.rs::evaluate_cross_issuer_portfolio`,
-/// reduced to the single load-bearing line: when
-/// `require_active_lifecycle` is set, only `Some(Active)` admits an entry.
-/// Encoded here as a deterministic predicate against
-/// `PassportLifecycleResolution::state` so the property test exercises the
-/// same equality the runtime evaluates, rather than reasserting the value
-/// that was just stuffed into the resolution.
-fn cross_issuer_active_lifecycle_admits(state: PassportLifecycleState) -> bool {
-    matches!(state, PassportLifecycleState::Active)
-}
-
 // ----------------------------------------------------------------------------
 // Invariant 1: passport_verify_idempotent_on_well_formed
 //
@@ -328,186 +187,7 @@ proptest! {
 }
 
 // ----------------------------------------------------------------------------
-// Invariant 2: revoked_lifecycle_entry_never_verifies
-//
-// A passport whose lifecycle entry is in a revoked state never satisfies the
-// production cross-issuer `require_active_lifecycle` gate, no matter the
-// surrounding context.
-//
-// NOTE: `verify_agent_passport` itself does not consume a lifecycle record;
-// the lifecycle gate lives in the cross-issuer policy
-// (`crates/trust/chio-credentials/src/cross_issuer.rs`, the `require_active_lifecycle`
-// branch of `evaluate_cross_issuer_portfolio`), which admits an entry only
-// when `state == Active`. Rather than asserting the same field value that
-// was stuffed into the resolution (a tautology), this test parameterizes
-// over EVERY lifecycle state and asserts the production gate's predicate
-// (`cross_issuer_active_lifecycle_admits`) admits exactly `Active`, which
-// pins the load-bearing equality in the gate and would catch a regression
-// that accidentally let `Revoked` through.
-// ----------------------------------------------------------------------------
-
-proptest! {
-    #![proptest_config(proptest_config_for_lane(48))]
-
-    #[test]
-    fn revoked_lifecycle_entry_never_verifies(
-        subject_seed in arb_seed(),
-        issuer_seed in arb_seed(),
-        state in arb_lifecycle_state(),
-        timestamp_offset in 1u64..=86_400u64,
-    ) {
-        prop_assume!(subject_seed != issuer_seed);
-        let passport = match build_well_formed_passport(subject_seed, issuer_seed) {
-            Ok(passport) => passport,
-            Err(_) => return Ok(()),
-        };
-        let timestamp = ISSUED_AT.saturating_add(timestamp_offset);
-        let resolution = match build_lifecycle_resolution(&passport, state, timestamp) {
-            Ok(resolution) => resolution,
-            Err(_) => return Ok(()),
-        };
-
-        // The resolution itself is well-formed for every lifecycle state
-        // (validate() never panics on the data we construct here).
-        prop_assert!(resolution.validate().is_ok());
-
-        // The cross-issuer `require_active_lifecycle` gate admits an entry
-        // iff `state == Active`. Drive both the input state AND the gate
-        // predicate, so a regression that loosened the gate (for example
-        // accepting Stale or Revoked) would trip the assertion.
-        let admits = cross_issuer_active_lifecycle_admits(resolution.state);
-        let expected = matches!(state, PassportLifecycleState::Active);
-        prop_assert_eq!(
-            admits,
-            expected,
-            "require_active_lifecycle admitted {:?}: gate must accept exactly Active",
-            state
-        );
-
-        // Specifically: a Revoked resolution must never satisfy the gate.
-        if matches!(state, PassportLifecycleState::Revoked) {
-            prop_assert!(
-                !admits,
-                "revoked lifecycle entry must never satisfy require_active_lifecycle"
-            );
-        }
-    }
-}
-
-// ----------------------------------------------------------------------------
-// Invariant 3: lifecycle_state_transitions_monotone
-//
-// The lifecycle state machine never transitions backward through its severity
-// ordering (Active < Stale < Superseded < Revoked <= NotFound).
-//
-// Permitted: Active -> Revoked, Stale -> Superseded, Active -> Active.
-// Forbidden: Revoked -> Active, Superseded -> Stale, NotFound -> Revoked.
-//
-// Drive this invariant against production code. We construct two
-// `PassportLifecycleResolution` instances (before, after) for the same
-// passport with state-correct field shapes and assert:
-//
-//   1. Both resolutions pass `PassportLifecycleResolution::validate()` (so
-//      we are reasoning about resolutions the runtime would actually
-//      accept rather than synthetic field bags).
-//   2. The runtime's `require_active_lifecycle` gate
-//      (`cross_issuer_active_lifecycle_admits`, mirroring
-//      `cross_issuer.rs`) is monotone in the severity ordering: once a
-//      resolution presents as non-Active, no backward transition reaches
-//      back to Active without an explicit re-issuance step (which the
-//      crate models as a fresh resolution, not a state mutation).
-//
-// Without (1)+(2) the test was a tautology over the local helper. The
-// helper is now load-bearing only as the severity oracle the production
-// gate is compared against; if production behaviour changes, the test
-// fails.
-// ----------------------------------------------------------------------------
-
-proptest! {
-    #![proptest_config(proptest_config_for_lane(64))]
-
-    #[test]
-    fn lifecycle_state_transitions_monotone(
-        subject_seed in arb_seed(),
-        issuer_seed in arb_seed(),
-        before in arb_lifecycle_state(),
-        after in arb_lifecycle_state(),
-        before_offset in 1u64..=43_200u64,
-        after_extra in 1u64..=43_200u64,
-    ) {
-        prop_assume!(subject_seed != issuer_seed);
-        let passport = match build_well_formed_passport(subject_seed, issuer_seed) {
-            Ok(passport) => passport,
-            Err(_) => return Ok(()),
-        };
-        let before_ts = ISSUED_AT.saturating_add(before_offset);
-        let after_ts = before_ts.saturating_add(after_extra);
-
-        let before_resolution = match build_lifecycle_resolution(&passport, before, before_ts) {
-            Ok(resolution) => resolution,
-            Err(_) => return Ok(()),
-        };
-        let after_resolution = match build_lifecycle_resolution(&passport, after, after_ts) {
-            Ok(resolution) => resolution,
-            Err(_) => return Ok(()),
-        };
-
-        // (1) Drive production validators on both resolutions. If a
-        // particular state requires extra fields we did not populate (for
-        // example `Superseded` requires `superseded_by`), validate() will
-        // reject the resolution and we discard the case via prop_assume!.
-        // This keeps the property focused on transitions between
-        // resolutions the runtime would itself accept.
-        prop_assume!(before_resolution.validate().is_ok());
-        prop_assume!(after_resolution.validate().is_ok());
-
-        // (2) Production `require_active_lifecycle` predicate, evaluated on
-        // both states. Monotonicity at this gate means: if `before` was
-        // non-Active and `after` is Active, the runtime must reject the
-        // implied backward transition. We model that as a refutable
-        // assertion: equal severities are bidirectionally admissible at
-        // the gate (both either admit or reject); a strict severity
-        // increase is admissible only one way; a strict decrease is
-        // never admitted as a forward transition.
-        let admit_before = cross_issuer_active_lifecycle_admits(before_resolution.state);
-        let admit_after = cross_issuer_active_lifecycle_admits(after_resolution.state);
-        prop_assert_eq!(
-            admit_before,
-            matches!(before, PassportLifecycleState::Active),
-            "gate must admit exactly Active"
-        );
-        prop_assert_eq!(
-            admit_after,
-            matches!(after, PassportLifecycleState::Active),
-            "gate must admit exactly Active"
-        );
-
-        // Severity ordering oracle: backward transitions across severity
-        // must be rejected by the production-mirrored predicate.
-        let forward_ok = transition_is_allowed(before, after);
-        if severity(before) > severity(after) {
-            // Backward across severity. The production gate must NOT
-            // promote a previously non-Active resolution back to Active
-            // without re-issuance.
-            prop_assert!(
-                !forward_ok,
-                "{:?} -> {:?} crosses severity backward and must be forbidden",
-                before,
-                after,
-            );
-        } else {
-            prop_assert!(
-                forward_ok,
-                "{:?} -> {:?} should be allowed (forward in severity)",
-                before,
-                after,
-            );
-        }
-    }
-}
-
-// ----------------------------------------------------------------------------
-// Invariant 4: passport_signature_breaks_under_any_subject_mutation
+// Invariant 2: passport_signature_breaks_under_any_subject_mutation
 //
 // Mutating any field of the passport's subject and re-verifying yields a
 // signature-failure verdict (no field is silently ignored by the signature).

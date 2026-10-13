@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.world/schemas/chio/agent-passport/v2.schema.json",
+  "$id": "https://chio.world/schemas/chio/financial-agent-passport/v1.schema.json",
   "$defs": {
     "reputationCredential": {
       "type": "object",
@@ -164,7 +164,8 @@
     "credentials",
     "merkleRoots",
     "issuedAt",
-    "validUntil"
+    "validUntil",
+    "sourceManifest"
   ],
   "properties": {
     "schema": { "const": "chio.financial-agent-passport.v1" },
@@ -188,22 +189,6 @@
     "issuedAt": { "type": "string", "format": "date-time" },
     "validUntil": { "type": "string", "format": "date-time" },
     "trustTier": { "enum": ["unverified", "attested", "verified", "premier"] },
-    "sourceManifest": { "$ref": "https://chio.world/schemas/chio/agent-passport/source-manifest/v2.schema.json" }
-  },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "credentials": {
-            "contains": {
-              "type": "object",
-              "required": ["kind"],
-              "properties": { "kind": { "const": "financial" } }
-            }
-          }
-        }
-      },
-      "then": { "required": ["sourceManifest"] }
-    }
-  ]
+    "sourceManifest": { "$ref": "https://chio.world/schemas/chio/financial-agent-passport/source-manifest/v1.schema.json" }
+  }
 }

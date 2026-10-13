@@ -1,49 +1,8 @@
 use super::*;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LegacyCredentialIssuanceAnchorInputV2 {
-    pub authority_id: String,
-    pub signer_key_epoch: u64,
-    pub registry_generation: u64,
-    pub registry_checkpoint_digest: String,
-    pub credential_envelope_digest: String,
-    pub issuer: String,
-    pub verification_method: String,
-    pub resolved_key_id: String,
-    pub observed_issued_at: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LegacyCredentialIssuanceAnchorV2 {
-    pub schema: String,
-    pub authority_id: String,
-    pub signer_key_epoch: u64,
-    pub registry_generation: u64,
-    pub registry_checkpoint_digest: String,
-    pub credential_envelope_digest: String,
-    pub issuer: String,
-    pub verification_method: String,
-    pub resolved_key_id: String,
-    pub observed_issued_at: u64,
-    pub anchor_digest: String,
-}
-
-pub type SignedLegacyCredentialIssuanceAnchorV2 =
-    chio_core::receipt::lineage::SignedExportEnvelope<LegacyCredentialIssuanceAnchorV2>;
-
-pub trait LegacyCredentialIssuanceAnchorResolver {
-    fn resolve(
-        &self,
-        credential_envelope_digest: &str,
-        issuer: &str,
-        verification_method: &str,
-    ) -> Result<SignedLegacyCredentialIssuanceAnchorV2, FinancialAuthorityAvailabilityError>;
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct EntryActivationDigestPreimageV2<'a> {
+struct EntryActivationDigestPreimage<'a> {
     schema: &'a str,
     pack_id: &'a str,
     verifier_id: &'a str,
@@ -53,7 +12,7 @@ struct EntryActivationDigestPreimageV2<'a> {
     source_passport_id: &'a str,
     source_manifest_digest: &'a str,
     presentation_digest: &'a str,
-    credential_bindings: &'a [EntryActivationCredentialBindingV2],
+    credential_bindings: &'a [EntryActivationCredentialBinding],
     issuer: &'a str,
     profile_family: &'a str,
     source_kind: CrossIssuerPortfolioEntryKind,
@@ -61,14 +20,14 @@ struct EntryActivationDigestPreimageV2<'a> {
     lifecycle_evidence_digest: &'a str,
     lifecycle_pin_digest: &'a str,
     migration_envelope_digests: &'a [String],
-    decision: EntryActivationDispositionV2,
+    decision: EntryActivationDisposition,
     reason: &'a str,
     decided_at: u64,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct MigrationDigestPreimageV2<'a> {
+struct MigrationDigestPreimage<'a> {
     schema: &'a str,
     migration_id: &'a str,
     attester_id: &'a str,
@@ -85,26 +44,11 @@ struct MigrationDigestPreimageV2<'a> {
     expires_at: Option<u64>,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct LegacyAnchorDigestPreimageV2<'a> {
-    schema: &'a str,
-    authority_id: &'a str,
-    signer_key_epoch: u64,
-    registry_generation: u64,
-    registry_checkpoint_digest: &'a str,
-    credential_envelope_digest: &'a str,
-    issuer: &'a str,
-    verification_method: &'a str,
-    resolved_key_id: &'a str,
-    observed_issued_at: u64,
-}
-
-pub fn sign_entry_activation_decision_v2(
+pub fn sign_entry_activation_decision(
     signer: &Keypair,
-    input: EntryActivationDecisionInputV2,
-) -> Result<SignedEntryActivationDecisionV2, CredentialError> {
-    let mut body = EntryActivationDecisionV2 {
+    input: EntryActivationDecisionInput,
+) -> Result<SignedEntryActivationDecision, CredentialError> {
+    let mut body = EntryActivationDecision {
         schema: FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1.to_string(),
         pack_id: input.pack_id,
         verifier_id: input.verifier_id,
@@ -129,14 +73,14 @@ pub fn sign_entry_activation_decision_v2(
     };
     normalize_activation_decision(&mut body)?;
     body.decision_digest = recompute_activation_decision_digest(&body)?;
-    Ok(SignedEntryActivationDecisionV2::sign(body, signer)?)
+    Ok(SignedEntryActivationDecision::sign(body, signer)?)
 }
 
-pub fn sign_cross_issuer_trust_pack_v2(
+pub fn sign_financial_cross_issuer_trust_pack(
     signer: &Keypair,
-    input: CrossIssuerTrustPackInputV2,
-) -> Result<SignedCrossIssuerTrustPackV2, CredentialError> {
-    let body = CrossIssuerTrustPackV2 {
+    input: FinancialCrossIssuerTrustPackInput,
+) -> Result<SignedFinancialCrossIssuerTrustPack, CredentialError> {
+    let body = FinancialCrossIssuerTrustPack {
         schema: FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1.to_string(),
         pack_id: input.pack_id,
         verifier_id: input.verifier_id,
@@ -148,12 +92,12 @@ pub fn sign_cross_issuer_trust_pack_v2(
         decisions: input.decisions,
     };
     validate_trust_pack_body(&body)?;
-    Ok(SignedCrossIssuerTrustPackV2::sign(body, signer)?)
+    Ok(SignedFinancialCrossIssuerTrustPack::sign(body, signer)?)
 }
 
-pub fn verify_signed_cross_issuer_trust_pack_v2(
-    pack: &SignedCrossIssuerTrustPackV2,
-    trust: &CrossIssuerTrustRegistryV2,
+pub fn verify_financial_cross_issuer_trust_pack(
+    pack: &SignedFinancialCrossIssuerTrustPack,
+    trust: &CrossIssuerTrustRegistry,
     now: u64,
 ) -> Result<(), CredentialError> {
     validate_trust_pack_body(&pack.body)?;
@@ -188,11 +132,11 @@ pub fn verify_signed_cross_issuer_trust_pack_v2(
     Ok(())
 }
 
-pub fn sign_cross_issuer_migration_v2(
+pub fn sign_financial_cross_issuer_migration(
     signer: &Keypair,
-    input: CrossIssuerMigrationInputV2,
-) -> Result<SignedCrossIssuerMigrationV2, CredentialError> {
-    let mut body = CrossIssuerMigrationV2 {
+    input: FinancialCrossIssuerMigrationInput,
+) -> Result<SignedFinancialCrossIssuerMigration, CredentialError> {
+    let mut body = FinancialCrossIssuerMigration {
         schema: FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1.to_string(),
         migration_id: input.migration_id,
         attester_id: input.attester_id,
@@ -211,12 +155,12 @@ pub fn sign_cross_issuer_migration_v2(
     };
     validate_migration_body(&mut body)?;
     body.migration_digest = recompute_migration_digest(&body)?;
-    Ok(SignedCrossIssuerMigrationV2::sign(body, signer)?)
+    Ok(SignedFinancialCrossIssuerMigration::sign(body, signer)?)
 }
 
-pub fn verify_cross_issuer_migration_v2(
-    migration: &SignedCrossIssuerMigrationV2,
-    trust: &CrossIssuerTrustRegistryV2,
+pub fn verify_financial_cross_issuer_migration(
+    migration: &SignedFinancialCrossIssuerMigration,
+    trust: &CrossIssuerTrustRegistry,
     now: u64,
 ) -> Result<(), CredentialError> {
     let mut body = migration.body.clone();
@@ -243,74 +187,9 @@ pub fn verify_cross_issuer_migration_v2(
     Ok(())
 }
 
-pub fn sign_legacy_credential_issuance_anchor_v2(
-    signer: &Keypair,
-    input: LegacyCredentialIssuanceAnchorInputV2,
-) -> Result<SignedLegacyCredentialIssuanceAnchorV2, CredentialError> {
-    let mut body = LegacyCredentialIssuanceAnchorV2 {
-        schema: FINANCIAL_LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V1.to_string(),
-        authority_id: input.authority_id,
-        signer_key_epoch: input.signer_key_epoch,
-        registry_generation: input.registry_generation,
-        registry_checkpoint_digest: input.registry_checkpoint_digest,
-        credential_envelope_digest: input.credential_envelope_digest,
-        issuer: input.issuer,
-        verification_method: input.verification_method,
-        resolved_key_id: input.resolved_key_id,
-        observed_issued_at: input.observed_issued_at,
-        anchor_digest: String::new(),
-    };
-    validate_legacy_anchor_body(&body)?;
-    body.anchor_digest = recompute_legacy_anchor_digest(&body)?;
-    Ok(SignedLegacyCredentialIssuanceAnchorV2::sign(body, signer)?)
-}
-
-pub(in crate::financial_authority) fn verify_legacy_credential_authority(
-    credential: &ReputationCredential,
-    trust: &CrossIssuerTrustRegistryV2,
-    anchors: &dyn LegacyCredentialIssuanceAnchorResolver,
-    now: u64,
-) -> Result<(), CredentialError> {
-    let envelope_digest = sha256_hex(&canonical_json_bytes(credential)?);
-    let anchor = anchors
-        .resolve(
-            &envelope_digest,
-            &credential.unsigned.issuer,
-            &credential.proof.verification_method,
-        )
-        .map_err(|_| authority_error("legacy issuance anchor is unavailable"))?;
-    validate_legacy_anchor_body(&anchor.body)?;
-    trust.verify_legacy_anchor_authority(&anchor)?;
-    if !anchor.verify_signature()?
-        || recompute_legacy_anchor_digest(&anchor.body)? != anchor.body.anchor_digest
-        || anchor.body.credential_envelope_digest != envelope_digest
-        || anchor.body.issuer != credential.unsigned.issuer
-        || anchor.body.verification_method != credential.proof.verification_method
-        || anchor.body.observed_issued_at > now
-    {
-        return Err(authority_error("legacy issuance anchor binding is invalid"));
-    }
-    let key = trust.legacy_reputation_key(
-        &anchor.body.issuer,
-        &anchor.body.verification_method,
-        &anchor.body.resolved_key_id,
-        anchor.body.observed_issued_at,
-    )?;
-    let signature = Signature::from_hex(&credential.proof.proof_value)?;
-    if !key
-        .public_key
-        .verify(&canonical_json_bytes(&credential.unsigned)?, &signature)
-    {
-        return Err(authority_error(
-            "legacy reputation signature does not match interval authority",
-        ));
-    }
-    Ok(())
-}
-
 fn verify_activation_decision_signature(
-    decision: &SignedEntryActivationDecisionV2,
-    trust: &CrossIssuerTrustRegistryV2,
+    decision: &SignedEntryActivationDecision,
+    trust: &CrossIssuerTrustRegistry,
     now: u64,
 ) -> Result<(), CredentialError> {
     let mut normalized = decision.body.clone();
@@ -336,7 +215,7 @@ fn verify_activation_decision_signature(
     Ok(())
 }
 
-fn validate_trust_pack_body(body: &CrossIssuerTrustPackV2) -> Result<(), CredentialError> {
+fn validate_trust_pack_body(body: &FinancialCrossIssuerTrustPack) -> Result<(), CredentialError> {
     if body.schema != FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1
         || body.created_at >= body.expires_at
         || body.decisions.is_empty()
@@ -374,7 +253,7 @@ fn validate_trust_pack_body(body: &CrossIssuerTrustPackV2) -> Result<(), Credent
 }
 
 fn normalize_activation_decision(
-    body: &mut EntryActivationDecisionV2,
+    body: &mut EntryActivationDecision,
 ) -> Result<(), CredentialError> {
     if body.schema != FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1 {
         return Err(authority_error("entry activation schema is invalid"));
@@ -427,7 +306,7 @@ fn normalize_activation_decision(
     Ok(())
 }
 
-fn validate_migration_body(body: &mut CrossIssuerMigrationV2) -> Result<(), CredentialError> {
+fn validate_migration_body(body: &mut FinancialCrossIssuerMigration) -> Result<(), CredentialError> {
     if body.schema != FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1 {
         return Err(authority_error("cross-issuer migration schema is invalid"));
     }
@@ -464,38 +343,12 @@ fn validate_migration_body(body: &mut CrossIssuerMigrationV2) -> Result<(), Cred
     Ok(())
 }
 
-fn validate_legacy_anchor_body(
-    body: &LegacyCredentialIssuanceAnchorV2,
-) -> Result<(), CredentialError> {
-    if body.schema != FINANCIAL_LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V1 {
-        return Err(authority_error("legacy issuance anchor schema is invalid"));
-    }
-    validate_text("legacyAnchor.authorityId", &body.authority_id)?;
-    validate_text("legacyAnchor.verificationMethod", &body.verification_method)?;
-    validate_text("legacyAnchor.resolvedKeyId", &body.resolved_key_id)?;
-    validate_epoch("legacyAnchor.signerKeyEpoch", body.signer_key_epoch)?;
-    validate_epoch("legacyAnchor.registryGeneration", body.registry_generation)?;
-    DidChio::from_str(&body.issuer)?;
-    validate_digest(
-        "legacyAnchor.registryCheckpointDigest",
-        &body.registry_checkpoint_digest,
-    )?;
-    validate_digest(
-        "legacyAnchor.credentialEnvelopeDigest",
-        &body.credential_envelope_digest,
-    )?;
-    if !body.anchor_digest.is_empty() {
-        validate_digest("legacyAnchor.anchorDigest", &body.anchor_digest)?;
-    }
-    Ok(())
-}
-
 fn recompute_activation_decision_digest(
-    body: &EntryActivationDecisionV2,
+    body: &EntryActivationDecision,
 ) -> Result<String, CredentialError> {
     authority_digest(
         ENTRY_ACTIVATION_DIGEST_DOMAIN,
-        &EntryActivationDigestPreimageV2 {
+        &EntryActivationDigestPreimage {
             schema: &body.schema,
             pack_id: &body.pack_id,
             verifier_id: &body.verifier_id,
@@ -520,10 +373,10 @@ fn recompute_activation_decision_digest(
     )
 }
 
-fn recompute_migration_digest(body: &CrossIssuerMigrationV2) -> Result<String, CredentialError> {
+fn recompute_migration_digest(body: &FinancialCrossIssuerMigration) -> Result<String, CredentialError> {
     authority_digest(
         CROSS_ISSUER_MIGRATION_DIGEST_DOMAIN,
-        &MigrationDigestPreimageV2 {
+        &MigrationDigestPreimage {
             schema: &body.schema,
             migration_id: &body.migration_id,
             attester_id: &body.attester_id,
@@ -542,22 +395,3 @@ fn recompute_migration_digest(body: &CrossIssuerMigrationV2) -> Result<String, C
     )
 }
 
-fn recompute_legacy_anchor_digest(
-    body: &LegacyCredentialIssuanceAnchorV2,
-) -> Result<String, CredentialError> {
-    authority_digest(
-        LEGACY_ISSUANCE_ANCHOR_DIGEST_DOMAIN,
-        &LegacyAnchorDigestPreimageV2 {
-            schema: &body.schema,
-            authority_id: &body.authority_id,
-            signer_key_epoch: body.signer_key_epoch,
-            registry_generation: body.registry_generation,
-            registry_checkpoint_digest: &body.registry_checkpoint_digest,
-            credential_envelope_digest: &body.credential_envelope_digest,
-            issuer: &body.issuer,
-            verification_method: &body.verification_method,
-            resolved_key_id: &body.resolved_key_id,
-            observed_issued_at: body.observed_issued_at,
-        },
-    )
-}

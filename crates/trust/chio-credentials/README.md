@@ -50,8 +50,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## Status
 
 Artifact and bounded OID4VCI/OID4VP profile helpers are implemented. HTTP endpoints
-and durable storage live in consumers. V1 portfolio activation evaluation returns
-`UnsupportedLegacyCrossIssuerV1`; financial authority uses V2 APIs.
+and durable storage live in consumers. Cross-issuer activation uses the signed
+`chio.financial.cross-issuer-trust-pack.v1` under financial authority evaluation.
 Settlement-reliability credential decoding is disabled because its proof
 substrate is unavailable. Schema decoding and signature inspection alone do
 not establish current admission, financial source completeness, or revocation.

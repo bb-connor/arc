@@ -4,8 +4,6 @@ pub const FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1: &str = "chio.financial.cr
 pub const FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1: &str =
     "chio.financial.cross-issuer-entry-activation-decision.v1";
 pub const FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1: &str = "chio.financial.cross-issuer-migration.v1";
-pub const FINANCIAL_LEGACY_CREDENTIAL_ISSUANCE_ANCHOR_SCHEMA_V1: &str =
-    "chio.financial.legacy-credential-issuance-anchor.v1";
 pub const FINANCIAL_ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V1: &str = "chio.financial.cross-issuer.lifecycle-checkpoint.v1";
 pub const FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1: &str = "chio.financial.cross-issuer.lifecycle-result.v1";
 pub const FINANCIAL_ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V1: &str =
@@ -16,8 +14,6 @@ pub const FINANCIAL_LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V1: &str =
 const FINANCIAL_POLICY_DIGEST_DOMAIN: &[u8] = b"chio.fincred.verifier-policy-digest.v1\0";
 const ENTRY_ACTIVATION_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.entry-activation-digest.v1\0";
 const CROSS_ISSUER_MIGRATION_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.migration-digest.v1\0";
-const LEGACY_ISSUANCE_ANCHOR_DIGEST_DOMAIN: &[u8] =
-    b"chio.financial.legacy-credential.issuance-anchor-digest.v1\0";
 const LIFECYCLE_RESULT_DIGEST_DOMAIN: &[u8] = b"chio.financial.cross-issuer.lifecycle-result-digest.v1\0";
 const LIFECYCLE_CHECKPOINT_DIGEST_DOMAIN: &[u8] =
     b"chio.financial.cross-issuer.lifecycle-checkpoint-digest.v1\0";
@@ -46,28 +42,28 @@ pub fn signed_envelope_digest<T: Serialize>(
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum TrustedKeyStatusV2 {
+pub enum TrustedKeyStatus {
     Active,
     Inactive,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum EntryActivationDispositionV2 {
+pub enum EntryActivationDisposition {
     Activate,
     Deny,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct EntryActivationCredentialBindingV2 {
+pub struct EntryActivationCredentialBinding {
     pub credential_id: String,
     pub family: FinancialCredentialFamilyV1,
     pub envelope_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EntryActivationDecisionInputV2 {
+pub struct EntryActivationDecisionInput {
     pub pack_id: String,
     pub verifier_id: String,
     pub signer_key_id: String,
@@ -76,7 +72,7 @@ pub struct EntryActivationDecisionInputV2 {
     pub source_passport_id: String,
     pub source_manifest_digest: String,
     pub presentation_digest: String,
-    pub credential_bindings: Vec<EntryActivationCredentialBindingV2>,
+    pub credential_bindings: Vec<EntryActivationCredentialBinding>,
     pub issuer: String,
     pub profile_family: String,
     pub source_kind: CrossIssuerPortfolioEntryKind,
@@ -84,14 +80,14 @@ pub struct EntryActivationDecisionInputV2 {
     pub lifecycle_evidence_digest: String,
     pub lifecycle_pin_digest: String,
     pub migration_envelope_digests: Vec<String>,
-    pub decision: EntryActivationDispositionV2,
+    pub decision: EntryActivationDisposition,
     pub reason: String,
     pub decided_at: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct EntryActivationDecisionV2 {
+pub struct EntryActivationDecision {
     pub schema: String,
     pub pack_id: String,
     pub verifier_id: String,
@@ -101,7 +97,7 @@ pub struct EntryActivationDecisionV2 {
     pub source_passport_id: String,
     pub source_manifest_digest: String,
     pub presentation_digest: String,
-    pub credential_bindings: Vec<EntryActivationCredentialBindingV2>,
+    pub credential_bindings: Vec<EntryActivationCredentialBinding>,
     pub issuer: String,
     pub profile_family: String,
     pub source_kind: CrossIssuerPortfolioEntryKind,
@@ -109,16 +105,16 @@ pub struct EntryActivationDecisionV2 {
     pub lifecycle_evidence_digest: String,
     pub lifecycle_pin_digest: String,
     pub migration_envelope_digests: Vec<String>,
-    pub decision: EntryActivationDispositionV2,
+    pub decision: EntryActivationDisposition,
     pub reason: String,
     pub decided_at: u64,
     pub decision_digest: String,
 }
 
-impl EntryActivationDecisionV2 {
+impl EntryActivationDecision {
     #[must_use]
-    pub fn into_input(self) -> EntryActivationDecisionInputV2 {
-        EntryActivationDecisionInputV2 {
+    pub fn into_input(self) -> EntryActivationDecisionInput {
+        EntryActivationDecisionInput {
             pack_id: self.pack_id,
             verifier_id: self.verifier_id,
             signer_key_id: self.signer_key_id,
@@ -142,12 +138,12 @@ impl EntryActivationDecisionV2 {
     }
 }
 
-pub type SignedEntryActivationDecisionV2 =
-    chio_core::receipt::lineage::SignedExportEnvelope<EntryActivationDecisionV2>;
+pub type SignedEntryActivationDecision =
+    chio_core::receipt::lineage::SignedExportEnvelope<EntryActivationDecision>;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct CrossIssuerTrustPackPolicyV2 {
+pub struct FinancialCrossIssuerTrustPackPolicy {
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub allowed_issuers: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -161,20 +157,20 @@ pub struct CrossIssuerTrustPackPolicyV2 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CrossIssuerTrustPackInputV2 {
+pub struct FinancialCrossIssuerTrustPackInput {
     pub pack_id: String,
     pub verifier_id: String,
     pub signer_key_id: String,
     pub signer_key_epoch: u64,
     pub created_at: u64,
     pub expires_at: u64,
-    pub policy: CrossIssuerTrustPackPolicyV2,
-    pub decisions: Vec<SignedEntryActivationDecisionV2>,
+    pub policy: FinancialCrossIssuerTrustPackPolicy,
+    pub decisions: Vec<SignedEntryActivationDecision>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct CrossIssuerTrustPackV2 {
+pub struct FinancialCrossIssuerTrustPack {
     pub schema: String,
     pub pack_id: String,
     pub verifier_id: String,
@@ -182,15 +178,15 @@ pub struct CrossIssuerTrustPackV2 {
     pub signer_key_epoch: u64,
     pub created_at: u64,
     pub expires_at: u64,
-    pub policy: CrossIssuerTrustPackPolicyV2,
-    pub decisions: Vec<SignedEntryActivationDecisionV2>,
+    pub policy: FinancialCrossIssuerTrustPackPolicy,
+    pub decisions: Vec<SignedEntryActivationDecision>,
 }
 
-pub type SignedCrossIssuerTrustPackV2 =
-    chio_core::receipt::lineage::SignedExportEnvelope<CrossIssuerTrustPackV2>;
+pub type SignedFinancialCrossIssuerTrustPack =
+    chio_core::receipt::lineage::SignedExportEnvelope<FinancialCrossIssuerTrustPack>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CrossIssuerMigrationInputV2 {
+pub struct FinancialCrossIssuerMigrationInput {
     pub migration_id: String,
     pub attester_id: String,
     pub signer_key_id: String,
@@ -208,7 +204,7 @@ pub struct CrossIssuerMigrationInputV2 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct CrossIssuerMigrationV2 {
+pub struct FinancialCrossIssuerMigration {
     pub schema: String,
     pub migration_id: String,
     pub attester_id: String,
@@ -227,10 +223,10 @@ pub struct CrossIssuerMigrationV2 {
     pub migration_digest: String,
 }
 
-impl CrossIssuerMigrationV2 {
+impl FinancialCrossIssuerMigration {
     #[must_use]
-    pub fn into_input(self) -> CrossIssuerMigrationInputV2 {
-        CrossIssuerMigrationInputV2 {
+    pub fn into_input(self) -> FinancialCrossIssuerMigrationInput {
+        FinancialCrossIssuerMigrationInput {
             migration_id: self.migration_id,
             attester_id: self.attester_id,
             signer_key_id: self.signer_key_id,
@@ -248,12 +244,12 @@ impl CrossIssuerMigrationV2 {
     }
 }
 
-pub type SignedCrossIssuerMigrationV2 =
-    chio_core::receipt::lineage::SignedExportEnvelope<CrossIssuerMigrationV2>;
+pub type SignedFinancialCrossIssuerMigration =
+    chio_core::receipt::lineage::SignedExportEnvelope<FinancialCrossIssuerMigration>;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct VerifiedFinancialCredentialBindingV2 {
+pub struct VerifiedFinancialCredentialBinding {
     pub credential_id: String,
     pub family: FinancialCredentialFamilyV1,
     pub issuer: String,
@@ -271,7 +267,7 @@ pub struct VerifiedFinancialCredentialSet {
     pub(super) source_passport_id: String,
     pub(super) source_manifest_digest: String,
     pub(super) presentation_digest: String,
-    pub(super) credentials: Vec<VerifiedFinancialCredentialBindingV2>,
+    pub(super) credentials: Vec<VerifiedFinancialCredentialBinding>,
     pub(super) policy_id: String,
     pub(super) policy_body_digest: String,
     pub(super) policy_generation: u64,
@@ -301,7 +297,7 @@ impl VerifiedFinancialCredentialSet {
     }
 
     #[must_use]
-    pub fn credentials(&self) -> &[VerifiedFinancialCredentialBindingV2] {
+    pub fn credentials(&self) -> &[VerifiedFinancialCredentialBinding] {
         &self.credentials
     }
 

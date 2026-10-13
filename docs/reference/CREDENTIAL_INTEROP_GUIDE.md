@@ -228,11 +228,11 @@ replayed, or contradictory sender proof fails closed.
 
 ## Cross-Issuer Portfolios
 
-Chio now also supports one bounded cross-issuer composition contract over the
+Chio supports one bounded cross-issuer composition contract over the
 same passport truth:
 
 - `chio.cross-issuer-portfolio.v1` for a visible holder or operator portfolio
-- `chio.cross-issuer-trust-pack.v1` for explicit local activation policy
+- `chio.financial.cross-issuer-trust-pack.v1` for explicit local activation policy
 - `chio.cross-issuer-migration.v1` for explicit subject or issuer continuity
 
 The important boundary is conservative:
