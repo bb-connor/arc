@@ -967,7 +967,7 @@ mod tests {
     use crate::dead_letters::{DeadLetterStoreError, SqliteDeadLetterStore};
 
     fn pool() -> Pool<SqliteConnectionManager> {
-        Pool::builder()
+        crate::pool::sqlite_pool_builder()
             .max_size(1)
             .build(SqliteConnectionManager::memory())
             .test_expect("test pool builds")
@@ -979,7 +979,7 @@ mod tests {
             connection.pragma_update(None, "journal_mode", "WAL")?;
             Ok(())
         });
-        Pool::builder()
+        crate::pool::sqlite_pool_builder()
             .max_size(1)
             .build(manager)
             .test_expect("file-backed test pool builds")
