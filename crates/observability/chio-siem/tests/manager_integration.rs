@@ -265,6 +265,7 @@ fn manager_rejects_zero_batch_size() {
 
     let config = SiemConfig {
         db_path: db_path.clone(),
+        cursor_db_path: db_path.with_extension("cursor.sqlite3"),
         batch_size: 0,
         ..SiemConfig::default()
     };
