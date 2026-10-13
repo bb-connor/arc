@@ -14,11 +14,13 @@
 )]
 #![forbid(unsafe_code)]
 mod error;
+mod evolution;
 pub mod finding_pool;
 mod types;
 mod verifier;
 
 pub use error::SwarmAuthorityError;
+pub use evolution::verify_swarm_authority_extension;
 pub use types::{
     SwarmAuthorityBundle, SwarmAuthorityVerifierReport, SwarmBudgetAllocation,
     SwarmBudgetAllocationState, SwarmBudgetFanInReleaseRequest, SwarmBudgetFanoutAllocationRequest,
