@@ -116,6 +116,7 @@ windows-sys = { version = "0.60.2", features = [
 ] }
 
 [dev-dependencies]
+chio-http-core = { workspace = true }
 tracing-subscriber = { workspace = true }
 chio-anchor = { workspace = true }
 chio-secret-broker = { workspace = true, features = ["kernel-admission"] }

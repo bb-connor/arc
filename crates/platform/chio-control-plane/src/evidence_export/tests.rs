@@ -23,6 +23,9 @@ use chio_test_support::prelude::*;
 #[path = "tests/package_trust.rs"]
 mod package_trust;
 
+#[path = "tests/http_receipts.rs"]
+mod http_receipts;
+
 fn assert_registry_error(err: &CliError, expected_code: &str, expected_domain: &str) {
     match err {
         CliError::Chio(chio) => {
