@@ -11,7 +11,6 @@ pub(super) struct CredentialPreparationInput<'request> {
     pub(super) dpop_required: bool,
     pub(super) now: u64,
     pub(super) execution_nonce_credential: ExecutionNonceCredential,
-    pub(super) require_governed_approval: bool,
 }
 
 /// Validated inputs for one consuming reservation attempt. Dropping this value
@@ -176,7 +175,6 @@ impl ChioKernel {
             execution_nonce_credential: ExecutionNonceCredential::for_dispatch(
                 durable_execution_nonce,
             ),
-            require_governed_approval: false,
         })
     }
 
@@ -190,7 +188,6 @@ impl ChioKernel {
             dpop_required,
             now,
             execution_nonce_credential,
-            require_governed_approval,
         } = input;
         let mut dpop_credential = None;
         let dpop_proof = if dpop_required {
@@ -227,20 +224,13 @@ impl ChioKernel {
             ExecutionNonceCredential::ReplayStore => {
                 self.validate_execution_nonce_non_consuming(request, cap, now)?
             }
-            ExecutionNonceCredential::DurableParticipant
-            | ExecutionNonceCredential::NotPresented => None,
+            ExecutionNonceCredential::DurableParticipant => None,
         };
         let durable_nonce_presented = execution_nonce_credential
             == ExecutionNonceCredential::DurableParticipant
             && request.execution_nonce.is_some();
         let approval_intent_hash =
             self.validate_governed_approval_for_dispatch_non_consuming(request, cap, now)?;
-        if require_governed_approval && approval_intent_hash.is_none() {
-            return Err(KernelError::GovernedTransactionDenied(
-                "strict reserve-for-caller payment authorization requires a governed approval token"
-                    .to_string(),
-            ));
-        }
         if approval_intent_hash.is_some() && self.governed_approval_authority.is_some() {
             self.verify_configured_governed_approval_source()?;
         } else if approval_intent_hash.is_some() && self.approval_replay_store.is_none() {

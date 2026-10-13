@@ -1,4 +1,4 @@
-//! Request-id custody is serialized with budget reuse checks by the mediation kernel lock.
+//! Bounded request-id custody is serialized with durable admission by the kernel lock.
 use std::collections::{BTreeSet, HashMap};
 
 pub(crate) const MAX_LIVE_REQUEST_IDS: usize = 10_000;
@@ -21,6 +21,7 @@ pub(crate) enum RequestIdClaimError {
 pub(crate) struct RequestIdClaim {
     id: String,
     generation: u64,
+    owns_entry: bool,
 }
 
 pub(crate) struct MintedRequestIdWindow {
@@ -44,6 +45,7 @@ impl MintedRequestIdWindow {
         &mut self,
         id: &str,
         now: i64,
+        presented_nonce: bool,
     ) -> Result<RequestIdClaim, RequestIdClaimError> {
         if id.is_empty() || id.len() > 128 || !id.bytes().all(|b| b.is_ascii_graphic()) {
             return Err(RequestIdClaimError::Shape);
@@ -70,8 +72,16 @@ impl MintedRequestIdWindow {
                 self.live.remove(&id);
             }
         }
-        if self.live.contains_key(id) {
-            return Err(RequestIdClaimError::Reused);
+        if let Some(&(generation, _)) = self.live.get(id) {
+            return if presented_nonce {
+                Ok(RequestIdClaim {
+                    id: id.to_owned(),
+                    generation,
+                    owns_entry: false,
+                })
+            } else {
+                Err(RequestIdClaimError::Reused)
+            };
         }
         if self.live.len() >= MAX_LIVE_REQUEST_IDS {
             return Err(RequestIdClaimError::Capacity);
@@ -82,10 +92,14 @@ impl MintedRequestIdWindow {
         Ok(RequestIdClaim {
             id: id.to_owned(),
             generation,
+            owns_entry: true,
         })
     }
-    /// Cleanup may remove only its own generation, even after a later reuse.
+    /// Cleanup requires ownership of the exact entry generation.
     pub(crate) fn release(&mut self, claim: &RequestIdClaim) {
+        if !claim.owns_entry {
+            return;
+        }
         if let Some(&(generation, expires)) = self.live.get(&claim.id) {
             if generation == claim.generation {
                 self.live.remove(&claim.id);
@@ -116,15 +130,21 @@ mod tests {
     #[test]
     fn stale_cleanup_cannot_release_later_owner_and_retention_uses_signed_horizon() {
         let mut window = MintedRequestIdWindow::new(30);
-        let old = window.claim("id", 100).unwrap();
-        let new = window.claim("id", 130).unwrap();
+        let old = window.claim("id", 100, false).unwrap();
+        let new = window.claim("id", 130, false).unwrap();
         window.release(&old);
-        assert_eq!(window.claim("id", 130), Err(RequestIdClaimError::Reused));
+        assert_eq!(
+            window.claim("id", 130, false),
+            Err(RequestIdClaimError::Reused)
+        );
         window.retain_until(&new, 200);
-        assert_eq!(window.claim("id", 160), Err(RequestIdClaimError::Reused));
+        assert_eq!(
+            window.claim("id", 160, false),
+            Err(RequestIdClaimError::Reused)
+        );
         window.release(&new);
         assert!(window.expiries.is_empty());
         assert_eq!(window.len(), 0);
-        assert!(window.claim("id", 160).is_ok());
+        assert!(window.claim("id", 160, false).is_ok());
     }
 }

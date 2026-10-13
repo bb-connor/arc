@@ -39,11 +39,13 @@ fn product_default_guards_mediation_preserves_authority_policy_identity() {
 async fn product_default_guards_caller_reservation_refuses_internal_target_without_nonce() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let directory = tempfile::tempdir().test_unwrap();
+    let durable = durable_admission_stores(directory.path());
+    let budget = Arc::clone(&durable.budget_store);
     let issuer = issuing_kernel(&signer, budget.clone(), &[]);
     let capability =
         issue_invocation_capability(&issuer, &agent, "external-caller", "http_request", 10);
-    let state = mediated_test_state(signer.clone(), budget, Vec::new());
+    let state = mediated_test_state(signer.clone(), durable, Vec::new());
     let body = serde_json::json!({"capability":capability,"tool_server":"external-caller","tool_name":"http_request","parameters":{"url":"http://169.254.169.254/latest/meta-data"}});
     let (status, reply) = post_evaluate(state.clone(), &body).await;
     assert_eq!(status, StatusCode::OK, "{reply}");

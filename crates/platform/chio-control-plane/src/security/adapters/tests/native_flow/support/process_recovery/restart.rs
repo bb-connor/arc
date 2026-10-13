@@ -1,6 +1,14 @@
-// Reopen the original stores. No imported lifecycle is activated on recovery.
+// Recovery retains the original stores and their authority selection.
 use super::*;
-use chio_kernel::admission_operation::{AdmissionOperationV1, RetainedToolAdmissionRequestV1};
+use chio_kernel::admission_operation::{
+    AdmissionDigest, AdmissionOperationV1, RetainedToolAdmissionRequestV1,
+};
+use chio_kernel::caller_delivery::{
+    CallerCommittedDispatchV1, CallerDeliveryReportBodyV1, CallerDispatchAuthorizationBodyV1,
+    CallerExecutorIdentityV1, CallerInvocationBindingV1, SignedCallerDeliveryReportV1,
+    SignedCallerDispatchAuthorizationV1, CALLER_DELIVERY_REPORT_SCHEMA,
+    CALLER_DISPATCH_AUTHORIZATION_SCHEMA,
+};
 use chio_kernel::tool_outcome::ToolOutcomeStore;
 
 fn retained(
@@ -285,7 +293,8 @@ pub(super) fn verify(
             })?;
         }
         RecoveryMode::LateCallerReport => {
-            caller_lookup_waits_for_original_coordinator(&kernel, witness, &fence)?;
+            let (authorization, report) = adversarial_caller_report(witness, &before)?;
+            caller_lookup_waits_for_original_coordinator(&kernel, &authorization, &report, &fence)?;
             let barrier = std::sync::Barrier::new(2);
             std::thread::scope(|scope| -> TestResult {
                 let worker = scope.spawn(|| {
@@ -293,20 +302,13 @@ pub(super) fn verify(
                     kernel.reconcile_recoverable_admissions()
                 });
                 barrier.wait();
-                let result = kernel.reconcile_caller_execution_blocking(
-                    witness
-                        .request
-                        .execution_nonce
-                        .as_ref()
-                        .ok_or("native nonce")?,
-                    &witness.request.arguments,
-                    chio_kernel::CallerExecutionReport {
-                        output: serde_json::json!({"forged_late_report": true}),
-                        realized_cost: None,
-                    },
-                );
+                let result = kernel
+                    .reconcile_authenticated_caller_execution_blocking(&authorization, &report);
                 assert!(
-                    matches!(result, Err(KernelError::DurableAdmission(ref reason)) if reason.contains("caller")),
+                    matches!(result, Err(KernelError::DurableAdmission(ref reason))
+                        if matches!(reason.as_str(),
+                            "caller report original context is absent"
+                                | "caller operation is already being evaluated")),
                     "late caller transport must be rejected: {result:?}"
                 );
                 worker
@@ -314,6 +316,13 @@ pub(super) fn verify(
                     .map_err(|_| "late-report recovery panicked")??;
                 Ok(())
             })?;
+            let result =
+                kernel.reconcile_authenticated_caller_execution_blocking(&authorization, &report);
+            assert!(
+                matches!(result, Err(KernelError::DurableAdmission(ref reason))
+                    if reason == "caller report original context is absent"),
+                "native dispatch cannot accept caller delivery after recovery: {result:?}"
+            );
         }
     }
     let startup = kernel.reconcile_durable_admission_startup();
@@ -479,12 +488,105 @@ pub(super) fn verify(
     Ok(())
 }
 
-// A retained-request read must select trusted time only after it owns the same
-// sequencer as recovery. Otherwise a writer can advance the operation while
-// the lookup waits for SQLite, producing a false clock-regression failure.
+fn adversarial_caller_report(
+    witness: &Witness,
+    operation: &AdmissionOperationV1,
+) -> TestResult<(
+    SignedCallerDispatchAuthorizationV1,
+    SignedCallerDeliveryReportV1,
+)> {
+    let signer = Keypair::from_seed_hex(&witness.signer)?;
+    let executor_key = Keypair::generate();
+    let executor = CallerExecutorIdentityV1 {
+        executor_id: AdmissionIdentifier::try_new("executor", "adversarial-native-executor")?,
+        public_key: executor_key.public_key(),
+        key_epoch: 71,
+    };
+    let mut dispatch_commit = operation
+        .dispatch_commit()
+        .cloned()
+        .ok_or("native commit")?;
+    let attempt = dispatch_commit
+        .provider_attempt
+        .as_mut()
+        .ok_or("native attempt")?;
+    attempt.transport_id = format!(
+        "{}{}",
+        chio_core_types::provider_attempt::ProviderAttemptBindingV1::NATIVE_CALLER_REPORT_TRANSPORT_PREFIX,
+        witness.request.server_id,
+    );
+    attempt.transport_key_epoch = executor.key_epoch;
+    let authorization = SignedCallerDispatchAuthorizationV1::sign(
+        CallerDispatchAuthorizationBodyV1 {
+            schema: CALLER_DISPATCH_AUTHORIZATION_SCHEMA.into(),
+            kernel_public_key: signer.public_key(),
+            executor: executor.clone(),
+            invocation: CallerInvocationBindingV1 {
+                operation_id: operation.binding().operation_id().clone(),
+                request_id: operation.binding().request_id().clone(),
+                request_binding_hash: operation.binding().request_binding_hash().clone(),
+                capability_id: operation.binding().capability_id().clone(),
+                capability_digest: AdmissionDigest::try_new(
+                    "capability_digest",
+                    chio_core::sha256_hex(&chio_core::canonical_json_bytes(
+                        &witness.request.capability,
+                    )?),
+                )?,
+                server_id: AdmissionIdentifier::try_new("server", &witness.request.server_id)?,
+                tool_name: AdmissionIdentifier::try_new("tool", &witness.request.tool_name)?,
+                parameters_digest: operation.binding().action_parameter_hash().clone(),
+            },
+            committed: CallerCommittedDispatchV1 {
+                execution_nonce_id: operation
+                    .execution_nonce_id()
+                    .cloned()
+                    .ok_or("native nonce")?,
+                budget_hold_id: operation.budget_hold_id().cloned().ok_or("native hold")?,
+                dispatch_commit,
+                frozen_context_digest: operation
+                    .native_dispatch_ledger_digest()
+                    .cloned()
+                    .ok_or("native ledger")?,
+            },
+            not_before_unix_ms: witness.clock_unix_ms,
+            expires_at_unix_ms: witness
+                .clock_unix_ms
+                .checked_add(60_000)
+                .ok_or("time overflow")?,
+        },
+        &signer,
+    )?;
+    let report = SignedCallerDeliveryReportV1::sign(
+        CallerDeliveryReportBodyV1 {
+            schema: CALLER_DELIVERY_REPORT_SCHEMA.into(),
+            authorization_digest: authorization.verify_historical(
+                &signer.public_key(),
+                &executor,
+                &authorization.authorization.invocation,
+            )?,
+            executor: executor.clone(),
+            claim_id: AdmissionIdentifier::try_new("claim", "adversarial-native-report")?,
+            execution_started_at_unix_ms: witness.clock_unix_ms,
+            completed_at_unix_ms: witness.clock_unix_ms,
+            output: serde_json::json!({"forged_native_report": true}),
+            realized_cost: None,
+        },
+        &executor_key,
+    )?;
+    report.verify(
+        &authorization,
+        &signer.public_key(),
+        &executor,
+        &authorization.authorization.invocation,
+    )?;
+    Ok((authorization, report))
+}
+
+// Caller lookup samples trusted time under the operation's mutation sequencer.
 fn caller_lookup_waits_for_original_coordinator(
     kernel: &ChioKernel,
-    witness: &Witness,
+    authorization: &SignedCallerDispatchAuthorizationV1,
+    report: &SignedCallerDeliveryReportV1,
     fence: &chio_kernel::admission_operation::StoreMutationFence,
 ) -> TestResult {
     use chio_kernel::admission_operation::AdmissionMutationSequencer;
@@ -492,30 +594,18 @@ fn caller_lookup_waits_for_original_coordinator(
 
     let sequencer = AdmissionMutationSequencer::for_fence(fence)?;
     let guard = sequencer.lock()?;
-    let nonce = witness
-        .request
-        .execution_nonce
-        .as_ref()
-        .ok_or("native nonce")?;
     std::thread::scope(|scope| -> TestResult {
         let (started_tx, started_rx) = mpsc::sync_channel(1);
         let (finished_tx, finished_rx) = mpsc::sync_channel(1);
         let worker = scope.spawn(move || {
             let _ = started_tx.send(());
-            let result = kernel.reconcile_caller_execution_blocking(
-                nonce,
-                &witness.request.arguments,
-                chio_kernel::CallerExecutionReport {
-                    output: serde_json::json!({"forged_queued_report": true}),
-                    realized_cost: None,
-                },
-            );
+            let result =
+                kernel.reconcile_authenticated_caller_execution_blocking(authorization, report);
             let _ = finished_tx.send(result);
         });
         let started = started_rx.recv_timeout(Duration::from_secs(30));
         let early = finished_rx.recv_timeout(Duration::from_secs(1));
-        // Release before checking assertions so a failing test cannot strand
-        // the scoped worker waiting for the held coordinator.
+        // The worker must remain joinable when an assertion fails.
         drop(guard);
         started?;
         let waited = matches!(early, Err(mpsc::RecvTimeoutError::Timeout));
@@ -529,7 +619,8 @@ fn caller_lookup_waits_for_original_coordinator(
             "caller lookup bypassed the original mutation sequencer"
         );
         assert!(
-            matches!(result, Err(KernelError::DurableAdmission(ref reason)) if reason.contains("caller")),
+            matches!(result, Err(KernelError::DurableAdmission(ref reason))
+                if reason == "caller report original context is absent"),
             "queued native caller report must still be refused: {result:?}"
         );
         Ok(())

@@ -1,45 +1,56 @@
-//! A dispatched caller's unknown outcome must never become a free retry.
+//! An unknown caller outcome retains executor custody, quota and delegated share.
 
 use super::*;
-use chio_kernel::CallerExecutionCheckpoint;
+use crate::authenticated::{fixture, start};
+use chio_kernel::KernelError;
+use chio_store_sqlite::caller_execution_ledger::CallerExecutionLedgerError;
+use std::fs::OpenOptions;
+use std::io::Write;
 
 #[test]
 fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_expiry() -> TestResult
 {
-    let fixture = Fixture::with_nonce_ttl(300)?;
-    let (siblings, first) = {
+    let (fixture, executor_key) = fixture()?;
+    let ledger_path = fixture.directory.path().join("executor.db");
+    let effect_path = fixture.directory.path().join("unknown-external-effect");
+    let effects = std::sync::atomic::AtomicUsize::new(0);
+    let (siblings, first, authorization) = {
+        let ledger = crate::authenticated::ledger(&fixture)?;
         let mut runtime = fixture.open()?;
         let siblings = Siblings::new(&fixture, &mut runtime)?;
-        Arc::get_mut(&mut runtime.kernel)
-            .ok_or("exclusive test kernel")?
-            .install_caller_execution_checkpoint_hook(Arc::new(|checkpoint, operation| {
-                assert!(
-                    checkpoint != CallerExecutionCheckpoint::DispatchCommitted
-                        || operation.binding().request_id().as_str() != "unknown-caller",
-                    "injected interruption after caller dispatch commitment"
-                );
-            }));
         let first = reserve_child(&runtime, &request(&siblings.first, "unknown-caller")?)?;
-        let nonce = first.execution_nonce.as_ref().ok_or("reserved nonce")?;
-        let interrupted = std::thread::scope(|scope| {
-            scope
-                .spawn(|| {
-                    runtime.kernel.reconcile_caller_execution_blocking(
-                        nonce,
-                        &first.arguments,
-                        report(),
-                    )
-                })
-                .join()
-        });
-        assert!(
-            interrupted.is_err(),
-            "the dispatch checkpoint must be reached"
+        let authorization = start(&runtime, &first)?;
+        let result = ledger.execute_once(
+            &authorization,
+            &fixture.signer.public_key(),
+            &authorization.authorization.invocation,
+            &executor_key,
+            || {
+                effects.fetch_add(1, Ordering::SeqCst);
+                let write_effect = || -> std::io::Result<()> {
+                    let mut effect = OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(&effect_path)?;
+                    effect.write_all(b"caller effect committed\n")?;
+                    effect.sync_all()
+                };
+                write_effect().map_err(|error| KernelError::ToolServerError(error.to_string()))?;
+                Err(KernelError::ToolServerError(
+                    "caller result unavailable".into(),
+                ))
+            },
         );
-        assert_state(&fixture, &first, "outcome_unknown_after_dispatch")?;
+        assert!(matches!(
+            result,
+            Err(CallerExecutionLedgerError::OutcomeUnknown)
+        ));
+        assert_eq!(std::fs::read(&effect_path)?, b"caller effect committed\n");
+        assert_eq!(authorization, start(&runtime, &first)?);
+        assert_state(&fixture, &first, "dispatch_committed")?;
         assert_eq!(grant_quota(&runtime, &first)?, (0, 1));
         assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
-        (siblings, first)
+        (siblings, first, authorization)
     };
     let expiry = u64::try_from(
         first
@@ -49,11 +60,12 @@ fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_exp
             .expires_at(),
     )?;
     let after_expiry = expiry.checked_add(1).ok_or("expiry overflow")?;
+    assert!(after_expiry < first.capability.expires_at);
     let _clock = chio_test_support::clock::scope_unix_secs(after_expiry);
     let mut runtime = fixture.open_with_reconcile(false)?;
     siblings.configure(&fixture, &mut runtime)?;
     runtime.kernel.reconcile_durable_admission_startup()?;
-    assert_state(&fixture, &first, "outcome_unknown_after_dispatch")?;
+    assert_state(&fixture, &first, "awaiting_caller_report")?;
     assert_eq!(grant_quota(&runtime, &first)?, (0, 1));
     let parent = AdmissionIdentifier::try_new("parent_id", siblings.parent.id.clone())?;
     let shares = runtime
@@ -68,7 +80,7 @@ fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_exp
     assert_eq!(
         shares.len(),
         1,
-        "unknown terminal owners stay in the complete view"
+        "unreported caller effects retain their delegated share"
     );
     assert_eq!(shares[0].child_id().as_str(), first.capability.id);
     assert!(shares[0].is_reserved_for_caller());
@@ -81,14 +93,36 @@ fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_exp
         .reason
         .as_deref()
         .is_some_and(|reason| reason.contains("sibling-sum")));
-    if let Ok(replayed) = reconcile(&runtime, &first) {
-        assert_ne!(
-            replayed.verdict,
-            Verdict::Allow,
-            "unknown effects cannot be replayed as success"
+    let ledger = crate::authenticated::ledger(&fixture)?;
+    for _ in 0..2 {
+        let replayed = start(&runtime, &first)?;
+        assert_eq!(replayed, authorization);
+        let result = ledger.execute_once(
+            &replayed,
+            &fixture.signer.public_key(),
+            &authorization.authorization.invocation,
+            &executor_key,
+            || {
+                effects.fetch_add(1, Ordering::SeqCst);
+                Ok(report())
+            },
         );
+        assert!(matches!(
+            result,
+            Err(CallerExecutionLedgerError::OutcomeUnknown)
+        ));
     }
-    assert_state(&fixture, &first, "outcome_unknown_after_dispatch")?;
+    let connection = rusqlite::Connection::open(&ledger_path)?;
+    let custody: (u64, u64) = connection.query_row(
+        "SELECT (SELECT count(*) FROM caller_executor_claims),
+                (SELECT count(*) FROM caller_executor_reports)",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    assert_eq!(custody, (1, 0));
+    assert_eq!(effects.load(Ordering::SeqCst), 1);
+    assert_eq!(std::fs::read(&effect_path)?, b"caller effect committed\n");
+    assert_state(&fixture, &first, "awaiting_caller_report")?;
     assert_eq!(grant_quota(&runtime, &first)?, (0, 1));
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())

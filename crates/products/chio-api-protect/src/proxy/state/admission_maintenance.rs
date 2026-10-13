@@ -22,7 +22,6 @@ pub(crate) struct MaintenanceHealth {
     pub(crate) ticks_attempted: u64,
     pub(crate) ticks_completed: u64,
     pub(crate) recovered: u64,
-    pub(crate) reaped: u64,
     pub(crate) busy_skips: u64,
     pub(crate) worker_running: bool,
     pub(crate) worker_joined: bool,
@@ -52,7 +51,6 @@ impl MaintenanceControl {
                     ticks_attempted: 0,
                     ticks_completed: 0,
                     recovered: 0,
-                    reaped: 0,
                     busy_skips: 0,
                     worker_running: true,
                     worker_joined: false,
@@ -163,7 +161,6 @@ pub(crate) struct AdmissionMaintenance {
 impl AdmissionMaintenance {
     pub(crate) fn spawn(
         kernel: Arc<Mutex<ChioKernel>>,
-        hold_capable: bool,
         controller: Arc<ShutdownController>,
         interval: Duration,
     ) -> Result<Self, ProtectError> {
@@ -175,7 +172,7 @@ impl AdmissionMaintenance {
             .spawn(move || {
                 let _entered_original_runtime = runtime.enter();
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    run_worker(&kernel, hold_capable, &worker_control, interval)
+                    run_worker(&kernel, &worker_control, interval)
                 }));
                 match result {
                     Ok(Ok(())) => {}
@@ -244,7 +241,6 @@ impl Drop for AdmissionMaintenance {
 
 fn run_worker(
     kernel: &Mutex<ChioKernel>,
-    hold_capable: bool,
     control: &MaintenanceControl,
     interval: Duration,
 ) -> Result<(), KernelError> {
@@ -258,8 +254,7 @@ fn run_worker(
             })?;
             continue;
         };
-        // Exactly one physical page on this original kernel. Ok(0) can mean a
-        // known parked item or concurrent progress; it does not settle money.
+        // Each tick recovers at most one bounded page on the serving kernel.
         let recovered =
             kernel.reconcile_recoverable_admissions_batch(ADMISSION_CANDIDATES_PER_TICK)?;
         control.update(|state| {
@@ -267,21 +262,6 @@ fn run_worker(
                 .health
                 .recovered
                 .saturating_add(u64::try_from(recovered).unwrap_or(u64::MAX));
-        })?;
-        let reaped = if hold_capable {
-            let now = kernel.authority_clock_reading()?.unix_millis().get() / 1_000;
-            let now = i64::try_from(now).map_err(|_| {
-                KernelError::Clock(chio_security_types::clock::ClockError::Overflow)
-            })?;
-            kernel.reap_expired_reserved_budget_holds(now)?
-        } else {
-            0
-        };
-        control.update(|state| {
-            state.health.reaped = state
-                .health
-                .reaped
-                .saturating_add(u64::try_from(reaped).unwrap_or(u64::MAX));
             state.health.ticks_completed = state.health.ticks_completed.saturating_add(1);
             state.health.lifecycle = MaintenanceLifecycle::Ready;
         })?;

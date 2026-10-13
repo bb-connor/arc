@@ -354,10 +354,10 @@ separate requirements; this table alone does not qualify a deployment.
 | D004-D005 | `crates/core/chio-arena/src/runtime.rs` | Adversarial arena harness | P10, workspace arena tests |
 | D006-D007 | `crates/guards/chio-policy/src/evaluate/engine.rs` | Pure policy evaluation, no connector dispatch | P01, policy tests |
 | D008-D009 | `crates/kernel/chio-kernel/benches/fixtures/dispatch_request_fixture.rs` | Benchmark harness, not deployment authority | C23-C25 |
-| D010-D015 | `crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs` | Caller reservation/start/report kernel owner | P01, M1-M3 and flow gates |
+| D011-D015 | `crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs` | Caller reservation/start/report kernel owner | P01, M1-M3 and flow gates |
 | D016-D022 | `crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_entry.rs` | Ordinary kernel entry/facade | P01, M1-M3 and flow gates |
 | D023-D024 | `crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs` | Nested/session kernel owner | P01, M1-M3 and flow gates |
-| D025-D035 | `crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs` | Ordinary kernel entry/facade | P01, M1-M3 and flow gates |
+| D026-D035 | `crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs` | Ordinary kernel entry/facade | P01, M1-M3 and flow gates |
 | D036-D037 | `crates/kernel/chio-kernel/src/kernel/evaluator.rs` | Ordinary kernel entry/facade | P01, M1-M3 and flow gates |
 | D038 | `crates/kernel/chio-kernel/src/kernel/session_ops.rs` | Nested/session kernel owner | P01, M1-M3 and flow gates |
 | D039-D042 | `crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs` | Nested/session kernel owner | P01, M1-M3 and flow gates |
@@ -370,7 +370,6 @@ separate requirements; this table alone does not qualify a deployment.
 | D051-D052 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support.rs` | Included native host acceptance fixture | P01/P07, exact M3 native custody |
 | D053 | `crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs` | Configured operator purchase host | C17/P10, domain authority and recovery tests |
 | D054 | `crates/platform/chio-http-core/src/authority.rs` | HTTP authorization kernel host | C06-C07/P06, HTTP authority tests |
-| D055 | `crates/products/chio-api-protect/src/proxy/mediated.rs` | Authenticated caller control and retained report | P07, exact M3 dependency gate |
 | D056 | `crates/products/chio-api-protect/src/proxy/mediated/authenticated.rs` | Authenticated caller control and retained report | P07, exact M3 dependency gate |
 | D057 | `crates/products/chio-cli/src/cli/mcp/governed_sim.rs` | Simulation harness, no provider authority | C14 |
 | D058 | `crates/products/chio-cli/src/cli/mcp/wrap.rs` | Ordinary MCP wrap, constrained profiles reject | C13, wrap compatibility gate |
@@ -384,7 +383,7 @@ separate requirements; this table alone does not qualify a deployment.
 | D079 | `examples/hello-mcp/src/lib.rs` | Ordinary executable example, local echo connector | C18-C20, example tests |
 | D080-D082 | `crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs` | Caller reservation, including host security context and strict nonce preflight | P01/P07, exact M3 dependency gate |
 | D083-D084 | `crates/kernel/chio-kernel/src/provider_verdict.rs` | Provider verdict APIs retain verified registry and optional host security context | P06, provider lowering and missing/forged-sidecar cases |
-| D085-D086 | `crates/products/chio-api-protect/src/proxy/mediated.rs` | Mediated reservation endpoint, never execution permission | P07, API-protect caller and M3 dependency gates |
+| D086 | `crates/products/chio-api-protect/src/proxy/mediated.rs` | Mediated reservation endpoint, never execution permission | P07, API-protect caller and M3 dependency gates |
 | D087, D089 | `crates/kernel/chio-process/src/lib.rs::ProcessRuntime::invoke_with_recovery` | Original operation/request and ancestor capability binding; optional trusted security context is refreshed before kernel evaluation | C30, `host_flow_identity_is_bound_to_the_original_process_operation`, nonce and crash/recovery gates |
 | D088 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/process_recovery/restart.rs::caller_lookup_waits_for_original_coordinator` | Included reconciliation fixture | P01/P07, native process restart and exact M3 dependency gate |
 | D090-D091 | `examples/rust-runtime-consumer/src/main.rs::{initial,recover}` | Two initial kernel calls (allow/deny) and original-outcome recovery | C31, offline Rust package consumer with independently counted effect |

@@ -82,7 +82,7 @@ fn start(
         .mediation_kernel
         .as_ref()
         .ok_or_else(|| ProtectError::Config("fixture omitted its original kernel".into()))?;
-    AdmissionMaintenance::spawn(kernel.clone(), true, controller, Duration::from_millis(10))
+    AdmissionMaintenance::spawn(kernel.clone(), controller, Duration::from_millis(10))
 }
 
 #[tokio::test]

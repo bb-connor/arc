@@ -451,7 +451,6 @@ const REQUIRED_SOURCES: &[RequiredSource] = &[
         symbols: &[
             "ChioKernel::run_pre_budget_admission",
             "ChioKernel::reserve_admitted_dispatch_credentials",
-            "ChioKernel::reserve_admitted_caller_credentials",
             "PreparedDispatchCredentials::claim_for_admission",
             "PreparedDispatchCredentials::reserve_for_admission",
         ],

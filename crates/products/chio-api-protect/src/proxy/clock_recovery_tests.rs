@@ -183,11 +183,11 @@ fn service_clock_is_shared_by_durable_admission_and_configured_budget_owners(
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
-    let legacy =
+    let configured_budget =
         build_budget_store(&config, Arc::new(clock.clone()))?.ok_or("missing budget store")?;
     let operation =
         chio_kernel::admission_operation::AdmissionOperationId::from_persisted("01".repeat(32))?;
-    let stores = [legacy.store];
+    let stores = [configured_budget];
     source.set(base - 90_000, 1_000_000_000);
     assert!(durable
         .store

@@ -81,11 +81,6 @@ fn process_loss_retains_capture_and_never_reexecutes_original_attempt() -> TestR
         let (fixture, executor_key) = fixture()?;
         let root = fixture.directory.path();
         let executor = fixture.caller_executor.clone().ok_or("executor")?;
-        drop(SqliteCallerExecutionLedger::provision(
-            &root.join("executor.db"),
-            executor.clone(),
-            4,
-        )?);
         let mut child = Command::new(std::env::current_exe()?)
             .args(["--exact", "authenticated::process_loss::process_loss_retains_capture_and_never_reexecutes_original_attempt", "--nocapture"])
             .env(ROOT, root).env(CUT, cut)

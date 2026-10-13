@@ -15,10 +15,12 @@
  * `/chio/evaluate` rejects them outright, so a caller that populated them would
  * be denied before the kernel ever saw the intent. Those extensions belong to
  * the kernel-mediated `POST /v1/evaluate` route, which takes a full signed
- * capability, reserves a budget hold and returns a minted execution nonce that
- * the caller must settle through `/v1/reconcile`. That is a different request
- * and response contract than this client exposes; see the Python SDK's
- * `evaluate_tool_call_mediated` for the mediated shape.
+ * capability and requires durable admission. Its reservation requires a signed
+ * `/v1/caller/start` authorization and a durable claim by the host-pinned executor
+ * before execution. The executor's signed `/v1/caller/report` resumes the
+ * original operation's kernel finalization. See the Python SDK's
+ * `evaluate_tool_call_mediated`, `start_mediated_execution`, and
+ * `report_mediated_execution` for that contract.
  *
  * Transport uses `globalThis.fetch` (Node >= 20 ships it natively) and
  * supports a pluggable `fetch` override for testing.

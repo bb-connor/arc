@@ -1,28 +1,15 @@
-//! Strict-nonce preflight of the async evaluation core.
+//! Strict-nonce preparation without execution authority.
 
-use super::evaluation_helpers::{ExecutionNonceReservingResponse, PreDispatchCleanupDeny};
+use super::evaluation_helpers::PreDispatchCleanupDeny;
 use super::*;
-use crate::kernel::dispatch::dispatch_admission_error_reason;
-use crate::kernel::receipt_identity::{with_identity_disposition, IdentityDisposition};
-use crate::kernel::responses::PreflightNonceSource;
-use crate::kernel::validation::ReservedPrepaymentFailure;
 
-/// Evaluation state at the strict-nonce preflight: every admission check has
-/// passed, the pre-execution hold is reserved, and no execution nonce was
-/// presented on the request.
+/// Admitted state before nonce issuance and reversal of the preflight hold.
 pub(super) struct StrictNoncePreflight<'a> {
     pub(super) request: &'a ToolCallRequest,
-    pub(super) session_filesystem_roots: Option<&'a [String]>,
-    pub(super) session_id: Option<&'a SessionId>,
-    pub(super) security_context: Option<&'a SecurityInvocationContext>,
-    pub(super) preflight_disposition: PreflightHoldDisposition,
-    pub(super) receipt_admission: &'a ReceiptFederationAdmission,
     pub(super) now: u64,
     pub(super) cap: &'a CapabilityToken,
     pub(super) matching_grants: &'a [MatchingGrant<'a>],
-    pub(super) dpop_required: bool,
     pub(super) matched_grant_index: usize,
-    pub(super) matched_grant: &'a ToolGrant,
     pub(super) budget_mutation: &'a PreExecutionBudgetMutation,
     pub(super) durable_admission: &'a mut Option<DurableToolAdmission>,
     pub(super) extra_metadata: Option<serde_json::Value>,
@@ -32,26 +19,16 @@ pub(super) struct StrictNoncePreflight<'a> {
 }
 
 impl ChioKernel {
-    /// Settle the reserved hold per the preflight disposition without
-    /// dispatching the tool: reverse it for a retry, or keep it open and hand
-    /// the caller a non-authoritative authorization carrying the minted nonce.
-    pub(super) async fn run_async_strict_nonce_preflight(
+    pub(super) fn run_strict_nonce_preflight(
         &self,
         preflight: StrictNoncePreflight<'_>,
     ) -> Result<ToolCallResponse, KernelError> {
         let StrictNoncePreflight {
             request,
-            session_filesystem_roots,
-            session_id,
-            security_context,
-            preflight_disposition,
-            receipt_admission,
             now,
             cap,
             matching_grants,
-            dpop_required,
             matched_grant_index,
-            matched_grant,
             budget_mutation,
             durable_admission,
             extra_metadata,
@@ -59,11 +36,6 @@ impl ChioKernel {
             verified_governed_payee_binding,
             budget_lease_acquired,
         } = preflight;
-        // Nonce-preflight authorizes without producing output: reserve-
-        // for-caller settles a prepayment and reverse-for-retry mints a
-        // nonce, neither reaching an output-aware terminal. An
-        // output-digest grant cannot be enforced here, so reject before
-        // any mint or capture.
         if matching_grants
             .iter()
             .find(|matching| matching.index == matched_grant_index)
@@ -96,368 +68,17 @@ impl ChioKernel {
                 })
             });
         }
-        if preflight_disposition == PreflightHoldDisposition::ReverseForRetry {
-            return self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
-                self.build_execution_nonce_preflight_allow_response_after_cleanup(
-                    request,
-                    now,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation,
-                    durable_admission.as_mut(),
-                    extra_metadata,
-                    budget_lease_acquired,
-                )
-            });
-        }
-
-        let governed_mustprepay = Self::is_governed_mustprepay_request(request);
-        let mut credential_reservation = match self.reserve_admitted_caller_credentials(
-            request,
-            dpop_required,
-            now,
-            durable_admission.as_ref(),
-            matched_grant_index,
-        ) {
-            Ok(reservation) => reservation,
-            Err(error) => {
-                let reason = error.to_string();
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %redacted!(&reason),
-                    "reserve-for-caller credential reservation denied"
-                );
-                return self.with_pre_invocation_guard_evidence(
-                    pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: &reason,
-                            timestamp: now,
-                            matched_grant_index,
-                            cap,
-                            budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_admission
-                                .as_ref()
-                                .map(DurableToolAdmission::operation),
-                            runtime_admission_metadata: extra_metadata.clone(),
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            budget_lease_acquired,
-                        })
-                    },
-                );
-            }
-        };
-
-        let revalidation_now_unix_ms = self.read_authority_time()?.get();
-        let readiness_result = {
-            let mut readiness_drop_guard = PostAdmissionDropGuard::new(
-                self,
+        self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
+            self.build_execution_nonce_preflight_allow_response_after_cleanup(
                 request,
+                now,
+                matched_grant_index,
                 cap,
-                Some(matched_grant_index),
                 budget_mutation,
-                None,
-                PostAdmissionReceiptContext {
-                    extra_metadata: extra_metadata.clone(),
-                    pre_invocation_guard_evidence: pre_invocation_guard_evidence.to_vec(),
-                    verified_payee_binding: verified_governed_payee_binding.clone(),
-                },
+                durable_admission.as_mut(),
+                extra_metadata,
                 budget_lease_acquired,
             )
-            .with_durable_operation(
-                durable_admission
-                    .as_ref()
-                    .map(DurableToolAdmission::operation),
-            );
-            let result = self
-                .wait_for_runtime_admission_dispatch_readiness(request)
-                .await;
-            readiness_drop_guard.disarm();
-            result
-        };
-        let reserve_authorization_admission = match readiness_result {
-            Ok(readiness_waited) => self
-                .revalidate_immediately_before_dispatch(
-                    request,
-                    durable_admission.as_ref(),
-                    dpop_required,
-                    matched_grant,
-                    matched_grant_index,
-                    None,
-                    session_id,
-                    session_filesystem_roots,
-                    security_context,
-                    receipt_admission,
-                    extra_metadata.as_ref(),
-                    true,
-                    false,
-                    readiness_waited
-                        || credential_reservation.requires_post_reservation_revalidation(),
-                    revalidation_now_unix_ms / 1000,
-                    revalidation_now_unix_ms,
-                )
-                .map(|_| ()),
-            Err(error) => Err(error),
-        };
-        if let Err(error) = reserve_authorization_admission {
-            let mut reason = dispatch_admission_error_reason(&error);
-            let credential_disposition =
-                if let Err(rollback_error) = credential_reservation.rollback_before_dispatch() {
-                    reason = format!("{reason}; {rollback_error}");
-                    PaymentCredentialDisposition::RetentionOutcomeUnknown
-                } else {
-                    PaymentCredentialDisposition::NonePresent
-                };
-            warn!(
-                request_id = %request.request_id,
-                reason = %redacted!(&reason),
-                "reserve-for-caller revalidation denied"
-            );
-            return self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
-                let denial = PreDispatchCleanupDeny {
-                    request,
-                    reason: &reason,
-                    timestamp: revalidation_now_unix_ms / 1000,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    runtime_admission_metadata: error.denied_metadata(&extra_metadata),
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                };
-                if credential_disposition == PaymentCredentialDisposition::RetentionOutcomeUnknown {
-                    self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                        denial,
-                        credential_disposition,
-                    )
-                } else {
-                    self.build_pre_dispatch_cleanup_deny_response(denial)
-                }
-            });
-        }
-
-        if governed_mustprepay && !credential_reservation.has_payment_authorization_credential() {
-            let mut reason =
-                "strict reserve-for-caller payment authorization omitted its governed replay marker"
-                    .to_string();
-            if let Err(rollback_error) = credential_reservation.rollback_before_dispatch() {
-                reason = format!("{reason}; {rollback_error}");
-            }
-            return self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
-                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                    request,
-                    reason: &reason,
-                    timestamp: revalidation_now_unix_ms / 1000,
-                    matched_grant_index,
-                    cap,
-                    budget_mutation,
-                    payment_authorization: None,
-                    durable_operation: durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    runtime_admission_metadata: extra_metadata.clone(),
-                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                    budget_lease_acquired,
-                })
-            });
-        }
-
-        let settled_prepayment = match self.ensure_reserved_mustprepay_prepaid(
-            request,
-            budget_mutation.charge_result(),
-            durable_admission.as_ref(),
-            revalidation_now_unix_ms,
-            verified_governed_payee_binding.as_ref(),
-        ) {
-            Ok(prepayment) => prepayment,
-            Err(ReservedPrepaymentFailure::CaptureOutcomeUnknown(failure)) => {
-                // The rail acknowledged authorization and may have captured it.
-                // Retain credentials before any diagnostic or receipt callback.
-                let mut reason = format!(
-                    "MustPrepay prepayment capture outcome is unknown before reserving an execution nonce: {}",
-                    failure.error_code()
-                );
-                let credential_disposition = match credential_reservation.commit() {
-                    Ok(disposition) => disposition,
-                    Err(error) => {
-                        reason.push_str("; dispatch credential retention could not be confirmed");
-                        warn!(
-                            request_id = %request.request_id,
-                            reason = %redacted!(&error),
-                            audit_fault = "pre_dispatch_payment_capture_credentials_unconfirmed",
-                            "credential retention is unconfirmed after prepayment capture"
-                        );
-                        PaymentCredentialDisposition::RetentionOutcomeUnknown
-                    }
-                };
-                let authorization = failure.authorization();
-                warn!(
-                    request_id = %request.request_id,
-                    authorization_id = %authorization.authorization_id,
-                    error_code = failure.error_code(),
-                    reason = %redacted!(failure.error()),
-                    audit_fault = "pre_dispatch_payment_capture_outcome_unknown",
-                    "prepayment capture outcome is unknown; retaining payment and budget custody"
-                );
-                let metadata = merge_metadata_objects(
-                    self.retained_admission_receipt_metadata(
-                        budget_mutation,
-                        extra_metadata.clone(),
-                    ),
-                    Some(serde_json::json!({
-                        "financial": {
-                            "authorization_id": authorization.authorization_id,
-                            "payment_reference": authorization.authorization_id,
-                            "settlement_status": SettlementStatus::Failed,
-                            "release_outcome": "not_released",
-                            "payment_authorization_retained": true,
-                            "payment_capture_ambiguous": true,
-                            "payment_capture_error_code": failure.error_code(),
-                            "payment_capture_attempt_reference": request.request_id
-                        }
-                    })),
-                );
-                let metadata = self.merge_dispatch_credential_disposition_metadata(
-                    metadata,
-                    credential_disposition,
-                );
-                let metadata = with_identity_disposition(metadata, IdentityDisposition::Retained);
-                return self.with_pre_invocation_guard_evidence(
-                    pre_invocation_guard_evidence,
-                    || {
-                        self.build_deny_response_with_metadata_and_payee_binding(
-                            request,
-                            &reason,
-                            revalidation_now_unix_ms / 1000,
-                            Some(matched_grant_index),
-                            metadata,
-                            verified_governed_payee_binding.as_ref(),
-                        )
-                    },
-                );
-            }
-            Err(ReservedPrepaymentFailure::Denied(error)) => {
-                let mut reason = error.to_string();
-                let credential_disposition = if governed_mustprepay {
-                    match credential_reservation.commit() {
-                        Ok(disposition) => disposition,
-                        Err(retention_error) => {
-                            reason = format!("{reason}; {retention_error}");
-                            PaymentCredentialDisposition::RetentionOutcomeUnknown
-                        }
-                    }
-                } else {
-                    match credential_reservation.rollback_before_dispatch() {
-                        Ok(()) => PaymentCredentialDisposition::NonePresent,
-                        Err(rollback_error) => {
-                            reason = format!("{reason}; {rollback_error}");
-                            PaymentCredentialDisposition::RetentionOutcomeUnknown
-                        }
-                    }
-                };
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %redacted!(&reason),
-                    "reserve-for-caller prepayment gate denied"
-                );
-                return self.with_pre_invocation_guard_evidence(
-                    pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                            PreDispatchCleanupDeny {
-                                request,
-                                reason: &reason,
-                                timestamp: revalidation_now_unix_ms / 1000,
-                                matched_grant_index,
-                                cap,
-                                budget_mutation,
-                                payment_authorization: None,
-                                durable_operation: durable_admission
-                                    .as_ref()
-                                    .map(DurableToolAdmission::operation),
-                                runtime_admission_metadata: extra_metadata.clone(),
-                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                                budget_lease_acquired,
-                            },
-                            credential_disposition,
-                        )
-                    },
-                );
-            }
-        };
-
-        let credential_disposition = match credential_reservation
-            .retain_after_external_authorization()
-        {
-            Ok(disposition) => disposition,
-            Err(error) => {
-                let reason = format!(
-                    "reserve-for-caller credential retention failed before authorization: {error}"
-                );
-                return self.with_pre_invocation_guard_evidence(
-                    pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                            PreDispatchCleanupDeny {
-                                request,
-                                reason: &reason,
-                                timestamp: self
-                                    .read_authority_time()
-                                    .map(|time| time.as_secs())
-                                    .unwrap_or(now),
-                                matched_grant_index,
-                                cap,
-                                budget_mutation,
-                                payment_authorization: settled_prepayment
-                                    .as_ref()
-                                    .map(|prepayment| &prepayment.authorization),
-                                durable_operation: durable_admission
-                                    .as_ref()
-                                    .map(DurableToolAdmission::operation),
-                                runtime_admission_metadata: extra_metadata.clone(),
-                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                                budget_lease_acquired,
-                            },
-                            PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                        )
-                    },
-                );
-            }
-        };
-
-        let reserved_payment_reference = settled_prepayment
-            .as_ref()
-            .and_then(|prepayment| prepayment.payment_reference.clone());
-        let response =
-            self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
-                self.build_execution_nonce_authorization_reserving_response(
-                    ExecutionNonceReservingResponse {
-                        durable_admission: None,
-                        request,
-                        timestamp: now,
-                        matched_grant_index,
-                        budget_mutation,
-                        runtime_admission_metadata: extra_metadata,
-                        reserved_payment_reference,
-                        budget_lease_acquired,
-                        nonce: PreflightNonceSource::Mint,
-                    },
-                )
-            });
-        if response.is_err() {
-            if let Some(prepayment) = settled_prepayment.as_ref() {
-                self.refund_reserved_mustprepay_prepayment(request, &prepayment.authorization);
-            }
-        }
-        let response = response?;
-        let committed_disposition = credential_reservation.commit()?;
-        debug_assert_eq!(committed_disposition, credential_disposition);
-        Ok(response)
+        })
     }
 }

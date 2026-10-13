@@ -21,7 +21,7 @@ use std::time::Duration;
 
 use chio_core::session::OperationTerminalState;
 use chio_kernel::execution_nonce::SignedExecutionNonce;
-use chio_kernel::{CallerExecutionReport, ToolCallRequest, ToolCallResponse, Verdict};
+use chio_kernel::{CallerExecutionReport, ToolCallRequest, Verdict};
 use support::*;
 
 fn preflight(runtime: &Runtime, request: &ToolCallRequest) -> TestResult<SignedExecutionNonce> {
@@ -77,13 +77,6 @@ fn report() -> CallerExecutionReport {
     }
 }
 
-fn reconcile(runtime: &Runtime, execution: &ToolCallRequest) -> TestResult<ToolCallResponse> {
-    let nonce = execution.execution_nonce.as_ref().ok_or("reserved nonce")?;
-    Ok(runtime
-        .kernel
-        .reconcile_caller_execution_blocking(nonce, &execution.arguments, report())?)
-}
-
 fn assert_state(fixture: &Fixture, request: &ToolCallRequest, state: &str) -> TestResult {
     let (_, actual) = operation_state(fixture, &request.request_id)?.ok_or("retained operation")?;
     assert_eq!(actual, state);
@@ -96,11 +89,14 @@ fn canonical<T: serde::Serialize>(value: &T) -> TestResult<Vec<u8>> {
 
 #[test]
 fn caller_reservation_holds_the_budget_until_the_report_settles() -> TestResult {
-    let fixture = Fixture::new()?;
+    let (fixture, key) = authenticated::fixture()?;
     let runtime = fixture.open()?;
     let execution = reserve(&fixture, &runtime, "caller-settles")?;
 
-    let settled = reconcile(&runtime, &execution)?;
+    let (authorization, report) = authenticated::deliver(&fixture, &key, &runtime, &execution)?;
+    let settled = runtime
+        .kernel
+        .reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;
     assert_eq!(settled.verdict, Verdict::Allow, "{:?}", settled.reason);
     assert_eq!(settled.terminal_state, OperationTerminalState::Completed);
     assert_state(&fixture, &execution, "completed")?;
@@ -111,7 +107,9 @@ fn caller_reservation_holds_the_budget_until_the_report_settles() -> TestResult 
         "the kernel never dispatched to its own server"
     );
 
-    let replay = reconcile(&runtime, &execution)?;
+    let replay = runtime
+        .kernel
+        .reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;
     assert_eq!(replay.verdict, Verdict::Allow, "{:?}", replay.reason);
     assert_eq!(canonical(&settled.receipt)?, canonical(&replay.receipt)?);
     assert_eq!(grant_quota(&runtime, &execution)?, (0, 1));
@@ -119,49 +117,46 @@ fn caller_reservation_holds_the_budget_until_the_report_settles() -> TestResult 
 }
 
 #[test]
-fn a_report_for_other_arguments_is_refused_and_keeps_the_reservation() -> TestResult {
-    let fixture = Fixture::new()?;
+fn a_start_for_other_arguments_is_refused_and_keeps_the_reservation() -> TestResult {
+    let (fixture, key) = authenticated::fixture()?;
     let runtime = fixture.open()?;
     let execution = reserve(&fixture, &runtime, "caller-other-arguments")?;
     let nonce = execution.execution_nonce.as_ref().ok_or("reserved nonce")?;
-    let refused = runtime.kernel.reconcile_caller_execution_blocking(
-        nonce,
-        &serde_json::json!({ "not": "the reserved call" }),
-        report(),
-    );
+    let refused = runtime
+        .kernel
+        .start_caller_execution_blocking(nonce, &serde_json::json!({ "not": "the reserved call" }));
     assert!(
-        refused
-            .as_ref()
-            .is_err_and(|error| error.to_string().contains("do not match the reserved call")),
-        "{refused:?}"
+        matches!(refused, Err(chio_kernel::KernelError::DurableAdmission(reason))
+        if reason == "caller start arguments differ from the original request")
     );
     assert_state(&fixture, &execution, "ready_to_dispatch")?;
     assert_eq!(grant_quota(&runtime, &execution)?, (1, 0));
-    let settled = reconcile(&runtime, &execution)?;
+    let (authorization, report) = authenticated::deliver(&fixture, &key, &runtime, &execution)?;
+    let settled = runtime
+        .kernel
+        .reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;
     assert_eq!(settled.verdict, Verdict::Allow, "{:?}", settled.reason);
     assert_state(&fixture, &execution, "completed")?;
     Ok(())
 }
 
 #[test]
-fn a_nonce_of_an_unreserved_operation_cannot_reconcile() -> TestResult {
-    let fixture = Fixture::new()?;
+fn a_nonce_of_an_unreserved_operation_cannot_start() -> TestResult {
+    let (fixture, _) = authenticated::fixture()?;
     let runtime = fixture.open()?;
     let _reserved = reserve(&fixture, &runtime, "caller-reserved")?;
     let other = fixture.request(&runtime, "caller-unreserved")?;
     let other_nonce = preflight(&runtime, &other)?;
-    let refused = runtime.kernel.reconcile_caller_execution_blocking(
-        &other_nonce,
-        &other.arguments,
-        report(),
-    );
+    let refused = runtime
+        .kernel
+        .start_caller_execution_blocking(&other_nonce, &other.arguments);
     assert!(
         matches!(
             &refused,
             Err(chio_kernel::KernelError::DurableAdmission(reason))
-                if reason == "original caller nonce reservation is absent"
+                if reason == "caller start original nonce is absent"
         ),
-        "{refused:?}"
+        "an unreserved nonce cannot publish start authority"
     );
     assert_state(&fixture, &other, "prepared")?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
@@ -170,7 +165,7 @@ fn a_nonce_of_an_unreserved_operation_cannot_reconcile() -> TestResult {
 
 #[test]
 fn kernel_dispatch_cannot_resume_a_caller_reservation() -> TestResult {
-    let fixture = Fixture::new()?;
+    let (fixture, _) = authenticated::fixture()?;
     let runtime = fixture.open()?;
     let execution = reserve(&fixture, &runtime, "caller-not-kernel")?;
     let denied = runtime.kernel.evaluate_tool_call_blocking(&execution)?;
@@ -191,7 +186,7 @@ fn kernel_dispatch_cannot_resume_a_caller_reservation() -> TestResult {
 
 #[test]
 fn restart_keeps_a_live_caller_reservation() -> TestResult {
-    let fixture = Fixture::new()?;
+    let (fixture, key) = authenticated::fixture()?;
     let execution = {
         let runtime = fixture.open()?;
         reserve(&fixture, &runtime, "caller-restart")?
@@ -214,7 +209,10 @@ fn restart_keeps_a_live_caller_reservation() -> TestResult {
     assert_eq!(runtime.kernel.reconcile_recoverable_admissions()?, 0);
     assert_state(&fixture, &execution, "ready_to_dispatch")?;
     assert_eq!(grant_quota(&runtime, &execution)?, (1, 0));
-    let settled = reconcile(&runtime, &execution)?;
+    let (authorization, report) = authenticated::deliver(&fixture, &key, &runtime, &execution)?;
+    let settled = runtime
+        .kernel
+        .reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;
     assert_eq!(settled.verdict, Verdict::Allow, "{:?}", settled.reason);
     assert_state(&fixture, &execution, "completed")?;
     assert_eq!(grant_quota(&runtime, &execution)?, (0, 1));
@@ -224,7 +222,8 @@ fn restart_keeps_a_live_caller_reservation() -> TestResult {
 
 #[test]
 fn an_expired_caller_reservation_is_compensated_by_startup_recovery() -> TestResult {
-    let fixture = Fixture::with_nonce_ttl(2)?;
+    let (mut fixture, _) = authenticated::fixture()?;
+    fixture.nonce_ttl_secs = 2;
     let execution = {
         let runtime = fixture.open()?;
         reserve(&fixture, &runtime, "caller-expired")?
@@ -235,8 +234,14 @@ fn an_expired_caller_reservation_is_compensated_by_startup_recovery() -> TestRes
     assert_state(&fixture, &execution, "compensated_before_dispatch")?;
     assert_eq!(grant_quota(&runtime, &execution)?, (0, 0));
     runtime.kernel.reconcile_durable_admission_startup()?;
-    let late = reconcile(&runtime, &execution)?;
-    assert_eq!(late.verdict, Verdict::Deny, "{:?}", late.reason);
+    let late = runtime.kernel.start_caller_execution_blocking(
+        execution.execution_nonce.as_ref().ok_or("nonce")?,
+        &execution.arguments,
+    );
+    assert!(
+        matches!(late, Err(chio_kernel::KernelError::DurableAdmission(reason))
+        if reason == "caller start requires a ready original reservation")
+    );
     assert_state(&fixture, &execution, "compensated_before_dispatch")?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())
@@ -244,20 +249,21 @@ fn an_expired_caller_reservation_is_compensated_by_startup_recovery() -> TestRes
 
 #[test]
 fn a_second_reservation_is_bounded_by_the_shared_budget() -> TestResult {
-    let fixture = Fixture::new()?;
+    let (fixture, key) = authenticated::fixture()?;
     let runtime = fixture.open()?;
     let first = reserve(&fixture, &runtime, "caller-budget-first")?;
     let mut second = first.clone();
     second.request_id = "caller-budget-second".into();
     second.execution_nonce = None;
-    // The open reservation already counts against the shared grant, so the
-    // second request cannot even preflight while the caller holds it.
     let denied = runtime.kernel.evaluate_tool_call_blocking(&second)?;
     assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
     assert!(denied.execution_nonce.is_none());
     assert_state(&fixture, &first, "ready_to_dispatch")?;
     assert_eq!(grant_quota(&runtime, &first)?, (1, 0));
-    let settled = reconcile(&runtime, &first)?;
+    let (authorization, report) = authenticated::deliver(&fixture, &key, &runtime, &first)?;
+    let settled = runtime
+        .kernel
+        .reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;
     assert_eq!(settled.verdict, Verdict::Allow, "{:?}", settled.reason);
     assert_eq!(grant_quota(&runtime, &first)?, (0, 1));
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);

@@ -82,26 +82,33 @@ with a 5-second append budget. Store failure produces an error response.
 
 `POST /chio/evaluate` evaluates HTTP authority without forwarding upstream.
 `POST /v1/evaluate` uses one retained kernel with default runtime guards, approval
-and DPoP replay state, strict execution nonces, and budget holds. It authorizes
-pre-execution reservation without dispatch. A hold-capable local authority and
-control credential are required. Remote budget configuration cannot supply the
-reservation hold API. Durable admission also rejects external budget authorities
-at startup so reservations share the local authority transaction.
+and DPoP replay state, strict execution nonces, and budget holds. It requires
+durable local admission, a configured control credential, and an operator-pinned
+executor. Reservation returns a non-executable acknowledgement without dispatch
+or payment-rail operations. External budget authorities are rejected at startup
+so reservations share the local authority transaction.
 
-Authenticated `/v1/caller/start` and `/v1/caller/report` bind durable reservations
-to the pinned executor. Control-gated `/v1/reconcile` records trusted execution
-results. Durable approved retries may present their operation-bound nonce;
-legacy reservations reject presented nonces. Ordinary approvals pin an already
-activated replay source and approver roster. Loading configuration activates no
-source. Threshold collection requires an operator context resolver; direct
-threshold tokens and proposals remain rejected on `/v1/evaluate`, as does
-supplemental authorization without a verifier. Prepayment remains denied until
-a payment adapter is installed.
+Control-gated `/v1/caller/start` commits the original durable reservation and
+returns a signed authorization bound to the pinned executor. The executor
+independently verifies that authorization and claims the original operation in
+its durable execution ledger before an effect. `/v1/caller/report` authenticates
+the exact original commitment and signed executor report, restores the retained
+request and caller context, and resumes finalization without admission or
+dispatch. Only kernel guard-evaluated output and the resulting signed receipt
+return to the caller. Conflicting reports fail closed; duplicate reports reuse
+the original completion.
+
+Durable approved retries may present their operation-bound nonce. Ordinary
+approvals pin an already activated replay source and approver roster. Loading
+configuration activates no source. Threshold collection requires an operator
+context resolver; direct threshold tokens and proposals remain rejected on
+`/v1/evaluate`, as does supplemental authorization without a verifier. Prepayment
+requires a configured payment adapter and authenticated caller start.
 
 ## Trust and lifecycle invariants
 
 Control credentials authenticate capability lifecycle, approval workflows,
-receipt submission, reconciliation, and metrics independently of peer address.
+receipt submission, caller start/report, and metrics independently of peer address.
 Nonempty configured credentials use RFC 6750 token syntax with a 512-byte limit.
 The proxy's 64 KiB aggregate header scan rejects control-token bytes before
 mediation and egress. Public liveness, verification, and independently authorized
@@ -137,7 +144,7 @@ Axum, Tokio, and reqwest provide routing, task ownership, and upstream I/O.
 extensions, and rejection before listener activation. Proxy test modules cover
 control credentials and containment, encoded routes, signer trust, receipt
 redelivery, readiness, upstream errors/timeouts, and producer numbers. Mediated
-tests cover authorization, approvals, authenticated caller delivery, reconciliation,
+tests cover authorization, approvals, authenticated caller delivery, finalization,
 and default guards. These tests exercise local authority and loopback fixtures;
 production composition needs deployed custody, TLS, persistent stores, and an
 independently configured execution site.

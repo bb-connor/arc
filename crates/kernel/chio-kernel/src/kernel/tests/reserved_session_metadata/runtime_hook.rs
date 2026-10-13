@@ -92,11 +92,6 @@ fn installed_runtime_hook_never_receives_caller_runtime_metadata() -> TestResult
         .build()?;
 
     assert_runtime_key_rejected(
-        kernel
-            .authorize_tool_call_reserving_blocking_with_metadata(&request, Some(foreign.clone())),
-        "reserving blocking",
-    );
-    assert_runtime_key_rejected(
         kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(foreign.clone())),
         "blocking",
     );
@@ -134,8 +129,8 @@ fn installed_runtime_hook_never_receives_caller_runtime_metadata() -> TestResult
     assert_untouched(&kernel, &context, &invocations);
 
     let host = serde_json::json!({"host_note": "caller-visible"});
-    let response = kernel
-        .authorize_tool_call_reserving_blocking_with_metadata(&request, Some(host.clone()))?;
+    let response =
+        kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(host.clone()))?;
     assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
     assert_eq!(hook.entries(), vec!["evaluate", "release_reserved"]);
     assert_eq!(hook.released(), vec![host]);

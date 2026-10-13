@@ -5,7 +5,7 @@ client provides a typed Python interface over that API, handling serialization,
 error mapping, and receipt verification.
 
 Authoritative enforcement uses the kernel-mediated ``/v1/evaluate`` route,
-which requires a full signed capability token and an execution nonce. The
+which requires a full signed capability token and durable admission. The
 id-only ``evaluate_tool_call`` default holds only a capability id, not a signed
 token, so it cannot obtain an authoritative allow. It therefore fails closed:
 it runs advisory evaluation for its audit receipt and integrity check, then
@@ -16,7 +16,8 @@ executing a tool after a non-authoritative observation.
 Callers that deliberately want a non-authoritative observation (and will check
 ``trust_level`` themselves) use ``evaluate_tool_call_advisory`` directly.
 Callers holding a full signed token drive the authoritative mediated route via
-``evaluate_tool_call_mediated``.
+``evaluate_tool_call_mediated``. Execution requires authenticated caller start,
+a durable executor claim, and a signed report for kernel finalization.
 """
 
 from __future__ import annotations
@@ -693,10 +694,7 @@ class ChioClient:
             ):
                 raise ChioValidationError("Invalid caller reservation contract")
         elif data.get("status") not in {"deny", "pending_approval"}:
-            raise ChioValidationError(
-                "Reservation-only authorization is unsupported; upgrade the sidecar "
-                "to authenticated caller start and delivery"
-            )
+            raise ChioValidationError("Invalid caller reservation status")
         return data
 
     async def start_mediated_execution(
@@ -759,20 +757,6 @@ class ChioClient:
         ):
             raise ChioValidationError("Invalid authenticated caller report response")
         return data
-
-    async def reconcile_mediated_authorization(
-        self,
-        *,
-        control_token: str,
-        execution_nonce: dict[str, Any],
-        arguments: dict[str, Any],
-        realized_cost: dict[str, Any],
-    ) -> dict:
-        """Reject the obsolete unsigned-report contract before sending a request."""
-        raise ChioValidationError(
-            "Unsigned caller reconciliation is unsupported; use start_mediated_execution, "
-            "a durable authenticated executor, then report_mediated_execution"
-        )
 
     async def evaluate_http_request(
         self,

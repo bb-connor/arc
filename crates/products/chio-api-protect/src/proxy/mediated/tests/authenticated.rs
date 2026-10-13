@@ -1,5 +1,3 @@
-//! Public router acceptance: reservation, controlled start, durable executor,
-//! signed delivery and exact duplicate receipt. No test-only routing bypass.
 use super::*;
 use chio_kernel::admission_operation::AdmissionIdentifier;
 use chio_kernel::caller_delivery::{CallerExecutorIdentityV1, SignedCallerDispatchAuthorizationV1};
@@ -33,7 +31,6 @@ async fn public_caller_routes_require_commit_and_authenticated_durable_delivery(
         Vec::new(),
         Some(MEDIATED_CONTROL_TOKEN.into()),
         None,
-        true,
         None,
         None,
     );
@@ -130,15 +127,46 @@ async fn public_caller_routes_require_commit_and_authenticated_durable_delivery(
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(completed, replay);
-    let (legacy_status, _) = post_reconcile(
+    let usage_before = budget.get_usage(
+        authorization
+            .authorization
+            .invocation
+            .capability_id
+            .as_str(),
+        0,
+    )?;
+    let receipts_before = state.tool_receipt_log.lock().await.receipts.len();
+    let (refused_status, refused) = post_json_with_bearer(
         Arc::clone(&state),
+        "/v1/reconcile",
         &serde_json::json!({
             "execution_nonce": reserved["execution_nonce"], "arguments": parameters,
             "realized_cost": {"units": 0, "currency": "USD"},
         }),
+        Some(MEDIATED_CONTROL_TOKEN),
     )
     .await;
-    assert_eq!(legacy_status, StatusCode::BAD_REQUEST);
+    assert_eq!(refused_status, StatusCode::FORBIDDEN);
+    assert_eq!(refused["error"], "chio_control_credential_wrong_route");
+    assert_eq!(
+        refused["message"],
+        "sidecar control credentials cannot be sent to upstream proxy routes"
+    );
+    assert_eq!(
+        budget.get_usage(
+            authorization
+                .authorization
+                .invocation
+                .capability_id
+                .as_str(),
+            0
+        )?,
+        usage_before
+    );
+    assert_eq!(
+        state.tool_receipt_log.lock().await.receipts.len(),
+        receipts_before
+    );
     assert_eq!(effects.load(Ordering::SeqCst), 1);
     Ok(())
 }

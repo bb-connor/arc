@@ -16,7 +16,6 @@ impl ChioKernel {
         disposition: EvaluationDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
         let EvaluationDisposition {
-            preflight_hold: preflight_disposition,
             dispatch: dispatch_mode,
             session_guard_attempt,
         } = disposition;
@@ -335,11 +334,7 @@ impl ChioKernel {
             }
         }
 
-        let reserving_preflight = matches!(
-            preflight_disposition,
-            PreflightHoldDisposition::ReserveForCaller
-        ) && self.execution_nonce_preflight_required(request);
-        if !reserving_preflight && !dispatch_mode.caller_executed() {
+        if !dispatch_mode.caller_executed() {
             if let Err(e) = self.ensure_registered_tool_target(request) {
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool target not registered");
@@ -374,16 +369,6 @@ impl ChioKernel {
                 );
             }
         };
-
-        if let Some(denial) = self.reject_legacy_caller_reservation_for_durable_nonce(
-            request,
-            preflight_disposition,
-            durable_admission.as_ref(),
-            now,
-            extra_metadata.as_ref(),
-        )? {
-            return Ok(denial);
-        }
 
         if let Some(admission) = durable_admission.as_mut() {
             if let Some(response) = self.recover_durable_tool_admission(admission, request)? {
@@ -850,28 +835,19 @@ impl ChioKernel {
         };
 
         if self.execution_nonce_preflight_required(request) {
-            return self
-                .run_async_strict_nonce_preflight(StrictNoncePreflight {
-                    request,
-                    session_filesystem_roots,
-                    session_id,
-                    security_context,
-                    preflight_disposition,
-                    receipt_admission: &receipt_admission,
-                    now,
-                    cap,
-                    matching_grants: &matching_grants,
-                    dpop_required,
-                    matched_grant_index,
-                    matched_grant,
-                    budget_mutation: &budget_mutation,
-                    durable_admission: &mut durable_admission,
-                    extra_metadata,
-                    pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
-                    verified_governed_payee_binding: &verified_governed_payee_binding,
-                    budget_lease_acquired,
-                })
-                .await;
+            return self.run_strict_nonce_preflight(StrictNoncePreflight {
+                request,
+                now,
+                cap,
+                matching_grants: &matching_grants,
+                matched_grant_index,
+                budget_mutation: &budget_mutation,
+                durable_admission: &mut durable_admission,
+                extra_metadata,
+                pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
+                verified_governed_payee_binding: &verified_governed_payee_binding,
+                budget_lease_acquired,
+            });
         }
 
         if let Err(error) = self.validate_required_execution_nonce_for_admission(
@@ -1047,7 +1023,6 @@ impl ChioKernel {
         }
 
         let server = match &dispatch_mode {
-            DispatchMode::CallerReport(report) => Some(report.clone()),
             DispatchMode::Kernel => self.tool_servers.get(&request.server_id).cloned(),
             // Preparation cannot dispatch an external effect.
             DispatchMode::ReserveForCaller | DispatchMode::CallerStart => None,

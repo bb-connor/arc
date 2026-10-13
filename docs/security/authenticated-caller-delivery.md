@@ -126,14 +126,15 @@ This gate is local functional and process-loss acceptance. It does not qualify
 process confinement, power loss, distributed authority or public activation.
 See [launch status](launch-status.md) for the tested candidate and broader gates.
 
-## Compatibility and provisioning
+## Provisioning
 
-This is an explicit break with reserve/execute/unsigned-report integrations.
-The SDK rejects old `status: "authorized"` reservation responses and its old
-`reconcile_mediated_authorization` method fails before sending HTTP. A configured
-authenticated kernel rejects unsigned reconciliation. An unconfigured legacy
-embedding remains available for historical compatibility tests; its reservation
-is not an executable authorization. Do not use it for external effects.
+Caller reservation requires durable local admission and an executor identity
+pinned by the host before admission. API Protect also requires a configured
+sidecar control credential. The SDK accepts only `reserved`, `deny`, or
+`pending_approval` reservation statuses and validates the non-executable
+reservation contract. Execution requires signed start authorization and a
+durable executor claim; delivery requires the executor's signed report. Reports
+resume the original persisted operation and cannot grant new execution authority.
 
 Signed wire artifacts have separate schemas:
 `chio.caller-dispatch-authorization.v1` and `chio.caller-delivery-report.v1`.
@@ -142,12 +143,10 @@ authorization and report encodings are limited to 32 KiB and 1 MiB respectively.
 Signatures, exact bindings, semantic bounds and independently selected keys still
 require runtime verification; generated schema types alone confer no authority.
 
-Admission schema v34 adds the nonterminal waiting state without rewriting old
-operation or commit bytes. Its offline upgrade verifies the predecessor catalog
-and custody before rebuilding the constrained parent table. Old authority
-profiles and caller frames do not gain a new executor pin, credential history or
-start authority through migration. Ambiguous legacy external effects require
-operator reconciliation, not backfilling or recreating reservations.
+The retained operation must contain its original executor pin, credential
+history, caller context, and start commitment. Missing or inconsistent custody
+fails closed. Neither a current host configuration nor a submitted report can
+replace those records or recreate execution permission.
 
 The executor ledger must be explicitly provisioned in a private directory or
 opened as existing history. A missing ledger is an error, never a request to
@@ -155,4 +154,4 @@ create a replacement. Capacity is a bounded 1 to 64 retained operations, with no
 eviction or implicit rotation. Capacity exhaustion fails closed. Privileged file
 rollback, independent provisioned ledgers for one identity, power-loss behavior,
 long-running retention and production deployment are not qualified by the local
-process-loss tests. No populated operator database is migrated by this work.
+process-loss tests.

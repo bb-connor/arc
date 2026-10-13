@@ -38,11 +38,9 @@ async fn subject_identity_all_mint_shapes_preserve_caller_public_key() {
         ("/v1/capabilities", false),
         ("/v1/capabilities", true),
     ] {
-        let state = mediated_test_state(
-            Keypair::generate(),
-            Arc::new(InMemoryBudgetStore::new()),
-            Vec::new(),
-        );
+        let directory = tempfile::tempdir().test_unwrap();
+        let durable = durable_admission_stores(directory.path());
+        let state = mediated_test_state(Keypair::generate(), durable, Vec::new());
         let token = mint(
             state,
             path,
@@ -62,7 +60,6 @@ async fn subject_identity_all_mint_shapes_preserve_caller_public_key() {
 async fn subject_identity_invalid_subjects_reject_before_mutation() {
     let valid = Keypair::generate().public_key().to_hex();
     let padded = format!(" {valid}");
-    // These have valid SEC1 lengths and prefixes but are not points on either curve.
     let off_curve_p256 = format!("p256:04{}", "00".repeat(64));
     let off_curve_p384 = format!("p384:04{}", "00".repeat(96));
     for (path, structured) in [
@@ -72,13 +69,13 @@ async fn subject_identity_invalid_subjects_reject_before_mutation() {
     ] {
         let directory = tempfile::tempdir().test_unwrap();
         let database = directory.path().join("receipts.sqlite");
+        let durable = durable_admission_stores(directory.path());
         let state = mediated_test_state_inner(
             Keypair::generate(),
-            Arc::new(InMemoryBudgetStore::new()),
+            durable,
             Vec::new(),
             Some(MEDIATED_CONTROL_TOKEN.to_owned()),
             Some(SqliteReceiptStore::open(database.to_str().test_unwrap()).test_unwrap()),
-            true,
         );
         for subject in [
             None,
@@ -122,21 +119,18 @@ async fn subject_identity_invalid_subjects_reject_before_mutation() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn subject_identity_dpop_refuses_public_seed_wrong_key_and_stolen_token() {
+async fn subject_identity_dpop_requires_owned_custody_for_every_presented_identity() {
     let agent = Keypair::generate();
     let subject = agent.public_key().to_hex();
     let mut hasher = Sha256::new();
     hasher.update(subject.as_bytes());
     hasher.update([0]);
-    // The SDK scope alias defaults job_uid to the empty public string.
     let seed: [u8; 32] = hasher.finalize().into();
     let public_seed_attacker = Keypair::from_seed(&seed);
     let unrelated = Keypair::generate();
-    let state = mediated_test_state(
-        Keypair::generate(),
-        Arc::new(InMemoryBudgetStore::new()),
-        Vec::new(),
-    );
+    let directory = tempfile::tempdir().test_unwrap();
+    let durable = durable_admission_stores(directory.path());
+    let state = mediated_test_state(Keypair::generate(), durable, Vec::new());
     let token = mint(
         Arc::clone(&state),
         "/v1/capabilities",
@@ -144,7 +138,6 @@ async fn subject_identity_dpop_refuses_public_seed_wrong_key_and_stolen_token() 
     )
     .await;
     let params = serde_json::json!({"path": "safe.txt"});
-    // A thief advertising the caller public key still needs its private signer.
     let mut forged = dpop_proof_for(&public_seed_attacker, &token, "filesystem", "read", &params);
     forged.body.agent_key = agent.public_key();
     let (_, denied) = post_evaluate(
@@ -157,11 +150,11 @@ async fn subject_identity_dpop_refuses_public_seed_wrong_key_and_stolen_token() 
     .await;
     assert_eq!(denied["status"], "deny", "{denied}");
     assert!(!denied["execution_nonce"].is_object());
-    for (signer, expected) in [
-        (Some(&public_seed_attacker), "deny"),
-        (Some(&unrelated), "deny"),
-        (None, "deny"),
-        (Some(&agent), "reserved"),
+    for signer in [
+        Some(&public_seed_attacker),
+        Some(&unrelated),
+        None,
+        Some(&agent),
     ] {
         let mut body = serde_json::json!({
             "capability": token, "tool_server": "filesystem", "tool_name": "read",
@@ -179,7 +172,11 @@ async fn subject_identity_dpop_refuses_public_seed_wrong_key_and_stolen_token() 
         }
         let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
         assert_eq!(status, StatusCode::OK, "{json}");
-        assert_eq!(json["status"], expected, "{json}");
-        assert_eq!(json["execution_nonce"].is_object(), expected == "reserved");
+        assert_eq!(json["status"], "deny", "{json}");
+        assert_eq!(
+            json["receipt"]["decision"]["reason"],
+            "caller execution requires authenticated start and operation-owned credential custody"
+        );
+        assert!(json["execution_nonce"].is_null());
     }
 }

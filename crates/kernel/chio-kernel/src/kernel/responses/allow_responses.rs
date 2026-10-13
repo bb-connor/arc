@@ -1,25 +1,5 @@
 use super::*;
 
-pub(crate) enum ReservedHoldStamp<'a> {
-    Monetary {
-        charge: &'a BudgetChargeResult,
-        payment_reference: Option<String>,
-    },
-    Invocation {
-        hold_id: String,
-        grant_index: usize,
-    },
-}
-
-impl ReservedHoldStamp<'_> {
-    fn hold_id(&self) -> &str {
-        match self {
-            Self::Monetary { charge, .. } => charge.budget_hold_id.as_str(),
-            Self::Invocation { hold_id, .. } => hold_id.as_str(),
-        }
-    }
-}
-
 pub(crate) enum AllowResponseNonce {
     Preminted(Box<crate::execution_nonce::SignedExecutionNonce>),
     MintForAllow,
@@ -28,7 +8,7 @@ pub(crate) enum AllowResponseNonce {
 
 /// Origin of the nonce delivered on a strict preflight receipt.
 pub(crate) enum PreflightNonceSource {
-    /// Mint a legacy replay-store nonce bound to the just-signed receipt.
+    /// Mint a replay-store nonce bound to the signed receipt.
     Mint,
     /// Deliver the nonce retained by the durable admission operation.
     Durable(Box<crate::execution_nonce::SignedExecutionNonce>),
@@ -172,10 +152,6 @@ impl ChioKernel {
         })
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
     pub(crate) fn build_execution_nonce_preflight_allow_response_with_metadata(
         &self,
         request: &ToolCallRequest,
@@ -183,7 +159,6 @@ impl ChioKernel {
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
         incomplete_reason: &str,
-        reserved_hold: Option<ReservedHoldStamp<'_>>,
         nonce: PreflightNonceSource,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
@@ -224,86 +199,18 @@ impl ChioKernel {
         })?;
 
         let execution_nonce = match nonce {
-            PreflightNonceSource::Mint => self.mint_execution_nonce_for_allow_reserving(
-                request,
-                cap,
-                &receipt,
-                reserved_hold.as_ref().map(ReservedHoldStamp::hold_id),
-            )?,
+            PreflightNonceSource::Mint => {
+                self.mint_execution_nonce_for_allow(request, cap, &receipt)?
+            }
             PreflightNonceSource::Durable(signed) => Some(signed),
         };
-
-        if let (Some(stamp), Some(nonce)) = (reserved_hold.as_ref(), execution_nonce.as_ref()) {
-            let reserved_until = nonce.expires_at();
-            match stamp {
-                ReservedHoldStamp::Monetary {
-                    charge,
-                    payment_reference,
-                } => {
-                    let envelope = crate::budget_store::ReservedHoldEnvelope {
-                        budget_total: charge.budget_total,
-                        delegation_depth: crate::receipt_support::checked_receipt_count(
-                            cap.delegation_chain.len(),
-                            "delegation depth",
-                        )?,
-                        root_budget_holder: cap.issuer.to_hex(),
-                    };
-                    if let Err(error) = self.with_budget_store(|store| {
-                        Ok(store.mark_hold_reserved(
-                            charge.budget_hold_id.as_str(),
-                            reserved_until,
-                            charge.currency.as_str(),
-                            payment_reference.as_deref(),
-                            &envelope,
-                        )?)
-                    }) {
-                        self.reverse_budget_charge(&cap.id, charge)?;
-                        self.release_admitted_capability_budget(cap)
-                            .map_err(KernelError::DelegationInvalid)?;
-                        return Err(error);
-                    }
-                    self.record_reserved_sibling_share(charge.budget_hold_id.as_str(), cap);
-                }
-                ReservedHoldStamp::Invocation {
-                    hold_id,
-                    grant_index,
-                } => {
-                    let envelope = crate::budget_store::ReservedHoldEnvelope {
-                        budget_total: None,
-                        delegation_depth: crate::receipt_support::checked_receipt_count(
-                            cap.delegation_chain.len(),
-                            "delegation depth",
-                        )?,
-                        root_budget_holder: cap.issuer.to_hex(),
-                    };
-                    if let Err(error) = self.with_budget_store(|store| {
-                        Ok(store.reserve_invocation_hold(
-                            hold_id,
-                            &cap.id,
-                            *grant_index,
-                            reserved_until,
-                            &envelope,
-                        )?)
-                    }) {
-                        self.with_budget_store(|store| {
-                            Ok(store.reverse_charge_cost(&cap.id, *grant_index, 0)?)
-                        })?;
-                        self.release_admitted_capability_budget(cap)
-                            .map_err(KernelError::DelegationInvalid)?;
-                        return Err(error);
-                    }
-                    self.record_reserved_sibling_share(hold_id, cap);
-                }
-            }
-        }
 
         if let Err(error) = self.record_chio_receipt_with_federation(request, &receipt) {
             warn!(
                 request_id = %request.request_id,
-                hold_id = reserved_hold.as_ref().map(ReservedHoldStamp::hold_id),
                 receipt_id = %receipt.id,
                 reason = %redacted!(&error),
-                "durable receipt persistence failed for a stamped reservation"
+                "nonce preparation receipt persistence failed"
             );
         }
 

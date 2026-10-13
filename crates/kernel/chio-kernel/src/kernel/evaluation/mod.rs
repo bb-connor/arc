@@ -28,53 +28,20 @@ mod sync_evaluation_wrapper;
 
 pub use caller_execution::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
 
-/// Disposition of the pre-execution budget hold when a strict-nonce preflight
-/// is reached (nonce required, no nonce presented on the request).
-///
-/// The preflight is the point in the evaluation pipeline where the capability,
-/// DPoP, governed-transaction, guard, runtime-admission, and budget checks have
-/// all passed but the tool has not yet been dispatched. What happens to the
-/// reserved hold there depends on who executes the tool.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PreflightHoldDisposition {
-    /// Reverse the pre-execution hold and return an incomplete preflight
-    /// receipt. The same kernel re-takes the hold when the caller retries
-    /// presenting the minted nonce, then dispatches the tool. This is the
-    /// default for every in-process strict-nonce dispatch surface.
-    ReverseForRetry,
-    /// Keep the pre-execution hold reserved (open) and return a
-    /// non-authoritative authorization receipt carrying the minted nonce. The
-    /// kernel does not dispatch the tool: the caller presents the nonce to the
-    /// real tool server, which verifies and consumes it and reconciles the
-    /// reserved hold. Used by the sidecar mediated `/v1/evaluate` pre-execution
-    /// authorization gate, where the reserved hold enforces `max_total_cost`
-    /// against concurrent authorizations. An orphaned reserved hold (the caller
-    /// never executes) is fail-closed: budget stays over-reserved until the
-    /// crash reaper reclaims it, never over-subscribed.
-    ReserveForCaller,
-}
-
 /// How an admitted execution request proceeds past its last admission step.
 #[derive(Clone)]
 pub(crate) enum DispatchMode {
     /// Dispatch to the registered tool server and finalize its return.
     Kernel,
-    /// Reserve the executable hold and the nonce, then stop. The caller
-    /// executes the tool elsewhere and returns through a reconcile that resumes
-    /// the same operation.
+    /// Retain the admitted hold and nonce without authorizing execution.
     ReserveForCaller,
-    /// Resume a caller-reserved operation with the caller's report standing in
-    /// for the tool server.
-    CallerReport(std::sync::Arc<dyn crate::ToolServerConnection>),
     /// Capture the original participants, then stop before any external effect.
     CallerStart,
 }
 
-/// What an evaluation does at its two decision points: the strict-nonce
-/// preflight and the dispatch of an admitted execution request.
+/// Dispatch selection and session guard ownership for an evaluation.
 #[derive(Clone)]
 pub(crate) struct EvaluationDisposition {
-    pub(crate) preflight_hold: PreflightHoldDisposition,
     pub(crate) dispatch: DispatchMode,
     pub(crate) session_guard_attempt: Option<GuardInvocationAttempt>,
 }
@@ -84,17 +51,6 @@ impl EvaluationDisposition {
     /// dispatch to the registered tool server.
     pub(crate) fn kernel() -> Self {
         Self {
-            preflight_hold: PreflightHoldDisposition::ReverseForRetry,
-            dispatch: DispatchMode::Kernel,
-            session_guard_attempt: None,
-        }
-    }
-
-    /// The legacy sidecar reservation: keep the preflight hold open and mint
-    /// a nonce for a tool server the kernel never dispatches to.
-    pub(crate) fn legacy_reservation() -> Self {
-        Self {
-            preflight_hold: PreflightHoldDisposition::ReserveForCaller,
             dispatch: DispatchMode::Kernel,
             session_guard_attempt: None,
         }
@@ -104,24 +60,13 @@ impl EvaluationDisposition {
     /// execution's first half stopping once the nonce is reserved.
     pub(crate) fn caller_reservation() -> Self {
         Self {
-            preflight_hold: PreflightHoldDisposition::ReverseForRetry,
             dispatch: DispatchMode::ReserveForCaller,
-            session_guard_attempt: None,
-        }
-    }
-
-    /// Resume a caller reservation with the caller's report as the server.
-    pub(crate) fn caller_report(report: std::sync::Arc<dyn crate::ToolServerConnection>) -> Self {
-        Self {
-            preflight_hold: PreflightHoldDisposition::ReverseForRetry,
-            dispatch: DispatchMode::CallerReport(report),
             session_guard_attempt: None,
         }
     }
 
     pub(crate) fn caller_start() -> Self {
         Self {
-            preflight_hold: PreflightHoldDisposition::ReverseForRetry,
             dispatch: DispatchMode::CallerStart,
             session_guard_attempt: None,
         }

@@ -36,14 +36,22 @@ fn verified_shares(
 
 #[test]
 fn indexed_caller_shares_match_verified_operations_for_each_parent() -> TestResult {
-    let fixture = Fixture::new()?;
+    let (fixture, key) = crate::authenticated::fixture()?;
     let mut runtime = fixture.open()?;
     let first_family = Siblings::new(&fixture, &mut runtime)?;
     let second_family = Siblings::new(&fixture, &mut runtime)?;
     let settled = reserve_child(&runtime, &request(&first_family.first, "indexed-settled")?)?;
     let live = reserve_child(&runtime, &request(&first_family.first, "indexed-live")?)?;
     let other = reserve_child(&runtime, &request(&second_family.first, "indexed-other")?)?;
-    assert_eq!(reconcile(&runtime, &settled)?.verdict, Verdict::Allow);
+    let (authorization, delivery) =
+        crate::authenticated::deliver(&fixture, &key, &runtime, &settled)?;
+    assert_eq!(
+        runtime
+            .kernel
+            .reconcile_authenticated_caller_execution_blocking(&authorization, &delivery)?
+            .verdict,
+        Verdict::Allow
+    );
     assert_state(&fixture, &settled, "completed")?;
 
     let store = runtime.authority.admission_operation_store();

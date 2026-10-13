@@ -10,9 +10,8 @@ use chio_kernel::execution_nonce::{
     ExecutionNonceConfig, InMemoryExecutionNonceStore, SignedExecutionNonce,
 };
 use chio_kernel::{
-    CallerExecutionReport, ChioKernel, KernelConfig, ToolCallRequest, ToolInvocationCost,
-    ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    ChioKernel, KernelConfig, ToolCallRequest, ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 
 #[path = "mediated/authenticated.rs"]
@@ -70,41 +69,7 @@ pub(crate) fn load_revocation_db_ids(
     Ok(ids)
 }
 
-/// Build a `ChioKernel` for tool-call mediation with the budget store, a strict
-/// execution-nonce config, and DPoP verification state installed.
-///
-/// The mediated `/v1/evaluate` route is a PURE pre-execution authorization gate.
-/// Strict execution-nonce mode is always on, so every request reaches the
-/// authorization preflight: the kernel verifies the capability (plus any DPoP
-/// proof, governed intent, and approval token), reserves the pre-execution
-/// budget hold and KEEPS IT OPEN, and mints a fresh execution nonce. It never
-/// dispatches a tool server, never consumes a presented nonce, and never signs
-/// a completed or settled spend. The caller presents the minted nonce to the
-/// real tool server, which verifies and consumes it and reconciles the reserved
-/// hold at the execution site.
-///
-/// A SINGLE kernel is built once at sidecar startup and reused for the process
-/// lifetime (held behind a `Mutex` in `ProxyState`). Reuse is load-bearing for
-/// security: the kernel's approval-token replay store and DPoP-nonce store live
-/// on the instance, so a per-request kernel would reset them every call and let
-/// an approval token or DPoP proof be replayed within its TTL. One instance
-/// keeps both replay stores authoritative across `/v1/evaluate` requests, and it
-/// is the same nonce store that mints on `/v1/evaluate` and verifies+consumes on
-/// `/v1/reconcile`, so a reconciled nonce cannot be replayed. The route never
-/// registers the caller-named `server_id`: the reserve-for-caller authorization
-/// path never dispatches a tool on this kernel and so no longer requires the
-/// target to be registered, which keeps the kernel's tool-server map from
-/// growing on every caller-arbitrary request.
-///
-/// `trusted_capability_issuers` are trusted as capability authorities in
-/// addition to the sidecar signer, so an externally minted capability that the
-/// sidecar's other endpoints accept is not rejected here as untrusted.
-///
-/// `payment_adapter` is the operator-configured payment rail. When present it is
-/// installed on the kernel so a governed `MustPrepay` (x402/ACP) quote is
-/// authorized and captured before the reserve-for-caller path mints a nonce.
-/// When `None` the kernel carries no adapter, so the governed prepayment gate
-/// denies `MustPrepay` fail-closed: only a configured adapter enables it.
+/// Capability authorities, policy identity, and receipt storage for mediation.
 pub(crate) struct MediationPolicy<'a> {
     pub issuers: &'a [PublicKey],
     pub hash: Option<&'a str>,
@@ -125,8 +90,7 @@ pub(crate) fn build_mediation_kernel(
             ca_public_keys.push(issuer.clone());
         }
     }
-    // Production supplies the same policy digest to HTTP and durable admission.
-    // Preserve that identity; only an absent digest uses this default material.
+    // HTTP mediation and durable admission share one policy identity.
     let policy_hash = match policy.hash {
         Some(hash) => hash.to_owned(),
         None => {
@@ -151,16 +115,9 @@ pub(crate) fn build_mediation_kernel(
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
             require_web3_evidence: false,
-            // A money-bearing mediated deployment should enable durable admission (the
-            // durable receipt db path wired through evaluator.rs and proxy/state.rs) so
-            // that an ambiguous post-dispatch outcome has its retained budget or payment
-            // hold reconciled by the recovery sweep. The ephemeral log has no sweep, so
-            // any hold retained on this non-durable kernel is surfaced instead by
-            // chio_ambiguous_dispatch_retained_hold_total{reconciliation="none"}.
+            // Signed caller delivery requires a separate durable admission authority.
             allow_ephemeral_receipt_log: policy.receipt_store.is_none(),
-            // Revocation is enforced sidecar-side over the durable revoked set (the
-            // revoked-ancestor walk below); this kernel's internal store is
-            // intentionally empty, so its durability gate must not deny mediation.
+            // The sidecar checks the durable revocation store before admission.
             allow_ephemeral_revocation_store: true,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
@@ -203,9 +160,7 @@ pub(crate) fn build_mediation_kernel(
             clock.clone(),
         )),
     );
-    // Install DPoP verification state so a grant with `dpop_required` can verify
-    // a presented proof. Without it every dpop_required capability denies
-    // fail-closed with no way to present a proof.
+    // Credential-bearing caller execution also requires operation-owned custody.
     kernel
         .set_dpop_store(
             DpopNonceStore::with_clock(
@@ -219,30 +174,13 @@ pub(crate) fn build_mediation_kernel(
             DpopConfig::default(),
         )
         .map_err(|error| ProtectError::Config(error.to_string()))?;
-    // Install the operator's payment rail so the governed prepayment gate can
-    // authorize and capture a MustPrepay (x402/ACP) quote before the
-    // reserve-for-caller path mints a nonce. Absent an adapter the gate denies
-    // MustPrepay fail-closed, so only a configured adapter enables prepayment.
+    // The configured rail settles only after the caller commits a signed start.
     if let Some(payment_adapter) = payment_adapter {
         kernel.set_payment_adapter(payment_adapter);
     }
     for server in tool_servers {
         kernel.register_tool_server(server);
     }
-    // Rebuild the delegated reserve-for-caller accounting from the durable budget
-    // store. A delegated reservation keeps its child's sibling-sum share admitted
-    // against the parent while its hold stays open, but that admission is
-    // in-memory only, so a kernel built fresh over a populated store (a restart)
-    // would otherwise admit a sibling against the parent as if the still-open
-    // reservation consumed nothing. Since the durable hold record does not carry
-    // the parent capability id or the shares needed to rebuild the reservation,
-    // this arms a fail-closed gate that denies delegated admission while any such
-    // hold from a prior process remains open. Fail-closed: a store read error here
-    // aborts startup so the sidecar refuses to mediate over a store it could not
-    // inspect.
-    kernel
-        .arm_restart_reserved_hold_gate()
-        .map_err(|error| ProtectError::Config(error.to_string()))?;
     Ok(kernel)
 }
 
@@ -259,26 +197,21 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// server-owned identity; otherwise the sidecar generates one when omitted.
     #[serde(default)]
     request_id: Option<String>,
-    /// Optional governed transaction intent bound to this invocation. Forwarded
-    /// so a grant carrying `GovernedIntentRequired` (or an approval threshold)
-    /// can be authorized instead of denied.
+    /// Governed transaction intent bound to this invocation.
     #[serde(default)]
     governed_intent: Option<GovernedTransactionIntent>,
-    /// Legacy direct token field, rejected in favor of a retained approval_id.
+    /// Direct token presentations are rejected; `approval_id` selects retained authority.
     #[serde(default)]
     approval_token: Option<GovernedApprovalToken>,
     /// Server-assigned identifier of a retained, signed approval.
     #[serde(default)]
     approval_id: Option<String>,
-    /// Reserved threshold approval fields. The mediated product does not yet
-    /// configure a threshold policy resolver, so either field is rejected at the
-    /// HTTP boundary instead of being advertised as an unusable kernel feature.
+    /// Threshold credentials are rejected without a configured policy resolver.
     #[serde(default)]
     approval_tokens: Vec<GovernedApprovalToken>,
     #[serde(default)]
     threshold_approval_proposal: Option<ThresholdApprovalProposal>,
-    /// Optional DPoP proof-of-possession. Forwarded so a grant carrying
-    /// `dpop_required` can verify the proof instead of denying fail-closed.
+    /// DPoP proof; caller execution requires operation-owned proof custody.
     #[serde(default)]
     dpop_proof: Option<DpopProof>,
     /// Reserved opaque extension. The mediated product has no configured
@@ -286,10 +219,7 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// boundary.
     #[serde(default)]
     supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
-    /// A signed execution nonce. This endpoint MINTS nonces; it does not settle
-    /// presented ones. The field is parsed only so a caller that mistakenly
-    /// presents a nonce here is rejected explicitly (fail-closed) rather than
-    /// having the nonce silently ignored.
+    /// Signed nonce identifying the retained operation for an approved retry.
     #[serde(default)]
     execution_nonce: Option<SignedExecutionNonce>,
 }
@@ -329,55 +259,22 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         )
         .into_response();
     }
-    // This endpoint is a pre-execution authorization gate: it mints an execution
-    // nonce for the caller to present downstream. It does not consume or settle a
-    // presented nonce. Reject one fail-closed so a caller cannot mistake this for
-    // a completion endpoint (and so the sidecar never consumes the downstream
-    // nonce, which would make the real tool server reject the caller as a
-    // replay).
     let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
         return internal_json_error_response(
             "chio_mediation_unavailable",
-            "mediated tool-call route requires a durable receipt store or a configured budget store (--budget-db or --control-url)",
+            "mediated tool-call route requires a durable admission store",
         );
     };
-    // Under durable admission the reservation is the operation's own and an
-    // approved retry presents the nonce the strict preflight issued. The
-    // legacy reservation mints nonces and never accepts one: a presented nonce
-    // would be consumed here instead of by the tool server that expects it.
-    // The kernel mutex also owns the reuse check/claim/authorization/cleanup sequence.
-    // No request-id claim can age out while its owner waits for this lock.
+    // The kernel mutex serializes request binding, reservation, and claim cleanup.
     let kernel = mediation_kernel.lock().await;
-    let durable_reservation = kernel.has_durable_admission_store();
-    let presented_nonce = parsed.execution_nonce.take();
-    if presented_nonce.is_some() && !durable_reservation {
-        return sidecar_bad_request(
-            "/v1/evaluate issues execution nonces; it does not accept a presented nonce. \
-             Present the minted nonce to the tool server, not to this endpoint",
-        )
-        .into_response();
-    }
-    // A mediated reservation requires a hold-capable budget store. The remote
-    // control-plane store forwards only charge/reverse/reconcile and rejects the
-    // unsupported hold APIs, so a reservation minted against it could never
-    // be reconciled by nonce or reclaimed by the TTL reaper. Reject fail-closed
-    // rather than mint an unreconcilable reserved nonce.
-    if !state.mediation_hold_capable {
+    if !kernel.has_durable_admission_store() {
         return internal_json_error_response(
-            "chio_mediation_requires_local_budget_store",
-            "mediated authorization requires a hold-capable local budget store (--budget-db); \
-             a remote control-plane budget store (--control-url) cannot persist a reserved hold",
+            "chio_mediation_requires_durable_admission",
+            "mediated authorization requires a durable admission store",
         );
     }
-    // A reserved hold is settled only through `/v1/reconcile`, which the
-    // reconcile control gate restricts to the trusted tool server presenting the
-    // sidecar-control token. Without a configured token every reconcile is
-    // rejected, so a reservation minted here could only expire and forfeit
-    // budget. The reconcile gate trims the configured token and treats a
-    // whitespace-only value as unconfigured, so an unconfigured OR blank token
-    // is rejected here identically. Reject fail-closed before reserving budget or
-    // minting a nonce, mirroring the reconcile gate's own configured-token
-    // requirement.
+    let presented_nonce = parsed.execution_nonce.take();
+    // A reservation requires access to the authenticated start and report routes.
     if state
         .sidecar_control_token
         .as_deref()
@@ -385,28 +282,12 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         .is_none_or(str::is_empty)
     {
         return internal_json_error_response(
-            "chio_mediation_requires_reconcile_token",
-            "mediated authorization requires a configured sidecar-control token so the reserved \
-             hold can be settled on /v1/reconcile; without one the reservation could only expire \
-             and forfeit budget",
+            "chio_mediation_requires_control_token",
+            "mediated authorization requires a configured sidecar-control token for signed caller delivery",
         );
     }
-    // Fail-closed: reject the presented capability when its own id OR any ancestor
-    // in its delegation chain is revoked, so a delegated child of a revoked root
-    // cannot keep earning mediated reservations until expiry. `capability_is_revoked`
-    // consults the in-memory release set first (no I/O for a known-revoked id) and
-    // then the durable revocation store, failing closed if that store cannot be
-    // read, so a revocation a sibling replica or `chio trust revoke --revocation-db`
-    // recorded after this process booted is honored here exactly as it is on the
-    // proxy and validate paths. The kernel's own revocation store starts empty, so
-    // this sidecar-side walk is the authority.
-    //
-    // Bound the chain before the per-ancestor durable walk: the capability
-    // signature is not verified until the kernel below, so cap the ancestors
-    // consulted to keep an unverified, caller-supplied token from forcing one
-    // durable store read per fabricated ancestor. A legitimate chain never
-    // approaches this bound (the kernel caps delegation depth far under it) and a
-    // longer one is rejected by the kernel regardless.
+    // Cap unverified ancestry before durable revocation reads.
+    // Revocation of any ancestor invalidates the delegated capability.
     const MAX_MEDIATED_DELEGATION_CHAIN: usize = 32;
     if parsed.capability.delegation_chain.len() > MAX_MEDIATED_DELEGATION_CHAIN {
         return sidecar_bad_request("capability delegation chain is too long").into_response();
@@ -438,100 +319,22 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         .clone()
         .or_else(|| parsed.approval_id.clone())
         .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
-    // Durable reuse guard that survives a restart, which the in-memory window
-    // below cannot: after a restart the window is empty, but a reservation opened
-    // before it persists as a budget hold. Rejecting the reuse fail-closed (409)
-    // is load-bearing because a reused id would either collapse into an idempotent
-    // authorize that mints a second nonce against one reservation without
-    // reserving more budget, or (for a closed, settled-or-reaped hold) make the
-    // kernel reject the duplicate hold id on creation and turn an otherwise valid
-    // later authorization into a 500 instead of the documented bounded-reuse 409.
-    let Some(budget_store) = state.budget_store.as_ref() else {
-        return internal_json_error_response(
-            "chio_mediation_requires_local_budget_store",
-            "mediated authorization requires a configured hold-capable budget store",
-        );
-    };
-    // Bound the pre-verification durable lookup: the capability signature is
-    // verified inside the kernel below, so cap the number of grants scanned to a
-    // sane maximum and reject an oversized scope fail-closed, rather than fan out
-    // one store read per grant for an unverified, caller-supplied capability.
+    // Bound the unverified capability before admission.
     const MAX_MEDIATED_SCOPE_GRANTS: usize = 64;
     if parsed.capability.scope.grants.len() > MAX_MEDIATED_SCOPE_GRANTS {
         return sidecar_bad_request("capability scope carries too many grants").into_response();
     }
-    // Prefer the capability-agnostic durable probe. The kernel derives each hold
-    // id from (request_id, capability id, grant index), so the per-grant exact-id
-    // lookup below only sees a reuse under the SAME capability: a caller that
-    // replays this request_id under a DIFFERENT capability token would miss the
-    // existing `budget-hold:{request_id}:{other_cap}:..` row and win a second
-    // reservation once a restart cleared the in-memory window. When the store can
-    // enumerate holds by the `budget-hold:{request_id}:` prefix it rejects the
-    // reuse regardless of which capability opened the hold; when it cannot
-    // (`Ok(None)`), fall back to the per-grant exact-id probe.
-    match budget_store.request_id_has_reserved_hold(&request_id) {
-        Ok(Some(true)) => {
-            return (
-                StatusCode::CONFLICT,
-                axum::Json(serde_json::json!({
-                    "error": "chio_request_id_reused",
-                    "message": "request_id already backs a reservation; choose a fresh request_id",
-                })),
-            )
-                .into_response();
-        }
-        Ok(Some(false)) => {}
-        Ok(None) => {
-            for grant_index in 0..parsed.capability.scope.grants.len() {
-                let hold_id = format!(
-                    "budget-hold:{}:{}:{}",
-                    request_id, parsed.capability.id, grant_index
-                );
-                match budget_store.get_budget_hold(&hold_id) {
-                    Ok(Some(_)) => {
-                        return (
-                            StatusCode::CONFLICT,
-                            axum::Json(serde_json::json!({
-                                "error": "chio_request_id_reused",
-                                "message": "request_id already backs a reservation; choose a fresh request_id",
-                            })),
-                        )
-                            .into_response();
-                    }
-                    Ok(None) => {}
-                    Err(error) => {
-                        warn!("durable hold lookup failed: {error}");
-                        return internal_json_error_response(
-                            "chio_mediation_failed",
-                            &error.to_string(),
-                        );
-                    }
-                }
-            }
-        }
-        Err(error) => {
-            warn!("durable hold lookup failed: {error}");
-            return internal_json_error_response("chio_mediation_failed", &error.to_string());
-        }
-    }
-    // Fail-closed over-subscription guard: the kernel derives the durable budget
-    // hold identity from `request_id`, so a reused id inside a live reservation
-    // window would collapse into an idempotent authorize with no fresh
-    // reservation. Claim the id for this window before authorizing and reject a
-    // reuse with 409. The claim is released below when the authorization places
-    // no durable hold, so a denied or failed attempt does not permanently burn
-    // the id; claimed ids expire with the reservation TTL, keeping the set
-    // bounded.
+    // The bounded window limits outstanding request identities. Presented nonces
+    // borrow existing entries until durable admission verifies their exact binding.
     let now_unix = match state.clock.signed_seconds() {
         Ok(now) => now,
         Err(error) => return clock::rejection(error),
     };
-    let request_claim = match state
-        .minted_request_ids
-        .lock()
-        .await
-        .claim(&request_id, now_unix)
-    {
+    let request_claim = match state.minted_request_ids.lock().await.claim(
+        &request_id,
+        now_unix,
+        presented_nonce.is_some(),
+    ) {
         Ok(claim) => claim,
         Err(error) => {
             let status = match error {
@@ -557,8 +360,6 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         agent_id,
         arguments: parsed.parameters,
         dpop_proof: parsed.dpop_proof,
-        // Only a durable approved retry presents a nonce; the legacy route
-        // rejected one above, so it always takes the authorization-reserve path.
         execution_nonce: presented_nonce,
         governed_intent: parsed.governed_intent,
         approval_token: parsed.approval_token,
@@ -581,24 +382,9 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             return approval_error_response(error);
         }
     }
-    // Reservation on the shared, process-lifetime kernel: verify +
-    // reserve the budget hold (kept open) + mint a fresh execution nonce. The
-    // reserve-for-caller path never dispatches, so it does not require the
-    // caller-named server to be registered; the route therefore never registers
-    // it and holds the kernel behind a shared (non-mut) lock. No dispatch, no
-    // reconcile, no settlement. The lock is released at the end of the block,
-    // before any await, so authorizations serialize without holding the kernel
-    // across receipt-persistence I/O.
+    // Reservation binds the nonce and budget to one retained operation.
     let response = {
-        // Under durable admission the reservation is the operation's own: the
-        // strict preflight issues the operation-bound nonce and the execution's
-        // first half reserves the executable hold and nonce. Only the separate
-        // authenticated start can commit them for external execution.
-        let reserved = if durable_reservation {
-            kernel.reserve_caller_execution_blocking(&kernel_request)
-        } else {
-            kernel.authorize_tool_call_reserving_blocking_with_metadata(&kernel_request, None)
-        };
+        let reserved = kernel.reserve_caller_execution_blocking(&kernel_request);
         match reserved {
             Ok(response) => response,
             Err(error) => {
@@ -614,22 +400,21 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             }
         }
     };
-    // Only a successful reservation (Verdict::Allow) keeps its request-id claim: a
-    // denied or pending verdict placed no durable hold, so release the id to let
-    // the caller retry it without a spurious 409.
-    if !matches!(response.verdict, chio_kernel::Verdict::Allow) {
+    // Failed candidates cannot release borrowed custody or extend its horizon.
+    if matches!(response.verdict, chio_kernel::Verdict::Allow) {
+        if let Some(nonce) = response.execution_nonce.as_deref() {
+            state
+                .minted_request_ids
+                .lock()
+                .await
+                .retain_until(&request_claim, nonce.nonce.expires_at);
+        }
+    } else {
         state
             .minted_request_ids
             .lock()
             .await
             .release(&request_claim);
-    }
-    if let Some(nonce) = response.execution_nonce.as_deref() {
-        state
-            .minted_request_ids
-            .lock()
-            .await
-            .retain_until(&request_claim, nonce.nonce.expires_at);
     }
     drop(kernel);
     // Kernel delivery is idempotent on the shared sink. An irreversible reserve
@@ -652,9 +437,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             "mediated reserve receipt persistence failed; returning minted nonce to caller: {error}"
         );
     }
-    // Reservation is deliberately not the old "authorized" wire status. A
-    // caller must obtain a committed statement through the trusted start route
-    // and durably claim it at the configured executor before acting.
+    // Execution requires a committed statement and a durable executor claim.
     let status_str = match &response.verdict {
         chio_kernel::Verdict::Allow => "reserved",
         chio_kernel::Verdict::Deny => "deny",
@@ -673,142 +456,4 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         })),
     )
         .into_response()
-}
-
-/// `POST /v1/reconcile` request shape. The caller presents the execution nonce
-/// minted by `/v1/evaluate`, the exact `arguments` that nonce authorized, and
-/// the measured `realized_cost`. The kernel settles the reserved hold the nonce
-/// names at `min(realized, reserved)` and returns an authoritative
-/// mediated-spend receipt.
-#[derive(Debug, serde::Deserialize)]
-pub(crate) struct SidecarReconcileRequest {
-    execution_nonce: SignedExecutionNonce,
-    #[serde(default)]
-    arguments: serde_json::Value,
-    realized_cost: ToolInvocationCost,
-}
-
-/// Settle a reserved authorization by the execution nonce that names its hold.
-///
-/// This route is gated by the reconcile control middleware: only the trusted
-/// tool server, presenting the sidecar-control token, reconciles. The controlled
-/// agent that called `/v1/evaluate` must not reach this endpoint, or it could
-/// settle its own reservation at cost zero and defeat the cumulative spend cap.
-///
-/// The presented nonce is the credential: the shared kernel that minted it
-/// verifies its signature and operation binding under the configured profile,
-/// settles the exact reserved hold at `min(realized, reserved)`, releases the
-/// difference back to the grant, and signs a completed authoritative receipt.
-/// The `realized_cost` is the tool server's own report of what the call cost;
-/// binding it to an attested oracle cost is a later concern. Invalid credentials
-/// or mismatched arguments cannot authorize a settlement. The legacy profile
-/// rejects a consumed nonce. Durable admission can redeliver a completed
-/// operation's retained receipt without settling again; that replay never
-/// authorizes a second external execution.
-pub(crate) async fn sidecar_reconcile_handler(
-    State(state): State<Arc<ProxyState>>,
-    request: Request<Body>,
-) -> Response {
-    let (_parts, body) = request.into_parts();
-    let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            warn!("failed to read reconcile body: {error}");
-            return sidecar_bad_request("failed to read reconcile body").into_response();
-        }
-    };
-    let parsed: SidecarReconcileRequest =
-        match input::decode_arguments(&body_bytes, input::MAX_BODY_BYTES) {
-            Ok(parsed) => parsed,
-            Err(error) => return input::rejected(error),
-        };
-    let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
-        return internal_json_error_response(
-            "chio_mediation_unavailable",
-            "reconcile route requires a durable receipt store or a configured budget store (--budget-db or --control-url)",
-        );
-    };
-    // A reserved hold can only be resolved by nonce when the budget store
-    // implements the hold APIs. The remote control-plane store cannot, so a
-    // reconcile against it could never settle the reserved hold the nonce names.
-    // Reject fail-closed rather than attempt a settle that cannot succeed.
-    if !state.mediation_hold_capable {
-        return internal_json_error_response(
-            "chio_mediation_requires_local_budget_store",
-            "mediated reconcile requires a hold-capable local budget store (--budget-db); \
-             a remote control-plane budget store (--control-url) cannot resolve a reserved hold",
-        );
-    }
-    // Settle on the shared kernel. The same instance minted the nonce, so its
-    // configured nonce authority prevents a second settlement. Legacy replay is
-    // rejected; durable completion can redeliver its retained receipt. The lock
-    // releases at the end of the block, before sidecar receipt-persistence I/O.
-    let reconciled = {
-        let kernel = mediation_kernel.lock().await;
-        if kernel.has_durable_admission_store() {
-            kernel.reconcile_caller_execution_blocking(
-                &parsed.execution_nonce,
-                &parsed.arguments,
-                CallerExecutionReport {
-                    output: serde_json::json!({
-                        "caller_report": { "realized_cost": parsed.realized_cost }
-                    }),
-                    realized_cost: Some(parsed.realized_cost.clone()),
-                },
-            )
-        } else {
-            kernel.reconcile_reserved_authorization_by_nonce(
-                &parsed.execution_nonce,
-                &parsed.arguments,
-                &parsed.realized_cost,
-            )
-        }
-    };
-    let reconciled = match reconciled {
-        Ok(response) => response,
-        Err(error) => {
-            warn!("reconcile rejected: {error}");
-            return (
-                StatusCode::BAD_REQUEST,
-                axum::Json(serde_json::json!({
-                    "error": "chio_reconcile_rejected",
-                    "message": error.to_string(),
-                })),
-            )
-                .into_response();
-        }
-    };
-    // A completed settlement cannot be undone. Preserve its signed result even
-    // if retrying the shared evidence append fails, and expose persistence truthfully.
-    let persistence = record_kernel_receipt(&state, &reconciled.receipt).await;
-    let evidence_persisted = state.receipt_store.is_some() && persistence.is_ok();
-    if let Err(error) = persistence {
-        warn!("reconcile settled but receipt persistence failed; returning authoritative receipt to caller: {error}");
-    }
-    (
-        StatusCode::OK,
-        axum::Json(serde_json::json!({
-            "status": "reconciled",
-            "evidence_persisted": evidence_persisted,
-            "receipt": reconciled.receipt,
-        })),
-    )
-        .into_response()
-}
-
-/// Release expired, unreconciled reserved budget holds on the shared kernel so a
-/// caller that authorizes but never reconciles cannot permanently burn budget.
-/// Returns the number of holds released; a sidecar without a configured budget
-/// store (no mediation kernel) releases nothing. Factored out of the startup
-/// interval task so it is directly unit-testable with a controlled clock.
-#[cfg(test)]
-pub(crate) async fn reap_expired_reserved_holds_once(
-    state: &Arc<ProxyState>,
-    now_unix_secs: i64,
-) -> Result<usize, chio_kernel::KernelError> {
-    let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
-        return Ok(0);
-    };
-    let kernel = mediation_kernel.lock().await;
-    kernel.reap_expired_reserved_budget_holds(now_unix_secs)
 }

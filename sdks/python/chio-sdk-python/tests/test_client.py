@@ -550,25 +550,6 @@ class TestEvaluateToolCall:
         assert "execution_nonce" not in request_body
 
     @respx.mock
-    async def test_legacy_unsigned_reconciliation_is_rejected_without_http(self) -> None:
-        nonce = {"nonce_id": "n-1", "signature": "e" * 128}
-        arguments = {"path": "/tmp"}
-        realized_cost = {"units": 30, "currency": "USD", "breakdown": None}
-        expected = {"status": "reconciled", "receipt": _make_receipt_dict()}
-        route = respx.post(f"{BASE}/v1/reconcile").mock(
-            return_value=httpx.Response(200, json=expected)
-        )
-        async with ChioClient(BASE) as client:
-            with pytest.raises(ChioValidationError, match="Unsigned caller reconciliation"):
-                await client.reconcile_mediated_authorization(
-                    control_token="ctl-secret",
-                    execution_nonce=nonce,
-                    arguments=arguments,
-                    realized_cost=realized_cost,
-                )
-        assert not route.called
-
-    @respx.mock
     async def test_evaluate_tool_call_mediated_forwards_governed_and_dpop(self) -> None:
         # Single-phase authorization: the helper forwards governed intent,
         # approval token, request id, and DPoP proof for gated grants, and never
@@ -761,15 +742,16 @@ class TestEvaluateToolCall:
 
 class TestAuthenticatedCallerDelivery:
     @respx.mock
-    async def test_reservation_only_authorization_is_not_execution_permission(self) -> None:
+    async def test_unrecognized_reservation_status_is_rejected(self) -> None:
         respx.post(f"{BASE}/v1/evaluate").mock(return_value=httpx.Response(200, json={
-            "status": "authorized", "execution_nonce": {"legacy": True},
+            "status": "authorized", "execution_nonce": {},
         }))
         async with ChioClient(BASE) as client:
-            with pytest.raises(ChioValidationError, match="Reservation-only"):
+            with pytest.raises(ChioValidationError) as exc_info:
                 await client.evaluate_tool_call_mediated(
                     capability=_make_token_dict(), tool_server="srv", tool_name="read", parameters={},
                 )
+        assert str(exc_info.value) == "Invalid caller reservation status"
 
     @respx.mock
     async def test_start_and_report_are_separate_control_requests(self) -> None:

@@ -14,7 +14,7 @@ async fn post_original_json(state: Arc<ProxyState>, uri: &str, body: String) -> 
         .method("POST")
         .uri(uri)
         .header("content-type", "application/json");
-    if uri == "/v1/reconcile" {
+    if uri.starts_with("/v1/caller/") {
         builder = builder.header("authorization", format!("Bearer {MEDIATED_CONTROL_TOKEN}"));
     }
     let request = with_loopback_peer(builder.body(Body::from(body)).test_unwrap());
@@ -28,24 +28,26 @@ async fn response_json(response: Response) -> serde_json::Value {
     serde_json::from_slice(&bytes).test_unwrap()
 }
 
-fn reconcile_json(nonce: &str, arguments: &str) -> String {
+fn start_json(nonce: &str, arguments: &str) -> String {
     format!(
-        r#"{{"execution_nonce":{nonce},"arguments":{arguments},"realized_cost":{{"units":30,"currency":"USD"}}}}"#
+        r#"{{"protocol":"chio.caller-delivery.v1","execution_nonce":{nonce},"arguments":{arguments}}}"#
     )
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn reconcile_original_decimal_arguments_settles_only_the_signed_hold() {
+async fn signed_report_for_decimal_arguments_settles_only_its_reserved_hold() {
     let signer = Keypair::generate();
     let signer_pub = signer.public_key();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let directory = tempfile::tempdir().test_unwrap();
+    let durable = durable_admission_stores(directory.path());
+    let budget = Arc::clone(&durable.budget_store);
     let issuer = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let capability =
         issue_cost_bearing_capability(&issuer, &agent, "cost-srv", "compute", 100, 300, "USD");
     let cap_id = capability.id.clone();
     let capability_json = serde_json::to_string(&capability).test_unwrap();
-    let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+    let state = mediated_test_state(signer, durable, Vec::new());
     let original_arguments = r#"{"confidence":0.50,"invoice":"inv-decimal"}"#;
     let evaluate_json = format!(
         r#"{{"capability":{capability_json},"tool_server":"cost-srv","tool_name":"compute","request_id":"original-decimal","parameters":{original_arguments}}}"#
@@ -59,10 +61,11 @@ async fn reconcile_original_decimal_arguments_settles_only_the_signed_hold() {
     assert!(nonce.verify_signed_by(&signer_pub));
     assert_eq!(nonce.nonce.bound_to.capability_id, cap_id);
     assert_eq!(nonce.nonce.bound_to.request_id, "original-decimal");
-    let hold_id = nonce.reserved_hold_id().test_unwrap();
-    let nonce_json = serde_json::to_string(&nonce).test_unwrap();
-
-    // A second open hold makes settling the wrong reservation observable.
+    let hold_id = authorized["receipt"]["metadata"]["budget_authority"]["hold_id"]
+        .as_str()
+        .test_unwrap()
+        .to_owned();
+    let caller = CallerExecutorFixture::new();
     let (status, neighbor) = post_evaluate(
         Arc::clone(&state),
         &serde_json::json!({
@@ -75,11 +78,15 @@ async fn reconcile_original_decimal_arguments_settles_only_the_signed_hold() {
     assert_eq!(neighbor["status"], "reserved", "{neighbor}");
     let neighbor_nonce: SignedExecutionNonce =
         serde_json::from_value(neighbor["execution_nonce"].clone()).test_unwrap();
-    let neighbor_hold_id = neighbor_nonce.reserved_hold_id().test_unwrap();
+    assert!(neighbor_nonce.verify_signed_by(&signer_pub));
+    let neighbor_hold_id = neighbor["receipt"]["metadata"]["budget_authority"]["hold_id"]
+        .as_str()
+        .test_unwrap()
+        .to_owned();
     assert_ne!(hold_id, neighbor_hold_id);
-    let target_before = budget.get_budget_hold(hold_id).test_unwrap().test_unwrap();
+    let target_before = budget.get_budget_hold(&hold_id).test_unwrap().test_unwrap();
     let neighbor_before = budget
-        .get_budget_hold(neighbor_hold_id)
+        .get_budget_hold(&neighbor_hold_id)
         .test_unwrap()
         .test_unwrap();
     assert_eq!(target_before.disposition, BudgetHoldDispositionView::Open);
@@ -92,16 +99,20 @@ async fn reconcile_original_decimal_arguments_settles_only_the_signed_hold() {
     assert_eq!(usage_before.total_cost_realized_spend, 0);
     let receipt_count_before = state.tool_receipt_log.lock().await.receipts.len();
 
-    // Preserve the exact original decimal lexeme across the real HTTP routes.
-    let reconcile_body = reconcile_json(&nonce_json, original_arguments);
-    let response =
-        post_original_json(Arc::clone(&state), "/v1/reconcile", reconcile_body.clone()).await;
-    assert_eq!(
-        response.status(),
-        StatusCode::OK,
-        "evaluate accepted 0.50; reconcile must accept the same original arguments"
-    );
-    let reconciled = response_json(response).await;
+    let report = caller
+        .report_request(
+            Arc::clone(&state),
+            &authorized["execution_nonce"],
+            &serde_json::from_str(original_arguments).test_unwrap(),
+            ToolInvocationCost {
+                units: 100,
+                currency: "USD".to_owned(),
+                breakdown: None,
+            },
+        )
+        .await;
+    let (status, reconciled) = post_caller_report(Arc::clone(&state), &report).await;
+    assert_eq!(status, StatusCode::OK, "{reconciled}");
     assert_eq!(reconciled["status"], "reconciled", "{reconciled}");
     let receipt: ChioReceipt = serde_json::from_value(reconciled["receipt"].clone()).test_unwrap();
     assert_eq!(
@@ -113,25 +124,25 @@ async fn reconcile_original_decimal_arguments_settles_only_the_signed_hold() {
     assert_eq!(lineage.capability_id, cap_id);
     assert_eq!(lineage.grant_index, 0);
     assert_eq!(lineage.exposed_units, 100);
-    assert_eq!(lineage.realized_units, 30);
+    assert_eq!(lineage.realized_units, 100);
     assert_eq!(
         lineage.execution_nonce_id.as_deref(),
         Some(nonce.nonce_id())
     );
-    let target_after = budget.get_budget_hold(hold_id).test_unwrap().test_unwrap();
+    let target_after = budget.get_budget_hold(&hold_id).test_unwrap().test_unwrap();
     assert_eq!(
         target_after.disposition,
         BudgetHoldDispositionView::Reconciled
     );
     assert_eq!(target_after.remaining_exposure_units, 0);
     assert_eq!(
-        budget.get_budget_hold(neighbor_hold_id).test_unwrap(),
+        budget.get_budget_hold(&neighbor_hold_id).test_unwrap(),
         Some(neighbor_before.clone())
     );
     let usage_after = budget.get_usage(&cap_id, 0).test_unwrap().test_unwrap();
     assert_eq!(usage_after.total_cost_exposed, 100);
-    assert_eq!(usage_after.total_cost_realized_spend, 30);
-    assert_eq!(usage_after.committed_cost_units().test_unwrap(), 130);
+    assert_eq!(usage_after.total_cost_realized_spend, 100);
+    assert_eq!(usage_after.committed_cost_units().test_unwrap(), 200);
     let events_after = budget
         .list_mutation_events(100, Some(&cap_id), Some(0))
         .test_unwrap();
@@ -141,26 +152,24 @@ async fn reconcile_original_decimal_arguments_settles_only_the_signed_hold() {
         .collect();
     assert_eq!(settlements.len(), 1);
     let settlement = settlements.first().test_unwrap();
-    assert_eq!(settlement.hold_id.as_deref(), Some(hold_id));
+    assert_eq!(settlement.hold_id.as_deref(), Some(hold_id.as_str()));
     assert_eq!(settlement.exposure_units, 100);
-    assert_eq!(settlement.realized_spend_units, 30);
+    assert_eq!(settlement.realized_spend_units, 100);
     assert_eq!(
         state.tool_receipt_log.lock().await.receipts.len(),
-        receipt_count_before + 1
+        receipt_count_before
     );
 
-    let response = post_original_json(Arc::clone(&state), "/v1/reconcile", reconcile_body).await;
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    let replay = response_json(response).await;
-    assert_eq!(replay["error"], "chio_reconcile_rejected");
-    assert_eq!(replay["message"], "internal error: reconcile-by-nonce rejected the nonce: execution nonce has already been consumed");
-    assert!(replay.get("receipt").is_none());
+    let (status, replay) = post_caller_report(Arc::clone(&state), &report).await;
+    assert_eq!(status, StatusCode::OK, "{replay}");
+    assert_eq!(replay["status"], "reconciled", "{replay}");
+    assert_eq!(replay["receipt"], reconciled["receipt"]);
     assert_eq!(
-        budget.get_budget_hold(hold_id).test_unwrap(),
+        budget.get_budget_hold(&hold_id).test_unwrap(),
         Some(target_after)
     );
     assert_eq!(
-        budget.get_budget_hold(neighbor_hold_id).test_unwrap(),
+        budget.get_budget_hold(&neighbor_hold_id).test_unwrap(),
         Some(neighbor_before)
     );
     assert_eq!(
@@ -175,21 +184,23 @@ async fn reconcile_original_decimal_arguments_settles_only_the_signed_hold() {
     );
     assert_eq!(
         state.tool_receipt_log.lock().await.receipts.len(),
-        receipt_count_before + 1
+        receipt_count_before
     );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn reconcile_rejects_original_duplicates_and_signed_nonce_aliases_before_settlement() {
+async fn caller_start_rejects_duplicates_and_signed_nonce_aliases_before_dispatch() {
     let signer = Keypair::generate();
     let signer_pub = signer.public_key();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let directory = tempfile::tempdir().test_unwrap();
+    let durable = durable_admission_stores(directory.path());
+    let budget = Arc::clone(&durable.budget_store);
     let issuer = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let capability =
         issue_cost_bearing_capability(&issuer, &agent, "cost-srv", "compute", 100, 300, "USD");
     let cap_id = capability.id.clone();
-    let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+    let state = mediated_test_state(signer, durable, Vec::new());
     let (status, authorized) = post_evaluate(
         Arc::clone(&state),
         &serde_json::json!({
@@ -203,9 +214,12 @@ async fn reconcile_rejects_original_duplicates_and_signed_nonce_aliases_before_s
     let nonce: SignedExecutionNonce =
         serde_json::from_value(authorized["execution_nonce"].clone()).test_unwrap();
     assert!(nonce.verify_signed_by(&signer_pub));
-    let hold_id = nonce.reserved_hold_id().test_unwrap();
+    let hold_id = authorized["receipt"]["metadata"]["budget_authority"]["hold_id"]
+        .as_str()
+        .test_unwrap()
+        .to_owned();
     let nonce_json = serde_json::to_string(&nonce).test_unwrap();
-    let hold_before = budget.get_budget_hold(hold_id).test_unwrap().test_unwrap();
+    let hold_before = budget.get_budget_hold(&hold_id).test_unwrap().test_unwrap();
     assert_eq!(hold_before.disposition, BudgetHoldDispositionView::Open);
     let usage_before = budget.get_usage(&cap_id, 0).test_unwrap().test_unwrap();
     assert_eq!(usage_before.total_cost_exposed, 100);
@@ -215,8 +229,6 @@ async fn reconcile_rejects_original_duplicates_and_signed_nonce_aliases_before_s
         .test_unwrap();
     let receipt_count_before = state.tool_receipt_log.lock().await.receipts.len();
 
-    // Canonical argument spelling isolates the strict controls from the
-    // ordinary unsigned decimal regression above.
     let canonical_arguments = r#"{"confidence":0.5,"invoice":"inv-strict"}"#;
     let issued_at_field = format!("\"issued_at\":{}", nonce.nonce.issued_at);
     assert_eq!(nonce_json.matches(&issued_at_field).count(), 1);
@@ -228,7 +240,7 @@ async fn reconcile_rejects_original_duplicates_and_signed_nonce_aliases_before_s
     );
     for (body, duplicate_key) in [
         (
-            reconcile_json(
+            start_json(
                 &nonce_json,
                 r#"{"confidence":0.5,"confidence":0.5,"invoice":"inv-strict"}"#,
             ),
@@ -236,13 +248,13 @@ async fn reconcile_rejects_original_duplicates_and_signed_nonce_aliases_before_s
         ),
         (
             format!(
-                r#"{{"execution_nonce":{nonce_json},"arguments":{canonical_arguments},"arguments":{canonical_arguments},"realized_cost":{{"units":30,"currency":"USD"}}}}"#
+                r#"{{"protocol":"chio.caller-delivery.v1","execution_nonce":{nonce_json},"arguments":{canonical_arguments},"arguments":{canonical_arguments}}}"#
             ),
             Some("arguments"),
         ),
-        (reconcile_json(&aliased_nonce, canonical_arguments), None),
+        (start_json(&aliased_nonce, canonical_arguments), None),
     ] {
-        let response = post_original_json(Arc::clone(&state), "/v1/reconcile", body).await;
+        let response = post_original_json(Arc::clone(&state), "/v1/caller/start", body).await;
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         let error = response
             .extensions()
@@ -278,7 +290,7 @@ async fn reconcile_rejects_original_duplicates_and_signed_nonce_aliases_before_s
         );
         assert!(rejected.get("receipt").is_none());
         assert_eq!(
-            budget.get_budget_hold(hold_id).test_unwrap(),
+            budget.get_budget_hold(&hold_id).test_unwrap(),
             Some(hold_before.clone())
         );
         assert_eq!(
@@ -297,22 +309,28 @@ async fn reconcile_rejects_original_duplicates_and_signed_nonce_aliases_before_s
         );
     }
 
-    // Every invalid input left the real nonce usable for exactly one settlement.
-    let response = post_original_json(
-        Arc::clone(&state),
-        "/v1/reconcile",
-        reconcile_json(&nonce_json, canonical_arguments),
-    )
-    .await;
-    assert_eq!(response.status(), StatusCode::OK);
-    let reconciled = response_json(response).await;
+    let caller = CallerExecutorFixture::new();
+    let report = caller
+        .report_request(
+            Arc::clone(&state),
+            &authorized["execution_nonce"],
+            &serde_json::from_str(canonical_arguments).test_unwrap(),
+            ToolInvocationCost {
+                units: 100,
+                currency: "USD".to_owned(),
+                breakdown: None,
+            },
+        )
+        .await;
+    let (status, reconciled) = post_caller_report(Arc::clone(&state), &report).await;
+    assert_eq!(status, StatusCode::OK, "{reconciled}");
     assert_eq!(reconciled["status"], "reconciled", "{reconciled}");
     let receipt: ChioReceipt = serde_json::from_value(reconciled["receipt"].clone()).test_unwrap();
     assert_eq!(
         is_authoritative_spend_receipt(&receipt, &[signer_pub], &nonce),
         Ok(())
     );
-    let hold_after = budget.get_budget_hold(hold_id).test_unwrap().test_unwrap();
+    let hold_after = budget.get_budget_hold(&hold_id).test_unwrap().test_unwrap();
     assert_eq!(
         hold_after.disposition,
         BudgetHoldDispositionView::Reconciled
@@ -320,7 +338,7 @@ async fn reconcile_rejects_original_duplicates_and_signed_nonce_aliases_before_s
     assert_eq!(hold_after.remaining_exposure_units, 0);
     let usage_after = budget.get_usage(&cap_id, 0).test_unwrap().test_unwrap();
     assert_eq!(usage_after.total_cost_exposed, 0);
-    assert_eq!(usage_after.total_cost_realized_spend, 30);
+    assert_eq!(usage_after.total_cost_realized_spend, 100);
     let events = budget
         .list_mutation_events(100, Some(&cap_id), Some(0))
         .test_unwrap();
@@ -333,6 +351,6 @@ async fn reconcile_rejects_original_duplicates_and_signed_nonce_aliases_before_s
     );
     assert_eq!(
         state.tool_receipt_log.lock().await.receipts.len(),
-        receipt_count_before + 1
+        receipt_count_before
     );
 }

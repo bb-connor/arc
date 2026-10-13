@@ -2,7 +2,7 @@ use super::*;
 use crate::admission_operation::AdmissionOperationV1;
 use crate::budget_store::BudgetReverseHoldDecision;
 use crate::kernel::dispatch::PreDispatchMonetaryUnwindFailure;
-use crate::kernel::responses::{PreflightNonceSource, ReservedHoldStamp};
+use crate::kernel::responses::PreflightNonceSource;
 
 impl ChioKernel {
     /// Share the exact denial vocabulary and guard evidence after a completed
@@ -58,38 +58,12 @@ impl ChioKernel {
             now.as_secs(),
         )
     }
-
-    /// The legacy sidecar reservation response does not carry the qualified
-    /// nonce participant. Reject that composition before acquiring participants.
-    pub(super) fn reject_legacy_caller_reservation_for_durable_nonce(
-        &self,
-        request: &ToolCallRequest,
-        disposition: PreflightHoldDisposition,
-        admission: Option<&DurableToolAdmission>,
-        now: u64,
-        metadata: Option<&serde_json::Value>,
-    ) -> Result<Option<ToolCallResponse>, KernelError> {
-        if disposition != PreflightHoldDisposition::ReserveForCaller
-            || !admission.is_some_and(DurableToolAdmission::requires_execution_nonce)
-        {
-            return Ok(None);
-        }
-        let reason = "durable execution nonces do not support reserve-for-caller authorization";
-        warn!(request_id = %request.request_id, reason, "durable admission denied");
-        self.compensate_durable_admission_after_pre_dispatch_cleanup(
-            admission.map(DurableToolAdmission::operation),
-            None,
-            None,
-        )?;
-        self.build_deny_response_with_metadata(request, reason, now, None, metadata.cloned())
-            .map(Some)
-    }
 }
 
 const EXECUTION_NONCE_PREFLIGHT_RETRY_REASON: &str =
     "execution nonce preflight requires retry with presented nonce";
 const EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON: &str =
-    "pre-execution authorization reserved; present the minted execution nonce to the tool server";
+    "caller execution reserved; authenticated start required";
 
 pub(super) struct PreDispatchCleanupDeny<'a> {
     pub(super) request: &'a ToolCallRequest,
@@ -111,15 +85,14 @@ pub(super) struct PreDispatchCleanupDeny<'a> {
 }
 
 pub(super) struct ExecutionNonceReservingResponse<'a> {
-    pub(super) durable_admission: Option<&'a DurableToolAdmission>,
+    pub(super) durable_admission: &'a DurableToolAdmission,
     pub(super) request: &'a ToolCallRequest,
     pub(super) timestamp: u64,
     pub(super) matched_grant_index: usize,
     pub(super) budget_mutation: &'a PreExecutionBudgetMutation,
     pub(super) runtime_admission_metadata: Option<serde_json::Value>,
-    pub(super) reserved_payment_reference: Option<String>,
     pub(super) budget_lease_acquired: bool,
-    pub(super) nonce: PreflightNonceSource,
+    pub(super) nonce: Box<crate::execution_nonce::SignedExecutionNonce>,
 }
 
 pub(crate) struct OrdinaryRecoveryFinalization<'a> {
@@ -1105,7 +1078,6 @@ impl ChioKernel {
             Some(matched_grant_index),
             metadata,
             EXECUTION_NONCE_PREFLIGHT_RETRY_REASON,
-            None,
             nonce,
         )
     }
@@ -1121,45 +1093,22 @@ impl ChioKernel {
             matched_grant_index,
             budget_mutation,
             runtime_admission_metadata,
-            reserved_payment_reference,
             budget_lease_acquired,
             nonce,
         } = reserving;
-        let (runtime_admission_metadata, runtime_release_confirmed) = if let Some(admission) =
-            durable_admission
+        if durable_admission.state()
+            != crate::admission_operation::AdmissionOperationState::ReadyToDispatch
+            || durable_admission.issued_nonce() != Some(nonce.as_ref())
         {
-            // A caller's Ready reservation retains its original operation
-            // custody. It is not a pre-dispatch denial or nonce preflight.
-            // Validate physical episodes before acknowledging retention.
-            if admission.state()
-                != crate::admission_operation::AdmissionOperationState::ReadyToDispatch
-                || !matches!(&nonce, PreflightNonceSource::Durable(value) if admission.issued_nonce() == Some(value.as_ref()))
-            {
-                return Err(KernelError::DurableAdmission(
-                    "caller reservation response lost its original nonce owner".into(),
-                ));
-            }
-            self.read_caller_participant_custody(
-                admission,
-                matched_grant_index,
-                self.read_authority_time()?.get(),
-            )?;
-            (runtime_admission_metadata, true)
-        } else {
-            self.release_runtime_admission_reservations_for_pre_dispatch_denial(
-                None,
-                runtime_admission_metadata,
-            )
-        };
-        if !runtime_release_confirmed {
-            return self.build_deny_response_with_metadata(
-                request,
-                "execution nonce authorization cleanup could not be confirmed",
-                timestamp,
-                Some(matched_grant_index),
-                runtime_admission_metadata,
-            );
+            return Err(KernelError::DurableAdmission(
+                "caller reservation response lost its original nonce owner".into(),
+            ));
         }
+        self.read_caller_participant_custody(
+            durable_admission,
+            matched_grant_index,
+            self.read_authority_time()?.get(),
+        )?;
 
         if matches!(budget_mutation, PreExecutionBudgetMutation::None) && budget_lease_acquired {
             self.release_admitted_capability_budget(&request.capability)
@@ -1180,43 +1129,13 @@ impl ChioKernel {
             })),
         );
 
-        // A retained nonce belongs to a durable operation whose reservation the
-        // admission authority governs; only a minted nonce stamps a legacy hold.
-        let reserved_hold = match (&nonce, budget_mutation) {
-            (PreflightNonceSource::Durable(_), _) => None,
-            (PreflightNonceSource::Mint, PreExecutionBudgetMutation::Charge(charge)) => {
-                Some(ReservedHoldStamp::Monetary {
-                    charge,
-                    payment_reference: reserved_payment_reference,
-                })
-            }
-            (PreflightNonceSource::Mint, PreExecutionBudgetMutation::InvocationHold(charge)) => {
-                Some(ReservedHoldStamp::Monetary {
-                    charge,
-                    payment_reference: reserved_payment_reference,
-                })
-            }
-            (
-                PreflightNonceSource::Mint,
-                PreExecutionBudgetMutation::Invocation { grant_index },
-            ) => Some(ReservedHoldStamp::Invocation {
-                hold_id: format!(
-                    "budget-hold:{}:{}:{}",
-                    request.request_id, request.capability.id, grant_index
-                ),
-                grant_index: *grant_index,
-            }),
-            (PreflightNonceSource::Mint, PreExecutionBudgetMutation::None) => None,
-        };
-
         self.build_execution_nonce_preflight_allow_response_with_metadata(
             request,
             timestamp,
             Some(matched_grant_index),
             metadata,
             EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON,
-            reserved_hold,
-            nonce,
+            PreflightNonceSource::Durable(nonce),
         )
     }
 }

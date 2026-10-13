@@ -118,17 +118,6 @@ pub fn mint_execution_nonce(
     config: &ExecutionNonceConfig,
     now: i64,
 ) -> Result<SignedExecutionNonce, KernelError> {
-    mint_execution_nonce_with_reservation(kernel_keypair, binding, None, None, config, now)
-}
-
-pub fn mint_execution_nonce_with_reservation(
-    kernel_keypair: &Keypair,
-    binding: NonceBinding,
-    reserved_hold_id: Option<String>,
-    reserving_request_id: Option<String>,
-    config: &ExecutionNonceConfig,
-    now: i64,
-) -> Result<SignedExecutionNonce, KernelError> {
     let ttl = i64::try_from(config.nonce_ttl_secs)
         .ok()
         .filter(|ttl| *ttl > 0)
@@ -146,8 +135,8 @@ pub fn mint_execution_nonce_with_reservation(
         issued_at: now,
         expires_at,
         bound_to: binding,
-        reserved_hold_id,
-        reserving_request_id,
+        reserved_hold_id: None,
+        reserving_request_id: None,
     };
     let (signature, _bytes) = kernel_keypair.sign_canonical(&nonce).map_err(|e| {
         KernelError::ReceiptSigningFailed(format!("failed to sign execution nonce: {e}"))

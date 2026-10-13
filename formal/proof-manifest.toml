@@ -382,12 +382,11 @@ model_file = "formal/tla/RevocationPropagation.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/credential_reservation/operation_owned.rs"
-rust_symbols = ["ChioKernel::run_pre_budget_admission", "ChioKernel::reserve_admitted_dispatch_credentials", "ChioKernel::reserve_admitted_caller_credentials", "PreparedDispatchCredentials::reserve_for_admission", "PreparedDispatchCredentials::claim_for_admission"]
+rust_symbols = ["ChioKernel::run_pre_budget_admission", "ChioKernel::reserve_admitted_dispatch_credentials", "PreparedDispatchCredentials::reserve_for_admission", "PreparedDispatchCredentials::claim_for_admission"]
 normalized_sha256 = "f8043e7c72ba2fb2fff6c943aa9e2faed6423f3fbb82a5714f7e36c3a972ad11"
 symbol_sha256 = [
   { symbol = "ChioKernel::run_pre_budget_admission", sha256 = "abd2d3913819daab98d492a875a44ca83eaab5d6bf4271806632d7c4e934b47e" },
   { symbol = "ChioKernel::reserve_admitted_dispatch_credentials", sha256 = "89376d5970f5bd2550f05b2a786e03068adf68e19608138c1aa45d4405283988" },
-  { symbol = "ChioKernel::reserve_admitted_caller_credentials", sha256 = "a4be908e16720acf6cbe1dc1a142c96e915e349d658ecb4b59f75cc29afe10d1" },
   { symbol = "PreparedDispatchCredentials::reserve_for_admission", sha256 = "ef3d0a7400b6033f52f5a96449b447861776e6e0037b5a893636af03127931ea" },
   { symbol = "PreparedDispatchCredentials::claim_for_admission", sha256 = "50d6ed68b52880364eeca71edd69b658b882f1cda8bd8b215f1b7ded29935d68" },
 ]
@@ -419,12 +418,11 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/credential_reservation/operation_owned.rs"
-rust_symbols = ["ChioKernel::run_pre_budget_admission", "ChioKernel::reserve_admitted_dispatch_credentials", "ChioKernel::reserve_admitted_caller_credentials", "PreparedDispatchCredentials::reserve_for_admission", "PreparedDispatchCredentials::claim_for_admission"]
+rust_symbols = ["ChioKernel::run_pre_budget_admission", "ChioKernel::reserve_admitted_dispatch_credentials", "PreparedDispatchCredentials::reserve_for_admission", "PreparedDispatchCredentials::claim_for_admission"]
 normalized_sha256 = "f8043e7c72ba2fb2fff6c943aa9e2faed6423f3fbb82a5714f7e36c3a972ad11"
 symbol_sha256 = [
   { symbol = "ChioKernel::run_pre_budget_admission", sha256 = "abd2d3913819daab98d492a875a44ca83eaab5d6bf4271806632d7c4e934b47e" },
   { symbol = "ChioKernel::reserve_admitted_dispatch_credentials", sha256 = "89376d5970f5bd2550f05b2a786e03068adf68e19608138c1aa45d4405283988" },
-  { symbol = "ChioKernel::reserve_admitted_caller_credentials", sha256 = "a4be908e16720acf6cbe1dc1a142c96e915e349d658ecb4b59f75cc29afe10d1" },
   { symbol = "PreparedDispatchCredentials::reserve_for_admission", sha256 = "ef3d0a7400b6033f52f5a96449b447861776e6e0037b5a893636af03127931ea" },
   { symbol = "PreparedDispatchCredentials::claim_for_admission", sha256 = "50d6ed68b52880364eeca71edd69b658b882f1cda8bd8b215f1b7ded29935d68" },
 ]

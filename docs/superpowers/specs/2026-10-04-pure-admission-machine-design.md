@@ -55,12 +55,12 @@ An independent review found 3 Blocker, 15 Major, 5 Minor and 4 Nit issues (secti
 - **Commit failures split by reason and path.** A policy refusal on the fused path writes a deny tombstone, `Unavailable` replans from `Unbegun`, `VersionConflict` re-projects, and only slow-path refusals compensate. Refusals after the effect, and unknown commit outcomes, have their own rules.
 - **One normative cut table.** `CutFacts` replaces `LivenessFacts`. The table covers every phase and cause, including governed active response and economic mutation, and spec 4 cites it.
 - **Integrity is a crossing precondition**, not a participant. Read-only calls are their own operation class.
-- **The evaluation context gains a disposition and a request source**, which covers the 17th method (`authorize_tool_call_reserving_blocking_with_metadata`), caller execution and nested flow.
+- **The evaluation context carries a disposition and a request source** for direct evaluation, durable caller reservation/start, and nested flow. Authenticated caller reports resume original finalization outside evaluation.
 - **The proof plan is honest about Aeneas.** An extractable core over codes and digests is lowered to Lean. Plans and receipt metadata live in a hydrator that is not extracted. Liveness moves to the TLA model under named fairness assumptions.
 
 ## 1. Decision summary
 
-The decisions about a mediated request (the next admission state; whether to compensate, terminalize, transition, retain or wait; which receipt to sign) are made in imperative code mixed with I/O, across two durable operation models with their own legality predicates, at least five deciders of in-flight operations (section 2), two full evaluators with the same shape, and seventeen public evaluation methods under five evaluation dispositions. Only the pure kernel core is proven, and only over scalar projections. No TLA model describes the admission saga's states.
+The decisions about a mediated request (the next admission state; whether to compensate, terminalize, transition, retain or wait; which receipt to sign) are made in imperative code mixed with I/O, across two durable operation models with their own legality predicates, at least five deciders of in-flight operations (section 2), two full evaluators with the same shape, sixteen public `evaluate_tool_call*` methods, and five caller reservation/start methods under three evaluation dispositions. Authenticated caller reporting uses a separate original-operation finalization entrypoint. Only the pure kernel core is proven, and only over scalar projections. No TLA model describes the admission saga's states.
 
 This design makes the decision a function:
 
@@ -74,7 +74,7 @@ pub struct Transition { pub next: AdmissionState, pub effects: EffectList }
    - Every driver feeds events and performs effects through ports.
    - Every decider becomes one cut function over a typed cause and the facts the driver gathers.
    - The cut table in section 6.1 is normative for startup, recovery closure and the spec 4 drain.
-3. **One entry point.** `evaluate(source, EvaluationContext)` replaces seventeen methods. Blocking is an adapter (section 8).
+3. **One entry point.** `evaluate(source, EvaluationContext)` and its blocking adapter replace the sixteen `evaluate_tool_call*` methods. Caller reservation/start use their dispositions; authenticated reports resume original finalization separately (section 8).
 4. **Proof reaches the decision.**
    - The extractable core of `transition` (codes, bitsets, digests) is lowered to Lean through Aeneas.
    - The specs' safety predicates become Lean theorems.
@@ -103,8 +103,8 @@ The machine decides; it never executes. Spec 10 owns how commit effects execute 
 | Finalization chooses `ContractualZeroCharge` only for a zero recomputed amount or a contractual delivery denial. The contractual denials are the committed-digest and finding-delivery contracts, and a checked-output guard that opts in as trusted pricing authority (`output_rejection_is_zero_charge`, "not an inference from an ordinary security denial"). A contractual denial requires a reversible hold | V2: `kernel/delivery_contract.rs:66-175`; `kernel/mod.rs:931-942`; `kernel/output_guard.rs:51-105`; `kernel/admission_coordinator/terminal_payment.rs:111-125` |
 | An ordinary guard denial at release is an error, not a delivery denial. Startup retains the known return and its hold in `Finalizing`, claims the operation under the current fence and continues with unrelated operations. Neither path authorizes another dispatch | V2: `kernel/admission_coordinator/recovery.rs:341-356`; `spec/EXECUTION_EVIDENCE_AND_PAYMENT_SUCCESSORS.md:138-149` |
 | A contractual capture waiver resolves a known return: `Finalizing`, a recorded tool outcome, a reversible hold, and a positive capture pending in `Settling` or `ReconcileFailed` with no transaction id. Its successor goes fenced `Resolving -> Resolved`, and finalization then projects a settled receipt with zero charged units and the original realized cost. A mutually agreed release instead requires `OutcomeUnknownAfterDispatch` and no known outcome | V2: `payment/contractual_resolution.rs:224-245`; `kernel/admission_coordinator/terminal_payment.rs:24-35`; `spec/EXECUTION_EVIDENCE_AND_PAYMENT_SUCCESSORS.md:66-134` |
-| Seventeen public evaluation methods: 6 async, 6 blocking and 4 nested `evaluate_tool_call*`, plus `authorize_tool_call_reserving_blocking_with_metadata`, which `chio-api-protect` calls in production | M: `kernel/evaluation/evaluation_entry.rs:98-235`; `sync_evaluation_wrapper.rs:4-110`, `:204-222`; `session_ops/nested_tool_call.rs:36-195`; `crates/products/chio-api-protect/src/proxy/mediated.rs:591` |
-| Five evaluation dispositions: kernel, legacy reservation, caller reservation, caller report, caller start. Caller execution re-runs the full evaluator under the last three | M: `kernel/evaluation/mod.rs:83-121`; `kernel/evaluation/caller_execution.rs:233`, `:412`, `:462` |
+| Sixteen public `evaluate_tool_call*` methods: 6 direct async, 6 direct blocking and 4 nested. Caller delivery additionally exposes 2 reservation methods, 3 start methods and 1 authenticated report method | `kernel/evaluation/evaluation_entry.rs`; `kernel/evaluation/sync_evaluation_wrapper.rs`; `kernel/session_ops/nested_tool_call.rs`; `kernel/evaluation/caller_execution.rs`; `kernel/admission_coordinator/return_context/caller/report.rs` |
+| Three evaluation dispositions: `Kernel`, `ReserveForCaller` and `CallerStart`. Caller reservation and fresh start run evaluation; authenticated reports restore the original request and caller context, verify the exact signed commitment and executor report, and resume finalization without admission or dispatch | `kernel/evaluation/mod.rs`; `kernel/evaluation/caller_execution.rs`; `kernel/admission_coordinator/return_context/caller/report.rs` |
 | Deciders of in-flight operations | (1) startup `reconcile_recoverable_admissions` (M: `recovery.rs:133-352`); (2) `retire_expired_parked_admission` (`recovery.rs:368-389`); (3) governed active response recovery `recover_nonterminal_active_response_operations_with_authorities`, which compensates `Prepared` and `ApprovalReserved` and converges a `DispatchCommitted` approval without terminalizing (`kernel/admission_cleanup.rs:633-709`), plus the committed-resume path that rolls a committed approval forward (`kernel/active_response_committed_recovery.rs:204`, `:424`; `admission_cleanup.rs:551-599`); (4) the post-dispatch error arms that terminalize (`async_evaluation_core.rs:1744-1761`, with matching arms in `nested_flow_evaluation.rs`); (5) W:'s `reconcile_recovery_original` (W: `kernel/admission_coordinator/recovery_runtime.rs:184-265`). Specs 4 and 8 would add a sixth and a seventh |
 | Startup refuses to terminalize a `DispatchCommitted` operation that already has a durable tool outcome | M: `recovery.rs:408-418` |
 | The extraction hub projects strings, vectors and runtime structs to booleans or bounded integers before the boundary. Its 18 functions are scalar. The 20-function count spans `formal_aeneas.rs` and `chio-credit/src/formal_economy.rs` | M: `crates/kernel/chio-kernel-core/src/formal_aeneas.rs:1-5`; `formal/aeneas/production.toml` |
@@ -803,13 +803,12 @@ effect_crossed(s, cause, f) = s.phase = DispatchCommitted
 | `EvaluationDriver` (async) | `Begin`, acknowledgements, capture, dispatch acknowledgement, tool return, post-return stages, failures | `CrossingPort` (spec 10), `DispatchPort`, `SigningPort`, participant ports, `HintPort` |
 | `BlockingAdapter` | none of its own: wraps `EvaluationDriver` on the existing blocking runtime | as above |
 | `NestedFlowDriver` | the same events, with nested-flow client callbacks as an event source | as above, plus `NestedFlowClient` |
-| `CallerExecutionDriver` | reserve, `CallerStartAuthenticated` and `CallerReportAuthenticated`, under the caller dispositions | `CrossingPort` |
+| `CallerExecutionDriver` | reservation and `CallerStartAuthenticated` under caller dispositions; `CallerReportAuthenticated` resumes original finalization without admission or dispatch | `CrossingPort` |
 | `StartupReconciler` | `Cut(StartupRecovery)` per recoverable operation, after the lease claim and after spec 8's stop heads load | `CrossingPort`, `SigningPort` |
 | `ApprovalRetirementDriver` | `Cut(ApprovalRetirement)` | as above |
 | `GovernedResponseRecoveryDriver` | `Cut(GovernedResponseRecovery)`, and the committed active-response resume (M: `kernel/active_response_committed_recovery.rs:204`, `:424`) | as above |
 | `RecoveryClosureDriver` (W:) | `Cut(RecoveryClosure { control })` | as above |
 | `DrainDriver` (spec 4) | `Cut(AuthorityCut { trigger })` | as above |
-| `ReservationReconcileDriver` | settlement of a reserved authorization by nonce (M: `kernel/reconciliation.rs:148`) | as above |
 | `DropReconcileJob` | for a driver dropped after submitting its dispatch-commit crossing: the writer's reply for that member, then `Cut(DriverDropped)` (M17) | as above |
 | `FinalizingRetryDriver` | `Tick` to every operation retained in `Finalizing` (stop-withheld output, infrastructure fault, re-submitted plan), except `DeliveryRefused` whose payment stage is `Open`. A `DeliveryRefused` operation whose payment is `InFlight` is retried under M11a. It fires on the `StopHeads` watch when a stop is resumed, and with bounded backoff otherwise (M11, M16) | `CrossingPort` |
 | `UnknownReleaseDriver` | `ReleaseAuthorized` after it verifies a mutually agreed release for a frozen unknown hold. From `ReleaseSubmitted` it resolves the release only through the adapter's declared `IdempotentPerKey` or `FenceByKey` capability, never from a status query alone (M7a) | payment-journal port, `CrossingPort` |
@@ -842,7 +841,7 @@ pub enum RequestSource<'a> {
 }
 
 pub struct EvaluationContext<'a> {
-    pub disposition: Disposition,                    // Kernel | LegacyReservation | CallerReservation | CallerStart | CallerReport(conn)
+    pub disposition: Disposition,                    // Kernel | CallerReservation | CallerStart
     pub extra_metadata: Option<serde_json::Value>,
     pub security: SecuritySource<'a>,                // None | Explicit(&SecurityInvocationContext) | AuthenticatedSession { session_id, context }
     pub manifest: Option<ManifestSecurity<'a>>,      // (&VerifiedManifestRegistry, &BridgeSecurityMetadata)
@@ -851,7 +850,7 @@ pub struct EvaluationContext<'a> {
 
 `Nested` builds the `ToolCallRequest` internally, after `reject_conflicting_session_authorization` and `begin_or_resume_tool_request`. It finishes with `finish_session_tool_request`, including `Cancelled` bookkeeping, exactly as today (M: `session_ops/nested_tool_call.rs:52-112`, `:132-195`).
 
-| Legacy entry point (M:) | `RequestSource` and `EvaluationContext` |
+| Current entry point | `RequestSource` and `EvaluationContext` |
 |---|---|
 | `evaluate_tool_call` | `Direct`, defaults |
 | `evaluate_tool_call_with_metadata` | `Direct`, `extra_metadata` |
@@ -862,18 +861,18 @@ pub struct EvaluationContext<'a> {
 | five blocking variants matching the async ones that exist in blocking form | as the async row, through `evaluate_blocking` |
 | `..._blocking_with_manifest_security_and_authenticated_session_context` | `Direct`, `manifest`, `security: AuthenticatedSession`, through `evaluate_blocking` |
 | four `evaluate_tool_call_operation_with_nested_flow_client*` (sync and async, with and without proofs) | `Nested` |
-| `authorize_tool_call_reserving_blocking_with_metadata` | `Direct`, `extra_metadata`, `disposition: LegacyReservation`, through `evaluate_blocking` |
-| caller reservation, start and report re-entries | `Direct`, `disposition: CallerReservation`, `CallerStart` or `CallerReport` |
+| two caller reservation methods | `Direct`, `disposition: CallerReservation` |
+| three caller start methods | `Direct`, `disposition: CallerStart`; recovery of a committed start returns its original authorization |
 
-The blocking mapping is pinned in phase 4 from the six blocking methods on M:. There is no blocking `metadata_and_security_context` form.
+The blocking mapping covers the six direct blocking methods. There is no blocking `metadata_and_security_context` form. `reconcile_authenticated_caller_execution_blocking` is a separate finalization entrypoint: it accepts the original signed authorization and executor report, never an evaluation request. API Protect uses durable `/v1/evaluate`, then `/v1/caller/start`, then `/v1/caller/report`; reservation and start preserve the original operation identity, and reporting grants no new execution authority.
 
 **Metadata validation per source:**
 - Non-manifest sources run `reject_reserved_receipt_metadata` (M: `evaluation_entry.rs:118`, `:154`; `sync_evaluation_wrapper.rs:46`).
 - Manifest sources run `registry_validated_manifest_security_metadata` instead.
 
-**Combination validity.** Combinations with no legacy equivalent are refused at construction with `KernelError::InvalidEvaluationContext`. That covers caller dispositions with `Nested`, and `AuthenticatedSession` without `manifest`.
+**Combination validity.** Unsupported combinations are refused at construction with `KernelError::InvalidEvaluationContext`. That covers caller dispositions with `Nested`, and `AuthenticatedSession` without `manifest`.
 
-**Budgets.** The legacy methods stay as `#[deprecated]` one-line wrappers for one minor release, then are removed. Spec 1's entry-point budget for `EvaluateToolCall` and `EvaluateSessionOperation` falls from 17 public methods to 2. The duplicated post-effect region (D1 at M: `async_evaluation_core.rs:1740` and `nested_flow_evaluation.rs:1495`) then exists once, inside the one driver that spec 3's obligation wraps.
+**Budgets.** Every caller moves to the two evaluation entrypoints in the same change that deletes the sixteen `evaluate_tool_call*` methods. No deprecated wrappers remain. Caller reservation and start retain their disposition-specific contracts; authenticated reporting stays outside evaluation. The post-effect region exists once, inside the driver covered by spec 3's obligation.
 
 ## 9. Migration
 
@@ -893,7 +892,7 @@ Each phase keeps the suite green and changes no wire, receipt or persisted forma
 2. **Phase 1: startup reconciler and approval retirement.** Effects must equal today's behavior on the DST seeds and the existing recovery tests, including the durable `AwaitingCallerReport` transition. The one intended difference is the stop row of section 6.2, which spec 8 phase 1 has already landed in the legacy reconciler.
 3. **Phase 2: recovery closure and governed active response recovery.** These follow the section 6.1 rows.
 4. **Phase 3: drain and stop.** Spec 4's drain is built on the machine from the start. Spec 8 phase 1 lands earlier, in the bug-fix lane, on the legacy code: it adopts the M11 retain rule in the legacy reconciler and needs nothing else from this spec. Spec 8 phase 2 (the `StopEpoch` crossing check, with spec 10) and its later phases are built on the machine.
-5. **Phase 4: evaluators.** `EvaluationDriver`, `NestedFlowDriver`, `CallerExecutionDriver`, `ReservationReconcileDriver` and `DropReconcileJob` replace their legacy code. The `evaluate` entry point lands and the seventeen wrappers are deprecated. Spec 3 phase 1 lands earlier, in the bug-fix lane, as the D1 fix on the legacy evaluator. Spec 3's later phases are re-specified against these drivers.
+5. **Phase 4: evaluators.** `EvaluationDriver`, `NestedFlowDriver`, `CallerExecutionDriver` and `DropReconcileJob` own their respective transitions. The evaluation entrypoints replace all sixteen `evaluate_tool_call*` methods, with every caller updated in the same change. Spec 3 phase 1 lands earlier, in the bug-fix lane, as the D1 fix on the legacy evaluator. Spec 3's later phases are re-specified against these drivers.
 6. **Phase 5: one persisted model** (open decision 2).
 
 **Compatibility period.** Through phase 5, the store's CAS keeps asserting the legacy predicate for the record's model. When the predicate rejects a machine-chosen step, that operation is handed to the retained legacy driver, with an `audit_fault`. It is never blocked, and holds are never stranded. The assertions and the legacy drivers are removed only after one release with zero recorded disagreements in CI, DST and production traces.
@@ -982,7 +981,7 @@ Acceptance:
 | 1 | Startup and approval-retirement drivers; Lean skeleton; `AdmissionMachine.tla` | T3, T5, T10 proven; Apalache positive and negative pass |
 | 2 | Recovery closure and governed active response drivers | W: recovery suites and governed active response recovery tests green |
 | 3 | Drain driver (spec 4) and the stop path from spec 8 phase 2 onward; spec 8 phase 1 has already landed on the legacy reconciler | Spec 4 and 8 conformance |
-| 4 | Evaluation, nested, caller-execution, reservation-reconcile and drop-reconcile drivers; `evaluate`; deprecations | Benchmark acceptance; T1-T14 proven; liveness checked |
+| 4 | Evaluation, nested, caller-execution and drop-reconcile drivers; `evaluate`; caller updates and replaced-method deletion | Benchmark acceptance; T1-T14 proven; liveness checked |
 | 5 | Persisted model decision; compatibility assertions and legacy drivers removed | One release with zero disagreements |
 
 Gate GT1 applies: no proof or conformance claim until the lanes run in hosted CI.

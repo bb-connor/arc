@@ -342,8 +342,6 @@ preflight cleanup and grant fallback release through that ledger, not receipt
 metadata. Dispatch commitment keeps the physical custody retained. The new
 acquisition, readback, physical release, runtime plan commit and revalidation
 implementations are required abstraction anchors, in addition to their callers.
-The legacy reservation path is unchanged except for explicit rejection when
-the operation-owned profile is selected and stricter artifact hash validation.
 
 Runtime authority selection now contains callback unwinds and distinguishes
 selection failure from an absent binding. Retained runtime cleanup routes by

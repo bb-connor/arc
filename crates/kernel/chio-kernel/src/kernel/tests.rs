@@ -234,13 +234,10 @@ mod threshold_crypto_floor;
 #[path = "tests/threshold_issuance.rs"]
 mod threshold_issuance;
 use execution_nonce_support::{binding_for_request, kernel_with_nonce, mint_nonce_for_request};
-#[path = "tests/execution_nonce.rs"]
-mod execution_nonce;
-use execution_nonce::{install_strict_nonce_store, reserve_request, StampFailingBudgetStore};
 #[path = "tests/dispatch_credentials.rs"]
 mod dispatch_credentials;
-#[path = "tests/execution_nonce_transient_settle.rs"]
-mod execution_nonce_transient_settle;
+#[path = "tests/execution_nonce.rs"]
+mod execution_nonce;
 #[path = "tests/nonce_admission.rs"]
 mod nonce_admission;
 use dispatch_credentials::{
@@ -265,8 +262,6 @@ mod payment_outcomes;
 mod post_payment_revalidation;
 #[path = "tests/prepared_dispatch_credentials.rs"]
 mod prepared_dispatch_credentials;
-#[path = "tests/prepay_custody.rs"]
-mod prepay_custody;
 #[path = "tests/session_nonce_binding.rs"]
 mod session_nonce_binding;
 use multi_tenant_receipt::oauth_auth_with_enterprise_tenant;

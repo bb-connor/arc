@@ -1,4 +1,3 @@
-//! Actual approval routes over retained SQLite state and native replay custody.
 use super::*;
 use chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalAuthorityBindingV1;
 use chio_kernel::admission_operation::{AdmissionIdentifier, StoreMutationFence};
@@ -137,7 +136,6 @@ impl ApprovalHarness {
             fence: authority.mutation_fence(),
             budget_store: Arc::new(authority.budget_store()),
         };
-        let budget = durable.budget_store.clone();
         let revocation: Arc<dyn chio_kernel::RevocationStore> =
             Arc::new(chio_store_sqlite::SqliteRevocationStore::open(
                 self.directory.path().join("revocations.db"),
@@ -147,7 +145,7 @@ impl ApprovalHarness {
         let policy_hash = chio_core_types::sha256_hex(policy.as_bytes());
         let mut kernel = build_mediation_kernel(
             &self.signer,
-            super::super::MediationBudget::Durable(durable),
+            super::super::MediationBudget::Durable(durable.clone()),
             super::super::MediationPolicy {
                 issuers: &[],
                 hash: Some(&policy_hash),
@@ -162,11 +160,10 @@ impl ApprovalHarness {
         kernel.reconcile_durable_admission_startup()?;
         let mut state = mediated_test_state_core(
             self.signer.clone(),
-            budget,
+            durable,
             Vec::new(),
             Some(MEDIATED_CONTROL_TOKEN.into()),
             None,
-            true,
             None,
             Some(revocation),
         );

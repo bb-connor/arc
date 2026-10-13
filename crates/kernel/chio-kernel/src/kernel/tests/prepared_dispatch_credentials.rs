@@ -248,35 +248,3 @@ fn prepared_credentials_do_not_turn_approval_validation_into_replay_permission()
     assert_eq!(fixture.writes(), (1, 1, 2, 1, 0));
     Ok(())
 }
-
-#[test]
-fn caller_authorization_preparation_preserves_no_presented_nonce_and_required_approval(
-) -> TestResult {
-    let mut fixture = Fixture::new()?;
-    fixture.request.execution_nonce = None;
-    fixture.nonce.mode.store(2, Ordering::SeqCst);
-    let reservation = fixture.kernel.reserve_caller_authorization_credentials(
-        &fixture.request,
-        &fixture.request.capability,
-        true,
-        current_unix_timestamp(),
-        true,
-    )?;
-    assert_eq!(fixture.writes(), (0, 0, 1, 0, 0));
-    reservation.rollback_before_dispatch()?;
-    let before = fixture.writes();
-    fixture.request.approval_token = None;
-    assert!(fixture
-        .kernel
-        .reserve_caller_authorization_credentials(
-            &fixture.request,
-            &fixture.request.capability,
-            true,
-            current_unix_timestamp(),
-            true,
-        )
-        .is_err());
-    assert_eq!(fixture.writes(), before);
-    assert_eq!(fixture.dpop_occupancy()?, 0);
-    Ok(())
-}

@@ -109,8 +109,7 @@ impl PaymentAdapter for PendingRail {
             RailSettlementStatus::Pending
         } else {
             self.0.gate.wait()?;
-            // The configured fixture rail commits at most one financial effect
-            // for this original idempotent intent, even if recovery repeats it.
+            // Repeated capture intents commit at most one financial effect.
             if self
                 .0
                 .committed_intents
@@ -312,7 +311,6 @@ impl Fixture {
             trusted_receipt_signers: vec![signer.public_key()],
             sidecar_control_token: None,
             budget_store: Some(budget),
-            mediation_hold_capable: true,
             mediation_kernel: Some(Arc::new(Mutex::new(kernel))),
             minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
                 chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
@@ -451,8 +449,7 @@ async fn admission_host_retry_pending_payment_completes_without_new_request() ->
         );
         operation_id = fixture.finalizing_operation()?;
         assert_eq!(fixture.trace.dispatches.load(Ordering::SeqCst), 1);
-        // The original same-fence coordinator still owns its persisted claim.
-        // Recovery may inspect it only after this real claim expires.
+        // Recovery requires the serving coordinator's persisted claim to expire.
         fixture.expire_original_claim(&operation_id)?;
         let candidate_page = fixture
             .authority
@@ -540,8 +537,7 @@ async fn admission_host_retry_pending_payment_completes_without_new_request() ->
                 [operation_id.as_str()],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
             )?;
-        // These source preconditions compare actual producer commitments. Do
-        // not render identifiers, digests or retained payload on failure.
+        // Assertion diagnostics must omit identifiers, digests and retained payloads.
         assert!(latest_kind == "recovery_deferred");
         assert!(status_digest == canonical_status_digest);
         assert!(latest_digest == canonical_status_digest);
@@ -568,7 +564,6 @@ async fn admission_host_retry_pending_payment_completes_without_new_request() ->
             .as_ref()
             .ok_or("original kernel")?
             .clone(),
-        true,
         controller,
         Duration::from_millis(10),
     )?;

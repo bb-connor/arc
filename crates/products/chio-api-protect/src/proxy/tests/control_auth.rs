@@ -40,7 +40,6 @@ const CONTROL_ROUTES: &[(&str, &str)] = &[
     ("POST", "/v1/capabilities/validate"),
     ("POST", "/v1/capabilities/attenuate"),
     ("POST", "/v1/receipts"),
-    ("POST", "/v1/reconcile"),
     ("POST", "/v1/caller/start"),
     ("POST", "/v1/caller/report"),
     ("GET", "/metrics"),

@@ -1,8 +1,6 @@
-//! Codec checks use the actual atomically retained authenticated return, not a
-//! synthetic receipt marker. Legacy formats remain readable without new power.
+//! Authenticated return evidence binds the original delivery and invocation.
 use super::*;
 use chio_kernel::tool_outcome::{InvocationOutputV1, RawInvocationOutcomeV1, ToolOutcomeStore};
-use chio_store_sqlite::caller_execution_ledger::SqliteCallerExecutionLedger;
 
 #[test]
 fn private_delivery_evidence_rejects_tampering_and_schema_confusion() -> TestResult {
@@ -10,11 +8,7 @@ fn private_delivery_evidence_rejects_tampering_and_schema_confusion() -> TestRes
     let runtime = fixture.open()?;
     let request = reserve(&fixture, &runtime, "private-delivery-evidence")?;
     let authorization = start(&runtime, &request)?;
-    let ledger = SqliteCallerExecutionLedger::provision(
-        &fixture.directory.path().join("executor.db"),
-        fixture.caller_executor.clone().ok_or("executor")?,
-        2,
-    )?;
+    let ledger = crate::authenticated::ledger(&fixture)?;
     let report = ledger.execute_once(
         &authorization,
         &fixture.signer.public_key(),

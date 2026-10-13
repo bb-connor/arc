@@ -19,7 +19,6 @@ impl ChioKernel {
         let Some(parent) = cap.delegation_chain.last() else {
             return Ok(false);
         };
-        self.enforce_restart_reserved_hold_gate()?;
         let proposed_share = cap
             .budget_share_bps
             .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);

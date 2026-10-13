@@ -595,30 +595,6 @@ fn session_flow_preflights_and_executes_with_the_same_participant() -> TestResul
 }
 
 #[test]
-fn reserve_for_caller_authorization_denies_durable_nonce_operations() -> TestResult {
-    let fixture = Fixture::new()?;
-    let runtime = fixture.open()?;
-    let request = fixture.request(&runtime, "reserve-for-caller")?;
-    let denied = runtime
-        .kernel
-        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)?;
-    assert_eq!(denied.verdict, Verdict::Deny);
-    assert!(
-        denied
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("reserve-for-caller")),
-        "{:?}",
-        denied.reason
-    );
-    assert!(denied.execution_nonce.is_none());
-    assert_state(&fixture, &request, "compensated_before_dispatch")?;
-    assert_eq!(count_rows(&fixture, "budget_authorization_holds")?, 0);
-    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
-    Ok(())
-}
-
-#[test]
 fn opt_in_nonces_deny_under_durable_admission() -> TestResult {
     let mut fixture = Fixture::new()?;
     fixture.require_nonce = false;

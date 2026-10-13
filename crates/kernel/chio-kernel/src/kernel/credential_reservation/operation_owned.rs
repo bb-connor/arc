@@ -123,25 +123,6 @@ impl ChioKernel {
         )?
         .reserve_for_admission(admission, grant_index)
     }
-
-    pub(crate) fn reserve_admitted_caller_credentials(
-        &self,
-        request: &ToolCallRequest,
-        dpop_required: bool,
-        now: u64,
-        admission: Option<&DurableToolAdmission>,
-        grant_index: usize,
-    ) -> Result<DispatchCredentialReservation<'_>, KernelError> {
-        self.prepare_credentials(CredentialPreparationInput {
-            request,
-            cap: &request.capability,
-            dpop_required,
-            now,
-            execution_nonce_credential: ExecutionNonceCredential::NotPresented,
-            require_governed_approval: Self::is_governed_mustprepay_request(request),
-        })?
-        .reserve_for_admission(admission, grant_index)
-    }
 }
 
 impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {

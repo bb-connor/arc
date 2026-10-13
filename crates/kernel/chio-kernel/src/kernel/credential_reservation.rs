@@ -11,7 +11,6 @@ mod preparation;
 
 pub use native_dispatch::VerifiedNativeDispatchCredentials;
 
-use preparation::CredentialPreparationInput;
 pub(crate) use preparation::PreparedDispatchCredentials;
 
 fn run_credential_store_operation<T>(
@@ -42,8 +41,6 @@ enum ExecutionNonceCredential {
     /// The durable admission operation owns the nonce; the store already
     /// verified it and reserves it atomically with the operation.
     DurableParticipant,
-    /// A reserve-for-caller preflight mints a nonce and presents none.
-    NotPresented,
 }
 
 impl ExecutionNonceCredential {
@@ -104,10 +101,6 @@ impl DispatchCredentialReservation<'_> {
 
     pub(crate) fn requires_post_reservation_revalidation(&self) -> bool {
         self.credentials_present
-    }
-
-    pub(crate) fn has_payment_authorization_credential(&self) -> bool {
-        self.execution_nonce_present || self.approval_key.is_some() || self.owned_approval.is_some()
     }
 
     pub(crate) fn commit(&mut self) -> Result<PaymentCredentialDisposition, KernelError> {
@@ -359,57 +352,6 @@ impl ChioKernel {
             now,
             durable_execution_nonce,
         )?
-        .reserve()
-    }
-
-    /// Reserve the credentials presented to a reserve-for-caller authorization.
-    ///
-    /// No execution nonce exists yet on this preflight. DPoP and governed
-    /// approval credentials are nevertheless authorizing this request to mint
-    /// one, so they use the same owned commit/rollback lifecycle as normal
-    /// dispatch credentials. This prevents concurrent authorization replays
-    /// without burning a credential when later admission revalidation denies.
-    #[cfg(test)]
-    pub(crate) fn reserve_caller_authorization_credentials(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-        dpop_required: bool,
-        now: u64,
-        require_governed_approval: bool,
-    ) -> Result<DispatchCredentialReservation<'_>, KernelError> {
-        self.reserve_credentials(
-            request,
-            cap,
-            dpop_required,
-            now,
-            ExecutionNonceCredential::NotPresented,
-            require_governed_approval,
-        )
-    }
-
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
-    #[cfg(test)]
-    fn reserve_credentials(
-        &self,
-        request: &ToolCallRequest,
-        cap: &CapabilityToken,
-        dpop_required: bool,
-        now: u64,
-        execution_nonce_credential: ExecutionNonceCredential,
-        require_governed_approval: bool,
-    ) -> Result<DispatchCredentialReservation<'_>, KernelError> {
-        self.prepare_credentials(CredentialPreparationInput {
-            request,
-            cap,
-            dpop_required,
-            now,
-            execution_nonce_credential,
-            require_governed_approval,
-        })?
         .reserve()
     }
 }

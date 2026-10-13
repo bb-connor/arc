@@ -137,22 +137,6 @@ async fn nested_async_rejects_reserved_metadata_before_claiming_request() -> Tes
 }
 
 #[test]
-fn reserving_blocking_rejects_reserved_metadata() -> TestResult {
-    let (kernel, request, context, invocations) = fixture();
-    for key in RESERVED_KEYS {
-        assert_rejected(
-            kernel.authorize_tool_call_reserving_blocking_with_metadata(
-                &request,
-                Some(metadata(key)),
-            ),
-            key,
-        );
-        assert_untouched(&kernel, &context, &invocations);
-    }
-    Ok(())
-}
-
-#[test]
 fn blocking_rejects_runtime_release_metadata() -> TestResult {
     let (kernel, request, context, invocations) = fixture();
     assert_rejected(

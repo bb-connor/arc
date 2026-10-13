@@ -35,14 +35,10 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
             require_sidecar_control_middleware,
         ));
 
-    // Settling a reserved authorization is a money operation reported by the
-    // trusted tool server, never by the controlled agent that called
-    // `/v1/evaluate`. It sits behind the reconcile control gate so only a caller
-    // presenting the sidecar-control token can reconcile.
-    let reconcile_routes = Router::new()
+    // Signed execution and settlement require the sidecar control credential.
+    let caller_delivery_routes = Router::new()
         .route("/v1/caller/start", post(mediated::authenticated::start))
         .route("/v1/caller/report", post(mediated::authenticated::report))
-        .route("/v1/reconcile", post(mediated::sidecar_reconcile_handler))
         .route_layer(middleware::from_fn_with_state(
             Arc::clone(&state),
             require_sidecar_control_middleware,
@@ -97,8 +93,8 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
         // Settle a reserved authorization by the execution nonce that names its
         // hold, producing an authoritative mediated-spend receipt and freeing the
         // reserved-minus-realized difference back to the grant. Behind the
-        // reconcile control gate (see `reconcile_routes` above).
-        .merge(reconcile_routes)
+        // reconcile control gate (see `caller_delivery_routes` above).
+        .merge(caller_delivery_routes)
         // Admin-gated Prometheus scrape endpoint. Mounted before the catch-all
         // so axum prefers this specific route, and gated by the same
         // sidecar-control posture as the approval routes.

@@ -297,13 +297,6 @@ target = ".evaluate_tool_call"
 references = 1
 
 [[dispatch_sites]]
-id = "D010"
-path = "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs"
-symbol = "ChioKernel::reconcile_caller_execution_blocking"
-target = ".evaluate_tool_call_async_with_session_context"
-references = 1
-
-[[dispatch_sites]]
 id = "D011"
 path = "crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs"
 symbol = "ChioKernel::reserve_caller_execution_step"
@@ -399,13 +392,6 @@ id = "D024"
 path = "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs"
 symbol = "ChioKernel::evaluate_tool_call_with_nested_flow_client_async_and_security_context"
 target = ".evaluate_tool_call_with_nested_flow_client_async_scoped"
-references = 1
-
-[[dispatch_sites]]
-id = "D025"
-path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
-symbol = "ChioKernel::authorize_tool_call_reserving_blocking_with_metadata"
-target = ".evaluate_tool_call_async_with_session_context"
 references = 1
 
 [[dispatch_sites]]
@@ -567,13 +553,6 @@ id = "D054"
 path = "crates/platform/chio-http-core/src/authority.rs"
 symbol = "HttpAuthority::authorize_via_kernel"
 target = ".evaluate_tool_call_blocking_with_metadata"
-references = 1
-
-[[dispatch_sites]]
-id = "D055"
-path = "crates/products/chio-api-protect/src/proxy/mediated.rs"
-symbol = "sidecar_reconcile_handler"
-target = ".reconcile_caller_execution_blocking"
 references = 1
 
 [[dispatch_sites]]
@@ -756,13 +735,6 @@ id = "D084"
 path = "crates/kernel/chio-kernel/src/provider_verdict.rs"
 symbol = "ChioKernel::verdict_for_provider_invocation_with_security_context"
 target = ".verdict_for_provider_invocation_inner"
-references = 1
-
-[[dispatch_sites]]
-id = "D085"
-path = "crates/products/chio-api-protect/src/proxy/mediated.rs"
-symbol = "sidecar_evaluate_tool_call_mediated_handler"
-target = ".authorize_tool_call_reserving_blocking_with_metadata"
 references = 1
 
 [[dispatch_sites]]

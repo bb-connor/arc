@@ -4,12 +4,14 @@ use super::*;
 async fn mediated_authorization_rejects_unconfigured_supplemental_authorization() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let directory = tempfile::tempdir().test_unwrap();
+    let durable = durable_admission_stores(directory.path());
+    let budget = Arc::clone(&durable.budget_store);
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
     let cap_id = cap.id.clone();
-    let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+    let state = mediated_test_state(signer, durable.clone(), Vec::new());
     let body = serde_json::json!({
         "capability": cap,
         "tool_server": "cost-srv",
@@ -36,11 +38,13 @@ async fn mediated_authorization_rejects_threshold_approval_without_policy_runtim
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let approver = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let directory = tempfile::tempdir().test_unwrap();
+    let durable = durable_admission_stores(directory.path());
+    let budget = Arc::clone(&durable.budget_store);
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
-    let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+    let state = mediated_test_state(signer, durable.clone(), Vec::new());
     let approval_token = GovernedApprovalToken::sign(
         GovernedApprovalTokenBody {
             id: "approval-mediated".to_string(),
@@ -56,9 +60,6 @@ async fn mediated_authorization_rejects_threshold_approval_without_policy_runtim
         &approver,
     )
     .unwrap();
-    // The mediated product does not install a threshold requirement resolver, so
-    // it rejects the advertised fields at the boundary instead of forwarding a
-    // request the kernel cannot authorize.
     let body = serde_json::json!({
         "capability": cap,
         "tool_server": "cost-srv",
@@ -80,20 +81,24 @@ async fn mediated_authorization_rejects_threshold_approval_without_policy_runtim
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mediated_presented_execution_nonce_is_rejected() {
+async fn mediated_execution_nonce_rejects_a_different_request() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let directory = tempfile::tempdir().test_unwrap();
+    let durable = durable_admission_stores(directory.path());
+    let budget = Arc::clone(&durable.budget_store);
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+    let cap_id = cap.id.clone();
     let cap_value = serde_json::to_value(&cap).unwrap();
-    let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+    let state = mediated_test_state(signer, durable.clone(), Vec::new());
     let body = serde_json::json!({
         "capability": cap_value,
         "tool_server": "cost-srv",
         "tool_name": "compute",
-        "parameters": { "invoice": "inv-1" }
+        "parameters": { "invoice": "inv-1" },
+        "request_id": "nonce-original-request",
     });
     let (_, authorized) = post_evaluate(Arc::clone(&state), &body).await;
     let minted_nonce = authorized["execution_nonce"].clone();
@@ -103,24 +108,34 @@ async fn mediated_presented_execution_nonce_is_rejected() {
         "tool_server": "cost-srv",
         "tool_name": "compute",
         "parameters": { "invoice": "inv-1" },
+        "request_id": "nonce-different-request",
         "execution_nonce": minted_nonce
     });
 
+    let usage = budget.get_usage(&cap_id, 0).test_unwrap();
     let (status, json) = post_evaluate(Arc::clone(&state), &settle_body).await;
 
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert_ne!(json["status"], "reserved");
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["status"], "deny");
+    assert_eq!(
+        json["receipt"]["decision"]["reason"],
+        "durable admission failed: presented execution nonce was never issued for this request"
+    );
+    assert!(json["execution_nonce"].is_null());
+    assert_eq!(budget.get_usage(&cap_id, 0).test_unwrap(), usage);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mediated_governed_context_accepts_producer_numbers_but_not_signed_aliases() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+    let directory = tempfile::tempdir().test_unwrap();
+    let durable = durable_admission_stores(directory.path());
+    let budget = Arc::clone(&durable.budget_store);
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
-    let state = mediated_test_state(signer, budget, Vec::new());
+    let state = mediated_test_state(signer, durable.clone(), Vec::new());
     let template = serde_json::json!({
         "capability": cap, "tool_server": "cost-srv", "tool_name": "compute",
         "parameters": {},

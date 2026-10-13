@@ -11,13 +11,11 @@ use std::time::Duration;
 mod admission_maintenance;
 use admission_maintenance::AdmissionMaintenance;
 
-/// Interval between reserved-hold reaper sweeps. A hold reserved on
-/// `/v1/evaluate` but never reconciled is released once its execution-nonce TTL
-/// lapses; sweeping on this cadence bounds how long abandoned budget stays held.
-const RESERVED_HOLD_REAP_INTERVAL_SECS: u64 = 30;
+/// Interval between durable admission recovery attempts.
+const ADMISSION_RECOVERY_INTERVAL_SECS: u64 = 30;
 
 /// Keep native work attached to one owner until its current tick joins.
-pub(crate) fn spawn_reserved_hold_reaper(
+pub(crate) fn spawn_admission_maintenance(
     state: &Arc<ProxyState>,
     controller: Arc<ShutdownController>,
 ) -> Result<Option<AdmissionMaintenance>, ProtectError> {
@@ -27,9 +25,8 @@ pub(crate) fn spawn_reserved_hold_reaper(
         .map(|kernel| {
             AdmissionMaintenance::spawn(
                 kernel.clone(),
-                state.mediation_hold_capable,
                 controller,
-                Duration::from_secs(RESERVED_HOLD_REAP_INTERVAL_SECS),
+                Duration::from_secs(ADMISSION_RECOVERY_INTERVAL_SECS),
             )
         })
         .transpose()
@@ -147,21 +144,7 @@ pub(crate) struct ProxyState {
     pub(crate) trusted_receipt_signers: Vec<PublicKey>,
     pub(crate) sidecar_control_token: Option<String>,
     pub(crate) budget_store: Option<Arc<dyn chio_kernel::budget_store::BudgetStore>>,
-    /// Whether the configured `budget_store` implements the pre-execution hold
-    /// APIs the mediated reservation path depends on. `true` for the local SQLite
-    /// store, `false` for the remote control-plane store (which forwards only
-    /// charge/reverse/reconcile and cannot persist a durable reserved hold). The
-    /// mediated `/v1/evaluate` and `/v1/reconcile` routes reject fail-closed when
-    /// this is `false`, rather than mint a reserved nonce that can never be
-    /// reconciled by nonce or reclaimed by the TTL reaper.
-    pub(crate) mediation_hold_capable: bool,
-    /// The process-lifetime kernel-mediation authority, built once when the
-    /// sidecar has a budget authority (durable admission or a configured budget
-    /// store). Held behind a `Mutex` because admitting the
-    /// caller-named tool server (registration) needs `&mut self`, and reused
-    /// across requests so the approval-token and DPoP replay stores stay
-    /// authoritative, and so the nonce it mints on `/v1/evaluate` is the one it
-    /// verifies and consumes on `/v1/reconcile`.
+    /// Shared authority for durable reservations, signed execution, and finalization.
     pub(crate) mediation_kernel: Option<Arc<Mutex<chio_kernel::ChioKernel>>>,
     /// Request ids claimed for a live reservation window on `/v1/evaluate`. The
     /// kernel derives the durable budget hold identity from the request id, so
@@ -548,15 +531,10 @@ impl ProtectProxy {
         let http_client = client_builder_with_contract(&egress_contract)
             .timeout(self.config.upstream_request_timeout)
             .build()?;
-        let (mediation_budget, mediation_hold_capable) = match durable_admission {
-            Some(durable) => (Some(MediationBudget::Durable(durable)), true),
-            None => match build_budget_store(&self.config, Arc::new(clock.clone()))? {
-                Some(configured) => (
-                    Some(MediationBudget::Configured(configured.store)),
-                    configured.hold_capable,
-                ),
-                None => (None, false),
-            },
+        let mediation_budget = match durable_admission {
+            Some(durable) => Some(MediationBudget::Durable(durable)),
+            None => build_budget_store(&self.config, Arc::new(clock.clone()))?
+                .map(MediationBudget::Configured),
         };
         let budget_store = mediation_budget.as_ref().map(MediationBudget::store);
 
@@ -586,12 +564,7 @@ impl ProtectProxy {
             }
         }
 
-        // Build the kernel-mediation authority once, for the process lifetime, so
-        // the approval-token and DPoP replay stores it carries stay authoritative
-        // across `/v1/evaluate` requests and the nonce it mints is the one it
-        // verifies and consumes on `/v1/reconcile`. It exists exactly when a
-        // budget authority exists; without one, `/v1/evaluate` and
-        // `/v1/reconcile` deny fail-closed.
+        // Replay and admission custody share the process-lifetime kernel.
         let payment_adapter = self.payment_adapter;
         let mediation_kernel = match mediation_budget {
             Some(budget) => {
@@ -687,7 +660,6 @@ impl ProtectProxy {
             trusted_receipt_signers,
             sidecar_control_token: self.config.sidecar_control_token.clone(),
             budget_store,
-            mediation_hold_capable,
             mediation_kernel,
             minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
                 chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
@@ -723,8 +695,10 @@ impl ProtectProxy {
             _ => None,
         };
         let controller = Arc::new(ShutdownController::install());
-        let mut reaper_owner = spawn_reserved_hold_reaper(&state, controller.clone())?;
-        let reaper_control = reaper_owner.as_ref().map(AdmissionMaintenance::control);
+        let mut maintenance_owner = spawn_admission_maintenance(&state, controller.clone())?;
+        let maintenance_control = maintenance_owner
+            .as_ref()
+            .map(AdmissionMaintenance::control);
         observer(local_addr);
 
         // No generic request timeout: every proxied call writes its receipt
@@ -761,10 +735,10 @@ impl ProtectProxy {
             controller.subscribe(),
             hygiene.drain_timeout,
             async move {
-                if let Some(owner) = reaper_owner.as_mut() {
+                if let Some(owner) = maintenance_owner.as_mut() {
                     owner.stop_and_join(PROXY_DRAIN_MARGIN).await;
                 }
-                drop(reaper_owner);
+                drop(maintenance_owner);
                 drop(retention_maintenance);
                 if let Some(store) = flush_store {
                     tokio::task::spawn_blocking(move || {
@@ -784,13 +758,12 @@ impl ProtectProxy {
         .map(|_outcome| ())
         .map_err(protect_serve_error);
 
-        if let Some(control) = reaper_control {
+        if let Some(control) = maintenance_control {
             let health = control.health();
             info!(
                 ticks_attempted = health.ticks_attempted,
                 ticks_completed = health.ticks_completed,
                 recovered = health.recovered,
-                reaped = health.reaped,
                 busy_skips = health.busy_skips,
                 worker_running = health.worker_running,
                 worker_joined = health.worker_joined,
@@ -1013,15 +986,21 @@ mod reservation_boundary_tests {
     fn reservation_capacity_preserves_live_ids_and_reclaims_only_expired_ids() {
         let mut window = MintedRequestIdWindow::new(30);
         for id in 0..MAX_LIVE_REQUEST_IDS {
-            assert_eq!(window.claim(&id.to_string(), 1000).map(|_| ()), Ok(()));
+            assert_eq!(
+                window.claim(&id.to_string(), 1000, false).map(|_| ()),
+                Ok(())
+            );
         }
         assert_eq!(
-            window.claim("extra", 1000),
+            window.claim("extra", 1000, false),
             Err(RequestIdClaimError::Capacity)
         );
-        assert_eq!(window.claim("0", 1000), Err(RequestIdClaimError::Reused));
+        assert_eq!(
+            window.claim("0", 1000, false),
+            Err(RequestIdClaimError::Reused)
+        );
         assert_eq!(window.len(), MAX_LIVE_REQUEST_IDS);
-        assert_eq!(window.claim("extra", 1030).map(|_| ()), Ok(()));
+        assert_eq!(window.claim("extra", 1030, false).map(|_| ()), Ok(()));
         assert_eq!(window.len(), 1);
     }
 
@@ -1029,13 +1008,22 @@ mod reservation_boundary_tests {
     fn invalid_time_cannot_prune_or_claim_reservations() {
         for (ttl, now) in [(0, 1), (u64::MAX, 1), (30, i64::MAX), (30, -1)] {
             let mut window = MintedRequestIdWindow::new(ttl);
-            assert_eq!(window.claim("id", now), Err(RequestIdClaimError::Time));
+            assert_eq!(
+                window.claim("id", now, false),
+                Err(RequestIdClaimError::Time)
+            );
             assert_eq!(window.len(), 0);
         }
         let mut window = MintedRequestIdWindow::new(30);
-        assert_eq!(window.claim("id", 100).map(|_| ()), Ok(()));
-        assert_eq!(window.claim("another", 99), Err(RequestIdClaimError::Time));
-        assert_eq!(window.claim("id", 100), Err(RequestIdClaimError::Reused));
+        assert_eq!(window.claim("id", 100, false).map(|_| ()), Ok(()));
+        assert_eq!(
+            window.claim("another", 99, false),
+            Err(RequestIdClaimError::Time)
+        );
+        assert_eq!(
+            window.claim("id", 100, false),
+            Err(RequestIdClaimError::Reused)
+        );
     }
 }
 

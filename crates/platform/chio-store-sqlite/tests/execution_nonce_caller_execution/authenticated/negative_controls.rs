@@ -1,5 +1,4 @@
 use super::*;
-use chio_store_sqlite::caller_execution_ledger::SqliteCallerExecutionLedger;
 
 #[test]
 fn authenticated_executor_pin_does_not_bypass_native_release_custody() -> TestResult {
@@ -42,11 +41,7 @@ fn unused_expired_reservation_cannot_publish_start_authority() -> TestResult {
 #[test]
 fn changed_executor_pin_cannot_adopt_original_start_or_report() -> TestResult {
     let (mut fixture, key) = fixture()?;
-    let ledger = SqliteCallerExecutionLedger::provision(
-        &fixture.directory.path().join("executor.db"),
-        fixture.caller_executor.clone().ok_or("executor")?,
-        4,
-    )?;
+    let ledger = crate::authenticated::ledger(&fixture)?;
     let (request, authorization, report) = {
         let runtime = fixture.open()?;
         let request = reserve(&fixture, &runtime, "pinned-start")?;
@@ -83,11 +78,7 @@ fn revocation_blocks_historical_output_and_completed_receipt_replay() -> TestRes
         let runtime = fixture.open()?;
         let request = reserve(&fixture, &runtime, "revoked-output")?;
         let authorization = start(&runtime, &request)?;
-        let ledger = SqliteCallerExecutionLedger::provision(
-            &fixture.directory.path().join("executor.db"),
-            fixture.caller_executor.clone().ok_or("executor")?,
-            4,
-        )?;
+        let ledger = crate::authenticated::ledger(&fixture)?;
         let report = ledger.execute_once(
             &authorization,
             &fixture.signer.public_key(),

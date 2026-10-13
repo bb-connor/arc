@@ -1,12 +1,11 @@
-//! Live typed return-context capture, separate from the unfinished external
-//! start handshake. These tests never treat a reservation as an effect permit.
+//! Signed caller execution retains the original private return context across
+//! report delivery and restart.
 
 use super::*;
 use chio_kernel::admission_operation::{
     AdmissionCallerDispatchContextV1, AdmissionIdentifier, AdmissionOperationStore,
+    AdmissionOperationStoreError,
 };
-use chio_kernel::{CallerExecutionCheckpoint, CallerExecutionReport};
-use std::sync::Arc;
 
 fn now_ms() -> TestResult<u64> {
     Ok(u64::try_from(
@@ -47,8 +46,8 @@ fn load(
 #[test]
 fn caller_report_retains_typed_private_context_with_capture_and_exact_restart_replay() -> TestResult
 {
-    let fixture = Fixture::new()?;
-    let (execution, bytes, receipt, old_fence) = {
+    let (fixture, executor_key) = authenticated::fixture()?;
+    let (execution, authorization, report, bytes, receipt, old_fence) = {
         let runtime = fixture.open()?;
         let execution = reserve(&fixture, &runtime, "caller-context-restart")?;
         let raw = rusqlite::Connection::open(fixture.database())?;
@@ -60,7 +59,11 @@ fn caller_report_retains_typed_private_context_with_capture_and_exact_restart_re
             )?,
             0
         );
-        let completed = reconcile(&runtime, &execution)?;
+        let (authorization, report) =
+            authenticated::deliver(&fixture, &executor_key, &runtime, &execution)?;
+        let completed = runtime
+            .kernel
+            .reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;
         assert_eq!(completed.verdict, Verdict::Allow, "{completed:#?}");
         assert!(completed.receipt.verify_signature()?);
         let frame = load(&runtime, &execution)?;
@@ -107,6 +110,8 @@ fn caller_report_retains_typed_private_context_with_capture_and_exact_restart_re
         );
         (
             execution,
+            authorization,
+            report,
             frame.canonical_bytes().to_vec(),
             completed.receipt,
             runtime.authority.mutation_fence(),
@@ -115,18 +120,22 @@ fn caller_report_retains_typed_private_context_with_capture_and_exact_restart_re
     let runtime = fixture.open()?;
     let frame = load(&runtime, &execution)?;
     assert_eq!(frame.canonical_bytes(), bytes);
-    let replay = reconcile(&runtime, &execution)?;
+    let replay = runtime
+        .kernel
+        .reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;
     assert_eq!(canonical(&replay.receipt)?, canonical(&receipt)?);
     assert_eq!(load(&runtime, &execution)?.canonical_bytes(), bytes);
     let wire: serde_json::Value = serde_json::from_slice(&bytes)?;
     let operation_id = chio_kernel::admission_operation::AdmissionOperationId::from_persisted(
         wire["operation_id"].as_str().ok_or("framed operation id")?,
     )?;
-    assert!(runtime
-        .authority
-        .admission_operation_store()
-        .load_caller_dispatch_context(&operation_id, &old_fence, now_ms()?)
-        .is_err());
+    assert!(matches!(
+        runtime
+            .authority
+            .admission_operation_store()
+            .load_caller_dispatch_context(&operation_id, &old_fence, now_ms()?),
+        Err(AdmissionOperationStoreError::Fenced)
+    ));
     assert_eq!(grant_quota(&runtime, &execution)?, (0, 1));
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())
@@ -134,20 +143,22 @@ fn caller_report_retains_typed_private_context_with_capture_and_exact_restart_re
 
 #[test]
 fn caller_context_capture_rejects_out_of_band_schema_changes() -> TestResult {
-    let fixture = Fixture::new()?;
+    let (fixture, executor_key) = authenticated::fixture()?;
     let runtime = fixture.open()?;
     let execution = reserve(&fixture, &runtime, "caller-context-insert-failure")?;
     let raw = rusqlite::Connection::open(fixture.database())?;
     raw.execute_batch("CREATE TRIGGER fail_caller_context_insert BEFORE INSERT ON admission_operation_caller_contexts
         BEGIN SELECT RAISE(ABORT, 'injected caller context insertion failure'); END;")?;
-    // A second connection is not a valid fault-injection port. The live owner
-    // must reject its write before reaching the caller-context capture path.
-    let refused = reconcile(&runtime, &execution);
+    let refused = runtime.kernel.start_caller_execution_blocking(
+        execution.execution_nonce.as_ref().ok_or("nonce")?,
+        &execution.arguments,
+    );
     assert!(
         refused.as_ref().is_err_and(|error| error
             .to_string()
             .contains("authority database changed outside its serving-owner connection")),
-        "wrong rejection: {refused:#?}"
+        "wrong rejection: {:?}",
+        refused.as_ref().err()
     );
     assert_eq!(
         raw.query_row(
@@ -160,7 +171,6 @@ fn caller_context_capture_rejects_out_of_band_schema_changes() -> TestResult {
     assert_state(&fixture, &execution, "ready_to_dispatch")?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     drop(runtime);
-    // Reopening must not legitimize the changed schema either.
     let startup = fixture.open_with_reconcile(false);
     assert!(startup.as_ref().is_err_and(|error| error
         .to_string()
@@ -172,7 +182,11 @@ fn caller_context_capture_rejects_out_of_band_schema_changes() -> TestResult {
     assert_eq!(runtime.kernel.reconcile_recoverable_admissions()?, 0);
     assert_state(&fixture, &execution, "ready_to_dispatch")?;
     assert_eq!(grant_quota(&runtime, &execution)?, (1, 0));
-    let completed = reconcile(&runtime, &execution)?;
+    let (authorization, report) =
+        authenticated::deliver(&fixture, &executor_key, &runtime, &execution)?;
+    let completed = runtime
+        .kernel
+        .reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;
     assert_eq!(completed.verdict, Verdict::Allow, "{completed:#?}");
     load(&runtime, &execution)?;
     assert_eq!(grant_quota(&runtime, &execution)?, (0, 1));
@@ -181,40 +195,31 @@ fn caller_context_capture_rejects_out_of_band_schema_changes() -> TestResult {
 }
 
 #[test]
-fn caller_context_survives_interruption_after_capture_before_report_recording() -> TestResult {
-    let fixture = Fixture::new()?;
-    let (execution, frame_bytes) = {
-        let mut runtime = fixture.open()?;
+fn caller_context_survives_restart_after_start_before_report_delivery() -> TestResult {
+    let (fixture, executor_key) = authenticated::fixture()?;
+    let (execution, authorization, frame_bytes) = {
+        let runtime = fixture.open()?;
         let execution = reserve(&fixture, &runtime, "caller-context-interrupted")?;
-        Arc::get_mut(&mut runtime.kernel)
-            .ok_or("unshared kernel")?
-            .install_caller_execution_checkpoint_hook(Arc::new(|point, _| {
-                if point == CallerExecutionCheckpoint::DispatchCommitted {
-                    panic!("injected interruption after caller context capture");
-                }
-            }));
-        let kernel = runtime.kernel.clone();
-        let nonce = execution.execution_nonce.clone().ok_or("nonce")?;
-        let arguments = execution.arguments.clone();
-        assert!(
-            std::thread::spawn(move || kernel.reconcile_caller_execution_blocking(
-                &nonce,
-                &arguments,
-                CallerExecutionReport {
-                    output: serde_json::json!({"not_recorded": true}),
-                    realized_cost: None
-                },
-            ))
-            .join()
-            .is_err()
-        );
+        let authorization = authenticated::start(&runtime, &execution)?;
         let bytes = load(&runtime, &execution)?.canonical_bytes().to_vec();
-        assert!(!std::str::from_utf8(&bytes)?.contains("not_recorded"));
+        assert!(!std::str::from_utf8(&bytes)?.contains("caller_reported"));
         assert_eq!(grant_quota(&runtime, &execution)?, (0, 1));
-        (execution, bytes)
+        (execution, authorization, bytes)
     };
     let runtime = fixture.open()?;
-    assert_state(&fixture, &execution, "outcome_unknown_after_dispatch")?;
+    assert_state(&fixture, &execution, "awaiting_caller_report")?;
+    assert_eq!(load(&runtime, &execution)?.canonical_bytes(), frame_bytes);
+    assert_eq!(grant_quota(&runtime, &execution)?, (0, 1));
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    assert_eq!(authorization, authenticated::start(&runtime, &execution)?);
+    let (recovered_authorization, report) =
+        authenticated::deliver(&fixture, &executor_key, &runtime, &execution)?;
+    assert_eq!(authorization, recovered_authorization);
+    let completed = runtime
+        .kernel
+        .reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;
+    assert_eq!(completed.verdict, Verdict::Allow, "{completed:#?}");
+    assert_state(&fixture, &execution, "completed")?;
     assert_eq!(load(&runtime, &execution)?.canonical_bytes(), frame_bytes);
     assert_eq!(grant_quota(&runtime, &execution)?, (0, 1));
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);

@@ -66,17 +66,22 @@ The upstream timeout defaults to 20 seconds and includes response-body reading;
 the proxy performs no application retry and drains for that timeout plus 5 seconds.
 
 A dedicated `sidecar_control_token` protects capability lifecycle, receipt
-submission, approval, reconciliation, and metrics routes, including on loopback.
+submission, approval, caller start/report, and metrics routes, including on loopback.
 Missing configuration disables them. The proxy rejects that credential's bytes
 in request headers before egress. `trusted_capability_issuers` adds capability
 authorities; receipt verification independently pins the sidecar signer.
 
 `POST /chio/evaluate` runs HTTP authority evaluation. `POST /v1/evaluate` runs
-kernel preflight, reserves a budget hold, and returns an execution nonce when
-configured with a hold-capable authority and control credential. Execution and
-reconciliation belong to the trusted execution site; the reservation route
-dispatches no tool. Authenticated caller start/report additionally requires
-durable admission and an operator-pinned executor.
+kernel preflight and reserves a budget hold under durable local admission. It
+requires a configured control credential and an operator-pinned executor. Its
+execution nonce and receipt acknowledge the reservation; they authorize no
+external effect and perform no payment-rail operation.
+
+The trusted executor calls `POST /v1/caller/start`, independently verifies the
+signed commitment, and claims the operation in its durable execution ledger
+before executing. `POST /v1/caller/report` authenticates the executor's signed
+report and resumes the original persisted operation's finalization. The kernel
+guards determine the returned output. A report cannot authorize another execution.
 
 `POST /v1/evaluate/advisory` is disabled unless `allow_advisory` is set; its
 signed output carries `authorization: false`. Capability validation checks a
