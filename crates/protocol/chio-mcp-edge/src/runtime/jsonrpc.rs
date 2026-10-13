@@ -44,15 +44,16 @@ pub(super) fn jsonrpc_protocol_error(args: JsonRpcProtocolErrorArgs<'_>) -> Valu
     jsonrpc_error_with_data(id, jsonrpc_code, message, Some(Value::Object(data)))
 }
 
+/// MCP 2025-11-25 lifecycle: when the requested revision is not served, the
+/// server answers with one it does serve and the client decides whether to
+/// continue. Only a malformed request is refused.
 pub(super) fn negotiate_protocol_version(
     id: &Value,
     params: &Value,
 ) -> Result<&'static str, Value> {
-    let Some(requested) = params.get("protocolVersion") else {
-        return Ok(MCP_PROTOCOL_VERSION);
-    };
-    let Some(requested) = requested.as_str() else {
-        return Err(jsonrpc_protocol_error(JsonRpcProtocolErrorArgs {
+    match params.get("protocolVersion") {
+        None | Some(Value::String(_)) => Ok(MCP_PROTOCOL_VERSION),
+        Some(_) => Err(jsonrpc_protocol_error(JsonRpcProtocolErrorArgs {
             id: id.clone(),
             jsonrpc_code: JSONRPC_INVALID_REQUEST,
             message: "initialize.params.protocolVersion must be a string",
@@ -63,23 +64,6 @@ pub(super) fn negotiate_protocol_version(
             context: Some(json!({
                 "parameter": "protocolVersion"
             })),
-        }));
-    };
-    if SUPPORTED_MCP_PROTOCOL_VERSIONS.contains(&requested) {
-        Ok(MCP_PROTOCOL_VERSION)
-    } else {
-        Err(jsonrpc_protocol_error(JsonRpcProtocolErrorArgs {
-            id: id.clone(),
-            jsonrpc_code: JSONRPC_INVALID_REQUEST,
-            message: "unsupported protocolVersion",
-            chio_code: CHIO_ERROR_PROTOCOL_VERSION_UNSUPPORTED,
-            name: "protocol_version_unsupported",
-            retry_strategy: "do_not_retry_until_version_change",
-            guidance: "retry only after selecting one of the server's supported protocol versions",
-            context: Some(json!({
-                "requestedProtocolVersion": requested,
-                "supportedProtocolVersions": SUPPORTED_MCP_PROTOCOL_VERSIONS,
-            })),
-        }))
+        })),
     }
 }

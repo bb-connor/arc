@@ -290,7 +290,7 @@ different names for the same bytes.
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs:33` `FINDING_SCHEMA_LABEL`
 - `crates/products/chio-cli/src/cli/dispatch/finding/verify.rs:34` `FINDING_SCHEMA_LABEL`
 
-## `chio.active-response-policy-authority.v2` (2 declarations, 2 crates)
+## `chio.active-response-policy-authority.v1` (2 declarations, 2 crates)
 
 - `crates/platform/chio-control-plane/src/security/active_response_authority.rs:38` `ACTIVE_RESPONSE_AUTHORITY_SCHEMA`
 - `crates/security/chio-active-response-authority/src/config.rs:23` `ACTIVE_RESPONSE_AUTHORITY_PROTOCOL`

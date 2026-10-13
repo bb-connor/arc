@@ -51,6 +51,7 @@ def _signed_vote(outcome: str = "approved") -> dict:
 
 def _signed_capability() -> dict:
     return {
+        "schema": "chio.capability.v1",
         "id": "cap-1", "subject": "bb" * 32, "issuer": "ee" * 32,
         "issued_at": 1, "expires_at": 601, "scope": {"grants": []},
         "signature": "ff" * 64,

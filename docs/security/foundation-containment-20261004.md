@@ -24,11 +24,8 @@ KG4 retains the wire variants but rejects `TableAllowlist`, `ColumnDenylist`,
 does not prove that it enforces the narrower constraints of a particular grant.
 Future support needs grant-bound enforcement and production-constructor tests.
 
-The October 4 checkpoint intentionally changed policy hashes under
-`chio.runtime-policy.v2`. The October 5 product-profile repair advances the
-current control-plane identity to `chio.runtime-policy.v3`, also committing the
-installed default guard profile. Historical hashes and approval evidence retain
-their original meaning. The identity includes resolved approval inputs,
+The control-plane policy identity is `chio.runtime-policy.v1`. It commits the
+installed default guard profile and the resolved approval inputs,
 excluding only its self-referential policy-hash field. It does not turn an
 identity digest into issuer authority. The current profile repair and its
 remaining qualification are recorded in the [landing ledger](landing-ledger.md).

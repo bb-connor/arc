@@ -1815,7 +1815,7 @@ fn initialize_then_initialized_enters_ready_state() {
     assert_eq!(
         initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
             ["compatibility"],
-        "exact_match"
+        "server_selected"
     );
     assert_eq!(
         initialize["result"]["capabilities"]["experimental"][CHIO_PROTOCOL_CAPABILITY_KEY]
@@ -1901,47 +1901,34 @@ fn malformed_initialized_notification_does_not_enter_ready_state() {
 }
 
 #[test]
-fn initialize_unsupported_protocol_version_rejected() {
-    let mut edge = make_edge(10);
+fn initialize_answers_an_unserved_revision_with_the_served_one() {
+    for requested in ["2025-06-18", "2024-01-01"] {
+        let mut edge = make_edge(10);
+        let response = edge
+            .handle_jsonrpc(json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": { "protocolVersion": requested }
+            }))
+            .unwrap();
+        assert_eq!(response["result"]["protocolVersion"], MCP_PROTOCOL_VERSION);
+        assert!(matches!(
+            edge.state,
+            EdgeState::WaitingForInitialized { .. }
+        ));
+    }
 
-    let response = edge
+    let mut edge = make_edge(10);
+    let malformed = edge
         .handle_jsonrpc(json!({
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-01-01"
-            }
+            "params": { "protocolVersion": 20251125 }
         }))
         .unwrap();
-
-    assert_eq!(response["error"]["code"], JSONRPC_INVALID_REQUEST);
-    assert_eq!(response["error"]["message"], "unsupported protocolVersion");
-    assert_eq!(
-        response["error"]["data"]["chioError"]["code"],
-        CHIO_ERROR_PROTOCOL_VERSION_UNSUPPORTED
-    );
-    assert_eq!(
-        response["error"]["data"]["chioError"]["name"],
-        "protocol_version_unsupported"
-    );
-    assert_eq!(
-        response["error"]["data"]["chioError"]["category"],
-        "protocol"
-    );
-    assert_eq!(response["error"]["data"]["chioError"]["transient"], false);
-    assert_eq!(
-        response["error"]["data"]["chioError"]["retry"]["strategy"],
-        "do_not_retry_until_version_change"
-    );
-    assert_eq!(
-        response["error"]["data"]["requestedProtocolVersion"],
-        "2024-01-01"
-    );
-    assert_eq!(
-        response["error"]["data"]["supportedProtocolVersions"],
-        json!([MCP_PROTOCOL_VERSION])
-    );
+    assert_eq!(malformed["error"]["code"], JSONRPC_INVALID_REQUEST);
     assert!(matches!(edge.state, EdgeState::Uninitialized));
 }
 

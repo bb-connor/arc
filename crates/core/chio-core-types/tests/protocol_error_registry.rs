@@ -213,11 +213,11 @@ fn protocol_error_registry_version_negotiation_artifact_is_consistent() {
     );
     assert_eq!(
         negotiation.surfaces.hosted_mcp.selection_policy,
-        "exact_match_from_supported_set"
+        "server_selected_on_initialize_exact_match_per_request"
     );
     assert_eq!(
         negotiation.surfaces.hosted_mcp.downgrade_behavior,
-        "current implementation publishes one supported version and rejects mismatches"
+        "initialize answers 2025-11-25 for any requested revision; per-request metadata naming an unserved revision is refused"
     );
     assert!(!negotiation
         .surfaces
@@ -229,6 +229,11 @@ fn protocol_error_registry_version_negotiation_artifact_is_consistent() {
         .hosted_mcp
         .supported_protocol_versions
         .contains(&"2025-11-25".to_string()));
+    assert!(negotiation
+        .surfaces
+        .hosted_mcp
+        .supported_protocol_versions
+        .contains(&"2026-07-28".to_string()));
     assert_eq!(negotiation.surfaces.trust_control.versioning, "path_prefix");
     assert_eq!(negotiation.surfaces.trust_control.base_path_prefix, "/v1");
     assert_eq!(

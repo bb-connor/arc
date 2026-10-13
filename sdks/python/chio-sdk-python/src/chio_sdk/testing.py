@@ -271,6 +271,7 @@ class MockChioClient:
         """Return a plausible, locally-generated capability token."""
         now = int(time.time())
         token = CapabilityToken(
+            schema="chio.capability.v1",
             id=f"mock-tok-{uuid.uuid4().hex[:8]}",
             issuer=self._kernel_key,
             subject=_hex_or_hash(subject),

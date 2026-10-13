@@ -148,6 +148,13 @@ class VectorTests(unittest.TestCase):
         self.assertFalse(verification["signature_valid"])
         self.assertFalse(verification["ok"])
 
+    def test_capability_without_v1_schema_is_refused(self) -> None:
+        for payload in ('{"id":"cap"}', '{"id":"cap","schema":"chio.capability.v2"}'):
+            with self.assertRaises(ChioInvariantError) as raised:
+                parse_capability_json(payload)
+            self.assertEqual(raised.exception.code, "json")
+            self.assertIn('capability schema must be "chio.capability.v1"', str(raised.exception))
+
     def test_capability_vectors(self) -> None:
         fixture = load_vector("capability")
         for case in fixture["cases"]:

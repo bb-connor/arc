@@ -319,19 +319,26 @@ The machine-readable negotiation artifact for the shipped stack is:
 
 Hosted MCP negotiation rules:
 
-- Clients **MAY** send `initialize.params.protocolVersion`.
-- The server compares that value against its supported version set.
-- The current shipped implementation supports one MCP protocol version:
-  `2025-11-25`.
-- Compatibility determination is therefore an exact-match test against that
-  supported set.
-- The current implementation has no downgrade path; unsupported requested
-  versions are rejected rather than silently downgraded.
-- On success, the selected version is echoed in `result.protocolVersion` and
-  exposed again under
-  `result.capabilities.experimental.chioProtocol.selectedProtocolVersion`.
-- On failure, initialize is rejected with JSON-RPC `-32600` plus a structured
-  Chio protocol error descriptor in `error.data.chioError`.
+- The edge serves two external MCP revisions: `2025-11-25` through the
+  `initialize` handshake and `2026-07-28` through per-request metadata.
+- A request whose `params._meta["io.modelcontextprotocol/protocolVersion"]`
+  names `2026-07-28` is served without a session. Any other value in that
+  field **MUST** be refused with JSON-RPC `-32022` whose `data` carries
+  `supported` (every served revision) and `requested`; over HTTP the status is
+  `400`. `server/discover` returns the same `supportedVersions` list.
+- On HTTP, a stateless request **MUST** carry `MCP-Protocol-Version`,
+  `Mcp-Method` and, for `tools/call`, `resources/read` and `prompts/get`,
+  `Mcp-Name`, each equal to the body. A missing or mismatched header is
+  refused with `400` and JSON-RPC `-32020`.
+- `initialize` selects `2025-11-25`. Clients **MAY** send
+  `initialize.params.protocolVersion`; when it names another revision the
+  server answers with `2025-11-25` and the client decides whether to
+  continue. A non-string `protocolVersion` is rejected with JSON-RPC
+  `-32600` plus a structured Chio protocol error descriptor in
+  `error.data.chioError`.
+- The selected version is echoed in `result.protocolVersion` and exposed again
+  under `result.capabilities.experimental.chioProtocol.selectedProtocolVersion`.
+- A session opened by one revision refuses requests made under the other.
 
 ### 3.5 Model Metadata Admission
 

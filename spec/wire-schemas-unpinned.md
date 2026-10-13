@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-162 of 529 identifier constants in the security crates are unpinned.
+161 of 528 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (25)
 
@@ -156,8 +156,8 @@ since been pinned is removed by the next `--update`.
 
 ## crates/security/chio-active-response-authority (4)
 
-- `crates/security/chio-active-response-authority/src/config.rs:18` `AUTHORITY_RUNTIME_CONFIG_SCHEMA` = `chio.active-response-authority.runtime-config.v2`
-- `crates/security/chio-active-response-authority/src/config.rs:20` `ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA` = `chio.active-defense.deployment-config.v2`
+- `crates/security/chio-active-response-authority/src/config.rs:18` `AUTHORITY_RUNTIME_CONFIG_SCHEMA` = `chio.active-response-authority.runtime-config.v1`
+- `crates/security/chio-active-response-authority/src/config.rs:20` `ACTIVE_DEFENSE_DEPLOYMENT_CONFIG_SCHEMA` = `chio.active-defense.deployment-config.v1`
 - `crates/security/chio-active-response-authority/src/store.rs:31` `AUTHORITY_STORE_BUNDLE_SCHEMA` = `chio.active-response-authority.bundle.v1`
 - `crates/security/chio-active-response-authority/src/store.rs:32` `AUTHORITY_STORE_MANIFEST_SCHEMA` = `chio.active-response-authority.store-manifest.v1`
 
@@ -169,10 +169,6 @@ since been pinned is removed by the next `--update`.
 
 - `crates/security/chio-cage-plan/src/launch_protocol.rs:3` `LAUNCH_ENVELOPE_SCHEMA` = `chio.cage.launch-envelope.v1`
 - `crates/security/chio-cage-plan/src/launch_protocol.rs:4` `STATUS_RECORD_SCHEMA` = `chio.cage.status-record.v1`
-
-## crates/security/chio-decoy (1)
-
-- `crates/security/chio-decoy/src/registry.rs:35` `PRIVATE_ENVELOPE_SCHEMA` = `chio.decoy-private-envelope.v2`
 
 ## crates/security/chio-keyring (12)
 

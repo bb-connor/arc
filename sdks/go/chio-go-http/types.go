@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: a853c82d36820f41a0738efc444e9f0de8e507ee9b10cdc6c4c57b4c2cacdeb4
+// Schema content SHA-256: fdbe3617027caed17bb2f0ce40abe83e7ec91a3e09034b079017c9645e1867dd
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -2769,7 +2769,7 @@ type CapabilityToken struct {
 	Id              string                           `json:"id"`
 	IssuedAt        int64                            `json:"issued_at"`
 	Issuer          string                           `json:"issuer"`
-	Schema          *CapabilityTokenSchema           `json:"schema,omitempty"`
+	Schema          CapabilityTokenSchema            `json:"schema"`
 
 	// Scope What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
 	Scope             CapabilityTokenChioScope                  `json:"scope"`

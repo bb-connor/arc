@@ -1606,7 +1606,7 @@ fn build_receipt_pool(
         }
         Ok(())
     });
-    Pool::builder()
+    crate::pool::sqlite_pool_builder()
         .max_size(max_size)
         .build(manager)
         .map_err(|error| ReceiptStoreError::Pool(error.to_string()))

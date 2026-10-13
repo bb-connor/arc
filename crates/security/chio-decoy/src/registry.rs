@@ -31,8 +31,7 @@ use crate::materialize::{
     MaterializationRequest, MaterializeError,
 };
 
-const PRIVATE_ENVELOPE_SCHEMA_V1: &str = "chio.decoy-private-envelope.v1";
-const PRIVATE_ENVELOPE_SCHEMA: &str = "chio.decoy-private-envelope.v2";
+const PRIVATE_ENVELOPE_SCHEMA: &str = "chio.decoy-private-envelope.v1";
 const ARTIFACT_INDEX_DOMAIN: &[u8] = b"chio-decoy-artifact-index-v1";
 const MARKER_INDEX_DOMAIN: &[u8] = b"chio-decoy-marker-index-v1";
 const PUBLIC_REF_INDEX_DOMAIN: &[u8] = b"chio-decoy-public-ref-index-v1";
@@ -420,7 +419,7 @@ pub enum RegistryError {
 
 struct PrivateEnvelope {
     schema: String,
-    key_version: Option<RegistryKeyVersion>,
+    key_version: RegistryKeyVersion,
     record: DecoyRecord,
     marker: Vec<u8>,
     materialization_payload: Option<Vec<u8>>,
@@ -434,8 +433,7 @@ struct PrivateEnvelope {
 #[serde(deny_unknown_fields)]
 struct SerializablePrivateEnvelope<'a> {
     schema: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    key_version: Option<RegistryKeyVersion>,
+    key_version: RegistryKeyVersion,
     record: &'a DecoyRecord,
     marker: &'a [u8],
     materialization_payload: Option<&'a [u8]>,
@@ -449,8 +447,7 @@ struct SerializablePrivateEnvelope<'a> {
 #[serde(deny_unknown_fields)]
 struct DeserializablePrivateEnvelope {
     schema: String,
-    #[serde(default)]
-    key_version: Option<RegistryKeyVersion>,
+    key_version: RegistryKeyVersion,
     record: DecoyRecord,
     marker: Vec<u8>,
     materialization_payload: Option<Vec<u8>>,
@@ -677,7 +674,7 @@ impl PrivateDecoyRegistry {
             .map_err(|_| RegistryError::InvalidRequest)?;
         let envelope = PrivateEnvelope {
             schema: PRIVATE_ENVELOPE_SCHEMA.to_string(),
-            key_version: Some(key.version()),
+            key_version: key.version(),
             record: record.clone(),
             marker: request.marker.into_vec(),
             materialization_payload: request
@@ -1532,19 +1529,20 @@ fn open_scanned_envelope(
 
 fn bind_envelope_to_key(envelope: &mut PrivateEnvelope, key: &VersionedRegistryKey) {
     envelope.schema = PRIVATE_ENVELOPE_SCHEMA.to_string();
-    envelope.key_version = Some(key.version());
+    envelope.key_version = key.version();
 }
 
 fn validate_envelope_key_binding(
     envelope: &PrivateEnvelope,
     key: &VersionedRegistryKey,
 ) -> Result<(), RegistryError> {
-    match (envelope.schema.as_str(), envelope.key_version) {
-        (PRIVATE_ENVELOPE_SCHEMA, Some(version)) if version == key.version() => Ok(()),
-        (PRIVATE_ENVELOPE_SCHEMA, Some(_)) => Err(RegistryError::KeyUnavailable),
-        (PRIVATE_ENVELOPE_SCHEMA_V1, None) => Ok(()),
-        _ => Err(RegistryError::IntegrityFailure),
+    if envelope.schema != PRIVATE_ENVELOPE_SCHEMA {
+        return Err(RegistryError::IntegrityFailure);
     }
+    if envelope.key_version != key.version() {
+        return Err(RegistryError::KeyUnavailable);
+    }
+    Ok(())
 }
 
 fn seal_envelope(
@@ -1556,7 +1554,7 @@ fn seal_envelope(
     generation: u64,
     envelope: &PrivateEnvelope,
 ) -> Result<SealedDecoyRecord, RegistryError> {
-    if envelope.schema != PRIVATE_ENVELOPE_SCHEMA || envelope.key_version != Some(key.version()) {
+    if envelope.schema != PRIVATE_ENVELOPE_SCHEMA || envelope.key_version != key.version() {
         return Err(RegistryError::IntegrityFailure);
     }
     let public_ref_token = envelope

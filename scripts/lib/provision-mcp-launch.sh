@@ -28,10 +28,16 @@
 # after it so the launched command equals the bound one by construction.
 #
 # Requires a qualified enforcing Linux host and explicit CHIO_CAGE_INIT,
-# CHIO_RECEIPT_ANCHOR_ROOT and CHIO_CAGE_READ_PATHS_FILE. The latter lists the
-# reviewed absolute read paths, one per line, including interpreter runtime
-# dependencies for dynamic targets. The execution identity is the invoking
-# user, which must not be root. Discovery itself runs inside the enforced cage.
+# CHIO_RECEIPT_ANCHOR_ROOT, CHIO_CAGE_READ_PATHS_FILE,
+# CHIO_CAGE_RUNTIME_FILES_FILE and CHIO_CAGE_SYSCALL_PROFILE. The two files list
+# reviewed absolute paths, one per line: the read grants, and the loader,
+# shared objects and interpreter files a dynamic target retains, each of which
+# is also a read grant. A static target uses an empty runtime-files file.
+# Every target argument naming a regular file is bound as a read grant and a
+# retained runtime file at its canonical path. The signed artifact bound is
+# the size of the largest retained artifact. The execution identity is the
+# invoking user with its supplementary groups, none of which may be root.
+# Discovery itself runs inside the enforced cage.
 
 chio_canonical_path() {
   python3 - "$1" <<'PY'
@@ -145,10 +151,31 @@ chio_provision_mcp_launch() {
   fi
   local cage_init="${CHIO_CAGE_INIT:-}" anchor_root="${CHIO_RECEIPT_ANCHOR_ROOT:-}"
   local read_paths_file="${CHIO_CAGE_READ_PATHS_FILE:-}"
-  if [[ "${cage_init}" != /* || ! -x "${cage_init}" || "${anchor_root}" != /* || ! -d "${anchor_root}" || "${read_paths_file}" != /* || ! -f "${read_paths_file}" ]]; then
-    echo "chio_provision_mcp_launch: configure absolute CHIO_CAGE_INIT (executable), CHIO_RECEIPT_ANCHOR_ROOT (independent anchor directory), and CHIO_CAGE_READ_PATHS_FILE (reviewed read grants)" >&2
+  local runtime_files_file="${CHIO_CAGE_RUNTIME_FILES_FILE:-}"
+  local syscall_profile="${CHIO_CAGE_SYSCALL_PROFILE:-}"
+  if [[ "${cage_init}" != /* || ! -x "${cage_init}" || "${anchor_root}" != /* || ! -d "${anchor_root}" || "${read_paths_file}" != /* || ! -f "${read_paths_file}" || "${runtime_files_file}" != /* || ! -f "${runtime_files_file}" ]]; then
+    echo "chio_provision_mcp_launch: configure absolute CHIO_CAGE_INIT (executable), CHIO_RECEIPT_ANCHOR_ROOT (independent anchor directory), CHIO_CAGE_READ_PATHS_FILE (reviewed read grants), and CHIO_CAGE_RUNTIME_FILES_FILE (reviewed runtime files, empty for a static target)" >&2
     return 1
   fi
+  case "${syscall_profile}" in
+    native-minimal-v1|native-standard-v1) ;;
+    *)
+      echo "chio_provision_mcp_launch: set CHIO_CAGE_SYSCALL_PROFILE to native-minimal-v1 (static target) or native-standard-v1 (dynamic interpreter)" >&2
+      return 1
+      ;;
+  esac
+
+  local -a supplementary_gids=()
+  local group primary_gid
+  primary_gid="$(id -g)"
+  for group in $(id -G); do
+    [[ "${group}" == "${primary_gid}" ]] && continue
+    if [[ "${group}" -eq 0 ]]; then
+      echo "chio_provision_mcp_launch: refusing to bind the root supplementary group; run the launch as a user outside group 0" >&2
+      return 1
+    fi
+    supplementary_gids+=("${group}")
+  done
 
   local canonical_target canonical_workdir
   canonical_target="$(chio_resolve_target "${target}")" || return 1
@@ -169,37 +196,78 @@ chio_provision_mcp_launch() {
     fi
   fi
 
-  local -a target_args=("$@")
+  local -a read_paths=() runtime_files=()
+  local path
+  while IFS= read -r path || [[ -n "${path}" ]]; do
+    [[ -z "${path}" ]] && continue
+    if [[ "${path}" != /* ]]; then
+      echo "chio_provision_mcp_launch: read grants must be absolute paths" >&2
+      return 1
+    fi
+    read_paths+=("${path}")
+  done < "${read_paths_file}"
+  while IFS= read -r path || [[ -n "${path}" ]]; do
+    [[ -z "${path}" ]] && continue
+    if [[ "${path}" != /* ]]; then
+      echo "chio_provision_mcp_launch: runtime files must be absolute paths" >&2
+      return 1
+    fi
+    runtime_files+=("${path}")
+  done < "${runtime_files_file}"
+
+  local -a target_args=()
   local argument
-  for argument in ${target_args[@]+"${target_args[@]}"}; do
+  for argument in "$@"; do
     if [[ -f "${argument}" ]]; then
       chio_bind_script_mode "${argument}" || return 1
+      argument="$(chio_canonical_path "${argument}")"
+      chio_append_unique read_paths "${argument}"
+      chio_append_unique runtime_files "${argument}"
     fi
+    target_args+=("${argument}")
   done
+
+  local max_artifact_bytes
+  max_artifact_bytes="$(python3 - "${cage_init}" "${canonical_target}" ${runtime_files[@]+"${runtime_files[@]}"} <<'PY'
+import os
+import sys
+
+sizes = []
+for path in sys.argv[1:]:
+    try:
+        sizes.append(os.stat(path).st_size)
+    except OSError as error:
+        raise SystemExit(f"chio_provision_mcp_launch: cannot size retained artifact {path}: {error.strerror}")
+print(max(sizes))
+PY
+)" || return 1
+
   local -a provision=(
     "${chio}" security provision-reference-runtime
     --stage enforced
     --cage-init "${cage_init}"
     --receipt-rollback-anchor-root "${anchor_root}"
+    --max-artifact-bytes "${max_artifact_bytes}"
+    --syscall-profile "${syscall_profile}"
     --output-dir "${output_dir}"
     --discover-tools
     --target "${canonical_target}"
     --working-directory "${canonical_workdir}"
     --execution-uid "$(id -u)"
-    --execution-gid "$(id -g)"
+    --execution-gid "${primary_gid}"
     --server-id "${server_id}"
     --server-name "${server_name}"
     --server-version "${server_version}"
   )
-  local read_path
-  while IFS= read -r read_path || [[ -n "${read_path}" ]]; do
-    [[ -z "${read_path}" ]] && continue
-    if [[ "${read_path}" != /* ]]; then
-      echo "chio_provision_mcp_launch: read grants must be absolute paths" >&2
-      return 1
-    fi
-    provision+=(--read-path "${read_path}")
-  done < "${read_paths_file}"
+  for group in ${supplementary_gids[@]+"${supplementary_gids[@]}"}; do
+    provision+=(--execution-supplementary-gid "${group}")
+  done
+  for path in ${read_paths[@]+"${read_paths[@]}"}; do
+    provision+=(--read-path "${path}")
+  done
+  for path in ${runtime_files[@]+"${runtime_files[@]}"}; do
+    provision+=(--runtime-file "${path}")
+  done
   for argument in ${target_args[@]+"${target_args[@]}"}; do
     provision+=(--target-arg "${argument}")
   done
@@ -222,6 +290,17 @@ chio_provision_mcp_launch() {
   CHIO_LAUNCH_COMMAND=("${canonical_target}" ${target_args[@]+"${target_args[@]}"})
   export CHIO_LAUNCH_SIGNED_MANIFEST CHIO_LAUNCH_MANIFEST_PUBLIC_KEY \
     CHIO_LAUNCH_CAGE_POLICY CHIO_LAUNCH_CAGE_POLICY_SIGNER CHIO_LAUNCH_TARGET
+}
+
+# Append <value> to the array named <array> unless it already holds it; the
+# provisioner refuses a grant declared twice.
+chio_append_unique() {
+  local -n chio_unique_array="$1"
+  local existing
+  for existing in ${chio_unique_array[@]+"${chio_unique_array[@]}"}; do
+    [[ "${existing}" == "$2" ]] && return 0
+  done
+  chio_unique_array+=("$2")
 }
 
 # Print the current public key of the capability authority behind a trust

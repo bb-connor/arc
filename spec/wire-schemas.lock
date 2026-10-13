@@ -65,9 +65,9 @@ files = ["crates/products/chio-cli/src/active_defense_migration.rs"]
 first_seen = "6a12a69155"
 
 [[schema]]
-value = "chio.active-defense.deployment-config.v2"
+value = "chio.active-defense.deployment-config.v1"
 files = ["crates/security/chio-active-response-authority/src/config.rs"]
-first_seen = "0b59590555"
+first_seen = "28d826e3e6"
 
 [[schema]]
 value = "chio.active-defense.shadow-migration-input.v1"
@@ -90,9 +90,9 @@ files = ["crates/security/chio-active-response-authority/src/store.rs"]
 first_seen = "ff2ea2a8d2"
 
 [[schema]]
-value = "chio.active-response-authority.runtime-config.v2"
+value = "chio.active-response-authority.runtime-config.v1"
 files = ["crates/security/chio-active-response-authority/src/config.rs"]
-first_seen = "0b59590555"
+first_seen = "28d826e3e6"
 
 [[schema]]
 value = "chio.active-response-authority.store-manifest.v1"
@@ -110,9 +110,9 @@ files = ["crates/kernel/chio-kernel/src/kernel/active_response_executor.rs"]
 first_seen = "b39b131271"
 
 [[schema]]
-value = "chio.active-response-policy-authority.v2"
+value = "chio.active-response-policy-authority.v1"
 files = ["crates/security/chio-security-types/src/response_domains.rs"]
-first_seen = "ff2ea2a8d2"
+first_seen = "28d826e3e6"
 
 [[schema]]
 value = "chio.active-response-policy-decision.v1"
@@ -1326,11 +1326,6 @@ first_seen = "51e46336b1"
 
 [[schema]]
 value = "chio.decoy-private-envelope.v1"
-files = ["crates/security/chio-decoy/src/registry.rs"]
-first_seen = "6ea79bb5da"
-
-[[schema]]
-value = "chio.decoy-private-envelope.v2"
 files = ["crates/security/chio-decoy/src/registry.rs"]
 first_seen = "6ea79bb5da"
 
@@ -4760,7 +4755,7 @@ files = ["crates/economy/chio-appraisal/src/types.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.runtime-policy.v3"
+value = "chio.runtime-policy.v1"
 files = ["crates/platform/chio-control-plane/src/policy/util.rs"]
 first_seen = "de519d7776"
 

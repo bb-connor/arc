@@ -41,7 +41,8 @@ same Chio subject and therefore the same receipt attribution path.
 Every launch below wraps the repository's mock MCP server and passes the
 signed manifest and native-launch policy provisioned for that exact command.
 Configure the [enforcing host inputs](../security/native-launch-examples.md),
-including reviewed Python runtime read grants, then provision and export them:
+including the reviewed Python runtime read grants, runtime files and
+`native-standard-v1` syscall profile, then provision and export them:
 
 ```bash
 source scripts/lib/provision-mcp-launch.sh
