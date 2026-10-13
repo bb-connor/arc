@@ -339,7 +339,7 @@ func withSchema(body map[string]any, schema string) map[string]any {
 func TestVerifyCapabilityRefusesSignatureWithoutSchema(t *testing.T) {
 	signer := newKernelSigner(t)
 	body := schemaLessTokenBody(signer)
-	raw := signedRawToken(t, signer, body, body)
+	raw := signedRawToken(t, signer, body, withSchema(body, capabilitySchema))
 
 	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
 	if err == nil || !strings.Contains(err.Error(), "capability signature verification failed") {
@@ -347,13 +347,14 @@ func TestVerifyCapabilityRefusesSignatureWithoutSchema(t *testing.T) {
 	}
 }
 
-func TestVerifyCapabilityAcceptsSchemaOmittedFromToken(t *testing.T) {
+func TestVerifyCapabilityRejectsTokenWithoutSchema(t *testing.T) {
 	signer := newKernelSigner(t)
 	body := schemaLessTokenBody(signer)
 	raw := signedRawToken(t, signer, withSchema(body, capabilitySchema), body)
 
-	if err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC()); err != nil {
-		t.Fatalf("expected verification to pass, got %v", err)
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err == nil || !strings.Contains(err.Error(), `schema must be "chio.capability.v1"`) {
+		t.Fatalf("expected schema refusal, got %v", err)
 	}
 }
 

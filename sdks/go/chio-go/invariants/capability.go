@@ -15,6 +15,9 @@ type CapabilityVerification struct {
 	TimeValid                 bool                 `json:"time_valid"`
 }
 
+// CapabilitySchema is the only accepted capability token schema.
+const CapabilitySchema = "chio.capability.v1"
+
 func ParseCapabilityJSON(input string) (map[string]any, error) {
 	value, err := ParseJSONText(input)
 	if err != nil {
@@ -24,7 +27,17 @@ func ParseCapabilityJSON(input string) (map[string]any, error) {
 	if !ok {
 		return nil, newInvariantError("json", "capability must be a JSON object")
 	}
+	if err := validateCapabilitySchema(capability); err != nil {
+		return nil, err
+	}
 	return capability, nil
+}
+
+func validateCapabilitySchema(capability map[string]any) error {
+	if schema, ok := capability["schema"].(string); !ok || schema != CapabilitySchema {
+		return newInvariantError("json", `capability schema must be "chio.capability.v1"`)
+	}
+	return nil
 }
 
 func capabilityBody(capability map[string]any) map[string]any {
@@ -55,8 +68,7 @@ func isNonEmptyArray(value any) bool {
 func CapabilitySigningBody(capability map[string]any) map[string]any {
 	body := capabilityBody(capability)
 	signingBody := make(map[string]any, len(body)+4)
-	signingBody["schema"] = "chio.capability.v1"
-	if schema, ok := capability["schema"].(string); ok && schema != "" {
+	if schema, ok := capability["schema"]; ok {
 		signingBody["schema"] = schema
 	}
 	for key, value := range body {
@@ -81,6 +93,9 @@ func CapabilitySigningBody(capability map[string]any) map[string]any {
 }
 
 func CapabilitySigningBodyCanonicalJSON(capability map[string]any) (string, error) {
+	if err := validateCapabilitySchema(capability); err != nil {
+		return "", err
+	}
 	return CanonicalizeJSON(CapabilitySigningBody(capability))
 }
 
