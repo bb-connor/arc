@@ -48,6 +48,48 @@ pub enum SchemaVersionError {
         "database schema version {found} is newer than this binary supports ({supported}); refusing to open"
     )]
     FutureSchema { found: i32, supported: i32 },
+    #[error(
+        "database schema version {found} is not the current schema version {current}; refusing to open"
+    )]
+    StaleSchema { found: i32, current: i32 },
+}
+
+/// Stamp state of a store that has exactly one schema, as reported by
+/// [`check_current_schema`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SchemaState {
+    /// This store's row records the current version; its schema already exists.
+    Current,
+    /// This store has no row yet. The caller creates the current schema and
+    /// records the version with [`stamp_schema_version`] in one transaction.
+    Unstamped,
+}
+
+/// Validate the stamp of a store that has exactly one schema.
+///
+/// The identity checks match [`check_schema_version`]. A database stamped at any
+/// version other than `current_version` is refused:
+/// [`SchemaVersionError::StaleSchema`] when older and
+/// [`SchemaVersionError::FutureSchema`] when newer.
+pub fn check_current_schema(
+    conn: &Connection,
+    store_key: &str,
+    current_version: i32,
+    anchor_tables: &[&str],
+) -> Result<SchemaState, SchemaVersionError> {
+    check_store_identity(conn, anchor_tables)?;
+    match read_store_schema_version(conn, store_key)? {
+        None => Ok(SchemaState::Unstamped),
+        Some(found) if found == current_version => Ok(SchemaState::Current),
+        Some(found) if found > current_version => Err(SchemaVersionError::FutureSchema {
+            found,
+            supported: current_version,
+        }),
+        Some(found) => Err(SchemaVersionError::StaleSchema {
+            found,
+            current: current_version,
+        }),
+    }
 }
 
 /// Read and validate the schema stamp, returning the on-disk revision so the
@@ -76,6 +118,21 @@ pub fn check_schema_version(
     supported_version: i32,
     legacy_tables: &[&str],
 ) -> Result<i32, SchemaVersionError> {
+    check_store_identity(conn, legacy_tables)?;
+    let on_disk_version = read_store_schema_version(conn, store_key)?.unwrap_or(0);
+    if on_disk_version > supported_version {
+        return Err(SchemaVersionError::FutureSchema {
+            found: on_disk_version,
+            supported: supported_version,
+        });
+    }
+    Ok(on_disk_version)
+}
+
+fn check_store_identity(
+    conn: &Connection,
+    legacy_tables: &[&str],
+) -> Result<(), SchemaVersionError> {
     let app_id: i32 = conn.query_row("PRAGMA application_id", [], |row| row.get(0))?;
 
     if app_id == 0 {
@@ -88,7 +145,7 @@ pub fn check_schema_version(
         conn.execute_batch(&format!(
             "PRAGMA application_id = {CHIO_SQLITE_APPLICATION_ID};"
         ))?;
-        return Ok(0);
+        return Ok(());
     }
     if app_id != CHIO_SQLITE_APPLICATION_ID {
         return Err(SchemaVersionError::ForeignDatabase {
@@ -104,40 +161,30 @@ pub fn check_schema_version(
                 .collect(),
         });
     }
-    let on_disk_version = read_store_schema_version(conn, store_key)?;
-    if on_disk_version > supported_version {
-        return Err(SchemaVersionError::FutureSchema {
-            found: on_disk_version,
-            supported: supported_version,
-        });
-    }
-    Ok(on_disk_version)
+    Ok(())
 }
 
-/// The schema revision recorded for `store_key`, or 0 when this store has never
-/// stamped one into the database (a fresh file, a legacy pre-stamping store, or
-/// a co-located sibling that has not run yet). A missing metadata table is
-/// treated the same as a missing row: revision 0.
+/// The schema version recorded for `store_key`, or `None` when this store has
+/// never stamped one into the database.
 fn read_store_schema_version(
     conn: &Connection,
     store_key: &str,
-) -> Result<i32, SchemaVersionError> {
+) -> Result<Option<i32>, SchemaVersionError> {
     let table_present: bool = conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
         [SCHEMA_VERSION_TABLE],
         |row| row.get(0),
     )?;
     if !table_present {
-        return Ok(0);
+        return Ok(None);
     }
-    let version: Option<i32> = conn
+    Ok(conn
         .query_row(
             &format!("SELECT version FROM {SCHEMA_VERSION_TABLE} WHERE store_key = ?1"),
             [store_key],
             |row| row.get(0),
         )
-        .optional()?;
-    Ok(version.unwrap_or(0))
+        .optional()?)
 }
 
 /// Whether a database may be adopted as this store's. It qualifies when it has no
@@ -309,9 +356,88 @@ mod tests {
         ));
         assert_eq!(
             read_store_schema_version(&conn, STORE_KEY)?,
-            5,
+            Some(5),
             "a refused future database is not mutated"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn current_schema_reports_unstamped_then_current() -> Result<(), Box<dyn std::error::Error>> {
+        let conn = Connection::open_in_memory()?;
+        assert_eq!(
+            check_current_schema(&conn, STORE_KEY, 1, &["chio_tool_receipts"])?,
+            SchemaState::Unstamped
+        );
+        conn.execute_batch("CREATE TABLE chio_tool_receipts (receipt_id TEXT PRIMARY KEY);")?;
+        stamp_schema_version(&conn, STORE_KEY, 1)?;
+        assert_eq!(
+            check_current_schema(&conn, STORE_KEY, 1, &["chio_tool_receipts"])?,
+            SchemaState::Current
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn current_schema_refuses_an_older_stamp_without_mutation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(&format!(
+            "PRAGMA application_id = {CHIO_SQLITE_APPLICATION_ID};
+             CREATE TABLE chio_tool_receipts (receipt_id TEXT PRIMARY KEY);"
+        ))?;
+        stamp_schema_version(&conn, STORE_KEY, 0)?;
+        let error = check_current_schema(&conn, STORE_KEY, 1, &["chio_tool_receipts"]);
+        assert!(matches!(
+            error,
+            Err(SchemaVersionError::StaleSchema {
+                found: 0,
+                current: 1
+            })
+        ));
+        assert_eq!(read_store_schema_version(&conn, STORE_KEY)?, Some(0));
+        Ok(())
+    }
+
+    #[test]
+    fn current_schema_refuses_a_newer_stamp_without_mutation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(&format!(
+            "PRAGMA application_id = {CHIO_SQLITE_APPLICATION_ID};
+             CREATE TABLE chio_tool_receipts (receipt_id TEXT PRIMARY KEY);"
+        ))?;
+        stamp_schema_version(&conn, STORE_KEY, 2)?;
+        let error = check_current_schema(&conn, STORE_KEY, 1, &["chio_tool_receipts"]);
+        assert!(matches!(
+            error,
+            Err(SchemaVersionError::FutureSchema {
+                found: 2,
+                supported: 1
+            })
+        ));
+        assert_eq!(read_store_schema_version(&conn, STORE_KEY)?, Some(2));
+        Ok(())
+    }
+
+    #[test]
+    fn current_schema_keeps_identity_refusals() -> Result<(), Box<dyn std::error::Error>> {
+        let foreign = Connection::open_in_memory()?;
+        foreign.execute_batch("PRAGMA application_id = 305419896;")?;
+        assert!(matches!(
+            check_current_schema(&foreign, STORE_KEY, 1, &["chio_tool_receipts"]),
+            Err(SchemaVersionError::ForeignDatabase { .. })
+        ));
+
+        let sibling = Connection::open_in_memory()?;
+        sibling.execute_batch(&format!(
+            "PRAGMA application_id = {CHIO_SQLITE_APPLICATION_ID};
+             CREATE TABLE capability_grant_budgets (id TEXT PRIMARY KEY);"
+        ))?;
+        assert!(matches!(
+            check_current_schema(&sibling, STORE_KEY, 1, &["chio_tool_receipts"]),
+            Err(SchemaVersionError::MismatchedStore { .. })
+        ));
         Ok(())
     }
 
@@ -467,7 +593,7 @@ mod tests {
                 ))?;
                 stamp_schema_version(&conn, STORE_KEY, v_disk)?;
                 let result = check_schema_version(&conn, STORE_KEY, v_bin, &["chio_tool_receipts"]);
-                let after = read_store_schema_version(&conn, STORE_KEY)?;
+                let after = read_store_schema_version(&conn, STORE_KEY)?.unwrap_or(0);
                 if v_disk > v_bin {
                     assert!(matches!(
                         result,

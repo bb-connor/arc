@@ -23,7 +23,8 @@ pub(super) fn schema_version_error(error: crate::SchemaVersionError) -> PortErro
         crate::SchemaVersionError::Sqlite(error) => sqlite_error(error),
         crate::SchemaVersionError::ForeignDatabase { .. }
         | crate::SchemaVersionError::MismatchedStore { .. }
-        | crate::SchemaVersionError::FutureSchema { .. } => PortError::integrity_failure(),
+        | crate::SchemaVersionError::FutureSchema { .. }
+        | crate::SchemaVersionError::StaleSchema { .. } => PortError::integrity_failure(),
     }
 }
 
