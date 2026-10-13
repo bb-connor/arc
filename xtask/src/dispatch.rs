@@ -3,6 +3,7 @@
 
 use crate::adapter_no_bypass;
 use crate::broker_receipt_vectors;
+use crate::cage_vectors;
 use crate::cli::{
     self, CheckCommand, CodegenArgs, ErrorsCompat, FormalCommand, GenCommand, Lang, QualifyCommand,
     SnippetsCompat, VerifyCommand,
@@ -29,6 +30,7 @@ pub(crate) fn dispatch(command: cli::Command) -> Result<(), XtaskError> {
             GenCommand::Snippets { check } => run_snippets(snippets_regen_argv(check)),
             GenCommand::EvalReceipt { check } => eval_receipt_regen::run(check_argv(check)),
             GenCommand::FreezeVectors { check } => freeze_vectors(check_argv(check)),
+            GenCommand::CageVectors { check } => cage_vectors::run(check),
             GenCommand::ProofCoverage { check } => proof_coverage::run(check),
             GenCommand::BrokerReceiptVectors { check } => broker_receipt_vectors::run(check),
         },

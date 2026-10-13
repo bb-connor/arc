@@ -39,7 +39,7 @@
     "target_binding_digest": { "$ref": "#/$defs/digest" },
     "target_identity": { "$ref": "#/$defs/regularFileIdentity" },
     "applied_execution_identity": {
-      "$ref": "cage-init-plan-v2.schema.json#/$defs/executionIdentity"
+      "$ref": "cage-init-plan-v1.schema.json#/$defs/executionIdentity"
     },
     "nono_version": { "const": "0.53.0" },
     "nono_patch_version": { "const": "chio.2" },

@@ -521,6 +521,28 @@ fn independent_operator_ceiling_rejection_precedes_runtime_launch() {
 }
 
 #[test]
+fn retired_launch_policy_schema_id_is_refused() {
+    let mut retired = policy(
+        chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+        chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+    );
+    retired.schema = "chio.mcp.cage-launch-policy.v2".to_string();
+    let error = compose_cage_required_launch(
+        retired,
+        &"a".repeat(64),
+        "/operator/mcp-server",
+        &[],
+        &test_launch_contract(),
+        None,
+    )
+    .test_unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        CliError::cli_other_error("unsupported MCP cage launch policy schema").to_string()
+    );
+}
+
+#[test]
 fn operator_runtime_file_cannot_widen_verified_manifest_authority() {
     let mut policy = policy(
         chio_manifest::NativeSyscallProfile::NativeMinimalV1,

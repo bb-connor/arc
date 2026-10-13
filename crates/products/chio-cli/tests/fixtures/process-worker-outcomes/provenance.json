@@ -30,15 +30,13 @@
     "m5_acceptance_complete": false
   },
   "current-native-budget": {
-    "local_source_base": "95f04d5d74",
-    "runtime_checkout_base": "cacaf69fc9d4b709ebe30fd9c549fc0eeffc12f9",
-    "source_state": "uncommitted native multi-route consumer changes; binary identity retained, not exact-commit qualification",
-    "runtime_binary_sha256": "de2773e21ce312e08a809b856b38ad7bb02fedd546698de0b837313c811e4bc1",
-    "runtime_id": "428c8b57-51e6-45f8-9f86-f97b0ce92f70",
-    "source_directory": "/tmp/chio-native-budget-0v0o_e9s/campaign",
-    "evidence_directory": "/home/ubuntu/native-multiroute-evidence-20260929",
-    "campaign": "budget-native-5",
-    "sha256": "a7226862742a02e1c0a1715199edd6f295be0a59aa6fec9373ce12ff45e2bf1b",
+    "runtime_source": "47623d496292b252d0c027d7fb08e4dd4d3eddbf",
+    "runtime_binary_sha256": "4ba17dda2f884d8314f8043710ab8f5d599cf93b2ee512b1a3fdeee6b775f047",
+    "cage_init_sha256": "192323435395e38f4c108dccbb2111b6e5453b744bd373cd50e1bcff94548181",
+    "probe_sha256": "8bdba2c6456b4c44cc2f8a214973444a8f8f63d1473c3b263571b95e76476e2b",
+    "runtime_id": "99285ec5-109e-453a-b375-1f81b71d529c",
+    "campaign": "examples/reference-swarm/qualify-process-budget.py",
+    "sha256": "f36255887d7f257dececee52164b3f1eec33249c31596a4b94c9af82258dfa49",
     "private_keys_exported": false,
     "retrospective_observation": true,
     "m5_acceptance_complete": false

@@ -204,8 +204,8 @@ mod tests {
             include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget-kernel.pub")
                 .trim(),
         )?;
-        // Preserve the original signed evidence. Its valid signature cannot
-        // qualify a runtime with different reviewed enforcement dependencies.
+        // The original signed evidence carries a retired launch policy schema id;
+        // its valid signature cannot qualify the current enforcement contract.
         let signed = crate::receipt_verify::verify_original_receipt(
             include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"),
             &key,
@@ -230,11 +230,12 @@ mod tests {
         let error = verify(&run, &pins)
             .err()
             .ok_or("accepted historical evidence from obsolete enforcement")?;
-        assert!(
-            error
-                .to_string()
-                .contains("unreviewed nono or seccompiler version"),
-            "unexpected rejection: {error}"
+        assert_eq!(
+            error.to_string(),
+            CliError::cli_other_error(
+                "native launch evidence: expected the pinned server's selected Enforced policy"
+            )
+            .to_string()
         );
         Ok(())
     }
@@ -273,8 +274,8 @@ mod tests {
         assert_eq!(report.len(), 4);
         assert_eq!(report["alice"]["terminal_verified"], false);
         assert_eq!(report["bob"]["terminal_verified"], true);
-        assert_eq!(report["carol"]["terminal_verified"], true);
-        assert_eq!(report["dave"]["terminal_verified"], false);
+        assert_eq!(report["carol"]["terminal_verified"], false);
+        assert_eq!(report["dave"]["terminal_verified"], true);
         assert!(verify(&run, &BTreeMap::new()).is_err());
         let mut extra_pin = pins.clone();
         extra_pin.insert("unused-server".into(), key.clone());
@@ -286,21 +287,21 @@ mod tests {
         // Test the native composition boundary after the original signatures
         // above passed. Substituted receipts retain their valid native signatures.
         let alice = report["alice"]["receipt_id"].as_str().ok_or("alice")?;
-        let carol = report["carol"]["receipt_id"].as_str().ok_or("carol")?;
+        let dave = report["dave"]["receipt_id"].as_str().ok_or("dave")?;
         let params = &signed.action.parameters;
         let cases = [
             ("/confinement".to_owned(), json!({})),
             (
                 format!("/confinement/{alice}/enforcement"),
-                params["confinement"][carol]["enforcement"].clone(),
+                params["confinement"][dave]["enforcement"].clone(),
             ),
             (
                 format!("/confinement/{alice}/terminal"),
-                params["confinement"][carol]["terminal"].clone(),
+                params["confinement"][dave]["terminal"].clone(),
             ),
             (
-                format!("/confinement/{carol}/terminal"),
-                params["confinement"][carol]["enforcement"].clone(),
+                format!("/confinement/{dave}/terminal"),
+                params["confinement"][dave]["enforcement"].clone(),
             ),
             (
                 format!("/confinement/{alice}/signed_policy"),
@@ -329,11 +330,11 @@ mod tests {
         let mut changed: Outcomes = serde_json::from_value(params.clone())?;
         changed
             .confinement
-            .get_mut(carol)
-            .ok_or("carol launch")?
+            .get_mut(dave)
+            .ok_or("dave launch")?
             .terminal = None;
         assert_eq!(
-            verify(&changed, &pins)?["carol"]["terminal_verified"],
+            verify(&changed, &pins)?["dave"]["terminal_verified"],
             false
         );
         Ok(())
