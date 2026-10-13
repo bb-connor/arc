@@ -51,8 +51,7 @@ fn require_reference_format(tx: &Connection) -> Result<(), AdmissionOperationSto
         )
         .optional()
         .map_err(sqlite_error)?;
-    if ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION < 40
-        || revision != Some(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
+    if revision != Some(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
     {
         return Err(invariant(
             "logical references require the current serving format",

@@ -15,8 +15,7 @@ pub(in crate::admission_operation_store) fn require_current_terminal_format(
         )
         .optional()
         .map_err(sqlite_error)?;
-    if ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION < 39
-        || version != Some(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
+    if version != Some(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
     {
         return Err(invariant(
             "captured terminal custody requires the current serving format",

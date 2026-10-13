@@ -169,8 +169,7 @@ fn require_encoding_format(tx: &Connection) -> Result<(), AdmissionOperationStor
         )
         .optional()
         .map_err(sqlite_error)?;
-    if ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION < 40
-        || version != Some(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
+    if version != Some(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
     {
         return Err(invariant(
             "knowledge encoding requires the current serving format",

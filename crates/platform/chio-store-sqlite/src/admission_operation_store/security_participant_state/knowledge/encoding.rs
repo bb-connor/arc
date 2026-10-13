@@ -99,15 +99,16 @@ pub(super) fn decode(
 fn require_atom_format(tx: &Connection) -> Result<(), AdmissionOperationStoreError> {
     use crate::admission_operation_store::{
         ADMISSION_OPERATION_SCHEMA_ANCHORS, ADMISSION_OPERATION_SCHEMA_KEY,
+        ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
     };
     let version = crate::check_schema_version(
         tx,
         ADMISSION_OPERATION_SCHEMA_KEY,
-        40,
+        ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
         ADMISSION_OPERATION_SCHEMA_ANCHORS,
     )
     .map_err(|_| invalid())?;
-    if version != 40 {
+    if version != ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
         return Err(invalid());
     }
     Ok(())

@@ -123,8 +123,7 @@ fn require_checkpoint_head_format(tx: &Connection) -> Result<(), AdmissionOperat
         )
         .optional()
         .map_err(sqlite_error)?;
-    if ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION < 40
-        || version != Some(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
+    if version != Some(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
     {
         return Err(invariant(
             "checkpoint heads require the current serving format",

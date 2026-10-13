@@ -15,8 +15,7 @@ fn require_current_alias_format(tx: &Connection) -> Result<(), AdmissionOperatio
         )
         .optional()
         .map_err(sqlite_error)?;
-    if ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION < 38
-        || format != Some(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
+    if format != Some(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
     {
         return Err(invariant(
             "durable command aliases require the current serving format",
