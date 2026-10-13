@@ -10,12 +10,8 @@ CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}" \
 
 CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}" \
   cargo test -p chio-agent-web-interop --test agent_web_interop \
-  core_tests::published_v1_proof_envelope_schema_accepts_legacy_shape -- --exact
-
-CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}" \
-  cargo test -p chio-agent-web-interop --test agent_web_interop \
   core_tests::published_v2_proof_envelope_schema_requires_scope_and_unique_receipts -- --exact
 
 CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}" \
   cargo test -p chio-agent-web-interop --test agent_web_interop \
-  core_tests::verifier_accepts_signed_legacy_v1_envelope -- --exact
+  core_tests::verifier_refuses_unsupported_envelope_schema -- --exact
