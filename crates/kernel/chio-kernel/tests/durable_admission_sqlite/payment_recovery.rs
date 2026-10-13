@@ -19,12 +19,14 @@ impl chio_kernel::post_invocation::PostInvocationHook for RefuseAfterPrepayment 
         "sqlite-refuse-after-original-prepayment"
     }
 
-    fn inspect(
+    fn inspect_with_evidence(
         &self,
         _: &chio_kernel::post_invocation::PostInvocationContext<'_>,
         _: &serde_json::Value,
-    ) -> chio_kernel::post_invocation::PostInvocationVerdict {
-        chio_kernel::post_invocation::PostInvocationVerdict::Allow
+    ) -> chio_kernel::post_invocation::PostInvocationInspection {
+        chio_kernel::post_invocation::PostInvocationInspection::without_evidence(
+            chio_kernel::post_invocation::PostInvocationVerdict::Allow,
+        )
     }
 
     fn durable_identity(

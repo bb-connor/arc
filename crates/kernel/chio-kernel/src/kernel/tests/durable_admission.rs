@@ -1242,12 +1242,14 @@ impl crate::post_invocation::PostInvocationHook for VersionlessPostInvocationHoo
         "versionless-post-hook"
     }
 
-    fn inspect(
+    fn inspect_with_evidence(
         &self,
         _context: &crate::post_invocation::PostInvocationContext<'_>,
         _response: &serde_json::Value,
-    ) -> crate::post_invocation::PostInvocationVerdict {
-        crate::post_invocation::PostInvocationVerdict::Allow
+    ) -> crate::post_invocation::PostInvocationInspection {
+        crate::post_invocation::PostInvocationInspection::without_evidence(
+            crate::post_invocation::PostInvocationVerdict::Allow,
+        )
     }
 }
 
@@ -1260,15 +1262,17 @@ impl crate::post_invocation::PostInvocationHook for StableRedactingPostInvocatio
         "stable-redacting-post-hook"
     }
 
-    fn inspect(
+    fn inspect_with_evidence(
         &self,
         _context: &crate::post_invocation::PostInvocationContext<'_>,
         _response: &serde_json::Value,
-    ) -> crate::post_invocation::PostInvocationVerdict {
-        crate::post_invocation::PostInvocationVerdict::Redact(serde_json::json!({
-            "kind": "value",
-            "value": {"replacement": self.replacement}
-        }))
+    ) -> crate::post_invocation::PostInvocationInspection {
+        crate::post_invocation::PostInvocationInspection::without_evidence(
+            crate::post_invocation::PostInvocationVerdict::Redact(serde_json::json!({
+                "kind": "value",
+                "value": {"replacement": self.replacement}
+            })),
+        )
     }
 
     fn durable_identity(
@@ -1291,18 +1295,20 @@ impl crate::post_invocation::PostInvocationHook for StableStreamRedactingPostInv
         "stable-stream-redacting-post-hook"
     }
 
-    fn inspect(
+    fn inspect_with_evidence(
         &self,
         _context: &crate::post_invocation::PostInvocationContext<'_>,
         _response: &serde_json::Value,
-    ) -> crate::post_invocation::PostInvocationVerdict {
-        crate::post_invocation::PostInvocationVerdict::Redact(serde_json::json!({
-            "kind": "stream",
-            "stream": {
-                "complete": true,
-                "chunks": [{"part": 1}, {"part": 2}]
-            }
-        }))
+    ) -> crate::post_invocation::PostInvocationInspection {
+        crate::post_invocation::PostInvocationInspection::without_evidence(
+            crate::post_invocation::PostInvocationVerdict::Redact(serde_json::json!({
+                "kind": "stream",
+                "stream": {
+                    "complete": true,
+                    "chunks": [{"part": 1}, {"part": 2}]
+                }
+            })),
+        )
     }
 
     fn durable_identity(

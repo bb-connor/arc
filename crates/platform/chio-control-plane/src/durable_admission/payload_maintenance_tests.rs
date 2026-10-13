@@ -42,13 +42,15 @@ impl chio_kernel::post_invocation::PostInvocationHook for CountedPostReturnHook 
     fn name(&self) -> &str {
         "payload-maintenance-counted-hook"
     }
-    fn inspect(
+    fn inspect_with_evidence(
         &self,
         _: &chio_kernel::post_invocation::PostInvocationContext<'_>,
         _: &serde_json::Value,
-    ) -> chio_kernel::post_invocation::PostInvocationVerdict {
+    ) -> chio_kernel::post_invocation::PostInvocationInspection {
         self.0.fetch_add(1, Ordering::SeqCst);
-        chio_kernel::post_invocation::PostInvocationVerdict::Allow
+        chio_kernel::post_invocation::PostInvocationInspection::without_evidence(
+            chio_kernel::post_invocation::PostInvocationVerdict::Allow,
+        )
     }
     fn durable_identity(
         &self,

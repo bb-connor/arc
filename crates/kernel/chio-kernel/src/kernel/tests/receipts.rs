@@ -1068,19 +1068,21 @@ fn redaction_reapplies_stream_chunk_cap() {
         fn name(&self) -> &str {
             "oversize-redact"
         }
-        fn inspect(
+        fn inspect_with_evidence(
             &self,
             _ctx: &crate::post_invocation::PostInvocationContext<'_>,
             _response: &serde_json::Value,
-        ) -> crate::post_invocation::PostInvocationVerdict {
+        ) -> crate::post_invocation::PostInvocationInspection {
             // Redact to a 5-chunk COMPLETE stream regardless of the input.
-            crate::post_invocation::PostInvocationVerdict::Redact(serde_json::json!({
-                "kind": "stream",
-                "stream": {
-                    "complete": true,
-                    "chunks": [ {"n": 0}, {"n": 1}, {"n": 2}, {"n": 3}, {"n": 4} ],
-                }
-            }))
+            crate::post_invocation::PostInvocationInspection::without_evidence(
+                crate::post_invocation::PostInvocationVerdict::Redact(serde_json::json!({
+                    "kind": "stream",
+                    "stream": {
+                        "complete": true,
+                        "chunks": [ {"n": 0}, {"n": 1}, {"n": 2}, {"n": 3}, {"n": 4} ],
+                    }
+                })),
+            )
         }
     }
 

@@ -20,7 +20,7 @@
 use chio_core::receipt::metadata::GuardEvidence;
 pub use chio_kernel::{
     PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity,
-    PostInvocationPipeline, PostInvocationVerdict,
+    PostInvocationInspection, PostInvocationPipeline, PostInvocationVerdict,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -46,7 +46,6 @@ use crate::response_sanitization::{
 pub struct SanitizerHook {
     sanitizer: OutputSanitizer,
     hook_name: String,
-    evidence: std::sync::Mutex<Option<GuardEvidence>>,
 }
 
 impl SanitizerHook {
@@ -55,7 +54,6 @@ impl SanitizerHook {
         Self {
             sanitizer: OutputSanitizer::new(),
             hook_name: "output-sanitizer".to_string(),
-            evidence: std::sync::Mutex::new(None),
         }
     }
 
@@ -64,7 +62,6 @@ impl SanitizerHook {
         Ok(Self {
             sanitizer: OutputSanitizer::with_config(config)?,
             hook_name: "output-sanitizer".to_string(),
-            evidence: std::sync::Mutex::new(None),
         })
     }
 
@@ -73,7 +70,6 @@ impl SanitizerHook {
         Self {
             sanitizer,
             hook_name: "output-sanitizer".to_string(),
-            evidence: std::sync::Mutex::new(None),
         }
     }
 
@@ -86,14 +82,6 @@ impl SanitizerHook {
     /// Access the underlying sanitizer (useful for tests / operator tooling).
     pub fn sanitizer(&self) -> &OutputSanitizer {
         &self.sanitizer
-    }
-
-    fn store_evidence(&self, ev: GuardEvidence) {
-        let mut guard = match self.evidence.lock() {
-            Ok(g) => g,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        *guard = Some(ev);
     }
 }
 
@@ -108,22 +96,24 @@ impl PostInvocationHook for SanitizerHook {
         &self.hook_name
     }
 
-    fn inspect(&self, _ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
+    fn inspect_with_evidence(
+        &self,
+        _ctx: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationInspection {
         let sanitized = self.sanitizer.sanitize_value(response);
         if !sanitized.was_redacted {
-            // Clear any stale evidence from a previous run.
-            if let Ok(mut g) = self.evidence.lock() {
-                *g = None;
-            }
-            return PostInvocationVerdict::Allow;
+            return PostInvocationInspection::without_evidence(PostInvocationVerdict::Allow);
         }
         let details = summarize_findings(&sanitized.findings, &sanitized.redactions);
-        self.store_evidence(GuardEvidence {
-            guard_name: self.hook_name.clone(),
-            verdict: true, // sanitized: still allowed but redacted
-            details: Some(details),
-        });
-        PostInvocationVerdict::Redact(sanitized.value)
+        PostInvocationInspection::new(
+            PostInvocationVerdict::Redact(sanitized.value),
+            vec![GuardEvidence {
+                guard_name: self.hook_name.clone(),
+                verdict: true,
+                details: Some(details),
+            }],
+        )
     }
 
     fn durable_identity(&self) -> Result<Option<PostInvocationHookIdentity>, String> {
@@ -148,14 +138,6 @@ impl PostInvocationHook for SanitizerHook {
             },
         )
         .map(Some)
-    }
-
-    fn take_evidence(&self) -> Option<GuardEvidence> {
-        let mut guard = match self.evidence.lock() {
-            Ok(g) => g,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        guard.take()
     }
 }
 
@@ -215,12 +197,12 @@ mod tests {
         fn name(&self) -> &str {
             "allow-all"
         }
-        fn inspect(
+        fn inspect_with_evidence(
             &self,
             _ctx: &PostInvocationContext<'_>,
             _resp: &Value,
-        ) -> PostInvocationVerdict {
-            PostInvocationVerdict::Allow
+        ) -> PostInvocationInspection {
+            PostInvocationInspection::without_evidence(PostInvocationVerdict::Allow)
         }
     }
 
@@ -229,12 +211,12 @@ mod tests {
         fn name(&self) -> &str {
             "block-all"
         }
-        fn inspect(
+        fn inspect_with_evidence(
             &self,
             _ctx: &PostInvocationContext<'_>,
             _resp: &Value,
-        ) -> PostInvocationVerdict {
-            PostInvocationVerdict::Block(self.0.clone())
+        ) -> PostInvocationInspection {
+            PostInvocationInspection::without_evidence(PostInvocationVerdict::Block(self.0.clone()))
         }
     }
 
@@ -243,12 +225,14 @@ mod tests {
         fn name(&self) -> &str {
             "redact-all"
         }
-        fn inspect(
+        fn inspect_with_evidence(
             &self,
             _ctx: &PostInvocationContext<'_>,
             _resp: &Value,
-        ) -> PostInvocationVerdict {
-            PostInvocationVerdict::Redact(serde_json::json!({"redacted": true}))
+        ) -> PostInvocationInspection {
+            PostInvocationInspection::without_evidence(PostInvocationVerdict::Redact(
+                serde_json::json!({"redacted": true}),
+            ))
         }
     }
 
@@ -257,12 +241,14 @@ mod tests {
         fn name(&self) -> &str {
             "escalate"
         }
-        fn inspect(
+        fn inspect_with_evidence(
             &self,
             _ctx: &PostInvocationContext<'_>,
             _resp: &Value,
-        ) -> PostInvocationVerdict {
-            PostInvocationVerdict::Escalate(self.0.clone())
+        ) -> PostInvocationInspection {
+            PostInvocationInspection::without_evidence(PostInvocationVerdict::Escalate(
+                self.0.clone(),
+            ))
         }
     }
 

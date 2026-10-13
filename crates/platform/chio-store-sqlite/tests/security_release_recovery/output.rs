@@ -2,7 +2,8 @@
 use super::*;
 use chio_core::canonical_json_bytes;
 use chio_kernel::post_invocation::{
-    PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity, PostInvocationVerdict,
+    PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity,
+    PostInvocationInspection, PostInvocationVerdict,
 };
 use chio_kernel::tool_outcome::{DurableSecurityReleaseContext, ToolOutcomeStore};
 use chio_kernel::{
@@ -23,7 +24,11 @@ impl PostInvocationHook for Redact {
         "release-output-redaction"
     }
 
-    fn inspect(&self, _: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
+    fn inspect_with_evidence(
+        &self,
+        _: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationInspection {
         let mut response = response.clone();
         match response.get("kind").and_then(Value::as_str) {
             Some("value") => response["value"] = redacted(),
@@ -33,15 +38,21 @@ impl PostInvocationHook for Redact {
                     .and_then(|stream| stream.get_mut("chunks"))
                     .and_then(Value::as_array_mut)
                 else {
-                    return PostInvocationVerdict::Block("missing stream chunks".into());
+                    return PostInvocationInspection::without_evidence(
+                        PostInvocationVerdict::Block("missing stream chunks".into()),
+                    );
                 };
                 for chunk in chunks {
                     *chunk = redacted();
                 }
             }
-            _ => return PostInvocationVerdict::Block("unexpected output envelope".into()),
+            _ => {
+                return PostInvocationInspection::without_evidence(PostInvocationVerdict::Block(
+                    "unexpected output envelope".into(),
+                ))
+            }
         }
-        PostInvocationVerdict::Redact(response)
+        PostInvocationInspection::without_evidence(PostInvocationVerdict::Redact(response))
     }
 
     fn durable_identity(&self) -> Result<Option<PostInvocationHookIdentity>, String> {

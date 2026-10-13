@@ -466,7 +466,7 @@ Port request and response types use only portable security types, canonical body
 **Work**
 
 - `FlowPreInvocationGuard` implements `chio_kernel::Guard::name` and `evaluate`.
-- `FlowPostInvocationHook` implements the existing hook API, but evidence attribution is keyed by request id or returned atomically with the verdict through a backward-compatible pipeline extension. It must not use one shared `take_evidence()` slot that concurrent requests can interchange.
+- `FlowPostInvocationHook::inspect_with_evidence` returns the request-local verdict and evidence together in a `PostInvocationInspection`.
 - Add a versioned optional `SecurityInvocationContext` accessed through constructors and accessors on `GuardContext` and `PostInvocationContext`, containing authoritative tenant, session, subject, isolation epoch, lineage root, and context generation. Because these structs are public and literal-constructed, treat this as an API migration: enumerate and update every in-tree constructor, add a deprecation window for downstream literals where feasible, and never claim field addition is source-compatible. Enforce mode denies missing context rather than trusting request fields.
 - Treat `PostInvocationContext.agent_id` and `server_id` as optional typed ids. Synthetic context without a session is denied when enforcement is enabled.
 - Return existing `PostInvocationVerdict::Allow` or `Block`; do not introduce a stale `Pass` variant.

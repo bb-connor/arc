@@ -98,32 +98,21 @@ impl PostInvocationInspection {
 pub trait PostInvocationHook: Send + Sync {
     fn name(&self) -> &str;
 
-    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict;
-
-    /// Return a verdict and its evidence atomically. Existing hooks retain the
-    /// serialized legacy evidence path through this default implementation.
+    /// Return the request's verdict and evidence in one inspection.
     fn inspect_with_evidence(
         &self,
         ctx: &PostInvocationContext<'_>,
         response: &Value,
-    ) -> PostInvocationInspection {
-        let verdict = self.inspect(ctx, response);
-        let evidence = self.take_evidence().into_iter().collect();
-        PostInvocationInspection::new(verdict, evidence)
-    }
+    ) -> PostInvocationInspection;
 
     /// Stable identity for deterministic, non-blocking durable evaluation.
     ///
-    /// Returning an identity asserts that `inspect` is a pure function of the
-    /// request context and response, and that it returns only `Allow`,
+    /// Returning an identity asserts that `inspect_with_evidence` is a pure
+    /// function of the request context and response, returning only `Allow`,
     /// `Redact`, or `Escalate`. Hooks without this contract remain usable on
     /// non-durable paths and are rejected before a durable dispatch starts.
     fn durable_identity(&self) -> Result<Option<PostInvocationHookIdentity>, String> {
         Ok(None)
-    }
-
-    fn take_evidence(&self) -> Option<GuardEvidence> {
-        None
     }
 }
 
@@ -451,22 +440,22 @@ mod tests {
             "overlap-detecting-hook"
         }
 
-        fn inspect(
+        fn inspect_with_evidence(
             &self,
             _ctx: &PostInvocationContext<'_>,
             _response: &Value,
-        ) -> PostInvocationVerdict {
+        ) -> PostInvocationInspection {
             if self.active.fetch_add(1, Ordering::SeqCst) != 0 {
                 self.overlapped.store(true, Ordering::SeqCst);
             }
             thread::sleep(Duration::from_millis(25));
             self.active.fetch_sub(1, Ordering::SeqCst);
-            PostInvocationVerdict::Allow
+            PostInvocationInspection::without_evidence(PostInvocationVerdict::Allow)
         }
     }
 
     #[test]
-    fn pipeline_serializes_hook_evaluation_and_evidence_side_channels() {
+    fn pipeline_serializes_hook_evaluation() {
         let active = Arc::new(AtomicUsize::new(0));
         let overlapped = Arc::new(AtomicBool::new(false));
         let mut pipeline = PostInvocationPipeline::new();
