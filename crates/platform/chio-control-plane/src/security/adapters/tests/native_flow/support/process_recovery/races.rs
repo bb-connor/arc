@@ -323,12 +323,17 @@ fn race(pause: Pause, revoke: bool) -> TestResult {
                 (usage.reserved_invocations, usage.captured_invocations),
                 (0, 0)
             );
-            let response = recovered.evaluate_tool_call_blocking_with_security_context(
+            let receipts = recovered.receipt_log().len();
+            let retry = recovered.evaluate_tool_call_blocking_with_security_context(
                 &fixture.request,
                 &fixture.context,
-            )?;
-            assert_eq!(response.verdict, Verdict::Deny);
-            assert!(response.output.is_none());
+            );
+            assert!(
+                matches!(&retry, Err(KernelError::DurableAdmission(reason))
+                    if reason == "request identity is already owned by a durable operation"),
+                "a revoked retry cannot sign over the retained operation: {retry:?}"
+            );
+            assert_eq!(recovered.receipt_log().len(), receipts);
             assert_eq!(invocations.load(Ordering::SeqCst), 0);
         }
     } else {

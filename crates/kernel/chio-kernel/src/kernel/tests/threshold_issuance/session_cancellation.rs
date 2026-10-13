@@ -144,12 +144,26 @@ fn dropped_async_retry_restores_the_original_threshold_claim() -> TestResult {
     assert_eq!(retained_binding(&fixture, &context)?, original);
     assert_pending_session(&fixture, &context)?;
     let receipts = fixture.kernel.receipt_log().len();
-    let error = evaluate(&fixture, &context, EntryPoint::NestedAsync)
-        .expect_err("a terminal cancellation cannot mint another receipt");
-    assert!(
-        matches!(error.downcast_ref::<KernelError>(), Some(KernelError::DurableAdmission(reason))
-        if reason == "request replay is retained in state CompensatedBeforeDispatch"),
-        "{error:?}"
+    let replay = evaluate(&fixture, &context, EntryPoint::NestedAsync)?;
+    let cancellation = fixture
+        .store
+        .state
+        .lock()
+        .map_err(|_| "admission state")?
+        .receipt
+        .clone()
+        .ok_or("persisted cancellation receipt")?;
+    assert_eq!(
+        replay.terminal_state,
+        OperationTerminalState::Cancelled {
+            reason: "evaluation cancelled before dispatch".into()
+        }
+    );
+    assert!(replay.output.is_none());
+    assert_eq!(
+        chio_core::canonical::canonical_json_bytes(&replay.receipt)?,
+        chio_core::canonical::canonical_json_bytes(&cancellation)?,
+        "retry must replay the persisted cancellation receipt"
     );
     assert_eq!(fixture.kernel.receipt_log().len(), receipts);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
