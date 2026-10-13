@@ -35,7 +35,7 @@ use persistence::*;
 pub(crate) use persistence::{append_stage_commit, load_stage_tx, update_stage};
 
 const ECONOMIC_STATE_CACHE_SCHEMA_KEY: &str = "economic_state_cache";
-pub(crate) const ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION: i32 = 3;
+pub(crate) const ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const ECONOMIC_STATE_CACHE_SCHEMA_ANCHORS: &[&str] =
     &["economic_state_stages", "capability_grant_budgets"];
 const MAX_REASON_BYTES: usize = 4 * 1024;
@@ -49,29 +49,6 @@ const GENESIS_STAGE_COMMIT_DIGEST: &str =
 const ADMISSION_TERMINAL_EFFECT_RESULT_SCHEMA: &str = "chio.admission.terminal-effect-result.v1";
 
 const ECONOMIC_STATE_CACHE_SCHEMA: &str = include_str!("economic_state_cache.sql");
-const ECONOMIC_STATE_CACHE_DESCRIPTOR_MIGRATION: &str = r#"
-ALTER TABLE economic_state_stages ADD COLUMN descriptor_kind TEXT
-    CHECK (descriptor_kind IS NULL OR length(descriptor_kind) BETWEEN 1 AND 128);
-ALTER TABLE economic_state_stages ADD COLUMN descriptor_key TEXT
-    CHECK (descriptor_key IS NULL OR length(descriptor_key) BETWEEN 1 AND 2048);
-ALTER TABLE economic_state_stages ADD COLUMN descriptor_digest TEXT
-    CHECK (descriptor_digest IS NULL OR (
-        length(descriptor_digest) = 64
-        AND descriptor_digest NOT GLOB '*[^0-9a-f]*'
-    ));
-ALTER TABLE economic_state_stages ADD COLUMN descriptor_json BLOB
-    CHECK (descriptor_json IS NULL OR length(descriptor_json) BETWEEN 1 AND 4194304);
-DROP TRIGGER IF EXISTS economic_state_stage_identity_immutable;
-CREATE TRIGGER economic_state_stage_identity_immutable
-BEFORE UPDATE OF batch_id, checkpoint_sequence, checkpoint_digest,
-    base_view_json, batch_json, operation_binding_json, descriptor_kind,
-    descriptor_key, descriptor_digest, descriptor_json, created_at_unix_ms
-ON economic_state_stages
-BEGIN
-    SELECT RAISE(ABORT, 'economic stage identity is immutable');
-END;
-"#;
-
 #[derive(Debug, thiserror::Error)]
 pub enum EconomicStateCacheError {
     #[error(transparent)]
@@ -1703,48 +1680,27 @@ pub(crate) fn finalize_stage_in_transaction(
 pub(crate) fn initialize_economic_state_cache_schema(
     connection: &mut Connection,
 ) -> Result<(), EconomicStateCacheError> {
-    let on_disk = crate::check_schema_version(
-        connection,
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(sqlite_error)?;
+    let state = crate::check_current_schema(
+        &transaction,
         ECONOMIC_STATE_CACHE_SCHEMA_KEY,
         ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
         ECONOMIC_STATE_CACHE_SCHEMA_ANCHORS,
     )
     .map_err(|error| invariant(error.to_string()))?;
-    if on_disk == ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION {
-        return verify_cache_sql_invariants(connection);
-    }
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    let stage_table_exists = transaction
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'economic_state_stages')",
-            [],
-            |row| row.get::<_, bool>(0),
-        )
-        .map_err(sqlite_error)?;
-    let descriptor_column_exists = stage_table_exists
-        && transaction
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('economic_state_stages') WHERE name = 'descriptor_kind')",
-                [],
-                |row| row.get::<_, bool>(0),
-            )
-            .map_err(sqlite_error)?;
-    if stage_table_exists && !descriptor_column_exists {
+    if state == crate::SchemaState::Unstamped {
         transaction
-            .execute_batch(ECONOMIC_STATE_CACHE_DESCRIPTOR_MIGRATION)
+            .execute_batch(ECONOMIC_STATE_CACHE_SCHEMA)
             .map_err(sqlite_error)?;
+        crate::stamp_schema_version(
+            &transaction,
+            ECONOMIC_STATE_CACHE_SCHEMA_KEY,
+            ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| invariant(error.to_string()))?;
     }
-    transaction
-        .execute_batch(ECONOMIC_STATE_CACHE_SCHEMA)
-        .map_err(sqlite_error)?;
-    crate::stamp_schema_version(
-        &transaction,
-        ECONOMIC_STATE_CACHE_SCHEMA_KEY,
-        ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
     verify_cache_sql_invariants(&transaction)?;
     transaction.commit().map_err(sqlite_error)
 }

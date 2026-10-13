@@ -24,7 +24,7 @@ mod signer;
 use schema::FROST_STORE_SCHEMA;
 
 const FROST_STORE_SCHEMA_KEY: &str = "frost";
-pub(crate) const FROST_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+pub(crate) const FROST_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const FROST_STORE_SCHEMA_ANCHORS: &[&str] = &[
     "frost_ceremonies",
     "chio_serving_owner",
@@ -484,25 +484,27 @@ impl SqliteFrostStore {
 }
 
 pub(crate) fn initialize_frost_schema(connection: &mut Connection) -> Result<(), FrostStoreError> {
-    crate::check_schema_version(
-        connection,
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(sqlite_error)?;
+    let state = crate::check_current_schema(
+        &transaction,
         FROST_STORE_SCHEMA_KEY,
         FROST_STORE_SUPPORTED_SCHEMA_VERSION,
         FROST_STORE_SCHEMA_ANCHORS,
     )
     .map_err(|error| FrostStoreError::InvalidState(error.to_string()))?;
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(FROST_STORE_SCHEMA)
-        .map_err(sqlite_error)?;
-    crate::stamp_schema_version(
-        &transaction,
-        FROST_STORE_SCHEMA_KEY,
-        FROST_STORE_SUPPORTED_SCHEMA_VERSION,
-    )
-    .map_err(|error| FrostStoreError::InvalidState(error.to_string()))?;
+    if state == crate::SchemaState::Unstamped {
+        transaction
+            .execute_batch(FROST_STORE_SCHEMA)
+            .map_err(sqlite_error)?;
+        crate::stamp_schema_version(
+            &transaction,
+            FROST_STORE_SCHEMA_KEY,
+            FROST_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| FrostStoreError::InvalidState(error.to_string()))?;
+    }
     verify_frost_store_invariants(&transaction)?;
     transaction.commit().map_err(sqlite_error)
 }

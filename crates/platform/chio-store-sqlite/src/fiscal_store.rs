@@ -19,7 +19,7 @@ use serde::Serialize;
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 
 const FISCAL_STORE_SCHEMA_KEY: &str = "fiscal";
-pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 6;
+pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const FISCAL_STORE_SCHEMA: &str = include_str!("fiscal_store.sql");
 const FISCAL_GENESIS_PROJECTION_KEY: &str = "authority";
 const ZERO_DIGEST: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -2299,29 +2299,27 @@ fn finalize_rotation_mutation(
 pub(crate) fn initialize_fiscal_schema(
     connection: &mut Connection,
 ) -> Result<(), FiscalStoreError> {
-    let on_disk = crate::check_schema_version(
-        connection,
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(sqlite_error)?;
+    let state = crate::check_current_schema(
+        &transaction,
         FISCAL_STORE_SCHEMA_KEY,
         FISCAL_STORE_SUPPORTED_SCHEMA_VERSION,
         &["fiscal_authority_state", "capability_grant_budgets"],
     )
     .map_err(|error| invariant(error.to_string()))?;
-    if on_disk == FISCAL_STORE_SUPPORTED_SCHEMA_VERSION {
-        return verify_fiscal_sql_invariants(connection);
+    if state == crate::SchemaState::Unstamped {
+        transaction
+            .execute_batch(FISCAL_STORE_SCHEMA)
+            .map_err(sqlite_error)?;
+        crate::stamp_schema_version(
+            &transaction,
+            FISCAL_STORE_SCHEMA_KEY,
+            FISCAL_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| invariant(error.to_string()))?;
     }
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    ensure_legacy_envelope_digest_column(&transaction)?;
-    transaction
-        .execute_batch(FISCAL_STORE_SCHEMA)
-        .map_err(sqlite_error)?;
-    crate::stamp_schema_version(
-        &transaction,
-        FISCAL_STORE_SCHEMA_KEY,
-        FISCAL_STORE_SUPPORTED_SCHEMA_VERSION,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
     verify_fiscal_sql_invariants(&transaction)?;
     transaction.commit().map_err(sqlite_error)
 }
@@ -2583,41 +2581,6 @@ pub(crate) fn verify_fiscal_sql_invariants(
     } else {
         Ok(())
     }
-}
-
-fn ensure_legacy_envelope_digest_column(
-    transaction: &Transaction<'_>,
-) -> Result<(), FiscalStoreError> {
-    let table_present = transaction
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'fiscal_legacy_fee_schedule_bindings')",
-            [],
-            |row| row.get::<_, bool>(0),
-        )
-        .map_err(sqlite_error)?;
-    if !table_present {
-        return Ok(());
-    }
-    let mut statement = transaction
-        .prepare("PRAGMA table_info(fiscal_legacy_fee_schedule_bindings)")
-        .map_err(sqlite_error)?;
-    let columns = statement
-        .query_map([], |row| row.get::<_, String>(1))
-        .map_err(sqlite_error)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(sqlite_error)?;
-    if !columns
-        .iter()
-        .any(|column| column == "legacy_envelope_digest")
-    {
-        transaction
-            .execute(
-                "ALTER TABLE fiscal_legacy_fee_schedule_bindings ADD COLUMN legacy_envelope_digest TEXT",
-                [],
-            )
-            .map_err(sqlite_error)?;
-    }
-    Ok(())
 }
 
 #[allow(

@@ -25,7 +25,7 @@ use crate::serving_owner::SqliteServingOwner;
 use crate::store_connection::StoreConnection;
 
 const TOOL_OUTCOME_SCHEMA_KEY: &str = "tool_outcome";
-pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 4;
+pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const TOOL_OUTCOME_SCHEMA_ANCHORS: &[&str] = &[
     "tool_outcomes",
     "admission_operations",
@@ -49,25 +49,6 @@ const MAX_EVALUATION_RECORD_BYTES: usize = 64 * 1024 * 1024;
 #[path = "tool_outcome_store/payload_compaction.rs"]
 mod payload_compaction;
 pub use payload_compaction::{ToolOutcomeCompactionLimits, ToolOutcomeCompactionPage};
-
-/// Result of one raw-invocation retention pass.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolOutcomeCompactionSummary {
-    /// Raw invocation payloads cleared to NULL during this pass.
-    pub compacted: u64,
-    /// Payloads past the retention cutoff left in place because at least one
-    /// owning admission operation has not yet reached a terminal state.
-    pub retained_live: u64,
-    pub retained_resolved: u64,
-    pub retained_non_completed: u64,
-    pub retained_unsupported: u64,
-    pub retained_owner_budget: u64,
-    pub inspected: u64,
-    /// A committed first page may leave work. Resume with the paged API and
-    /// this cursor; repeatedly calling this compatibility method restarts.
-    pub next_digest: Option<AdmissionDigest>,
-    pub byte_budget_exhausted: bool,
-}
 
 /// A stored raw invocation blob, or a marker that its payload was compacted away
 /// under retention while the digest and size were preserved.
@@ -146,35 +127,6 @@ impl SqliteToolOutcomeStore {
         self.serving_owner
             .sync_authority_anchor(connection)
             .map_err(|error| ToolOutcomeStoreError::Unavailable(error.to_string()))
-    }
-
-    /// Compatibility entrypoint for one default bounded page, not a whole
-    /// sweep. The same custody, replay-profile, poison, fence, clock and work
-    /// gates apply. Use `next_digest` with the paged API to continue a sweep.
-    pub fn compact_retained_invocation_blobs(
-        &self,
-        retention_cutoff_unix_ms: u64,
-        active_fence: &StoreMutationFence,
-        trusted_now_unix_ms: u64,
-    ) -> Result<ToolOutcomeCompactionSummary, ToolOutcomeStoreError> {
-        let page = self.compact_retained_invocation_blobs_page_with_limits(
-            retention_cutoff_unix_ms,
-            active_fence,
-            trusted_now_unix_ms,
-            None,
-            ToolOutcomeCompactionLimits::default(),
-        )?;
-        Ok(ToolOutcomeCompactionSummary {
-            compacted: page.compacted,
-            retained_live: page.retained_live,
-            retained_resolved: page.retained_resolved,
-            retained_non_completed: page.retained_non_completed,
-            retained_unsupported: page.retained_unsupported,
-            retained_owner_budget: page.retained_owner_budget,
-            inspected: page.inspected,
-            next_digest: page.next_digest,
-            byte_budget_exhausted: page.byte_budget_exhausted,
-        })
     }
 }
 
@@ -777,56 +729,28 @@ pub(crate) fn initialize_tool_outcome_schema(
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
-    security_release::verify_unstamped_source(&transaction)?;
-    let on_disk = crate::check_schema_version(
+    let state = crate::check_current_schema(
         &transaction,
         TOOL_OUTCOME_SCHEMA_KEY,
         TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
         TOOL_OUTCOME_SCHEMA_ANCHORS,
     )
     .map_err(|error| invariant(error.to_string()))?;
-    if on_disk == TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION {
-        verify_tool_outcome_invariants(&transaction)?;
-        return transaction.commit().map_err(sqlite_error);
-    }
-    if on_disk == 3 {
-        let expected = Connection::open_in_memory().map_err(sqlite_error)?;
-        expected
-            .execute_batch(TOOL_OUTCOME_SCHEMA)
-            .map_err(sqlite_error)?;
-        expected
-            .execute_batch(SECURITY_RELEASE_SCHEMA)
-            .map_err(sqlite_error)?;
-        if tool_outcome_schema_catalog(&transaction)? != tool_outcome_schema_catalog(&expected)? {
-            return Err(invariant(
-                "pre-v4 outcome schema is not the exact qualified v3 predecessor",
-            ));
+    if state == crate::SchemaState::Unstamped {
+        for schema in [
+            TOOL_OUTCOME_SCHEMA,
+            SECURITY_RELEASE_SCHEMA,
+            PAYLOAD_COMPACTION_SCHEMA,
+        ] {
+            transaction.execute_batch(schema).map_err(sqlite_error)?;
         }
-        verify_tool_outcome_data_invariants(&transaction)?;
-    } else {
-        security_release::verify_pre_migration(&transaction, on_disk)?;
+        crate::stamp_schema_version(
+            &transaction,
+            TOOL_OUTCOME_SCHEMA_KEY,
+            TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| invariant(error.to_string()))?;
     }
-    // Version 2 permits a compacted payload to be restored when a later owner
-    // supplies the same digest- and size-verified canonical bytes. Recreate the
-    // trigger transactionally before applying the canonical schema definition.
-    transaction
-        .execute_batch("DROP TRIGGER IF EXISTS tool_outcome_blobs_immutable;")
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(TOOL_OUTCOME_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(SECURITY_RELEASE_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(PAYLOAD_COMPACTION_SCHEMA)
-        .map_err(sqlite_error)?;
-    crate::stamp_schema_version(
-        &transaction,
-        TOOL_OUTCOME_SCHEMA_KEY,
-        TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
     verify_tool_outcome_invariants(&transaction)?;
     transaction.commit().map_err(sqlite_error)
 }

@@ -555,106 +555,25 @@ fn store_fixture() -> TestResult<StoreFixture> {
 }
 
 #[test]
-fn fiscal_schema_migrates_the_single_open_transition_guard() -> TestResult {
+fn obsolete_fiscal_schema_is_refused_without_rewriting() -> TestResult {
     let mut connection = rusqlite::Connection::open_in_memory()?;
     initialize_fiscal_schema(&mut connection)?;
-    connection.execute(
-        "UPDATE chio_store_schema_versions SET version = 1 WHERE store_key = 'fiscal'",
-        [],
-    )?;
-    connection.execute("DROP INDEX fiscal_one_open_transition", [])?;
-
-    initialize_fiscal_schema(&mut connection)?;
-
+    crate::stamp_schema_version(&connection, "fiscal", 0)?;
+    let error = initialize_fiscal_schema(&mut connection)
+        .err()
+        .ok_or("an obsolete fiscal schema opened")?;
+    assert!(
+        error
+            .to_string()
+            .contains("is not the current schema version"),
+        "{error}"
+    );
     let version: i32 = connection.query_row(
         "SELECT version FROM chio_store_schema_versions WHERE store_key = 'fiscal'",
         [],
         |row| row.get(0),
     )?;
-    let index_present: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'index' AND name = 'fiscal_one_open_transition')",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(version, FISCAL_STORE_SUPPORTED_SCHEMA_VERSION);
-    assert!(index_present);
-    Ok(())
-}
-
-#[test]
-fn fiscal_schema_migrates_the_legacy_envelope_digest_binding() -> TestResult {
-    let mut connection = rusqlite::Connection::open_in_memory()?;
-    initialize_fiscal_schema(&mut connection)?;
-    connection.execute(
-        "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'fiscal'",
-        [],
-    )?;
-    connection.execute_batch(
-        "DROP TRIGGER fiscal_legacy_fee_schedule_bindings_immutable;
-         DROP TRIGGER fiscal_legacy_fee_schedule_bindings_no_delete;
-         ALTER TABLE fiscal_legacy_fee_schedule_bindings DROP COLUMN legacy_envelope_digest;",
-    )?;
-
-    initialize_fiscal_schema(&mut connection)?;
-
-    let digest_column_present = connection
-        .prepare("PRAGMA table_info(fiscal_legacy_fee_schedule_bindings)")?
-        .query_map([], |row| row.get::<_, String>(1))?
-        .collect::<Result<Vec<_>, _>>()?
-        .iter()
-        .any(|column| column == "legacy_envelope_digest");
-    assert!(digest_column_present);
-    Ok(())
-}
-
-#[test]
-fn fiscal_schema_migrates_atomic_charter_rotation_tables() -> TestResult {
-    let mut connection = rusqlite::Connection::open_in_memory()?;
-    initialize_fiscal_schema(&mut connection)?;
-    connection.execute(
-        "UPDATE chio_store_schema_versions SET version = 4 WHERE store_key = 'fiscal'",
-        [],
-    )?;
-    connection.execute_batch(
-        "DROP TRIGGER fiscal_staged_rotation_schedules_no_delete;
-         DROP TRIGGER fiscal_staged_rotation_schedules_immutable;
-         DROP TRIGGER fiscal_staged_rotation_mutations_no_delete;
-         DROP TRIGGER fiscal_staged_rotation_mutations_immutable;
-         DROP TABLE fiscal_staged_rotation_schedules;
-         DROP TABLE fiscal_staged_rotation_mutations;",
-    )?;
-
-    initialize_fiscal_schema(&mut connection)?;
-
-    let tables: i64 = connection.query_row(
-        "SELECT COUNT(*) FROM sqlite_schema WHERE type = 'table' AND name IN ('fiscal_staged_rotation_mutations', 'fiscal_staged_rotation_schedules')",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(tables, 2);
-    Ok(())
-}
-
-#[test]
-fn fiscal_schema_migrates_durable_admission_sequence() -> TestResult {
-    let mut connection = rusqlite::Connection::open_in_memory()?;
-    initialize_fiscal_schema(&mut connection)?;
-    connection.execute(
-        "UPDATE chio_store_schema_versions SET version = 5 WHERE store_key = 'fiscal'",
-        [],
-    )?;
-    connection.execute("DROP TABLE fiscal_admission_sequence", [])?;
-
-    initialize_fiscal_schema(&mut connection)?;
-
-    assert_eq!(
-        connection.query_row(
-            "SELECT current_sequence FROM fiscal_admission_sequence WHERE singleton = 1",
-            [],
-            |row| row.get::<_, i64>(0),
-        )?,
-        0
-    );
+    assert_eq!(version, 0);
     Ok(())
 }
 

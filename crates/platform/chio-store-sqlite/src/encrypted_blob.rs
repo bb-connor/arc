@@ -363,14 +363,13 @@ pub struct SqliteEncryptedBlobStore {
     pool: Pool<SqliteConnectionManager>,
 }
 
-/// Encrypted-blob-store schema revision. Bump on every schema-affecting change.
-const ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Encrypted-blob-store schema version; a database stamped otherwise is refused.
+const ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const ENCRYPTED_BLOB_STORE_SCHEMA_KEY: &str = "encrypted_blob";
-/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
-/// encrypted-blob database rather than reject it as foreign.
-const ENCRYPTED_BLOB_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
+/// Tables that identify a populated encrypted-blob database as this store's.
+const ENCRYPTED_BLOB_STORE_ANCHOR_TABLES: &[&str] =
     &["chio_encrypted_blobs", "security_transitions"];
 
 impl SqliteEncryptedBlobStore {
@@ -425,11 +424,11 @@ impl SqliteEncryptedBlobStore {
 
     fn run_migrations(&self) -> Result<(), BlobStoreError> {
         let conn = self.pool.get()?;
-        crate::check_schema_version(
+        crate::check_current_schema(
             &conn,
             ENCRYPTED_BLOB_STORE_SCHEMA_KEY,
             ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION,
-            ENCRYPTED_BLOB_STORE_LEGACY_ANCHOR_TABLES,
+            ENCRYPTED_BLOB_STORE_ANCHOR_TABLES,
         )
         .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?;
         conn.execute_batch(

@@ -1118,7 +1118,13 @@ fn legacy_compaction_refuses_unsupported_replay_profile() {
     assert!(blob_state(&fixture, outcome.raw_output_digest().as_str()).1);
     let summary = fixture
         .outcomes
-        .compact_retained_invocation_blobs(cutoff, &fixture.fence, cutoff)
+        .compact_retained_invocation_blobs_page_with_limits(
+            cutoff,
+            &fixture.fence,
+            cutoff,
+            None,
+            ToolOutcomeCompactionLimits::default(),
+        )
         .expect("legacy bounded pass");
     assert_eq!(
         summary.compacted, 0,
@@ -1160,7 +1166,13 @@ fn legacy_compaction_obeys_a_bounded_page_instead_of_global_erasure() {
     assert_eq!(eligible,65,"all65 distinct completed raw envelopes must really be past the cutoff before the erase attempt");
     let summary = fixture
         .outcomes
-        .compact_retained_invocation_blobs(cutoff, &fixture.fence, cutoff)
+        .compact_retained_invocation_blobs_page_with_limits(
+            cutoff,
+            &fixture.fence,
+            cutoff,
+            None,
+            ToolOutcomeCompactionLimits::default(),
+        )
         .expect("legacy pass");
     assert!(
         summary.compacted > 0,
@@ -1193,7 +1205,13 @@ fn compaction_clears_a_terminal_blob_and_reports_compacted_reads() {
 
     let summary = fixture
         .outcomes
-        .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 200)
+        .compact_retained_invocation_blobs_page_with_limits(
+            begun_at + 100,
+            &fixture.fence,
+            begun_at + 200,
+            None,
+            ToolOutcomeCompactionLimits::default(),
+        )
         .expect("compact terminal blob");
     assert_eq!(summary.compacted, 1);
     assert_eq!(summary.retained_live, 0);
@@ -1223,7 +1241,13 @@ fn compaction_clears_a_terminal_blob_and_reports_compacted_reads() {
     // A second pass is idempotent: the payload is already cleared.
     let repeat = fixture
         .outcomes
-        .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 201)
+        .compact_retained_invocation_blobs_page_with_limits(
+            begun_at + 100,
+            &fixture.fence,
+            begun_at + 201,
+            None,
+            ToolOutcomeCompactionLimits::default(),
+        )
         .expect("second compaction pass");
     assert_eq!(repeat.compacted, 0);
     assert_eq!(repeat.retained_live, 0);
@@ -1249,7 +1273,13 @@ fn reinserting_verified_bytes_rehydrates_a_compacted_blob() {
 
     fixture
         .outcomes
-        .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 200)
+        .compact_retained_invocation_blobs_page_with_limits(
+            begun_at + 100,
+            &fixture.fence,
+            begun_at + 200,
+            None,
+            ToolOutcomeCompactionLimits::default(),
+        )
         .expect("compact terminal blob");
     assert!(!blob_state(&fixture, &digest).1, "blob starts compacted");
 
@@ -1296,7 +1326,13 @@ fn compaction_is_refused_while_an_owning_operation_is_live() {
 
     let summary = fixture
         .outcomes
-        .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 200)
+        .compact_retained_invocation_blobs_page_with_limits(
+            begun_at + 100,
+            &fixture.fence,
+            begun_at + 200,
+            None,
+            ToolOutcomeCompactionLimits::default(),
+        )
         .expect("compaction pass over a live operation");
     assert_eq!(summary.compacted, 0, "a live operation is never compacted");
     assert_eq!(summary.retained_live, 1);
@@ -1325,7 +1361,13 @@ fn compaction_respects_the_retention_cutoff() {
     // The injected authority clock fixes the blob's real recording time.
     let early = fixture
         .outcomes
-        .compact_retained_invocation_blobs(begun_at - 1, &fixture.fence, begun_at + 200)
+        .compact_retained_invocation_blobs_page_with_limits(
+            begun_at - 1,
+            &fixture.fence,
+            begun_at + 200,
+            None,
+            ToolOutcomeCompactionLimits::default(),
+        )
         .expect("compaction below the cutoff");
     assert_eq!(
         early.compacted, 0,
@@ -1339,7 +1381,13 @@ fn compaction_respects_the_retention_cutoff() {
 
     let due = fixture
         .outcomes
-        .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 201)
+        .compact_retained_invocation_blobs_page_with_limits(
+            begun_at + 100,
+            &fixture.fence,
+            begun_at + 201,
+            None,
+            ToolOutcomeCompactionLimits::default(),
+        )
         .expect("compaction at the cutoff");
     assert_eq!(due.compacted, 1, "a payload past the cutoff is compacted");
     assert!(
