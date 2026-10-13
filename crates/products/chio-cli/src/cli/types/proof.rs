@@ -217,6 +217,17 @@ pub(crate) enum ProofFixtureCommands {
         #[arg(long, value_name = "DIR")]
         out: PathBuf,
     },
+
+    /// Regenerate every catalog fixture in place under the fixed fixture seeds.
+    Regenerate {
+        /// Proof fixture root holding catalog.json.
+        #[arg(long, value_name = "DIR", default_value = "fixtures/proof-room")]
+        root: PathBuf,
+
+        /// Fail instead of writing when a fixture would change.
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
