@@ -31,7 +31,7 @@ CANDIDATE_UID = 65532
 CANDIDATE_GID = 65532
 VERIFIER_UID = 65533
 VERIFIER_GID = 65533
-TRUSTED_STATE_DIRECTORY_PREFIX = ".chio-security-adversarial-evidence.state.v2."
+TRUSTED_STATE_DIRECTORY_PREFIX = ".chio-security-adversarial-evidence.state.v1."
 SOURCE = Path("/source")
 LINUX_CAMPAIGNS = (
     "broker_plaintext_custody",

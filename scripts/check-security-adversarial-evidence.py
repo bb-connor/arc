@@ -1252,10 +1252,10 @@ def render_threat_aggregate_replacements(
 
 # Trusted refresh state is isolated from the repository.
 # Repository-local transaction state is rejected.
-STATE_DIRECTORY_PREFIX = ".chio-security-adversarial-evidence.state.v2."
+STATE_DIRECTORY_PREFIX = ".chio-security-adversarial-evidence.state.v1."
 TRANSACTION_DIRECTORY = "refresh-transaction"
 LOCK_DIRECTORY = "refresh.lock"
-TRANSACTION_SCHEMA = "chio.security-adversarial-refresh-transaction.v2"
+TRANSACTION_SCHEMA = "chio.security-adversarial-refresh-transaction.v1"
 
 
 @dataclass(frozen=True)
