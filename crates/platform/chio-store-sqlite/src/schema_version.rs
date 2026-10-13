@@ -67,16 +67,25 @@ pub enum SchemaState {
 
 /// Validate the stamp of a store that has exactly one schema.
 ///
-/// The identity checks match [`check_schema_version`]. A database stamped at any
-/// version other than `current_version` is refused:
-/// [`SchemaVersionError::StaleSchema`] when older and
-/// [`SchemaVersionError::FutureSchema`] when newer.
+/// An unstamped (`application_id == 0`) database is accepted only when it has no
+/// user tables; populated, it is refused as
+/// [`SchemaVersionError::ForeignDatabase`]. The remaining identity checks match
+/// [`check_schema_version`]. A database stamped at any version other than
+/// `current_version` is refused: [`SchemaVersionError::StaleSchema`] when older
+/// and [`SchemaVersionError::FutureSchema`] when newer.
 pub fn check_current_schema(
     conn: &Connection,
     store_key: &str,
     current_version: i32,
     anchor_tables: &[&str],
 ) -> Result<SchemaState, SchemaVersionError> {
+    let app_id: i32 = conn.query_row("PRAGMA application_id", [], |row| row.get(0))?;
+    if app_id == 0 && user_table_count(conn)? != 0 {
+        return Err(SchemaVersionError::ForeignDatabase {
+            found: app_id,
+            expected: CHIO_SQLITE_APPLICATION_ID,
+        });
+    }
     check_store_identity(conn, anchor_tables)?;
     match read_store_schema_version(conn, store_key)? {
         None => Ok(SchemaState::Unstamped),
@@ -197,12 +206,7 @@ fn database_belongs_to_store(
     conn: &Connection,
     legacy_tables: &[&str],
 ) -> Result<bool, SchemaVersionError> {
-    let user_table_count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
-        [],
-        |row| row.get(0),
-    )?;
-    if user_table_count == 0 {
+    if user_table_count(conn)? == 0 {
         return Ok(true);
     }
     for table in legacy_tables {
@@ -216,6 +220,14 @@ fn database_belongs_to_store(
         }
     }
     Ok(false)
+}
+
+fn user_table_count(conn: &Connection) -> Result<i64, SchemaVersionError> {
+    Ok(conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+        [],
+        |row| row.get(0),
+    )?)
 }
 
 /// Record this store's schema revision in keyed metadata after migrations run.
@@ -417,6 +429,24 @@ mod tests {
             })
         ));
         assert_eq!(read_store_schema_version(&conn, STORE_KEY)?, Some(2));
+        Ok(())
+    }
+
+    #[test]
+    fn current_schema_refuses_an_unstamped_populated_database(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch("CREATE TABLE chio_tool_receipts (receipt_id TEXT PRIMARY KEY);")?;
+        let error = check_current_schema(&conn, STORE_KEY, 1, &["chio_tool_receipts"]);
+        assert!(matches!(
+            error,
+            Err(SchemaVersionError::ForeignDatabase {
+                found: 0,
+                expected: CHIO_SQLITE_APPLICATION_ID
+            })
+        ));
+        let app_id: i32 = conn.query_row("PRAGMA application_id", [], |r| r.get(0))?;
+        assert_eq!(app_id, 0, "a refused database is not stamped");
         Ok(())
     }
 
