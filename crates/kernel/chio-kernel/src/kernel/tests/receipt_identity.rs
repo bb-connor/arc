@@ -26,7 +26,13 @@ fn fixture() -> (ChioKernel, ToolCallRequest, Arc<AtomicU64>) {
 
 #[test]
 fn caller_cannot_supply_receipt_namespace_or_disposition() {
-    for key in ["receipt_context", "chio_runtime"] {
+    for (key, purpose) in [
+        ("receipt_context", "kernel-derived receipts"),
+        (
+            "chio_runtime",
+            "kernel-derived runtime admission reservations",
+        ),
+    ] {
         let (kernel, request, invocations) = fixture();
         let result = kernel.evaluate_tool_call_blocking_with_metadata(
             &request,
@@ -34,7 +40,11 @@ fn caller_cannot_supply_receipt_namespace_or_disposition() {
                 "request_namespace_digest": "caller-selected", "identity_disposition": "reusable"
             }})),
         );
-        assert!(result.is_err(), "caller metadata key {key} must be refused");
+        assert!(matches!(
+            result,
+            Err(KernelError::InvalidReceiptMetadata(reason))
+                if reason == format!("{key} is reserved for {purpose}")
+        ));
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
         assert!(kernel.receipt_log().is_empty());
     }

@@ -4,7 +4,7 @@ use std::os::unix::fs::PermissionsExt as _;
 use super::open_trusted_unix_directory_chain;
 use super::{
     open_durable_sqlite_file, validate_custody_sensitive_file_security_values,
-    validate_trusted_file_security_values, validate_trusted_parent_security,
+    validate_trusted_file_security_values, validate_trusted_parent_security, KeyringError,
 };
 
 fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
@@ -73,13 +73,33 @@ fn trusted_file_policy_rejects_group_or_world_access_foreign_owner_links_and_acl
         0o100640, 0o100620, 0o100610, 0o100604, 0o100602, 0o100601, 0o100644, 0o100666,
     ] {
         assert!(
-            validate_trusted_file_security_values(501, 501, mode, 1, false).is_err(),
+            matches!(
+                validate_trusted_file_security_values(501, 501, mode, 1, false),
+                Err(KeyringError::StateInvariant(
+                    "key-log database file must have trusted ownership, no untrusted write access or ACL, and one hard link"
+                ))
+            ),
             "mode {mode:o} must be refused"
         );
     }
-    assert!(validate_trusted_file_security_values(502, 501, 0o100600, 1, false).is_err());
-    assert!(validate_trusted_file_security_values(501, 501, 0o100600, 2, false).is_err());
-    assert!(validate_trusted_file_security_values(501, 501, 0o100600, 1, true).is_err());
+    assert!(matches!(
+        validate_trusted_file_security_values(502, 501, 0o100600, 1, false),
+        Err(KeyringError::StateInvariant(
+            "key-log database file must have trusted ownership, no untrusted write access or ACL, and one hard link"
+        ))
+    ));
+    assert!(matches!(
+        validate_trusted_file_security_values(501, 501, 0o100600, 2, false),
+        Err(KeyringError::StateInvariant(
+            "key-log database file must have trusted ownership, no untrusted write access or ACL, and one hard link"
+        ))
+    ));
+    assert!(matches!(
+        validate_trusted_file_security_values(501, 501, 0o100600, 1, true),
+        Err(KeyringError::StateInvariant(
+            "key-log database file must have trusted ownership, no untrusted write access or ACL, and one hard link"
+        ))
+    ));
 }
 
 #[test]
@@ -95,7 +115,12 @@ fn retained_sqlite_descriptor_rejects_group_or_world_access_to_the_database_file
     for mode in [0o640, 0o604] {
         std::fs::set_permissions(&database, std::fs::Permissions::from_mode(mode))?;
         assert!(
-            retained.validate().is_err(),
+            matches!(
+                retained.validate(),
+                Err(KeyringError::StateInvariant(
+                    "key-log database file must have trusted ownership, no untrusted write access or ACL, and one hard link"
+                ))
+            ),
             "mode {mode:o} must be refused"
         );
     }
