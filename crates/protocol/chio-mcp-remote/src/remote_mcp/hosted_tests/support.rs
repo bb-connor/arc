@@ -484,6 +484,13 @@ impl TestServer {
 
     #[allow(dead_code)]
     pub fn post_admin_session_shutdown(&self, session_id: &str) -> Response {
+        self.try_post_admin_session_shutdown(session_id)
+            .expect("send admin session shutdown request")
+    }
+
+    /// For cleanup in `Drop`, where a panic during unwinding aborts the
+    /// whole test binary.
+    pub fn try_post_admin_session_shutdown(&self, session_id: &str) -> reqwest::Result<Response> {
         self.client
             .post(format!(
                 "{}/admin/sessions/{session_id}/shutdown",
@@ -491,7 +498,6 @@ impl TestServer {
             ))
             .header(AUTHORIZATION, format!("Bearer {}", self.admin_token))
             .send()
-            .expect("send admin session shutdown request")
     }
 
     pub fn wait_for_session_state(&self, session_id: &str, expected_state: &str) -> Value {
