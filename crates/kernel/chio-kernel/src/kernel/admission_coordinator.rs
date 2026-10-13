@@ -608,7 +608,7 @@ impl ChioKernel {
                     .iter()
                     .any(|matching| matching.grant.dpop_required == Some(true));
             // Keep coverage, store requirements and retention on one decision.
-            // A selected authority cannot enter an unbound legacy path.
+            // A selected authority requires a bound admission path.
             let requires_authority_admission = native_security_selected
                 || operation_owned_runtime
                 || operation_owned_approval
