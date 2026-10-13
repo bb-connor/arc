@@ -28,7 +28,7 @@ use chio_kernel::admission_operation::{
     AdmissionRequestBindingV1, AuthenticatedRequestNamespace, ProviderAttemptBindingV1,
     QualifiedAdmissionOperationStoreExt, SideEffectClass,
 };
-use chio_kernel::ReceiptStore;
+use chio_kernel::{QualifiedAdmissionProjectionStore, ReceiptStore};
 use chio_store_sqlite::{
     SqliteAdmissionOperationStore, SqliteAuthorityStore, SqliteEconomicStateCache,
     SqliteServingOwnerError,
