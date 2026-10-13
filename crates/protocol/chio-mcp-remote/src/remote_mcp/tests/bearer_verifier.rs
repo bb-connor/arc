@@ -905,3 +905,29 @@ async fn introspection_bearer_verifier_rejects_missing_or_mismatched_issuer() {
         );
     }
 }
+
+#[test]
+fn local_authorization_server_rejects_subject_token_without_exp() {
+    let server = test_local_authorization_server();
+    let subject_token = sign_jwt(
+        &server.signing_key,
+        &json!({"iss": server.issuer, "aud": server.default_audience, "sub": "operator",
+            "scope": "mcp:invoke", "client_id": "client-abc"}),
+    );
+    let form: TokenRequestForm = serde_json::from_value(json!({
+        "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+        "subject_token": subject_token,
+        "subject_token_type": "urn:ietf:params:oauth:token-type:access_token",
+    }))
+    .expect("token exchange form");
+    let response = server
+        .exchange_subject_token((&empty_header_map()).into(), form)
+        .expect_err("subject token without exp must be refused");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let cause = response
+        .extensions()
+        .get::<Arc<OAuthRejection>>()
+        .expect("local OAuth cause");
+    assert_eq!(cause.kind, OAuthError::InvalidGrant);
+    assert_eq!(cause.local_detail(), "subject token has no exp");
+}
