@@ -12,6 +12,11 @@ not establish that any historical release ran through that pipeline, or that a
 candidate is published or accepted. An older release without both sidecars fails
 verification; do not install it by bypassing verification.
 
+No signed release is published yet. The first will be a `0.2.0-alpha.N`
+preview, a GitHub prerelease selected by its exact tag. The deprecated `v0.1.0`
+release has no signing sidecars and always fails this policy. Never resolve a
+tag through `releases/latest`, which points at `v0.1.0`.
+
 ## Exact signer policy
 
 Each artifact family uses one workflow and the **exact tag selected by the
@@ -23,10 +28,10 @@ consumer**, including prerelease and build metadata when present:
 | PyPI wheel or sdist | `release-pypi.yml` | `py/v<semver>` or `py/<slug>-v<semver>` |
 | npm tarball | `release-npm.yml` | `ts/v<semver>` or `ts/<slug>-v<semver>` |
 
-For example, the native tag `v0.1.1-rc.1` requires this literal certificate SAN:
+For example, the native tag `v0.2.0-alpha.1` requires this literal certificate SAN:
 
 ```text
-https://github.com/bb-connor/arc/.github/workflows/release-binaries.yml@refs/tags/v0.1.1-rc.1
+https://github.com/bb-connor/arc/.github/workflows/release-binaries.yml@refs/tags/v0.2.0-alpha.1
 ```
 
 A certificate for another tag, source commit, branch, owner, repository or
@@ -78,7 +83,7 @@ To inspect the literal identity before verification:
 
 ```bash
 python3 scripts/verify-release-identity.py identity \
-  --channel binaries --tag v0.1.1-rc.1
+  --channel binaries --tag v0.2.0-alpha.1
 ```
 
 ## Download examples
@@ -93,9 +98,9 @@ before fetching. Each example requires `SOURCE_SHA` to be set to that commit.
 ```bash
 CHIO_CHECKOUT="$PWD"
 CHANNEL=binaries
-TAG=v0.1.1-rc.1
+TAG=v0.2.0-alpha.1
 : "${SOURCE_SHA:?Set the independently accepted full source commit}"
-ARTIFACT=chio-0.1.1-rc.1-x86_64-unknown-linux-gnu.tar.gz
+ARTIFACT=chio-0.2.0-alpha.1-x86_64-unknown-linux-gnu.tar.gz
 
 gh release download "$TAG" --repo bb-connor/arc \
   --pattern "$ARTIFACT" --pattern "${ARTIFACT}.sig" --pattern "${ARTIFACT}.pem"
