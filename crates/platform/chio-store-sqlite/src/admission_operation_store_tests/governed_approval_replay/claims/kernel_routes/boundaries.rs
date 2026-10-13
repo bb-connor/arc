@@ -110,14 +110,22 @@ async fn dropped_evaluation_releases_only_before_the_durable_effect_boundary() -
                 GovernedApprovalClaimDisposition::ReleasedBeforeDispatch
             }
         );
-        assert_eq!(
-            operation.state(),
-            if after_dispatch {
+        if after_dispatch {
+            assert_eq!(
+                operation.state(),
+                AdmissionOperationState::DispatchCommitted
+            );
+            assert_eq!(route.kernel.reconcile_recoverable_admissions()?, 1);
+            assert_eq!(
+                route.history(&request)?.0.state(),
                 AdmissionOperationState::OutcomeUnknownAfterDispatch
-            } else {
+            );
+        } else {
+            assert_eq!(
+                operation.state(),
                 AdmissionOperationState::CompensatedBeforeDispatch
-            }
-        );
+            );
+        }
         assert_eq!(
             route.calls.load(Ordering::SeqCst),
             usize::from(after_dispatch)

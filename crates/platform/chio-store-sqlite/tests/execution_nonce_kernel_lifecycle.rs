@@ -432,6 +432,8 @@ fn dropped_execution_after_dispatch_commit_never_redispatches() -> TestResult {
     tokio_runtime.shutdown_timeout(std::time::Duration::from_secs(5));
 
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    assert_state(&fixture, &request, "dispatch_committed")?;
+    assert_eq!(runtime.kernel.reconcile_recoverable_admissions()?, 1);
     assert_state(&fixture, &request, "outcome_unknown_after_dispatch")?;
     assert_eq!(
         grant_quota(&runtime, &request)?,
@@ -440,10 +442,10 @@ fn dropped_execution_after_dispatch_commit_never_redispatches() -> TestResult {
     );
     let retry = execute(&runtime, &request, &nonce)?;
     assert_eq!(retry.verdict, Verdict::Deny, "{:?}", retry.reason);
-    assert!(retry
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("OutcomeUnknownAfterDispatch")));
+    assert_eq!(
+        retry.reason.as_deref(),
+        Some("dispatch outcome is unknown after recovery")
+    );
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     drop(runtime);
 
