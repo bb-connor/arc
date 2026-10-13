@@ -13,11 +13,11 @@ use crate::XtaskError;
 pub(super) fn harden(root: &Path) -> Result<(), XtaskError> {
     for (file, classes) in [
         (
-            "cage_init_plan_v2_schema.py",
+            "cage_init_plan_v1_schema.py",
             &["AbsoluteCanonicalPath"][..],
         ),
         (
-            "mcp_cage_launch_policy_v2_schema.py",
+            "mcp_cage_launch_policy_v1_schema.py",
             &["AbsoluteCanonicalPath", "EnvironmentVariable"][..],
         ),
         (

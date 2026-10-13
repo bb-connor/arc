@@ -2689,10 +2689,10 @@
       "schemaFile": "spec/schemas/chio-wire/v1/security/cage-fully-enforced-evidence-v1.schema.json"
     },
     {
-      "schema": "chio.cage.init-plan.v2",
+      "schema": "chio.cage.init-plan.v1",
       "artifactKind": "cage_init_plan",
       "introducedBy": "enterprise-security-execution-v1",
-      "schemaFile": "spec/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json"
+      "schemaFile": "spec/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json"
     },
     {
       "schema": "chio.cage.process-exit-evidence.v1",
@@ -2715,10 +2715,10 @@
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/security/tool-manifest-v2.schema.json"
     },
     {
-      "schema": "chio.mcp.cage-launch-policy.v2",
+      "schema": "chio.mcp.cage-launch-policy.v1",
       "artifactKind": "mcp_cage_launch_policy",
       "introducedBy": "enterprise-security-execution-v1",
-      "schemaFile": "spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json"
+      "schemaFile": "spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json"
     },
     {
       "schema": "chio.security-event-body.v1",

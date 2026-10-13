@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json",
   "title": "Chio signed MCP cage launch policy v2",
   "description": "Canonical signed operator policy for a migration-enforced MCP stdio cage launch.",
   "type": "object",
@@ -26,7 +26,7 @@
         "enterprise_migration"
       ],
       "properties": {
-        "schema": { "const": "chio.mcp.cage-launch-policy.v2" },
+        "schema": { "const": "chio.mcp.cage-launch-policy.v1" },
         "signed_manifest": { "$ref": "signed-tool-manifest-v2.schema.json" },
         "registered_public_key": { "$ref": "#/$defs/publicKey" },
         "operator_ceilings": { "$ref": "#/$defs/operatorCeilings" },
@@ -152,7 +152,7 @@
           }
         },
         "execution_identity": {
-          "$ref": "cage-init-plan-v2.schema.json#/$defs/executionIdentity"
+          "$ref": "cage-init-plan-v1.schema.json#/$defs/executionIdentity"
         }
       }
     },

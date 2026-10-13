@@ -1319,204 +1319,204 @@ const (
 	SecurityCageExecTransitionObservedV1RegularFileIdentityKindRegularFile SecurityCageExecTransitionObservedV1RegularFileIdentityKind = "regular_file"
 )
 
-// Defines values for SecurityCageInitPlanV2CompilerVersion.
+// Defines values for SecurityCageInitPlanV1CompilerVersion.
 const (
-	SecurityCageInitPlanV2CompilerVersionChioCageCompilerV2 SecurityCageInitPlanV2CompilerVersion = "chio-cage-compiler.v2"
+	SecurityCageInitPlanV1CompilerVersionChioCageCompilerV2 SecurityCageInitPlanV1CompilerVersion = "chio-cage-compiler.v1"
 )
 
-// Defines values for SecurityCageInitPlanV2HelperFdSlot.
+// Defines values for SecurityCageInitPlanV1HelperFdSlot.
 const (
-	SecurityCageInitPlanV2HelperFdSlotN5 SecurityCageInitPlanV2HelperFdSlot = 5
+	SecurityCageInitPlanV1HelperFdSlotN5 SecurityCageInitPlanV1HelperFdSlot = 5
 )
 
-// Defines values for SecurityCageInitPlanV2PlanFdSlot.
+// Defines values for SecurityCageInitPlanV1PlanFdSlot.
 const (
-	SecurityCageInitPlanV2PlanFdSlotN3 SecurityCageInitPlanV2PlanFdSlot = 3
+	SecurityCageInitPlanV1PlanFdSlotN3 SecurityCageInitPlanV1PlanFdSlot = 3
 )
 
-// Defines values for SecurityCageInitPlanV2Schema.
+// Defines values for SecurityCageInitPlanV1Schema.
 const (
-	SecurityCageInitPlanV2SchemaChioCageInitPlanV2 SecurityCageInitPlanV2Schema = "chio.cage.init-plan.v2"
+	SecurityCageInitPlanV1SchemaChioCageInitPlanV1 SecurityCageInitPlanV1Schema = "chio.cage.init-plan.v1"
 )
 
-// Defines values for SecurityCageInitPlanV2StatusFdSlot.
+// Defines values for SecurityCageInitPlanV1StatusFdSlot.
 const (
-	SecurityCageInitPlanV2StatusFdSlotN4 SecurityCageInitPlanV2StatusFdSlot = 4
+	SecurityCageInitPlanV1StatusFdSlotN4 SecurityCageInitPlanV1StatusFdSlot = 4
 )
 
-// Defines values for SecurityCageInitPlanV2TargetFdSlot.
+// Defines values for SecurityCageInitPlanV1TargetFdSlot.
 const (
-	SecurityCageInitPlanV2TargetFdSlotN255 SecurityCageInitPlanV2TargetFdSlot = 255
+	SecurityCageInitPlanV1TargetFdSlotN255 SecurityCageInitPlanV1TargetFdSlot = 255
 )
 
-// Defines values for SecurityCageInitPlanV2WorkingDirectoryFdSlot.
+// Defines values for SecurityCageInitPlanV1WorkingDirectoryFdSlot.
 const (
-	SecurityCageInitPlanV2WorkingDirectoryFdSlotN6 SecurityCageInitPlanV2WorkingDirectoryFdSlot = 6
+	SecurityCageInitPlanV1WorkingDirectoryFdSlotN6 SecurityCageInitPlanV1WorkingDirectoryFdSlot = 6
 )
 
-// Defines values for SecurityCageInitPlanV2DirectoryIdentityKind.
+// Defines values for SecurityCageInitPlanV1DirectoryIdentityKind.
 const (
-	SecurityCageInitPlanV2DirectoryIdentityKindDirectory SecurityCageInitPlanV2DirectoryIdentityKind = "directory"
+	SecurityCageInitPlanV1DirectoryIdentityKindDirectory SecurityCageInitPlanV1DirectoryIdentityKind = "directory"
 )
 
-// Defines values for SecurityCageInitPlanV2FdEntry0Slot.
+// Defines values for SecurityCageInitPlanV1FdEntry0Slot.
 const (
-	SecurityCageInitPlanV2FdEntry0SlotN5 SecurityCageInitPlanV2FdEntry0Slot = 5
+	SecurityCageInitPlanV1FdEntry0SlotN5 SecurityCageInitPlanV1FdEntry0Slot = 5
 )
 
-// Defines values for SecurityCageInitPlanV2FdEntry1Slot.
+// Defines values for SecurityCageInitPlanV1FdEntry1Slot.
 const (
-	SecurityCageInitPlanV2FdEntry1SlotN255 SecurityCageInitPlanV2FdEntry1Slot = 255
+	SecurityCageInitPlanV1FdEntry1SlotN255 SecurityCageInitPlanV1FdEntry1Slot = 255
 )
 
-// Defines values for SecurityCageInitPlanV2FdEntry2Slot.
+// Defines values for SecurityCageInitPlanV1FdEntry2Slot.
 const (
-	SecurityCageInitPlanV2FdEntry2SlotN6 SecurityCageInitPlanV2FdEntry2Slot = 6
+	SecurityCageInitPlanV1FdEntry2SlotN6 SecurityCageInitPlanV1FdEntry2Slot = 6
 )
 
-// Defines values for SecurityCageInitPlanV2FdEntry3Slot.
+// Defines values for SecurityCageInitPlanV1FdEntry3Slot.
 const (
-	SecurityCageInitPlanV2FdEntry3SlotN7 SecurityCageInitPlanV2FdEntry3Slot = 7
+	SecurityCageInitPlanV1FdEntry3SlotN7 SecurityCageInitPlanV1FdEntry3Slot = 7
 )
 
-// Defines values for SecurityCageInitPlanV2FdEntry4Slot.
+// Defines values for SecurityCageInitPlanV1FdEntry4Slot.
 const (
-	SecurityCageInitPlanV2FdEntry4SlotN9 SecurityCageInitPlanV2FdEntry4Slot = 9
+	SecurityCageInitPlanV1FdEntry4SlotN9 SecurityCageInitPlanV1FdEntry4Slot = 9
 )
 
-// Defines values for SecurityCageInitPlanV2FdEntry5Slot.
+// Defines values for SecurityCageInitPlanV1FdEntry5Slot.
 const (
-	SecurityCageInitPlanV2FdEntry5SlotN10 SecurityCageInitPlanV2FdEntry5Slot = 10
+	SecurityCageInitPlanV1FdEntry5SlotN10 SecurityCageInitPlanV1FdEntry5Slot = 10
 )
 
-// Defines values for SecurityCageInitPlanV2FdEntry6PurposeKind.
+// Defines values for SecurityCageInitPlanV1FdEntry6PurposeKind.
 const (
-	SecurityCageInitPlanV2FdEntry6PurposeKindRuntimeFile SecurityCageInitPlanV2FdEntry6PurposeKind = "runtime_file"
+	SecurityCageInitPlanV1FdEntry6PurposeKindRuntimeFile SecurityCageInitPlanV1FdEntry6PurposeKind = "runtime_file"
 )
 
-// Defines values for SecurityCageInitPlanV2FdEntry7PurposeKind.
+// Defines values for SecurityCageInitPlanV1FdEntry7PurposeKind.
 const (
-	SecurityCageInitPlanV2FdEntry7PurposeKindReadGrant SecurityCageInitPlanV2FdEntry7PurposeKind = "read_grant"
+	SecurityCageInitPlanV1FdEntry7PurposeKindReadGrant SecurityCageInitPlanV1FdEntry7PurposeKind = "read_grant"
 )
 
-// Defines values for SecurityCageInitPlanV2FdEntry8PurposeKind.
+// Defines values for SecurityCageInitPlanV1FdEntry8PurposeKind.
 const (
-	SecurityCageInitPlanV2FdEntry8PurposeKindWriteGrant SecurityCageInitPlanV2FdEntry8PurposeKind = "write_grant"
+	SecurityCageInitPlanV1FdEntry8PurposeKindWriteGrant SecurityCageInitPlanV1FdEntry8PurposeKind = "write_grant"
 )
 
-// Defines values for SecurityCageInitPlanV2FdEntry9Slot.
+// Defines values for SecurityCageInitPlanV1FdEntry9Slot.
 const (
-	SecurityCageInitPlanV2FdEntry9SlotN8 SecurityCageInitPlanV2FdEntry9Slot = 8
+	SecurityCageInitPlanV1FdEntry9SlotN8 SecurityCageInitPlanV1FdEntry9Slot = 8
 )
 
-// Defines values for SecurityCageInitPlanV2FileIdentityKind.
+// Defines values for SecurityCageInitPlanV1FileIdentityKind.
 const (
-	SecurityCageInitPlanV2FileIdentityKindDirectory   SecurityCageInitPlanV2FileIdentityKind = "directory"
-	SecurityCageInitPlanV2FileIdentityKindRegularFile SecurityCageInitPlanV2FileIdentityKind = "regular_file"
-	SecurityCageInitPlanV2FileIdentityKindUnixSocket  SecurityCageInitPlanV2FileIdentityKind = "unix_socket"
+	SecurityCageInitPlanV1FileIdentityKindDirectory   SecurityCageInitPlanV1FileIdentityKind = "directory"
+	SecurityCageInitPlanV1FileIdentityKindRegularFile SecurityCageInitPlanV1FileIdentityKind = "regular_file"
+	SecurityCageInitPlanV1FileIdentityKindUnixSocket  SecurityCageInitPlanV1FileIdentityKind = "unix_socket"
 )
 
-// Defines values for SecurityCageInitPlanV2FilesystemGrantAccess.
+// Defines values for SecurityCageInitPlanV1FilesystemGrantAccess.
 const (
-	SecurityCageInitPlanV2FilesystemGrantAccessExecuteRead    SecurityCageInitPlanV2FilesystemGrantAccess = "execute_read"
-	SecurityCageInitPlanV2FilesystemGrantAccessRead           SecurityCageInitPlanV2FilesystemGrantAccess = "read"
-	SecurityCageInitPlanV2FilesystemGrantAccessReadDirectory  SecurityCageInitPlanV2FilesystemGrantAccess = "read_directory"
-	SecurityCageInitPlanV2FilesystemGrantAccessWriteExactFile SecurityCageInitPlanV2FilesystemGrantAccess = "write_exact_file"
+	SecurityCageInitPlanV1FilesystemGrantAccessExecuteRead    SecurityCageInitPlanV1FilesystemGrantAccess = "execute_read"
+	SecurityCageInitPlanV1FilesystemGrantAccessRead           SecurityCageInitPlanV1FilesystemGrantAccess = "read"
+	SecurityCageInitPlanV1FilesystemGrantAccessReadDirectory  SecurityCageInitPlanV1FilesystemGrantAccess = "read_directory"
+	SecurityCageInitPlanV1FilesystemGrantAccessWriteExactFile SecurityCageInitPlanV1FilesystemGrantAccess = "write_exact_file"
 )
 
-// Defines values for SecurityCageInitPlanV2LandlockPlanNetworkMode.
+// Defines values for SecurityCageInitPlanV1LandlockPlanNetworkMode.
 const (
-	SecurityCageInitPlanV2LandlockPlanNetworkModeBlocked SecurityCageInitPlanV2LandlockPlanNetworkMode = "blocked"
+	SecurityCageInitPlanV1LandlockPlanNetworkModeBlocked SecurityCageInitPlanV1LandlockPlanNetworkMode = "blocked"
 )
 
-// Defines values for SecurityCageInitPlanV2PathIdentityKind.
+// Defines values for SecurityCageInitPlanV1PathIdentityKind.
 const (
-	SecurityCageInitPlanV2PathIdentityKindDirectory   SecurityCageInitPlanV2PathIdentityKind = "directory"
-	SecurityCageInitPlanV2PathIdentityKindRegularFile SecurityCageInitPlanV2PathIdentityKind = "regular_file"
+	SecurityCageInitPlanV1PathIdentityKindDirectory   SecurityCageInitPlanV1PathIdentityKind = "directory"
+	SecurityCageInitPlanV1PathIdentityKindRegularFile SecurityCageInitPlanV1PathIdentityKind = "regular_file"
 )
 
-// Defines values for SecurityCageInitPlanV2PurposeBrokerIpcKind.
+// Defines values for SecurityCageInitPlanV1PurposeBrokerIpcKind.
 const (
-	SecurityCageInitPlanV2PurposeBrokerIpcKindBrokerIpc SecurityCageInitPlanV2PurposeBrokerIpcKind = "broker_ipc"
+	SecurityCageInitPlanV1PurposeBrokerIpcKindBrokerIpc SecurityCageInitPlanV1PurposeBrokerIpcKind = "broker_ipc"
 )
 
-// Defines values for SecurityCageInitPlanV2PurposeCageInitHelperKind.
+// Defines values for SecurityCageInitPlanV1PurposeCageInitHelperKind.
 const (
-	SecurityCageInitPlanV2PurposeCageInitHelperKindCageInitHelper SecurityCageInitPlanV2PurposeCageInitHelperKind = "cage_init_helper"
+	SecurityCageInitPlanV1PurposeCageInitHelperKindCageInitHelper SecurityCageInitPlanV1PurposeCageInitHelperKind = "cage_init_helper"
 )
 
-// Defines values for SecurityCageInitPlanV2PurposeIndexedResourceKind.
+// Defines values for SecurityCageInitPlanV1PurposeIndexedResourceKind.
 const (
-	SecurityCageInitPlanV2PurposeIndexedResourceKindReadGrant   SecurityCageInitPlanV2PurposeIndexedResourceKind = "read_grant"
-	SecurityCageInitPlanV2PurposeIndexedResourceKindRuntimeFile SecurityCageInitPlanV2PurposeIndexedResourceKind = "runtime_file"
-	SecurityCageInitPlanV2PurposeIndexedResourceKindWriteGrant  SecurityCageInitPlanV2PurposeIndexedResourceKind = "write_grant"
+	SecurityCageInitPlanV1PurposeIndexedResourceKindReadGrant   SecurityCageInitPlanV1PurposeIndexedResourceKind = "read_grant"
+	SecurityCageInitPlanV1PurposeIndexedResourceKindRuntimeFile SecurityCageInitPlanV1PurposeIndexedResourceKind = "runtime_file"
+	SecurityCageInitPlanV1PurposeIndexedResourceKindWriteGrant  SecurityCageInitPlanV1PurposeIndexedResourceKind = "write_grant"
 )
 
-// Defines values for SecurityCageInitPlanV2PurposeTargetExecutableKind.
+// Defines values for SecurityCageInitPlanV1PurposeTargetExecutableKind.
 const (
-	SecurityCageInitPlanV2PurposeTargetExecutableKindTargetExecutable SecurityCageInitPlanV2PurposeTargetExecutableKind = "target_executable"
+	SecurityCageInitPlanV1PurposeTargetExecutableKindTargetExecutable SecurityCageInitPlanV1PurposeTargetExecutableKind = "target_executable"
 )
 
-// Defines values for SecurityCageInitPlanV2PurposeTargetStderrKind.
+// Defines values for SecurityCageInitPlanV1PurposeTargetStderrKind.
 const (
-	SecurityCageInitPlanV2PurposeTargetStderrKindTargetStderr SecurityCageInitPlanV2PurposeTargetStderrKind = "target_stderr"
+	SecurityCageInitPlanV1PurposeTargetStderrKindTargetStderr SecurityCageInitPlanV1PurposeTargetStderrKind = "target_stderr"
 )
 
-// Defines values for SecurityCageInitPlanV2PurposeTargetStdinKind.
+// Defines values for SecurityCageInitPlanV1PurposeTargetStdinKind.
 const (
-	SecurityCageInitPlanV2PurposeTargetStdinKindTargetStdin SecurityCageInitPlanV2PurposeTargetStdinKind = "target_stdin"
+	SecurityCageInitPlanV1PurposeTargetStdinKindTargetStdin SecurityCageInitPlanV1PurposeTargetStdinKind = "target_stdin"
 )
 
-// Defines values for SecurityCageInitPlanV2PurposeTargetStdoutKind.
+// Defines values for SecurityCageInitPlanV1PurposeTargetStdoutKind.
 const (
-	SecurityCageInitPlanV2PurposeTargetStdoutKindTargetStdout SecurityCageInitPlanV2PurposeTargetStdoutKind = "target_stdout"
+	SecurityCageInitPlanV1PurposeTargetStdoutKindTargetStdout SecurityCageInitPlanV1PurposeTargetStdoutKind = "target_stdout"
 )
 
-// Defines values for SecurityCageInitPlanV2PurposeWorkingDirectoryKind.
+// Defines values for SecurityCageInitPlanV1PurposeWorkingDirectoryKind.
 const (
-	SecurityCageInitPlanV2PurposeWorkingDirectoryKindWorkingDirectory SecurityCageInitPlanV2PurposeWorkingDirectoryKind = "working_directory"
+	SecurityCageInitPlanV1PurposeWorkingDirectoryKindWorkingDirectory SecurityCageInitPlanV1PurposeWorkingDirectoryKind = "working_directory"
 )
 
-// Defines values for SecurityCageInitPlanV2RegularFileIdentityKind.
+// Defines values for SecurityCageInitPlanV1RegularFileIdentityKind.
 const (
-	SecurityCageInitPlanV2RegularFileIdentityKindRegularFile SecurityCageInitPlanV2RegularFileIdentityKind = "regular_file"
+	SecurityCageInitPlanV1RegularFileIdentityKindRegularFile SecurityCageInitPlanV1RegularFileIdentityKind = "regular_file"
 )
 
-// Defines values for SecurityCageInitPlanV2ResourceLimitsNofileHard.
+// Defines values for SecurityCageInitPlanV1ResourceLimitsNofileHard.
 const (
-	SecurityCageInitPlanV2ResourceLimitsNofileHardN192 SecurityCageInitPlanV2ResourceLimitsNofileHard = 192
+	SecurityCageInitPlanV1ResourceLimitsNofileHardN192 SecurityCageInitPlanV1ResourceLimitsNofileHard = 192
 )
 
-// Defines values for SecurityCageInitPlanV2ResourceLimitsNofileSoft.
+// Defines values for SecurityCageInitPlanV1ResourceLimitsNofileSoft.
 const (
-	SecurityCageInitPlanV2ResourceLimitsNofileSoftN192 SecurityCageInitPlanV2ResourceLimitsNofileSoft = 192
+	SecurityCageInitPlanV1ResourceLimitsNofileSoftN192 SecurityCageInitPlanV1ResourceLimitsNofileSoft = 192
 )
 
-// Defines values for SecurityCageInitPlanV2SeccompPlanArchitecture.
+// Defines values for SecurityCageInitPlanV1SeccompPlanArchitecture.
 const (
-	SecurityCageInitPlanV2SeccompPlanArchitectureX8664 SecurityCageInitPlanV2SeccompPlanArchitecture = "x86_64"
+	SecurityCageInitPlanV1SeccompPlanArchitectureX8664 SecurityCageInitPlanV1SeccompPlanArchitecture = "x86_64"
 )
 
-// Defines values for SecurityCageInitPlanV2SeccompPlanDefaultAction.
+// Defines values for SecurityCageInitPlanV1SeccompPlanDefaultAction.
 const (
-	SecurityCageInitPlanV2SeccompPlanDefaultActionKillProcess SecurityCageInitPlanV2SeccompPlanDefaultAction = "kill_process"
+	SecurityCageInitPlanV1SeccompPlanDefaultActionKillProcess SecurityCageInitPlanV1SeccompPlanDefaultAction = "kill_process"
 )
 
-// Defines values for SecurityCageInitPlanV2SeccompPlanProfile.
+// Defines values for SecurityCageInitPlanV1SeccompPlanProfile.
 const (
-	SecurityCageInitPlanV2SeccompPlanProfileBrokeredNativeV1 SecurityCageInitPlanV2SeccompPlanProfile = "brokered_native_v1"
-	SecurityCageInitPlanV2SeccompPlanProfileNativeMinimalV1  SecurityCageInitPlanV2SeccompPlanProfile = "native_minimal_v1"
-	SecurityCageInitPlanV2SeccompPlanProfileNativeStandardV1 SecurityCageInitPlanV2SeccompPlanProfile = "native_standard_v1"
+	SecurityCageInitPlanV1SeccompPlanProfileBrokeredNativeV1 SecurityCageInitPlanV1SeccompPlanProfile = "brokered_native_v1"
+	SecurityCageInitPlanV1SeccompPlanProfileNativeMinimalV1  SecurityCageInitPlanV1SeccompPlanProfile = "native_minimal_v1"
+	SecurityCageInitPlanV1SeccompPlanProfileNativeStandardV1 SecurityCageInitPlanV1SeccompPlanProfile = "native_standard_v1"
 )
 
-// Defines values for SecurityCageInitPlanV2SocketIdentityKind.
+// Defines values for SecurityCageInitPlanV1SocketIdentityKind.
 const (
-	SecurityCageInitPlanV2SocketIdentityKindUnixSocket SecurityCageInitPlanV2SocketIdentityKind = "unix_socket"
+	SecurityCageInitPlanV1SocketIdentityKindUnixSocket SecurityCageInitPlanV1SocketIdentityKind = "unix_socket"
 )
 
-// Defines values for SecurityCageInitPlanV2SyscallArgumentConstraintComparison.
+// Defines values for SecurityCageInitPlanV1SyscallArgumentConstraintComparison.
 const (
-	SecurityCageInitPlanV2SyscallArgumentConstraintComparisonEqual SecurityCageInitPlanV2SyscallArgumentConstraintComparison = "equal"
+	SecurityCageInitPlanV1SyscallArgumentConstraintComparisonEqual SecurityCageInitPlanV1SyscallArgumentConstraintComparison = "equal"
 )
 
 // Defines values for SecurityCageReceiptBodyV1Schema.
@@ -1992,52 +1992,52 @@ const (
 	SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4StateNoRollbackRequired SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State = "no_rollback_required"
 )
 
-// Defines values for SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage.
+// Defines values for SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage.
 const (
-	SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStageDisabled      SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage = "disabled"
-	SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStageEnforced      SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage = "enforced"
-	SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStageLegacyRemoved SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage = "legacy_removed"
-	SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStageShadow        SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage = "shadow"
+	SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStageDisabled      SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage = "disabled"
+	SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStageEnforced      SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage = "enforced"
+	SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStageLegacyRemoved SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage = "legacy_removed"
+	SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStageShadow        SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage = "shadow"
 )
 
-// Defines values for SecurityMcpCageLaunchPolicyV2LimitsNofileHard.
+// Defines values for SecurityMcpCageLaunchPolicyV1LimitsNofileHard.
 const (
-	SecurityMcpCageLaunchPolicyV2LimitsNofileHardN192 SecurityMcpCageLaunchPolicyV2LimitsNofileHard = 192
+	SecurityMcpCageLaunchPolicyV1LimitsNofileHardN192 SecurityMcpCageLaunchPolicyV1LimitsNofileHard = 192
 )
 
-// Defines values for SecurityMcpCageLaunchPolicyV2LimitsNofileSoft.
+// Defines values for SecurityMcpCageLaunchPolicyV1LimitsNofileSoft.
 const (
-	SecurityMcpCageLaunchPolicyV2LimitsNofileSoftN192 SecurityMcpCageLaunchPolicyV2LimitsNofileSoft = 192
+	SecurityMcpCageLaunchPolicyV1LimitsNofileSoftN192 SecurityMcpCageLaunchPolicyV1LimitsNofileSoft = 192
 )
 
-// Defines values for SecurityMcpCageLaunchPolicyV2MigrationKeyControl.
+// Defines values for SecurityMcpCageLaunchPolicyV1MigrationKeyControl.
 const (
-	SecurityMcpCageLaunchPolicyV2MigrationKeyControlCageEnforcement SecurityMcpCageLaunchPolicyV2MigrationKeyControl = "cage_enforcement"
+	SecurityMcpCageLaunchPolicyV1MigrationKeyControlCageEnforcement SecurityMcpCageLaunchPolicyV1MigrationKeyControl = "cage_enforcement"
 )
 
-// Defines values for SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKind.
+// Defines values for SecurityMcpCageLaunchPolicyV1MigrationKeyScopeKind.
 const (
-	SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKindToolServer SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKind = "tool_server"
+	SecurityMcpCageLaunchPolicyV1MigrationKeyScopeKindToolServer SecurityMcpCageLaunchPolicyV1MigrationKeyScopeKind = "tool_server"
 )
 
-// Defines values for SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration.
+// Defines values for SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration.
 const (
-	SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGenerationN0 SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration = 0
-	SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGenerationN1 SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration = 1
-	SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGenerationN2 SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration = 2
-	SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGenerationN3 SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration = 3
+	SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGenerationN0 SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration = 0
+	SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGenerationN1 SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration = 1
+	SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGenerationN2 SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration = 2
+	SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGenerationN3 SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration = 3
 )
 
-// Defines values for SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles.
+// Defines values for SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfiles.
 const (
-	SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfilesBrokeredNativeV1 SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles = "brokered_native_v1"
-	SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfilesNativeMinimalV1  SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles = "native_minimal_v1"
-	SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfilesNativeStandardV1 SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles = "native_standard_v1"
+	SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfilesBrokeredNativeV1 SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfiles = "brokered_native_v1"
+	SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfilesNativeMinimalV1  SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfiles = "native_minimal_v1"
+	SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfilesNativeStandardV1 SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfiles = "native_standard_v1"
 )
 
-// Defines values for SecurityMcpCageLaunchPolicyV2PolicyBodySchema.
+// Defines values for SecurityMcpCageLaunchPolicyV1PolicyBodySchema.
 const (
-	SecurityMcpCageLaunchPolicyV2PolicyBodySchemaChioMcpCageLaunchPolicyV2 SecurityMcpCageLaunchPolicyV2PolicyBodySchema = "chio.mcp.cage-launch-policy.v2"
+	SecurityMcpCageLaunchPolicyV1PolicyBodySchemaChioMcpCageLaunchPolicyV1 SecurityMcpCageLaunchPolicyV1PolicyBodySchema = "chio.mcp.cage-launch-policy.v1"
 )
 
 // Defines values for SecurityResponseCompletionReceiptBodyV1FinalState.
@@ -5576,7 +5576,7 @@ type SecurityCageEnforcementFailureV1Code string
 
 // SecurityCageEnforcementPreparedV1 Evidence emitted after resource limits, full Landlock, and default-deny seccomp are prepared but before the target exec transition is accepted.
 type SecurityCageEnforcementPreparedV1 struct {
-	AppliedExecutionIdentity SecurityCageInitPlanV2ExecutionIdentity                   `json:"applied_execution_identity"`
+	AppliedExecutionIdentity SecurityCageInitPlanV1ExecutionIdentity                   `json:"applied_execution_identity"`
 	FdTableDigest            SecurityCageEnforcementPreparedV1Digest                   `json:"fd_table_digest"`
 	HelperBindingDigest      SecurityCageEnforcementPreparedV1Digest                   `json:"helper_binding_digest"`
 	LandlockAbi              int64                                                     `json:"landlock_abi"`
@@ -5728,465 +5728,465 @@ type SecurityCageFullyEnforcedEvidenceV1 struct {
 	StatusEofObserved bool                              `json:"status_eof_observed"`
 }
 
-// SecurityCageInitPlanV2 Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.
-type SecurityCageInitPlanV2 struct {
-	BrokerAuthenticationDigest SecurityCageInitPlanV2Digest                 `json:"broker_authentication_digest"`
-	CompilerVersion            SecurityCageInitPlanV2CompilerVersion        `json:"compiler_version"`
-	Environment                SecurityCageInitPlanV2Environment            `json:"environment"`
-	ExecutionIdentity          SecurityCageInitPlanV2ExecutionIdentity      `json:"execution_identity"`
-	FdTable                    SecurityCageInitPlanV2FdTable                `json:"fd_table"`
-	HelperFdSlot               SecurityCageInitPlanV2HelperFdSlot           `json:"helper_fd_slot"`
-	Landlock                   SecurityCageInitPlanV2LandlockPlan           `json:"landlock"`
-	ManifestDigest             SecurityCageInitPlanV2Digest                 `json:"manifest_digest"`
-	PlanFdSlot                 SecurityCageInitPlanV2PlanFdSlot             `json:"plan_fd_slot"`
-	ProfileDigest              SecurityCageInitPlanV2Digest                 `json:"profile_digest"`
-	ResourceLimits             SecurityCageInitPlanV2ResourceLimits         `json:"resource_limits"`
-	Schema                     SecurityCageInitPlanV2Schema                 `json:"schema"`
-	Seccomp                    SecurityCageInitPlanV2SeccompPlan            `json:"seccomp"`
-	StatusFdSlot               SecurityCageInitPlanV2StatusFdSlot           `json:"status_fd_slot"`
-	TargetArgv                 SecurityCageInitPlanV2TargetArgv             `json:"target_argv"`
-	TargetFdSlot               SecurityCageInitPlanV2TargetFdSlot           `json:"target_fd_slot"`
-	WorkingDirectoryFdSlot     SecurityCageInitPlanV2WorkingDirectoryFdSlot `json:"working_directory_fd_slot"`
+// SecurityCageInitPlanV1 Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.
+type SecurityCageInitPlanV1 struct {
+	BrokerAuthenticationDigest SecurityCageInitPlanV1Digest                 `json:"broker_authentication_digest"`
+	CompilerVersion            SecurityCageInitPlanV1CompilerVersion        `json:"compiler_version"`
+	Environment                SecurityCageInitPlanV1Environment            `json:"environment"`
+	ExecutionIdentity          SecurityCageInitPlanV1ExecutionIdentity      `json:"execution_identity"`
+	FdTable                    SecurityCageInitPlanV1FdTable                `json:"fd_table"`
+	HelperFdSlot               SecurityCageInitPlanV1HelperFdSlot           `json:"helper_fd_slot"`
+	Landlock                   SecurityCageInitPlanV1LandlockPlan           `json:"landlock"`
+	ManifestDigest             SecurityCageInitPlanV1Digest                 `json:"manifest_digest"`
+	PlanFdSlot                 SecurityCageInitPlanV1PlanFdSlot             `json:"plan_fd_slot"`
+	ProfileDigest              SecurityCageInitPlanV1Digest                 `json:"profile_digest"`
+	ResourceLimits             SecurityCageInitPlanV1ResourceLimits         `json:"resource_limits"`
+	Schema                     SecurityCageInitPlanV1Schema                 `json:"schema"`
+	Seccomp                    SecurityCageInitPlanV1SeccompPlan            `json:"seccomp"`
+	StatusFdSlot               SecurityCageInitPlanV1StatusFdSlot           `json:"status_fd_slot"`
+	TargetArgv                 SecurityCageInitPlanV1TargetArgv             `json:"target_argv"`
+	TargetFdSlot               SecurityCageInitPlanV1TargetFdSlot           `json:"target_fd_slot"`
+	WorkingDirectoryFdSlot     SecurityCageInitPlanV1WorkingDirectoryFdSlot `json:"working_directory_fd_slot"`
 }
 
-// SecurityCageInitPlanV2CompilerVersion defines model for SecurityCageInitPlanV2.CompilerVersion.
-type SecurityCageInitPlanV2CompilerVersion string
+// SecurityCageInitPlanV1CompilerVersion defines model for SecurityCageInitPlanV1.CompilerVersion.
+type SecurityCageInitPlanV1CompilerVersion string
 
-// SecurityCageInitPlanV2HelperFdSlot defines model for SecurityCageInitPlanV2.HelperFdSlot.
-type SecurityCageInitPlanV2HelperFdSlot int64
+// SecurityCageInitPlanV1HelperFdSlot defines model for SecurityCageInitPlanV1.HelperFdSlot.
+type SecurityCageInitPlanV1HelperFdSlot int64
 
-// SecurityCageInitPlanV2PlanFdSlot defines model for SecurityCageInitPlanV2.PlanFdSlot.
-type SecurityCageInitPlanV2PlanFdSlot int64
+// SecurityCageInitPlanV1PlanFdSlot defines model for SecurityCageInitPlanV1.PlanFdSlot.
+type SecurityCageInitPlanV1PlanFdSlot int64
 
-// SecurityCageInitPlanV2Schema defines model for SecurityCageInitPlanV2.Schema.
-type SecurityCageInitPlanV2Schema string
+// SecurityCageInitPlanV1Schema defines model for SecurityCageInitPlanV1.Schema.
+type SecurityCageInitPlanV1Schema string
 
-// SecurityCageInitPlanV2StatusFdSlot defines model for SecurityCageInitPlanV2.StatusFdSlot.
-type SecurityCageInitPlanV2StatusFdSlot int64
+// SecurityCageInitPlanV1StatusFdSlot defines model for SecurityCageInitPlanV1.StatusFdSlot.
+type SecurityCageInitPlanV1StatusFdSlot int64
 
-// SecurityCageInitPlanV2TargetFdSlot defines model for SecurityCageInitPlanV2.TargetFdSlot.
-type SecurityCageInitPlanV2TargetFdSlot int64
+// SecurityCageInitPlanV1TargetFdSlot defines model for SecurityCageInitPlanV1.TargetFdSlot.
+type SecurityCageInitPlanV1TargetFdSlot int64
 
-// SecurityCageInitPlanV2WorkingDirectoryFdSlot defines model for SecurityCageInitPlanV2.WorkingDirectoryFdSlot.
-type SecurityCageInitPlanV2WorkingDirectoryFdSlot int64
+// SecurityCageInitPlanV1WorkingDirectoryFdSlot defines model for SecurityCageInitPlanV1.WorkingDirectoryFdSlot.
+type SecurityCageInitPlanV1WorkingDirectoryFdSlot int64
 
-// SecurityCageInitPlanV2AbsoluteCanonicalPath defines model for SecurityCageInitPlanV2AbsoluteCanonicalPath.
-type SecurityCageInitPlanV2AbsoluteCanonicalPath = string
+// SecurityCageInitPlanV1AbsoluteCanonicalPath defines model for SecurityCageInitPlanV1AbsoluteCanonicalPath.
+type SecurityCageInitPlanV1AbsoluteCanonicalPath = string
 
-// SecurityCageInitPlanV2ArtifactEntry defines model for SecurityCageInitPlanV2ArtifactEntry.
-type SecurityCageInitPlanV2ArtifactEntry struct {
-	BindingDigest      SecurityCageInitPlanV2Digest                `json:"binding_digest"`
+// SecurityCageInitPlanV1ArtifactEntry defines model for SecurityCageInitPlanV1ArtifactEntry.
+type SecurityCageInitPlanV1ArtifactEntry struct {
+	BindingDigest      SecurityCageInitPlanV1Digest                `json:"binding_digest"`
 	BrokerPeerIdentity *interface{}                                `json:"broker_peer_identity"`
 	CloseOnExec        bool                                        `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2FileIdentity          `json:"identity"`
-	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+	Identity           SecurityCageInitPlanV1FileIdentity          `json:"identity"`
+	Path               SecurityCageInitPlanV1AbsoluteCanonicalPath `json:"path"`
 	Purpose            map[string]interface{}                      `json:"purpose"`
 	Slot               int64                                       `json:"slot"`
 }
 
-// SecurityCageInitPlanV2BrokerPeerIdentity defines model for SecurityCageInitPlanV2BrokerPeerIdentity.
-type SecurityCageInitPlanV2BrokerPeerIdentity struct {
+// SecurityCageInitPlanV1BrokerPeerIdentity defines model for SecurityCageInitPlanV1BrokerPeerIdentity.
+type SecurityCageInitPlanV1BrokerPeerIdentity struct {
 	Gid int64 `json:"gid"`
 	Pid int64 `json:"pid"`
 	Uid int64 `json:"uid"`
 }
 
-// SecurityCageInitPlanV2Digest defines model for SecurityCageInitPlanV2Digest.
-type SecurityCageInitPlanV2Digest = string
+// SecurityCageInitPlanV1Digest defines model for SecurityCageInitPlanV1Digest.
+type SecurityCageInitPlanV1Digest = string
 
-// SecurityCageInitPlanV2DirectoryIdentity defines model for SecurityCageInitPlanV2DirectoryIdentity.
-type SecurityCageInitPlanV2DirectoryIdentity struct {
+// SecurityCageInitPlanV1DirectoryIdentity defines model for SecurityCageInitPlanV1DirectoryIdentity.
+type SecurityCageInitPlanV1DirectoryIdentity struct {
 	Device  int64                                       `json:"device"`
 	Gid     int64                                       `json:"gid"`
 	Inode   int64                                       `json:"inode"`
-	Kind    SecurityCageInitPlanV2DirectoryIdentityKind `json:"kind"`
+	Kind    SecurityCageInitPlanV1DirectoryIdentityKind `json:"kind"`
 	Mode    int64                                       `json:"mode"`
 	MountId int64                                       `json:"mount_id"`
 	Uid     int64                                       `json:"uid"`
 }
 
-// SecurityCageInitPlanV2DirectoryIdentityKind defines model for SecurityCageInitPlanV2DirectoryIdentity.Kind.
-type SecurityCageInitPlanV2DirectoryIdentityKind string
+// SecurityCageInitPlanV1DirectoryIdentityKind defines model for SecurityCageInitPlanV1DirectoryIdentity.Kind.
+type SecurityCageInitPlanV1DirectoryIdentityKind string
 
-// SecurityCageInitPlanV2Environment defines model for SecurityCageInitPlanV2Environment.
-type SecurityCageInitPlanV2Environment map[string]string
+// SecurityCageInitPlanV1Environment defines model for SecurityCageInitPlanV1Environment.
+type SecurityCageInitPlanV1Environment map[string]string
 
-// SecurityCageInitPlanV2ExecutionIdentity defines model for SecurityCageInitPlanV2ExecutionIdentity.
-type SecurityCageInitPlanV2ExecutionIdentity struct {
+// SecurityCageInitPlanV1ExecutionIdentity defines model for SecurityCageInitPlanV1ExecutionIdentity.
+type SecurityCageInitPlanV1ExecutionIdentity struct {
 	Gid               int64   `json:"gid"`
 	SupplementaryGids []int64 `json:"supplementary_gids"`
 	Uid               int64   `json:"uid"`
 }
 
-// SecurityCageInitPlanV2FdEntry defines model for SecurityCageInitPlanV2FdEntry.
-type SecurityCageInitPlanV2FdEntry struct {
+// SecurityCageInitPlanV1FdEntry defines model for SecurityCageInitPlanV1FdEntry.
+type SecurityCageInitPlanV1FdEntry struct {
 	union json.RawMessage
 }
 
-// SecurityCageInitPlanV2FdEntry0 defines model for .
-type SecurityCageInitPlanV2FdEntry0 struct {
-	BindingDigest      SecurityCageInitPlanV2Digest                `json:"binding_digest"`
+// SecurityCageInitPlanV1FdEntry0 defines model for .
+type SecurityCageInitPlanV1FdEntry0 struct {
+	BindingDigest      SecurityCageInitPlanV1Digest                `json:"binding_digest"`
 	BrokerPeerIdentity *interface{}                                `json:"broker_peer_identity"`
 	CloseOnExec        bool                                        `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2RegularFileIdentity   `json:"identity"`
-	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
-	Purpose            SecurityCageInitPlanV2PurposeCageInitHelper `json:"purpose"`
-	Slot               SecurityCageInitPlanV2FdEntry0Slot          `json:"slot"`
+	Identity           SecurityCageInitPlanV1RegularFileIdentity   `json:"identity"`
+	Path               SecurityCageInitPlanV1AbsoluteCanonicalPath `json:"path"`
+	Purpose            SecurityCageInitPlanV1PurposeCageInitHelper `json:"purpose"`
+	Slot               SecurityCageInitPlanV1FdEntry0Slot          `json:"slot"`
 }
 
-// SecurityCageInitPlanV2FdEntry0Slot defines model for SecurityCageInitPlanV2FdEntry.0.Slot.
-type SecurityCageInitPlanV2FdEntry0Slot int64
+// SecurityCageInitPlanV1FdEntry0Slot defines model for SecurityCageInitPlanV1FdEntry.0.Slot.
+type SecurityCageInitPlanV1FdEntry0Slot int64
 
-// SecurityCageInitPlanV2FdEntry1 defines model for .
-type SecurityCageInitPlanV2FdEntry1 struct {
-	BindingDigest      SecurityCageInitPlanV2Digest                  `json:"binding_digest"`
+// SecurityCageInitPlanV1FdEntry1 defines model for .
+type SecurityCageInitPlanV1FdEntry1 struct {
+	BindingDigest      SecurityCageInitPlanV1Digest                  `json:"binding_digest"`
 	BrokerPeerIdentity *interface{}                                  `json:"broker_peer_identity"`
 	CloseOnExec        bool                                          `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2RegularFileIdentity     `json:"identity"`
-	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath   `json:"path"`
-	Purpose            SecurityCageInitPlanV2PurposeTargetExecutable `json:"purpose"`
-	Slot               SecurityCageInitPlanV2FdEntry1Slot            `json:"slot"`
+	Identity           SecurityCageInitPlanV1RegularFileIdentity     `json:"identity"`
+	Path               SecurityCageInitPlanV1AbsoluteCanonicalPath   `json:"path"`
+	Purpose            SecurityCageInitPlanV1PurposeTargetExecutable `json:"purpose"`
+	Slot               SecurityCageInitPlanV1FdEntry1Slot            `json:"slot"`
 }
 
-// SecurityCageInitPlanV2FdEntry1Slot defines model for SecurityCageInitPlanV2FdEntry.1.Slot.
-type SecurityCageInitPlanV2FdEntry1Slot int64
+// SecurityCageInitPlanV1FdEntry1Slot defines model for SecurityCageInitPlanV1FdEntry.1.Slot.
+type SecurityCageInitPlanV1FdEntry1Slot int64
 
-// SecurityCageInitPlanV2FdEntry2 defines model for .
-type SecurityCageInitPlanV2FdEntry2 struct {
-	BindingDigest      SecurityCageInitPlanV2Digest                  `json:"binding_digest"`
+// SecurityCageInitPlanV1FdEntry2 defines model for .
+type SecurityCageInitPlanV1FdEntry2 struct {
+	BindingDigest      SecurityCageInitPlanV1Digest                  `json:"binding_digest"`
 	BrokerPeerIdentity *interface{}                                  `json:"broker_peer_identity"`
 	CloseOnExec        bool                                          `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2DirectoryIdentity       `json:"identity"`
-	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath   `json:"path"`
-	Purpose            SecurityCageInitPlanV2PurposeWorkingDirectory `json:"purpose"`
-	Slot               SecurityCageInitPlanV2FdEntry2Slot            `json:"slot"`
+	Identity           SecurityCageInitPlanV1DirectoryIdentity       `json:"identity"`
+	Path               SecurityCageInitPlanV1AbsoluteCanonicalPath   `json:"path"`
+	Purpose            SecurityCageInitPlanV1PurposeWorkingDirectory `json:"purpose"`
+	Slot               SecurityCageInitPlanV1FdEntry2Slot            `json:"slot"`
 }
 
-// SecurityCageInitPlanV2FdEntry2Slot defines model for SecurityCageInitPlanV2FdEntry.2.Slot.
-type SecurityCageInitPlanV2FdEntry2Slot int64
+// SecurityCageInitPlanV1FdEntry2Slot defines model for SecurityCageInitPlanV1FdEntry.2.Slot.
+type SecurityCageInitPlanV1FdEntry2Slot int64
 
-// SecurityCageInitPlanV2FdEntry3 defines model for .
-type SecurityCageInitPlanV2FdEntry3 struct {
+// SecurityCageInitPlanV1FdEntry3 defines model for .
+type SecurityCageInitPlanV1FdEntry3 struct {
 	BindingDigest      *interface{}                             `json:"binding_digest"`
 	BrokerPeerIdentity *interface{}                             `json:"broker_peer_identity"`
 	CloseOnExec        bool                                     `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2SocketIdentity     `json:"identity"`
+	Identity           SecurityCageInitPlanV1SocketIdentity     `json:"identity"`
 	Path               *interface{}                             `json:"path"`
-	Purpose            SecurityCageInitPlanV2PurposeTargetStdin `json:"purpose"`
-	Slot               SecurityCageInitPlanV2FdEntry3Slot       `json:"slot"`
+	Purpose            SecurityCageInitPlanV1PurposeTargetStdin `json:"purpose"`
+	Slot               SecurityCageInitPlanV1FdEntry3Slot       `json:"slot"`
 }
 
-// SecurityCageInitPlanV2FdEntry3Slot defines model for SecurityCageInitPlanV2FdEntry.3.Slot.
-type SecurityCageInitPlanV2FdEntry3Slot int64
+// SecurityCageInitPlanV1FdEntry3Slot defines model for SecurityCageInitPlanV1FdEntry.3.Slot.
+type SecurityCageInitPlanV1FdEntry3Slot int64
 
-// SecurityCageInitPlanV2FdEntry4 defines model for .
-type SecurityCageInitPlanV2FdEntry4 struct {
+// SecurityCageInitPlanV1FdEntry4 defines model for .
+type SecurityCageInitPlanV1FdEntry4 struct {
 	BindingDigest      *interface{}                              `json:"binding_digest"`
 	BrokerPeerIdentity *interface{}                              `json:"broker_peer_identity"`
 	CloseOnExec        bool                                      `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2SocketIdentity      `json:"identity"`
+	Identity           SecurityCageInitPlanV1SocketIdentity      `json:"identity"`
 	Path               *interface{}                              `json:"path"`
-	Purpose            SecurityCageInitPlanV2PurposeTargetStdout `json:"purpose"`
-	Slot               SecurityCageInitPlanV2FdEntry4Slot        `json:"slot"`
+	Purpose            SecurityCageInitPlanV1PurposeTargetStdout `json:"purpose"`
+	Slot               SecurityCageInitPlanV1FdEntry4Slot        `json:"slot"`
 }
 
-// SecurityCageInitPlanV2FdEntry4Slot defines model for SecurityCageInitPlanV2FdEntry.4.Slot.
-type SecurityCageInitPlanV2FdEntry4Slot int64
+// SecurityCageInitPlanV1FdEntry4Slot defines model for SecurityCageInitPlanV1FdEntry.4.Slot.
+type SecurityCageInitPlanV1FdEntry4Slot int64
 
-// SecurityCageInitPlanV2FdEntry5 defines model for .
-type SecurityCageInitPlanV2FdEntry5 struct {
+// SecurityCageInitPlanV1FdEntry5 defines model for .
+type SecurityCageInitPlanV1FdEntry5 struct {
 	BindingDigest      *interface{}                              `json:"binding_digest"`
 	BrokerPeerIdentity *interface{}                              `json:"broker_peer_identity"`
 	CloseOnExec        bool                                      `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2SocketIdentity      `json:"identity"`
+	Identity           SecurityCageInitPlanV1SocketIdentity      `json:"identity"`
 	Path               *interface{}                              `json:"path"`
-	Purpose            SecurityCageInitPlanV2PurposeTargetStderr `json:"purpose"`
-	Slot               SecurityCageInitPlanV2FdEntry5Slot        `json:"slot"`
+	Purpose            SecurityCageInitPlanV1PurposeTargetStderr `json:"purpose"`
+	Slot               SecurityCageInitPlanV1FdEntry5Slot        `json:"slot"`
 }
 
-// SecurityCageInitPlanV2FdEntry5Slot defines model for SecurityCageInitPlanV2FdEntry.5.Slot.
-type SecurityCageInitPlanV2FdEntry5Slot int64
+// SecurityCageInitPlanV1FdEntry5Slot defines model for SecurityCageInitPlanV1FdEntry.5.Slot.
+type SecurityCageInitPlanV1FdEntry5Slot int64
 
-// SecurityCageInitPlanV2FdEntry6 defines model for .
-type SecurityCageInitPlanV2FdEntry6 struct {
-	BindingDigest      SecurityCageInitPlanV2Digest                `json:"binding_digest"`
+// SecurityCageInitPlanV1FdEntry6 defines model for .
+type SecurityCageInitPlanV1FdEntry6 struct {
+	BindingDigest      SecurityCageInitPlanV1Digest                `json:"binding_digest"`
 	BrokerPeerIdentity *interface{}                                `json:"broker_peer_identity"`
 	CloseOnExec        bool                                        `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2RegularFileIdentity   `json:"identity"`
-	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+	Identity           SecurityCageInitPlanV1RegularFileIdentity   `json:"identity"`
+	Path               SecurityCageInitPlanV1AbsoluteCanonicalPath `json:"path"`
 	Purpose            struct {
 		Index int64                                     `json:"index"`
-		Kind  SecurityCageInitPlanV2FdEntry6PurposeKind `json:"kind"`
+		Kind  SecurityCageInitPlanV1FdEntry6PurposeKind `json:"kind"`
 	} `json:"purpose"`
 	Slot int64 `json:"slot"`
 }
 
-// SecurityCageInitPlanV2FdEntry6PurposeKind defines model for SecurityCageInitPlanV2FdEntry.6.Purpose.Kind.
-type SecurityCageInitPlanV2FdEntry6PurposeKind string
+// SecurityCageInitPlanV1FdEntry6PurposeKind defines model for SecurityCageInitPlanV1FdEntry.6.Purpose.Kind.
+type SecurityCageInitPlanV1FdEntry6PurposeKind string
 
-// SecurityCageInitPlanV2FdEntry7 defines model for .
-type SecurityCageInitPlanV2FdEntry7 struct {
+// SecurityCageInitPlanV1FdEntry7 defines model for .
+type SecurityCageInitPlanV1FdEntry7 struct {
 	BindingDigest      *interface{}                                `json:"binding_digest"`
 	BrokerPeerIdentity *interface{}                                `json:"broker_peer_identity"`
 	CloseOnExec        bool                                        `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2PathIdentity          `json:"identity"`
-	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+	Identity           SecurityCageInitPlanV1PathIdentity          `json:"identity"`
+	Path               SecurityCageInitPlanV1AbsoluteCanonicalPath `json:"path"`
 	Purpose            struct {
 		Index int64                                     `json:"index"`
-		Kind  SecurityCageInitPlanV2FdEntry7PurposeKind `json:"kind"`
+		Kind  SecurityCageInitPlanV1FdEntry7PurposeKind `json:"kind"`
 	} `json:"purpose"`
 	Slot int64 `json:"slot"`
 }
 
-// SecurityCageInitPlanV2FdEntry7PurposeKind defines model for SecurityCageInitPlanV2FdEntry.7.Purpose.Kind.
-type SecurityCageInitPlanV2FdEntry7PurposeKind string
+// SecurityCageInitPlanV1FdEntry7PurposeKind defines model for SecurityCageInitPlanV1FdEntry.7.Purpose.Kind.
+type SecurityCageInitPlanV1FdEntry7PurposeKind string
 
-// SecurityCageInitPlanV2FdEntry8 defines model for .
-type SecurityCageInitPlanV2FdEntry8 struct {
+// SecurityCageInitPlanV1FdEntry8 defines model for .
+type SecurityCageInitPlanV1FdEntry8 struct {
 	BindingDigest      *interface{}                                `json:"binding_digest"`
 	BrokerPeerIdentity *interface{}                                `json:"broker_peer_identity"`
 	CloseOnExec        bool                                        `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2RegularFileIdentity   `json:"identity"`
-	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+	Identity           SecurityCageInitPlanV1RegularFileIdentity   `json:"identity"`
+	Path               SecurityCageInitPlanV1AbsoluteCanonicalPath `json:"path"`
 	Purpose            struct {
 		Index int64                                     `json:"index"`
-		Kind  SecurityCageInitPlanV2FdEntry8PurposeKind `json:"kind"`
+		Kind  SecurityCageInitPlanV1FdEntry8PurposeKind `json:"kind"`
 	} `json:"purpose"`
 	Slot int64 `json:"slot"`
 }
 
-// SecurityCageInitPlanV2FdEntry8PurposeKind defines model for SecurityCageInitPlanV2FdEntry.8.Purpose.Kind.
-type SecurityCageInitPlanV2FdEntry8PurposeKind string
+// SecurityCageInitPlanV1FdEntry8PurposeKind defines model for SecurityCageInitPlanV1FdEntry.8.Purpose.Kind.
+type SecurityCageInitPlanV1FdEntry8PurposeKind string
 
-// SecurityCageInitPlanV2FdEntry9 defines model for .
-type SecurityCageInitPlanV2FdEntry9 struct {
-	BindingDigest      SecurityCageInitPlanV2Digest             `json:"binding_digest"`
-	BrokerPeerIdentity SecurityCageInitPlanV2BrokerPeerIdentity `json:"broker_peer_identity"`
+// SecurityCageInitPlanV1FdEntry9 defines model for .
+type SecurityCageInitPlanV1FdEntry9 struct {
+	BindingDigest      SecurityCageInitPlanV1Digest             `json:"binding_digest"`
+	BrokerPeerIdentity SecurityCageInitPlanV1BrokerPeerIdentity `json:"broker_peer_identity"`
 	CloseOnExec        bool                                     `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2SocketIdentity     `json:"identity"`
+	Identity           SecurityCageInitPlanV1SocketIdentity     `json:"identity"`
 	Path               *interface{}                             `json:"path"`
-	Purpose            SecurityCageInitPlanV2PurposeBrokerIpc   `json:"purpose"`
-	Slot               SecurityCageInitPlanV2FdEntry9Slot       `json:"slot"`
+	Purpose            SecurityCageInitPlanV1PurposeBrokerIpc   `json:"purpose"`
+	Slot               SecurityCageInitPlanV1FdEntry9Slot       `json:"slot"`
 }
 
-// SecurityCageInitPlanV2FdEntry9Slot defines model for SecurityCageInitPlanV2FdEntry.9.Slot.
-type SecurityCageInitPlanV2FdEntry9Slot int64
+// SecurityCageInitPlanV1FdEntry9Slot defines model for SecurityCageInitPlanV1FdEntry.9.Slot.
+type SecurityCageInitPlanV1FdEntry9Slot int64
 
-// SecurityCageInitPlanV2FdEntryBase defines model for SecurityCageInitPlanV2FdEntryBase.
-type SecurityCageInitPlanV2FdEntryBase struct {
-	BindingDigest      SecurityCageInitPlanV2Digest                `json:"binding_digest"`
-	BrokerPeerIdentity SecurityCageInitPlanV2BrokerPeerIdentity    `json:"broker_peer_identity"`
+// SecurityCageInitPlanV1FdEntryBase defines model for SecurityCageInitPlanV1FdEntryBase.
+type SecurityCageInitPlanV1FdEntryBase struct {
+	BindingDigest      SecurityCageInitPlanV1Digest                `json:"binding_digest"`
+	BrokerPeerIdentity SecurityCageInitPlanV1BrokerPeerIdentity    `json:"broker_peer_identity"`
 	CloseOnExec        bool                                        `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2FileIdentity          `json:"identity"`
-	Path               SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+	Identity           SecurityCageInitPlanV1FileIdentity          `json:"identity"`
+	Path               SecurityCageInitPlanV1AbsoluteCanonicalPath `json:"path"`
 	Purpose            map[string]interface{}                      `json:"purpose"`
 	Slot               int64                                       `json:"slot"`
 }
 
-// SecurityCageInitPlanV2FdTable defines model for SecurityCageInitPlanV2FdTable.
-type SecurityCageInitPlanV2FdTable = []interface{}
+// SecurityCageInitPlanV1FdTable defines model for SecurityCageInitPlanV1FdTable.
+type SecurityCageInitPlanV1FdTable = []interface{}
 
-// SecurityCageInitPlanV2FileIdentity defines model for SecurityCageInitPlanV2FileIdentity.
-type SecurityCageInitPlanV2FileIdentity struct {
+// SecurityCageInitPlanV1FileIdentity defines model for SecurityCageInitPlanV1FileIdentity.
+type SecurityCageInitPlanV1FileIdentity struct {
 	Device  int64                                  `json:"device"`
 	Gid     int64                                  `json:"gid"`
 	Inode   int64                                  `json:"inode"`
-	Kind    SecurityCageInitPlanV2FileIdentityKind `json:"kind"`
+	Kind    SecurityCageInitPlanV1FileIdentityKind `json:"kind"`
 	Mode    int64                                  `json:"mode"`
 	MountId int64                                  `json:"mount_id"`
 	Uid     int64                                  `json:"uid"`
 }
 
-// SecurityCageInitPlanV2FileIdentityKind defines model for SecurityCageInitPlanV2FileIdentity.Kind.
-type SecurityCageInitPlanV2FileIdentityKind string
+// SecurityCageInitPlanV1FileIdentityKind defines model for SecurityCageInitPlanV1FileIdentity.Kind.
+type SecurityCageInitPlanV1FileIdentityKind string
 
-// SecurityCageInitPlanV2FilesystemGrant defines model for SecurityCageInitPlanV2FilesystemGrant.
-type SecurityCageInitPlanV2FilesystemGrant struct {
-	Access   SecurityCageInitPlanV2FilesystemGrantAccess `json:"access"`
+// SecurityCageInitPlanV1FilesystemGrant defines model for SecurityCageInitPlanV1FilesystemGrant.
+type SecurityCageInitPlanV1FilesystemGrant struct {
+	Access   SecurityCageInitPlanV1FilesystemGrantAccess `json:"access"`
 	FdSlot   int64                                       `json:"fd_slot"`
-	Identity SecurityCageInitPlanV2PathIdentity          `json:"identity"`
+	Identity SecurityCageInitPlanV1PathIdentity          `json:"identity"`
 }
 
-// SecurityCageInitPlanV2FilesystemGrantAccess defines model for SecurityCageInitPlanV2FilesystemGrant.Access.
-type SecurityCageInitPlanV2FilesystemGrantAccess string
+// SecurityCageInitPlanV1FilesystemGrantAccess defines model for SecurityCageInitPlanV1FilesystemGrant.Access.
+type SecurityCageInitPlanV1FilesystemGrantAccess string
 
-// SecurityCageInitPlanV2ForbiddenResource defines model for SecurityCageInitPlanV2ForbiddenResource.
-type SecurityCageInitPlanV2ForbiddenResource struct {
-	Identity SecurityCageInitPlanV2PathIdentity          `json:"identity"`
-	Path     SecurityCageInitPlanV2AbsoluteCanonicalPath `json:"path"`
+// SecurityCageInitPlanV1ForbiddenResource defines model for SecurityCageInitPlanV1ForbiddenResource.
+type SecurityCageInitPlanV1ForbiddenResource struct {
+	Identity SecurityCageInitPlanV1PathIdentity          `json:"identity"`
+	Path     SecurityCageInitPlanV1AbsoluteCanonicalPath `json:"path"`
 }
 
-// SecurityCageInitPlanV2LandlockPlan defines model for SecurityCageInitPlanV2LandlockPlan.
-type SecurityCageInitPlanV2LandlockPlan struct {
+// SecurityCageInitPlanV1LandlockPlan defines model for SecurityCageInitPlanV1LandlockPlan.
+type SecurityCageInitPlanV1LandlockPlan struct {
 	DefaultFilesystemDeny bool                                          `json:"default_filesystem_deny"`
-	ForbiddenResources    []SecurityCageInitPlanV2ForbiddenResource     `json:"forbidden_resources"`
-	Grants                []SecurityCageInitPlanV2FilesystemGrant       `json:"grants"`
-	NetworkMode           SecurityCageInitPlanV2LandlockPlanNetworkMode `json:"network_mode"`
+	ForbiddenResources    []SecurityCageInitPlanV1ForbiddenResource     `json:"forbidden_resources"`
+	Grants                []SecurityCageInitPlanV1FilesystemGrant       `json:"grants"`
+	NetworkMode           SecurityCageInitPlanV1LandlockPlanNetworkMode `json:"network_mode"`
 }
 
-// SecurityCageInitPlanV2LandlockPlanNetworkMode defines model for SecurityCageInitPlanV2LandlockPlan.NetworkMode.
-type SecurityCageInitPlanV2LandlockPlanNetworkMode string
+// SecurityCageInitPlanV1LandlockPlanNetworkMode defines model for SecurityCageInitPlanV1LandlockPlan.NetworkMode.
+type SecurityCageInitPlanV1LandlockPlanNetworkMode string
 
-// SecurityCageInitPlanV2PathIdentity defines model for SecurityCageInitPlanV2PathIdentity.
-type SecurityCageInitPlanV2PathIdentity struct {
+// SecurityCageInitPlanV1PathIdentity defines model for SecurityCageInitPlanV1PathIdentity.
+type SecurityCageInitPlanV1PathIdentity struct {
 	Device  int64                                  `json:"device"`
 	Gid     int64                                  `json:"gid"`
 	Inode   int64                                  `json:"inode"`
-	Kind    SecurityCageInitPlanV2PathIdentityKind `json:"kind"`
+	Kind    SecurityCageInitPlanV1PathIdentityKind `json:"kind"`
 	Mode    int64                                  `json:"mode"`
 	MountId int64                                  `json:"mount_id"`
 	Uid     int64                                  `json:"uid"`
 }
 
-// SecurityCageInitPlanV2PathIdentityKind defines model for SecurityCageInitPlanV2PathIdentity.Kind.
-type SecurityCageInitPlanV2PathIdentityKind string
+// SecurityCageInitPlanV1PathIdentityKind defines model for SecurityCageInitPlanV1PathIdentity.Kind.
+type SecurityCageInitPlanV1PathIdentityKind string
 
-// SecurityCageInitPlanV2PurposeBrokerIpc defines model for SecurityCageInitPlanV2PurposeBrokerIpc.
-type SecurityCageInitPlanV2PurposeBrokerIpc struct {
-	Kind SecurityCageInitPlanV2PurposeBrokerIpcKind `json:"kind"`
+// SecurityCageInitPlanV1PurposeBrokerIpc defines model for SecurityCageInitPlanV1PurposeBrokerIpc.
+type SecurityCageInitPlanV1PurposeBrokerIpc struct {
+	Kind SecurityCageInitPlanV1PurposeBrokerIpcKind `json:"kind"`
 }
 
-// SecurityCageInitPlanV2PurposeBrokerIpcKind defines model for SecurityCageInitPlanV2PurposeBrokerIpc.Kind.
-type SecurityCageInitPlanV2PurposeBrokerIpcKind string
+// SecurityCageInitPlanV1PurposeBrokerIpcKind defines model for SecurityCageInitPlanV1PurposeBrokerIpc.Kind.
+type SecurityCageInitPlanV1PurposeBrokerIpcKind string
 
-// SecurityCageInitPlanV2PurposeCageInitHelper defines model for SecurityCageInitPlanV2PurposeCageInitHelper.
-type SecurityCageInitPlanV2PurposeCageInitHelper struct {
-	Kind SecurityCageInitPlanV2PurposeCageInitHelperKind `json:"kind"`
+// SecurityCageInitPlanV1PurposeCageInitHelper defines model for SecurityCageInitPlanV1PurposeCageInitHelper.
+type SecurityCageInitPlanV1PurposeCageInitHelper struct {
+	Kind SecurityCageInitPlanV1PurposeCageInitHelperKind `json:"kind"`
 }
 
-// SecurityCageInitPlanV2PurposeCageInitHelperKind defines model for SecurityCageInitPlanV2PurposeCageInitHelper.Kind.
-type SecurityCageInitPlanV2PurposeCageInitHelperKind string
+// SecurityCageInitPlanV1PurposeCageInitHelperKind defines model for SecurityCageInitPlanV1PurposeCageInitHelper.Kind.
+type SecurityCageInitPlanV1PurposeCageInitHelperKind string
 
-// SecurityCageInitPlanV2PurposeIndexedResource defines model for SecurityCageInitPlanV2PurposeIndexedResource.
-type SecurityCageInitPlanV2PurposeIndexedResource struct {
+// SecurityCageInitPlanV1PurposeIndexedResource defines model for SecurityCageInitPlanV1PurposeIndexedResource.
+type SecurityCageInitPlanV1PurposeIndexedResource struct {
 	Index int64                                            `json:"index"`
-	Kind  SecurityCageInitPlanV2PurposeIndexedResourceKind `json:"kind"`
+	Kind  SecurityCageInitPlanV1PurposeIndexedResourceKind `json:"kind"`
 }
 
-// SecurityCageInitPlanV2PurposeIndexedResourceKind defines model for SecurityCageInitPlanV2PurposeIndexedResource.Kind.
-type SecurityCageInitPlanV2PurposeIndexedResourceKind string
+// SecurityCageInitPlanV1PurposeIndexedResourceKind defines model for SecurityCageInitPlanV1PurposeIndexedResource.Kind.
+type SecurityCageInitPlanV1PurposeIndexedResourceKind string
 
-// SecurityCageInitPlanV2PurposeTargetExecutable defines model for SecurityCageInitPlanV2PurposeTargetExecutable.
-type SecurityCageInitPlanV2PurposeTargetExecutable struct {
-	Kind SecurityCageInitPlanV2PurposeTargetExecutableKind `json:"kind"`
+// SecurityCageInitPlanV1PurposeTargetExecutable defines model for SecurityCageInitPlanV1PurposeTargetExecutable.
+type SecurityCageInitPlanV1PurposeTargetExecutable struct {
+	Kind SecurityCageInitPlanV1PurposeTargetExecutableKind `json:"kind"`
 }
 
-// SecurityCageInitPlanV2PurposeTargetExecutableKind defines model for SecurityCageInitPlanV2PurposeTargetExecutable.Kind.
-type SecurityCageInitPlanV2PurposeTargetExecutableKind string
+// SecurityCageInitPlanV1PurposeTargetExecutableKind defines model for SecurityCageInitPlanV1PurposeTargetExecutable.Kind.
+type SecurityCageInitPlanV1PurposeTargetExecutableKind string
 
-// SecurityCageInitPlanV2PurposeTargetStderr defines model for SecurityCageInitPlanV2PurposeTargetStderr.
-type SecurityCageInitPlanV2PurposeTargetStderr struct {
-	Kind SecurityCageInitPlanV2PurposeTargetStderrKind `json:"kind"`
+// SecurityCageInitPlanV1PurposeTargetStderr defines model for SecurityCageInitPlanV1PurposeTargetStderr.
+type SecurityCageInitPlanV1PurposeTargetStderr struct {
+	Kind SecurityCageInitPlanV1PurposeTargetStderrKind `json:"kind"`
 }
 
-// SecurityCageInitPlanV2PurposeTargetStderrKind defines model for SecurityCageInitPlanV2PurposeTargetStderr.Kind.
-type SecurityCageInitPlanV2PurposeTargetStderrKind string
+// SecurityCageInitPlanV1PurposeTargetStderrKind defines model for SecurityCageInitPlanV1PurposeTargetStderr.Kind.
+type SecurityCageInitPlanV1PurposeTargetStderrKind string
 
-// SecurityCageInitPlanV2PurposeTargetStdin defines model for SecurityCageInitPlanV2PurposeTargetStdin.
-type SecurityCageInitPlanV2PurposeTargetStdin struct {
-	Kind SecurityCageInitPlanV2PurposeTargetStdinKind `json:"kind"`
+// SecurityCageInitPlanV1PurposeTargetStdin defines model for SecurityCageInitPlanV1PurposeTargetStdin.
+type SecurityCageInitPlanV1PurposeTargetStdin struct {
+	Kind SecurityCageInitPlanV1PurposeTargetStdinKind `json:"kind"`
 }
 
-// SecurityCageInitPlanV2PurposeTargetStdinKind defines model for SecurityCageInitPlanV2PurposeTargetStdin.Kind.
-type SecurityCageInitPlanV2PurposeTargetStdinKind string
+// SecurityCageInitPlanV1PurposeTargetStdinKind defines model for SecurityCageInitPlanV1PurposeTargetStdin.Kind.
+type SecurityCageInitPlanV1PurposeTargetStdinKind string
 
-// SecurityCageInitPlanV2PurposeTargetStdout defines model for SecurityCageInitPlanV2PurposeTargetStdout.
-type SecurityCageInitPlanV2PurposeTargetStdout struct {
-	Kind SecurityCageInitPlanV2PurposeTargetStdoutKind `json:"kind"`
+// SecurityCageInitPlanV1PurposeTargetStdout defines model for SecurityCageInitPlanV1PurposeTargetStdout.
+type SecurityCageInitPlanV1PurposeTargetStdout struct {
+	Kind SecurityCageInitPlanV1PurposeTargetStdoutKind `json:"kind"`
 }
 
-// SecurityCageInitPlanV2PurposeTargetStdoutKind defines model for SecurityCageInitPlanV2PurposeTargetStdout.Kind.
-type SecurityCageInitPlanV2PurposeTargetStdoutKind string
+// SecurityCageInitPlanV1PurposeTargetStdoutKind defines model for SecurityCageInitPlanV1PurposeTargetStdout.Kind.
+type SecurityCageInitPlanV1PurposeTargetStdoutKind string
 
-// SecurityCageInitPlanV2PurposeWorkingDirectory defines model for SecurityCageInitPlanV2PurposeWorkingDirectory.
-type SecurityCageInitPlanV2PurposeWorkingDirectory struct {
-	Kind SecurityCageInitPlanV2PurposeWorkingDirectoryKind `json:"kind"`
+// SecurityCageInitPlanV1PurposeWorkingDirectory defines model for SecurityCageInitPlanV1PurposeWorkingDirectory.
+type SecurityCageInitPlanV1PurposeWorkingDirectory struct {
+	Kind SecurityCageInitPlanV1PurposeWorkingDirectoryKind `json:"kind"`
 }
 
-// SecurityCageInitPlanV2PurposeWorkingDirectoryKind defines model for SecurityCageInitPlanV2PurposeWorkingDirectory.Kind.
-type SecurityCageInitPlanV2PurposeWorkingDirectoryKind string
+// SecurityCageInitPlanV1PurposeWorkingDirectoryKind defines model for SecurityCageInitPlanV1PurposeWorkingDirectory.Kind.
+type SecurityCageInitPlanV1PurposeWorkingDirectoryKind string
 
-// SecurityCageInitPlanV2RegularFileIdentity defines model for SecurityCageInitPlanV2RegularFileIdentity.
-type SecurityCageInitPlanV2RegularFileIdentity struct {
+// SecurityCageInitPlanV1RegularFileIdentity defines model for SecurityCageInitPlanV1RegularFileIdentity.
+type SecurityCageInitPlanV1RegularFileIdentity struct {
 	Device  int64                                         `json:"device"`
 	Gid     int64                                         `json:"gid"`
 	Inode   int64                                         `json:"inode"`
-	Kind    SecurityCageInitPlanV2RegularFileIdentityKind `json:"kind"`
+	Kind    SecurityCageInitPlanV1RegularFileIdentityKind `json:"kind"`
 	Mode    int64                                         `json:"mode"`
 	MountId int64                                         `json:"mount_id"`
 	Uid     int64                                         `json:"uid"`
 }
 
-// SecurityCageInitPlanV2RegularFileIdentityKind defines model for SecurityCageInitPlanV2RegularFileIdentity.Kind.
-type SecurityCageInitPlanV2RegularFileIdentityKind string
+// SecurityCageInitPlanV1RegularFileIdentityKind defines model for SecurityCageInitPlanV1RegularFileIdentity.Kind.
+type SecurityCageInitPlanV1RegularFileIdentityKind string
 
-// SecurityCageInitPlanV2ResourceLimits defines model for SecurityCageInitPlanV2ResourceLimits.
-type SecurityCageInitPlanV2ResourceLimits struct {
-	NofileHard SecurityCageInitPlanV2ResourceLimitsNofileHard `json:"nofile_hard"`
-	NofileSoft SecurityCageInitPlanV2ResourceLimitsNofileSoft `json:"nofile_soft"`
+// SecurityCageInitPlanV1ResourceLimits defines model for SecurityCageInitPlanV1ResourceLimits.
+type SecurityCageInitPlanV1ResourceLimits struct {
+	NofileHard SecurityCageInitPlanV1ResourceLimitsNofileHard `json:"nofile_hard"`
+	NofileSoft SecurityCageInitPlanV1ResourceLimitsNofileSoft `json:"nofile_soft"`
 }
 
-// SecurityCageInitPlanV2ResourceLimitsNofileHard defines model for SecurityCageInitPlanV2ResourceLimits.NofileHard.
-type SecurityCageInitPlanV2ResourceLimitsNofileHard int64
+// SecurityCageInitPlanV1ResourceLimitsNofileHard defines model for SecurityCageInitPlanV1ResourceLimits.NofileHard.
+type SecurityCageInitPlanV1ResourceLimitsNofileHard int64
 
-// SecurityCageInitPlanV2ResourceLimitsNofileSoft defines model for SecurityCageInitPlanV2ResourceLimits.NofileSoft.
-type SecurityCageInitPlanV2ResourceLimitsNofileSoft int64
+// SecurityCageInitPlanV1ResourceLimitsNofileSoft defines model for SecurityCageInitPlanV1ResourceLimits.NofileSoft.
+type SecurityCageInitPlanV1ResourceLimitsNofileSoft int64
 
-// SecurityCageInitPlanV2SeccompPlan defines model for SecurityCageInitPlanV2SeccompPlan.
-type SecurityCageInitPlanV2SeccompPlan struct {
+// SecurityCageInitPlanV1SeccompPlan defines model for SecurityCageInitPlanV1SeccompPlan.
+type SecurityCageInitPlanV1SeccompPlan struct {
 	AllowedSyscalls     []string                                                       `json:"allowed_syscalls"`
-	Architecture        SecurityCageInitPlanV2SeccompPlanArchitecture                  `json:"architecture"`
-	ArgumentConstraints map[string][][]SecurityCageInitPlanV2SyscallArgumentConstraint `json:"argument_constraints"`
-	DefaultAction       SecurityCageInitPlanV2SeccompPlanDefaultAction                 `json:"default_action"`
-	Profile             SecurityCageInitPlanV2SeccompPlanProfile                       `json:"profile"`
+	Architecture        SecurityCageInitPlanV1SeccompPlanArchitecture                  `json:"architecture"`
+	ArgumentConstraints map[string][][]SecurityCageInitPlanV1SyscallArgumentConstraint `json:"argument_constraints"`
+	DefaultAction       SecurityCageInitPlanV1SeccompPlanDefaultAction                 `json:"default_action"`
+	Profile             SecurityCageInitPlanV1SeccompPlanProfile                       `json:"profile"`
 }
 
-// SecurityCageInitPlanV2SeccompPlanArchitecture defines model for SecurityCageInitPlanV2SeccompPlan.Architecture.
-type SecurityCageInitPlanV2SeccompPlanArchitecture string
+// SecurityCageInitPlanV1SeccompPlanArchitecture defines model for SecurityCageInitPlanV1SeccompPlan.Architecture.
+type SecurityCageInitPlanV1SeccompPlanArchitecture string
 
-// SecurityCageInitPlanV2SeccompPlanDefaultAction defines model for SecurityCageInitPlanV2SeccompPlan.DefaultAction.
-type SecurityCageInitPlanV2SeccompPlanDefaultAction string
+// SecurityCageInitPlanV1SeccompPlanDefaultAction defines model for SecurityCageInitPlanV1SeccompPlan.DefaultAction.
+type SecurityCageInitPlanV1SeccompPlanDefaultAction string
 
-// SecurityCageInitPlanV2SeccompPlanProfile defines model for SecurityCageInitPlanV2SeccompPlan.Profile.
-type SecurityCageInitPlanV2SeccompPlanProfile string
+// SecurityCageInitPlanV1SeccompPlanProfile defines model for SecurityCageInitPlanV1SeccompPlan.Profile.
+type SecurityCageInitPlanV1SeccompPlanProfile string
 
-// SecurityCageInitPlanV2SocketIdentity defines model for SecurityCageInitPlanV2SocketIdentity.
-type SecurityCageInitPlanV2SocketIdentity struct {
+// SecurityCageInitPlanV1SocketIdentity defines model for SecurityCageInitPlanV1SocketIdentity.
+type SecurityCageInitPlanV1SocketIdentity struct {
 	Device  int64                                    `json:"device"`
 	Gid     int64                                    `json:"gid"`
 	Inode   int64                                    `json:"inode"`
-	Kind    SecurityCageInitPlanV2SocketIdentityKind `json:"kind"`
+	Kind    SecurityCageInitPlanV1SocketIdentityKind `json:"kind"`
 	Mode    int64                                    `json:"mode"`
 	MountId int64                                    `json:"mount_id"`
 	Uid     int64                                    `json:"uid"`
 }
 
-// SecurityCageInitPlanV2SocketIdentityKind defines model for SecurityCageInitPlanV2SocketIdentity.Kind.
-type SecurityCageInitPlanV2SocketIdentityKind string
+// SecurityCageInitPlanV1SocketIdentityKind defines model for SecurityCageInitPlanV1SocketIdentity.Kind.
+type SecurityCageInitPlanV1SocketIdentityKind string
 
-// SecurityCageInitPlanV2StdioEntry defines model for SecurityCageInitPlanV2StdioEntry.
-type SecurityCageInitPlanV2StdioEntry struct {
+// SecurityCageInitPlanV1StdioEntry defines model for SecurityCageInitPlanV1StdioEntry.
+type SecurityCageInitPlanV1StdioEntry struct {
 	BindingDigest      *interface{}                         `json:"binding_digest"`
 	BrokerPeerIdentity *interface{}                         `json:"broker_peer_identity"`
 	CloseOnExec        bool                                 `json:"close_on_exec"`
-	Identity           SecurityCageInitPlanV2SocketIdentity `json:"identity"`
+	Identity           SecurityCageInitPlanV1SocketIdentity `json:"identity"`
 	Path               *interface{}                         `json:"path"`
 	Purpose            map[string]interface{}               `json:"purpose"`
 	Slot               int64                                `json:"slot"`
 }
 
-// SecurityCageInitPlanV2SyscallArgumentConstraint defines model for SecurityCageInitPlanV2SyscallArgumentConstraint.
-type SecurityCageInitPlanV2SyscallArgumentConstraint struct {
+// SecurityCageInitPlanV1SyscallArgumentConstraint defines model for SecurityCageInitPlanV1SyscallArgumentConstraint.
+type SecurityCageInitPlanV1SyscallArgumentConstraint struct {
 	ArgumentIndex int64                                                     `json:"argument_index"`
-	Comparison    SecurityCageInitPlanV2SyscallArgumentConstraintComparison `json:"comparison"`
+	Comparison    SecurityCageInitPlanV1SyscallArgumentConstraintComparison `json:"comparison"`
 	Value         int64                                                     `json:"value"`
 }
 
-// SecurityCageInitPlanV2SyscallArgumentConstraintComparison defines model for SecurityCageInitPlanV2SyscallArgumentConstraint.Comparison.
-type SecurityCageInitPlanV2SyscallArgumentConstraintComparison string
+// SecurityCageInitPlanV1SyscallArgumentConstraintComparison defines model for SecurityCageInitPlanV1SyscallArgumentConstraint.Comparison.
+type SecurityCageInitPlanV1SyscallArgumentConstraintComparison string
 
-// SecurityCageInitPlanV2TargetArgv defines model for SecurityCageInitPlanV2TargetArgv.
-type SecurityCageInitPlanV2TargetArgv = []string
+// SecurityCageInitPlanV1TargetArgv defines model for SecurityCageInitPlanV1TargetArgv.
+type SecurityCageInitPlanV1TargetArgv = []string
 
 // SecurityCageProcessExitEvidenceV1 Terminal process observation carrying exactly one normal exit code or terminating signal.
 type SecurityCageProcessExitEvidenceV1 struct {
@@ -7373,161 +7373,161 @@ type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4 struct {
 // SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State defines model for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome.4.State.
 type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State string
 
-// SecurityMcpCageLaunchPolicyV2 Canonical signed operator policy for a migration-enforced MCP stdio cage launch.
-type SecurityMcpCageLaunchPolicyV2 struct {
-	Body            SecurityMcpCageLaunchPolicyV2PolicyBody `json:"body"`
-	Signature       SecurityMcpCageLaunchPolicyV2Signature  `json:"signature"`
-	SignerPublicKey SecurityMcpCageLaunchPolicyV2PublicKey  `json:"signer_public_key"`
+// SecurityMcpCageLaunchPolicyV1 Canonical signed operator policy for a migration-enforced MCP stdio cage launch.
+type SecurityMcpCageLaunchPolicyV1 struct {
+	Body            SecurityMcpCageLaunchPolicyV1PolicyBody `json:"body"`
+	Signature       SecurityMcpCageLaunchPolicyV1Signature  `json:"signature"`
+	SignerPublicKey SecurityMcpCageLaunchPolicyV1PublicKey  `json:"signer_public_key"`
 }
 
-// SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath defines model for SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath.
-type SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath = string
+// SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath defines model for SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath.
+type SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath = string
 
-// SecurityMcpCageLaunchPolicyV2BrokerBinding defines model for SecurityMcpCageLaunchPolicyV2BrokerBinding.
-type SecurityMcpCageLaunchPolicyV2BrokerBinding struct {
-	AuthenticationDigest SecurityMcpCageLaunchPolicyV2Digest                 `json:"authentication_digest"`
-	ExpectedPeerIdentity SecurityMcpCageLaunchPolicyV2BrokerPeerIdentity     `json:"expected_peer_identity"`
+// SecurityMcpCageLaunchPolicyV1BrokerBinding defines model for SecurityMcpCageLaunchPolicyV1BrokerBinding.
+type SecurityMcpCageLaunchPolicyV1BrokerBinding struct {
+	AuthenticationDigest SecurityMcpCageLaunchPolicyV1Digest                 `json:"authentication_digest"`
+	ExpectedPeerIdentity SecurityMcpCageLaunchPolicyV1BrokerPeerIdentity     `json:"expected_peer_identity"`
 	InheritedFd          *int64                                              `json:"inherited_fd,omitempty"`
-	SocketPath           *SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath `json:"socket_path,omitempty"`
+	SocketPath           *SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath `json:"socket_path,omitempty"`
 	union                json.RawMessage
 }
 
-// SecurityMcpCageLaunchPolicyV2BrokerBinding0 defines model for .
-type SecurityMcpCageLaunchPolicyV2BrokerBinding0 struct {
+// SecurityMcpCageLaunchPolicyV1BrokerBinding0 defines model for .
+type SecurityMcpCageLaunchPolicyV1BrokerBinding0 struct {
 	InheritedFd int64 `json:"inherited_fd"`
 }
 
-// SecurityMcpCageLaunchPolicyV2BrokerBinding1 defines model for .
-type SecurityMcpCageLaunchPolicyV2BrokerBinding1 struct {
-	SocketPath SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath `json:"socket_path"`
+// SecurityMcpCageLaunchPolicyV1BrokerBinding1 defines model for .
+type SecurityMcpCageLaunchPolicyV1BrokerBinding1 struct {
+	SocketPath SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath `json:"socket_path"`
 }
 
-// SecurityMcpCageLaunchPolicyV2BrokerPeerIdentity defines model for SecurityMcpCageLaunchPolicyV2BrokerPeerIdentity.
-type SecurityMcpCageLaunchPolicyV2BrokerPeerIdentity struct {
+// SecurityMcpCageLaunchPolicyV1BrokerPeerIdentity defines model for SecurityMcpCageLaunchPolicyV1BrokerPeerIdentity.
+type SecurityMcpCageLaunchPolicyV1BrokerPeerIdentity struct {
 	Gid int64 `json:"gid"`
 	Pid int64 `json:"pid"`
 	Uid int64 `json:"uid"`
 }
 
-// SecurityMcpCageLaunchPolicyV2Digest defines model for SecurityMcpCageLaunchPolicyV2Digest.
-type SecurityMcpCageLaunchPolicyV2Digest = string
+// SecurityMcpCageLaunchPolicyV1Digest defines model for SecurityMcpCageLaunchPolicyV1Digest.
+type SecurityMcpCageLaunchPolicyV1Digest = string
 
-// SecurityMcpCageLaunchPolicyV2EnterpriseMigration defines model for SecurityMcpCageLaunchPolicyV2EnterpriseMigration.
-type SecurityMcpCageLaunchPolicyV2EnterpriseMigration struct {
-	DeploymentId             SecurityMcpCageLaunchPolicyV2Identifier               `json:"deployment_id"`
-	MinimumHead              SecurityMcpCageLaunchPolicyV2MinimumHead              `json:"minimum_head"`
-	Stage                    SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage `json:"stage"`
-	StateDatabasePath        SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath    `json:"state_database_path"`
-	TrustedTransitionSigners []SecurityMcpCageLaunchPolicyV2PublicKey              `json:"trusted_transition_signers"`
+// SecurityMcpCageLaunchPolicyV1EnterpriseMigration defines model for SecurityMcpCageLaunchPolicyV1EnterpriseMigration.
+type SecurityMcpCageLaunchPolicyV1EnterpriseMigration struct {
+	DeploymentId             SecurityMcpCageLaunchPolicyV1Identifier               `json:"deployment_id"`
+	MinimumHead              SecurityMcpCageLaunchPolicyV1MinimumHead              `json:"minimum_head"`
+	Stage                    SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage `json:"stage"`
+	StateDatabasePath        SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath    `json:"state_database_path"`
+	TrustedTransitionSigners []SecurityMcpCageLaunchPolicyV1PublicKey              `json:"trusted_transition_signers"`
 }
 
-// SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage defines model for SecurityMcpCageLaunchPolicyV2EnterpriseMigration.Stage.
-type SecurityMcpCageLaunchPolicyV2EnterpriseMigrationStage string
+// SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage defines model for SecurityMcpCageLaunchPolicyV1EnterpriseMigration.Stage.
+type SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage string
 
-// SecurityMcpCageLaunchPolicyV2EnvironmentVariable defines model for SecurityMcpCageLaunchPolicyV2EnvironmentVariable.
-type SecurityMcpCageLaunchPolicyV2EnvironmentVariable = string
+// SecurityMcpCageLaunchPolicyV1EnvironmentVariable defines model for SecurityMcpCageLaunchPolicyV1EnvironmentVariable.
+type SecurityMcpCageLaunchPolicyV1EnvironmentVariable = string
 
-// SecurityMcpCageLaunchPolicyV2Identifier defines model for SecurityMcpCageLaunchPolicyV2Identifier.
-type SecurityMcpCageLaunchPolicyV2Identifier = string
+// SecurityMcpCageLaunchPolicyV1Identifier defines model for SecurityMcpCageLaunchPolicyV1Identifier.
+type SecurityMcpCageLaunchPolicyV1Identifier = string
 
-// SecurityMcpCageLaunchPolicyV2Limits defines model for SecurityMcpCageLaunchPolicyV2Limits.
-type SecurityMcpCageLaunchPolicyV2Limits struct {
+// SecurityMcpCageLaunchPolicyV1Limits defines model for SecurityMcpCageLaunchPolicyV1Limits.
+type SecurityMcpCageLaunchPolicyV1Limits struct {
 	LaunchTimeoutMs  int64                                         `json:"launch_timeout_ms"`
 	MaxArtifactBytes int64                                         `json:"max_artifact_bytes"`
-	NofileHard       SecurityMcpCageLaunchPolicyV2LimitsNofileHard `json:"nofile_hard"`
-	NofileSoft       SecurityMcpCageLaunchPolicyV2LimitsNofileSoft `json:"nofile_soft"`
+	NofileHard       SecurityMcpCageLaunchPolicyV1LimitsNofileHard `json:"nofile_hard"`
+	NofileSoft       SecurityMcpCageLaunchPolicyV1LimitsNofileSoft `json:"nofile_soft"`
 }
 
-// SecurityMcpCageLaunchPolicyV2LimitsNofileHard defines model for SecurityMcpCageLaunchPolicyV2Limits.NofileHard.
-type SecurityMcpCageLaunchPolicyV2LimitsNofileHard int64
+// SecurityMcpCageLaunchPolicyV1LimitsNofileHard defines model for SecurityMcpCageLaunchPolicyV1Limits.NofileHard.
+type SecurityMcpCageLaunchPolicyV1LimitsNofileHard int64
 
-// SecurityMcpCageLaunchPolicyV2LimitsNofileSoft defines model for SecurityMcpCageLaunchPolicyV2Limits.NofileSoft.
-type SecurityMcpCageLaunchPolicyV2LimitsNofileSoft int64
+// SecurityMcpCageLaunchPolicyV1LimitsNofileSoft defines model for SecurityMcpCageLaunchPolicyV1Limits.NofileSoft.
+type SecurityMcpCageLaunchPolicyV1LimitsNofileSoft int64
 
-// SecurityMcpCageLaunchPolicyV2MigrationKey defines model for SecurityMcpCageLaunchPolicyV2MigrationKey.
-type SecurityMcpCageLaunchPolicyV2MigrationKey struct {
-	Control      SecurityMcpCageLaunchPolicyV2MigrationKeyControl   `json:"control"`
-	DeploymentId SecurityMcpCageLaunchPolicyV2Identifier            `json:"deployment_id"`
-	ScopeId      SecurityMcpCageLaunchPolicyV2Identifier            `json:"scope_id"`
-	ScopeKind    SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKind `json:"scope_kind"`
+// SecurityMcpCageLaunchPolicyV1MigrationKey defines model for SecurityMcpCageLaunchPolicyV1MigrationKey.
+type SecurityMcpCageLaunchPolicyV1MigrationKey struct {
+	Control      SecurityMcpCageLaunchPolicyV1MigrationKeyControl   `json:"control"`
+	DeploymentId SecurityMcpCageLaunchPolicyV1Identifier            `json:"deployment_id"`
+	ScopeId      SecurityMcpCageLaunchPolicyV1Identifier            `json:"scope_id"`
+	ScopeKind    SecurityMcpCageLaunchPolicyV1MigrationKeyScopeKind `json:"scope_kind"`
 }
 
-// SecurityMcpCageLaunchPolicyV2MigrationKeyControl defines model for SecurityMcpCageLaunchPolicyV2MigrationKey.Control.
-type SecurityMcpCageLaunchPolicyV2MigrationKeyControl string
+// SecurityMcpCageLaunchPolicyV1MigrationKeyControl defines model for SecurityMcpCageLaunchPolicyV1MigrationKey.Control.
+type SecurityMcpCageLaunchPolicyV1MigrationKeyControl string
 
-// SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKind defines model for SecurityMcpCageLaunchPolicyV2MigrationKey.ScopeKind.
-type SecurityMcpCageLaunchPolicyV2MigrationKeyScopeKind string
+// SecurityMcpCageLaunchPolicyV1MigrationKeyScopeKind defines model for SecurityMcpCageLaunchPolicyV1MigrationKey.ScopeKind.
+type SecurityMcpCageLaunchPolicyV1MigrationKeyScopeKind string
 
-// SecurityMcpCageLaunchPolicyV2MinimumHead defines model for SecurityMcpCageLaunchPolicyV2MinimumHead.
-type SecurityMcpCageLaunchPolicyV2MinimumHead struct {
-	Key               SecurityMcpCageLaunchPolicyV2MigrationKey                 `json:"key"`
-	MinimumGeneration SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration `json:"minimum_generation"`
-	TransitionDigest  SecurityMcpCageLaunchPolicyV2NonzeroDigest32              `json:"transition_digest"`
+// SecurityMcpCageLaunchPolicyV1MinimumHead defines model for SecurityMcpCageLaunchPolicyV1MinimumHead.
+type SecurityMcpCageLaunchPolicyV1MinimumHead struct {
+	Key               SecurityMcpCageLaunchPolicyV1MigrationKey                 `json:"key"`
+	MinimumGeneration SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration `json:"minimum_generation"`
+	TransitionDigest  SecurityMcpCageLaunchPolicyV1NonzeroDigest32              `json:"transition_digest"`
 }
 
-// SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration defines model for SecurityMcpCageLaunchPolicyV2MinimumHead.MinimumGeneration.
-type SecurityMcpCageLaunchPolicyV2MinimumHeadMinimumGeneration int64
+// SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration defines model for SecurityMcpCageLaunchPolicyV1MinimumHead.MinimumGeneration.
+type SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration int64
 
-// SecurityMcpCageLaunchPolicyV2NonzeroDigest32 defines model for SecurityMcpCageLaunchPolicyV2NonzeroDigest32.
-type SecurityMcpCageLaunchPolicyV2NonzeroDigest32 = []int64
+// SecurityMcpCageLaunchPolicyV1NonzeroDigest32 defines model for SecurityMcpCageLaunchPolicyV1NonzeroDigest32.
+type SecurityMcpCageLaunchPolicyV1NonzeroDigest32 = []int64
 
-// SecurityMcpCageLaunchPolicyV2OperatorCeilings defines model for SecurityMcpCageLaunchPolicyV2OperatorCeilings.
-type SecurityMcpCageLaunchPolicyV2OperatorCeilings struct {
-	EnvironmentVariables  []SecurityMcpCageLaunchPolicyV2EnvironmentVariable                   `json:"environment_variables"`
-	ForbiddenPaths        []SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath                 `json:"forbidden_paths"`
-	NativeSyscallProfiles []SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles `json:"native_syscall_profiles"`
+// SecurityMcpCageLaunchPolicyV1OperatorCeilings defines model for SecurityMcpCageLaunchPolicyV1OperatorCeilings.
+type SecurityMcpCageLaunchPolicyV1OperatorCeilings struct {
+	EnvironmentVariables  []SecurityMcpCageLaunchPolicyV1EnvironmentVariable                   `json:"environment_variables"`
+	ForbiddenPaths        []SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath                 `json:"forbidden_paths"`
+	NativeSyscallProfiles []SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfiles `json:"native_syscall_profiles"`
 	NetworkDestinations   []SecurityToolManifestV2NetworkDestination                           `json:"network_destinations"`
-	ReadPaths             []SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath                 `json:"read_paths"`
-	WritePaths            []SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath                 `json:"write_paths"`
+	ReadPaths             []SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath                 `json:"read_paths"`
+	WritePaths            []SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath                 `json:"write_paths"`
 }
 
-// SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles defines model for SecurityMcpCageLaunchPolicyV2OperatorCeilings.NativeSyscallProfiles.
-type SecurityMcpCageLaunchPolicyV2OperatorCeilingsNativeSyscallProfiles string
+// SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfiles defines model for SecurityMcpCageLaunchPolicyV1OperatorCeilings.NativeSyscallProfiles.
+type SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfiles string
 
-// SecurityMcpCageLaunchPolicyV2PolicyBody defines model for SecurityMcpCageLaunchPolicyV2PolicyBody.
-type SecurityMcpCageLaunchPolicyV2PolicyBody struct {
-	Broker              *SecurityMcpCageLaunchPolicyV2BrokerBinding      `json:"broker,omitempty"`
-	EnterpriseMigration SecurityMcpCageLaunchPolicyV2EnterpriseMigration `json:"enterprise_migration"`
-	Limits              SecurityMcpCageLaunchPolicyV2Limits              `json:"limits"`
-	OperatorCeilings    SecurityMcpCageLaunchPolicyV2OperatorCeilings    `json:"operator_ceilings"`
-	Receipt             SecurityMcpCageLaunchPolicyV2ReceiptRuntime      `json:"receipt"`
-	RegisteredPublicKey SecurityMcpCageLaunchPolicyV2PublicKey           `json:"registered_public_key"`
-	Runtime             SecurityMcpCageLaunchPolicyV2Runtime             `json:"runtime"`
-	Schema              SecurityMcpCageLaunchPolicyV2PolicyBodySchema    `json:"schema"`
+// SecurityMcpCageLaunchPolicyV1PolicyBody defines model for SecurityMcpCageLaunchPolicyV1PolicyBody.
+type SecurityMcpCageLaunchPolicyV1PolicyBody struct {
+	Broker              *SecurityMcpCageLaunchPolicyV1BrokerBinding      `json:"broker,omitempty"`
+	EnterpriseMigration SecurityMcpCageLaunchPolicyV1EnterpriseMigration `json:"enterprise_migration"`
+	Limits              SecurityMcpCageLaunchPolicyV1Limits              `json:"limits"`
+	OperatorCeilings    SecurityMcpCageLaunchPolicyV1OperatorCeilings    `json:"operator_ceilings"`
+	Receipt             SecurityMcpCageLaunchPolicyV1ReceiptRuntime      `json:"receipt"`
+	RegisteredPublicKey SecurityMcpCageLaunchPolicyV1PublicKey           `json:"registered_public_key"`
+	Runtime             SecurityMcpCageLaunchPolicyV1Runtime             `json:"runtime"`
+	Schema              SecurityMcpCageLaunchPolicyV1PolicyBodySchema    `json:"schema"`
 
 	// SignedManifest Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.
 	SignedManifest SecuritySignedToolManifestV2 `json:"signed_manifest"`
 }
 
-// SecurityMcpCageLaunchPolicyV2PolicyBodySchema defines model for SecurityMcpCageLaunchPolicyV2PolicyBody.Schema.
-type SecurityMcpCageLaunchPolicyV2PolicyBodySchema string
+// SecurityMcpCageLaunchPolicyV1PolicyBodySchema defines model for SecurityMcpCageLaunchPolicyV1PolicyBody.Schema.
+type SecurityMcpCageLaunchPolicyV1PolicyBodySchema string
 
-// SecurityMcpCageLaunchPolicyV2PublicKey defines model for SecurityMcpCageLaunchPolicyV2PublicKey.
-type SecurityMcpCageLaunchPolicyV2PublicKey = string
+// SecurityMcpCageLaunchPolicyV1PublicKey defines model for SecurityMcpCageLaunchPolicyV1PublicKey.
+type SecurityMcpCageLaunchPolicyV1PublicKey = string
 
-// SecurityMcpCageLaunchPolicyV2ReceiptRuntime defines model for SecurityMcpCageLaunchPolicyV2ReceiptRuntime.
-type SecurityMcpCageLaunchPolicyV2ReceiptRuntime struct {
-	CapabilityId           SecurityMcpCageLaunchPolicyV2Identifier            `json:"capability_id"`
-	DatabasePath           SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath `json:"database_path"`
-	SignerSeedPath         SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath `json:"signer_seed_path"`
-	TenantId               *SecurityMcpCageLaunchPolicyV2Identifier           `json:"tenant_id,omitempty"`
-	TrustedSignerPublicKey SecurityMcpCageLaunchPolicyV2PublicKey             `json:"trusted_signer_public_key"`
+// SecurityMcpCageLaunchPolicyV1ReceiptRuntime defines model for SecurityMcpCageLaunchPolicyV1ReceiptRuntime.
+type SecurityMcpCageLaunchPolicyV1ReceiptRuntime struct {
+	CapabilityId           SecurityMcpCageLaunchPolicyV1Identifier            `json:"capability_id"`
+	DatabasePath           SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath `json:"database_path"`
+	SignerSeedPath         SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath `json:"signer_seed_path"`
+	TenantId               *SecurityMcpCageLaunchPolicyV1Identifier           `json:"tenant_id,omitempty"`
+	TrustedSignerPublicKey SecurityMcpCageLaunchPolicyV1PublicKey             `json:"trusted_signer_public_key"`
 }
 
-// SecurityMcpCageLaunchPolicyV2Runtime defines model for SecurityMcpCageLaunchPolicyV2Runtime.
-type SecurityMcpCageLaunchPolicyV2Runtime struct {
-	CageInitBindingDigest SecurityMcpCageLaunchPolicyV2Digest                  `json:"cage_init_binding_digest"`
-	CageInitPath          SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath   `json:"cage_init_path"`
-	ExecutionIdentity     SecurityCageInitPlanV2ExecutionIdentity              `json:"execution_identity"`
-	RuntimeFiles          []SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath `json:"runtime_files"`
+// SecurityMcpCageLaunchPolicyV1Runtime defines model for SecurityMcpCageLaunchPolicyV1Runtime.
+type SecurityMcpCageLaunchPolicyV1Runtime struct {
+	CageInitBindingDigest SecurityMcpCageLaunchPolicyV1Digest                  `json:"cage_init_binding_digest"`
+	CageInitPath          SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath   `json:"cage_init_path"`
+	ExecutionIdentity     SecurityCageInitPlanV1ExecutionIdentity              `json:"execution_identity"`
+	RuntimeFiles          []SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath `json:"runtime_files"`
 	TargetArgv            []string                                             `json:"target_argv"`
-	TargetBindingDigest   SecurityMcpCageLaunchPolicyV2Digest                  `json:"target_binding_digest"`
-	TargetPath            SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath   `json:"target_path"`
-	WorkingDirectory      SecurityMcpCageLaunchPolicyV2AbsoluteCanonicalPath   `json:"working_directory"`
+	TargetBindingDigest   SecurityMcpCageLaunchPolicyV1Digest                  `json:"target_binding_digest"`
+	TargetPath            SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath   `json:"target_path"`
+	WorkingDirectory      SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath   `json:"working_directory"`
 }
 
-// SecurityMcpCageLaunchPolicyV2Signature defines model for SecurityMcpCageLaunchPolicyV2Signature.
-type SecurityMcpCageLaunchPolicyV2Signature = string
+// SecurityMcpCageLaunchPolicyV1Signature defines model for SecurityMcpCageLaunchPolicyV1Signature.
+type SecurityMcpCageLaunchPolicyV1Signature = string
 
 // SecurityResponseCompletionReceiptBodyV1 defines model for SecurityResponseCompletionReceiptBodyV1.
 type SecurityResponseCompletionReceiptBodyV1 struct {
@@ -11083,22 +11083,22 @@ func (t *SecurityBrokerAuthorityResponseBodyV1Result) UnmarshalJSON(b []byte) er
 	return err
 }
 
-// AsSecurityCageInitPlanV2FdEntry0 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry0
-func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry0() (SecurityCageInitPlanV2FdEntry0, error) {
-	var body SecurityCageInitPlanV2FdEntry0
+// AsSecurityCageInitPlanV1FdEntry0 returns the union data inside the SecurityCageInitPlanV1FdEntry as a SecurityCageInitPlanV1FdEntry0
+func (t SecurityCageInitPlanV1FdEntry) AsSecurityCageInitPlanV1FdEntry0() (SecurityCageInitPlanV1FdEntry0, error) {
+	var body SecurityCageInitPlanV1FdEntry0
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityCageInitPlanV2FdEntry0 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry0
-func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry0(v SecurityCageInitPlanV2FdEntry0) error {
+// FromSecurityCageInitPlanV1FdEntry0 overwrites any union data inside the SecurityCageInitPlanV1FdEntry as the provided SecurityCageInitPlanV1FdEntry0
+func (t *SecurityCageInitPlanV1FdEntry) FromSecurityCageInitPlanV1FdEntry0(v SecurityCageInitPlanV1FdEntry0) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityCageInitPlanV2FdEntry0 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry0
-func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry0(v SecurityCageInitPlanV2FdEntry0) error {
+// MergeSecurityCageInitPlanV1FdEntry0 performs a merge with any union data inside the SecurityCageInitPlanV1FdEntry, using the provided SecurityCageInitPlanV1FdEntry0
+func (t *SecurityCageInitPlanV1FdEntry) MergeSecurityCageInitPlanV1FdEntry0(v SecurityCageInitPlanV1FdEntry0) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -11109,22 +11109,22 @@ func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry0(v Se
 	return err
 }
 
-// AsSecurityCageInitPlanV2FdEntry1 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry1
-func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry1() (SecurityCageInitPlanV2FdEntry1, error) {
-	var body SecurityCageInitPlanV2FdEntry1
+// AsSecurityCageInitPlanV1FdEntry1 returns the union data inside the SecurityCageInitPlanV1FdEntry as a SecurityCageInitPlanV1FdEntry1
+func (t SecurityCageInitPlanV1FdEntry) AsSecurityCageInitPlanV1FdEntry1() (SecurityCageInitPlanV1FdEntry1, error) {
+	var body SecurityCageInitPlanV1FdEntry1
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityCageInitPlanV2FdEntry1 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry1
-func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry1(v SecurityCageInitPlanV2FdEntry1) error {
+// FromSecurityCageInitPlanV1FdEntry1 overwrites any union data inside the SecurityCageInitPlanV1FdEntry as the provided SecurityCageInitPlanV1FdEntry1
+func (t *SecurityCageInitPlanV1FdEntry) FromSecurityCageInitPlanV1FdEntry1(v SecurityCageInitPlanV1FdEntry1) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityCageInitPlanV2FdEntry1 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry1
-func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry1(v SecurityCageInitPlanV2FdEntry1) error {
+// MergeSecurityCageInitPlanV1FdEntry1 performs a merge with any union data inside the SecurityCageInitPlanV1FdEntry, using the provided SecurityCageInitPlanV1FdEntry1
+func (t *SecurityCageInitPlanV1FdEntry) MergeSecurityCageInitPlanV1FdEntry1(v SecurityCageInitPlanV1FdEntry1) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -11135,22 +11135,22 @@ func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry1(v Se
 	return err
 }
 
-// AsSecurityCageInitPlanV2FdEntry2 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry2
-func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry2() (SecurityCageInitPlanV2FdEntry2, error) {
-	var body SecurityCageInitPlanV2FdEntry2
+// AsSecurityCageInitPlanV1FdEntry2 returns the union data inside the SecurityCageInitPlanV1FdEntry as a SecurityCageInitPlanV1FdEntry2
+func (t SecurityCageInitPlanV1FdEntry) AsSecurityCageInitPlanV1FdEntry2() (SecurityCageInitPlanV1FdEntry2, error) {
+	var body SecurityCageInitPlanV1FdEntry2
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityCageInitPlanV2FdEntry2 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry2
-func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry2(v SecurityCageInitPlanV2FdEntry2) error {
+// FromSecurityCageInitPlanV1FdEntry2 overwrites any union data inside the SecurityCageInitPlanV1FdEntry as the provided SecurityCageInitPlanV1FdEntry2
+func (t *SecurityCageInitPlanV1FdEntry) FromSecurityCageInitPlanV1FdEntry2(v SecurityCageInitPlanV1FdEntry2) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityCageInitPlanV2FdEntry2 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry2
-func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry2(v SecurityCageInitPlanV2FdEntry2) error {
+// MergeSecurityCageInitPlanV1FdEntry2 performs a merge with any union data inside the SecurityCageInitPlanV1FdEntry, using the provided SecurityCageInitPlanV1FdEntry2
+func (t *SecurityCageInitPlanV1FdEntry) MergeSecurityCageInitPlanV1FdEntry2(v SecurityCageInitPlanV1FdEntry2) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -11161,22 +11161,22 @@ func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry2(v Se
 	return err
 }
 
-// AsSecurityCageInitPlanV2FdEntry3 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry3
-func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry3() (SecurityCageInitPlanV2FdEntry3, error) {
-	var body SecurityCageInitPlanV2FdEntry3
+// AsSecurityCageInitPlanV1FdEntry3 returns the union data inside the SecurityCageInitPlanV1FdEntry as a SecurityCageInitPlanV1FdEntry3
+func (t SecurityCageInitPlanV1FdEntry) AsSecurityCageInitPlanV1FdEntry3() (SecurityCageInitPlanV1FdEntry3, error) {
+	var body SecurityCageInitPlanV1FdEntry3
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityCageInitPlanV2FdEntry3 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry3
-func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry3(v SecurityCageInitPlanV2FdEntry3) error {
+// FromSecurityCageInitPlanV1FdEntry3 overwrites any union data inside the SecurityCageInitPlanV1FdEntry as the provided SecurityCageInitPlanV1FdEntry3
+func (t *SecurityCageInitPlanV1FdEntry) FromSecurityCageInitPlanV1FdEntry3(v SecurityCageInitPlanV1FdEntry3) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityCageInitPlanV2FdEntry3 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry3
-func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry3(v SecurityCageInitPlanV2FdEntry3) error {
+// MergeSecurityCageInitPlanV1FdEntry3 performs a merge with any union data inside the SecurityCageInitPlanV1FdEntry, using the provided SecurityCageInitPlanV1FdEntry3
+func (t *SecurityCageInitPlanV1FdEntry) MergeSecurityCageInitPlanV1FdEntry3(v SecurityCageInitPlanV1FdEntry3) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -11187,22 +11187,22 @@ func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry3(v Se
 	return err
 }
 
-// AsSecurityCageInitPlanV2FdEntry4 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry4
-func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry4() (SecurityCageInitPlanV2FdEntry4, error) {
-	var body SecurityCageInitPlanV2FdEntry4
+// AsSecurityCageInitPlanV1FdEntry4 returns the union data inside the SecurityCageInitPlanV1FdEntry as a SecurityCageInitPlanV1FdEntry4
+func (t SecurityCageInitPlanV1FdEntry) AsSecurityCageInitPlanV1FdEntry4() (SecurityCageInitPlanV1FdEntry4, error) {
+	var body SecurityCageInitPlanV1FdEntry4
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityCageInitPlanV2FdEntry4 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry4
-func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry4(v SecurityCageInitPlanV2FdEntry4) error {
+// FromSecurityCageInitPlanV1FdEntry4 overwrites any union data inside the SecurityCageInitPlanV1FdEntry as the provided SecurityCageInitPlanV1FdEntry4
+func (t *SecurityCageInitPlanV1FdEntry) FromSecurityCageInitPlanV1FdEntry4(v SecurityCageInitPlanV1FdEntry4) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityCageInitPlanV2FdEntry4 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry4
-func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry4(v SecurityCageInitPlanV2FdEntry4) error {
+// MergeSecurityCageInitPlanV1FdEntry4 performs a merge with any union data inside the SecurityCageInitPlanV1FdEntry, using the provided SecurityCageInitPlanV1FdEntry4
+func (t *SecurityCageInitPlanV1FdEntry) MergeSecurityCageInitPlanV1FdEntry4(v SecurityCageInitPlanV1FdEntry4) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -11213,22 +11213,22 @@ func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry4(v Se
 	return err
 }
 
-// AsSecurityCageInitPlanV2FdEntry5 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry5
-func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry5() (SecurityCageInitPlanV2FdEntry5, error) {
-	var body SecurityCageInitPlanV2FdEntry5
+// AsSecurityCageInitPlanV1FdEntry5 returns the union data inside the SecurityCageInitPlanV1FdEntry as a SecurityCageInitPlanV1FdEntry5
+func (t SecurityCageInitPlanV1FdEntry) AsSecurityCageInitPlanV1FdEntry5() (SecurityCageInitPlanV1FdEntry5, error) {
+	var body SecurityCageInitPlanV1FdEntry5
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityCageInitPlanV2FdEntry5 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry5
-func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry5(v SecurityCageInitPlanV2FdEntry5) error {
+// FromSecurityCageInitPlanV1FdEntry5 overwrites any union data inside the SecurityCageInitPlanV1FdEntry as the provided SecurityCageInitPlanV1FdEntry5
+func (t *SecurityCageInitPlanV1FdEntry) FromSecurityCageInitPlanV1FdEntry5(v SecurityCageInitPlanV1FdEntry5) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityCageInitPlanV2FdEntry5 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry5
-func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry5(v SecurityCageInitPlanV2FdEntry5) error {
+// MergeSecurityCageInitPlanV1FdEntry5 performs a merge with any union data inside the SecurityCageInitPlanV1FdEntry, using the provided SecurityCageInitPlanV1FdEntry5
+func (t *SecurityCageInitPlanV1FdEntry) MergeSecurityCageInitPlanV1FdEntry5(v SecurityCageInitPlanV1FdEntry5) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -11239,22 +11239,22 @@ func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry5(v Se
 	return err
 }
 
-// AsSecurityCageInitPlanV2FdEntry6 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry6
-func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry6() (SecurityCageInitPlanV2FdEntry6, error) {
-	var body SecurityCageInitPlanV2FdEntry6
+// AsSecurityCageInitPlanV1FdEntry6 returns the union data inside the SecurityCageInitPlanV1FdEntry as a SecurityCageInitPlanV1FdEntry6
+func (t SecurityCageInitPlanV1FdEntry) AsSecurityCageInitPlanV1FdEntry6() (SecurityCageInitPlanV1FdEntry6, error) {
+	var body SecurityCageInitPlanV1FdEntry6
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityCageInitPlanV2FdEntry6 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry6
-func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry6(v SecurityCageInitPlanV2FdEntry6) error {
+// FromSecurityCageInitPlanV1FdEntry6 overwrites any union data inside the SecurityCageInitPlanV1FdEntry as the provided SecurityCageInitPlanV1FdEntry6
+func (t *SecurityCageInitPlanV1FdEntry) FromSecurityCageInitPlanV1FdEntry6(v SecurityCageInitPlanV1FdEntry6) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityCageInitPlanV2FdEntry6 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry6
-func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry6(v SecurityCageInitPlanV2FdEntry6) error {
+// MergeSecurityCageInitPlanV1FdEntry6 performs a merge with any union data inside the SecurityCageInitPlanV1FdEntry, using the provided SecurityCageInitPlanV1FdEntry6
+func (t *SecurityCageInitPlanV1FdEntry) MergeSecurityCageInitPlanV1FdEntry6(v SecurityCageInitPlanV1FdEntry6) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -11265,22 +11265,22 @@ func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry6(v Se
 	return err
 }
 
-// AsSecurityCageInitPlanV2FdEntry7 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry7
-func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry7() (SecurityCageInitPlanV2FdEntry7, error) {
-	var body SecurityCageInitPlanV2FdEntry7
+// AsSecurityCageInitPlanV1FdEntry7 returns the union data inside the SecurityCageInitPlanV1FdEntry as a SecurityCageInitPlanV1FdEntry7
+func (t SecurityCageInitPlanV1FdEntry) AsSecurityCageInitPlanV1FdEntry7() (SecurityCageInitPlanV1FdEntry7, error) {
+	var body SecurityCageInitPlanV1FdEntry7
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityCageInitPlanV2FdEntry7 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry7
-func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry7(v SecurityCageInitPlanV2FdEntry7) error {
+// FromSecurityCageInitPlanV1FdEntry7 overwrites any union data inside the SecurityCageInitPlanV1FdEntry as the provided SecurityCageInitPlanV1FdEntry7
+func (t *SecurityCageInitPlanV1FdEntry) FromSecurityCageInitPlanV1FdEntry7(v SecurityCageInitPlanV1FdEntry7) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityCageInitPlanV2FdEntry7 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry7
-func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry7(v SecurityCageInitPlanV2FdEntry7) error {
+// MergeSecurityCageInitPlanV1FdEntry7 performs a merge with any union data inside the SecurityCageInitPlanV1FdEntry, using the provided SecurityCageInitPlanV1FdEntry7
+func (t *SecurityCageInitPlanV1FdEntry) MergeSecurityCageInitPlanV1FdEntry7(v SecurityCageInitPlanV1FdEntry7) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -11291,22 +11291,22 @@ func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry7(v Se
 	return err
 }
 
-// AsSecurityCageInitPlanV2FdEntry8 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry8
-func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry8() (SecurityCageInitPlanV2FdEntry8, error) {
-	var body SecurityCageInitPlanV2FdEntry8
+// AsSecurityCageInitPlanV1FdEntry8 returns the union data inside the SecurityCageInitPlanV1FdEntry as a SecurityCageInitPlanV1FdEntry8
+func (t SecurityCageInitPlanV1FdEntry) AsSecurityCageInitPlanV1FdEntry8() (SecurityCageInitPlanV1FdEntry8, error) {
+	var body SecurityCageInitPlanV1FdEntry8
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityCageInitPlanV2FdEntry8 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry8
-func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry8(v SecurityCageInitPlanV2FdEntry8) error {
+// FromSecurityCageInitPlanV1FdEntry8 overwrites any union data inside the SecurityCageInitPlanV1FdEntry as the provided SecurityCageInitPlanV1FdEntry8
+func (t *SecurityCageInitPlanV1FdEntry) FromSecurityCageInitPlanV1FdEntry8(v SecurityCageInitPlanV1FdEntry8) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityCageInitPlanV2FdEntry8 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry8
-func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry8(v SecurityCageInitPlanV2FdEntry8) error {
+// MergeSecurityCageInitPlanV1FdEntry8 performs a merge with any union data inside the SecurityCageInitPlanV1FdEntry, using the provided SecurityCageInitPlanV1FdEntry8
+func (t *SecurityCageInitPlanV1FdEntry) MergeSecurityCageInitPlanV1FdEntry8(v SecurityCageInitPlanV1FdEntry8) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -11317,22 +11317,22 @@ func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry8(v Se
 	return err
 }
 
-// AsSecurityCageInitPlanV2FdEntry9 returns the union data inside the SecurityCageInitPlanV2FdEntry as a SecurityCageInitPlanV2FdEntry9
-func (t SecurityCageInitPlanV2FdEntry) AsSecurityCageInitPlanV2FdEntry9() (SecurityCageInitPlanV2FdEntry9, error) {
-	var body SecurityCageInitPlanV2FdEntry9
+// AsSecurityCageInitPlanV1FdEntry9 returns the union data inside the SecurityCageInitPlanV1FdEntry as a SecurityCageInitPlanV1FdEntry9
+func (t SecurityCageInitPlanV1FdEntry) AsSecurityCageInitPlanV1FdEntry9() (SecurityCageInitPlanV1FdEntry9, error) {
+	var body SecurityCageInitPlanV1FdEntry9
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityCageInitPlanV2FdEntry9 overwrites any union data inside the SecurityCageInitPlanV2FdEntry as the provided SecurityCageInitPlanV2FdEntry9
-func (t *SecurityCageInitPlanV2FdEntry) FromSecurityCageInitPlanV2FdEntry9(v SecurityCageInitPlanV2FdEntry9) error {
+// FromSecurityCageInitPlanV1FdEntry9 overwrites any union data inside the SecurityCageInitPlanV1FdEntry as the provided SecurityCageInitPlanV1FdEntry9
+func (t *SecurityCageInitPlanV1FdEntry) FromSecurityCageInitPlanV1FdEntry9(v SecurityCageInitPlanV1FdEntry9) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityCageInitPlanV2FdEntry9 performs a merge with any union data inside the SecurityCageInitPlanV2FdEntry, using the provided SecurityCageInitPlanV2FdEntry9
-func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry9(v SecurityCageInitPlanV2FdEntry9) error {
+// MergeSecurityCageInitPlanV1FdEntry9 performs a merge with any union data inside the SecurityCageInitPlanV1FdEntry, using the provided SecurityCageInitPlanV1FdEntry9
+func (t *SecurityCageInitPlanV1FdEntry) MergeSecurityCageInitPlanV1FdEntry9(v SecurityCageInitPlanV1FdEntry9) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -11343,12 +11343,12 @@ func (t *SecurityCageInitPlanV2FdEntry) MergeSecurityCageInitPlanV2FdEntry9(v Se
 	return err
 }
 
-func (t SecurityCageInitPlanV2FdEntry) MarshalJSON() ([]byte, error) {
+func (t SecurityCageInitPlanV1FdEntry) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
 }
 
-func (t *SecurityCageInitPlanV2FdEntry) UnmarshalJSON(b []byte) error {
+func (t *SecurityCageInitPlanV1FdEntry) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -12984,22 +12984,22 @@ func (t *SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome) UnmarshalJSON(b
 	return err
 }
 
-// AsSecurityMcpCageLaunchPolicyV2BrokerBinding0 returns the union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding as a SecurityMcpCageLaunchPolicyV2BrokerBinding0
-func (t SecurityMcpCageLaunchPolicyV2BrokerBinding) AsSecurityMcpCageLaunchPolicyV2BrokerBinding0() (SecurityMcpCageLaunchPolicyV2BrokerBinding0, error) {
-	var body SecurityMcpCageLaunchPolicyV2BrokerBinding0
+// AsSecurityMcpCageLaunchPolicyV1BrokerBinding0 returns the union data inside the SecurityMcpCageLaunchPolicyV1BrokerBinding as a SecurityMcpCageLaunchPolicyV1BrokerBinding0
+func (t SecurityMcpCageLaunchPolicyV1BrokerBinding) AsSecurityMcpCageLaunchPolicyV1BrokerBinding0() (SecurityMcpCageLaunchPolicyV1BrokerBinding0, error) {
+	var body SecurityMcpCageLaunchPolicyV1BrokerBinding0
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityMcpCageLaunchPolicyV2BrokerBinding0 overwrites any union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding as the provided SecurityMcpCageLaunchPolicyV2BrokerBinding0
-func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) FromSecurityMcpCageLaunchPolicyV2BrokerBinding0(v SecurityMcpCageLaunchPolicyV2BrokerBinding0) error {
+// FromSecurityMcpCageLaunchPolicyV1BrokerBinding0 overwrites any union data inside the SecurityMcpCageLaunchPolicyV1BrokerBinding as the provided SecurityMcpCageLaunchPolicyV1BrokerBinding0
+func (t *SecurityMcpCageLaunchPolicyV1BrokerBinding) FromSecurityMcpCageLaunchPolicyV1BrokerBinding0(v SecurityMcpCageLaunchPolicyV1BrokerBinding0) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityMcpCageLaunchPolicyV2BrokerBinding0 performs a merge with any union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding, using the provided SecurityMcpCageLaunchPolicyV2BrokerBinding0
-func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) MergeSecurityMcpCageLaunchPolicyV2BrokerBinding0(v SecurityMcpCageLaunchPolicyV2BrokerBinding0) error {
+// MergeSecurityMcpCageLaunchPolicyV1BrokerBinding0 performs a merge with any union data inside the SecurityMcpCageLaunchPolicyV1BrokerBinding, using the provided SecurityMcpCageLaunchPolicyV1BrokerBinding0
+func (t *SecurityMcpCageLaunchPolicyV1BrokerBinding) MergeSecurityMcpCageLaunchPolicyV1BrokerBinding0(v SecurityMcpCageLaunchPolicyV1BrokerBinding0) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -13010,22 +13010,22 @@ func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) MergeSecurityMcpCageLaunchP
 	return err
 }
 
-// AsSecurityMcpCageLaunchPolicyV2BrokerBinding1 returns the union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding as a SecurityMcpCageLaunchPolicyV2BrokerBinding1
-func (t SecurityMcpCageLaunchPolicyV2BrokerBinding) AsSecurityMcpCageLaunchPolicyV2BrokerBinding1() (SecurityMcpCageLaunchPolicyV2BrokerBinding1, error) {
-	var body SecurityMcpCageLaunchPolicyV2BrokerBinding1
+// AsSecurityMcpCageLaunchPolicyV1BrokerBinding1 returns the union data inside the SecurityMcpCageLaunchPolicyV1BrokerBinding as a SecurityMcpCageLaunchPolicyV1BrokerBinding1
+func (t SecurityMcpCageLaunchPolicyV1BrokerBinding) AsSecurityMcpCageLaunchPolicyV1BrokerBinding1() (SecurityMcpCageLaunchPolicyV1BrokerBinding1, error) {
+	var body SecurityMcpCageLaunchPolicyV1BrokerBinding1
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromSecurityMcpCageLaunchPolicyV2BrokerBinding1 overwrites any union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding as the provided SecurityMcpCageLaunchPolicyV2BrokerBinding1
-func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) FromSecurityMcpCageLaunchPolicyV2BrokerBinding1(v SecurityMcpCageLaunchPolicyV2BrokerBinding1) error {
+// FromSecurityMcpCageLaunchPolicyV1BrokerBinding1 overwrites any union data inside the SecurityMcpCageLaunchPolicyV1BrokerBinding as the provided SecurityMcpCageLaunchPolicyV1BrokerBinding1
+func (t *SecurityMcpCageLaunchPolicyV1BrokerBinding) FromSecurityMcpCageLaunchPolicyV1BrokerBinding1(v SecurityMcpCageLaunchPolicyV1BrokerBinding1) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeSecurityMcpCageLaunchPolicyV2BrokerBinding1 performs a merge with any union data inside the SecurityMcpCageLaunchPolicyV2BrokerBinding, using the provided SecurityMcpCageLaunchPolicyV2BrokerBinding1
-func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) MergeSecurityMcpCageLaunchPolicyV2BrokerBinding1(v SecurityMcpCageLaunchPolicyV2BrokerBinding1) error {
+// MergeSecurityMcpCageLaunchPolicyV1BrokerBinding1 performs a merge with any union data inside the SecurityMcpCageLaunchPolicyV1BrokerBinding, using the provided SecurityMcpCageLaunchPolicyV1BrokerBinding1
+func (t *SecurityMcpCageLaunchPolicyV1BrokerBinding) MergeSecurityMcpCageLaunchPolicyV1BrokerBinding1(v SecurityMcpCageLaunchPolicyV1BrokerBinding1) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -13036,7 +13036,7 @@ func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) MergeSecurityMcpCageLaunchP
 	return err
 }
 
-func (t SecurityMcpCageLaunchPolicyV2BrokerBinding) MarshalJSON() ([]byte, error) {
+func (t SecurityMcpCageLaunchPolicyV1BrokerBinding) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	if err != nil {
 		return nil, err
@@ -13076,7 +13076,7 @@ func (t SecurityMcpCageLaunchPolicyV2BrokerBinding) MarshalJSON() ([]byte, error
 	return b, err
 }
 
-func (t *SecurityMcpCageLaunchPolicyV2BrokerBinding) UnmarshalJSON(b []byte) error {
+func (t *SecurityMcpCageLaunchPolicyV1BrokerBinding) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	if err != nil {
 		return err

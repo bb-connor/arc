@@ -163,7 +163,7 @@ since been pinned is removed by the next `--update`.
 
 ## crates/security/chio-cage (1)
 
-- `crates/security/chio-cage/src/lib.rs:62` `COMPILED_SANDBOX_PROFILE_SCHEMA` = `chio.cage.compiled-sandbox-profile.v2`
+- `crates/security/chio-cage/src/lib.rs:62` `COMPILED_SANDBOX_PROFILE_SCHEMA` = `chio.cage.compiled-sandbox-profile.v1`
 
 ## crates/security/chio-cage-plan (2)
 
@@ -206,4 +206,4 @@ since been pinned is removed by the next `--update`.
 ## crates/security/chio-security-types (2)
 
 - `crates/security/chio-security-types/src/migration.rs:9` `ENTERPRISE_MIGRATION_TRANSITION_SIGNATURE_DOMAIN` = `chio.enterprise-migration-transition.v1`
-- `crates/security/chio-security-types/src/migration.rs:13` `CAGE_MIGRATION_POSTURE_SCHEMA` = `chio.cage-migration-posture.v2`
+- `crates/security/chio-security-types/src/migration.rs:13` `CAGE_MIGRATION_POSTURE_SCHEMA` = `chio.cage-migration-posture.v1`

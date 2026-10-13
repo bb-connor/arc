@@ -20,7 +20,7 @@
     },
     {
       "id": "policy_noncanonical_trailing_newline",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "append_bytes",
         "hex": "0a"
@@ -35,7 +35,7 @@
     },
     {
       "id": "policy_signature_tampered",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/signature",
@@ -51,7 +51,7 @@
     },
     {
       "id": "policy_unknown_field",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "add",
         "path": "/body/allow_legacy_fallback",
@@ -67,7 +67,7 @@
     },
     {
       "id": "policy_registered_key_mismatch",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/body/registered_public_key",
@@ -83,7 +83,7 @@
     },
     {
       "id": "policy_receipt_runtime_missing",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "remove",
         "path": "/body/receipt"
@@ -98,7 +98,7 @@
     },
     {
       "id": "policy_enterprise_migration_missing",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "remove",
         "path": "/body/enterprise_migration"
@@ -113,7 +113,7 @@
     },
     {
       "id": "policy_enterprise_migration_stage_generation_mismatch",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/body/enterprise_migration/stage",
@@ -129,7 +129,7 @@
     },
     {
       "id": "policy_receipt_trusted_signer_mismatch",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/body/receipt/trusted_signer_public_key",
@@ -145,7 +145,7 @@
     },
     {
       "id": "policy_independent_ceiling_denies_read_path",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/body/operator_ceilings/read_paths",
@@ -161,7 +161,7 @@
     },
     {
       "id": "policy_target_pin_wrong_length",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/body/runtime/target_binding_digest",
@@ -177,7 +177,7 @@
     },
     {
       "id": "policy_broker_on_nonbroker_profile",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "add",
         "path": "/body/broker",
@@ -201,7 +201,7 @@
     },
     {
       "id": "policy_broker_binding_ambiguous",
-      "base": "positive/mcp-cage-launch-policy-v2.json",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
         "op": "add",
         "path": "/body/broker",
@@ -226,7 +226,7 @@
     },
     {
       "id": "argv_empty_argv0",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/target_argv/0",
@@ -242,7 +242,7 @@
     },
     {
       "id": "argv_embedded_nul",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/target_argv/1",
@@ -258,7 +258,7 @@
     },
     {
       "id": "argv0_target_path_mismatch",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/target_argv/0",
@@ -274,7 +274,7 @@
     },
     {
       "id": "plan_unreviewed_seccomp_architecture",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/seccomp/architecture",
@@ -290,7 +290,7 @@
     },
     {
       "id": "environment_casefolded_credential_marker",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "add",
         "path": "/environment/app_secret",
@@ -306,7 +306,7 @@
     },
     {
       "id": "environment_unicode_control_value",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "add",
         "path": "/environment/LANG",
@@ -322,7 +322,7 @@
     },
     {
       "id": "fd_stdout_role_swapped",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/fd_table/3/purpose/kind",
@@ -338,7 +338,7 @@
     },
     {
       "id": "fd_stdio_identity_not_socket",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/fd_table/2/identity/kind",
@@ -354,7 +354,7 @@
     },
     {
       "id": "fd_live_identity_changed",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/fd_table/3/identity/inode",
@@ -370,7 +370,7 @@
     },
     {
       "id": "helper_binding_digest_mismatch",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/fd_table/0/binding_digest",
@@ -404,7 +404,7 @@
     {
       "id": "profile_digest_mismatch",
       "base": "positive/cage-enforcement-prepared-v1.json",
-      "related_positive": "positive/cage-init-plan-native-v2.json",
+      "related_positive": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/profile_digest",
@@ -467,7 +467,7 @@
     },
     {
       "id": "broker_fd_missing",
-      "base": "positive/cage-init-plan-brokered-v2.json",
+      "base": "positive/cage-init-plan-brokered-v1.json",
       "mutation": {
         "op": "remove",
         "path": "/fd_table/3"
@@ -482,7 +482,7 @@
     },
     {
       "id": "broker_authentication_digest_mismatch",
-      "base": "positive/cage-init-plan-brokered-v2.json",
+      "base": "positive/cage-init-plan-brokered-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/fd_table/3/binding_digest",
@@ -595,7 +595,7 @@
     },
     {
       "id": "execution_identity_missing",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "remove",
         "path": "/execution_identity"
@@ -610,7 +610,7 @@
     },
     {
       "id": "execution_identity_root_uid",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/execution_identity/uid",
@@ -626,7 +626,7 @@
     },
     {
       "id": "execution_identity_root_gid",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/execution_identity/gid",
@@ -642,7 +642,7 @@
     },
     {
       "id": "execution_identity_sentinel_uid",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/execution_identity/uid",
@@ -658,7 +658,7 @@
     },
     {
       "id": "execution_identity_sentinel_gid",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/execution_identity/gid",
@@ -674,7 +674,7 @@
     },
     {
       "id": "execution_identity_sentinel_supplementary_gid",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/execution_identity/supplementary_gids/0",
@@ -690,7 +690,7 @@
     },
     {
       "id": "execution_identity_primary_gid_duplicated",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/execution_identity/supplementary_gids",
@@ -706,7 +706,7 @@
     },
     {
       "id": "execution_identity_groups_unsorted",
-      "base": "positive/cage-init-plan-native-v2.json",
+      "base": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/execution_identity/supplementary_gids",
@@ -723,7 +723,7 @@
     {
       "id": "prepared_execution_identity_mismatch",
       "base": "positive/cage-enforcement-prepared-v1.json",
-      "related_positive": "positive/cage-init-plan-native-v2.json",
+      "related_positive": "positive/cage-init-plan-native-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/applied_execution_identity/uid",

@@ -490,7 +490,7 @@ fb23c4ac6bd6b764ec08e761fac94296dcc3a96151852ea45f7eeef6698bc876  spec/schemas/c
 16242b528f954908c5a8e6498f26d700537476b2dd406ae7100ee4abb0930d63  spec/schemas/chio-wire/v1/security/cage-enforcement-record-v1.schema.json
 fc3aef4a4c751c6e39b7fda6d5ea0513812b506ce7d87494e48def9b545cbd0c  spec/schemas/chio-wire/v1/security/cage-exec-transition-observed-v1.schema.json
 cf0a29e92204cc16fd74dafc4cc3870f676d94d9d0ec218b7e988a6c1c06608b  spec/schemas/chio-wire/v1/security/cage-fully-enforced-evidence-v1.schema.json
-e131036e2146eea83988a92e67c959260a6f36cd948bb0ac6360c2f7f2b3acc2  spec/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json
+e131036e2146eea83988a92e67c959260a6f36cd948bb0ac6360c2f7f2b3acc2  spec/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json
 52090151e09378b905edc5b46791aa460805df5ba081ee87c9c746f66c4eb623  spec/schemas/chio-wire/v1/security/cage-process-exit-evidence-v1.schema.json
 4f7e36d618bd340375993bb8aede7b010ba5465d0af4ac462adf41cb07c0fb23  spec/schemas/chio-wire/v1/security/cage-receipt-body-v1.schema.json
 5da9dfca334b1dfcf2f438dba900e8bda2fa6e8b0499303778618b0e5667d377  spec/schemas/chio-wire/v1/security/cage-receipt-metadata-v1.schema.json
@@ -521,7 +521,7 @@ fce6a4e763efa63821eeaeb5494ea442903d32871bb83068e679307f607983e0  spec/schemas/c
 12dd631dac1dd654e24cb13d976432b60a1763a32722d4e5599c7e5a2d40c24f  spec/schemas/chio-wire/v1/security/key-log-witness-signature-v1.schema.json
 0c352eab453320a55df09f32eabf9d235bf4f6a937a77b54e93aa6e16a7a8ada  spec/schemas/chio-wire/v1/security/keyring-artifact-signature-v1.schema.json
 ab857b7010dbdc6437056597f23fcbdf5f0a830b73eae31648b9ab1a51d82a0c  spec/schemas/chio-wire/v1/security/lift-rollback-completion-receipt-body-v1.schema.json
-2cad2f1d85bffa9247561875d8ab764e38227677835fde97889eeb8d28973824  spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json
+2cad2f1d85bffa9247561875d8ab764e38227677835fde97889eeb8d28973824  spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json
 cba94aa57349c4af61ef0846b0c58423e3e81b903952ed2355befd1ba77232db  spec/schemas/chio-wire/v1/security/response-completion-receipt-body-v1.schema.json
 d52e1fa62a0e3ab9af7bc73038cfbbbba550af507635ee8443d747456c1dcbd0  spec/schemas/chio-wire/v1/security/response-effect-v1.schema.json
 b0def7efc306001c6e9158797ff48394ab5bccb8df21a84b09849e9f81c24bf0  spec/schemas/chio-wire/v1/security/response-plan-receipt-body-v1.schema.json

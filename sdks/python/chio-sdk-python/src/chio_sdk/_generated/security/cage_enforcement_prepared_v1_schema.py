@@ -16,7 +16,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
-from . import cage_init_plan_v2_schema
+from . import cage_init_plan_v1_schema
 
 
 class Digest(RootModel[constr(pattern=r"^[0-9a-f]{64}$")]):
@@ -63,7 +63,7 @@ class ChioCageEnforcementPreparedEvidenceV1(BaseModel):
     helper_binding_digest: Digest
     target_binding_digest: Digest
     target_identity: RegularFileIdentity
-    applied_execution_identity: cage_init_plan_v2_schema.ExecutionIdentity
+    applied_execution_identity: cage_init_plan_v1_schema.ExecutionIdentity
     nono_version: Literal["0.53.0"]
     nono_patch_version: Literal["chio.2"]
     landlock_abi: conint(ge=4, le=4294967295)

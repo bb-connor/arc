@@ -174,8 +174,8 @@
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-fully-enforced-evidence-v1.schema.json"
     },
     {
-      "file": "cage-init-plan-v2.schema.json",
-      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json"
+      "file": "cage-init-plan-v1.schema.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json"
     },
     {
       "file": "cage-process-exit-evidence-v1.schema.json",
@@ -298,8 +298,8 @@
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/lift-rollback-completion-receipt-body-v1.schema.json"
     },
     {
-      "file": "mcp-cage-launch-policy-v2.schema.json",
-      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json"
+      "file": "mcp-cage-launch-policy-v1.schema.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json"
     },
     {
       "file": "response-completion-receipt-body-v1.schema.json",

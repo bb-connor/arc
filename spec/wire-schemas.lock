@@ -5,7 +5,7 @@
 version = 1
 
 [[schema]]
-value = "chio-cage-compiler.v2"
+value = "chio-cage-compiler.v1"
 files = ["crates/security/chio-cage-plan/src/model.rs"]
 first_seen = "3d3e4b4d9d"
 
@@ -665,12 +665,12 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
-value = "chio.cage-migration-posture.v2"
+value = "chio.cage-migration-posture.v1"
 files = ["crates/security/chio-security-types/src/migration.rs"]
 first_seen = "6ea79bb5da"
 
 [[schema]]
-value = "chio.cage.compiled-sandbox-profile.v2"
+value = "chio.cage.compiled-sandbox-profile.v1"
 files = ["crates/security/chio-cage/src/lib.rs"]
 first_seen = "3d3e4b4d9d"
 
@@ -690,7 +690,7 @@ files = ["crates/security/chio-cage-plan/src/enforcement.rs"]
 first_seen = "3d3e4b4d9d"
 
 [[schema]]
-value = "chio.cage.init-plan.v2"
+value = "chio.cage.init-plan.v1"
 files = ["crates/security/chio-cage-plan/src/model.rs"]
 first_seen = "3d3e4b4d9d"
 
@@ -3165,7 +3165,7 @@ files = ["crates/economy/chio-listing/src/discovery.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.mcp.cage-launch-policy.v2"
+value = "chio.mcp.cage-launch-policy.v1"
 files = ["crates/products/chio-cli/src/cli/mcp/cage_policy.rs"]
 first_seen = "3d3e4b4d9d"
 

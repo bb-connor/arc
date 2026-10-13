@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json",
   "title": "Chio cage-init plan v2",
   "description": "Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.",
   "type": "object",
@@ -25,8 +25,8 @@
     "broker_authentication_digest"
   ],
   "properties": {
-    "schema": { "const": "chio.cage.init-plan.v2" },
-    "compiler_version": { "const": "chio-cage-compiler.v2" },
+    "schema": { "const": "chio.cage.init-plan.v1" },
+    "compiler_version": { "const": "chio-cage-compiler.v1" },
     "manifest_digest": { "$ref": "#/$defs/digest" },
     "profile_digest": { "$ref": "#/$defs/digest" },
     "plan_fd_slot": { "const": 3 },

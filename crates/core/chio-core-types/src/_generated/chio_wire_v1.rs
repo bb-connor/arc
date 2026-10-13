@@ -70225,7 +70225,7 @@ pub mod security_broker_release_attempt_acknowledgement_v1 {
         }
     }
 }
-pub mod security_cage_init_plan_v2 {
+pub mod security_cage_init_plan_v1 {
     /// Error types.
     pub mod error {
         /// Error from a `TryFrom` or `FromStr` implementation.
@@ -70438,7 +70438,7 @@ pub mod security_cage_init_plan_v2 {
     ///
     /// ```json
     ///{
-    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json",
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json",
     ///  "title": "Chio cage-init plan v2",
     ///  "description": "Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.",
     ///  "type": "object",
@@ -70473,7 +70473,7 @@ pub mod security_cage_init_plan_v2 {
     ///      ]
     ///    },
     ///    "compiler_version": {
-    ///      "const": "chio-cage-compiler.v2"
+    ///      "const": "chio-cage-compiler.v1"
     ///    },
     ///    "environment": {
     ///      "$ref": "#/$defs/environment"
@@ -70503,7 +70503,7 @@ pub mod security_cage_init_plan_v2 {
     ///      "$ref": "#/$defs/resourceLimits"
     ///    },
     ///    "schema": {
-    ///      "const": "chio.cage.init-plan.v2"
+    ///      "const": "chio.cage.init-plan.v1"
     ///    },
     ///    "seccomp": {
     ///      "$ref": "#/$defs/seccompPlan"
@@ -107614,7 +107614,7 @@ pub mod security_lift_rollback_completion_receipt_body_v1 {
         }
     }
 }
-pub mod security_mcp_cage_launch_policy_v2 {
+pub mod security_mcp_cage_launch_policy_v1 {
     /// Error types.
     pub mod error {
         /// Error from a `TryFrom` or `FromStr` implementation.
@@ -107903,7 +107903,7 @@ pub mod security_mcp_cage_launch_policy_v2 {
     ///
     /// ```json
     ///{
-    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json",
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json",
     ///  "title": "Chio signed MCP cage launch policy v2",
     ///  "description": "Canonical signed operator policy for a migration-enforced MCP stdio cage launch.",
     ///  "type": "object",
@@ -113695,7 +113695,7 @@ pub mod security_mcp_cage_launch_policy_v2 {
     ///      "$ref": "#/$defs/runtime"
     ///    },
     ///    "schema": {
-    ///      "const": "chio.mcp.cage-launch-policy.v2"
+    ///      "const": "chio.mcp.cage-launch-policy.v1"
     ///    },
     ///    "signed_manifest": {
     ///      "title": "Chio signed tool manifest v2",
