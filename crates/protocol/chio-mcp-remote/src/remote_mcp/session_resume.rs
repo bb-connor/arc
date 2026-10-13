@@ -933,22 +933,24 @@ fn verify_remote_session_hmac(
 fn validate_restored_peer_capabilities(
     record: &RemoteSessionResumeRecord,
 ) -> Result<PeerCapabilities, CliError> {
-    let mut derived = parse_remote_session_peer_capabilities(&record.initialize_params);
-    if record.peer_capabilities.authorization.is_some() {
-        // New sessions persist the handshake's negotiated profile, even when
-        // every extension is disabled. Recompute that exact profile; do not
-        // upgrade legacy records that deliberately retain no authorization.
-        derived.authorization = Some(
-            chio_mcp_adapter::edge::authorization::negotiate_authorization_capabilities(
-                &record.initialize_params,
-            )
-            .map_err(|_| {
-                CliError::cli_other_error(
-                    "stored MCP session has invalid authorization negotiation".to_string(),
-                )
-            })?,
-        );
+    // Every session persists the handshake's negotiated authorization profile,
+    // even when every extension is disabled; restore recomputes that exact profile.
+    if record.peer_capabilities.authorization.is_none() {
+        return Err(CliError::cli_other_error(
+            "stored MCP session lacks its negotiated authorization profile".to_string(),
+        ));
     }
+    let mut derived = parse_remote_session_peer_capabilities(&record.initialize_params);
+    derived.authorization = Some(
+        chio_mcp_adapter::edge::authorization::negotiate_authorization_capabilities(
+            &record.initialize_params,
+        )
+        .map_err(|_| {
+            CliError::cli_other_error(
+                "stored MCP session has invalid authorization negotiation".to_string(),
+            )
+        })?,
+    );
     if derived != record.peer_capabilities {
         return Err(CliError::cli_other_error(
             "stored MCP session failed peer capability re-validation against initialize params"

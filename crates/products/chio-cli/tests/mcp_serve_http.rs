@@ -246,30 +246,8 @@ fn spawn_http_server_with_session_lifecycle_tuning(
     drain_grace_millis: Option<u64>,
     reaper_interval_millis: Option<u64>,
 ) -> ServerGuard {
-    spawn_http_server_with_session_lifecycle_env_prefix(
-        dir,
-        listen,
-        token,
-        session_db_path,
-        idle_expiry_millis,
-        drain_grace_millis,
-        reaper_interval_millis,
-        "CHIO",
-    )
-}
-
-fn spawn_http_server_with_session_lifecycle_env_prefix(
-    dir: &Path,
-    listen: SocketAddr,
-    token: &str,
-    session_db_path: Option<&Path>,
-    idle_expiry_millis: Option<u64>,
-    drain_grace_millis: Option<u64>,
-    reaper_interval_millis: Option<u64>,
-    env_prefix: &str,
-) -> ServerGuard {
     let policy_path = write_policy(dir);
-    spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+    spawn_http_server_with_policy_path_and_session_lifecycle(
         dir,
         &policy_path,
         listen,
@@ -278,11 +256,10 @@ fn spawn_http_server_with_session_lifecycle_env_prefix(
         idle_expiry_millis,
         drain_grace_millis,
         reaper_interval_millis,
-        env_prefix,
     )
 }
 
-fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+fn spawn_http_server_with_policy_path_and_session_lifecycle(
     dir: &Path,
     policy_path: &Path,
     listen: SocketAddr,
@@ -291,7 +268,6 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
     idle_expiry_millis: Option<u64>,
     drain_grace_millis: Option<u64>,
     reaper_interval_millis: Option<u64>,
-    env_prefix: &str,
 ) -> ServerGuard {
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
@@ -324,22 +300,13 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
     ]);
     add_remote_session_state(&mut command, dir, session_db_path);
     if let Some(value) = idle_expiry_millis {
-        command.env(
-            format!("{env_prefix}_MCP_SESSION_IDLE_EXPIRY_MILLIS"),
-            value.to_string(),
-        );
+        command.env("CHIO_MCP_SESSION_IDLE_EXPIRY_MILLIS", value.to_string());
     }
     if let Some(value) = drain_grace_millis {
-        command.env(
-            format!("{env_prefix}_MCP_SESSION_DRAIN_GRACE_MILLIS"),
-            value.to_string(),
-        );
+        command.env("CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS", value.to_string());
     }
     if let Some(value) = reaper_interval_millis {
-        command.env(
-            format!("{env_prefix}_MCP_SESSION_REAPER_INTERVAL_MILLIS"),
-            value.to_string(),
-        );
+        command.env("CHIO_MCP_SESSION_REAPER_INTERVAL_MILLIS", value.to_string());
     }
     spawn_secured_http_command(command, dir, &script_path, "spawn chio mcp serve-http")
 }
@@ -2571,16 +2538,15 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
     let policy_path = write_policy_with_tools(&dir, &["echo_json", "sampled_echo"]);
 
     let (session_id, protocol_version) = {
-        let mut server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        let mut server = spawn_http_server_with_policy_path_and_session_lifecycle(
             &dir,
             &policy_path,
             listen,
             token,
             Some(&session_db_path),
-            Some(5_000),
-            Some(5_000),
-            Some(50),
-            "Chio",
+            None,
+            None,
+            None,
         );
         let client = Client::builder()
             .timeout(HTTP_CLIENT_TIMEOUT)
@@ -2593,16 +2559,15 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
     };
 
     let policy_path = write_policy_with_tools(&dir, &["sampled_echo"]);
-    let mut server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+    let mut server = spawn_http_server_with_policy_path_and_session_lifecycle(
         &dir,
         &policy_path,
         listen,
         token,
         Some(&session_db_path),
-        Some(5_000),
-        Some(5_000),
-        Some(50),
-        "Chio",
+        None,
+        None,
+        None,
     );
     let client = Client::builder()
         .timeout(HTTP_CLIENT_TIMEOUT)
@@ -2664,16 +2629,15 @@ fn mcp_serve_http_restores_sessions_with_fresh_capabilities_after_ttl_expiry() {
     let policy_path = write_policy_with_tools_and_ttl(&dir, &["echo_json"], 1);
 
     let (session_id, protocol_version) = {
-        let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        let _server = spawn_http_server_with_policy_path_and_session_lifecycle(
             &dir,
             &policy_path,
             listen,
             token,
             Some(&session_db_path),
-            Some(5_000),
-            Some(5_000),
-            Some(50),
-            "Chio",
+            None,
+            None,
+            None,
         );
         let client = Client::builder()
             .timeout(HTTP_CLIENT_TIMEOUT)
@@ -2686,16 +2650,15 @@ fn mcp_serve_http_restores_sessions_with_fresh_capabilities_after_ttl_expiry() {
 
     thread::sleep(Duration::from_secs(2));
 
-    let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+    let _server = spawn_http_server_with_policy_path_and_session_lifecycle(
         &dir,
         &policy_path,
         listen,
         token,
         Some(&session_db_path),
-        Some(5_000),
-        Some(5_000),
-        Some(50),
-        "Chio",
+        None,
+        None,
+        None,
     );
     let client = Client::builder()
         .timeout(HTTP_CLIENT_TIMEOUT)
@@ -2737,16 +2700,15 @@ fn mcp_serve_http_drops_restored_sessions_when_auth_mode_changes() {
     let policy_path = write_policy(&dir);
 
     let session_id = {
-        let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        let _server = spawn_http_server_with_policy_path_and_session_lifecycle(
             &dir,
             &policy_path,
             listen,
             token,
             Some(&session_db_path),
-            Some(5_000),
-            Some(5_000),
-            Some(50),
-            "Chio",
+            None,
+            None,
+            None,
         );
         let client = Client::builder()
             .timeout(HTTP_CLIENT_TIMEOUT)
@@ -3405,11 +3367,11 @@ fn mcp_serve_http_shared_hosted_owner_reuses_one_upstream_subprocess_and_keeps_s
         .expect("session A trust json");
     assert_eq!(
         trust_a["ownership"]["hostedIsolation"].as_str(),
-        Some("shared_hosted_owner_compatibility")
+        Some("shared_hosted_owner")
     );
     assert_eq!(
         trust_a["ownership"]["hostedIdentityProfile"].as_str(),
-        Some("weak_shared_hosted_owner_compatibility")
+        Some("weak_shared_hosted_owner")
     );
 
     let startup_markers =
@@ -4797,11 +4759,11 @@ fn mcp_serve_http_shared_owner_jwt_sessions_keep_weak_compatibility_continuity()
     let trust: Value = trust.json().expect("session trust json");
     assert_eq!(
         trust["ownership"]["hostedIsolation"].as_str(),
-        Some("shared_hosted_owner_compatibility")
+        Some("shared_hosted_owner")
     );
     assert_eq!(
         trust["ownership"]["hostedIdentityProfile"].as_str(),
-        Some("weak_shared_hosted_owner_compatibility")
+        Some("weak_shared_hosted_owner")
     );
 
     let token_b = sign_jwt(

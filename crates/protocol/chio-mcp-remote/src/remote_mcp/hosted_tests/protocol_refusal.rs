@@ -61,7 +61,7 @@ fn fixture() -> TestResult<HttpFixture> {
         .public_key();
     let sessions = Arc::new(RemoteSessionLedger::new(
         config.clock.clone(),
-        config.lifecycle_policy(),
+        config.lifecycle_policy()?,
         config.session_db_path.clone(),
         factory.resume_hmac_keyring.clone(),
     )?);

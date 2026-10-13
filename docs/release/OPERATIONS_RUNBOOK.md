@@ -18,7 +18,7 @@ The current ship boundary is:
   deterministic leader selection and eventual repair; not consensus-backed HA
 - **hosted auth:** single-node or dedicated-per-session hosted admission with
   explicit sender-constrained access tokens where available; static bearer,
-  non-`cnf`, and `shared_hosted_owner` paths are compatibility-only
+  non-`cnf`, and `shared_hosted_owner` paths are outside the bounded profile
 - **monetary budgets:** single-node atomic on one SQLite store; clustered mode
   admits the documented overrun bound and is not distributed-linearizable
 - **receipts and checkpoints:** signed local audit evidence with checkpoint
@@ -122,9 +122,11 @@ Bounded hosted/auth recommendation:
 - require explicit sender-constrained access tokens with `cnf` where the
   hosted authorization surface is part of the security boundary
 - treat `--auth-token`, non-`cnf` JWT/introspection tokens, random per-session
-  subject fallback, and `shared_hosted_owner` as compatibility-only paths
+  subject fallback, and `shared_hosted_owner` as outside the bounded profile
 
-Hosted session lifecycle tuning now uses these canonical env names:
+Hosted session lifecycle tuning reads these env variables. An unset variable
+takes its default; a set value that is not a positive integer number of
+milliseconds refuses startup:
 
 - `CHIO_MCP_SESSION_IDLE_EXPIRY_MILLIS`
 - `CHIO_MCP_SESSION_DRAIN_GRACE_MILLIS`

@@ -13,7 +13,7 @@ The current ship boundary is:
   deterministic leader selection and eventual repair; not consensus-backed HA
 - **hosted auth:** single-node or dedicated-per-session hosted admission with
   explicit sender-constrained access tokens where available; static bearer,
-  non-`cnf`, and `shared_hosted_owner` paths are compatibility-only
+  non-`cnf`, and `shared_hosted_owner` paths are outside the bounded profile
 - **monetary budgets:** single-node atomic on one SQLite store; clustered mode
   admits the documented overrun bound and is not distributed-linearizable
 - **receipts and checkpoints:** signed local audit evidence with checkpoint

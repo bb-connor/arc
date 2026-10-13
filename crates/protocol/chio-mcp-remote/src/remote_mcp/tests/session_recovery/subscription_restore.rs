@@ -140,7 +140,7 @@ impl Hosted {
     fn ledger(&self) -> Result<RemoteSessionLedger, Box<dyn std::error::Error>> {
         Ok(RemoteSessionLedger::new(
             self.factory.config.clock.clone(),
-            self.factory.config.lifecycle_policy(),
+            self.factory.config.lifecycle_policy()?,
             Some(self.path.clone()),
             self.factory.resume_hmac_keyring.clone(),
         )?)

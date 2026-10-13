@@ -253,9 +253,60 @@ struct SessionLifecyclePolicy {
     request_response_timeout_millis: u64,
 }
 
+impl Default for SessionLifecyclePolicy {
+    fn default() -> Self {
+        Self {
+            idle_expiry_millis: DEFAULT_SESSION_IDLE_EXPIRY_MILLIS,
+            drain_grace_millis: DEFAULT_SESSION_DRAIN_GRACE_MILLIS,
+            reaper_interval_millis: DEFAULT_SESSION_REAPER_INTERVAL_MILLIS,
+            tombstone_retention_millis: DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS,
+            request_response_timeout_millis: DEFAULT_REQUEST_RESPONSE_TIMEOUT_MILLIS,
+        }
+    }
+}
+
 impl SessionLifecyclePolicy {
-    fn from_env() -> Self {
-        read_session_lifecycle_policy()
+    fn from_env() -> Result<Self, CliError> {
+        Self::from_lookup(|name| std::env::var_os(name))
+    }
+
+    /// An unset variable takes its default. A set variable must be a positive
+    /// decimal integer of milliseconds; anything else refuses the policy.
+    fn from_lookup(
+        lookup: impl Fn(&str) -> Option<std::ffi::OsString>,
+    ) -> Result<Self, CliError> {
+        let read = |name: &str, default: u64| -> Result<u64, CliError> {
+            let Some(raw) = lookup(name) else {
+                return Ok(default);
+            };
+            raw.to_str()
+                .and_then(|value| value.parse::<u64>().ok())
+                .filter(|value| *value > 0)
+                .ok_or_else(|| {
+                    CliError::cli_other_error(format!(
+                        "{name} must be a positive integer number of milliseconds"
+                    ))
+                })
+        };
+        Ok(Self {
+            idle_expiry_millis: read(
+                SESSION_IDLE_EXPIRY_ENV,
+                DEFAULT_SESSION_IDLE_EXPIRY_MILLIS,
+            )?,
+            drain_grace_millis: read(SESSION_DRAIN_GRACE_ENV, DEFAULT_SESSION_DRAIN_GRACE_MILLIS)?,
+            reaper_interval_millis: read(
+                SESSION_REAPER_INTERVAL_ENV,
+                DEFAULT_SESSION_REAPER_INTERVAL_MILLIS,
+            )?,
+            tombstone_retention_millis: read(
+                SESSION_TOMBSTONE_RETENTION_ENV,
+                DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS,
+            )?,
+            request_response_timeout_millis: read(
+                REQUEST_RESPONSE_TIMEOUT_ENV,
+                DEFAULT_REQUEST_RESPONSE_TIMEOUT_MILLIS,
+            )?,
+        })
     }
 }
 
@@ -266,7 +317,6 @@ struct RemoteSessionDiagnosticRecord {
     capabilities: Vec<RemoteSessionCapability>,
     lifecycle: RemoteSessionLifecycleSnapshot,
     protocol_version: Option<String>,
-    #[serde(default)]
     ownership: RemoteSessionOwnershipSnapshot,
     terminal_at: u64,
     terminal_reason: Option<TerminalReason>,
@@ -524,28 +574,33 @@ enum RemoteNotificationDelivery {
     GetSse,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+/// Upstream process ownership for hosted sessions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum RemoteHostedIsolationMode {
-    #[default]
+    /// Each session owns its own upstream process.
     DedicatedPerSession,
-    SharedHostedOwnerCompatibility,
+    /// One upstream process serves every session of the edge.
+    SharedHostedOwner,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+/// Strength of the identity binding between a session and its upstream.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum RemoteHostedIdentityProfile {
-    #[default]
+    /// The upstream process sees only this session's authenticated principal.
     StrongDedicatedSession,
-    WeakSharedHostedOwnerCompatibility,
+    /// The upstream process is shared, so the session snapshot omits the
+    /// bearer token fingerprint and upstream state is not per-principal.
+    WeakSharedHostedOwner,
 }
 
 impl RemoteHostedIsolationMode {
     fn identity_profile(self) -> RemoteHostedIdentityProfile {
         match self {
             Self::DedicatedPerSession => RemoteHostedIdentityProfile::StrongDedicatedSession,
-            Self::SharedHostedOwnerCompatibility => {
-                RemoteHostedIdentityProfile::WeakSharedHostedOwnerCompatibility
+            Self::SharedHostedOwner => {
+                RemoteHostedIdentityProfile::WeakSharedHostedOwner
             }
         }
     }
@@ -553,7 +608,7 @@ impl RemoteHostedIsolationMode {
     fn snapshot_auth_context(self, auth_context: SessionAuthContext) -> SessionAuthContext {
         match (self, auth_context) {
             (
-                Self::SharedHostedOwnerCompatibility,
+                Self::SharedHostedOwner,
                 SessionAuthContext {
                     transport,
                     method,
@@ -604,9 +659,7 @@ impl RemoteHostedIsolationMode {
 #[serde(rename_all = "camelCase")]
 struct RemoteSessionOwnershipSnapshot {
     request_ownership: RequestOwnershipSnapshot,
-    #[serde(default)]
     hosted_isolation: RemoteHostedIsolationMode,
-    #[serde(default)]
     hosted_identity_profile: RemoteHostedIdentityProfile,
     request_stream_owner: RemoteRequestStreamOwner,
     notification_stream_owner: RemoteNotificationStreamOwner,
@@ -1067,10 +1120,10 @@ mod session_core_writer;
 use session_core_writer::BroadcastJsonRpcWriter;
 
 impl RemoteServeHttpConfig {
-    fn lifecycle_policy(&self) -> SessionLifecyclePolicy {
+    fn lifecycle_policy(&self) -> Result<SessionLifecyclePolicy, CliError> {
         #[cfg(test)]
         if let Some(policy) = &self.test_lifecycle_policy {
-            return policy.clone();
+            return Ok(policy.clone());
         }
         SessionLifecyclePolicy::from_env()
     }

@@ -40,7 +40,7 @@
     },
     "hosted_isolation": {
       "type": "string",
-      "enum": ["dedicated_per_session", "shared_hosted_owner_compatibility"],
+      "enum": ["dedicated_per_session", "shared_hosted_owner"],
       "description": "Hosted-isolation mode for the session. Mirrors the snake_case enum `RemoteHostedIsolationMode`."
     },
     "lifecycle": {
