@@ -1,7 +1,6 @@
 use super::*;
 use crate::stateless::{
-    JSONRPC_UNSUPPORTED_PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION, META_SERVER_INFO,
-    STATELESS_PROTOCOL_VERSION,
+    JSONRPC_UNSUPPORTED_PROTOCOL_VERSION, MCP_2025_11_25, MCP_2026_07_28, META_SERVER_INFO,
 };
 
 fn stateless_request(id: u64, method: &str, mut params: Value, version: &str) -> Value {
@@ -22,14 +21,14 @@ fn server_discover_lists_both_revisions_without_opening_a_session() {
             1,
             "server/discover",
             json!({}),
-            STATELESS_PROTOCOL_VERSION,
+            MCP_2026_07_28,
         ))
         .unwrap();
 
     let result = &response["result"];
     assert_eq!(
         result["supportedVersions"],
-        json!([STATELESS_PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION])
+        json!([MCP_2026_07_28, MCP_2025_11_25])
     );
     assert_eq!(result["resultType"], "complete");
     assert_eq!(result["cacheScope"], "private");
@@ -50,7 +49,7 @@ fn stateless_requests_are_served_without_initialize() {
             1,
             "tools/list",
             json!({}),
-            STATELESS_PROTOCOL_VERSION,
+            MCP_2026_07_28,
         ))
         .unwrap();
     assert_eq!(tools["result"]["resultType"], "complete");
@@ -64,7 +63,7 @@ fn stateless_requests_are_served_without_initialize() {
             2,
             "tools/call",
             json!({ "name": "read_file", "arguments": { "path": "/tmp/demo.txt" } }),
-            STATELESS_PROTOCOL_VERSION,
+            MCP_2026_07_28,
         ))
         .unwrap();
     assert_eq!(call["result"]["isError"], false);
@@ -84,7 +83,7 @@ fn stateless_requests_are_served_without_initialize() {
 fn unsupported_stateless_revision_is_refused_with_supported_list() {
     let mut edge = make_edge(10);
 
-    for requested in ["1900-01-01", LEGACY_PROTOCOL_VERSION] {
+    for requested in ["1900-01-01", MCP_2025_11_25] {
         let response = edge
             .handle_jsonrpc(stateless_request(1, "tools/list", json!({}), requested))
             .unwrap();
@@ -95,7 +94,7 @@ fn unsupported_stateless_revision_is_refused_with_supported_list() {
         assert_eq!(response["error"]["data"]["requested"], requested);
         assert_eq!(
             response["error"]["data"]["supported"],
-            json!([STATELESS_PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION])
+            json!([MCP_2026_07_28, MCP_2025_11_25])
         );
         assert_eq!(
             response["error"]["data"]["chioError"]["code"],
@@ -107,14 +106,14 @@ fn unsupported_stateless_revision_is_refused_with_supported_list() {
 
 #[test]
 fn eras_do_not_mix_on_one_edge() {
-    let mut legacy = make_edge(10);
-    initialize_edge(&mut legacy);
-    let refused = legacy
+    let mut handshake = make_edge(10);
+    initialize_edge(&mut handshake);
+    let refused = handshake
         .handle_jsonrpc(stateless_request(
             2,
             "tools/list",
             json!({}),
-            STATELESS_PROTOCOL_VERSION,
+            MCP_2026_07_28,
         ))
         .unwrap();
     assert_eq!(refused["error"]["code"], JSONRPC_INVALID_REQUEST);
@@ -124,8 +123,8 @@ fn eras_do_not_mix_on_one_edge() {
         .handle_jsonrpc(stateless_request(
             1,
             "initialize",
-            json!({ "protocolVersion": STATELESS_PROTOCOL_VERSION }),
-            STATELESS_PROTOCOL_VERSION,
+            json!({ "protocolVersion": MCP_2026_07_28 }),
+            MCP_2026_07_28,
         ))
         .unwrap();
     assert_eq!(initialize["error"]["code"], JSONRPC_INVALID_REQUEST);
@@ -135,7 +134,7 @@ fn eras_do_not_mix_on_one_edge() {
             2,
             "tools/list",
             json!({}),
-            STATELESS_PROTOCOL_VERSION,
+            MCP_2026_07_28,
         ))
         .unwrap();
     let missing_version = stateless
@@ -168,12 +167,7 @@ fn methods_removed_by_the_stateless_revision_are_not_found() {
         "tasks/list",
     ] {
         let response = edge
-            .handle_jsonrpc(stateless_request(
-                1,
-                method,
-                json!({}),
-                STATELESS_PROTOCOL_VERSION,
-            ))
+            .handle_jsonrpc(stateless_request(1, method, json!({}), MCP_2026_07_28))
             .unwrap();
         assert_eq!(
             response["error"]["code"], JSONRPC_METHOD_NOT_FOUND,
@@ -186,27 +180,24 @@ fn methods_removed_by_the_stateless_revision_are_not_found() {
             2,
             "tools/call",
             json!({ "name": "read_file", "arguments": {}, "task": {} }),
-            STATELESS_PROTOCOL_VERSION,
+            MCP_2026_07_28,
         ))
         .unwrap();
     assert_eq!(task["error"]["code"], JSONRPC_INVALID_PARAMS);
 }
 
 #[test]
-fn legacy_initialize_still_selects_the_handshake_revision() {
+fn initialize_still_selects_the_handshake_revision() {
     let mut edge = make_edge(10);
     let response = edge
         .handle_jsonrpc(json!({
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": { "protocolVersion": LEGACY_PROTOCOL_VERSION }
+            "params": { "protocolVersion": MCP_2025_11_25 }
         }))
         .unwrap();
-    assert_eq!(
-        response["result"]["protocolVersion"],
-        LEGACY_PROTOCOL_VERSION
-    );
+    assert_eq!(response["result"]["protocolVersion"], MCP_2025_11_25);
     assert!(response["result"].get("resultType").is_none());
 
     let mut edge = make_edge(10);
@@ -215,7 +206,7 @@ fn legacy_initialize_still_selects_the_handshake_revision() {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
-            "params": { "protocolVersion": STATELESS_PROTOCOL_VERSION }
+            "params": { "protocolVersion": MCP_2026_07_28 }
         }))
         .unwrap();
     assert_eq!(response["error"]["message"], "unsupported protocolVersion");

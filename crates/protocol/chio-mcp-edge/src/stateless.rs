@@ -8,14 +8,13 @@
 use serde_json::{json, Value};
 
 /// The stateless revision, served through per-request `_meta`.
-pub const STATELESS_PROTOCOL_VERSION: &str = "2026-07-28";
+pub const MCP_2026_07_28: &str = "2026-07-28";
 /// The handshake revision, served through `initialize`.
-pub const LEGACY_PROTOCOL_VERSION: &str = "2025-11-25";
+pub const MCP_2025_11_25: &str = "2025-11-25";
 /// Every revision this edge serves, newest first.
-pub const SUPPORTED_PROTOCOL_VERSIONS: &[&str] =
-    &[STATELESS_PROTOCOL_VERSION, LEGACY_PROTOCOL_VERSION];
+pub const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &[MCP_2026_07_28, MCP_2025_11_25];
 /// Revisions accepted through per-request `_meta`.
-pub const STATELESS_PROTOCOL_VERSIONS: &[&str] = &[STATELESS_PROTOCOL_VERSION];
+pub const STATELESS_PROTOCOL_VERSIONS: &[&str] = &[MCP_2026_07_28];
 
 pub const META_PROTOCOL_VERSION: &str = "io.modelcontextprotocol/protocolVersion";
 pub const META_CLIENT_CAPABILITIES: &str = "io.modelcontextprotocol/clientCapabilities";

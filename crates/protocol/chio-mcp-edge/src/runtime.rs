@@ -92,7 +92,7 @@ use tool_calls::{
     BridgeMcpToolCallRequest,
 };
 
-const MCP_PROTOCOL_VERSION: &str = crate::stateless::LEGACY_PROTOCOL_VERSION;
+const MCP_PROTOCOL_VERSION: &str = crate::stateless::MCP_2025_11_25;
 const SUPPORTED_MCP_PROTOCOL_VERSIONS: &[&str] = &[MCP_PROTOCOL_VERSION];
 const JSONRPC_INVALID_REQUEST: i64 = -32600;
 const JSONRPC_METHOD_NOT_FOUND: i64 = -32601;

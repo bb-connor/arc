@@ -2,9 +2,9 @@ use super::errors::JsonRpcProtocolErrorArgs;
 use super::jsonrpc::jsonrpc_protocol_error;
 use super::*;
 use crate::stateless::{
-    unsupported_protocol_version_data, JSONRPC_UNSUPPORTED_PROTOCOL_VERSION,
-    META_CLIENT_CAPABILITIES, META_PROTOCOL_VERSION, META_SERVER_INFO, STATELESS_PROTOCOL_VERSION,
-    STATELESS_PROTOCOL_VERSIONS, SUPPORTED_PROTOCOL_VERSIONS,
+    unsupported_protocol_version_data, JSONRPC_UNSUPPORTED_PROTOCOL_VERSION, MCP_2026_07_28,
+    META_CLIENT_CAPABILITIES, META_PROTOCOL_VERSION, META_SERVER_INFO, STATELESS_PROTOCOL_VERSIONS,
+    SUPPORTED_PROTOCOL_VERSIONS,
 };
 
 /// Methods 2026-07-28 removed from the core protocol.
@@ -143,8 +143,7 @@ impl ChioMcpEdge {
             Ok(authorization) => authorization,
             Err(error) => return error,
         };
-        let mut capabilities =
-            self.advertised_capabilities(&authorization, STATELESS_PROTOCOL_VERSION);
+        let mut capabilities = self.advertised_capabilities(&authorization, MCP_2026_07_28);
         stateless_capabilities(&mut capabilities);
         jsonrpc_result(
             id,
