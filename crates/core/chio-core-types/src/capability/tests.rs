@@ -93,10 +93,10 @@ fn capability_token_signature_verification() {
 }
 
 #[test]
-fn legacy_body_signed_capability_token_still_verifies() -> Result<()> {
+fn plain_body_signature_is_refused() -> Result<()> {
     let kp = Keypair::generate();
     let body = CapabilityTokenBody {
-        id: "cap-legacy-body".to_string(),
+        id: "cap-plain-body".to_string(),
         issuer: kp.public_key(),
         subject: Keypair::generate().public_key(),
         scope: make_scope(vec![make_grant(
@@ -128,10 +128,10 @@ fn legacy_body_signed_capability_token_still_verifies() -> Result<()> {
         signature,
     };
 
-    assert!(token.verify_signature()?);
+    assert!(!token.verify_signature()?);
     assert!(matches!(
         token.verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical),
-        Ok(true)
+        Ok(false)
     ));
     Ok(())
 }

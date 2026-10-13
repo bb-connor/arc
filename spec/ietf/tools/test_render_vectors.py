@@ -688,24 +688,17 @@ class CorpusClaimTests(unittest.TestCase):
         self.assertTrue(broken["signature_valid"])
         self.assertFalse(broken["delegation_chain_shape_valid"])
 
-    def test_capability_body_is_the_token_without_its_signature(self):
-        for case in load("capability")["cases"]:
-            cap = case["capability"]
-            body = {k: v for k, v in cap.items() if k != "signature"}
-            self.assertEqual(rv.canonicalize(body), case["capability_body_canonical_json"], case["id"])
-
     def test_capability_signatures_cover_the_body_with_schema_added_and_not_the_body_alone(self):
         for case in load("capability")["cases"]:
             cap = case["capability"]
             signing_input = rv.capability_signing_input(cap)
-            with_schema = json.loads(case["capability_body_canonical_json"])
-            with_schema["schema"] = "chio.capability.v1"
+            body = {k: v for k, v in cap.items() if k != "signature"}
+            with_schema = dict(body, schema="chio.capability.v1")
             self.assertEqual(signing_input, rv.canonicalize(with_schema), case["id"])
+            self.assertEqual(signing_input, case["capability_signing_body_canonical_json"], case["id"])
             self.assertNotIn("algorithm", json.loads(signing_input))
             over_signing_input = verify_hex(cap["issuer"], signing_input.encode("ascii"), cap["signature"])
-            over_body_alone = verify_hex(
-                cap["issuer"], case["capability_body_canonical_json"].encode("ascii"), cap["signature"]
-            )
+            over_body_alone = verify_hex(cap["issuer"], rv.canonicalize(body).encode("ascii"), cap["signature"])
             self.assertEqual(over_signing_input, case["expected"]["signature_valid"], case["id"])
             self.assertFalse(over_body_alone, case["id"])
 
@@ -809,14 +802,13 @@ class AppendixATests(unittest.TestCase):
         cap = self.capability["capability"]
         self.assertEqual(json.loads(blocks[0][1]), cap)
         self.assertEqual(blocks[0][1], json.dumps(cap, indent=2))
-        # The signing input is the corpus body with "schema" added, never the body alone.
-        expected = json.loads(self.capability["capability_body_canonical_json"])
-        expected["schema"] = "chio.capability.v1"
-        self.assertEqual(blocks[1][1], rv.canonicalize(expected))
-        self.assertNotEqual(blocks[1][1], self.capability["capability_body_canonical_json"])
+        # The signing input is the token body with "schema" added, never the body alone.
+        body = {k: v for k, v in cap.items() if k != "signature"}
+        self.assertEqual(blocks[1][1], rv.canonicalize(dict(body, schema="chio.capability.v1")))
+        self.assertEqual(blocks[1][1], self.capability["capability_signing_body_canonical_json"])
         text = text_of(items)
         self.assertIn('`"schema":"chio.capability.v1"`', text)
-        self.assertIn("`capability_body_canonical_json`", text)
+        self.assertIn("`capability_signing_body_canonical_json`", text)
         self.assertIn("signing input", text)
 
     def test_the_displayed_signing_input_verifies_against_the_issuer_key(self):
@@ -830,13 +822,10 @@ class AppendixATests(unittest.TestCase):
         self.assertTrue(verify_hex(members["issuer"], signing.encode("ascii"), cap["signature"]))
         names = list(members)
         self.assertEqual(names[names.index("schema") - 1 : names.index("schema") + 2], ["issuer", "schema", "scope"])
-        # One changed octet, or the body field as the corpus gives it, does not verify.
+        # One changed octet, or the body without "schema", does not verify.
         self.assertFalse(verify_hex(members["issuer"], signing.replace("3", "4", 1).encode("ascii"), cap["signature"]))
-        self.assertFalse(
-            verify_hex(
-                members["issuer"], self.capability["capability_body_canonical_json"].encode("ascii"), cap["signature"]
-            )
-        )
+        body = {k: v for k, v in cap.items() if k != "signature"}
+        self.assertFalse(verify_hex(members["issuer"], rv.canonicalize(body).encode("ascii"), cap["signature"]))
 
     def test_frame_example(self):
         items = self.by_anchor["example-frame"]["items"]
@@ -1056,12 +1045,12 @@ class AppendixBTests(unittest.TestCase):
             self.assertEqual(expected_text, json.dumps(case["expected"], indent=2), group["id"])
             self.assertEqual(signature, case["capability"]["signature"], group["id"])
             self.assertIn(str(case["verify_at"]), text_of(group["items"]), group["id"])
-            # The signing input is the corpus body with schema added, and the token is
-            # the body, without schema, plus the signature.
+            # The signing input is the corpus signing body, and the token is that
+            # body, without schema, plus the signature.
             members = json.loads(signing_text)
             self.assertEqual(rv.canonicalize(members), signing_text, group["id"])
+            self.assertEqual(signing_text, case["capability_signing_body_canonical_json"], group["id"])
             self.assertEqual(members.pop("schema"), "chio.capability.v1", group["id"])
-            self.assertEqual(rv.canonicalize(members), case["capability_body_canonical_json"], group["id"])
             token = dict(members, signature=signature)
             self.assertEqual(token, case["capability"], group["id"])
             # The shown bytes verify under the shown issuer key, or not, as the result says.

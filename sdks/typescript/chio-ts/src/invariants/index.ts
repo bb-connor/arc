@@ -12,7 +12,6 @@ export {
 } from "./receipt.ts";
 export type { ChioReceipt, ReceiptDecisionKind, ReceiptVerification } from "./receipt.ts";
 export {
-  capabilityBodyCanonicalJson,
   capabilitySigningBody,
   capabilitySigningBodyCanonicalJson,
   parseCapabilityJson,

@@ -47,10 +47,6 @@ func capabilityBody(capability map[string]any) map[string]any {
 	return body
 }
 
-func CapabilityBodyCanonicalJSON(capability map[string]any) (string, error) {
-	return CanonicalizeJSON(capabilityBody(capability))
-}
-
 func isNonEmptyArray(value any) bool {
 	array, ok := value.([]any)
 	return ok && len(array) > 0

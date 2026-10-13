@@ -51,9 +51,8 @@ from its tokens. Capability tokens are defined in {{capabilities}}.
 
 The signing input of the token is its canonical form without the
 `signature` member and with the member `"schema":"chio.capability.v1"`
-added, which sorts between `issuer` and `scope`. The
-`capability_body_canonical_json` value of the case is the same text
-without the `schema` member. The signing input is:
+added, which sorts between `issuer` and `scope`. It is the
+`capability_signing_body_canonical_json` value of the case:
 {: keepWithNext="true"}
 
 ~~~ json

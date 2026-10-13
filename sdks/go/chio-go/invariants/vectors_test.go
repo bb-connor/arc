@@ -59,7 +59,7 @@ type receiptVectors struct {
 type capabilityVectors struct {
 	Cases []struct {
 		Capability                     map[string]any                     `json:"capability"`
-		CapabilityBodyCanonicalJSON    string                             `json:"capability_body_canonical_json"`
+		CapabilitySigningBodyCanonical string                             `json:"capability_signing_body_canonical_json"`
 		Expected                       invariants.CapabilityVerification  `json:"expected"`
 		ExpectedWithMaxDelegationDepth *invariants.CapabilityVerification `json:"expected_with_max_delegation_depth"`
 		ID                             string                             `json:"id"`
@@ -307,12 +307,12 @@ func TestCapabilityVectors(t *testing.T) {
 	loadVectorFile(t, filepath.Join(vectorRoot, "capability", "v1.json"), &vectors)
 	for _, testCase := range vectors.Cases {
 		t.Run(testCase.ID, func(t *testing.T) {
-			renderedBody, err := invariants.CapabilityBodyCanonicalJSON(testCase.Capability)
+			renderedBody, err := invariants.CapabilitySigningBodyCanonicalJSON(testCase.Capability)
 			if err != nil {
-				t.Fatalf("CapabilityBodyCanonicalJSON returned error: %v", err)
+				t.Fatalf("CapabilitySigningBodyCanonicalJSON returned error: %v", err)
 			}
-			if renderedBody != testCase.CapabilityBodyCanonicalJSON {
-				t.Fatalf("unexpected capability body: %s", renderedBody)
+			if renderedBody != testCase.CapabilitySigningBodyCanonical {
+				t.Fatalf("unexpected capability signing body: %s", renderedBody)
 			}
 			verification, err := invariants.VerifyCapability(testCase.Capability, testCase.VerifyAt)
 			if err != nil {

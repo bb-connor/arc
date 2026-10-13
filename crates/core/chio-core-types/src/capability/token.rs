@@ -162,13 +162,13 @@ pub struct CapabilityToken {
     pub signature: Signature,
 }
 
-/// The body of a capability token, containing every field except the signature.
-/// Used as the signing input.
+/// The issuer-authored core of a capability token. It is not a signing input
+/// on its own: [`CapabilityTokenSigningBody`] wraps it with the schema and the
+/// attenuation members.
 ///
-/// The declared signing algorithm is not included in the body: the `signature`
-/// type itself is self-describing (Ed25519 / P-256 / P-384) via its hex
-/// encoding, and the `issuer` key encodes its own algorithm. This keeps the
-/// pre-`SigningBackend` Ed25519 body serialization byte-identical.
+/// The declared signing algorithm is not included: the `signature` is
+/// self-describing (Ed25519 / P-256 / P-384) via its encoding, and the
+/// `issuer` key encodes its own algorithm.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityTokenBody {
     pub id: String,
@@ -183,7 +183,7 @@ pub struct CapabilityTokenBody {
     pub aggregate_invocation_budget: Option<AggregateInvocationBudget>,
 }
 
-/// Schema-aware capability-token signing input used by newly-issued tokens.
+/// The capability-token signing input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityTokenSigningBody {
     pub schema: String,
@@ -229,7 +229,7 @@ impl CapabilityToken {
         }
     }
 
-    /// Extract the schema-aware body used for newly-issued signatures.
+    /// Extract the signing input.
     #[must_use]
     pub fn signing_body(&self) -> CapabilityTokenSigningBody {
         CapabilityTokenSigningBody {
@@ -240,17 +240,6 @@ impl CapabilityToken {
             attenuation_proof: self.attenuation_proof.clone(),
             budget_share_bps: self.budget_share_bps,
         }
-    }
-
-    fn permits_plain_body_signature(&self) -> bool {
-        // Plain v1 tokens sign over the body directly; caveat-bearing tokens sign the schema-aware envelope.
-        self.schema == CHIO_CAPABILITY_SCHEMA
-            && self.caveats.is_empty()
-            && self.scope_attenuations.as_ref().is_none_or(Vec::is_empty)
-            && self.attenuation_proof.is_none()
-            && self.budget_share_bps.is_none()
-            && self.aggregate_invocation_budget.is_none()
-            && !self.scope.has_cumulative_approval()
     }
 
     /// Reject unknown schema IDs and budget amplification.
@@ -887,18 +876,8 @@ impl CapabilityToken {
     /// level or verification returns `Ok(false)`.
     pub fn verify_signature(&self) -> Result<bool> {
         self.validate_schema()?;
-        let signing_body = self.signing_body();
-        if self
-            .issuer
-            .verify_canonical(&signing_body, &self.signature)?
-        {
-            return Ok(true);
-        }
-        if self.permits_plain_body_signature() {
-            let legacy_body = self.body();
-            return self.issuer.verify_canonical(&legacy_body, &self.signature);
-        }
-        Ok(false)
+        self.issuer
+            .verify_canonical(&self.signing_body(), &self.signature)
     }
 
     /// Verify the token's signature and enforce the kernel-side
@@ -975,22 +954,9 @@ impl CapabilityToken {
         // Step 3: schema and cryptographic verification.
         self.validate_schema()
             .map_err(CapabilityFloorVerifyError::Crypto)?;
-        let signing_body = self.signing_body();
-        if self
-            .issuer
-            .verify_canonical(&signing_body, &self.signature)
-            .map_err(CapabilityFloorVerifyError::Crypto)?
-        {
-            return Ok(true);
-        }
-        if self.permits_plain_body_signature() {
-            let legacy_body = self.body();
-            return self
-                .issuer
-                .verify_canonical(&legacy_body, &self.signature)
-                .map_err(CapabilityFloorVerifyError::Crypto);
-        }
-        Ok(false)
+        self.issuer
+            .verify_canonical(&self.signing_body(), &self.signature)
+            .map_err(CapabilityFloorVerifyError::Crypto)
     }
 
     /// Verify the signature AND enforce the validity window in one pass.

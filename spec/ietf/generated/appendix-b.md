@@ -220,8 +220,8 @@ the result that verification is expected to produce. The signing input
 is the canonical form of the token without its `signature` member and
 with the member `"schema":"chio.capability.v1"` added, as in
 {{example-capability}}. The corpus omits the `schema` member from the
-token itself, and its `capability_body_canonical_json` value is the
-signing input without that member.
+token itself, and its `capability_signing_body_canonical_json` value is
+the signing input.
 
 The expected result covers the signature of the token, the signatures,
 key connectivity, and timestamps of its delegation links, and its

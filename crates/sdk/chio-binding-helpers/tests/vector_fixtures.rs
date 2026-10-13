@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use chio_binding_helpers::{
-    canonicalize_json_str, capability_body_canonical_json, receipt_body_canonical_json,
+    canonicalize_json_str, capability_signing_body_canonical_json, receipt_body_canonical_json,
     sha256_hex_utf8, sign_json_str_ed25519, sign_utf8_message_ed25519,
     signed_manifest_body_canonical_json, verify_capability, verify_json_str_signature_ed25519,
     verify_receipt, verify_receipt_json, verify_receipt_json_with_trusted_signer_hex,
@@ -824,7 +824,7 @@ fn capability_case_value(
         "description": description,
         "verify_at": verify_at,
         "capability": capability,
-        "capability_body_canonical_json": capability_body_canonical_json(capability).test_unwrap("canonical capability body"),
+        "capability_signing_body_canonical_json": capability_signing_body_canonical_json(capability).test_unwrap("canonical capability signing body"),
         "expected": {
             "signature_valid": verification.signature_valid,
             "delegation_chain_shape_valid": verification.delegation_chain_shape_valid,
@@ -1638,6 +1638,15 @@ fn capability_fixture_cases_round_trip_through_public_api() {
     for case in fixture["cases"].as_array().test_unwrap("cases array") {
         let capability: CapabilityToken =
             serde_json::from_value(case["capability"].clone()).test_unwrap("parse capability case");
+        assert_eq!(
+            capability_signing_body_canonical_json(&capability)
+                .test_unwrap("canonical capability signing body"),
+            case["capability_signing_body_canonical_json"]
+                .as_str()
+                .test_unwrap("capability_signing_body_canonical_json"),
+            "capability case {} signing body",
+            case["id"]
+        );
         let verify_at = case["verify_at"].as_u64().test_unwrap("verify_at");
         let expected: CapabilityVerification = serde_json::from_value(case["expected"].clone())
             .test_unwrap("parse capability expectation");
