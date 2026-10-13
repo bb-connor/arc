@@ -1,6 +1,6 @@
 use chio_core::receipt::decision::ToolCallAction;
 use chio_kernel::admission_operation::{AdmissionIdentifier, AdmissionOperationStore};
-use chio_kernel::receipt_store::QualifiedAdmissionProjectionStore;
+use chio_kernel::receipt_store::ReceiptStore;
 
 use super::super::state::{read_json, write_secret, Host};
 use super::*;
