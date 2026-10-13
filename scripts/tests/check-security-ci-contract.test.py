@@ -1927,13 +1927,13 @@ assert_boundary_file_rejected(
     "verifier artifact authority authentication changed",
 )
 assert_boundary_file_rejected(
-    "adversarial checker permits enterprise legacy outcome promotion",
+    "adversarial checker permits enterprise outcome promotion",
     Path("scripts/check-security-adversarial-evidence.py"),
     replace_once(
         "    if args.promote_outcome and enterprise_security_runner(environment):\n",
         "    if False:\n",
     ),
-    "enterprise legacy outcome promotion boundary changed",
+    "enterprise outcome promotion boundary changed",
 )
 assert_boundary_file_rejected(
     "adversarial checker deadlocks trusted pending inventory on stale bindings",
