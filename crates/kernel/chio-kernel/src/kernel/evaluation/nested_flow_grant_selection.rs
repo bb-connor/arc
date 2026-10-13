@@ -459,7 +459,11 @@ impl ChioKernel {
                 )
             });
             let msg = error.to_string();
-            if runtime_release_retained && durable_admission.is_some() {
+            if durable_admission.as_ref().is_some_and(|admission| {
+                runtime_release_retained
+                    || admission.state()
+                        != crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
+            }) {
                 return Err(error);
             }
             let receipt_metadata = self.merge_budget_receipt_metadata(
@@ -469,7 +473,7 @@ impl ChioKernel {
                 )),
                 self.budget_backend_receipt_metadata()?,
             );
-            if !runtime_release_retained && durable_admission.is_some() {
+            if durable_admission.is_some() {
                 let (matched_grant_index, financial_metadata) =
                     self.monetary_deny_metadata(matching_grants, cap)?;
                 if let Some(response) = self

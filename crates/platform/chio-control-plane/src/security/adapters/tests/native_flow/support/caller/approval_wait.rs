@@ -758,6 +758,10 @@ impl Refusal {
             Err(error) => {
                 let (variant, detail) = match error {
                     KernelError::GuardDenied(detail) => ("GuardDenied", detail.clone()),
+                    KernelError::DurableAdmission(detail) => ("DurableAdmission", detail.clone()),
+                    KernelError::GovernedTransactionDenied(detail) => {
+                        ("GovernedTransactionDenied", detail.clone())
+                    }
                     KernelError::ReceiptSigningFailed(detail) => {
                         ("ReceiptSigningFailed", detail.clone())
                     }
@@ -793,67 +797,46 @@ enum Substitution {
 
 impl Substitution {
     /// The deciding boundary's exact refusal and the parked operation state it
-    /// leaves. Refusals while the retained operation is selected (identity,
-    /// nonce, authorization extensions and the elapsed approval window) carry
-    /// no signed rejection code; governed threshold verification and native
-    /// preparation refusals during the approved reservation do.
+    /// leaves. A refusal against the retained parked operation (identity, nonce,
+    /// approval material, governed threshold verification) returns the typed
+    /// error without a new receipt and preserves the parked owner. Native
+    /// preparation refusals during the approved reservation sign a rejection
+    /// code. An elapsed approval window replays the signed deadline compensation.
     fn expected(self, parked: &ParkedApproval) -> (Refusal, AdmissionOperationState) {
+        let admission =
+            |detail: &str| Refusal::failed("DurableAdmission", detail, DURABLE_ADMISSION);
         let durable = |detail: &str, code: Option<&str>| {
             Refusal::denied(format!("durable admission failed: {detail}"), code)
         };
+        let owned = || admission("request identity is already owned by a durable operation");
         let conflict = || {
-            durable(
-                &format!(
-                    "request id conflicts with retained operation {}",
-                    parked.operation_id.as_str()
-                ),
-                None,
-            )
+            admission(&format!(
+                "request id conflicts with retained operation {}",
+                parked.operation_id.as_str()
+            ))
         };
         let parked_state = AdmissionOperationState::ApprovalRequired;
         let retired = AdmissionOperationState::CompensatedBeforeDispatch;
         match self {
             Self::Proposal => (
-                Refusal::denied(
-                    "governed transaction denied: threshold approval verification denied: threshold proposal signer is not trusted",
-                    Some(GOVERNED_DENIED),
+                Refusal::failed(
+                    "GovernedTransactionDenied",
+                    "threshold approval verification denied: threshold proposal signer is not trusted",
+                    GOVERNED_DENIED,
                 ),
                 parked_state,
             ),
-            Self::MissingProposal => (
-                Refusal::denied(
-                    "canonical JSON error: threshold approval tokens have no signed proposal",
-                    None,
-                ),
-                parked_state,
-            ),
+            Self::MissingProposal | Self::MissingApproval => (owned(), parked_state),
             Self::Nonce => (
-                durable(
-                    "presented execution nonce does not match its retained issuance",
-                    None,
-                ),
+                admission("presented execution nonce does not match its retained issuance"),
                 parked_state,
             ),
             Self::Operation => (
-                durable(
-                    "presented execution nonce was never issued for this request",
-                    None,
-                ),
-                parked_state,
-            ),
-            Self::MissingApproval => (
-                Refusal::failed(
-                    "ReceiptSigningFailed",
-                    "failed to hash threshold approval set for receipt metadata: canonical JSON error: threshold approval proposal has no approval tokens",
-                    "CHIO-KERNEL-RECEIPT-SIGNING-FAILED",
-                ),
+                admission("presented execution nonce was never issued for this request"),
                 parked_state,
             ),
             Self::ExpiredApproval => (
-                Refusal::denied(
-                    "governed transaction denied: threshold approval verification denied: threshold proposal window is invalid for the active policy",
-                    None,
-                ),
+                Refusal::denied("approval proposal deadline elapsed before dispatch", None),
                 retired,
             ),
             Self::Executor | Self::Context => (conflict(), parked_state),
