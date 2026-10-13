@@ -3325,11 +3325,6 @@ files = ["crates/products/chio-mercury-core/src/proof_package.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.mercury.proof_package.v2"
-files = ["crates/products/chio-mercury-core/src/proof_package.rs"]
-first_seen = "38f1240b97"
-
-[[schema]]
 value = "chio.mercury.publication_profile.v1"
 files = ["crates/products/chio-mercury-core/src/proof_package.rs"]
 first_seen = "11e573d2d7"
