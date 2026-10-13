@@ -12,12 +12,6 @@ use chio_mcp_adapter::edge::McpTransport as _;
 /// `--emit-config` is supplied) emits a paste-ready IDE configuration blob
 /// for Cursor / Claude Desktop / Continue / Zed.
 pub(crate) fn cmd_mcp_wrap(args: &McpWrapArgs) -> Result<(), CliError> {
-    if args.self_test_attestation.is_some() {
-        return Err(CliError::cli_other_error(
-            "mcp wrap --self-test-attestation is unsupported: no receipt-bound verification is available",
-        ));
-    }
-
     if let Some(fixture) = args.e2e_fixture.as_ref() {
         return cmd_mcp_wrap_e2e_fixture(args, fixture);
     }

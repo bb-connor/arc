@@ -151,18 +151,19 @@ fn install_priced_guard_run_call_one_iou_one_settlement() {
     //    semantics from the catalog and underwriting helpers, which
     //    are the authoritative sources of truth for install.
     use chio_appraisal::{
-        compute_marketplace_invocation_price, MarketplaceBasePrice, MarketplacePricingContext,
-        MarketplaceReputationTier,
+        compute_checked_marketplace_invocation_price, MarketplaceBasePrice,
+        MarketplacePricingContext, MarketplaceReputationTier,
     };
     use chio_underwriting::{
         compute_marketplace_credit_limit, MarketplaceCreditLimitRequest, MarketplaceLimitTier,
     };
 
     let entry = entries[0].clone();
-    let price = compute_marketplace_invocation_price(
+    let price = compute_checked_marketplace_invocation_price(
         &MarketplaceBasePrice::new(entry.price.units, entry.price.currency.clone()),
         &MarketplacePricingContext::new("tenant-a", MarketplaceReputationTier::Tier1),
-    );
+    )
+    .expect("checked price");
     assert_eq!(price.units, 950, "tier1 5pct discount on 1000 USD = 950");
 
     let limit = compute_marketplace_credit_limit(&MarketplaceCreditLimitRequest {

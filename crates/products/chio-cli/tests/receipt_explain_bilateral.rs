@@ -83,9 +83,6 @@ fn receipt_explain_bilateral_renders_dual_dsse_and_inspection_trace() {
             "bilateral", // sentinel receipt_id; the bilateral path is keyed off --input-file shape
             "--input-file",
             fixture.to_str().unwrap(),
-            // The flag is `--inspect-bilateral`. The alias
-            // (`--explain-bilateral`) is retained as a clap alias on the
-            // parent enum (see types.rs).
             "--inspect-bilateral",
         ])
         .output()
@@ -285,10 +282,9 @@ fn receipt_explain_bilateral_without_flag_omits_trace() {
     );
 }
 
-/// The `--explain-bilateral` spelling is retained as an alias.
-/// The output schema is identical to the new flag.
+/// `--explain-bilateral` is not a flag; clap rejects it.
 #[test]
-fn explain_bilateral_flag_accepted_as_alias() {
+fn explain_bilateral_flag_is_rejected() {
     let bin = env!("CARGO_BIN_EXE_chio");
     let tmp = tempfile::tempdir().expect("tempdir");
     let fixture = write_artifact_fixture(tmp.path());
@@ -304,21 +300,9 @@ fn explain_bilateral_flag_accepted_as_alias() {
             "--explain-bilateral",
         ])
         .output()
-        .expect("invoke chio receipt explain with alias flag");
-    assert!(
-        out.status.success(),
-        "--explain-bilateral alias must be accepted: stderr={}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let stdout = String::from_utf8(out.stdout).expect("utf8 stdout");
-    let parsed: serde_json::Value =
-        serde_json::from_str(stdout.trim()).expect("renderer must emit valid JSON");
-    let trace = &parsed["bilateral_inspection_trace"];
-    assert_eq!(
-        trace["trace_kind"].as_str(),
-        Some("inspection"),
-        "trace_kind MUST be `inspection` even when invoked via alias"
-    );
+        .expect("invoke chio receipt explain");
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("--explain-bilateral"));
 }
 
 /// Pretty-print path: when `--json` is omitted, the human renderer must

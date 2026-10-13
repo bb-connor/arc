@@ -524,10 +524,8 @@ evaluate(request_ptr: i32, request_len: i32) -> i32
 **Deny reason protocol:** A denying core module **MAY** export
 `chio_deny_reason(buffer_ptr: i32, buffer_len: i32) -> i32`. The host supplies
 a 4096-byte region at offset 65536 and first parses the returned bytes as a
-JSON `GuestDenyResponse`. For compatibility, non-JSON UTF-8 is accepted as a
-plain reason. If the export is absent, the host reads a legacy NUL-terminated
-UTF-8 reason from offset 65536. An absent, empty, malformed, or failed reason
-read preserves the deny verdict and omits the optional reason.
+JSON `GuestDenyResponse`. An absent export, or an empty, non-JSON, or failed
+reason read, preserves the deny verdict and omits the optional reason.
 
 ### 6.2 GuardRequest
 

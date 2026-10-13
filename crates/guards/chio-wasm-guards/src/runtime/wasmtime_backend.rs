@@ -712,12 +712,9 @@ impl WasmGuardAbi for WasmtimeBackend {
                     .get_typed_func::<(i32, i32), i32>(&mut store, "chio_deny_reason")
                     .ok();
 
-                let reason = if let Some(ref reason_fn) = deny_reason_fn {
+                let reason = deny_reason_fn.as_ref().and_then(|reason_fn| {
                     read_structured_deny_reason(reason_fn, &memory, &mut store)
-                } else {
-                    // Fallback to core-module offset-64K NUL-terminated deny string (no chio_deny_reason export)
-                    read_deny_reason(&memory, &store)
-                };
+                });
 
                 Ok(GuardVerdict::Deny { reason })
             }
@@ -796,32 +793,6 @@ fn read_structured_deny_reason(
     crate::input::decode::<crate::abi::GuestDenyResponse>(&buf)
         .ok()
         .map(|response| response.reason)
-}
-
-/// Try to read a deny reason string from the guest memory region after
-/// the request data. The guest may write a NUL-terminated UTF-8 string
-/// starting at a well-known offset (64 KiB).
-fn read_deny_reason(memory: &Memory, store: &Store<WasmHostState>) -> Option<String> {
-    const DENY_REASON_OFFSET: usize = 65536;
-    const MAX_REASON_LEN: usize = 4096;
-
-    let data = memory.data(store);
-    if data.len() <= DENY_REASON_OFFSET {
-        return None;
-    }
-
-    let region = &data[DENY_REASON_OFFSET..];
-    let end = region
-        .iter()
-        .take(MAX_REASON_LEN)
-        .position(|&b| b == 0)
-        .unwrap_or(region.len().min(MAX_REASON_LEN));
-
-    if end == 0 {
-        return None;
-    }
-
-    std::str::from_utf8(&region[..end]).ok().map(String::from)
 }
 
 // -------------------------------------------------------------------

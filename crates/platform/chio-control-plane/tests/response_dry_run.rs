@@ -5,7 +5,7 @@ use chio_core::{receipt::body::ChioReceipt, Ed25519Backend, Keypair, SigningBack
 use chio_kernel::response_simulation_report::{
     verify_response_simulation_receipt, ResponseSimulationReport,
 };
-use chio_quarantine::simulation::evaluate_response_simulation;
+use chio_response_model::simulation::evaluate_response_simulation;
 use chio_security_types::{ports::*, response_simulation::*};
 use chio_store_sqlite::{security_state::SqliteSecurityStateStore, SqliteReceiptStore};
 use support::{fixture, TestResult};
