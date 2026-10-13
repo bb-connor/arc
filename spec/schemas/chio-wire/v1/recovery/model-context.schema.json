@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.computer/schemas/chio-wire/v1/recovery/model-context.schema.json",
+  "title": "Model Context V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "context",
+    "provider",
+    "account",
+    "conversation",
+    "cache",
+    "side_files",
+    "contract"
+  ],
+  "properties": {
+    "context": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "provider": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "account": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "conversation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "x-maxUtf8Bytes": 128
+    },
+    "cache": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "x-maxUtf8Bytes": 128
+    },
+    "side_files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifactReference"
+      },
+      "minItems": 0,
+      "maxItems": 8
+    },
+    "contract": {
+      "$ref": "#/$defs/recoveryDigest32"
+    }
+  },
+  "$defs": {
+    "artifactReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "artifact",
+        "version",
+        "provenance"
+      ],
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "artifact": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "version": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "provenance": {
+          "$ref": "#/$defs/recoveryDigest32"
+        }
+      }
+    },
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": { "pattern": "[\\r\\n]" }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    }
+  }
+}

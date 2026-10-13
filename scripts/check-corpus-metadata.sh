@@ -19,8 +19,10 @@
 #   libfuzzer_crash            crash file promoted via promote_fuzz_seed.sh --mode libfuzzer
 #   adversarial_curated        hand-written adversarial vector
 #   adversarial_promoted       crash promoted via promote_fuzz_seed.sh --mode adversarial
-#   m03_counterexample         minimised counterexample from chio-policy proptests
-#   m02_verdict_divergence     promoted from cross-SDK verdict divergence
+#   policy_counterexample     minimised counterexample from chio-policy proptests
+#   sdk_verdict_divergence     promoted from cross-SDK verdict divergence
+# Retained schema-version 1 metadata also accepts its deprecated source aliases
+# without rewriting seed records.
 #
 # The script enforces, fail-closed:
 #   1. Every file under fuzz/corpus/ has exactly one [[seed]] entry.
@@ -80,8 +82,13 @@ VALID_SOURCES = {
     "libfuzzer_crash",
     "adversarial_curated",
     "adversarial_promoted",
-    "m03_counterexample",
-    "m02_verdict_divergence",
+    "policy_counterexample",
+    "sdk_verdict_divergence",
+}
+
+LEGACY_SOURCE_ALIASES = {
+    "m03_counterexample": "policy_counterexample",
+    "m02_verdict_divergence": "sdk_verdict_divergence",
 }
 
 VALID_CLASSES = {
@@ -156,7 +163,7 @@ for idx, entry in enumerate(seeds):
         else:
             errors.append(f"{label}: sha256 must be 64 lowercase hex chars")
 
-    if isinstance(source, str) and source not in VALID_SOURCES:
+    if isinstance(source, str) and LEGACY_SOURCE_ALIASES.get(source, source) not in VALID_SOURCES:
         errors.append(
             f"{label}: source '{source}' not in {sorted(VALID_SOURCES)}"
         )

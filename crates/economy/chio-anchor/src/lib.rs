@@ -932,7 +932,7 @@ mod tests {
                 ),
                 trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),
                 signer_cert_ref: "did:web:chio.example#checkpoint-signer".to_string(),
-                publication_profile_version: "phase4-preview.v1".to_string(),
+                publication_profile_version: "evidence-preview.v1".to_string(),
             },
         )
         .test_expect("trust-anchored publication");

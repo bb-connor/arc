@@ -126,7 +126,36 @@ async fn operator_reads_retained_data_without_live_authority_or_schema_writes() 
     ));
     db.execute("UPDATE processes SET checkpoint=?1", ["é".repeat(600_000)])?;
     assert!(reader.checkpoint("root").is_err());
-    db.execute("UPDATE process_runtime SET version=99", [])?;
+    let journal_version: u32 = db.query_row(
+        "SELECT version FROM process_runtime WHERE singleton=1",
+        [],
+        |row| row.get(0),
+    )?;
+    let mediated_version = journal_version
+        .checked_add(2)
+        .ok_or(ProcessError::Invalid("process journal version overflow"))?;
+    assert!((3..=5).contains(&mediated_version));
+    // A supported upgrade closes the raw reader without bypassing the journal's
+    // monotonic version trigger. The original version cannot be restored.
+    assert_eq!(
+        db.execute(
+            "UPDATE process_runtime SET version=?1 WHERE singleton=1 AND version=?2",
+            [mediated_version, journal_version],
+        )?,
+        1
+    );
+    assert!(db
+        .execute(
+            "UPDATE process_runtime SET version=?1 WHERE singleton=1",
+            [journal_version],
+        )
+        .is_err());
+    let retained_version: u32 = db.query_row(
+        "SELECT version FROM process_runtime WHERE singleton=1",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(retained_version, mediated_version);
     assert!(matches!(
         chio_process::ProcessStateReader::open(&path),
         Err(ProcessError::Configuration(_))

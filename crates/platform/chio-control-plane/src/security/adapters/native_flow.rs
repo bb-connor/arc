@@ -23,6 +23,7 @@ const MAX_CANONICAL_TIME: u64 = (1_u64 << 53) - 1;
 mod declassification;
 mod output;
 mod policy;
+mod policy_refusal;
 pub use policy::NativeFlowPolicyEvidence;
 
 #[derive(Debug, thiserror::Error)]
@@ -60,6 +61,7 @@ pub struct NativeFlowResolver {
     clock: Arc<dyn Clock>,
     config: FlowResolverConfig,
     captured_lifecycle: bool,
+    policy_refusal_owner: std::sync::Mutex<Option<chio_kernel::NativeFlowPolicyRefusalOwner>>,
 }
 
 /// A verified policy result tied to the original resolver and kernel handle.
@@ -115,6 +117,57 @@ impl std::fmt::Debug for NativeFlowCustody {
 }
 
 impl NativeFlowResolver {
+    /// Trusted installation reserves policy evidence for this exact native
+    /// resolver. Ordinary extension registration receives no owner token.
+    pub fn install_captured_on_kernel(
+        self: &Arc<Self>,
+        kernel: &mut chio_kernel::ChioKernel,
+    ) -> Result<(), KernelError> {
+        let mut installed = self.policy_refusal_owner.lock().map_err(|_| {
+            KernelError::Internal("native policy owner installation unavailable".into())
+        })?;
+        if !self.captured_lifecycle || installed.is_some() {
+            return Err(KernelError::Internal(
+                "native policy owner cannot be installed twice".into(),
+            ));
+        }
+        let hook: Arc<dyn chio_kernel::SecurityPreDispatchHook> = self.clone();
+        let owner = kernel.set_native_flow_policy_pre_dispatch_hook(hook, &self.binding)?;
+        *installed = Some(owner);
+        Ok(())
+    }
+
+    pub fn supports_recovery(&self, binding: &NativeSecurityAuthorityBindingV1) -> bool {
+        self.captured_lifecycle
+            && &self.binding == binding
+            && !self.config.trusted_declassification_authorities.is_empty()
+    }
+
+    /// Derive complete input restrictions from the same verified classifier,
+    /// manifest and operator floor used at native dispatch. This preview is
+    /// data only; capture independently reclassifies and checks exact custody.
+    pub fn recovery_input_source(
+        &self,
+        request: &chio_kernel::ToolCallRequest,
+        context: &chio_kernel::SecurityInvocationContext,
+        observation: &chio_kernel::admission_operation::NativeSecurityFlowObservationV1,
+    ) -> Result<chio_security_types::InformationLabel, NativeFlowError> {
+        if observation.binding() != &self.binding {
+            return Err(NativeFlowError::AuthorityMismatch);
+        }
+        let state = observation.snapshot().ok_or(FlowDenial::StateChanged)?;
+        let label = self
+            .policy()
+            .classified_input_label(&FlowPreInvocationInput {
+                security_context: context.as_v1(),
+                request,
+            })?;
+        label
+            .join(&state.principal_label)
+            .and_then(|label| label.join(&state.lineage_label))
+            .and_then(|label| label.join(&state.session_label))
+            .map_err(|_| FlowDenial::StateOverflow.into())
+    }
     fn classify_admission_input(
         &self,
         context: &chio_kernel::NativeSecurityAdmissionContext<'_>,
@@ -153,6 +206,7 @@ impl NativeFlowResolver {
             clock,
             config,
             captured_lifecycle: false,
+            policy_refusal_owner: std::sync::Mutex::new(None),
         })
     }
 
@@ -181,13 +235,15 @@ impl NativeFlowResolver {
             .snapshot()
             .cloned()
             .ok_or(FlowDenial::StateChanged)?;
+        let recovery = custody.recovery_verification_context()?;
         let resolved = policy_call(|| {
-            self.policy().resolve_pre_with_evidence(
+            self.policy().resolve_recovery_with_evidence(
                 &FlowPreInvocationInput {
                     security_context: custody.security_context().as_v1(),
                     request: custody.request(),
                 },
                 state.clone(),
+                recovery.as_ref(),
             )
         })??;
         let prepared_at = resolved.request.now_unix_ms;
@@ -284,9 +340,11 @@ impl chio_kernel::SecurityPreDispatchHook for NativeFlowResolver {
             .map(|_| ())
             .map_err(|error| {
                 if let NativeFlowError::Policy(denial) = &error {
-                    // FlowDenial contains fixed reasons only. Keep payloads and
-                    // extension errors out of both operator and caller output.
+                    // Only the closed policy vocabulary can enter this owner.
                     tracing::warn!(policy_denial = %denial, "native flow policy denied dispatch");
+                    if let Err(error) = self.record_policy_refusal(authority, denial) {
+                        return error;
+                    }
                 }
                 KernelError::GuardDenied(error.to_string())
             })
@@ -333,6 +391,20 @@ impl chio_kernel::SecurityPreDispatchHook for NativeFlowResolver {
             .map_err(|error| KernelError::GuardDenied(error.to_string()))?;
         authority.join_output(label)?;
         Ok(())
+    }
+
+    fn classify_recovery_result(
+        &self,
+        context: &chio_kernel::recovery::RecoveryResultClassificationContext<'_>,
+    ) -> Result<InformationLabel, chio_kernel::recovery::RecoveryResultClassificationError> {
+        // The kernel guards this read-only callback. Keep a classifier panic
+        // distinct from an explicit refusal or unavailable implementation.
+        self.classified_output_label(
+            context.request(),
+            context.security_context(),
+            context.output(),
+        )
+        .map_err(|_| chio_kernel::recovery::RecoveryResultClassificationError::Refused)
     }
 
     fn commit(

@@ -1,9 +1,9 @@
 //! Fold separate native journal families in their anchored global order.
 //! Each family retains its own sequence and hash chain, including join-v1 bytes.
 use super::super::checkpoint;
-use super::super::egress;
 use super::super::nonce_preflight;
 use super::super::output;
+use super::super::{egress, knowledge};
 use super::*;
 
 const MAX_JOURNAL_EVENTS: i64 = 65_536;
@@ -122,6 +122,7 @@ pub(in crate::admission_operation_store::security_participant_state) enum Event 
     Egress(Box<egress::Record>),
     Output(Box<output::Record>),
     NoncePreflight(Box<nonce_preflight::Record>),
+    Knowledge(Box<knowledge::Record>),
 }
 
 impl Event {
@@ -133,6 +134,7 @@ impl Event {
             Self::Egress(record) => record.changes.as_slice(),
             Self::Output(record) => record.changes.as_slice(),
             Self::NoncePreflight(record) => record.changes.as_slice(),
+            Self::Knowledge(record) => record.changes.as_slice(),
         }
     }
     pub(in crate::admission_operation_store::security_participant_state) fn totals(
@@ -143,6 +145,7 @@ impl Event {
             Self::Egress(record) => (record.current_rows, record.current_bytes),
             Self::Output(record) => (record.current_rows, record.current_bytes),
             Self::NoncePreflight(record) => (record.current_rows, record.current_bytes),
+            Self::Knowledge(record) => (record.current_rows, record.current_bytes),
         }
     }
 }
@@ -157,6 +160,24 @@ pub(in crate::admission_operation_store::security_participant_state) fn validate
         return Err(invalid("combined native journal exceeds bounds"));
     }
     Ok(())
+}
+
+/// Actual retained native bytes and journal slots above the retained
+/// checkpoint. These totals are data and cannot discharge a pending source
+/// purpose or create an allocation.
+pub(in crate::admission_operation_store::security_participant_state) fn journal_totals(
+    connection: &Connection,
+    authority: &str,
+) -> Result<(u64, u64), AdmissionOperationStoreError> {
+    let (count, bytes) = segment_totals(connection, authority)?;
+    let (max_events, max_bytes) = journal_bounds();
+    if !(0..=max_events).contains(&count) || !(0..=max_bytes).contains(&bytes) {
+        return Err(invalid("combined native journal exceeds bounds"));
+    }
+    Ok((
+        u64::try_from(count).map_err(invalid)?,
+        u64::try_from(bytes).map_err(invalid)?,
+    ))
 }
 
 pub(in crate::admission_operation_store::security_participant_state) fn segment_totals(
@@ -191,6 +212,35 @@ pub(in crate::admission_operation_store::security_participant_state) fn segment_
         bytes = bytes
             .checked_add(extra_bytes)
             .ok_or_else(|| invalid("native journal byte overflow"))?;
+    }
+    // Knowledge joins have no checkpoint floor: an authority with retained
+    // checkpoints never accepts them, so the whole family is the suffix.
+    let knowledge_count = knowledge::head(connection, authority)?;
+    if knowledge_count != 0 {
+        let extra_bytes:i64=connection.query_row("SELECT COALESCE(SUM(length(payload)),0) FROM admission_operation_recovery_records WHERE record_key GLOB ?1",[format!("{}*",knowledge::prefix(authority))],|row|row.get(0)).map_err(sqlite_error)?;
+        count = count
+            .checked_add(i64::try_from(knowledge_count).map_err(invalid)?)
+            .ok_or_else(|| invalid("native journal count overflow"))?;
+        bytes = bytes
+            .checked_add(extra_bytes)
+            .ok_or_else(|| invalid("native journal byte overflow"))?;
+        // A compact root is not the complete retained byte inventory. Its
+        // immutable journal-owned chunks remain within the same history bound,
+        // while each root remains one native knowledge operation.
+        let chunk_bytes: i64 = connection
+            .query_row(
+                "SELECT COALESCE(SUM(length(payload)),0)
+             FROM admission_operation_recovery_records
+             WHERE record_key GLOB 'knowledge-encoding-chunk:*'
+               AND json_extract(payload,'$.owner.kind')='journal'
+               AND json_extract(payload,'$.owner.authority')=?1",
+                [authority],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        bytes = bytes
+            .checked_add(chunk_bytes)
+            .ok_or_else(|| invalid("native journal chunk byte overflow"))?;
     }
     Ok((count, bytes))
 }
@@ -275,6 +325,22 @@ pub(in crate::admission_operation_store::security_participant_state) fn latest_t
             last = Some((commit, kind.into(), sequence));
         }
     }
+    let knowledge_head = knowledge::head(connection, authority)?;
+    if knowledge_head != 0 {
+        if checkpoint.is_some() {
+            return Err(invalid(
+                "knowledge joins and retained native checkpoints are mutually exclusive",
+            ));
+        }
+        let commit: i64 = connection.query_row(
+            "SELECT commit_sequence FROM authority_global_commits WHERE projection_kind = 'recovery' AND projection_key = ?1 AND projection_sequence = 1",
+            [format!("{}{knowledge_head:016}", knowledge::prefix(authority))],|row|row.get(0),
+        ).map_err(sqlite_error)?;
+        let commit = u64::try_from(commit).map_err(invalid)?;
+        if last.as_ref().is_none_or(|previous| commit > previous.0) {
+            last = Some((commit, "recovery".into(), knowledge_head));
+        }
+    }
     let last = last.map(|(_, kind, sequence)| (kind, sequence));
     let Some((kind, sequence)) = last else {
         let (rows,bytes): (i64,i64) = connection.query_row("SELECT COUNT(*), COALESCE(SUM(length(canonical_row)),0) FROM security_participant_migration_rows WHERE security_authority_id = ?1", [authority], |row| Ok((row.get(0)?,row.get(1)?))).map_err(sqlite_error)?;
@@ -307,6 +373,10 @@ pub(in crate::admission_operation_store::security_participant_state) fn latest_t
                 .ok_or_else(|| invalid("latest native nonce_preflight is absent"))?;
             Ok((record.current_rows, record.current_bytes))
         }
+        "recovery" => {
+            let record = knowledge::load(connection, authority, sequence)?;
+            Ok((record.current_rows, record.current_bytes))
+        }
         _ => Err(invalid("unknown native journal family")),
     }
 }
@@ -335,6 +405,14 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
         record.heads.each_ref().map(|head| head.sequence)
     });
     let mut join_sequence = floors[0];
+    let knowledge_head = knowledge::head(connection, authority)?;
+    if checkpoint.is_some() && knowledge_head != 0 {
+        return Err(invalid(
+            "knowledge joins and retained native checkpoints are mutually exclusive",
+        ));
+    }
+    let mut knowledge_sequence = 0;
+    let mut knowledge_previous = initialization.digest.clone();
     let output_head = if output::exists(connection)? {
         output::head(connection, authority)?
     } else {
@@ -358,18 +436,20 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
         .map_or(initialization.initialized_at, |record| record.observed_at);
     let mut initialized = checkpoint.is_some();
     let join_floor = if checkpoint.is_some() { floors[0] } else { 0 };
-    let mut statement = connection.prepare("SELECT projection_kind, projection_sequence, mutation_kind, projection_reference_digest, store_uuid, store_lease_id, store_owner_epoch,commit_sequence FROM authority_global_commits WHERE projection_key = ?1
+    let mut statement = connection.prepare("SELECT projection_kind, projection_sequence, mutation_kind, projection_reference_digest, store_uuid, store_lease_id, store_owner_epoch,commit_sequence,projection_key FROM authority_global_commits WHERE (projection_key = ?1
         AND ((projection_kind = 'security_participant_state' AND projection_sequence > ?2)
           OR (projection_kind = 'security_participant_egress' AND projection_sequence > ?3)
           OR (projection_kind = 'security_participant_output' AND projection_sequence > ?4)
-          OR (projection_kind = 'security_participant_nonce_preflight' AND projection_sequence > ?5)) ORDER BY commit_sequence").map_err(sqlite_error)?;
+          OR (projection_kind = 'security_participant_nonce_preflight' AND projection_sequence > ?5)))
+          OR (projection_kind = 'recovery' AND projection_key GLOB ?6) ORDER BY commit_sequence").map_err(sqlite_error)?;
     let mut rows = statement
         .query(params![
             authority,
             i64::try_from(join_floor).map_err(invalid)?,
             i64::try_from(floors[1]).map_err(invalid)?,
             i64::try_from(floors[2]).map_err(invalid)?,
-            i64::try_from(floors[3]).map_err(invalid)?
+            i64::try_from(floors[3]).map_err(invalid)?,
+            format!("{}*", knowledge::prefix(authority))
         ])
         .map_err(sqlite_error)?;
     #[cfg(feature = "admission-test-support")]
@@ -378,6 +458,7 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
         #[cfg(feature = "admission-test-support")]
         probe.advance(connection)?;
         let kind: String = row.get(0).map_err(sqlite_error)?;
+        let key: String = row.get(8).map_err(sqlite_error)?;
         let sequence =
             u64::try_from(row.get::<_, i64>(1).map_err(sqlite_error)?).map_err(invalid)?;
         let global_sequence =
@@ -388,6 +469,7 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
                 || egress_sequence != 0
                 || output_sequence != 0
                 || nonce_preflight_sequence != 0
+                || knowledge_sequence != 0
             {
                 return Err(invalid(
                     "native initialization is not the first global event",
@@ -490,6 +572,24 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
                 observed_at = record.observed_at;
                 Event::NoncePreflight(Box::new(record))
             }
+            "recovery" => {
+                knowledge_sequence += 1;
+                let (record, digest) =
+                    knowledge::load_with_digest(connection, authority, knowledge_sequence)?;
+                let expected_key =
+                    format!("{}{knowledge_sequence:016}", knowledge::prefix(authority));
+                if sequence != 1
+                    || key != expected_key
+                    || record.initialization != initialization.digest
+                    || record.previous != knowledge_previous
+                    || record.observed_at < observed_at
+                {
+                    return Err(invalid("knowledge join family is out of global order"));
+                }
+                knowledge_previous = digest;
+                observed_at = record.observed_at;
+                Event::Knowledge(Box::new(record))
+            }
             _ => return Err(invalid("unknown native journal family")),
         };
         let (mutation, digest, fence) = match &event {
@@ -501,6 +601,11 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
                 record.digest()?,
                 &record.lease.fence,
             ),
+            // Knowledge rows are bound by their exact key and digest chain above.
+            Event::Knowledge(_) => {
+                apply(&event)?;
+                continue;
+            }
         };
         if row.get::<_, String>(2).map_err(sqlite_error)? != mutation
             || row.get::<_, String>(3).map_err(sqlite_error)? != digest
@@ -522,6 +627,7 @@ pub(in crate::admission_operation_store::security_participant_state) fn visit(
         || egress_sequence != egress_head
         || output_sequence != output_head
         || nonce_preflight_sequence != nonce_preflight_head
+        || knowledge_sequence != knowledge_head
     {
         return Err(invalid(
             "native journal events lack complete global coverage",

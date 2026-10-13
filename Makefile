@@ -30,8 +30,8 @@ KB_DIR ?= tools/knowledge-base
 	sdk-parity sdk-bindings-parity sdk-py sdk-go sdk-cpp sdk-drogon sdk-ts-deps \
 	vet deny supply-chain \
 	qualify-release qualify-trust qualify-portable-browser qualify-mobile-kernel \
-	qualify-cognition-market qualify-cognition-market-m11 \
-	qualify-cognition-market-m11-kvm schema-registry-check \
+	qualify-cognition-market qualify-cognition-market-hosted \
+	qualify-cognition-market-hosted-kvm schema-registry-check \
 	qualify-cross-protocol qualify-bounded \
 	coverage fuzz fuzz-budget kani kani-smoke loom mutants mutants-fuzz-cocoverage \
 	docker-demo-up docker-demo-down docker-demo-smoke \
@@ -66,7 +66,7 @@ help:
 	@echo ""
 	@echo "Tier 5 - heavy (slow):"
 	@echo "  qualify-release qualify-trust qualify-portable-browser qualify-mobile-kernel"
-	@echo "  qualify-cross-protocol qualify-bounded qualify-cognition-market qualify-cognition-market-m11"
+	@echo "  qualify-cross-protocol qualify-bounded qualify-cognition-market qualify-cognition-market-hosted"
 	@echo "  coverage fuzz fuzz-budget kani kani-smoke loom mutants mutants-fuzz-cocoverage"
 	@echo ""
 	@echo "Tier 6 - local infra:"
@@ -229,10 +229,10 @@ qualify-release:
 qualify-cognition-market:
 	./scripts/qualify-cognition-market.sh
 
-qualify-cognition-market-m11:
+qualify-cognition-market-hosted:
 	./scripts/qualify-cognition-market-hosted.sh
 
-qualify-cognition-market-m11-kvm:
+qualify-cognition-market-hosted-kvm:
 	./scripts/qualify-cognition-market-hosted.sh --kvm-boundary
 
 schema-registry-check:

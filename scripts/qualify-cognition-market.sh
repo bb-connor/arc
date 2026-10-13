@@ -197,6 +197,12 @@ for line in gate_index.read_text(encoding="utf-8").splitlines():
         }
     )
 
+bilateral_deployment = {
+    "triggered": False,
+    "disposition": "conditional-unbuilt",
+    "basis": "no verified bilateral seller and buyer deployment request",
+}
+
 report = {
     "formatVersion": 1,
     "profile": "cognition-market-single-operator",
@@ -219,11 +225,9 @@ report = {
         "ASSUME-FINDING-STATUS-OPERATOR-COMPLETENESS",
         "ASSUME-FINDING-SELLER-TOOL-SERVER",
     ],
-    "m7": {
-        "triggered": False,
-        "disposition": "conditional-unbuilt",
-        "basis": "no verified bilateral seller and buyer deployment request",
-    },
+    "bilateral_deployment": bilateral_deployment,
+    # Retained formatVersion 1 consumers may still use this deprecated key.
+    "m7": bilateral_deployment,
     "dogfood": dogfood,
     "gates": gates,
 }

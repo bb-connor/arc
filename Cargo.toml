@@ -18,6 +18,8 @@ members = [
     # Portable active-defense security
     "crates/security/chio-security-types",
     "crates/security/chio-flow",
+    "crates/security/chio-recovery",
+    "crates/security/chio-semantic-contracts",
     "crates/security/chio-decoy",
     "crates/security/chio-quarantine",
     "crates/security/chio-keyring",
@@ -461,11 +463,10 @@ zeroize = "1.8"
 # `path = "..."` redeclaration.
 chio-metrics-spec = { version = "=0.1.0", path = "crates/observability/chio-metrics-spec" }
 
-# Internal Chio crates centralized here (Phase 2). Each member consumes them as
+# Internal Chio workspace dependencies. Each member consumes them as
 # `chio-x = { workspace = true }` (plus per-member features / default-features /
 # optional / package-rename) instead of a scattered `path = "../chio-x"`. Paths
-# point at the crates' CURRENT locations; the later folder move edits only this
-# block. Each entry pins the exact workspace version beside its path, which
+# point at the workspace crate locations. Each entry pins the exact workspace version beside its path, which
 # `cargo package` requires. Feature and default-features selection stays on the
 # member side, because members consume the same crate with differing
 # default-features.

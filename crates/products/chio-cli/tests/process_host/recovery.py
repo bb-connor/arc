@@ -223,15 +223,18 @@ capabilities:
     }
     # ABI is checked before decoding old manifest shapes, including hosts
     # created before the ABI field was recorded.
-    for legacy_abi in ("chio.process.abi.v1", None):
+    for legacy_abi in ("chio.process.abi.v1", "chio.process.abi.v2", None):
         legacy = {**host_json, "manifests": {"legacy": "incompatible shape"}}
         if legacy_abi is None:
             legacy.pop("abi")
         else:
             legacy["abi"] = legacy_abi
         host_record.write_text(json.dumps(legacy))
-        assert "process ABI chio.process.abi.v1" in cli("export", "--state", state, success=False)
-        assert cli("status", "--state", state)["abi"]["host"] == "chio.process.abi.v1"
+        expected_abi = legacy_abi or "chio.process.abi.v1"
+        assert f"process ABI {expected_abi}" in cli(
+            "export", "--state", state, success=False
+        )
+        assert cli("status", "--state", state)["abi"]["host"] == expected_abi
         assert (state / "authority.db").read_bytes() == before_export
     host_record.write_bytes(recorded)
     socket = sockets / "first.sock"

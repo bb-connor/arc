@@ -27,6 +27,7 @@ mod generations;
 mod input_join;
 mod labels;
 mod mutations;
+mod native_join_preview;
 #[cfg(test)]
 mod tests;
 mod transitions;
@@ -39,11 +40,14 @@ use generations::{
     invalidate_related_flow_contexts, next_flow_generation, store_context_generation,
 };
 pub(crate) use input_join::{resolve_native_input_join, resolve_native_label_join};
+#[cfg(test)]
+use labels::isolation_epoch_exists;
 use labels::{
-    load_context_generation, load_lineage_label, load_principal_label, load_scoped_flow_snapshot,
+    load_context_generation, load_lineage_label, load_observed_flow_snapshot, load_principal_label, load_scoped_flow_snapshot,
     load_session_label, session_membership_exists, store_lineage_label, store_principal_label,
     store_session_label,
 };
+pub(crate) use native_join_preview::{preview_native_flow_join, NativeFlowJoinPreview};
 use transitions::{scoped_record_transition, scoped_transition_status};
 
 pub(crate) fn planned_native_egress_fence(request: &EgressFenceRequest) -> PortResult<EgressFence> {
@@ -82,12 +86,12 @@ pub(crate) fn observe_native_flow_state(
 ) -> PortResult<(Option<FlowStateSnapshot>, Option<u64>)> {
     let reader = FlowReader::native(transaction, authority);
     let stored_context_generation = load_context_generation(reader, key)?;
-    let snapshot = load_scoped_flow_snapshot(reader, key)?;
+    let snapshot = load_observed_flow_snapshot(reader, key)?;
     Ok((snapshot, stored_context_generation))
 }
 
 /// Validate the actual post-mutation rows, not only the computed return value.
-pub(super) fn verify_native_join_snapshot(
+pub(crate) fn verify_native_join_snapshot(
     connection: &Connection,
     authority: &str,
     expected: &FlowStateSnapshot,

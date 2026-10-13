@@ -51,8 +51,8 @@ scored_files = [
 scored_viability_target = 80
 scored_tools = [
   "cargo_mutants=25.3.1",
-  "kani=0.67.0",
-  "rustc=1.93.0",
+  "kani=0.68.0",
+  "rustc=1.95.0",
 ]
 
 [gates.strict]
@@ -453,8 +453,8 @@ def proof_report(commit, run_id, run_attempt, run_number):
         "sample_size_requested": 10,
         "tools": {
             "cargo_mutants": "25.3.1",
-            "kani": "0.67.0",
-            "rustc": "1.93.0",
+            "kani": "0.68.0",
+            "rustc": "1.95.0",
         },
         "inputs": report_inputs(PROOF_INPUT_PATHS),
         "mutants": mutants,
@@ -690,7 +690,7 @@ proof_low_viability["aggregate"]["source_activation_met"] = True
 archive("proof-low-viability.zip", {"report.json": proof_low_viability})
 
 proof_tool_drift = deepcopy(valid_proof)
-proof_tool_drift["tools"]["kani"] = "0.68.0"
+proof_tool_drift["tools"]["kani"] = "0.67.0"
 archive("proof-tool-drift.zip", {"report.json": proof_tool_drift})
 
 proof_inventory_digest = deepcopy(valid_proof)

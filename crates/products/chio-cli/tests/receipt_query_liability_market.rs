@@ -841,7 +841,7 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
         });
         let artifact = chio_core::credit::CreditFacilityArtifact {
             schema: chio_core::credit::CREDIT_FACILITY_ARTIFACT_SCHEMA.to_string(),
-            facility_id: format!("cfd-phase114-negative-{issued_at}"),
+            facility_id: format!("cfd-rejected-request-{issued_at}"),
             issued_at,
             expires_at: issued_at.saturating_add(14 * 86_400),
             lifecycle_state: chio_core::credit::CreditFacilityLifecycleState::Active,

@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.computer/schemas/chio-wire/v1/recovery/artifact-version.schema.json",
+  "title": "Artifact Version V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "domain_version",
+    "scope",
+    "artifact",
+    "version",
+    "content",
+    "size_bytes",
+    "media_type",
+    "schema",
+    "producer",
+    "dependencies",
+    "label",
+    "influence",
+    "lineage",
+    "isolation_epoch",
+    "evidence",
+    "policy",
+    "contract",
+    "creation_sequence",
+    "retention"
+  ],
+  "properties": {
+    "domain_version": {
+      "const": 1
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "artifact": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "version": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "content": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "size_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1048576
+    },
+    "media_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "x-maxUtf8Bytes": 128
+    },
+    "schema": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "producer": {
+      "$ref": "#/$defs/artifactProducer"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifactReference"
+      },
+      "minItems": 0,
+      "maxItems": 16
+    },
+    "label": {
+      "$ref": "https://chio.world/schemas/chio-wire/v1/security/information-label.schema.json"
+    },
+    "influence": {
+      "$ref": "#/$defs/artifactInfluence"
+    },
+    "lineage": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "isolation_epoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "x-maxUtf8Bytes": 128
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/opaqueId"
+      },
+      "minItems": 0,
+      "maxItems": 8
+    },
+    "policy": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "contract": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "creation_sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "retention": {
+      "type": "string",
+      "enum": [
+        "ephemeral",
+        "checkpoint",
+        "evidence"
+      ]
+    }
+  },
+  "$defs": {
+    "artifactInfluence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commitment",
+        "externally_influenced",
+        "unknown"
+      ],
+      "properties": {
+        "commitment": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "externally_influenced": {
+          "type": "boolean"
+        },
+        "unknown": {
+          "type": "boolean"
+        }
+      }
+    },
+    "artifactProducer": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operation"
+          ],
+          "properties": {
+            "kind": {
+              "const": "native_operation"
+            },
+            "operation": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "checkpoint"
+          ],
+          "properties": {
+            "kind": {
+              "const": "checkpoint"
+            },
+            "checkpoint": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operation"
+          ],
+          "properties": {
+            "kind": {
+              "const": "derivation"
+            },
+            "operation": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "evidence"
+          ],
+          "properties": {
+            "kind": {
+              "const": "adoption"
+            },
+            "evidence": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "manifest",
+            "origin"
+          ],
+          "properties": {
+            "kind": {
+              "const": "import"
+            },
+            "manifest": {
+              "$ref": "#/$defs/recoveryDigest32"
+            },
+            "origin": {
+              "$ref": "#/$defs/artifactReference"
+            }
+          }
+        }
+      ]
+    },
+    "artifactReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "artifact",
+        "version",
+        "provenance"
+      ],
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "artifact": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "version": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "provenance": {
+          "$ref": "#/$defs/recoveryDigest32"
+        }
+      }
+    },
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": { "pattern": "[\\r\\n]" }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    }
+  }
+}

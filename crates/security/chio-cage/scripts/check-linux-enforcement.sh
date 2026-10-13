@@ -196,6 +196,9 @@ export CHIO_CAGE_TEST_DYNAMIC_RUNTIME
 export CHIO_CAGE_PARENT_SECRET="must-not-cross"
 export CARGO_INCREMENTAL=0
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/tmp/chio-cage-target}"
+# The all-target lane deliberately compiles a configured acceptance fixture.
+# Ordinary workspace builds may leave the example safely unconfigured.
+export CHIO_CONFINED_CANARY_MODE=error
 
 cd "$root"
 

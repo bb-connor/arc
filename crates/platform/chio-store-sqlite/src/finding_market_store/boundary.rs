@@ -60,6 +60,10 @@ pub(super) fn admission_error(error: AdmissionOperationStoreError) -> FindingMar
         AdmissionOperationStoreError::Invariant(detail) => {
             FindingMarketStoreError::Invariant(detail)
         }
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired => {
+            invariant("recovery preview refusal is outside this store")
+        }
         AdmissionOperationStoreError::Operation(error) => invariant(error.to_string()),
     }
 }

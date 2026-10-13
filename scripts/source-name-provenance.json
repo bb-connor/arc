@@ -1,0 +1,330 @@
+{
+  "schema": "chio.source-name-provenance/v1",
+  "source_revision": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+  "files": [
+    {
+      "path": "spec/schemas/registry.json",
+      "format": "json",
+      "records": [
+        {
+          "record_key": "schema",
+          "record_value": "chio.finding.bond-observation-request.v1",
+          "field": "introducedBy",
+          "value": "cognition-market-m11"
+        },
+        {
+          "record_key": "schema",
+          "record_value": "chio.finding.bond-observation-response.v1",
+          "field": "introducedBy",
+          "value": "cognition-market-m11"
+        },
+        {
+          "record_key": "schema",
+          "record_value": "chio.finding.hosted-authenticated-delivery.v1",
+          "field": "introducedBy",
+          "value": "cognition-market-m11-delivery-authentication"
+        },
+        {
+          "record_key": "schema",
+          "record_value": "chio.finding.hosted-qualification.v1",
+          "field": "introducedBy",
+          "value": "cognition-market-m11-qualification-truth"
+        },
+        {
+          "record_key": "schema",
+          "record_value": "chio.finding.impairment-publisher-request.v1",
+          "field": "introducedBy",
+          "value": "cognition-market-m11"
+        },
+        {
+          "record_key": "schema",
+          "record_value": "chio.finding.impairment-publisher-response.v1",
+          "field": "introducedBy",
+          "value": "cognition-market-m11"
+        }
+      ]
+    },
+    {
+      "path": "spec/security/coverage.yaml",
+      "format": "coverage-yaml",
+      "records": [
+        {
+          "record_key": "id",
+          "record_value": "passkey_credential_theft",
+          "field": "owned_by",
+          "value": "M10"
+        },
+        {
+          "record_key": "id",
+          "record_value": "passkey_credential_theft",
+          "field": "closed_by",
+          "value": "M10.P2.T6"
+        },
+        {
+          "record_key": "id",
+          "record_value": "audience_confusion",
+          "field": "owned_by",
+          "value": "M10"
+        },
+        {
+          "record_key": "id",
+          "record_value": "audience_confusion",
+          "field": "closed_by",
+          "value": "M10.P2.T4"
+        },
+        {
+          "record_key": "id",
+          "record_value": "weights_hash_spoof",
+          "field": "owned_by",
+          "value": "M05"
+        },
+        {
+          "record_key": "id",
+          "record_value": "weights_hash_spoof",
+          "field": "closed_by",
+          "value": "M05.P1.T3"
+        },
+        {
+          "record_key": "id",
+          "record_value": "pq_signature_downgrade",
+          "field": "owned_by",
+          "value": "M05"
+        },
+        {
+          "record_key": "id",
+          "record_value": "pq_signature_downgrade",
+          "field": "closed_by",
+          "value": "M05.P4.T1"
+        },
+        {
+          "record_key": "id",
+          "record_value": "tee_quote_forgery",
+          "field": "owned_by",
+          "value": "M05"
+        },
+        {
+          "record_key": "id",
+          "record_value": "tee_quote_forgery",
+          "field": "closed_by",
+          "value": "M05.P4.T1"
+        },
+        {
+          "record_key": "id",
+          "record_value": "capability_token_theft",
+          "field": "owned_by",
+          "value": "M05"
+        },
+        {
+          "record_key": "id",
+          "record_value": "capability_token_theft",
+          "field": "closed_by",
+          "value": "M05.P5.T3"
+        },
+        {
+          "record_key": "id",
+          "record_value": "delegation_chain_abuse",
+          "field": "owned_by",
+          "value": "M05"
+        },
+        {
+          "record_key": "id",
+          "record_value": "delegation_chain_abuse",
+          "field": "closed_by",
+          "value": "M05.P5.T3"
+        },
+        {
+          "record_key": "id",
+          "record_value": "kernel_impersonation",
+          "field": "owned_by",
+          "value": "M05"
+        },
+        {
+          "record_key": "id",
+          "record_value": "kernel_impersonation",
+          "field": "closed_by",
+          "value": "M05.P5.T3"
+        },
+        {
+          "record_key": "id",
+          "record_value": "native_channel_replay",
+          "field": "owned_by",
+          "value": "M05"
+        },
+        {
+          "record_key": "id",
+          "record_value": "native_channel_replay",
+          "field": "closed_by",
+          "value": "M05.P5.T3"
+        },
+        {
+          "record_key": "id",
+          "record_value": "resource_exhaustion_dos",
+          "field": "owned_by",
+          "value": "M05"
+        },
+        {
+          "record_key": "id",
+          "record_value": "resource_exhaustion_dos",
+          "field": "closed_by",
+          "value": "M05.P5.T3"
+        },
+        {
+          "record_key": "id",
+          "record_value": "tool_server_escape",
+          "field": "owned_by",
+          "value": "M05"
+        },
+        {
+          "record_key": "id",
+          "record_value": "tool_server_escape",
+          "field": "closed_by",
+          "value": "M05.P5.T3"
+        },
+        {
+          "record_key": "id",
+          "record_value": "mobile_attestation_replay",
+          "field": "deferred_to",
+          "value": "backlog.M07.real-attestation"
+        },
+        {
+          "record_key": "id",
+          "record_value": "device_key_extraction",
+          "field": "deferred_to",
+          "value": "backlog.M07.real-attestation"
+        },
+        {
+          "record_key": "id",
+          "record_value": "play_integrity_token_replay",
+          "field": "deferred_to",
+          "value": "backlog.M07.real-attestation"
+        }
+      ]
+    },
+    {
+      "path": "spec/security/chio-threat-model.v1.json",
+      "format": "json",
+      "records": [
+        {
+          "record_key": "id",
+          "record_value": "capability_token_theft",
+          "field": "deferred_to",
+          "value": "future milestone (sender-constrained grants, durable replay state, and revocation propagation): real mutation evidence closes post-mint signed-scope expansion, while otherwise valid bearer-token replay, mandatory DPoP or mTLS continuity, restart and failover replay resistance, and end-to-end revocation remain deferred (see audits/evidence/threats/capability_token_theft.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "kernel_impersonation",
+          "field": "deferred_to",
+          "value": "future milestone (authenticated service transport and trust-anchor operations): real mutation evidence closes receipt mint-side kernel-key binding, and the same conformance row rejects on-the-wire kernel_key tampering; authenticated cross-host transport, verifier-key or service-certificate pinning, and safe trust-anchor rotation remain deferred (see audits/evidence/threats/kernel_impersonation.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "tool_server_escape",
+          "field": "deferred_to",
+          "value": "future milestone (WASM mutation evidence, authenticated process transport, and process isolation): real mutation evidence closes hosted-kernel and portable verified-core tool-name and server-ID mediation, while targeted WASM mutation evidence, authenticated process-boundary framing, and operator-enforced OS or container isolation remain deferred (see audits/evidence/threats/tool_server_escape.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "native_channel_replay",
+          "field": "deferred_to",
+          "value": "future milestone (durable replay state and sender-constrained native profiles): real mutation evidence closes signed execution-nonce consumption and same-process second-presentation rejection; restart and failover continuity, multi-process nonce coordination, and mandatory DPoP for replay-sensitive native traffic remain deferred (see audits/evidence/threats/native_channel_replay.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "resource_exhaustion_dos",
+          "field": "deferred_to",
+          "value": "future milestone (multi-edge resource governance): real mutation evidence closes pre-allocation rejection of oversized native-kernel frames; request-rate, concurrency, CPU-time, queue, replay-buffer, per-tenant state, and upstream load-shedding limits remain deferred (see audits/evidence/threats/resource_exhaustion_dos.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "delegation_chain_abuse",
+          "field": "deferred_to",
+          "value": "future milestone (authoritative recursive lineage and distributed delegation state): real mutation evidence closes verifier-owned parent presence and delegated budget admission; recursive ancestry resolution, cross-process sibling-budget coordination, revocation-aware lineage, and strongest-verifier coverage at every entry point remain deferred (see audits/evidence/threats/delegation_chain_abuse.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "ssrf_via_http_substrate",
+          "field": "deferred_to",
+          "value": "future milestone (pinned DNS and universal egress-contract adoption): real mutation evidence closes typed address-class enforcement for literal internal targets; DNS rebinding resistance, outbound call-site inventory enforcement, deployment-specific hostname policy, and operator network restrictions remain deferred (see audits/evidence/threats/ssrf_via_http_substrate.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "pii_phi_exposure",
+          "field": "deferred_to",
+          "value": "future milestone (deployment-specific detectors and non-text inspection): real mutation evidence closes built-in structured-text SSN and MRN detection with block and redact outcomes; local identifier coverage, image and binary inspection, mandatory regulated-profile activation, and detector-quality qualification remain deferred (see audits/evidence/threats/pii_phi_exposure.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "agent_velocity_abuse",
+          "field": "deferred_to",
+          "value": "future milestone (distributed velocity state and multi-identity controls): real mutation evidence closes single-process per-agent token-bucket exhaustion and identity isolation; per-session qualification, cross-process counters, Sybil resistance, and secure deployment configuration remain deferred (see audits/evidence/threats/agent_velocity_abuse.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "cumulative_data_exfiltration",
+          "field": "deferred_to",
+          "value": "future milestone (principal-wide durable data budgets): real mutation evidence closes a single session's cumulative byte ceiling with below-limit and over-limit controls; cross-session and cross-process aggregation, session-churn resistance, semantic and compression-aware accounting, and deployment-specific limits remain deferred (see audits/evidence/threats/cumulative_data_exfiltration.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "behavioral_sequence_attack",
+          "field": "deferred_to",
+          "value": "future milestone (principal-wide multi-step behavioral policies): real mutation evidence closes one explicit adjacent forbidden transition with a benign successor control; non-adjacent and cross-session chains, canonical action aliases, semantic-intent signals, and deployment-specific policy qualification remain deferred (see audits/evidence/threats/behavioral_sequence_attack.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "wasm_guard_resource_exhaustion",
+          "field": "deferred_to",
+          "value": "future milestone (WASM execution and compilation resource qualification): real mutation evidence closes core-module byte-cap admission; fuel-enforcement mutation evidence, component-backend parity, linear-memory, stack, and table ceilings, compilation-complexity bounds, and deployment-specific fuel tuning remain deferred (see audits/evidence/threats/wasm_guard_resource_exhaustion.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "pq_signature_downgrade",
+          "field": "deferred_to",
+          "value": "future milestone (cross-artifact hybrid downgrade and operations qualification): real mutation evidence closes rejection of classical capability tokens under a post-quantum-required floor; stripped or corrupted hybrid components across capabilities, receipts, and compliance certificates, policy-loader continuity, and deployment key rotation remain deferred (see audits/evidence/threats/pq_signature_downgrade.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "tee_quote_forgery",
+          "field": "deferred_to",
+          "value": "future milestone (platform-verifier mutation and collateral operations): real mutation evidence closes canonical TEE-frame tenant-key, body, signature, and tee-ID binding; TDX, SEV-SNP, and Nitro verifier bypass mutations plus production collateral freshness, revocation, and trust-root rotation remain deferred (see audits/evidence/threats/tee_quote_forgery.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "passkey_credential_theft",
+          "field": "deferred_to",
+          "value": "future milestone (credential-compromise recovery and deployment qualification): real mutation evidence closes retained credential and challenge replay classification shared by the in-memory and SQLite nonce stores; fresh assertions from a compromised authenticator, relying-party and origin configuration, durable-store adoption across clustered issuers, revocation propagation, and account recovery remain deferred (see audits/evidence/threats/passkey_credential_theft.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "audience_confusion",
+          "field": "deferred_to",
+          "value": "future milestone (universal audience namespaces and entry-point qualification): real mutation evidence closes issuer-signed passkey capability audience mismatch rejection; cross-environment audience naming, non-passkey artifact parity, universal kernel and hosted-edge adoption, and deployment namespace qualification remain deferred (see audits/evidence/threats/audience_confusion.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "weights_hash_spoof",
+          "field": "deferred_to",
+          "value": "future milestone (model supply-chain and activation qualification): real mutation evidence closes kernel comparison of a card-declared hash to a recomputed loaded-weight digest and fail-closed refusal when loaded bytes are unavailable; signed-bundle trust, artifact retrieval integrity, runtime activation linkage, provider parity, and deployment qualification remain deferred (see audits/evidence/threats/weights_hash_spoof.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "mobile_attestation_replay",
+          "field": "deferred_to",
+          "value": "future milestone (production mobile trust and capability integration): real mutation evidence closes monotonic App Attest counter replay refusal, and the server-owned authority now supplies one-time challenge state plus durable counter custody; real Apple certificate and nonce-extension evidence, production Google trust, capability-mint integration, clock-policy qualification, and physical-device qualification remain deferred (see audits/evidence/threats/mobile_attestation_replay.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "device_key_extraction",
+          "field": "deferred_to",
+          "value": "future milestone (hardware-key receipt signing and trust projection): real mutation evidence closes App Attest credential-id binding in the production WebAuthn-shaped verifier; hardware non-exportability, attestation leaf-key qualification, hardware-reference receipt signing, Android trust-level propagation, and physical-device qualification remain deferred (see audits/evidence/threats/device_key_extraction.json::deferred_follow_up)"
+        },
+        {
+          "record_key": "id",
+          "record_value": "play_integrity_token_replay",
+          "field": "deferred_to",
+          "value": "future milestone (production Play Integrity trust and capability integration): real mutation evidence closes signed-token nonce equality, and the server-owned authority now supplies atomic durable nonce issuance and consume; production Google trust-root provisioning, capability-mint integration, clock-policy qualification, and physical-device qualification remain deferred (see audits/evidence/threats/play_integrity_token_replay.json::deferred_follow_up)"
+        }
+      ]
+    }
+  ]
+}

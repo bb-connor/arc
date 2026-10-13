@@ -79,12 +79,13 @@ pub fn kernel_with_artifacts(
     nonce: bool,
     supplemental: bool,
 ) -> Result<Arc<ChioKernel>> {
-    kernel_with_artifacts_and_clock(
+    kernel_with_configuration_and_clock(
         path,
         server,
         payment,
         nonce,
         supplemental,
+        config(),
         chio_test_support::clock::clock(),
     )
 }
@@ -94,15 +95,35 @@ pub fn kernel_with_clock(
     server: Box<dyn ToolServerConnection>,
     clock: Arc<dyn chio_kernel::authority::Clock>,
 ) -> Result<Arc<ChioKernel>> {
-    kernel_with_artifacts_and_clock(path, server, false, false, false, clock)
+    kernel_with_configuration_and_clock(path, server, false, false, false, config(), clock)
 }
 
-fn kernel_with_artifacts_and_clock(
+pub fn kernel_with_configuration(
     path: &Path,
     server: Box<dyn ToolServerConnection>,
     payment: bool,
     nonce: bool,
     supplemental: bool,
+    configuration: KernelConfig,
+) -> Result<Arc<ChioKernel>> {
+    kernel_with_configuration_and_clock(
+        path,
+        server,
+        payment,
+        nonce,
+        supplemental,
+        configuration,
+        chio_test_support::clock::clock(),
+    )
+}
+
+fn kernel_with_configuration_and_clock(
+    path: &Path,
+    server: Box<dyn ToolServerConnection>,
+    payment: bool,
+    nonce: bool,
+    supplemental: bool,
+    configuration: KernelConfig,
     clock: Arc<dyn chio_kernel::authority::Clock>,
 ) -> Result<Arc<ChioKernel>> {
     private_dir(path)?;
@@ -114,7 +135,7 @@ fn kernel_with_artifacts_and_clock(
     }
     let authority =
         SqliteAuthorityStore::open_serving_with_clock(&database, &locks, clock.clone())?;
-    let mut kernel = ChioKernel::new_with_clock(config(), clock);
+    let mut kernel = ChioKernel::new_with_clock(configuration, clock);
     kernel.set_capability_trust_root(
         issuer().public_key(),
         scope_hash(&scope(&["append", "read"]))?,

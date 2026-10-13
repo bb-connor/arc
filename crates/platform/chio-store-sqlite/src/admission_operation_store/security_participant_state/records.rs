@@ -126,6 +126,102 @@ pub(super) fn load_metadata(
     load_bounded(connection, authority)
 }
 
+/// An owning warm read already authenticated the full store at startup and
+/// pinned the actual ServingOwner prefix. Check the immutable initialization
+/// framing here without replaying imported rows or later journal events.
+pub(in crate::admission_operation_store::security_participant_state) fn load_current_metadata(
+    connection: &Connection,
+    binding: &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1,
+) -> Result<SecurityParticipantStateInitialization, AdmissionOperationStoreError> {
+    if !validate_bounds(connection, schema::recorded_version(connection)?)? {
+        return Err(invalid("current native initialization catalog is absent"));
+    }
+    let authority = binding.security_authority_id().as_str();
+    type Stored = (String, String, String, i64, String, String, i64, String);
+    let stored: Stored = connection
+        .query_row(
+            "SELECT expectation_id, fingerprint_digest, schema_digest, initialized_at,
+             store_uuid, store_lease_id, store_owner_epoch, initialization_digest
+             FROM security_participant_state_initializations WHERE security_authority_id=?1",
+            [authority],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?
+        .ok_or_else(|| invalid("current native initialization is absent"))?;
+    let record = SecurityParticipantStateInitialization {
+        authority: AdmissionIdentifier::try_new("security_authority_id", authority)?,
+        expectation: AdmissionIdentifier::try_new("expectation_id", stored.0)?,
+        fingerprint: stored.1,
+        schema: stored.2,
+        initialized_at: u64::try_from(stored.3).map_err(invalid)?,
+        fence: StoreMutationFence {
+            store_uuid: stored.4,
+            lease_id: stored.5,
+            owner_epoch: u64::try_from(stored.6).map_err(invalid)?,
+        },
+        digest: stored.7,
+    };
+    if record.admission_binding()? != *binding
+        || digest(&record)? != record.digest
+        || (record.schema != schema::digest_version(28)?
+            && record.schema != schema::digest_version(29)?)
+    {
+        return Err(invalid("current native initialization binding differs"));
+    }
+    let references: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM authority_global_commits
+             WHERE projection_kind='security_participant_state' AND projection_key=?1
+               AND projection_sequence=1 AND mutation_kind='hydrate_security_participant_state'
+               AND projection_reference_digest=?2 AND store_uuid=?3
+               AND store_lease_id=?4 AND store_owner_epoch=?5",
+            params![
+                authority,
+                record.digest,
+                record.fence.store_uuid,
+                record.fence.lease_id,
+                i64::try_from(record.fence.owner_epoch).map_err(invalid)?
+            ],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    let imported: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM security_participant_migration_expectations
+             WHERE security_authority_id=?1 AND expectation_id=?2
+               AND fingerprint_digest=?3 AND destination_store_uuid=?4)
+             AND EXISTS(SELECT 1 FROM security_participant_migration_events
+             WHERE security_authority_id=?1 AND sequence=2 AND observed_at_unix_ms<=?5)",
+            params![
+                authority,
+                record.expectation.as_str(),
+                record.fingerprint,
+                record.fence.store_uuid,
+                i64::try_from(record.initialized_at).map_err(invalid)?
+            ],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if references != 1 || !imported {
+        return Err(invalid(
+            "current native initialization lost its immutable source",
+        ));
+    }
+    Ok(record)
+}
+
 fn load_bounded(
     connection: &Connection,
     authority: &str,

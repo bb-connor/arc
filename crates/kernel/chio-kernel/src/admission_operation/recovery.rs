@@ -49,7 +49,9 @@ impl AdmissionRecoveryPortError {
                     RemoteRecoveryFailureKind::OutcomeUnknown
                 }
                 AdmissionOperationStoreError::Invariant(_)
-                | AdmissionOperationStoreError::Operation(_) => {
+                | AdmissionOperationStoreError::Operation(_)
+                | AdmissionOperationStoreError::RecoveryAuthorityDenied
+                | AdmissionOperationStoreError::RecoveryMediationRequired => {
                     RemoteRecoveryFailureKind::Invariant
                 }
             },

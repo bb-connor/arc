@@ -75,7 +75,7 @@ fn load_projection_artifacts(
     let stored_raw_bytes = if retained_raw_bytes.is_some() {
         None
     } else {
-        load_blob_bytes_connection(connection, outcome.raw_output_digest())?
+        load_blob_bytes_connection(connection, outcome.raw_output_digest(), operation_id)?
     };
     let raw_bytes = retained_raw_bytes
         .map(Some)

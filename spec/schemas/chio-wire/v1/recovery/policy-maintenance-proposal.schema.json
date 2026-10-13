@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.computer/schemas/chio-wire/v1/recovery/policy-maintenance-proposal.schema.json",
+  "title": "Policy Maintenance Proposal V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "domain_version",
+    "scope",
+    "proposal_id",
+    "report_id",
+    "base_deployment",
+    "base_policy",
+    "target_policy",
+    "rationale",
+    "affected_contracts",
+    "benign_trajectories",
+    "adversarial_trajectories",
+    "expected_effects",
+    "rollback_policy",
+    "rollback_plan"
+  ],
+  "properties": {
+    "domain_version": {
+      "const": 1
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "proposal_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "report_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "base_deployment": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "base_policy": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "target_policy": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "affected_contracts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "$ref": "#/$defs/recoveryDigest32"
+      },
+      "uniqueItems": true
+    },
+    "benign_trajectories": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "$ref": "policy-trajectory-ref.schema.json"
+      },
+      "uniqueItems": true
+    },
+    "adversarial_trajectories": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "$ref": "policy-trajectory-ref.schema.json"
+      },
+      "uniqueItems": true
+    },
+    "expected_effects": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "rollback_policy": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "rollback_plan": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    }
+  },
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": { "pattern": "[\\r\\n]" }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  }
+}

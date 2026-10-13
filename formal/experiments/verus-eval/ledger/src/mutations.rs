@@ -1,4 +1,4 @@
-//! FV-B5 Phase 3: deliberately broken variants of `ReservationLedgerSync`.
+//! Deliberately broken variants of `ReservationLedgerSync`.
 //! Each machine copies the green machine and alters exactly one
 //! transition; each must FAIL verification, or the green property set is
 //! too weak to count as evidence (standing rule 1). Exercised only through

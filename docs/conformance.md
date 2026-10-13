@@ -220,7 +220,7 @@ The JSON envelope has the shape:
 ```
 
 The schema version is stable across patch releases. Any breaking change
-to this shape is gated by the Phase 5 conformance-matrix workflow
+to this shape is gated by the conformance-matrix workflow
 (`.github/workflows/conformance-matrix.yml`, job
 `external-consumer-smoke`).
 
@@ -284,8 +284,8 @@ corpus in one step.
 | Go      | in-repo + lockfile| Source build is in-repo only; pre-built binaries via fetch-peers |
 | C++     | in-repo + lockfile| Source build is in-repo only; pre-built binaries via fetch-peers |
 
-C++ Phase-0 scenario coverage (`mcp_core` and `auth`) is gated by the
-`cpp_peer_p0` integration test under `crates/tooling/chio-conformance/tests/`.
+C++ core scenario coverage (`mcp_core` and `auth`) is gated by the
+`cpp_peer_core` integration test under `crates/tooling/chio-conformance/tests/`.
 Other categories (`chio-extensions`, `tasks`, `nested_callbacks`,
 `notifications`) are deferred to a follow-on milestone for the C++
 peer per the initial roadmap decision.
@@ -427,5 +427,5 @@ External consumers can copy the same pattern into their own CI:
 - The `chio conformance run` subcommand.
 - A snapshot-tested JSON report shape.
 - The `chio conformance fetch-peers` subcommand plus `peers.lock.toml`.
-- A C++ peer P0 coverage gate (`mcp_core`, `auth`).
+- A C++ peer core coverage gate (`mcp_core`, `auth`).
 - A nightly `external-consumer-smoke` workflow.

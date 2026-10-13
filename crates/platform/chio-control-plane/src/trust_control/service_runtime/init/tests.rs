@@ -189,7 +189,7 @@ fn injected_challenge_authority_must_match_configured_database(
     secure_directory(&injected_locks)?;
     SqliteAuthorityStore::provision(&configured_database, &configured_locks)?;
     SqliteAuthorityStore::provision(&injected_database, &injected_locks)?;
-    let injected = SqliteAuthorityStore::open_serving(&injected_database, &injected_locks)?;
+    let injected = SqliteAuthorityStore::open_serving_with_clock(&injected_database, &injected_locks, chio_test_support::clock::clock())?;
 
     let matching = test_config(injected_database);
     validate_injected_joint_authority_store(&matching, &injected)?;

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.computer/schemas/chio-wire/v1/recovery/semantic-invocation.schema.json",
+  "title": "Semantic Invocation V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "action",
+    "payload",
+    "audience",
+    "endorsements",
+    "annotations",
+    "transformation",
+    "prerequisites"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.semantic.invocation.v1"
+    },
+    "action": {
+      "$ref": "semantic-action.schema.json"
+    },
+    "payload": {
+      "$ref": "semantic-payload.schema.json"
+    },
+    "audience": {
+      "$ref": "signed-semantic-audience.schema.json"
+    },
+    "endorsements": {
+      "type": "array",
+      "items": {
+        "$ref": "signed-scoped-endorsement.schema.json"
+      },
+      "minItems": 0,
+      "maxItems": 8
+    },
+    "annotations": {
+      "type": "array",
+      "items": {
+        "$ref": "signed-semantic-annotation.schema.json"
+      },
+      "minItems": 0,
+      "maxItems": 8
+    },
+    "transformation": {
+      "oneOf": [
+        {
+          "$ref": "signed-semantic-transformation.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "prerequisites": {
+      "type": "array",
+      "items": {
+        "$ref": "signed-semantic-prerequisite.schema.json"
+      },
+      "minItems": 0,
+      "maxItems": 8
+    }
+  },
+  "$defs": {}
+}

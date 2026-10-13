@@ -24,7 +24,7 @@ impl NativeFlowResolver {
         self.classified_output_label(&request, context.security_context(), context.output())
     }
 
-    fn classified_output_label(
+    pub(super) fn classified_output_label(
         &self,
         request: &chio_kernel::ToolCallRequest,
         context: &chio_kernel::SecurityInvocationContext,

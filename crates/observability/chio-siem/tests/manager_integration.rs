@@ -432,7 +432,7 @@ async fn manager_failed_exporter_does_not_advance_shared_cursor() {
 
     drop(conn);
 
-    // Phase 1: fail all 5 receipts.
+    // Failing exporter: fail all 5 receipts.
     let mut mgr1 = ExporterManager::new(SiemConfig {
         db_path: db_path.clone(),
         poll_interval: Duration::from_millis(60),
@@ -454,13 +454,16 @@ async fn manager_failed_exporter_does_not_advance_shared_cursor() {
         mgr1
     });
     tokio::time::sleep(Duration::from_millis(200)).await;
-    tx1.send(true).expect("cancel phase 1");
-    let mgr1 = h1.await.expect("phase 1 manager completes");
+    tx1.send(true).expect("cancel failing exporter");
+    let mgr1 = h1.await.expect("failing exporter manager completes");
 
     // All 5 receipts should be DLQ'd.
-    assert!(mgr1.dlq_len() > 0, "phase 1: events must be in DLQ");
+    assert!(
+        mgr1.dlq_len() > 0,
+        "failing exporter: events must be in DLQ"
+    );
 
-    // Phase 2: Insert 3 more receipts, run with counting exporter.
+    // Counting exporter: insert 3 more receipts, run with counting exporter.
     let conn2 = Connection::open(&db_path).expect("reopen db");
     for i in 5..8usize {
         insert_receipt(&conn2, &make_receipt(&format!("mgr-dlq-rcpt-{i:04}")));
@@ -489,13 +492,13 @@ async fn manager_failed_exporter_does_not_advance_shared_cursor() {
         mgr2
     });
     tokio::time::sleep(Duration::from_millis(200)).await;
-    tx2.send(true).expect("cancel phase 2");
-    h2.await.expect("phase 2 manager completes");
+    tx2.send(true).expect("cancel counting exporter");
+    h2.await.expect("counting exporter manager completes");
 
     assert_eq!(
         counter.total(),
         8,
-        "phase 2 counting exporter must export all 8 receipts (5 original + 3 new)"
+        "counting exporter must export all 8 receipts (5 original + 3 new)"
     );
 
     let _ = std::fs::remove_file(&db_path);

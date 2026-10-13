@@ -26,7 +26,7 @@ fn action() -> ToolCallAction {
 
 fn body_with(kp: &Keypair, tenant_id: Option<String>) -> ChioReceiptBody {
     ChioReceiptBody {
-        id: "rcpt-phase15".to_string(),
+        id: "rcpt-tenant-scope".to_string(),
         timestamp: 1_710_000_000,
         capability_id: "cap-001".to_string(),
         tool_server: "srv-files".to_string(),

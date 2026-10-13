@@ -7,34 +7,50 @@
     {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "owners", "compartments"],
+      "required": [
+        "kind",
+        "owners",
+        "compartments"
+      ],
       "properties": {
-        "kind": { "const": "known" },
+        "kind": {
+          "const": "known"
+        },
         "owners": {
           "type": "object",
           "maxProperties": 64,
-          "propertyNames": { "$ref": "#/$defs/flowIdentifier" },
+          "propertyNames": {
+            "$ref": "#/$defs/flowIdentifier"
+          },
           "additionalProperties": {
             "type": "array",
             "maxItems": 256,
             "uniqueItems": true,
-            "items": { "$ref": "#/$defs/flowIdentifier" }
+            "items": {
+              "$ref": "#/$defs/flowIdentifier"
+            }
           }
         },
         "compartments": {
           "type": "array",
           "maxItems": 64,
           "uniqueItems": true,
-          "items": { "$ref": "#/$defs/flowIdentifier" }
+          "items": {
+            "$ref": "#/$defs/flowIdentifier"
+          }
         }
       }
     },
     {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "properties": {
-        "kind": { "const": "top" }
+        "kind": {
+          "const": "top"
+        }
       }
     }
   ],
@@ -43,7 +59,8 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 256,
-      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+      "x-maxUtf8Bytes": 256
     }
   }
 }

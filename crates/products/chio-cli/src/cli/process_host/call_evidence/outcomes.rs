@@ -411,6 +411,7 @@ pub(crate) fn verify_file(
         ).collect::<BTreeMap<_, _>>(),
             "checks": checks,
             "unchecked": unchecked,
+            "qualification_complete": false,
             "m5_acceptance_complete": false,
         })
     );

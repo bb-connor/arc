@@ -2,7 +2,7 @@
 
 The explicitly built enforcement-probe example attempts raw OS reads/writes.
 An unconfined positive control proves both effects are possible; the same
-executable must then return EACCES under Enforced launch. This is one M5 slice.
+executable must then return EACCES under Enforced launch. This qualifies the filesystem boundary.
 """
 
 import argparse
@@ -281,7 +281,7 @@ capabilities:
         "protected_file_unchanged": True,
         "secret_not_returned": True,
         "verification": verification,
-        "m5_acceptance_complete": False,
+        "qualification_complete": False,
     }
     write(output / "qualification.json", result)
     print(json.dumps(result))

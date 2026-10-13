@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/action-intent.schema.json",
+  "title": "Recovery exact action intent V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "workflow_id",
+    "step_id",
+    "continuation_id",
+    "request_id",
+    "isolation_lineage",
+    "scope",
+    "capability_id",
+    "authorization_requirements",
+    "request_namespace",
+    "capability_body",
+    "semantic_request",
+    "policy_digest",
+    "contract_digest",
+    "authority_scope",
+    "basis",
+    "output_disposition",
+    "source_generation",
+    "isolation_epoch"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.recovery.action-intent.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "workflow_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "step_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "continuation_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "request_id": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "origin": {
+      "description": "Verified original effect-free denial. Historical actions may omit this field; fresh native recovery authorization requires it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "request_id",
+        "closure"
+      ],
+      "properties": {
+        "operation": {
+          "$ref": "observation.schema.json#/$defs/operation"
+        },
+        "request_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "closure": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    },
+    "isolation_lineage": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "capability_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+      "x-maxUtf8Bytes": 256
+    },
+    "authorization_requirements": {
+      "$ref": "authorization-requirements.schema.json"
+    },
+    "request_namespace": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "capability_body": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "semantic_request": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "policy_digest": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "contract_digest": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "authority_scope": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "basis": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "output_disposition": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "source_generation": {
+      "$ref": "#/$defs/safeInteger"
+    },
+    "isolation_epoch": {
+      "$ref": "#/$defs/safeInteger"
+    }
+  },
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    }
+  }
+}

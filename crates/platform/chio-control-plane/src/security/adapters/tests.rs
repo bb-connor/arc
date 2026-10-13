@@ -589,7 +589,8 @@ fn declassifying_flow_request(
     .unwrap_or_else(|error| panic!("grant body: {error}"));
     request.declassification_grant = Some(
         SignedDeclassificationGrant::sign(body, authority)
-            .unwrap_or_else(|error| panic!("sign grant: {error}")),
+            .unwrap_or_else(|error| panic!("sign grant: {error}"))
+            .into(),
     );
     request
 }

@@ -11,17 +11,33 @@ use crate::{digest, Checkpoint, ProcessError, ProcessLimits, ProcessSnapshot, Pr
 
 mod blobs;
 mod children;
+mod confined_delivery;
+mod confined_slots;
 #[cfg(feature = "worker-server")]
 mod credentials;
+mod knowledge;
+pub(crate) mod native_return_custody;
 mod nonces;
 mod prepared;
 
 pub(crate) const JOURNAL_VERSION: u32 = 2;
+/// Knowledge enforcement (3 and above), confined returns (5), unused recovery
+/// reservations (6) and confined delivery (7) raise a journal's stamp in
+/// place; no stamp outside this range is ever served.
+pub(crate) const LATEST_JOURNAL_STAMP: u32 = 7;
+mod objects;
+mod original_snapshot;
+mod recovery;
+mod unused_recovery_reservation;
+pub(crate) use original_snapshot::OriginalProcessSnapshot;
 
 pub(crate) struct Store {
     connection: Connection,
     clock: Arc<dyn Clock>,
     pub namespace: String,
+    path: std::path::PathBuf,
+    #[cfg(unix)]
+    identity: (u64, u64),
 }
 
 impl Store {
@@ -32,7 +48,19 @@ impl Store {
         clock: Arc<dyn Clock>,
     ) -> Result<Self, ProcessError> {
         let path = private_file(path)?;
-        let mut connection = Connection::open(path)?;
+        #[cfg(unix)]
+        let identity = {
+            use std::os::unix::fs::MetadataExt;
+            let file = std::fs::symlink_metadata(&path)?;
+            (file.dev(), file.ino())
+        };
+        let mut connection = Connection::open_with_flags(
+            &path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+                | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
+                | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )?;
         connection.busy_timeout(Duration::from_secs(5))?;
         let has_schema: bool = connection.query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*')",
@@ -58,18 +86,49 @@ impl Store {
         connection.pragma_update(None, "synchronous", "FULL")?;
         connection.pragma_update(None, "foreign_keys", "ON")?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        confined_delivery::verify_before_open(&tx)?;
+        unused_recovery_reservation::verify_before_open(&tx)?;
+        // Earlier triggers fenced a single version instead of preventing only
+        // downgrades. Replace them before a supported journal upgrade.
+        tx.execute_batch(
+            "DROP TRIGGER IF EXISTS process_recovery_version_monotone;
+            DROP TRIGGER IF EXISTS process_knowledge_no_downgrade;",
+        )?;
         tx.execute_batch(include_str!("store.sql"))?;
+        tx.execute_batch("CREATE TRIGGER process_knowledge_no_downgrade BEFORE UPDATE OF version ON process_runtime
+            WHEN OLD.version>=3 AND NEW.version<OLD.version
+            BEGIN SELECT RAISE(ABORT,'knowledge enforcement is permanent'); END;")?;
         tx.execute(
             "INSERT OR IGNORE INTO process_runtime(singleton, version, namespace, authority, kernel_key)
              VALUES (1, ?1, ?2, ?3, ?4)",
             params![JOURNAL_VERSION, uuid::Uuid::new_v4().to_string(), authority, kernel_key],
         )?;
         let namespace = journal_namespace(&tx, authority, kernel_key)?;
+        let version: u32 =
+            tx.query_row("SELECT version FROM process_runtime WHERE singleton = 1", [], |row| {
+                row.get(0)
+            })?;
+        if version < 5
+            && tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM process_confined_return_slots)",
+                [],
+                |row| row.get::<_, bool>(0),
+            )?
+        {
+            return Err(ProcessError::Configuration(
+                "confined return data requires its journal version",
+            ));
+        }
+        unused_recovery_reservation::install_or_verify(&tx, version)?;
+        confined_delivery::install_or_verify(&tx, version)?;
         tx.commit()?;
         Ok(Self {
             connection,
             clock,
             namespace,
+            path,
+            #[cfg(unix)]
+            identity,
         })
     }
 
@@ -99,6 +158,38 @@ impl Store {
         }
         result.reverse();
         Ok(result)
+    }
+
+    /// Host storage custody preserves exact ancestry after execution ends.
+    /// This grants neither original token liveness nor a new journal attachment.
+    pub(crate) fn retained_lineage(
+        &self,
+        id: &str,
+    ) -> Result<(ProcessSnapshot, Vec<CapabilityToken>), ProcessError> {
+        let snapshot = self.process(id)?;
+        let mut process = snapshot.clone();
+        let mut result = Vec::new();
+        loop {
+            let parent = process.parent_id;
+            result.push(process.capability);
+            if result.len() > 65 {
+                return Err(ProcessError::Invalid(
+                    "process lineage exceeds maximum depth",
+                ));
+            }
+            let Some(parent) = parent else {
+                if process.id != snapshot.root_id {
+                    return Err(ProcessError::Conflict);
+                }
+                break;
+            };
+            process = self.process(&parent)?;
+            if process.root_id != snapshot.root_id {
+                return Err(ProcessError::Conflict);
+            }
+        }
+        result.reverse();
+        Ok((snapshot, result))
     }
 
     pub fn create_root(
@@ -150,6 +241,7 @@ impl Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        unused_recovery_reservation::require_open_recovery_reservation(&tx, id, key)?;
         let process =
             read_process(&tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
         require_running(&process)?;
@@ -162,6 +254,17 @@ impl Store {
             "SELECT request_hash FROM process_calls WHERE process_id = ?1 AND operation_key = ?2",
             params![id, key], |row| row.get(0),
         ).optional()?;
+        let reserved: Option<Option<String>> = tx.query_row(
+            "SELECT final_binding FROM process_recovery_calls WHERE process_id=?1 AND operation_key=?2",
+            params![id,key],|row| row.get(0),
+        ).optional()?;
+        if reserved
+            .as_ref()
+            .is_some_and(|binding| binding.as_deref() != Some(request_hash))
+            || (reserved.is_some() && existing.is_none())
+        {
+            return Err(ProcessError::Conflict);
+        }
         match existing {
             Some(hash) if hash != request_hash => return Err(ProcessError::Conflict),
             Some(_) => {}
@@ -270,7 +373,11 @@ impl Store {
                 UNION ALL SELECT p.id FROM processes p JOIN descendants d ON p.parent_id = d.id
              ) UPDATE processes SET state = 'cancelled' WHERE id IN (SELECT id FROM descendants) AND state = 'running'", [id],
         )?;
+        let ordered = confined_delivery::cancellation_has_ordered_return(&tx, id);
         tx.commit()?;
+        if ordered? {
+            return Err(ProcessError::ConfinedReturnAlreadyOrdered);
+        }
         Ok(count)
     }
 }
@@ -289,7 +396,7 @@ fn journal_namespace(
         .optional()?;
     match binding {
         Some((version, namespace, stored_authority, stored_key))
-            if version == JOURNAL_VERSION
+            if (JOURNAL_VERSION..=LATEST_JOURNAL_STAMP).contains(&version)
                 && stored_authority == authority
                 && stored_key == kernel_key =>
         {
@@ -446,7 +553,12 @@ pub(crate) fn private_file(path: &Path) -> Result<std::path::PathBuf, ProcessErr
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        if file.nlink() != 1 {
+            return Err(ProcessError::Configuration(
+                "process journal cannot have hard-link aliases",
+            ));
+        }
         if file.permissions().mode() & 0o077 != 0 {
             return Err(ProcessError::Configuration(
                 "process journal must be private (mode 0600)",

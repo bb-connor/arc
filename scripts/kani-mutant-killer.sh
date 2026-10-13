@@ -11,7 +11,7 @@ if [[ -n "${CHIO_KANI_VERSION:-}" && "${CHIO_KANI_VERSION}" != "${expected_versi
   echo "kani-mutant-killer: CHIO_KANI_VERSION must remain ${expected_version}" >&2
   exit 2
 fi
-version="$(cargo kani --version 2>&1)"
+version="$(bash scripts/check-kani-toolchain.sh)"
 version_pattern="${expected_version//./\\.}"
 if [[ ! "${version}" =~ (^|[^0-9.])${version_pattern}([^0-9.]|$) ]]; then
   echo "kani-mutant-killer: expected Kani ${expected_version}, found ${version}" >&2

@@ -129,6 +129,8 @@ impl Category {
             AdmissionOperationStoreError::Unavailable(_) => Self::Unavailable,
             AdmissionOperationStoreError::Operation(_) => Self::Operation,
             AdmissionOperationStoreError::NotFound => Self::NotFound,
+            AdmissionOperationStoreError::RecoveryAuthorityDenied
+            | AdmissionOperationStoreError::RecoveryMediationRequired => Self::Invariant,
         }
     }
 }

@@ -57,7 +57,7 @@ id = "step-1"
 agent = "agent-a"
 server = "filesystem"
 tool = "read_file"
-arguments = { path = "/tmp/p5.txt" }
+arguments = { path = "/tmp/promotion-input.txt" }
 expect_verdict = "deny"
 
 [[steps]]

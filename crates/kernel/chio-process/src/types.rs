@@ -14,6 +14,8 @@ pub enum ProcessError {
     NotFound(String),
     #[error("process is cancelled: {0}")]
     Cancelled(String),
+    #[error("Stop accepted; a confined return was already ordered")]
+    ConfinedReturnAlreadyOrdered,
     #[error("process identity or operation binding conflicts with persisted state")]
     Conflict,
     #[error("process tree limit reached: {0}")]

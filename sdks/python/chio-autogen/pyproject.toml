@@ -24,7 +24,7 @@ classifiers = [
 
 # We depend on the classic pyautogen 0.2.x line because it exposes the
 # stable ``ConversableAgent`` / ``GroupChat`` / ``register_function``
-# surface referenced by the Chio roadmap. The v0.4+ ``autogen-agentchat``
+# surface used by this adapter. The v0.4+ ``autogen-agentchat``
 # redesign pivots to an async actor model that does not expose a
 # drop-in ``GroupChat`` with ``function_map``; adapting to it is tracked
 # as a follow-up. pyautogen 0.2.x installs cleanly under ``uv pip`` on

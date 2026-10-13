@@ -61,4 +61,4 @@ run_case "provider fabric bounded profile" provider_verdict::tests::provider_fab
 ./scripts/check-protocol-peer-negotiation.sh
 ./scripts/check-adapter-no-bypass.sh
 ./scripts/check-http-egress-contract.sh
-echo "Consumer boundary Rust gate passed (SDK, M3 and composed gates remain separate)"
+echo "Consumer boundary Rust gate passed (SDK, authenticated delivery and composed gates remain separate)"
