@@ -247,7 +247,7 @@
     "constraint": {
       "oneOf": [
         { "$ref": "#/$defs/genericConstraint" },
-        { "$ref": "#/$defs/legacyApprovalConstraint" },
+        { "$ref": "#/$defs/requireApprovalAboveConstraint" },
         { "$ref": "#/$defs/cumulativeApprovalDirectConstraint" },
         { "$ref": "#/$defs/cumulativeApprovalDelegableConstraint" }
       ]
@@ -273,7 +273,7 @@
         "value": true
       }
     },
-    "legacyApprovalConstraint": {
+    "requireApprovalAboveConstraint": {
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "value"],

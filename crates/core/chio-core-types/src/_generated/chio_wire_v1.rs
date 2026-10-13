@@ -9443,7 +9443,7 @@ pub mod agent_tool_call_request {
     ///      "$ref": "#/$defs/genericConstraint"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/legacyApprovalConstraint"
+    ///      "$ref": "#/$defs/requireApprovalAboveConstraint"
     ///    },
     ///    {
     ///      "$ref": "#/$defs/cumulativeApprovalDirectConstraint"
@@ -9459,7 +9459,7 @@ pub mod agent_tool_call_request {
     #[serde(untagged)]
     pub enum Constraint {
         GenericConstraint(GenericConstraint),
-        LegacyApprovalConstraint(LegacyApprovalConstraint),
+        RequireApprovalAboveConstraint(RequireApprovalAboveConstraint),
         CumulativeApprovalDirectConstraint(CumulativeApprovalDirectConstraint),
         CumulativeApprovalDelegableConstraint(CumulativeApprovalDelegableConstraint),
     }
@@ -9473,9 +9473,9 @@ pub mod agent_tool_call_request {
             Self::GenericConstraint(value)
         }
     }
-    impl ::std::convert::From<LegacyApprovalConstraint> for Constraint {
-        fn from(value: LegacyApprovalConstraint) -> Self {
-            Self::LegacyApprovalConstraint(value)
+    impl ::std::convert::From<RequireApprovalAboveConstraint> for Constraint {
+        fn from(value: RequireApprovalAboveConstraint) -> Self {
+            Self::RequireApprovalAboveConstraint(value)
         }
     }
     impl ::std::convert::From<CumulativeApprovalDirectConstraint> for Constraint {
@@ -11394,81 +11394,6 @@ pub mod agent_tool_call_request {
             value.parse()
         }
     }
-    ///`LegacyApprovalConstraint`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "type",
-    ///    "value"
-    ///  ],
-    ///  "properties": {
-    ///    "type": {
-    ///      "const": "require_approval_above"
-    ///    },
-    ///    "value": {
-    ///      "type": "object",
-    ///      "required": [
-    ///        "threshold_units"
-    ///      ],
-    ///      "properties": {
-    ///        "threshold_units": {
-    ///          "type": "integer",
-    ///          "minimum": 0.0
-    ///        }
-    ///      },
-    ///      "additionalProperties": false
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct LegacyApprovalConstraint {
-        #[serde(rename = "type")]
-        pub type_: ::serde_json::Value,
-        pub value: LegacyApprovalConstraintValue,
-    }
-    impl ::std::convert::From<&LegacyApprovalConstraint> for LegacyApprovalConstraint {
-        fn from(value: &LegacyApprovalConstraint) -> Self {
-            value.clone()
-        }
-    }
-    ///`LegacyApprovalConstraintValue`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "threshold_units"
-    ///  ],
-    ///  "properties": {
-    ///    "threshold_units": {
-    ///      "type": "integer",
-    ///      "minimum": 0.0
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct LegacyApprovalConstraintValue {
-        pub threshold_units: u64,
-    }
-    impl ::std::convert::From<&LegacyApprovalConstraintValue> for LegacyApprovalConstraintValue {
-        fn from(value: &LegacyApprovalConstraintValue) -> Self {
-            value.clone()
-        }
-    }
     ///A monetary amount in the currency's smallest minor unit. Mirrors `MonetaryAmount`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -11786,6 +11711,83 @@ pub mod agent_tool_call_request {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///`RequireApprovalAboveConstraint`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "type",
+    ///    "value"
+    ///  ],
+    ///  "properties": {
+    ///    "type": {
+    ///      "const": "require_approval_above"
+    ///    },
+    ///    "value": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "threshold_units"
+    ///      ],
+    ///      "properties": {
+    ///        "threshold_units": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RequireApprovalAboveConstraint {
+        #[serde(rename = "type")]
+        pub type_: ::serde_json::Value,
+        pub value: RequireApprovalAboveConstraintValue,
+    }
+    impl ::std::convert::From<&RequireApprovalAboveConstraint> for RequireApprovalAboveConstraint {
+        fn from(value: &RequireApprovalAboveConstraint) -> Self {
+            value.clone()
+        }
+    }
+    ///`RequireApprovalAboveConstraintValue`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "threshold_units"
+    ///  ],
+    ///  "properties": {
+    ///    "threshold_units": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RequireApprovalAboveConstraintValue {
+        pub threshold_units: u64,
+    }
+    impl ::std::convert::From<&RequireApprovalAboveConstraintValue>
+        for RequireApprovalAboveConstraintValue
+    {
+        fn from(value: &RequireApprovalAboveConstraintValue) -> Self {
+            value.clone()
         }
     }
     ///Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
@@ -26271,7 +26273,7 @@ pub mod kernel_capability_list {
     ///      "$ref": "#/$defs/genericConstraint"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/legacyApprovalConstraint"
+    ///      "$ref": "#/$defs/requireApprovalAboveConstraint"
     ///    },
     ///    {
     ///      "$ref": "#/$defs/cumulativeApprovalDirectConstraint"
@@ -26287,7 +26289,7 @@ pub mod kernel_capability_list {
     #[serde(untagged)]
     pub enum Constraint {
         GenericConstraint(GenericConstraint),
-        LegacyApprovalConstraint(LegacyApprovalConstraint),
+        RequireApprovalAboveConstraint(RequireApprovalAboveConstraint),
         CumulativeApprovalDirectConstraint(CumulativeApprovalDirectConstraint),
         CumulativeApprovalDelegableConstraint(CumulativeApprovalDelegableConstraint),
     }
@@ -26301,9 +26303,9 @@ pub mod kernel_capability_list {
             Self::GenericConstraint(value)
         }
     }
-    impl ::std::convert::From<LegacyApprovalConstraint> for Constraint {
-        fn from(value: LegacyApprovalConstraint) -> Self {
-            Self::LegacyApprovalConstraint(value)
+    impl ::std::convert::From<RequireApprovalAboveConstraint> for Constraint {
+        fn from(value: RequireApprovalAboveConstraint) -> Self {
+            Self::RequireApprovalAboveConstraint(value)
         }
     }
     impl ::std::convert::From<CumulativeApprovalDirectConstraint> for Constraint {
@@ -28054,81 +28056,6 @@ pub mod kernel_capability_list {
             value.parse()
         }
     }
-    ///`LegacyApprovalConstraint`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "type",
-    ///    "value"
-    ///  ],
-    ///  "properties": {
-    ///    "type": {
-    ///      "const": "require_approval_above"
-    ///    },
-    ///    "value": {
-    ///      "type": "object",
-    ///      "required": [
-    ///        "threshold_units"
-    ///      ],
-    ///      "properties": {
-    ///        "threshold_units": {
-    ///          "type": "integer",
-    ///          "minimum": 0.0
-    ///        }
-    ///      },
-    ///      "additionalProperties": false
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct LegacyApprovalConstraint {
-        #[serde(rename = "type")]
-        pub type_: ::serde_json::Value,
-        pub value: LegacyApprovalConstraintValue,
-    }
-    impl ::std::convert::From<&LegacyApprovalConstraint> for LegacyApprovalConstraint {
-        fn from(value: &LegacyApprovalConstraint) -> Self {
-            value.clone()
-        }
-    }
-    ///`LegacyApprovalConstraintValue`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "threshold_units"
-    ///  ],
-    ///  "properties": {
-    ///    "threshold_units": {
-    ///      "type": "integer",
-    ///      "minimum": 0.0
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct LegacyApprovalConstraintValue {
-        pub threshold_units: u64,
-    }
-    impl ::std::convert::From<&LegacyApprovalConstraintValue> for LegacyApprovalConstraintValue {
-        fn from(value: &LegacyApprovalConstraintValue) -> Self {
-            value.clone()
-        }
-    }
     ///A monetary amount in the currency's smallest minor unit. Mirrors `MonetaryAmount`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -28446,6 +28373,83 @@ pub mod kernel_capability_list {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///`RequireApprovalAboveConstraint`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "type",
+    ///    "value"
+    ///  ],
+    ///  "properties": {
+    ///    "type": {
+    ///      "const": "require_approval_above"
+    ///    },
+    ///    "value": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "threshold_units"
+    ///      ],
+    ///      "properties": {
+    ///        "threshold_units": {
+    ///          "type": "integer",
+    ///          "minimum": 0.0
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RequireApprovalAboveConstraint {
+        #[serde(rename = "type")]
+        pub type_: ::serde_json::Value,
+        pub value: RequireApprovalAboveConstraintValue,
+    }
+    impl ::std::convert::From<&RequireApprovalAboveConstraint> for RequireApprovalAboveConstraint {
+        fn from(value: &RequireApprovalAboveConstraint) -> Self {
+            value.clone()
+        }
+    }
+    ///`RequireApprovalAboveConstraintValue`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "threshold_units"
+    ///  ],
+    ///  "properties": {
+    ///    "threshold_units": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RequireApprovalAboveConstraintValue {
+        pub threshold_units: u64,
+    }
+    impl ::std::convert::From<&RequireApprovalAboveConstraintValue>
+        for RequireApprovalAboveConstraintValue
+    {
+        fn from(value: &RequireApprovalAboveConstraintValue) -> Self {
+            value.clone()
         }
     }
     ///Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.

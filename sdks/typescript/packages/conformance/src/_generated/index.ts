@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 2e5e0fb4ca5ecb7f1ddfb6bce82eaa22361eb383a30a6ac3a5f70de875d8c3e9
+// Schema SHA: ae513fe8e155813f74f4cf579519af96e27b03545b302a0d82fdfe33ecfc42ad
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -299,7 +299,7 @@ export namespace Agent_ToolCallRequest {
     ];
     constraints?: (
       | GenericConstraint
-      | LegacyApprovalConstraint
+      | RequireApprovalAboveConstraint
       | CumulativeApprovalDirectConstraint
       | CumulativeApprovalDelegableConstraint
     )[];
@@ -315,7 +315,7 @@ export namespace Agent_ToolCallRequest {
     type: string;
     value?: unknown;
   }
-  export interface LegacyApprovalConstraint {
+  export interface RequireApprovalAboveConstraint {
     type: "require_approval_above";
     value: {
       threshold_units: number;
@@ -983,7 +983,7 @@ export namespace Capability_Token {
   export type Operation = "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate";
   export type Constraint =
     | GenericConstraint
-    | LegacyApprovalConstraint
+    | RequireApprovalAboveConstraint
     | CumulativeApprovalDirectConstraint
     | CumulativeApprovalDelegableConstraint;
   export type ChioAggregateInvocationBudget =
@@ -1045,7 +1045,7 @@ export namespace Capability_Token {
     type: string;
     value?: unknown;
   }
-  export interface LegacyApprovalConstraint {
+  export interface RequireApprovalAboveConstraint {
     type: "require_approval_above";
     value: {
       threshold_units: number;
@@ -1626,7 +1626,7 @@ export namespace Kernel_CapabilityList {
     ];
     constraints?: (
       | GenericConstraint
-      | LegacyApprovalConstraint
+      | RequireApprovalAboveConstraint
       | CumulativeApprovalDirectConstraint
       | CumulativeApprovalDelegableConstraint
     )[];
@@ -1642,7 +1642,7 @@ export namespace Kernel_CapabilityList {
     type: string;
     value?: unknown;
   }
-  export interface LegacyApprovalConstraint {
+  export interface RequireApprovalAboveConstraint {
     type: "require_approval_above";
     value: {
       threshold_units: number;

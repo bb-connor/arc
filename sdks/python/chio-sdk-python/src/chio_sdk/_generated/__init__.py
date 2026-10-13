@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: e22bcbc3047b9108103f82aacc50dd02391fb934102bba305996ff3411a1a40d
+# Schema sha256: 5eeeda30a956e0352287f049e9df4bcad380fd2b0e27f4f342e018d182e65033
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -29,11 +29,11 @@ from pydantic_core import core_schema
 #: SHA-256 of the lexicographically sorted concatenation of every
 #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was
 #: fed into datamodel-code-generator at build time.
-SCHEMA_SHA256 = "e22bcbc3047b9108103f82aacc50dd02391fb934102bba305996ff3411a1a40d"
+SCHEMA_SHA256 = "5eeeda30a956e0352287f049e9df4bcad380fd2b0e27f4f342e018d182e65033"
 
 from .agent import Body as AgentBody, Body5, Body6, BoundToolInvocationBinding, ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, ChioGovernedActiveResponseIntentBody, ChioGovernedTransactionIntent, MaxAmount, OrderedEffect
 from .anchor import Body as AnchorBody, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind as AnchorKind, Witness, WitnessReceipt, WitnessState, WitnessState1, WitnessState2, WitnessState3
-from .capability import AggregateRootPublicKey, AggregateRootSignature, AggregateRootSigningAlgorithm, Algorithm as CapabilityAlgorithm, Attenuation, AttenuationProof, AttenuationWitness, Body as CapabilityBody, Caveat, ChioAggregateBudgetRootBinding, ChioAggregateInvocationBudget, ChioAggregateInvocationBudget1, ChioAggregateInvocationBudget2, ChioCapabilityGrant, ChioCapabilityNegotiationV1, ChioCapabilityRevocationEntry, ChioCapabilitySecurityBinding, ChioCapabilitytoken, ChioCumulativeApprovalRootBinding, ChioGovernedApprovalToken, ChioOpaqueSupplementalAuthorization, ChioScope, ChioThresholdApprovalProposal, ChioVerifiedApprovalSetBody, Constraint, CumulativeApprovalDelegableConstraint, CumulativeApprovalDirectConstraint, CumulativeRootMonetaryAmount, CumulativeRootPublicKey, CumulativeRootSignature, CumulativeRootSigningAlgorithm, Decision as CapabilityDecision, DelegationLink, GenericConstraint, GovernedApprovalPublicKey, GovernedApprovalSignature, GrantKind, GrantSubsetRelation, Kind as CapabilityKind, LegacyApprovalConstraint, MonetaryAmount as CapabilityMonetaryAmount, Operation as CapabilityOperation, PromptGrant, ResourceGrant, ScopeAttenuation, SecurityBindingText, Subset, ThresholdProposalPublicKey, ThresholdProposalSignature, TokenDigest, ToolGrant, Value, Value1, Value2
+from .capability import AggregateRootPublicKey, AggregateRootSignature, AggregateRootSigningAlgorithm, Algorithm as CapabilityAlgorithm, Attenuation, AttenuationProof, AttenuationWitness, Body as CapabilityBody, Caveat, ChioAggregateBudgetRootBinding, ChioAggregateInvocationBudget, ChioAggregateInvocationBudget1, ChioAggregateInvocationBudget2, ChioCapabilityGrant, ChioCapabilityNegotiationV1, ChioCapabilityRevocationEntry, ChioCapabilitySecurityBinding, ChioCapabilitytoken, ChioCumulativeApprovalRootBinding, ChioGovernedApprovalToken, ChioOpaqueSupplementalAuthorization, ChioScope, ChioThresholdApprovalProposal, ChioVerifiedApprovalSetBody, Constraint, CumulativeApprovalDelegableConstraint, CumulativeApprovalDirectConstraint, CumulativeRootMonetaryAmount, CumulativeRootPublicKey, CumulativeRootSignature, CumulativeRootSigningAlgorithm, Decision as CapabilityDecision, DelegationLink, GenericConstraint, GovernedApprovalPublicKey, GovernedApprovalSignature, GrantKind, GrantSubsetRelation, Kind as CapabilityKind, MonetaryAmount as CapabilityMonetaryAmount, Operation as CapabilityOperation, PromptGrant, RequireApprovalAboveConstraint, ResourceGrant, ScopeAttenuation, SecurityBindingText, Subset, ThresholdProposalPublicKey, ThresholdProposalSignature, TokenDigest, ToolGrant, Value, Value1, Value2
 from .error import ChioToolcallerrorCapabilityDenied, ChioToolcallerrorCapabilityExpired, ChioToolcallerrorCapabilityRevoked, ChioToolcallerrorInternalError, ChioToolcallerrorPolicyDenied, ChioToolcallerrorToolServerError, Detail as ErrorDetail
 from .federation import CapabilityLeaseRef, ChioBilateralDsseSignatureSliceEnvelope, ChioBilateralDsseSignatureSliceStatement, CoSign, CrossOrgVisibility, Digest as FederationDigest, GovernanceReceiptRef, HashRecord, JointDisposition, KernelIdentity, PolicyEvaluationSummary, PolicyVerdict, Predicate, Signature as FederationSignature, SubjectItem, Verdict as FederationVerdict
 from .jsonrpc import ChioJsonRpc20Notification, ChioJsonRpc20Request, ChioJsonRpc20Response, ChioJsonRpc20Response1, ChioJsonRpc20Response2, Error as JsonrpcError
@@ -438,7 +438,6 @@ __all__ = [
     "KnownLabel",
     "LandlockPlan",
     "LatencyHint",
-    "LegacyApprovalConstraint",
     "LiftOutcome",
     "LiftOutcome1",
     "LiftOutcome2",
@@ -541,6 +540,7 @@ __all__ = [
     "Report",
     "Request",
     "RequestConstraints",
+    "RequireApprovalAboveConstraint",
     "RequiredPermissions",
     "ResourceGrant",
     "ResourceLimits",
