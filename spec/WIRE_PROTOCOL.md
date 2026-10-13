@@ -274,6 +274,16 @@ Established-session rules:
 - Event sequences are monotonic across a session restore. A restored session
   starts above every sequence an earlier incarnation issued, so a cursor from
   before the restore fails with `409 Conflict` instead of naming a new event.
+- After a `409 Conflict` on `Last-Event-ID`, a client **MUST** re-list every
+  catalog it uses, re-read every resource it is subscribed to, and reconnect
+  without `Last-Event-ID`. Its resource subscriptions persist, so it does not
+  subscribe again.
+- Standard resource subscriptions survive a server restart. Each one is
+  re-authorized against the capability that granted it before the session is
+  served, and the session receives one `notifications/resources/updated` per
+  subscribed resource after the restart. If any subscription fails
+  re-authorization, or its authority lapses later, the session ends instead of
+  continuing without it.
 - Hosted deployments that reuse one upstream owner across multiple sessions
   **MUST** keep late notifications and task handles scoped to the originating
   session. They **MUST NOT** fan out unattributed notifications or allow a
