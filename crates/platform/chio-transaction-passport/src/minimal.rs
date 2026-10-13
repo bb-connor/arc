@@ -796,17 +796,17 @@ fn issuer_key_part(issuer: &str) -> &str {
     issuer.strip_prefix("did:chio:").unwrap_or(issuer)
 }
 
-const TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V1_ID: &str = "chio.transparency.inclusion-proof.v1";
-const TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V2_ID: &str = "chio.transparency.inclusion-proof.v2";
+const TRANSPARENCY_INCLUSION_PROOF_SCHEMA_ID: &str = "chio.transparency.inclusion-proof.v1";
+const RECEIPT_INCLUSION_PROOF_SCHEMA_ID: &str = "chio.transparency.receipt-inclusion-proof.v1";
 const CHECKPOINT_STATEMENT_SCHEMA_V1_ID: &str = "chio.checkpoint_statement.v1";
 const CHECKPOINT_STATEMENT_SCHEMA_V2_ID: &str = "chio.checkpoint_statement.v2";
 const RECEIPT_EVIDENCE_ROLE: &str = "receipt";
 
-/// Payload of a `chio.transparency.inclusion-proof.v2` artifact as consumed
-/// for transparency-state promotion. V2 uses RFC 6962 hashing over receipt
-/// bytes and embeds the signed checkpoint statement. The registered v1
-/// selective-disclosure format has different leaf and node hashing and remains
-/// preview-only here.
+/// Payload of a `chio.transparency.receipt-inclusion-proof.v1` artifact as
+/// consumed for transparency-state promotion. It uses RFC 6962 hashing over
+/// receipt bytes and embeds the signed checkpoint statement. The
+/// `chio.transparency.inclusion-proof.v1` selective-disclosure format has
+/// different leaf and node hashing and is preview-only here.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct TransparencyInclusionProofArtifact {
@@ -971,8 +971,8 @@ fn evidence_graph_transparency_state(
         if role == "transparency-inclusion-proof"
             || matches!(
                 schema,
-                TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V1_ID
-                    | TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V2_ID
+                TRANSPARENCY_INCLUSION_PROOF_SCHEMA_ID
+                    | RECEIPT_INCLUSION_PROOF_SCHEMA_ID
             )
         {
             match transparency_anchor_state(node, nodes, artifacts, trusted_checkpoint_signer_keys)
@@ -1049,22 +1049,21 @@ fn transparency_anchor_state(
             "transparency node schema {node_schema} does not match artifact schema {schema}"
         ));
     }
-    if schema == TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V1_ID {
-        // V1 is the registered selective-disclosure proof. Its leaf is the
-        // SHA-256 digest of the subject digest string and its internal nodes
-        // are unprefixed. It cannot be interpreted as the RFC 6962 receipt
-        // proof below, even if an unknown checkpoint_statement field was
-        // tolerated by a producer.
+    if schema == TRANSPARENCY_INCLUSION_PROOF_SCHEMA_ID {
+        // The selective-disclosure proof hashes the subject digest string as
+        // its leaf and leaves internal nodes unprefixed, so it is never read
+        // as the RFC 6962 receipt proof below, even if a producer smuggled in
+        // a checkpoint_statement field.
         return TransparencyAnchor::NotEvaluable;
     }
-    if schema != TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V2_ID {
+    if schema != RECEIPT_INCLUSION_PROOF_SCHEMA_ID {
         return TransparencyAnchor::Invalid(format!("unsupported inclusion proof schema {schema}"));
     }
     let artifact: TransparencyInclusionProofArtifact = match crate::input::project(raw_artifact) {
         Ok(artifact) => artifact,
         Err(error) => return TransparencyAnchor::InvalidInput(error),
     };
-    if artifact.schema != TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V2_ID {
+    if artifact.schema != RECEIPT_INCLUSION_PROOF_SCHEMA_ID {
         return TransparencyAnchor::Invalid(format!(
             "unsupported inclusion proof schema {}",
             artifact.schema
@@ -1077,18 +1076,18 @@ fn transparency_anchor_state(
     ] {
         if value.trim().is_empty() {
             return TransparencyAnchor::Invalid(format!(
-                "v2 inclusion proof {field} must not be empty"
+                "receipt inclusion proof {field} must not be empty"
             ));
         }
     }
     if artifact.verified_at == 0 {
         return TransparencyAnchor::Invalid(
-            "v2 inclusion proof verified_at must be greater than zero".to_string(),
+            "receipt inclusion proof verified_at must be greater than zero".to_string(),
         );
     }
     if artifact.tree_size == 0 || artifact.leaf_index >= artifact.tree_size {
         return TransparencyAnchor::Invalid(
-            "v2 inclusion proof leaf position is outside the committed tree".to_string(),
+            "receipt inclusion proof leaf position is outside the committed tree".to_string(),
         );
     };
     let statement = artifact.checkpoint_statement;
