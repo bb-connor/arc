@@ -2,12 +2,6 @@ name: Release Qualification
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-
-concurrency:
-  group: release-qualification-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
 permissions:
   contents: read

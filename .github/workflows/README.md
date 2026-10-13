@@ -193,12 +193,12 @@ exercised by any PR gate**. No PR gate compiles or runs
 `crates/guards/chio-wasm-guards/tests/*` (the other PR-triggered wasm/conformance
 workflows build browser SDK artifacts, run conformance peers, or run benches
 via `cargo bench`, none of which invoke these integration targets). They are
-covered outside the PR gates instead: the push-to-`main` and manual
-`release-qualification.yml` workflow runs `cargo +1.94.1 test --workspace` with
+covered outside the PR gates instead: the manually dispatched
+`release-qualification.yml` workflow runs `cargo +1.95.0 test --workspace` with
 no `--exclude`, which does compile and run those `wasmtime-runtime` integration
 targets. So editing or adding a test under `crates/guards/chio-wasm-guards/tests/`
-will not be caught by any PR gate (only later, by Release Qualification on
-push/main or a manual run). Do not "fix" the PR-gate carveout by folding
+will not be caught by any PR gate (only later, by a dispatched Release
+Qualification run on `main`). Do not "fix" the PR-gate carveout by folding
 `chio-wasm-guards` back into the PR `--workspace` test step (it is excluded there
 on purpose), and do not assume a green PR `ci.yml` run covered the wasm-guards
 integration tests.
