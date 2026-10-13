@@ -488,10 +488,7 @@ fn retire_for_replacement(
         && !record.captured
         && record.native_link.is_none()
     {
-        let proof = super::unused_generation::verify_unused_generation(
-            tx, owner, selected, deployment, fence, now,
-        )?;
-        protected::retire_unused_setup_generation_with_origin(tx, owner, proof, now, origin)?;
+        return Err(refused("unused setup generation retirement is unavailable"));
     } else if !matches!(
         reason,
         UnusedSetupReplacementReason::ProfileChanged

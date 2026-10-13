@@ -41,14 +41,7 @@ pub(in crate::admission_operation_store) use logical_reference::{
     VerifiedParticipantAllowance,
 };
 pub(in crate::admission_operation_store) use original_owner::{
-    original_owner_is_current, persist_original_owner_cohort, prepare_original_owner_cohort,
-    prepare_original_owner_creation, publish_original_owner_creation,
-    require_current_original_owner, require_predecessor_original_owner_absence,
-    retire_unused_setup_generation_with_origin, seal_original_owner_predecessor,
-    using_original_owner_successor_format, verify_original_owner_inventory,
-    verify_original_owner_membership, verify_unused_setup_generation_inventory,
-    VerifiedOriginalOwnerCohort, VerifiedOriginalOwnerInventory, ORIGINAL_OWNER_SQL,
-    UNUSED_SETUP_GENERATION_SQL,
+    original_owner_is_current, require_current_original_owner,
 };
 pub(in crate::admission_operation_store) use protected_mutation_delta::ProtectedMutationDelta;
 pub(in crate::admission_operation_store) use settled_command_aliases::{
@@ -595,8 +588,6 @@ pub(crate) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
     planning_budgets::verify_all(tx)?;
     active_workflows::verify_all(tx)?;
     settled_command_aliases::verify_all(tx)?;
-    verify_original_owner_inventory(tx)?;
-    verify_unused_setup_generation_inventory(tx)?;
     super::origins::verify_history(tx)?;
     Ok(())
 }

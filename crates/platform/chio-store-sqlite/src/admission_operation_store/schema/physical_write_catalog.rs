@@ -115,14 +115,6 @@ fn expected(original: bool) -> Result<&'static [Entry], AdmissionOperationStoreE
             // every36-40 immutable guard and expression/partial index. A35
             // recovery-only model cannot price a real current authority.
             let model = current_command_catalog_model().map_err(|error| error.to_string())?;
-            if original {
-                model
-                    .execute_batch(super::super::recovery_runtime::storage::ORIGINAL_OWNER_SQL)
-                    .map_err(|error| error.to_string())?;
-                model
-                    .execute_batch(super::super::recovery_runtime::storage::UNUSED_SETUP_GENERATION_SQL)
-                    .map_err(|error| error.to_string())?;
-            }
             catalog(&model).map_err(|error| error.to_string())
         })
         .as_ref()
@@ -250,22 +242,6 @@ mod tests {
             "CREATE TRIGGER extra_recovery_write AFTER INSERT ON admission_operation_recovery_records
              BEGIN UPDATE authority_global_commit_meta SET head_sequence=head_sequence+1; END;",
         )?;
-        assert!(verify_physical_command_catalog(&connection).is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn partial_original_owner_index_cohort_refuses_the_priced_catalog(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let connection = model()?;
-        connection.execute_batch(
-            crate::admission_operation_store::recovery_runtime::storage::ORIGINAL_OWNER_SQL,
-        )?;
-        connection.execute_batch(
-            crate::admission_operation_store::recovery_runtime::storage::UNUSED_SETUP_GENERATION_SQL,
-        )?;
-        verify_physical_command_catalog(&connection)?;
-        connection.execute_batch("DROP INDEX admission_operation_recovery_original_tombstone")?;
         assert!(verify_physical_command_catalog(&connection).is_err());
         Ok(())
     }

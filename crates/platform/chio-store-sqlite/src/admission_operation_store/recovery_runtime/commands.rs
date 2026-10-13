@@ -597,45 +597,19 @@ fn apply_in_origin(
                     provider_finality: None,
                     provider_lookups: SafeInteger::ZERO,
                 };
-                if using_original_owner_successor_format(tx)? {
-                    let prepared_cut;
-                    let cut = match initial_cut {
-                        Some(cut) => cut,
-                        None => {
-                            prepared_cut = owner
-                                .prepare_native_source_transaction(tx)
-                                .map_err(map_owner_error)?;
-                            &prepared_cut
-                        }
-                    };
-                    let mut original = prepare_original_owner_creation(
-                        tx,
-                        (owner, cut),
-                        actor,
-                        deployment,
-                        &new,
-                        now,
-                    )?;
-                    seal_original_owner_predecessor(tx, owner, &mut original)?;
-                    save_workflow(tx, owner, &mut new, WorkflowWriteClass::Planning)?;
-                    publish_original_owner_creation(tx, owner, original, &new)?;
-                } else {
-                    origins::claim(tx, owner, &new)?;
-                    save_workflow(tx, owner, &mut new, WorkflowWriteClass::Planning)?;
-                }
+                origins::claim(tx, owner, &new)?;
+                save_workflow(tx, owner, &mut new, WorkflowWriteClass::Planning)?;
                 new
             }
         }
         body => {
             let (id, revision) = selector(body)?;
             let mut record = workflow_preview_tx(tx, actor, deployment, id)?;
-            if record.origin.is_none()
-                && matches!(body, RecoveryCommandBodyV1::CancelWorkflow { .. })
+            // Historical control keeps its exact retained source without
+            // acquiring a fresh original or effect authority.
+            if record.origin.is_some()
+                || !matches!(body, RecoveryCommandBodyV1::CancelWorkflow { .. })
             {
-                // Historical control keeps its exact retained source without
-                // acquiring a fresh original or effect authority.
-                using_original_owner_successor_format(tx)?;
-            } else {
                 require_current_original_owner(tx, &record)?;
             }
             let held = historical_holds::effective(tx, &record)?.is_some();

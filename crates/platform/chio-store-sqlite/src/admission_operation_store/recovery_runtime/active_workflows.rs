@@ -491,24 +491,6 @@ pub(super) fn retire_cancelled(
     persist_retirement(tx, owner, record, None).map(|_| ())
 }
 
-/// Only the native absence/compensation owner can retire a materialized lease.
-/// This preserves the physical workflow, acknowledged reservation and charges.
-pub(super) fn retire_no_future_native_admission(
-    tx: &Transaction<'_>,
-    owner: &SqliteServingOwner,
-    proof: &super::original_owner::AuthenticatedNoFutureNativeAdmission<'_, '_, '_>,
-) -> Result<bool, AdmissionOperationStoreError> {
-    proof.verify(tx)?;
-    if !proof.matches_owner(owner)
-        || load_allocation(tx, &proof.record().scope, &proof.record().workflow_id)?.is_none()
-    {
-        return Err(invariant(
-            "original retirement lacks its actual allocated serving owner",
-        ));
-    }
-    persist_retirement(tx, owner, proof.record(), None)
-}
-
 pub(super) fn require_live_allocation(
     tx: &Connection,
     record: &RecoveryWorkflowRecordV1,
