@@ -537,9 +537,8 @@ fn map_signing_error(error: ReceiptSigningError) -> ChioMobileError {
 /// the exact byte preimage `body.content_hash` was derived from. The signer
 /// recomputes `sha256_hex(canonical_content)` *inside the trust boundary* via
 /// `chio_kernel_core::sign_receipt` and refuses to sign when it disagrees with
-/// `body.content_hash`. This closes the render-A / sign-B forgery at the mobile
-/// boundary: a caller can no longer render content A while signing a body
-/// claiming hash(B). The public signer does NOT relay a trusted body; callers
+/// `body.content_hash`. At the mobile boundary a caller cannot render content
+/// A while signing a body claiming hash(B). The public signer does NOT relay a trusted body; callers
 /// that only forward an upstream-minted body and cannot carry the preimage must
 /// use [`sign_receipt_relaying_trusted_body`] through the relay seam.
 ///

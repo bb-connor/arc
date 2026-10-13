@@ -808,7 +808,7 @@ fn wysiwys_body(keypair: &Keypair, content_hash: String) -> ChioReceiptBody {
     }
 }
 
-///  regression: the render-A / sign-B forgery is rejected.
+/// The render-A / sign-B forgery is rejected.
 ///
 /// A caller evaluates and renders content `A` to a human (so the human "sees"
 /// the hash of `A`), but submits a receipt body claiming the hash of a
@@ -898,13 +898,11 @@ fn sign_receipt_with_handle_is_fail_closed_on_any_mismatch() {
     ));
 }
 
-///  (case 2) regression on the **production / non-handle** signing path.
+/// Render-A / sign-B on the **production / non-handle** signing path.
 ///
 /// `sign_receipt` is the primitive the production kernel signing path
 /// (`build_and_sign_receipt` / the mpsc signing task) calls for every live
-/// receipt. Before this change it trusted the caller-supplied
-/// `body.content_hash`, leaving render-A / sign-B open on the live path. This
-/// test proves the hole is closed: `sign_receipt` recomputes `content_hash`
+/// receipt. It recomputes `content_hash`
 /// over the supplied canonical content inside the trust boundary and refuses to
 /// sign when the body claims the hash of a *different* content `B`, even though
 /// the kernel key matches and the backend is valid.
@@ -945,7 +943,7 @@ fn sign_receipt_production_path_rejects_render_a_sign_b() {
     }
 }
 
-///  (case 2): the production `sign_receipt` path signs when the body's
+/// The production `sign_receipt` path signs when the body's
 /// claimed `content_hash` matches the hash recomputed over the supplied
 /// canonical content, and the signed receipt carries exactly that recomputed
 /// hash (the signed bytes correspond to the canonical content).

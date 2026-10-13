@@ -44,9 +44,8 @@ pub enum ReceiptSigningError {
 /// output the literal `null` canonicalization). The signer recomputes
 /// `sha256_hex(canonical_content)` *inside the trust boundary* and refuses to
 /// sign when it disagrees with `body.content_hash` ([`ReceiptSigningError::ContentHashMismatch`],
-/// fail-closed). This closes the render-A / sign-B forgery on the production
-/// path: a caller can no longer render content `A` to a human while submitting
-/// a body claiming the hash of content `B`.
+/// fail-closed). On the production path a caller cannot render content `A` to
+/// a human while submitting a body claiming the hash of content `B`.
 ///
 /// The recompute runs **before** the kernel-key check and before any signing
 /// work, so a hash mismatch can never reach the signer.
@@ -116,11 +115,9 @@ pub fn sign_receipt(
 /// and the mpsc signing task) -- MUST instead call [`sign_receipt`] (or
 /// [`sign_receipt_with_handle`]) so `content_hash` is recomputed over the
 /// canonical content inside the trust boundary and signing is refused on
-/// mismatch (fail-closed). Threading the content preimage across the FFI/WASM
-/// boundary so these adapters can recompute too is the larger follow-up tracked
-/// as ; until then this entrypoint is the explicit, auditable seam where
-/// caller `content_hash` is trusted, rather than that trust being the silent
-/// default of `sign_receipt`.
+/// mismatch (fail-closed). This entrypoint is the explicit, auditable seam
+/// where caller `content_hash` is trusted, rather than that trust being the
+/// silent default of `sign_receipt`.
 ///
 /// The `body.kernel_key` must equal `backend.public_key()`; otherwise we
 /// fail fast with [`ReceiptSigningError::KernelKeyMismatch`] so the caller
@@ -210,17 +207,13 @@ pub fn sign_receipt_relaying_trusted_body(
 /// `content_hash` inside the trust boundary and is bound to a single artifact.
 /// The kernel key check from [`sign_receipt`] still applies.
 ///
-/// # Seam note ( follow-up / )
+/// # Content source
 ///
-/// Producers currently build the handle from canonical content they supply
+/// Producers build the handle from canonical content they supply
 /// (see [`ReceiptSigningHandle::from_content_preimage`] / [`ReceiptSigningHandle::from_content`]).
 /// On the kernel path that preimage is the exact bytes
 /// `receipt_content_for_output` hashed to produce `content_hash`, so the gate
-/// is non-tautological there. The intended end state is for `evaluate()` to
-/// return the handle so the only way to obtain one is to have actually run an
-/// evaluation; threading the handle out of [`crate::evaluate`] is a larger
-/// follow-up, but the recompute + refuse gate here already closes the
-/// render-A / sign-B regression on the production path.
+/// is non-tautological there.
 ///
 /// # Errors
 ///

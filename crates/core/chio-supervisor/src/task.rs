@@ -29,8 +29,7 @@ struct ChildControl {
 type ActiveChild = Arc<Mutex<ChildControl>>;
 
 /// A supervised tokio task that owns its join handle and a [`HealthFlag`]. Retaining
-/// the handle is the fix for the historical pattern of spawning a long-lived loop and
-/// dropping the handle, which made the task's death invisible.
+/// the handle keeps the task's death observable.
 pub struct SupervisedTask {
     handle: JoinHandle<()>,
     health: HealthFlag,

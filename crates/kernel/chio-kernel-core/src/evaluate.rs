@@ -116,8 +116,8 @@ impl EvaluationVerdict {
 ///
 /// These are portable-kernel equivalents of the
 /// `chio_kernel::KernelError` variants that can be produced without any
-/// I/O. The caller in `chio-kernel` maps them back onto its richer
-/// `KernelError` surface for backward compatibility.
+/// I/O. The caller in `chio-kernel` maps them onto its richer
+/// `KernelError` surface.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KernelCoreError {
     /// Capability signature or issuer trust failed.

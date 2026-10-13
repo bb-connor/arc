@@ -261,8 +261,8 @@ pub fn sign_receipt_body_hybrid_canonical(
     // sign when it disagrees with the caller-supplied `body.content_hash`. This
     // is the same recompute-and-refuse gate `chio_kernel_core::sign_receipt`
     // applies (also from the borrowed slice), so the shared-canonical hybrid/PQ
-    // path can no longer render content A while signing a body claiming the hash
-    // of content B.
+    // path cannot render content A while signing a body claiming the hash of
+    // content B.
     //
     // hash the borrowed slice directly instead of
     // cloning it into a `ReceiptSigningHandle` via `to_vec()`. The preimage can
@@ -529,8 +529,8 @@ mod borrowed_preimage_tests {
     #[test]
     fn borrowed_hash_path_signs_matching_body() {
         // A body whose claimed `content_hash` matches the borrowed preimage must
-        // sign: the borrowed-slice recompute agrees, so the (previously cloned)
-        // hash check still admits the legitimate receipt.
+        // sign: the borrowed-slice recompute agrees, so the hash check admits
+        // the legitimate receipt.
         let kp = Keypair::from_seed(&seed());
         let backend = Ed25519Backend::new(kp.clone());
         let body = body_for(kp.public_key(), chio_core::crypto::sha256_hex(PREIMAGE));

@@ -134,9 +134,8 @@ pub fn evaluate_pure(
 /// signer then routes through the production recompute-and-refuse primitive
 /// `chio_kernel_core::sign_receipt`, which recomputes
 /// `sha256_hex(canonical_content)` *inside the signer* and refuses to sign when
-/// it disagrees with `body.content_hash`. That closes the render-A / sign-B
-/// forgery at the browser boundary: a caller can no longer show content A while
-/// putting hash(B) in the body.
+/// it disagrees with `body.content_hash`. At the browser boundary a caller
+/// cannot show content A while putting hash(B) in the body.
 ///
 /// When the preimage is absent (`None`), this signer REFUSES (fail-closed)
 /// instead of silently relaying a trusted body. The trusted-body relay is no

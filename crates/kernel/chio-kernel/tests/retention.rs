@@ -1,7 +1,7 @@
 /// Retention and archival tests for SqliteReceiptStore.
 ///
-/// These tests cover COMP-03 (configurable retention) and COMP-04 (archived
-/// receipt verification). Archival removes only the whole checkpointed prefix
+/// These tests cover configurable retention and archived receipt
+/// verification. Archival removes only the whole checkpointed prefix
 /// that has aged past the cutoff, co-archiving the claim-log projection and
 /// deleting it together with the source rows. Tenant-scoped rotation is
 /// rejected fail-closed. Per-table co-archival mechanics are unit-tested in the
@@ -447,7 +447,7 @@ mod retention {
     }
 
     /// Archived receipts must be verifiable against the checkpoint roots stored
-    /// in the archive database (COMP-04).
+    /// in the archive database.
     #[test]
     fn archived_receipt_verifies_against_checkpoint() {
         let live_path = unique_db_path("retention-verify-live");
