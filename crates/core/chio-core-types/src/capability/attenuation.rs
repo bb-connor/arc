@@ -54,8 +54,7 @@ pub struct AttenuationProof {
 /// that the delegator authorized at this step. When set, it ties the
 /// delegation chain to the underlying capability lineage so a verifier
 /// can check `proof.parent_scope_hash == chain.last().scope_hash` and
-/// reject inflated parent-scope claims (the parent-scope-inflation
-/// soundness bug).
+/// reject inflated parent-scope claims.
 ///
 /// Links omit `scope_hash`; verifiers must reject attenuated tokens
 /// whose chain links lack this field via
@@ -217,10 +216,10 @@ pub enum Attenuation {
 /// 3. Timestamps are non-decreasing.
 /// 4. The chain length does not exceed `max_depth` (if provided).
 ///
-/// Note: this compatibility entry point does NOT enforce chain-binding
-/// (the `parent_scope_hash` invariant). Callers verifying attenuated
-/// tokens must use [`validate_delegation_chain_with_trust_root`] to close
-/// the parent-scope-inflation soundness gap.
+/// Note: this entry point does NOT enforce chain-binding (the
+/// `parent_scope_hash` invariant). Callers verifying attenuated tokens must
+/// use [`validate_delegation_chain_with_trust_root`], which refuses inflated
+/// parent-scope claims.
 pub fn validate_delegation_chain(chain: &[DelegationLink], max_depth: Option<u32>) -> Result<()> {
     if let Some(max) = max_depth {
         let len = u32::try_from(chain.len()).unwrap_or(u32::MAX);
@@ -1042,10 +1041,9 @@ pub fn delegate(
 
     validate_delegable_attenuation(&parent.scope, child_scope)?;
 
-    // Each attenuation step must be a TRUE narrowing of the parent: previously
-    // the steps were copied onto the signed link verbatim, so a widening step
-    // (raise a cap, target a tool outside the parent, extend expiry) could ride
-    // through unchecked. Validate reduce-only, fail-closed.
+    // Each attenuation step must be a TRUE narrowing of the parent. A widening
+    // step (raise a cap, target a tool outside the parent, extend expiry) is
+    // refused. Validate reduce-only, fail-closed.
     validate_attenuation_steps(&parent.scope, parent.expires_at, &attenuation.steps)?;
 
     // `budget_share_bps` is parent-relative: a delegated share is a fraction of

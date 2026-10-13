@@ -4,8 +4,7 @@
 //! that a producer attempting to submit while the queue is full increments
 //! `chio_signing_queue_block_total` rather than dropping the request.
 //!
-//! (case 2): a producer that hits a full queue no longer PARKS
-//! holding the preimage; it signs INLINE through the same WYSIWYS primitive and
+//! A producer that hits a full queue does not park holding the preimage; it signs INLINE through the same WYSIWYS primitive and
 //! completes immediately. The block counter still increments (the queue bound was
 //! hit), but the request is neither dropped nor blocked: it is served off-queue,
 //! so retained memory stays bounded.
@@ -168,7 +167,7 @@ async fn full_signing_queue_increments_block_counter_without_dropping() -> Resul
     let mut blocked = Box::pin(handle.sign(blocked_body, blocked_content));
     let waker = noop_waker();
     let mut context = Context::from_waker(&waker);
-    // (case 2): a full queue routes the producer to the INLINE
+    // A full queue routes the producer to the INLINE
     // fallback instead of parking. The future therefore resolves on the FIRST
     // poll (Ready) rather than returning Pending. The request is served off-queue,
     // so it neither blocks holding the preimage nor is dropped.

@@ -148,7 +148,6 @@ fn refused_heartbeats_preserve_every_persisted_field() -> TestResult {
         );
         assert_eq!(snapshot(&path)?, before);
     }
-    // The former implementation updated first, then discovered this invalid order.
     Connection::open(&path)?.execute(
         "UPDATE runtime_run_leases SET acquired_at_unix_ms = 115",
         [],

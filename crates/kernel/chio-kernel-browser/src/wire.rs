@@ -210,7 +210,7 @@ pub struct SignReceiptRequestJson {
     /// WYSIWYS: the public signer `sign_receipt_pure` recomputes
     /// `sha256_hex(canonical_content)` inside the signer and refuses to sign
     /// when it disagrees with `body.content_hash`, so a browser/mobile caller
-    /// can no longer render content A while signing a body claiming hash(B).
+    /// cannot render content A while signing a body claiming hash(B).
     /// This preimage is therefore REQUIRED for public signing: when it is
     /// absent (`None`), `sign_receipt_pure` fails closed with
     /// `canonical_content_required` and does NOT fall back to trusting

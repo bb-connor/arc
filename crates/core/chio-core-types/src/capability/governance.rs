@@ -1428,7 +1428,7 @@ impl GovernedApprovalToken {
     /// one pass.
     ///
     /// Sanctioned entry point when freshness matters (settlement lanes that
-    /// must assert approval expiry, per the dependent C2/C3 work): fails closed
+    /// must assert approval expiry): fails closed
     /// on expiry / not-yet-valid approvals, which the bare
     /// [`GovernedApprovalToken::verify_signature`] does not check. A clock is
     /// threaded explicitly via `now` (unix seconds).

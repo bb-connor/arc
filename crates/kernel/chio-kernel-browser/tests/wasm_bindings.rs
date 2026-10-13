@@ -136,10 +136,9 @@ fn sign_receipt_uses_webcrypto_seed() {
     let seed_hex = mint_signing_seed_hex().expect("mint seed");
     assert_eq!(seed_hex.len(), 64);
 
-    // WYSIWYS: the PUBLIC wasm signer now requires the
-    // `canonical_content` preimage and recomputes `content_hash` inside the
-    // trust boundary. Supply a matching preimage (a JSON array of `u8`) so the
-    // recompute gate passes; the legacy `{body}`-only shape is no longer valid.
+    // WYSIWYS: the PUBLIC wasm signer requires the `canonical_content`
+    // preimage and recomputes `content_hash` inside the trust boundary. Supply
+    // a matching preimage (a JSON array of `u8`) so the recompute gate passes.
     let canonical_content = br#"{"shown":"to-the-human"}"#.to_vec();
     let content_hash = sha256_hex(&canonical_content);
     let body = signable_body(content_hash);
