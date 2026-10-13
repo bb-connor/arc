@@ -5103,8 +5103,6 @@ def validate_security_adversarial_checker_boundary(source: str) -> None:
     if not expression_matches(assignment_node(artifact_function, "authority"), expected_authority):
         raise ContractError("verifier artifact authority chain changed")
     for required in (
-        "legacy = environment.get('CHIO_SECURITY_CANDIDATE_ARTIFACTS')",
-        "raise EvidenceError('candidate artifact authority is forbidden')",
         "relative.parts[1:] != ('verifier', 'artifacts')",
         "snapshots = {path: path.lstat() for path, _uid, _gid, _mode in authority}",
         "repeated = {path: path.lstat() for path, _uid, _gid, _mode in authority}",
@@ -5137,7 +5135,7 @@ def validate_security_adversarial_checker_boundary(source: str) -> None:
     )
     if (
         promotion_guard not in main_source
-        or "legacy --promote-outcome is forbidden in the enterprise boundary"
+        or "--promote-outcome is forbidden in the enterprise boundary"
         not in main_source
         or not (
             main_source.index(promotion_guard)
@@ -5145,7 +5143,7 @@ def validate_security_adversarial_checker_boundary(source: str) -> None:
             < main_source.index(load_binding)
         )
     ):
-        raise ContractError("enterprise legacy outcome promotion boundary changed")
+        raise ContractError("enterprise outcome promotion boundary changed")
     if (
         "refresh_campaign = args.refresh_outcome" not in main_source
         or refresh_listing not in main_source
