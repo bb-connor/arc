@@ -116,6 +116,14 @@ administration need their respective credentials, services, and operator
 configuration. CLI tests exercise parsing, rejection paths, fixtures, and
 selected real process/HTTP round trips; they do not certify a deployment.
 
+Verified-fix seller tests require a self-contained npm installation when npm
+and Node.js are on `PATH`. The installed npm package must contain its declared
+bundled dependencies and the `npm` and `npx` entrypoints. An official npm
+package installed in an operator-owned prefix satisfies this layout; split
+distribution packages with dependencies elsewhere are unsupported. Runtime
+discovery follows the npm executable independently of the configured global
+installation prefix. Only the selected package tree enters the sandbox.
+
 ## Related
 
 - [Architecture](ARCHITECTURE.md)
