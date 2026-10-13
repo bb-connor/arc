@@ -10,9 +10,9 @@ use chio_kernel::budget_store::{
     BudgetAdmissionBinding, BudgetAuthorizationOutcome, BudgetAuthorizeCumulativeApprovalRequest,
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest,
     BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalAuthorizationDecision,
-    BudgetCumulativeApprovalRequest, BudgetEventAuthority, BudgetInvocationCaptureDecision,
-    BudgetInvocationQuota, BudgetInvocationState, BudgetQuotaKey, BudgetQuotaProfile,
-    BudgetReconcileHoldRequest,
+    BudgetCumulativeApprovalRequest, BudgetEventAuthority, BudgetHoldCleanupCustody,
+    BudgetInvocationCaptureDecision, BudgetInvocationQuota, BudgetInvocationState, BudgetQuotaKey,
+    BudgetQuotaProfile, BudgetReconcileHoldRequest,
 };
 use chio_kernel::{BudgetStore, CanonicalRevocationSet, RevocationStore};
 use rusqlite::{params, Connection};
@@ -779,6 +779,19 @@ fn joint_structured_mutations_require_the_exact_active_authority() {
     assert!(budget.authorize_budget_hold(request).is_ok());
 }
 
+/// Asserts that `replay` is the fresh `first` decision with replayed custody.
+fn assert_replayed_authorization(
+    first: BudgetAuthorizeHoldDecision,
+    replay: BudgetAuthorizeHoldDecision,
+) {
+    let BudgetAuthorizeHoldDecision::Authorized(mut expected) = first else {
+        panic!("first decision must authorize the hold: {first:?}");
+    };
+    assert_eq!(expected.cleanup_custody, BudgetHoldCleanupCustody::Fresh);
+    expected.cleanup_custody = BudgetHoldCleanupCustody::Replayed;
+    assert_eq!(replay, BudgetAuthorizeHoldDecision::Authorized(expected));
+}
+
 #[test]
 fn joint_authorization_replay_uses_stored_revocation_head() {
     let (_temp, database, lock_root) = fixture();
@@ -810,11 +823,11 @@ fn joint_authorization_replay_uses_stored_revocation_head() {
         .observe_revocation("cap-structured")
         .expect("new observation")
         .commit;
-    assert_eq!(
+    assert_replayed_authorization(
+        original,
         budget
             .authorize_budget_hold(request)
             .expect("replay at newer revocation head"),
-        original
     );
 }
 
@@ -1151,11 +1164,11 @@ fn authorization_then_revocation_replays_the_serialized_authorization() {
         .observe_revocation("cap-structured")
         .expect("new observation")
         .commit;
-    assert_eq!(
+    assert_replayed_authorization(
+        authorized,
         budget
             .authorize_budget_hold(request)
             .expect("exact serialized replay"),
-        authorized
     );
 }
 
@@ -1231,12 +1244,12 @@ fn joint_hold_lifecycle_and_event_replays_survive_owner_epoch_rotation() {
     let second_authority = active_authority(&second);
     assert_eq!(second_authority.lease_epoch, 2);
     authorization.authority = Some(second_authority.clone());
-    assert_eq!(
+    assert_replayed_authorization(
+        first_decision,
         second
             .budget_store()
             .authorize_budget_hold(authorization)
             .expect("cross-epoch authorization replay"),
-        first_decision
     );
     let mut capture = BudgetCaptureInvocationRequest {
         capability_id: "cap-structured".to_string(),
