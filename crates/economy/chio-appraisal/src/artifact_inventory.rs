@@ -122,7 +122,6 @@ pub fn runtime_attestation_normalized_claim_vocabulary(
     .into_iter()
     .map(|code| RuntimeAttestationNormalizedClaimVocabularyEntry {
         code,
-        legacy_assertion_key: code.legacy_assertion_key().to_string(),
         category: code.category(),
         confidence: code.confidence(),
         freshness: code.freshness(),

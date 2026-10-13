@@ -136,7 +136,6 @@ pub enum RuntimeAttestationAppraisalReasonDisposition {
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeAttestationNormalizedClaim {
     pub code: RuntimeAttestationNormalizedClaimCode,
-    pub legacy_assertion_key: String,
     pub category: RuntimeAttestationNormalizedClaimCategory,
     pub confidence: RuntimeAttestationNormalizedClaimConfidence,
     pub freshness: RuntimeAttestationNormalizedClaimFreshness,
@@ -148,7 +147,6 @@ pub struct RuntimeAttestationNormalizedClaim {
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeAttestationNormalizedClaimVocabularyEntry {
     pub code: RuntimeAttestationNormalizedClaimCode,
-    pub legacy_assertion_key: String,
     pub category: RuntimeAttestationNormalizedClaimCategory,
     pub confidence: RuntimeAttestationNormalizedClaimConfidence,
     pub freshness: RuntimeAttestationNormalizedClaimFreshness,

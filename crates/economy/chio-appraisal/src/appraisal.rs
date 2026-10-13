@@ -70,21 +70,6 @@ impl VerifiedRuntimeAttestationRecord {
 
 impl RuntimeAttestationNormalizedClaimCode {
     #[must_use]
-    pub fn legacy_assertion_key(self) -> &'static str {
-        match self {
-            Self::AttestationType => "attestationType",
-            Self::RuntimeIdentity => "runtimeIdentity",
-            Self::WorkloadIdentityScheme => "workloadIdentityScheme",
-            Self::WorkloadIdentityUri => "workloadIdentityUri",
-            Self::ModuleId => "moduleId",
-            Self::MeasurementDigest => "digest",
-            Self::MeasurementRegisters => "pcrs",
-            Self::HardwareModel => "hardwareModel",
-            Self::SecureBootState => "secureBoot",
-        }
-    }
-
-    #[must_use]
     pub fn category(self) -> RuntimeAttestationNormalizedClaimCategory {
         match self {
             Self::RuntimeIdentity | Self::WorkloadIdentityScheme | Self::WorkloadIdentityUri => {
@@ -198,7 +183,6 @@ impl RuntimeAttestationNormalizedClaim {
     pub fn new(code: RuntimeAttestationNormalizedClaimCode, value: Value) -> Self {
         Self {
             code,
-            legacy_assertion_key: code.legacy_assertion_key().to_string(),
             category: code.category(),
             confidence: code.confidence(),
             freshness: code.freshness(),

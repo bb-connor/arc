@@ -1179,7 +1179,6 @@ fn runtime_attestation_claim_vocabulary_lists_portable_codes() {
     );
     assert!(vocabulary.entries.iter().any(|entry| {
         entry.code == RuntimeAttestationNormalizedClaimCode::SecureBootState
-            && entry.legacy_assertion_key == "secureBoot"
             && entry.category == RuntimeAttestationNormalizedClaimCategory::Configuration
             && entry
                 .supported_verifier_families
