@@ -17,6 +17,7 @@
   "id": "cap-ioa-web3-provider",
   "issued_at": 1776995579,
   "issuer": "a090e1a43efcd3a3bd5ea5b015e6014d20e33e0e2d480194802720e4d38f108b",
+  "schema": "chio.capability.v1",
   "scope": {
     "grants": [
       {
