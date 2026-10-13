@@ -410,6 +410,21 @@ fn prepared_dispatch_operation_with_requirements(
     )
 }
 
+fn prepared_active_response_operation(
+    fence: &StoreMutationFence,
+    request_id: &str,
+) -> AdmissionOperationV1 {
+    prepared_operation_with_requirements(
+        fence,
+        request_id,
+        AdmissionOperationKind::GovernedActiveResponse,
+        AdmissionParticipantRequirements {
+            approval: true,
+            ..AdmissionParticipantRequirements::NONE
+        },
+    )
+}
+
 fn prepared_operation_with_requirements(
     fence: &StoreMutationFence,
     request_id: &str,
@@ -724,7 +739,7 @@ fn bounded_stage_retries_before_expiry() -> TestResult {
 #[test]
 fn bounded_stage_compensates_at_the_exact_expiry_boundary() -> TestResult {
     let fixture = fixture();
-    let operation = prepared_dispatch_operation(&fixture.fence, "bounded-at-expiry");
+    let operation = prepared_active_response_operation(&fixture.fence, "bounded-at-expiry");
     let claimant = identifier("claimant_id", "bounded-stage-owner");
     let (now, _clock) = recovery_clock();
     let not_after = now + 3;
@@ -1172,15 +1187,8 @@ fn economic_compensation_active_response_retains_incident_replay() -> TestResult
     use chio_kernel::admission_operation::AdmissionTerminalReplay;
 
     let fixture = fixture();
-    let operation = prepared_operation_with_requirements(
-        &fixture.fence,
-        "active-response-compensation",
-        AdmissionOperationKind::GovernedActiveResponse,
-        AdmissionParticipantRequirements {
-            approval: true,
-            ..AdmissionParticipantRequirements::NONE
-        },
-    );
+    let operation =
+        prepared_active_response_operation(&fixture.fence, "active-response-compensation");
     let (now, _clock) = recovery_clock();
     fixture.operations.begin(&operation, &fixture.fence, now)?;
     let (advance, _) = stage_bounded_operation(
@@ -1240,7 +1248,7 @@ fn economic_compensation_active_response_retains_incident_replay() -> TestResult
 fn compensation_winner_discards_the_unanchored_stage_before_anchor_cas() -> TestResult {
     let fixture = fixture();
     let operations = fixture._authority.admission_operation_store();
-    let operation = prepared_dispatch_operation(&fixture.fence, "compensation-wins");
+    let operation = prepared_active_response_operation(&fixture.fence, "compensation-wins");
     let (now, _clock) = recovery_clock();
     operations.begin(&operation, &fixture.fence, now)?;
     let stage_claimant = identifier("claimant_id", "stage-owner");
@@ -1339,7 +1347,7 @@ fn recovery_winner_rejects_late_pre_dispatch_compensation() -> TestResult {
 fn compensation_and_unanchored_recovery_have_exactly_one_lifecycle_winner() -> TestResult {
     let fixture = fixture();
     let operations = fixture._authority.admission_operation_store();
-    let operation = prepared_dispatch_operation(&fixture.fence, "concurrent-race");
+    let operation = prepared_active_response_operation(&fixture.fence, "concurrent-race");
     // Every participant observes the same clock even under parallel test load.
     let (now, _clock) = recovery_clock();
     operations.begin(&operation, &fixture.fence, now)?;
@@ -1428,7 +1436,7 @@ fn compensation_and_unanchored_recovery_have_exactly_one_lifecycle_winner() -> T
 fn compensation_recovery_discards_a_stage_after_terminal_commit_ack_loss() -> TestResult {
     let fixture = fixture();
     let operations = fixture._authority.admission_operation_store();
-    let operation = prepared_dispatch_operation(&fixture.fence, "compensation-ack-loss");
+    let operation = prepared_active_response_operation(&fixture.fence, "compensation-ack-loss");
     let (now, _clock) = recovery_clock();
     operations.begin(&operation, &fixture.fence, now)?;
     let stage_claimant = identifier("claimant_id", "stage-owner");

@@ -16,10 +16,7 @@ pub fn verified_pre_dispatch_incident_projection(
     operation: &AdmissionOperationV1,
     context: AdmissionProjectionContext,
 ) -> Result<AdmissionTerminalProjection, AdmissionOperationError> {
-    if !matches!(
-        operation.binding().kind(),
-        AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse
-    ) {
+    if operation.binding().kind() != AdmissionOperationKind::GovernedActiveResponse {
         return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
     }
     let proof = VerifiedPreDispatchNoEffect::from_qualified_operation_snapshot(operation, &context)

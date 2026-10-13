@@ -1972,9 +1972,20 @@ pub(super) fn validate_terminal_replay(
             Some(AdmissionTerminalReplay::Receipt { .. }),
         ) => true,
         (
+            AdmissionOperationKind::ToolDispatch,
+            AdmissionOperationState::CompensatedBeforeDispatch,
+            Some(AdmissionTerminalReplay::Receipt { .. }),
+        ) => true,
+        (
+            AdmissionOperationKind::GovernedActiveResponse,
+            AdmissionOperationState::CompensatedBeforeDispatch,
+            Some(
+                AdmissionTerminalReplay::Receipt { .. } | AdmissionTerminalReplay::Incident { .. },
+            ),
+        ) => true,
+        (
             AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
-            AdmissionOperationState::CompensatedBeforeDispatch
-            | AdmissionOperationState::NotAcceptedAfterDispatchCommit,
+            AdmissionOperationState::NotAcceptedAfterDispatchCommit,
             Some(
                 AdmissionTerminalReplay::Receipt { .. } | AdmissionTerminalReplay::Incident { .. },
             ),

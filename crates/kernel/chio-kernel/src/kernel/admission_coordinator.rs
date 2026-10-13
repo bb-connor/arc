@@ -730,7 +730,45 @@ impl ChioKernel {
                         authorization.signed_extension.as_bytes(),
                     )
                 });
+            receipt_disposition = None;
             let signing_identity = self.freeze_receipt_signing_identity()?;
+            let namespace = self.authenticated_receipt_namespace(&request.request_id)?;
+            let replay_key = crate::admission_operation::AdmissionReplayKey {
+                request_namespace_digest: namespace.digest().clone(),
+                request_id: AdmissionIdentifier::try_new("request_id", request.request_id.clone())?,
+            };
+            let signing_identity = {
+                let _mutation_guard = runtime.lock_mutations()?;
+                match runtime
+                    .store
+                    .load_by_replay_key(&replay_key)
+                    .map_err(durable_store_error)?
+                {
+                    Some(operation) => {
+                        if operation.replay_key() != replay_key {
+                            return Err(KernelError::DurableAdmission(
+                                "retained operation does not match its replay selector".into(),
+                            ));
+                        }
+                        if operation.state().is_terminal()
+                            && matches!(
+                                operation.terminal_replay(),
+                                Some(AdmissionTerminalReplay::Receipt { .. })
+                            )
+                        {
+                            self.terminal_refusal_original(&operation, trusted_now_unix_ms)?
+                                .frozen_receipt_signing_identity()
+                                .clone()
+                        } else {
+                            signing_identity
+                        }
+                    }
+                    None => {
+                        receipt_disposition = Some(IdentityDisposition::Reusable);
+                        signing_identity
+                    }
+                }
+            };
             let immutable_request_hash = immutable_tool_admission_request_hash(
                 request,
                 matching_grants,
@@ -776,7 +814,6 @@ impl ChioKernel {
                 observation_attempt_zero: observer_required,
                 ..AdmissionParticipantRequirements::NONE
             };
-            let namespace = self.authenticated_receipt_namespace(&request.request_id)?;
             let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
                 kind: AdmissionOperationKind::ToolDispatch,
                 namespace,

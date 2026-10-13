@@ -1,7 +1,7 @@
 use chio_core::canonical::canonical_json_bytes;
 use chio_credit::obligation::CreditExposureReservationRecordV1;
 use chio_kernel::admission_operation::{
-    verified_pre_dispatch_incident_projection,
+    verified_pre_dispatch_compensation_projection,
     verified_released_pre_dispatch_compensation_projection_for_test,
 };
 
@@ -251,8 +251,15 @@ fn acquired_credit_rejects_unproven_compensation_before_store_mutation(
         coordinator_lease_epoch: recovery.coordinator_lease_epoch(),
         store_fence: recovery.store_fence().clone(),
     };
+    let receipt = refusal_receipt(
+        &operation,
+        &context,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        &Keypair::generate(),
+        &serde_json::json!({}),
+    )?;
     assert!(matches!(
-        verified_pre_dispatch_incident_projection(&operation, context),
+        verified_pre_dispatch_compensation_projection(&operation, context, receipt),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     ));
     assert_eq!(account_state(&fixture)?, before_account);

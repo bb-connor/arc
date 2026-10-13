@@ -511,6 +511,11 @@ impl EconomicStateRecovery {
                 stage: discarded,
             });
         }
+        if operation.binding().kind() == AdmissionOperationKind::ToolDispatch {
+            return Err(EconomicStateRecoveryError::CompensationRejected(
+                "tool dispatch compensation requires original receipt authority".to_owned(),
+            ));
+        }
         if operation.state() != binding.operation_state()
             || operation.version() != binding.operation_version()
             || operation.coordinator_lease_epoch() != binding.coordinator_lease_epoch()

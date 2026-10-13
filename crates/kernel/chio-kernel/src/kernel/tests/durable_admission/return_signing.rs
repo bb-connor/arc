@@ -4,6 +4,8 @@ use super::*;
 mod callbacks;
 #[path = "return_signing/recovery_classification.rs"]
 mod recovery_classification;
+#[path = "return_signing/replay.rs"]
+mod replay;
 
 fn replace_receipt_authority(kernel: &mut ChioKernel) {
     let authority =
@@ -48,8 +50,12 @@ fn unfinished_return_cannot_be_signed_by_a_replacement_authority() -> TestResult
         None,
     );
     assert!(
-        result.is_err(),
-        "unfinished return was signed by replacement authority"
+        matches!(&result, Err(KernelError::AdmissionRecovery(failure))
+            if matches!(failure.as_ref(), crate::admission_operation::AdmissionRecoveryError::Item {
+                kind: crate::admission_operation::AdmissionRecoveryFailureKind::ContractChanged,
+                detail,
+            } if detail == "original receipt signing authority is unavailable")),
+        "{result:?}"
     );
     assert_eq!(
         store.operation().state(),
@@ -125,7 +131,12 @@ fn completed_replay_does_not_weaken_the_current_crypto_floor() -> TestResult {
     let response = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Allow);
     kernel.signing_authority.floor = crate::KernelCryptoFloor::PqRequired;
-    assert!(kernel.evaluate_tool_call_blocking(&request).is_err());
+    let result = kernel.evaluate_tool_call_blocking(&request);
+    assert!(
+        matches!(&result, Err(KernelError::ReceiptSigningFailed(detail))
+            if detail == "binding mismatch: raw.receipt_signing_floor"),
+        "{result:?}"
+    );
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::Completed
