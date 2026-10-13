@@ -23,6 +23,8 @@ use fixture_agent_web::{
 #[path = "fixture_cleanup.rs"]
 mod fixture_cleanup;
 use fixture_cleanup::strip_collected_bundle_outputs;
+#[path = "fixture_regenerate.rs"]
+mod fixture_regenerate;
 #[path = "fixture_public_settlement_runtime.rs"]
 mod fixture_public_settlement_runtime;
 use fixture_public_settlement_runtime::public_settlement_runtime_hashes;
@@ -42,6 +44,7 @@ const DISCLOSURE_AGENT_WEB_FIXTURE_ID: &str = "disclosure-and-agent-web-envelope
 const DISCLOSURE_AGENT_WEB_FIXTURE_SOURCE: &str =
     "generated:disclosure-lineage/valid-lineage-ledger+agent-web/valid-webhook-cloudevents";
 const RECURSIVE_RUNTIME_SWARM_FIXTURE_ID: &str = "recursive-runtime-swarm";
+const AGENT_WEB_UNBOUND_RECEIPT_FIXTURE_ID: &str = "agent-web-vc-unbound-receipt";
 const RUNTIME_SWARM_LOOPBACK_NOW_UNIX_MS: u64 = 1_800_000_001_000;
 const DISCLOSURE_LINEAGE_SIGNATURE_SEED: [u8; 32] = [29; 32];
 const COMMERCE_PROVIDER_TRUST_SIGNATURE_SEED: [u8; 32] = [8; 32];
@@ -189,7 +192,7 @@ impl EnvVarOverride {
         Self { name, previous }
     }
 
-    fn set(name: &'static str, value: &'static str) -> Self {
+    fn set(name: &'static str, value: impl AsRef<std::ffi::OsStr>) -> Self {
         let previous = std::env::var_os(name);
         std::env::set_var(name, value);
         Self { name, previous }
@@ -265,6 +268,9 @@ pub(super) fn dispatch_proof_fixture(
         ProofFixtureCommands::Generate { fixture_id, out } => {
             generate_proof_fixture(&fixture_id, &out, json_output)
         }
+        ProofFixtureCommands::Regenerate { root, check } => {
+            fixture_regenerate::regenerate_proof_fixtures(&root, check, json_output)
+        }
     }
 }
 
@@ -292,72 +298,7 @@ fn list_proof_fixtures(json_output: bool) -> Result<(), CliError> {
 
 fn generate_proof_fixture(fixture_id: &str, out: &Path, json_output: bool) -> Result<(), CliError> {
     let descriptor = proof_fixture(fixture_id)?;
-    if descriptor.id == COMMERCE_TRANSACTION_PASSPORT_FIXTURE_ID {
-        generate_commerce_transaction_passport_fixture(out)?;
-    } else if descriptor.id == DISCLOSURE_AGENT_WEB_FIXTURE_ID {
-        generate_disclosure_agent_web_fixture(out)?;
-    } else if descriptor.id == RECURSIVE_RUNTIME_SWARM_FIXTURE_ID {
-        generate_recursive_runtime_swarm_fixture(out)?;
-    } else if let Some((case, _id)) = disclosure_negative_case_for_descriptor(&descriptor) {
-        copy_disclosure_negative_fixture(case, out)?;
-    } else if let Some(root) = installed_fixture_root() {
-        let source = installed_fixture_source(&root, &descriptor)?;
-        copy_dir_contents(&source, out)?;
-    } else {
-        copy_embedded_fixture(installed_fixture_path(&descriptor), out)?;
-    }
-    if descriptor.kind == "transaction-passport"
-        || descriptor.kind == "negative-transaction-passport"
-    {
-        remove_generated_negative_catalog(out)?;
-    }
-    normalize_enterprise_risk_lifecycle_replay(&descriptor, out)?;
-    normalize_enterprise_claim_payout_capital_instructions(&descriptor, out)?;
-    normalize_enterprise_preobserved_capital_instruction(&descriptor, out)?;
-    normalize_public_settlement_deployment_provenance(&descriptor, out)?;
-    normalize_enterprise_disclosure_projection_ref(&descriptor, out)?;
-    normalize_enterprise_export_verifier_report_ref(&descriptor, out)?;
-    normalize_enterprise_telemetry_passport_mismatch(&descriptor, out)?;
-    normalize_disclosure_lineage_bbs_material(&descriptor, out)?;
-    normalize_runtime_join_receipt_signature(&descriptor, out)?;
-    normalize_runtime_reused_nonce_fixture(&descriptor, out)?;
-    normalize_agent_web_fixture_material(&descriptor, out)?;
-    normalize_commerce_mandate_projection_edges(out)?;
-    normalize_commerce_order_passport_binding(&descriptor, out)?;
-    normalize_declared_evidence_graph_node_ids(&descriptor, out)?;
-    if descriptor.kind != "negative-transaction-passport" {
-        refresh_proof_room_bundle_source_reports(out)?;
-    }
-    refresh_proof_room_bundle_manifests(out)?;
-    if descriptor.kind == "transaction-passport"
-        && descriptor.id != RECURSIVE_RUNTIME_SWARM_FIXTURE_ID
-    {
-        collect::seal_generated_fixture_bundle(ProofCollectKind::TransactionPassport, out)?;
-    }
-    let verifier_report_path = proof_fixture_generated_verifier_report_path(&descriptor, out);
-    if let Some(verifier_report_path) = verifier_report_path.as_deref() {
-        write_generated_verifier_report(&descriptor, out, verifier_report_path)?;
-    }
-    let verify_path = proof_fixture_verify_path(&descriptor, out);
-    let preflight_plan_path = proof_fixture_preflight_plan_path(&descriptor, out);
-    let expected_failure = proof_fixture_expected_failure(
-        &descriptor,
-        verify_path.as_deref(),
-        verifier_report_path.as_deref(),
-        preflight_plan_path.as_deref(),
-    )?;
-    let expected_verdict = proof_fixture_expected_verdict(&descriptor, expected_failure.as_ref());
-    let report = ProofFixtureGenerateReport {
-        schema: "chio.proof.fixture-generate-report.v1",
-        fixture_id: descriptor.id.clone(),
-        source: descriptor.path.clone(),
-        out: out.to_string_lossy().into_owned(),
-        expected_verdict,
-        expected_failure,
-        verify_path: verify_path.map(|path| path.to_string_lossy().into_owned()),
-        verifier_report_path: verifier_report_path.map(|path| path.to_string_lossy().into_owned()),
-        preflight_plan_path: preflight_plan_path.map(|path| path.to_string_lossy().into_owned()),
-    };
+    let report = materialize_proof_fixture(&descriptor, out, FixtureLayout::Sealed)?;
 
     let mut stdout = std::io::stdout();
     if json_output {
@@ -375,6 +316,89 @@ fn generate_proof_fixture(fixture_id: &str, out: &Path, json_output: bool) -> Re
         }
     }
     Ok(())
+}
+
+/// Whether materializing a transaction passport fixture seals it into a
+/// Proof Room bundle with a fresh negative catalog. `chio proof fixture
+/// generate` always seals; regeneration seals only fixtures committed sealed.
+#[derive(Clone, Copy)]
+enum FixtureLayout {
+    Sealed,
+    Unsealed,
+}
+
+fn materialize_proof_fixture(
+    descriptor: &ProofFixtureDescriptor,
+    out: &Path,
+    layout: FixtureLayout,
+) -> Result<ProofFixtureGenerateReport, CliError> {
+    if descriptor.id == COMMERCE_TRANSACTION_PASSPORT_FIXTURE_ID {
+        generate_commerce_transaction_passport_fixture(out)?;
+    } else if descriptor.id == DISCLOSURE_AGENT_WEB_FIXTURE_ID {
+        generate_disclosure_agent_web_fixture(out)?;
+    } else if descriptor.id == RECURSIVE_RUNTIME_SWARM_FIXTURE_ID {
+        generate_recursive_runtime_swarm_fixture(out)?;
+    } else if let Some((case, _id)) = disclosure_negative_case_for_descriptor(descriptor) {
+        copy_disclosure_negative_fixture(case, out)?;
+    } else if let Some(root) = installed_fixture_root() {
+        let source = installed_fixture_source(&root, descriptor)?;
+        copy_dir_contents(&source, out)?;
+    } else {
+        copy_embedded_fixture(installed_fixture_path(descriptor), out)?;
+    }
+    if descriptor.kind == "negative-transaction-passport"
+        || (descriptor.kind == "transaction-passport" && matches!(layout, FixtureLayout::Sealed))
+    {
+        remove_generated_negative_catalog(out)?;
+    }
+    normalize_enterprise_risk_lifecycle_replay(descriptor, out)?;
+    normalize_enterprise_claim_payout_capital_instructions(descriptor, out)?;
+    normalize_enterprise_preobserved_capital_instruction(descriptor, out)?;
+    normalize_public_settlement_deployment_provenance(descriptor, out)?;
+    normalize_enterprise_disclosure_projection_ref(descriptor, out)?;
+    normalize_enterprise_export_verifier_report_ref(descriptor, out)?;
+    normalize_enterprise_telemetry_passport_mismatch(descriptor, out)?;
+    normalize_disclosure_lineage_bbs_material(descriptor, out)?;
+    normalize_runtime_join_receipt_signature(descriptor, out)?;
+    normalize_runtime_reused_nonce_fixture(descriptor, out)?;
+    normalize_agent_web_fixture_material(descriptor, out)?;
+    normalize_commerce_mandate_projection_edges(out)?;
+    normalize_commerce_order_passport_binding(descriptor, out)?;
+    normalize_declared_evidence_graph_node_ids(descriptor, out)?;
+    if descriptor.kind != "negative-transaction-passport" {
+        refresh_proof_room_bundle_source_reports(out)?;
+    }
+    refresh_proof_room_bundle_manifests(out)?;
+    if descriptor.kind == "transaction-passport"
+        && descriptor.id != RECURSIVE_RUNTIME_SWARM_FIXTURE_ID
+        && matches!(layout, FixtureLayout::Sealed)
+    {
+        collect::seal_generated_fixture_bundle(ProofCollectKind::TransactionPassport, out)?;
+    }
+    let verifier_report_path = proof_fixture_generated_verifier_report_path(descriptor, out);
+    if let Some(verifier_report_path) = verifier_report_path.as_deref() {
+        write_generated_verifier_report(descriptor, out, verifier_report_path)?;
+    }
+    let verify_path = proof_fixture_verify_path(descriptor, out);
+    let preflight_plan_path = proof_fixture_preflight_plan_path(descriptor, out);
+    let expected_failure = proof_fixture_expected_failure(
+        descriptor,
+        verify_path.as_deref(),
+        verifier_report_path.as_deref(),
+        preflight_plan_path.as_deref(),
+    )?;
+    let expected_verdict = proof_fixture_expected_verdict(descriptor, expected_failure.as_ref());
+    Ok(ProofFixtureGenerateReport {
+        schema: "chio.proof.fixture-generate-report.v1",
+        fixture_id: descriptor.id.clone(),
+        source: descriptor.path.clone(),
+        out: out.to_string_lossy().into_owned(),
+        expected_verdict,
+        expected_failure,
+        verify_path: verify_path.map(|path| path.to_string_lossy().into_owned()),
+        verifier_report_path: verifier_report_path.map(|path| path.to_string_lossy().into_owned()),
+        preflight_plan_path: preflight_plan_path.map(|path| path.to_string_lossy().into_owned()),
+    })
 }
 
 fn normalize_declared_evidence_graph_node_ids(
@@ -1385,6 +1409,8 @@ fn normalize_agent_web_fixture_material(
         let preserve_standard_webhooks_digest_mismatch = descriptor.id
             == "agent-web-external-digest-mismatch"
             || path_has_component(&artifact_root, "agent-web-external-digest-mismatch");
+        let allow_unbound_receipts = descriptor.id == AGENT_WEB_UNBOUND_RECEIPT_FIXTURE_ID
+            || path_has_component(&artifact_root, AGENT_WEB_UNBOUND_RECEIPT_FIXTURE_ID);
         let verifier_policy_path = artifact_root.join("verifier-policy.json");
         if !verifier_policy_path.is_file() {
             continue;
@@ -1406,7 +1432,11 @@ fn normalize_agent_web_fixture_material(
             &mut evidence_graph,
             preserve_standard_webhooks_digest_mismatch,
         )?;
-        resign_agent_web_receipts_for_policy(&artifact_root, &policy_sha256)?;
+        resign_agent_web_receipts_for_policy(
+            &artifact_root,
+            &policy_sha256,
+            allow_unbound_receipts,
+        )?;
         refresh_graph_node_hashes(&artifact_root, &mut evidence_graph)?;
         write_json_line_file(&evidence_graph_path, &evidence_graph)?;
 
@@ -3370,7 +3400,7 @@ fn merge_agent_web_fixture(bundle: &Path, agent_web_source: &Path) -> Result<(),
     append_graph_artifacts_from_fixture(bundle, agent_web_source, &mut evidence_graph, &[])?;
     normalize_agent_web_bilateral_in_toto_statement(bundle)?;
     refresh_agent_web_envelopes_for_subjects(bundle, &mut evidence_graph, false)?;
-    resign_agent_web_receipts_for_policy(bundle, &policy_sha256)?;
+    resign_agent_web_receipts_for_policy(bundle, &policy_sha256, false)?;
     refresh_graph_node_hashes(bundle, &mut evidence_graph)?;
     write_json_line_file(&evidence_graph_path, &evidence_graph)?;
     let evidence_graph_sha256 = sha256_file(&evidence_graph_path)?;
@@ -3441,6 +3471,7 @@ fn add_disclosure_agent_web_crypto_context_material(
         ))
     })?;
     let proof_path = bundle.join("selective-disclosure-proof.json");
+    let proof = keep_committed_selective_disclosure_proof(&proof_path, proof)?;
     write_json_line_file(&proof_path, &proof)?;
     let transparency_leaf_hash = chio_core::sha256_hex(proof.subject_sha256_hex.as_bytes());
     let transparency_inclusion = serde_json::json!({
@@ -3733,6 +3764,55 @@ fn add_disclosure_agent_web_crypto_context_material(
         "anchors",
     );
     Ok(())
+}
+
+thread_local! {
+    static COMMITTED_SELECTIVE_DISCLOSURE_PROOFS: std::cell::RefCell<
+        Vec<chio_selective_disclosure::SelectiveDisclosureProof>,
+    > = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Offers committed BBS proofs to [`keep_committed_selective_disclosure_proof`]
+/// for the rest of this thread's fixture generation.
+fn offer_committed_selective_disclosure_proofs(
+    proofs: Vec<chio_selective_disclosure::SelectiveDisclosureProof>,
+) {
+    COMMITTED_SELECTIVE_DISCLOSURE_PROOFS.with(|committed| *committed.borrow_mut() = proofs);
+}
+
+/// BBS proof generation draws fresh blinding scalars, so generation keeps a
+/// committed proof (the bundle's own or one offered by a regeneration) that
+/// proves exactly the derived disclosure. Any field drift or a proof that no
+/// longer verifies takes the freshly derived proof.
+fn keep_committed_selective_disclosure_proof(
+    proof_path: &Path,
+    derived: chio_selective_disclosure::SelectiveDisclosureProof,
+) -> Result<chio_selective_disclosure::SelectiveDisclosureProof, CliError> {
+    let mut candidates = Vec::new();
+    match fs::read(proof_path) {
+        Ok(bytes) => candidates.extend(
+            serde_json::from_slice::<chio_selective_disclosure::SelectiveDisclosureProof>(&bytes)
+                .ok(),
+        ),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(CliError::from(error)),
+    }
+    COMMITTED_SELECTIVE_DISCLOSURE_PROOFS
+        .with(|committed| candidates.extend(committed.borrow().iter().cloned()));
+
+    let mut registry = chio_selective_disclosure::InMemoryIssuerRegistry::default();
+    registry.insert(
+        derived.issuer_fingerprint.clone(),
+        derived.issuer_public_key_hex.clone(),
+    );
+    let kept = candidates.into_iter().find(|committed| {
+        let mut comparable = committed.clone();
+        comparable.proof_bytes_hex.clone_from(&derived.proof_bytes_hex);
+        comparable == derived
+            && chio_selective_disclosure::verify_selective_disclosure_proof(committed, &registry)
+                .is_ok()
+    });
+    Ok(kept.unwrap_or(derived))
 }
 
 fn disclosure_sensitivity_classes_json(
@@ -4058,7 +4138,7 @@ pub(super) fn add_disclosure_bbs_material_to_bundle(bundle: &Path) -> Result<(),
 
     let policy_sha256 = sha256_file(&bundle.join("verifier-policy.json"))?;
     refresh_agent_web_envelopes_for_subjects(bundle, &mut evidence_graph, false)?;
-    resign_agent_web_receipts_for_policy(bundle, &policy_sha256)?;
+    resign_agent_web_receipts_for_policy(bundle, &policy_sha256, false)?;
     refresh_graph_node_hashes(bundle, &mut evidence_graph)?;
     write_json_line_file(&evidence_graph_path, &evidence_graph)?;
     let evidence_graph_sha256 = sha256_file(&evidence_graph_path)?;
