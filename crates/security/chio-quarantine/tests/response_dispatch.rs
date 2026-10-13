@@ -9,7 +9,7 @@ use chio_security_types::ports::{
     ActionId, BoundedVec, CanonicalBody, CreateOutcome, Digest32, ErrorCode, LeaseOwnerId,
     RecordId, ResponseDispatchApproval, ResponseDispatchAuthorizationBody,
     ResponseDispatchCommitRequest, ResponseDispatchLease, ResponsePlanRecord, ResponseStore,
-    SessionId, TenantId,
+    ScheduledWork, SessionId, TenantId,
 };
 use chio_security_types::{
     DispatchRejection, OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
@@ -597,7 +597,14 @@ fn committed_dispatch_deadline_preserves_requested_ambiguity_and_applied_rollbac
         ResponseDispatchApproval::Automatic,
     ))
     .unwrap_or_else(|error| panic!("applied dispatch preparation failed: {error}"));
-    let applied_store = Arc::new(TestResponseStore::default());
+    let work = ScheduledWork {
+        tenant_id: applied_prepared.response_plan.tenant_id.clone(),
+        action_id: applied_prepared.response_plan.action_id.clone(),
+        lease_owner_id: applied_prepared.initial_lease.lease_owner_id.clone(),
+        lease_expires_at_unix_ms: 43_000,
+        fencing_token: 1,
+    };
+    let applied_store = Arc::new(TestResponseStore::with_work(Some(work.clone())));
     applied_store
         .create(&applied_prepared.response_plan)
         .unwrap_or_else(|error| panic!("applied dispatch persistence failed: {error}"));
@@ -614,8 +621,9 @@ fn committed_dispatch_deadline_preserves_requested_ambiguity_and_applied_rollbac
         )
         .unwrap_or_else(|error| panic!("applied effect request failed: {error}"));
     let applied = applied_machine
-        .record_effect_with_receipt(
+        .record_effect_with_receipt_scheduled(
             &effect_requested,
+            &work,
             &EffectMutationRequest {
                 expected_generation: effect_requested.generation,
                 effect_id,
@@ -626,15 +634,15 @@ fn committed_dispatch_deadline_preserves_requested_ambiguity_and_applied_rollbac
             },
             &EffectReceiptContext {
                 effect_generation: 2,
-                scheduler_lease_owner_id: None,
-                scheduler_fencing_token: 1,
+                scheduler_lease_owner_id: Some(work.lease_owner_id.clone()),
+                scheduler_fencing_token: work.fencing_token,
                 effect_transition_id: Some(record_id("dispatch-effect-applied")),
                 prior_receipt_id: None,
             },
         )
         .unwrap_or_else(|error| panic!("applied effect persistence failed: {error}"));
     let rolling_back = applied_machine
-        .handle_due(&applied, applied.generation, 42_000)
+        .handle_due_scheduled(&applied, &work, applied.generation, 42_000)
         .unwrap_or_else(|error| panic!("applied dispatch rollback failed: {error}"));
     assert_eq!(
         decode_response_record(&rolling_back)
@@ -699,7 +707,7 @@ fn dispatch_preparation_rejects_authorization_or_approval_mismatch() {
 }
 
 #[test]
-fn unbound_legacy_preparation_cannot_mint_fresh_dispatch_authority() {
+fn unbound_preparation_cannot_mint_fresh_dispatch_authority() {
     let mut request = preparation(
         plan(ResponseApprovalRequirement::Automatic),
         ResponseDispatchApproval::Automatic,

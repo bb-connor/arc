@@ -33,3 +33,7 @@ use crate::{canonical_json_bytes, sha256, Error, Result};
 
 include!("security_parts/definitions_and_projection.inc");
 include!("security_parts/lifecycle_and_validation.inc");
+
+#[cfg(test)]
+#[path = "security_parts/scheduler_fence_tests.rs"]
+mod scheduler_fence_tests;

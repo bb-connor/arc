@@ -5,7 +5,7 @@ b2c133ce8546be0e2824ff6d824a23ef447a057017650dffe8f130de04fd7fe8  tests/bindings
 c22fa7f39f71a11060ecd710bdd17297eadd249612964a95d519e98c60e95cc6  tests/bindings/vectors/hashing/v1.json
 5492de0309012bceb976bb34760876a69620b244737714fe57f0636cb477167e  tests/bindings/vectors/manifest/v1.json
 4ccf40bff7e7196646ea04c9ea1f7a98eb37e5ae331d9ddc10a283d908a309e8  tests/bindings/vectors/receipt/v1.json
-c659bacb60660a9f06a9d43f187b60aefcc7c62aafbc9d114bcd722b1d2c1c9d  tests/bindings/vectors/security/active-defense/index.json
+1028dfbdbec262c733b489a4e773a4688f9b0b5792148ebdf9f753d177800f71  tests/bindings/vectors/security/active-defense/index.json
 9848b771a2f1cb8f54e044a58ad01b5fc3d109866cfb2dde03bf827a65af4486  tests/bindings/vectors/security/active-defense/mutations-v1.json
 59e807fe75e2af94a1975b4ee2d1aa401c235b88481add1abb72a5dcf33dbb12  tests/bindings/vectors/security/active-defense/positive/correlated-finding-receipt-body-v1.json
 cc2a8964f98cce43e99fa364f9c18f97881dd1e973f7ec29c7f703c37a537b14  tests/bindings/vectors/security/active-defense/positive/correlated-finding-v1.json
@@ -14,7 +14,6 @@ ce50e84309565598651ffed3e455ea7ace6e3b58d0652b12860898456e7144a6  tests/bindings
 ce676cb8b733743f6fd0cb34f99a95c43e79c089717525576982d2ce45c5f38e  tests/bindings/vectors/security/active-defense/positive/detector-health-receipt-body-contradictory-v1.json
 c51c081e6c2b7b6ea4b9c89428b8153e6bee0f68924fc4d4d4c85a4d73ae1a44  tests/bindings/vectors/security/active-defense/positive/detector-health-receipt-body-unknown-v1.json
 6a1ee26d931bb64e0c67c1c673b361b67344d5b22cc46ada5a002e81c68839e8  tests/bindings/vectors/security/active-defense/positive/detector-health-receipt-body-v1.json
-68855d7d132b0dc29f43625000ab271e6fe6e0909614271e770316aec9169258  tests/bindings/vectors/security/active-defense/positive/effect-transition-receipt-body-legacy-v1.json
 362b974c8d339f8cd5764eb1bd159bcdb8aab3ee7536afcfc030c86c20378040  tests/bindings/vectors/security/active-defense/positive/effect-transition-receipt-body-v1.json
 9d53a270c3a038183ce96259c324106d033eff2e353803ed1381b18136114859  tests/bindings/vectors/security/active-defense/positive/flow-denial-receipt-body-v1.json
 bd38f948e939cfee3d7ec1d8b7dfbcb2a8d9207b522c41a02cb2c219d039464a  tests/bindings/vectors/security/active-defense/positive/lift-rollback-completion-receipt-body-nonreversible-v1.json
