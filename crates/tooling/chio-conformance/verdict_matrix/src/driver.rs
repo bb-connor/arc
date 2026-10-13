@@ -1138,8 +1138,7 @@ mod tests {
 
     #[test]
     fn delivery_lane_rejects_unknown_name() {
-        let Err(error) = serde_json::from_value::<DeliveryLane>(serde_json::json!("legacy"))
-        else {
+        let Err(error) = serde_json::from_value::<DeliveryLane>(serde_json::json!("legacy")) else {
             panic!("unknown delivery lane accepted");
         };
         assert_eq!(
