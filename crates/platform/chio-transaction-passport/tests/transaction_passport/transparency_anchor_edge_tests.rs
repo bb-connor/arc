@@ -44,7 +44,7 @@ fn standalone_minimal_passport_accepts_unique_key_proof_with_noncanonical_whites
 }
 
 #[test]
-fn standalone_minimal_passport_rejects_duplicate_v2_proof_keys() {
+fn standalone_minimal_passport_rejects_duplicate_receipt_proof_keys() {
     for (label, needle, replacement) in [
         (
             "proof envelope",
@@ -174,7 +174,7 @@ fn standalone_minimal_passport_validates_every_transparency_candidate() {
         .test_expect("graph nodes are an array")
         .push(json!({
             "id": invalid_digest,
-            "schema": "chio.transparency.inclusion-proof.v2",
+            "schema": "chio.transparency.receipt-inclusion-proof.v1",
             "path": "transparency-inclusion-proof-invalid.json",
             "sha256": invalid_digest,
             "role": "transparency-inclusion-proof"
@@ -509,9 +509,37 @@ fn standalone_minimal_passport_requires_node_and_artifact_schema_parity() {
         verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
             .test_expect_err("a node cannot promote an artifact under a different schema");
     assert!(
-        error
-            .to_string()
-            .contains("does not match artifact schema chio.transparency.inclusion-proof.v2"),
+        error.to_string().contains(
+            "does not match artifact schema chio.transparency.receipt-inclusion-proof.v1"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn standalone_minimal_passport_rejects_the_retired_v2_receipt_proof_id() {
+    let retired = "chio.transparency.inclusion-proof.v2";
+    let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
+        transparency_anchored_fixture_with_raw_artifact(|artifact| {
+            artifact.replacen("chio.transparency.receipt-inclusion-proof.v1", retired, 1)
+        });
+    let mut graph: Value =
+        serde_json::from_slice(&evidence_graph_bytes).test_expect("evidence graph parses");
+    graph["nodes"]
+        .as_array_mut()
+        .test_expect("graph nodes are an array")
+        .iter_mut()
+        .find(|node| node["role"] == "transparency-inclusion-proof")
+        .test_expect("transparency node exists")["schema"] = json!(retired);
+    let evidence_graph_bytes = serde_json::to_vec(&graph).test_expect("evidence graph serializes");
+
+    let error =
+        verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
+            .test_expect_err("the retired receipt proof id must deny");
+    assert!(
+        error.to_string().contains(
+            "unsupported evidence graph node schema: chio.transparency.inclusion-proof.v2"
+        ),
         "{error}"
     );
 }
