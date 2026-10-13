@@ -2,10 +2,7 @@
  * Core types for the Chio HTTP substrate.
  *
  * These types mirror the Rust chio-http-core crate and define the contract
- * between JVM middleware and the Chio sidecar kernel. Package:
- * world.chio.sdk. Typealiases in chio-spring-boot/compat/
- * expose the Spring Boot integration names without duplicating type
- * definitions.
+ * between JVM middleware and the Chio sidecar kernel.
  */
 package world.chio.sdk
 
