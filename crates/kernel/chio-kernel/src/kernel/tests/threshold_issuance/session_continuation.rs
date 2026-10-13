@@ -420,13 +420,18 @@ fn resumed_session_revalidates_approval_votes() -> TestResult {
     fixture.request.approval_tokens[0]
         .request_id
         .push_str("-changed");
-    let response = session_tool_call(
-        fixture
-            .kernel
-            .evaluate_session_operation(&context, &operation(&fixture.request))?,
-    )
-    .ok_or("denial response missing")?;
-    assert_eq!(response.verdict, Verdict::Deny);
+    let parked = fixture.store.operation();
+    let receipts = fixture.kernel.receipt_log().len();
+    let refused = fixture
+        .kernel
+        .evaluate_session_operation(&context, &operation(&fixture.request));
+    assert!(
+        matches!(&refused, Err(KernelError::GovernedTransactionDenied(reason))
+            if reason == "threshold approval verification denied: approval token binding or validity is invalid"),
+        "{refused:?}"
+    );
+    assert_eq!(fixture.store.operation(), parked);
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }

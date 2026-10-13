@@ -183,7 +183,7 @@ fn run(
 /// Everything the shared pre-dispatch cleanup leaves behind. Identifiers that
 /// differ between fixtures, including the request binding that commits to each
 /// fixture's receipt signer, are replaced by their role, and the per-receipt
-/// signing nonce is dropped.
+/// signing nonce and projection time are dropped.
 fn cleanup_state(run: &Run) -> TestResult<serde_json::Value> {
     let operation = run.store.operation();
     let operation_id = operation.binding().operation_id().as_str().to_owned();
@@ -224,6 +224,12 @@ fn cleanup_state(run: &Run) -> TestResult<serde_json::Value> {
                 .ok_or("metadata object")?
                 .remove("chio_receipt_signing_nonce")
                 .ok_or("signing nonce")?;
+            metadata
+                .pointer_mut("/admission_operation")
+                .and_then(serde_json::Value::as_object_mut)
+                .ok_or("admission projection")?
+                .remove("trusted_time_unix_ms")
+                .ok_or("projection trusted time")?;
             Ok(metadata)
         })
         .transpose()?;

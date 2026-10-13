@@ -112,7 +112,10 @@ fn prepared(
                 ..AdmissionParticipantRequirements::NONE
             },
         )?,
-        policy_hash: AdmissionDigest::try_new("policy_hash", "c".repeat(64))?,
+        policy_hash: AdmissionDigest::try_new(
+            "policy_hash",
+            sha256_hex(b"sqlite-durable-admission-test-policy"),
+        )?,
         effect_class: SideEffectClass::SideEffecting,
     })?;
     retained.validate_binding(&binding)?;
