@@ -66,6 +66,10 @@ async fn call(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn emergency_routes_authenticate_and_survive_an_edge_rebuild() -> TestResult {
     let directory = tempfile::tempdir()?;
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+    }
     let first = state(directory.path())?;
 
     for token in [None, Some("wrong-token"), Some("remote-auth-token")] {
