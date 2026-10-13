@@ -58,6 +58,24 @@ impl ContainerWriter {
         Ok(())
     }
 
+    /// At most one signed launch record exists per worker attempt.
+    pub fn launch_recorded(
+        &mut self,
+        signed: &chio_process::SignedContainerLaunchRecord,
+    ) -> Result<(), CliError> {
+        self.0
+            .execute(
+                "INSERT INTO run_container_launches(process,attempt,record) VALUES(?1,?2,?3)",
+                params![
+                    signed.record.process_id,
+                    signed.record.attempt,
+                    serde_json::to_string(signed).map_err(error)?
+                ],
+            )
+            .map_err(error)?;
+        Ok(())
+    }
+
     pub fn removed(&mut self, lease: &Lease) -> Result<(), CliError> {
         self.0
             .execute("DELETE FROM run_containers WHERE owner=?1", [&lease.owner])
@@ -145,6 +163,7 @@ impl<'a> Journal<'a> {
         if !container_columns.contains("create_rejected") {
             tx.execute_batch("ALTER TABLE run_containers ADD COLUMN create_rejected INTEGER NOT NULL DEFAULT 0 CHECK(create_rejected IN (0,1))").map_err(error)?;
         }
+        tx.execute_batch("CREATE TABLE IF NOT EXISTS run_container_launches(process TEXT NOT NULL, attempt INTEGER NOT NULL, record TEXT NOT NULL, PRIMARY KEY(process,attempt));").map_err(error)?;
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_child_settlements(parent TEXT NOT NULL, child TEXT NOT NULL, request_id TEXT NOT NULL, PRIMARY KEY(parent,child));").map_err(error)?;
         // Journals written before suspensions were counted gain the column; their
         // recorded attempts all count as failures, as they did when recorded.

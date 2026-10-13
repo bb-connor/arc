@@ -11,7 +11,10 @@ use chio_kernel::{
     RuntimeAdmissionHook, ToolServerConnection, Verdict,
 };
 use chio_process::worker::{WorkerService, PROTOCOL};
-use chio_process::{ProcessError, ProcessLaunchReceipt, ProcessRoute, ProcessRuntime};
+use chio_process::{
+    LaunchRef, ProcessError, ProcessLaunchReceipt, ProcessRoute, ProcessRuntime, WorkerProfile,
+    WorkerProfileKind,
+};
 use serde_json::{json, Value};
 use support::Result;
 
@@ -258,5 +261,70 @@ fn ambiguous_or_malformed_host_routes_refuse_configuration() -> Result {
         .with_launch_receipts([receipt.clone(), receipt])
         .is_err());
     assert!(runtime.with_routes([route.clone(), route]).is_err());
+    Ok(())
+}
+
+#[tokio::test]
+async fn host_bound_worker_profile_is_attributed_and_cannot_be_supplied_by_the_worker() -> Result {
+    let dir = tempfile::tempdir()?;
+    let effects = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), effects.clone())?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?
+        .with_routes(routes()?)?;
+    let capability = support::root(&runtime, &kernel, 4)?;
+    let service = WorkerService::new(runtime.clone());
+    let token = service.issue_credential("root", capability.expires_at)?;
+    let forged = json!({"kind": "container",
+        "launch_ref": {"record_id": "f".repeat(64), "record_sha256": "f".repeat(64)},
+        "launch_attempt": 9});
+    let call = |key: &str| {
+        json!({
+            "protocol": PROTOCOL, "credential": token.expose_secret(),
+            "operation": {"op": "invoke", "operation_key": key, "server_id": "tools",
+                "tool_name": "append", "arguments": {"text": key},
+                "governed_intent": {"id": key, "server_id": "tools", "tool_name": "append",
+                    "purpose": "a profiled task", "context": {
+                        "chio_process": {"worker_profile": forged.clone()},
+                        "worker_profile": forged.clone()
+                    }}
+            }
+        })
+    };
+    let attributed = |frame: Value| {
+        let service = service.clone();
+        async move {
+            let response: Value =
+                serde_json::from_slice(&service.handle_frame(&serde_json::to_vec(&frame)?).await)?;
+            assert_eq!(response["result"]["verdict"], "allow", "{response}");
+            let receipt: chio_core_types::receipt::body::ChioReceipt = serde_json::from_str(
+                response["result"]["receipt_json"]
+                    .as_str()
+                    .ok_or("missing receipt")?,
+            )?;
+            assert!(receipt.verify_signature()?);
+            let metadata = receipt.metadata.ok_or("missing signed attribution")?;
+            Result::<Option<Value>>::Ok(metadata["chio_process"].get("worker_profile").cloned())
+        }
+    };
+
+    assert_eq!(attributed(call("unprofiled")).await?, None);
+
+    let profile = WorkerProfile {
+        kind: WorkerProfileKind::Container,
+        launch_ref: LaunchRef {
+            record_id: "a".repeat(64),
+            record_sha256: "b".repeat(64),
+        },
+        launch_attempt: 2,
+    };
+    runtime.bind_worker_profile("root", profile.clone())?;
+    assert_eq!(
+        attributed(call("profiled")).await?,
+        Some(serde_json::to_value(&profile)?)
+    );
+
+    runtime.clear_worker_profile("root")?;
+    assert_eq!(attributed(call("cleared")).await?, None);
+    assert_eq!(effects.load(Ordering::SeqCst), 3);
     Ok(())
 }

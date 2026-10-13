@@ -1,5 +1,6 @@
 mod child;
 mod container;
+mod container_profile;
 mod journal;
 mod plan;
 mod socket;
@@ -166,6 +167,11 @@ async fn drive(
     let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     let mut interrupt = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
     let mut engines = BTreeMap::new();
+    let launch_authority = std::sync::Arc::new(container::LaunchAuthority {
+        key: host.authority.kernel_keypair(),
+        clock: host.kernel.authority_clock(),
+        runtime: host.runtime.clone(),
+    });
     if !journal.completion()?.complete {
         for profile in plan
             .workers
@@ -265,12 +271,13 @@ async fn drive(
                 let timeout = Duration::from_secs(worker.timeout_seconds);
                 let resident_ceiling = worker.resources.and_then(|resources| resources.max_resident_bytes);
                 active_ids.insert(index);
+                let launch_authority = launch_authority.clone();
                 active.spawn(async move {
                     let (result, diagnostics, cleanup) = if let Some((lease, writer)) = container {
-                        let (result, cleanup) = container::run(writer, lease, worker, socket, input).await;
+                        let (result, cleanup) = container::run(writer, lease, worker, socket, input, attempt, launch_authority).await;
                         (result.map_err(|failure| std::io::Error::other(failure.to_string())), None, Some(cleanup))
                     } else { match match spawned {
-                        Some(Ok(child)) => child::observe(child, input, timeout, resident_ceiling, None).await,
+                        Some(Ok(child)) => child::observe(child, input, None, timeout, resident_ceiling, None).await,
                         Some(Err(failure)) => Err(failure),
                         None => Err(std::io::Error::other("missing direct worker launch")),
                     } {
