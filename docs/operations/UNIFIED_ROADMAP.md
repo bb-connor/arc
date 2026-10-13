@@ -244,7 +244,6 @@ Each lane is a ladder of rungs. Each rung (and Lane REC as a whole) states one r
 - At proxied routes a federated capability is a bearer token, because holder possession is not checked.
 - The door ignores revocations made after it started.
 - `evidence verify` gains `--trusted-kernel-pubkey` and `--trusted-anchor-file` with #1160. That verifier already checks every receipt and checkpoint signer against keys the verifier supplies independently, so a partner's keys can be pinned by hand. What is missing is partner-card ingestion and discovery: nothing reads a partner's published card or key history into the verifier.
-- Door receipts are signed `HttpReceipt`s projected into `ChioReceipt`s in the door's own receipt store, with the original carried in metadata (`chio_http_receipt_v1`). The evidence verifier never checks that embedded `HttpReceipt`.
 - The issuance inbox design has no way to return the issued capability to the holder.
 - As written in #1177's NORTH-STAR-FLOWS, the HOST-M1 flow fails on #1160 in two places:
   - B rejects an A-signed delegation ceiling: federated issue requires the policy signer to be a key B's own capability authority trusts (the IETF draft's Delegated Issuance step 7 states the same rule);
