@@ -49,6 +49,7 @@ func signedTokenWith(
 	t.Helper()
 
 	body := map[string]any{
+		"schema":     capabilitySchema,
 		"id":         "cap-webhook-test",
 		"issuer":     signer.issuerHex,
 		"subject":    signer.issuerHex,
@@ -289,6 +290,81 @@ func TestAdmissionAdmitsWithVerifiedCapability(t *testing.T) {
 
 	if !review.Response.Allowed {
 		t.Fatalf("expected admission to be allowed, got denial %q", review.Response.Result.Message)
+	}
+}
+
+// signedRawToken signs the canonical form of signed, then emits emitted with
+// that signature attached.
+func signedRawToken(t *testing.T, signer kernelSigner, signed, emitted map[string]any) string {
+	t.Helper()
+	canonical, err := canonicalJSON(signed)
+	if err != nil {
+		t.Fatalf("failed to canonicalize token: %v", err)
+	}
+	out := make(map[string]any, len(emitted)+1)
+	for key, value := range emitted {
+		out[key] = value
+	}
+	out["signature"] = hex.EncodeToString(ed25519.Sign(signer.privateKey, canonical))
+	encoded, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("failed to marshal token: %v", err)
+	}
+	return string(encoded)
+}
+
+func schemaLessTokenBody(signer kernelSigner) map[string]any {
+	now := time.Now().UTC()
+	return map[string]any{
+		"id":      "cap-webhook-schema",
+		"issuer":  signer.issuerHex,
+		"subject": signer.issuerHex,
+		"scope": CapabilityScope{
+			Grants: []ToolGrant{{ServerID: "*", ToolName: "db", Operations: []string{"invoke"}}},
+		},
+		"issued_at":  now.Add(-1 * time.Minute).Unix(),
+		"expires_at": now.Add(1 * time.Hour).Unix(),
+	}
+}
+
+func withSchema(body map[string]any, schema string) map[string]any {
+	out := make(map[string]any, len(body)+1)
+	for key, value := range body {
+		out[key] = value
+	}
+	out["schema"] = schema
+	return out
+}
+
+func TestVerifyCapabilityRefusesSignatureWithoutSchema(t *testing.T) {
+	signer := newKernelSigner(t)
+	body := schemaLessTokenBody(signer)
+	raw := signedRawToken(t, signer, body, body)
+
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err == nil || !strings.Contains(err.Error(), "capability signature verification failed") {
+		t.Fatalf("expected signature refusal, got %v", err)
+	}
+}
+
+func TestVerifyCapabilityAcceptsSchemaOmittedFromToken(t *testing.T) {
+	signer := newKernelSigner(t)
+	body := schemaLessTokenBody(signer)
+	raw := signedRawToken(t, signer, withSchema(body, capabilitySchema), body)
+
+	if err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC()); err != nil {
+		t.Fatalf("expected verification to pass, got %v", err)
+	}
+}
+
+func TestVerifyCapabilityRejectsUnknownSchema(t *testing.T) {
+	signer := newKernelSigner(t)
+	body := withSchema(schemaLessTokenBody(signer), "chio.capability.v0")
+	raw := signedRawToken(t, signer, body, body)
+
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err == nil || !strings.Contains(err.Error(), `schema must be "chio.capability.v1"`) {
+		t.Fatalf("expected schema refusal, got %v", err)
 	}
 }
 

@@ -500,8 +500,8 @@ def check_capability_signing_input(case: Dict[str, Any]) -> str:
     signing_input = capability_signing_input(case["capability"])
     members = loads_strict(signing_input)
     _require(
-        canonicalize(without(members, "schema")) == case["capability_body_canonical_json"],
-        "the signing input of %s is not capability_body_canonical_json plus schema" % case["id"],
+        signing_input == case["capability_signing_body_canonical_json"],
+        "the signing input of %s is not capability_signing_body_canonical_json" % case["id"],
     )
     names = list(members)
     at = names.index("schema")
@@ -614,9 +614,8 @@ def build_appendix_a(corpus: Corpus) -> Fragment:
     f.block(pretty(cap), "json", indent=4)
     f.para(
         "The signing input of the token is its canonical form without the `signature` member and "
-        "with the member `%s` added, which sorts between `issuer` and `scope`. The "
-        "`capability_body_canonical_json` value of the case is the same text without the `schema` "
-        "member. The signing input is:" % SCHEMA_MEMBER
+        "with the member `%s` added, which sorts between `issuer` and `scope`. It is the "
+        "`capability_signing_body_canonical_json` value of the case:" % SCHEMA_MEMBER
     )
     f.block(cap_signing, "json")
     f.para(
@@ -835,7 +834,7 @@ def build_appendix_b(corpus: Corpus) -> Fragment:
         "to produce. The signing input is the canonical form of the token without its `signature` "
         "member and with the member `%s` added, as in {{example-capability}}. The "
         "corpus omits the `schema` member from the token itself, and its "
-        "`capability_body_canonical_json` value is the signing input without that member."
+        "`capability_signing_body_canonical_json` value is the signing input."
         % SCHEMA_MEMBER
     )
     f.para(

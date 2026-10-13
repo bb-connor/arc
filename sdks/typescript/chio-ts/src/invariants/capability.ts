@@ -80,7 +80,7 @@ export function parseCapabilityJson(input: string): CapabilityToken {
   return parsed as CapabilityToken;
 }
 
-export function capabilityBody(capability: CapabilityToken): Omit<CapabilityToken, "signature"> {
+function capabilityBody(capability: CapabilityToken): Omit<CapabilityToken, "signature"> {
   const {
     algorithm: _algorithm,
     attenuation_proof: _attenuationProof,
@@ -92,10 +92,6 @@ export function capabilityBody(capability: CapabilityToken): Omit<CapabilityToke
     ...body
   } = capability;
   return body;
-}
-
-export function capabilityBodyCanonicalJson(capability: CapabilityToken): string {
-  return canonicalizeJson(capabilityBody(capability));
 }
 
 export function capabilitySigningBody(capability: CapabilityToken): Record<string, unknown> {
