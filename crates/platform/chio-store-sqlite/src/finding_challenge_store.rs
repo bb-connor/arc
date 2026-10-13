@@ -96,11 +96,8 @@ use crate::finding_purchase_store::{
     block_new_slots_tx, highest_slot_ordinal_tx, lift_sales_block_tx,
     outstanding_exposure_total_tx, FindingPurchaseStoreError,
 };
-use crate::serving_owner::SqliteServingOwner;
-use crate::{
-    admission_operation_store::verify_active_owner,
-    store_connection::{StoreConnection, StoreGuard},
-};
+use crate::store_connection::{StoreConnection, StoreGuard};
+use crate::{admission_operation_store::verify_active_owner, serving_owner::SqliteServingOwner};
 
 mod submission_retention;
 pub use submission_retention::*;

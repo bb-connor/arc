@@ -67,11 +67,8 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBe
 use thiserror::Error;
 
 use crate::finding_status_store::{status_for_purchase_tx, FindingStatusDecision};
-use crate::serving_owner::SqliteServingOwner;
-use crate::{
-    admission_operation_store::verify_active_owner,
-    store_connection::{StoreConnection, StoreGuard},
-};
+use crate::store_connection::{StoreConnection, StoreGuard};
+use crate::{admission_operation_store::verify_active_owner, serving_owner::SqliteServingOwner};
 
 #[path = "finding_purchase_public_request.rs"]
 mod public_request;

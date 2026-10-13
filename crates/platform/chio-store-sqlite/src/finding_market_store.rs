@@ -23,11 +23,8 @@
 
 use crate::finding_purchase_store::sales_blocked_tx;
 use crate::finding_status_store::{status_for_purchase_tx, FindingStatusDecision};
-use crate::serving_owner::SqliteServingOwner;
-use crate::{
-    admission_operation_store::verify_active_owner,
-    store_connection::{StoreConnection, StoreGuard},
-};
+use crate::store_connection::{StoreConnection, StoreGuard};
+use crate::{admission_operation_store::verify_active_owner, serving_owner::SqliteServingOwner};
 use chio_core::capability::scope::MonetaryAmount;
 use chio_core::sha256_hex;
 use chio_finding::{
