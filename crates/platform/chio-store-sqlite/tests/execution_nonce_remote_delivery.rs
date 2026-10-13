@@ -136,14 +136,15 @@ fn transport_failure_after_delivery_is_outcome_unknown() -> TestResult {
     server.set_behavior(Behavior::CloseAfterRead)?;
 
     let response = execute(&runtime, &request, &nonce)?;
+    assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
     assert!(response.output.is_none(), "{response:?}");
-    assert!(
-        matches!(
-            &response.terminal_state,
-            OperationTerminalState::Incomplete { .. }
-        ),
-        "{:?}",
-        response.terminal_state
+    assert_eq!(
+        response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/admission_operation/projected_state")),
+        Some(&serde_json::json!("outcome_unknown_after_dispatch"))
     );
     assert_state(&fixture, &request, "outcome_unknown_after_dispatch")?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
@@ -155,12 +156,9 @@ fn transport_failure_after_delivery_is_outcome_unknown() -> TestResult {
 
     server.set_behavior(Behavior::Respond)?;
     let replay = execute(&runtime, &request, &nonce)?;
-    assert_eq!(replay.verdict, Verdict::Deny, "{:?}", replay.reason);
-    assert!(
-        reason_contains(&replay, "outcome_unknown_after_dispatch")
-            || reason_contains(&replay, "OutcomeUnknownAfterDispatch"),
-        "{:?}",
-        replay.reason
+    assert_eq!(
+        serde_json::to_value(&replay.receipt)?,
+        serde_json::to_value(&response.receipt)?
     );
     drop(runtime);
 
