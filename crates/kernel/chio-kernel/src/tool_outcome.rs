@@ -43,12 +43,7 @@ pub use original_security_dispatch::{
 };
 mod receipt_signing;
 mod record_binding;
-#[path = "tool_outcome/retained_encoding.rs"]
-mod retained_encoding;
-pub use receipt_signing::{
-    FrozenReceiptSigningIdentityV1, PrivateRecoverySettlementReceiptV1,
-    PRIVATE_RECOVERY_SETTLEMENT_METADATA_KEY,
-};
+pub use receipt_signing::FrozenReceiptSigningIdentityV1;
 pub const TOOL_OUTCOME_SCHEMA: &str = "chio.tool-outcome.v1";
 pub const POST_RETURN_EVALUATION_SCHEMA: &str = "chio.post-return-evaluation.v1";
 pub const POST_RETURN_EXACT_INPUTS_SCHEMA: &str = "chio.post-return-exact-inputs.v1";
@@ -148,23 +143,7 @@ fn bounded<T: Serialize>(
     value: &T,
     maximum: usize,
 ) -> Result<Vec<u8>, ToolOutcomeError> {
-    let value =
-        retained_encoding::to_value_bounded(value, maximum).map_err(|error| match error {
-            retained_encoding::BorrowedEncodingError::Exhausted { minimum } => {
-                ToolOutcomeError::TooLarge {
-                    field,
-                    // Encoding stopped before allocating the remaining fields.
-                    // Report the observed lower bound rather than an invented
-                    // complete-envelope length.
-                    actual: minimum,
-                    maximum,
-                }
-            }
-            retained_encoding::BorrowedEncodingError::Serialization(error) => {
-                ToolOutcomeError::Canonical(error.to_string())
-            }
-        })?;
-    let bytes = canonical(&value)?;
+    let bytes = canonical(value)?;
     if bytes.len() > maximum {
         return Err(ToolOutcomeError::TooLarge {
             field,
@@ -1784,12 +1763,6 @@ fn claimed_outcome_error(error: AdmissionOperationStoreError) -> ToolOutcomeStor
         AdmissionOperationStoreError::OutcomeUnknown(detail) => ToolOutcomeStoreError::Unavailable(
             format!("recovery claim durable outcome is unknown: {detail}"),
         ),
-        AdmissionOperationStoreError::RecoveryAuthorityDenied
-        | AdmissionOperationStoreError::RecoveryMediationRequired => {
-            ToolOutcomeStoreError::Invariant(
-                "recovery preview refusal is outside outcome claims".into(),
-            )
-        }
         AdmissionOperationStoreError::Operation(error) => {
             ToolOutcomeStoreError::Invariant(error.to_string())
         }
@@ -1934,7 +1907,3 @@ impl From<chio_core::canonical::UntrustedJsonError> for ToolOutcomeError {
         Self::UntrustedInput(error.into())
     }
 }
-
-#[cfg(test)]
-#[path = "tool_outcome/retained_encoding_tests.rs"]
-mod retained_encoding_tests;

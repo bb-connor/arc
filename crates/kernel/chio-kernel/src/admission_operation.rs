@@ -24,7 +24,6 @@ mod native_nonce_preflight;
 mod native_output_join;
 mod native_security_binding;
 mod nonce_preflight;
-mod output_retention;
 mod projection;
 pub mod recovery;
 mod remote_projection;
@@ -61,10 +60,7 @@ pub use native_egress::{
 };
 pub use native_flow_join::NativeSecurityFlowJoinRecordV1;
 pub use native_flow_observation::NativeSecurityFlowObservationV1;
-pub use native_input_join::{
-    NativeSecurityInputClassificationAuthority, NativeSecurityInputJoinOutcome,
-    NativeSecurityInputJoinRecordV1, NativeSecurityInputJoinRequestV1,
-};
+pub use native_input_join::{NativeSecurityInputJoinRecordV1, NativeSecurityInputJoinRequestV1};
 pub use native_nonce_preflight::{
     NativeSecurityNoncePreflightJoinRecordV1, NativeSecurityNoncePreflightJoinRequestV1,
 };
@@ -74,18 +70,11 @@ pub use nonce_preflight::{
     AdmissionNoncePreflightHoldDisposition, AdmissionNoncePreflightIdentityV1,
     AdmissionNoncePreflightRecoveryV1, NONCE_PREFLIGHT_BUDGET_PREFIX,
 };
-pub use output_retention::{
-    NativeOutputEnvelopeBoundsV1, NativeOutputOverflowDisposition, NativeOutputRetentionError,
-    NativeOutputRetentionProfileV1, NativeOutputRetentionSchema,
-};
 pub use projection::*;
 pub use recovery::*;
 pub use remote_projection::*;
 #[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash;
-pub(crate) use retained_request::immutable_tool_request_hash_with_original_semantics;
-pub(crate) use retained_request::immutable_tool_request_hash_with_output_retention;
-#[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash_with_profile;
 pub(crate) use retained_request::AdmissionSecurityBindingV1;
 pub use retained_request::RetainedToolAdmissionRequestV1;
