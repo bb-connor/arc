@@ -258,8 +258,7 @@ impl SqliteSecurityStateStore {
         }
         #[cfg(unix)]
         let (database_path, database_parent) = canonical_database_path(path)?;
-        // The identity is bound before the first statement so an aliased path
-        // is refused before migration writes through it.
+        // Bind the database identity before SQLite can write through an aliased path.
         #[cfg(unix)]
         let (connection, database_identity) =
             open_unaliased_database(&database_parent, &database_path)?;
@@ -272,7 +271,7 @@ impl SqliteSecurityStateStore {
         connection
             .busy_timeout(Duration::from_secs(5))
             .map_err(sqlite_error)?;
-        migrate(&connection)?;
+        open_schema(&connection)?;
         SqliteEncryptedBlobStore::open(path).map_err(|_| PortError::unavailable())?;
         Ok(Self {
             connection: StoreConnection::transaction_only("security_state", connection),
@@ -773,8 +772,7 @@ use correlation::{
 
 mod correlation_schema;
 use correlation_schema::{
-    ensure_attested_finding_batch_tenant_keys, table_has_foreign_key_violation,
-    upgrade_correlation_ingress_pending_index, validate_attested_finding_batch_tenant_keys,
+    table_has_foreign_key_violation, validate_attested_finding_batch_tenant_keys,
     validate_correlation_durable_schema,
 };
 
@@ -794,8 +792,8 @@ use declassification_codec::{
 
 mod declassification_schema;
 use declassification_schema::{
-    prepare_declassification_schema_migration, validate_declassification_evidence_integrity,
-    validate_declassification_evidence_schema, DECLASSIFICATION_READINESS_CURSOR,
+    validate_declassification_evidence_integrity, validate_declassification_evidence_schema,
+    DECLASSIFICATION_READINESS_CURSOR,
 };
 
 mod dispatch;
@@ -830,10 +828,11 @@ mod response_outbox;
 
 mod response_schema;
 use response_schema::{
-    attested_finding_response_outbox_is_one_to_one, ensure_attested_finding_response_outbox_schema,
-    ensure_lineage_fence_binding_columns, ensure_response_dispatch_commit_mode_column,
-    ensure_response_effect_generation_column, ensure_scheduler_lease_body_hash_column,
-    ensure_scheduler_retry_health_columns, ATTESTED_FINDING_RESPONSE_OUTBOX_CANONICAL_DDL,
+    attested_finding_response_outbox_is_one_to_one, create_attested_finding_response_outbox_schema,
+    validate_attested_finding_response_outbox_schema, validate_lineage_fence_binding_columns,
+    validate_response_dispatch_commit_mode_column, validate_response_effect_generation_column,
+    validate_scheduler_lease_body_hash_column, validate_scheduler_retry_health_columns,
+    ATTESTED_FINDING_RESPONSE_OUTBOX_CANONICAL_DDL,
     ATTESTED_FINDING_RESPONSE_OUTBOX_DELETE_TRIGGER_DDL,
     ATTESTED_FINDING_RESPONSE_OUTBOX_DUE_INDEX_DDL,
     ATTESTED_FINDING_RESPONSE_OUTBOX_IMMUTABLE_TRIGGER_DDL,
@@ -847,7 +846,7 @@ use scheduler::{
 };
 
 mod schema;
-use schema::migrate;
+use schema::open_schema;
 
 mod session_throttle;
 use session_throttle::load_session_throttle_snapshot;

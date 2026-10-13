@@ -1,4 +1,4 @@
-//! Explicit retirement of legacy flow and declassification writers. A source
+//! Explicit retirement of flow and declassification writers. A source
 //! fingerprint is not an admission owner, transferred inventory or activation.
 
 use crate::store_connection::StoreConnection;
@@ -36,6 +36,8 @@ pub enum SecurityParticipantSourceError {
     Invalid(&'static str),
     #[error("security participant source SQLite operation failed: {0}")]
     Storage(#[from] rusqlite::Error),
+    #[error("security participant source schema is refused: {0}")]
+    Schema(#[from] crate::SchemaVersionError),
     #[error("security participant source file operation failed: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -62,7 +64,7 @@ impl std::fmt::Debug for SecurityParticipantSourceSeal {
     }
 }
 
-/// Migration-only I/O for an existing source. No legacy writer or underlying
+/// Migration-only I/O for an existing source. No writer or underlying
 /// connection is exposed. Opening never migrates, prunes, stamps or creates it.
 ///
 /// This is not a serving store. Retirement requires operator quiescence and a
@@ -186,9 +188,9 @@ impl SqliteSecurityParticipantSource {
     }
 
     /// Permanently retire exactly the expected source. Operators must quiesce
-    /// every legacy consumer first. This cannot retract already admitted work,
+    /// every source consumer first. This cannot retract already admitted work,
     /// transfer ownership, or qualify an independent destination automatically.
-    /// Resolve uncertain commits by load/verify, never by resuming old writers.
+    /// Resolve uncertain commits by load/verify, never by resuming retired writers.
     pub fn seal_exact(
         &self,
         expected: &SecurityParticipantSourceSnapshot,

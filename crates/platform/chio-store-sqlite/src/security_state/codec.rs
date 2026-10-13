@@ -21,10 +21,14 @@ pub(super) fn sqlite_error(error: rusqlite::Error) -> PortError {
 pub(super) fn schema_version_error(error: crate::SchemaVersionError) -> PortError {
     match error {
         crate::SchemaVersionError::Sqlite(error) => sqlite_error(error),
+        error @ crate::SchemaVersionError::StaleSchema { .. } => PortError::with_source(
+            chio_security_types::ports::PortErrorKind::IntegrityFailure,
+            "store.integrity_failure",
+            error,
+        ),
         crate::SchemaVersionError::ForeignDatabase { .. }
         | crate::SchemaVersionError::MismatchedStore { .. }
-        | crate::SchemaVersionError::FutureSchema { .. }
-        | crate::SchemaVersionError::StaleSchema { .. } => PortError::integrity_failure(),
+        | crate::SchemaVersionError::FutureSchema { .. } => PortError::integrity_failure(),
     }
 }
 

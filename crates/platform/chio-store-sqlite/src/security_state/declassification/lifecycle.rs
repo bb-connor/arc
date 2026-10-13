@@ -14,7 +14,7 @@ pub(super) fn verify(connection: ScopedReader<'_>) -> PortResult<()> {
             ))
         })
         .map_err(sqlite_error)?;
-    if lifecycle.0 != 2
+    if lifecycle.0 != 1
         || lifecycle.1 != DECLASSIFICATION_READINESS_CURSOR
         || !matches!(lifecycle.2, 0 | 1)
         || !matches!(lifecycle.3, 0 | 1)
