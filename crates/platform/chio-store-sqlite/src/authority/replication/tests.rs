@@ -149,7 +149,9 @@ fn unsigned_substituted_stale_conflicting_and_unpinned_state_leave_every_table_u
                     public_key_hex: attacker.public_key().to_hex(),
                     generation: 1,
                     activated_at: 99,
-                    lifecycle: chio_kernel::authority::lifecycle::AuthorityKeyLifecycle::Retired { at: 99 },
+                    lifecycle: chio_kernel::authority::lifecycle::AuthorityKeyLifecycle::Retired {
+                        at: 99,
+                    },
                 },
             );
         } else if fault == "head" {

@@ -316,8 +316,10 @@ fn kg2_authority_wire_without_explicit_lifecycle_is_refused() -> TestResult {
     assert_eq!(error.to_string(), "missing field `lifecycle`");
     let mut foreign = anchor.clone();
     foreign.schema = "chio.authority-replication-anchor.v2".into();
-    assert!(matches!(foreign.validate(), Err(chio_kernel::AuthorityStoreError::Fence(message))
-        if message == "invalid replication anchor domain"));
+    assert!(
+        matches!(foreign.validate(), Err(chio_kernel::AuthorityStoreError::Fence(message))
+        if message == "invalid replication anchor domain")
+    );
     Ok(())
 }
 

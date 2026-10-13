@@ -268,12 +268,8 @@ pub fn verify_authority_chain(
             return Err(refused("authority transition signature invalid"));
         }
         require_distinct_recovery_root(anchor, &body.public_key_hex)?;
-        state = apply_lifecycle_change(
-            &state,
-            &body.change,
-            &body.public_key_hex,
-            body.rotated_at,
-        )?;
+        state =
+            apply_lifecycle_change(&state, &body.change, &body.public_key_hex, body.rotated_at)?;
         if digest(&state.trusted_keys)? != body.issuer_set_digest {
             return Err(refused("authority issuer-set digest mismatch"));
         }
