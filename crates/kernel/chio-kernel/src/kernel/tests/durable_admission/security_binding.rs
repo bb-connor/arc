@@ -235,13 +235,33 @@ fn adding_security_context_cannot_recover_an_unbound_terminal() -> TestResult {
 }
 
 #[test]
-fn security_binding_preserves_large_ordinary_requests() -> TestResult {
-    let (kernel, mut request, _, invocations) = durable_admission_fixture("security-large");
+fn security_bound_oversized_request_is_refused_before_admission() -> TestResult {
+    let (kernel, mut request, store, invocations) = durable_admission_fixture("security-large");
     request.arguments["payload"] = serde_json::json!("x".repeat(262_145));
+    let receipts = kernel.receipt_log().len();
     let response = kernel
         .evaluate_tool_call_blocking_with_security_context(&request, &context(&request, 1)?)?;
-    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("durable admission failed: admission operation invariant failed: retained request exceeds its artifact bound")
+    );
+    assert!(response.output.is_none());
+    assert!(response.receipt.verify_signature()?);
+    assert_eq!(
+        response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/identity_disposition"))
+            .and_then(serde_json::Value::as_str),
+        Some("reusable"),
+    );
+    assert_eq!(kernel.receipt_log().len(), receipts + 1);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    let state = store.state.lock().map_err(|_| "test lock")?;
+    assert!(state.operation.is_none());
+    assert!(state.retained_request.is_none());
     Ok(())
 }
 

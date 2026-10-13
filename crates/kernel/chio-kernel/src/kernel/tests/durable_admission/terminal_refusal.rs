@@ -408,7 +408,7 @@ fn compensation_refuses_financial_metadata_outside_the_original_grants() -> Test
             matches!(error, KernelError::DurableAdmission(ref reason) if reason == expected),
             "{error:?}"
         );
-        assert_eq!(store.operation().state(), AdmissionOperationState::Prepared);
+        assert_eq!(&store.operation(), admission.operation());
         assert!(store
             .state
             .lock()
