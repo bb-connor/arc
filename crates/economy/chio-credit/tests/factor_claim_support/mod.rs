@@ -33,8 +33,8 @@ use chio_credit::obligation::{
     VerifiedObligationStatusProofV1,
 };
 use chio_credit::{
-    CreditEvaluatorHook, IouEnvelopeCryptoFloorV2, IouEnvelopeIssuerTrustV2,
-    IouEnvelopeMintContextV2, IouEnvelopeReceiptTrustV2, LocalCreditAccount,
+    CreditEvaluatorHook, LocalCreditAccount, ReceivableIouCryptoFloor, ReceivableIouIssuerTrust,
+    ReceivableIouMintContext, ReceivableIouReceiptTrust,
 };
 use credit_admission_support::{
     CreditAdmissionInput, PreparedCreditAdmission, TestCreditAdmissionStore,
@@ -182,16 +182,16 @@ pub fn build_claim_evidence() -> SupportResult<ClaimEvidence> {
         },
     )?;
     let receipt_trust =
-        IouEnvelopeReceiptTrustV2::new([kernel_key.clone()], ReceiptCryptoFloor::AllowClassical);
+        ReceivableIouReceiptTrust::new([kernel_key.clone()], ReceiptCryptoFloor::AllowClassical);
     let issuer = Keypair::from_seed(&[112; 32]);
     let issuer_key = issuer.public_key();
     let account = LocalCreditAccount::new_with_receipt_trust(
         Ed25519Backend::new(issuer),
         receipt_trust.clone(),
     );
-    let signed_iou = account.mint_obligation_iou_v2(
+    let signed_iou = account.mint_receivable_iou(
         &credit_admission_store.adapter(),
-        &IouEnvelopeMintContextV2 {
+        &ReceivableIouMintContext {
             atom: &atom,
             disposition: &disposition,
             settlement_lifecycle: &settlement_lifecycle,
@@ -225,11 +225,11 @@ pub fn build_claim_evidence() -> SupportResult<ClaimEvidence> {
         built_at_unix_ms: CLAIM_BUILT_AT,
     })?;
     let claim_bytes = claim.canonical_bytes()?;
-    let issuer_trust = IouEnvelopeIssuerTrustV2::new(
+    let issuer_trust = ReceivableIouIssuerTrust::new(
         IOU_ISSUER_ID.to_owned(),
         IOU_ISSUER_EPOCH,
         issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     let trust = ReceivableClaimTrustV1::new(
         &status_trust,

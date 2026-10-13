@@ -27,9 +27,9 @@ pub mod factor;
 pub mod financial_credentials;
 pub mod formal_economy;
 pub mod hook;
-pub mod iou_v2;
 pub mod local_account;
 pub mod obligation;
+pub mod receivable_iou;
 pub mod risk_reports;
 pub mod store_binding;
 
@@ -39,13 +39,13 @@ mod kani_public_harnesses;
 pub use hook::{
     CreditEvaluatorError, CreditEvaluatorHook, IouEnvelope, IouEnvelopeBody, IOU_ENVELOPE_SCHEMA,
 };
-pub use iou_v2::{
-    verify_iou_envelope_v2, IouEnvelopeBodyV2, IouEnvelopeCryptoFloorV2, IouEnvelopeIssuerTrustV2,
-    IouEnvelopeMintContextV2, IouEnvelopeReceiptTrustV2, IouEnvelopeV2Error,
-    IouEnvelopeVerificationContextV2, SignedIouEnvelopeV2, VerifiedIouEnvelopeV2,
+pub use local_account::LocalCreditAccount;
+pub use receivable_iou::{
+    verify_receivable_iou, ReceivableIouBody, ReceivableIouCryptoFloor, ReceivableIouError,
+    ReceivableIouIssuerTrust, ReceivableIouMintContext, ReceivableIouReceiptTrust,
+    ReceivableIouVerificationContext, SignedReceivableIou, VerifiedReceivableIou,
     CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA, RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA,
 };
-pub use local_account::LocalCreditAccount;
 pub use risk_reports::{
     CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport, CreditBacktestSummary,
     CreditBacktestWindow, CreditCertificationState, CreditLossLifecycleArtifact,

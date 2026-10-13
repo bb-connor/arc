@@ -45,9 +45,9 @@ execution-window coverage, and custody-provider approval.
   allowed receipt with nonzero financial metadata produces an IOU.
 - `LocalCreditAccount::new` starts with an empty trusted kernel key set. Use an
   explicit trust constructor before receipt evaluation.
-- `verify_iou_envelope_v2` checks issuer trust, receipt and obligation bindings,
+- `verify_receivable_iou` checks issuer trust, receipt and obligation bindings,
   the embedded three-party facility bind, and a matching committed admission.
-  `SignedIouEnvelopeV2::from_canonical_bytes` only decodes and validates shape.
+  `SignedReceivableIou::from_canonical_bytes` only decodes and validates shape.
 - `IouEnvelopeStore` requires idempotent insertion by receipt ID and conflict
   rejection. Its backend must implement persistence and concurrent-write safety.
 

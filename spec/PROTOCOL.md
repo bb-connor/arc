@@ -402,7 +402,7 @@ Their registry kinds are `obligation_status_proof`, `credit_iou_envelope`,
 introduced by `receivables-factoring-v1`. Their envelope schemas are published
 under `spec/schemas/chio-economy/`.
 
-The v2 IOU envelope embeds the exact signed facility bind. Its
+The receivable IOU envelope embeds the exact signed facility bind. Its
 `creditAuthorityDigest` MUST equal the SHA-256 digest of the canonical embedded
 bind and MUST match the credit authority digest in the source receipt and
 obligation atom. A receipt, audit log, anchor, or partition lease does not

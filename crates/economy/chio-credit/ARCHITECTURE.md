@@ -20,7 +20,7 @@ in `chio-store-sqlite`. The crate has no settlement network client.
   minting; `store_binding` defines insertion and lookup errors.
 - `obligation` owns atoms, dispositions, status proofs, facility binds, and
   credit-admission authority resolution and reservation records.
-- `iou_v2` binds a receivable envelope to receipt, obligation, settlement
+- `receivable_iou` binds a receivable envelope to receipt, obligation, settlement
   lifecycle, facility signatures, and committed admission evidence.
 - `factor` owns normalized assignment requests, claims, offers, quotes, signed
   authorizations, and assignment results.
@@ -60,8 +60,8 @@ time, scope, amount, and issuer key.
 
 `verify_credit_facility_bind` checks configured authority, debtor, and creditor
 keys and epochs, all three signatures, the lifetime ceiling, and current time.
-`SignedIouEnvelopeV2::from_canonical_bytes` performs bounded canonical decoding
-and body validation. `verify_iou_envelope_v2` adds signatures, crypto floors,
+`SignedReceivableIou::from_canonical_bytes` performs bounded canonical decoding
+and body validation. `verify_receivable_iou` adds signatures, crypto floors,
 role separation, exact source bindings, and committed store evidence.
 
 `CreditAdmissionStoreAdapter::lookup_committed_by_operation` validates operation
@@ -90,7 +90,7 @@ boundary-specific failures.
 
 `cargo test -p chio-credit` exercises local minting, original-byte readers,
 credit admission, facility binds, receivable IOUs, factoring, clearing, and
-capital contracts. `tests/iou_v2.rs` covers exact committed admission, source
+capital contracts. `tests/receivable_iou.rs` covers exact committed admission, source
 request binding, role-key reuse, payee substitution, and crypto-floor rejection.
 `tests/credit_facility_bind.rs` checks role signatures and lifetime boundaries.
 `tests/clearing_lifecycle.rs` checks finalization/abort competition, effect
