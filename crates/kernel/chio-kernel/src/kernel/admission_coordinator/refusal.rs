@@ -468,7 +468,10 @@ impl ChioKernel {
             || receipt.capability_id != request.capability.id
             || receipt.tool_server != request.server_id
             || receipt.tool_name != request.tool_name
-            || receipt.action != action
+            || canonical_json_bytes(&receipt.action)
+                .map_err(chio_core::canonical::UntrustedJsonError::Canonicalization)?
+                != canonical_json_bytes(&action)
+                    .map_err(chio_core::canonical::UntrustedJsonError::Canonicalization)?
             || receipt.policy_hash != operation.binding().policy_hash().as_str()
             || receipt.tenant_id.as_deref() != tenant
             || receipt.content_hash != receipt_content_for_output(None, None)?.content_hash
