@@ -7,8 +7,9 @@ use chio_core_types::receipt::kinds::{
 };
 use chio_core_types::receipt::security::{
     active_defense_body_digest, active_defense_evidence_id, ActiveDefenseReceiptBody,
-    ActiveDefenseReceiptKind,
+    ActiveDefenseReceiptKind, ActiveDefenseReceiptValidationError,
 };
+use chio_test_support::prelude::*;
 use serde_json::{json, Value};
 
 const OCCURRED_AT_UNIX_MS: u64 = 1_700_000_000_123;
@@ -850,6 +851,91 @@ fn completion_dispatch_proofs_require_an_exact_nonzero_paired_binding() {
             json!(1);
         governed["body"]["execution_dispatch"]["approval"]["approval_set_hash"] = digest(0);
         assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(governed).is_err());
+    }
+}
+
+#[test]
+fn completion_dispatch_proofs_reject_missing_artifact_fingerprints() {
+    let expected: serde_json::Error =
+        serde::de::Error::missing_field("admission_artifact_fingerprint");
+    for kind in [
+        ActiveDefenseReceiptKind::ResponseCompletion,
+        ActiveDefenseReceiptKind::LiftRollbackCompletion,
+    ] {
+        let mut value = fixture(kind);
+        let mut dispatch = execution_dispatch_binding();
+        dispatch
+            .as_object_mut()
+            .test_expect("dispatch binding is an object")
+            .remove("admission_artifact_fingerprint");
+        value["body"]["execution_dispatch"] = dispatch;
+        value["body"]["dispatch_authorization_hash"] = digest(43);
+        let error = serde_json::from_value::<ActiveDefenseReceiptBody>(value)
+            .test_expect_err("dispatch proofs require an artifact fingerprint");
+        assert_eq!(error.classify(), serde_json::error::Category::Data);
+        assert_eq!(error.to_string(), expected.to_string(), "{kind:?}");
+    }
+}
+
+#[test]
+fn completion_dispatch_proofs_reject_null_artifact_fingerprints() {
+    let expected = serde_json::from_value::<chio_security_types::ports::Digest32>(Value::Null)
+        .test_expect_err("an artifact fingerprint is a digest array");
+    for kind in [
+        ActiveDefenseReceiptKind::ResponseCompletion,
+        ActiveDefenseReceiptKind::LiftRollbackCompletion,
+    ] {
+        let mut value = fixture(kind);
+        value["body"]["execution_dispatch"] = execution_dispatch_binding();
+        value["body"]["execution_dispatch"]["admission_artifact_fingerprint"] = Value::Null;
+        value["body"]["dispatch_authorization_hash"] = digest(43);
+        let error = serde_json::from_value::<ActiveDefenseReceiptBody>(value)
+            .test_expect_err("dispatch artifact fingerprints cannot be null");
+        assert_eq!(error.classify(), serde_json::error::Category::Data);
+        assert_eq!(error.to_string(), expected.to_string(), "{kind:?}");
+    }
+}
+
+#[test]
+fn completion_dispatch_proofs_reject_zero_fingerprints_and_unsupported_schemas() {
+    for kind in [
+        ActiveDefenseReceiptKind::ResponseCompletion,
+        ActiveDefenseReceiptKind::LiftRollbackCompletion,
+    ] {
+        for (schema_version, fingerprint) in [(1, digest(0)), (2, digest(44))] {
+            let mut value = fixture(kind);
+            value["body"]["execution_dispatch"] = execution_dispatch_binding();
+            value["body"]["execution_dispatch"]["schema_version"] = json!(schema_version);
+            value["body"]["execution_dispatch"]["admission_artifact_fingerprint"] = fingerprint;
+            value["body"]["dispatch_authorization_hash"] = digest(43);
+            let body = match kind {
+                ActiveDefenseReceiptKind::ResponseCompletion => {
+                    ActiveDefenseReceiptBody::ResponseCompletion(
+                        serde_json::from_value(value["body"].clone())
+                            .test_expect("response completion fields decode"),
+                    )
+                }
+                ActiveDefenseReceiptKind::LiftRollbackCompletion => {
+                    ActiveDefenseReceiptBody::LiftRollbackCompletion(
+                        serde_json::from_value(value["body"].clone())
+                            .test_expect("lift completion fields decode"),
+                    )
+                }
+                _ => panic!("expected a completion receipt kind"),
+            };
+            assert_eq!(
+                body.validate(),
+                Err(ActiveDefenseReceiptValidationError::InvalidResponseDispatchBinding),
+                "{kind:?}, schema {schema_version}"
+            );
+            let error = serde_json::from_value::<ActiveDefenseReceiptBody>(value)
+                .test_expect_err("invalid dispatch proofs cannot decode as receipts");
+            assert_eq!(
+                error.to_string(),
+                ActiveDefenseReceiptValidationError::InvalidResponseDispatchBinding.to_string(),
+                "{kind:?}, schema {schema_version}"
+            );
+        }
     }
 }
 

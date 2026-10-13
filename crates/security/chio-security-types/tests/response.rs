@@ -689,22 +689,14 @@ fn fresh_live_admission_refuses_simulated_plans() {
 }
 
 #[test]
-fn prepared_dispatch_binding_requires_exact_artifact_schema_pairing() {
+fn prepared_dispatch_binding_requires_v1_and_nonzero_artifact_fingerprint() {
     let plan = valid_response_plan();
     let valid = valid_prepared_dispatch_binding(&plan);
-    let mut absent = valid.clone();
-    absent.admission_artifact_fingerprint = None;
+    assert_eq!(valid.validate_for_plan(&plan), Ok(()));
+    let mut retired = valid.clone();
+    retired.schema_version = 2;
     assert_eq!(
-        absent.validate_for_plan(&plan),
-        Err(chio_security_types::ports::PreparedActiveResponseDispatchBindingError)
-    );
-    let mut legacy = absent;
-    legacy.schema_version = 1;
-    assert_eq!(legacy.validate_for_plan(&plan), Ok(()));
-    let mut legacy_bound = valid.clone();
-    legacy_bound.schema_version = 1;
-    assert_eq!(
-        legacy_bound.validate_for_plan(&plan),
+        retired.validate_for_plan(&plan),
         Err(chio_security_types::ports::PreparedActiveResponseDispatchBindingError)
     );
     let mut zero = valid;

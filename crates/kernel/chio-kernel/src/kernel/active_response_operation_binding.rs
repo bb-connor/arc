@@ -184,3 +184,46 @@ pub(super) fn bind_active_response_operation_request_hash_to_artifact(
     bytes.extend_from_slice(&canonical);
     Ok(sha256_hex(&bytes))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn anchor_value() -> serde_json::Value {
+        serde_json::json!({
+            "planHash": "01".repeat(32),
+            "executorAuthorityId": "02".repeat(32),
+            "executorAuthorityGeneration": 1,
+            "authorizedAtUnixMs": 10,
+            "authorizationCapabilityHash": "03".repeat(32),
+            "governedIntentHash": "04".repeat(32),
+            "policyDecisionHash": "05".repeat(32),
+            "approvalSetHash": "06".repeat(32),
+        })
+    }
+
+    #[test]
+    fn operation_anchor_requires_artifact_fingerprint() {
+        let error = serde_json::from_value::<ActiveResponseOperationAnchor>(anchor_value())
+            .err().map(|error| error.to_string());
+        assert_eq!(error.as_deref(), Some("missing field `admissionArtifactFingerprint`"));
+    }
+
+    #[test]
+    fn operation_anchor_rejects_null_artifact_fingerprint() {
+        let mut value = anchor_value();
+        value["admissionArtifactFingerprint"] = serde_json::Value::Null;
+        let error = serde_json::from_value::<ActiveResponseOperationAnchor>(value)
+            .err().map(|error| error.to_string());
+        assert_eq!(error.as_deref(), Some("invalid type: null, expected an array of length 32"));
+    }
+
+    #[test]
+    fn operation_anchor_rejects_zero_artifact_fingerprint() {
+        let mut value = anchor_value();
+        value["admissionArtifactFingerprint"] = serde_json::json!(vec![0; 32]);
+        let anchor: ActiveResponseOperationAnchor = serde_json::from_value(value)
+            .unwrap_or_else(|error| panic!("anchor decode failed: {error}"));
+        assert!(!anchor.is_valid());
+    }
+}
