@@ -211,12 +211,8 @@ async fn terminate_unserved(
         terminal_at,
         terminal_reason: None,
     };
-    let envelope = record
-        .resume_integrity
-        .envelope
-        .max(sessions.lifecycle_policy.resume_envelope_floor);
     let (tombstone, fence) =
-        sign_terminal_session_records(keyring, diagnostic, reason, envelope, epoch, epoch)?;
+        sign_terminal_session_records(keyring, diagnostic, reason, epoch, epoch)?;
     prepare_terminal_session_transition(path, &fence, &tombstone, keyring, terminal_at)?;
     finalize_terminal_session_transition(path, &tombstone, keyring, terminal_at)?;
     sessions

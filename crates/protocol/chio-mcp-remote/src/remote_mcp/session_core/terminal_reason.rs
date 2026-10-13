@@ -25,15 +25,6 @@ impl TerminalReason {
             }
         }
     }
-
-    /// A `v2` record has no reason field, so only the `v3` envelope can say
-    /// which subscription failure ended the session.
-    pub(super) fn requires_v3(self) -> bool {
-        matches!(
-            self,
-            Self::SubscriptionNotRestored | Self::SubscriptionAuthorityLost
-        )
-    }
 }
 
 #[derive(Serialize)]
@@ -52,21 +43,17 @@ struct RemoteSessionTerminalFenceIntegrityEnvelope<'a> {
     session_id: &'a str,
     terminal_at: u64,
     terminal_state: RemoteSessionState,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    terminal_reason: Option<TerminalReason>,
+    terminal_reason: TerminalReason,
     resume_generation: u64,
     terminal_epoch: u64,
     key_id: &'a str,
     key_version: u64,
 }
 
-/// Signs the terminal pair under `envelope`, raised to `v3` when only `v3`
-/// can carry `reason`. A `v2` pair records no reason.
 pub(super) fn sign_terminal_session_records(
     keyring: &RemoteSessionHmacKeyring,
     mut record: RemoteSessionDiagnosticRecord,
     reason: TerminalReason,
-    envelope: RemoteSessionEnvelope,
     resume_generation: u64,
     terminal_epoch: u64,
 ) -> Result<(RemoteSessionTombstoneRecord, RemoteSessionTerminalFence), CliError> {
@@ -83,14 +70,8 @@ pub(super) fn sign_terminal_session_records(
             record.lifecycle.state.as_str()
         )));
     }
-    let envelope = if reason.requires_v3() {
-        RemoteSessionEnvelope::V3
-    } else {
-        envelope
-    };
-    record.terminal_reason = (envelope == RemoteSessionEnvelope::V3).then_some(reason);
-    let mut integrity = keyring.empty_tag_for_current();
-    integrity.envelope = envelope;
+    record.terminal_reason = Some(reason);
+    let integrity = keyring.empty_tag_for_current();
     let mut tombstone = RemoteSessionTombstoneRecord {
         record,
         resume_generation,
@@ -103,7 +84,7 @@ pub(super) fn sign_terminal_session_records(
         session_id: tombstone.record.session_id.clone(),
         terminal_at: tombstone.record.terminal_at,
         terminal_state: tombstone.record.lifecycle.state,
-        terminal_reason: tombstone.record.terminal_reason,
+        terminal_reason: reason,
         resume_generation,
         terminal_epoch,
         resume_integrity: integrity,
@@ -117,10 +98,7 @@ pub(super) fn compute_terminal_tombstone_integrity_tag(
     tombstone: &RemoteSessionTombstoneRecord,
 ) -> Result<String, CliError> {
     let envelope = RemoteSessionTombstoneIntegrityEnvelope {
-        schema: match tombstone.resume_integrity.envelope {
-            RemoteSessionEnvelope::V2 => "chio.remote-mcp.terminal-tombstone-integrity.v2",
-            RemoteSessionEnvelope::V3 => "chio.remote-mcp.terminal-tombstone-integrity.v3",
-        },
+        schema: "chio.remote-mcp.terminal-tombstone-integrity.v1",
         record: &tombstone.record,
         resume_generation: tombstone.resume_generation,
         terminal_epoch: tombstone.terminal_epoch,
@@ -140,10 +118,7 @@ pub(super) fn compute_terminal_fence_integrity_tag(
     fence: &RemoteSessionTerminalFence,
 ) -> Result<String, CliError> {
     let envelope = RemoteSessionTerminalFenceIntegrityEnvelope {
-        schema: match fence.resume_integrity.envelope {
-            RemoteSessionEnvelope::V2 => "chio.remote-mcp.terminal-fence-integrity.v2",
-            RemoteSessionEnvelope::V3 => "chio.remote-mcp.terminal-fence-integrity.v3",
-        },
+        schema: "chio.remote-mcp.terminal-fence-integrity.v1",
         session_id: &fence.session_id,
         terminal_at: fence.terminal_at,
         terminal_state: fence.terminal_state,
@@ -161,20 +136,6 @@ pub(super) fn compute_terminal_fence_integrity_tag(
     )
 }
 
-/// A `v2` terminal record carries no reason; a `v3` one carries exactly the
-/// reason its terminal state permits.
-pub(super) fn terminal_reason_fits(
-    envelope: RemoteSessionEnvelope,
-    reason: Option<TerminalReason>,
-    state: RemoteSessionState,
-) -> bool {
-    match (envelope, reason) {
-        (RemoteSessionEnvelope::V2, None) => true,
-        (RemoteSessionEnvelope::V3, Some(reason)) => reason.state() == state,
-        _ => false,
-    }
-}
-
 pub(super) fn validate_terminal_tombstone_integrity(
     keyring: &RemoteSessionHmacKeyring,
     tombstone: &RemoteSessionTombstoneRecord,
@@ -187,11 +148,10 @@ pub(super) fn validate_terminal_tombstone_integrity(
             tombstone.record.lifecycle.state,
             RemoteSessionState::Deleted | RemoteSessionState::Expired | RemoteSessionState::Closed
         )
-        || !terminal_reason_fits(
-            tombstone.resume_integrity.envelope,
-            tombstone.record.terminal_reason,
-            tombstone.record.lifecycle.state,
-        )
+        || tombstone
+            .record
+            .terminal_reason
+            .is_none_or(|reason| reason.state() != tombstone.record.lifecycle.state)
     {
         return Err(CliError::cli_other_error(format!(
             "stored MCP session {} has an invalid terminal generation or state",
@@ -227,11 +187,7 @@ pub(super) fn validate_terminal_fence_integrity(
             fence.terminal_state,
             RemoteSessionState::Deleted | RemoteSessionState::Expired | RemoteSessionState::Closed
         )
-        || !terminal_reason_fits(
-            fence.resume_integrity.envelope,
-            fence.terminal_reason,
-            fence.terminal_state,
-        )
+        || fence.terminal_reason.state() != fence.terminal_state
     {
         return Err(CliError::cli_other_error(format!(
             "stored MCP session {} has an invalid terminal fence generation",

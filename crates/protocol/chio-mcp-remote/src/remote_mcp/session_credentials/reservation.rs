@@ -12,7 +12,7 @@ pub(crate) fn rollback_not_enqueued_call(
 }
 
 fn rollback_at(path: &FsPath, keypair: &Keypair, pending: &CredentialCall) -> Result<(), Response> {
-    if pending.state != "pending" || pending.reservation_id.is_none() {
+    if pending.state != "pending" {
         return Err(fence_error());
     }
     let mut conn = open_db(path).map_err(storage_error)?;
@@ -122,7 +122,6 @@ mod tests {
                 reaper_interval_millis: DEFAULT_SESSION_REAPER_INTERVAL_MILLIS,
                 tombstone_retention_millis: DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS,
                 request_response_timeout_millis: DEFAULT_REQUEST_RESPONSE_TIMEOUT_MILLIS,
-                resume_envelope_floor: RemoteSessionEnvelope::V3,
             },
             protocol_version: None,
             peer_capabilities: None,
@@ -165,57 +164,6 @@ mod tests {
             reserve_at(&path, &keypair, &credential, &request, 100),
             Ok(CallReservation::Pending(_))
         ));
-        Ok(())
-    }
-
-    #[test]
-    fn legacy_signed_row_without_reservation_id_preserves_its_canonical_bytes_and_fence(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let directory = chio_test_support::private_tempdir()?;
-        let path = directory.path().join("sessions.sqlite3");
-        let _lease = crate::tests::acquire_test_session_store(&path);
-        let keypair = Keypair::generate();
-        let credential = super::super::tests::record();
-        let request = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
-            "name":"write_file","arguments":{},"_meta":{"chioRequestId":"legacy-pending"}}});
-        let Ok(CallReservation::Pending(pending)) =
-            reserve_at(&path, &keypair, &credential, &request, 100)
-        else {
-            return Err("pending reservation failed".into());
-        };
-        // Sign the historical JSON shape itself, which has no new field. This
-        // is retained signed data, not a new-type signature accepted by fiat.
-        let mut legacy_body = serde_json::to_value(&pending)?;
-        legacy_body
-            .as_object_mut()
-            .ok_or("legacy call object")?
-            .remove("reservationId");
-        let encoded = serde_json::to_string(&legacy_body)?;
-        let (signature, legacy_bytes) = keypair.sign_canonical(&legacy_body)?;
-        let conn = open_db(&path)?;
-        for table in [CALL_TABLE, LATCH_TABLE] {
-            conn.execute(
-                &format!("UPDATE {table} SET record_json=?1,signature=?2 WHERE session_id=?3 AND request_id=?4"),
-                params![encoded, signature.to_hex(), pending.session_id, pending.request_id],
-            )?;
-        }
-        let reopened = read_latch(&conn, &keypair, &credential.session_id)
-            .map_err(|_| "legacy signed latch read")?
-            .ok_or("legacy signed latch missing")?;
-        assert!(reopened.reservation_id.is_none());
-        assert_eq!(canonical_json_bytes(&reopened)?, legacy_bytes);
-        assert!(keypair
-            .public_key()
-            .verify(&canonical_json_bytes(&reopened)?, &signature));
-        assert!(!input::encode_session(&reopened)?.contains("reservationId"));
-        assert!(rollback_at(&path, &keypair, &reopened).is_err());
-        let retained: (String, String) = conn.query_row(
-            &format!("SELECT record_json,signature FROM {LATCH_TABLE} WHERE session_id=?1"),
-            [&credential.session_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )?;
-        assert_eq!(retained, (encoded, signature.to_hex()));
-        assert!(reserve_at(&path, &keypair, &credential, &request, 100).is_err());
         Ok(())
     }
 

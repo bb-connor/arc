@@ -238,6 +238,7 @@ impl RemoteSessionLedger {
             record.lifecycle.last_seen_at = terminal_at;
             record.lifecycle.drain_deadline_at = None;
             record.terminal_at = terminal_at;
+            record.terminal_reason = Some(reason);
             let durable_tombstone = if let Some(path) = self.tombstone_db_path.as_deref() {
                 session.ensure_session_store_owned()?;
                 let keyring = self.resume_hmac_keyring.as_deref().ok_or_else(|| {
@@ -251,11 +252,9 @@ impl RemoteSessionLedger {
                     keyring,
                     record.clone(),
                     reason,
-                    session.resume_envelope.current(),
                     terminal_epoch,
                     terminal_epoch,
                 )?;
-                record.terminal_reason = tombstone.record.terminal_reason;
                 prepare_terminal_session_transition(path, &fence, &tombstone, keyring, terminal_at)?;
                 Some((path, keyring, tombstone))
             } else {
