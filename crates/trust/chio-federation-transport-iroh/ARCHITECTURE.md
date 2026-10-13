@@ -34,7 +34,7 @@ content downloads use `iroh_blobs::ALPN`.
 
 ## Data and control flow
 
-1. `verify_bundle` checks the v2 directory body and canonical directory digest
+1. `verify_bundle` checks the directory body and canonical directory digest
    against caller-supplied issuer and rollback pins. Active entries must carry
    domain-separated passport endorsements for their endpoints and oracle keys.
 2. The resulting directory derives endpoint, passport, oracle-signer, and
