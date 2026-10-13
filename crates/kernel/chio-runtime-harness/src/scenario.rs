@@ -2,13 +2,6 @@
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct RuntimeLoopbackScenario {
     pub(crate) run_id: String,
-    #[serde(default)]
-    pub(crate) admission_profile: Option<chio_runtime_core::RuntimeAdmissionProfile>,
-    #[serde(default)]
-    pub(crate) admission_bundle: Option<chio_runtime_core::RuntimeAdmissionBundle>,
-    #[serde(default)]
-    pub(crate) request: Option<chio_runtime_core::RuntimeRequestBinding>,
-    #[serde(default)]
     pub(crate) steps: Vec<RuntimeLoopbackStep>,
 }
 
@@ -25,49 +18,17 @@ pub(crate) struct RuntimeLoopbackStep {
 pub(crate) fn normalize_runtime_loopback_steps(
     scenario: RuntimeLoopbackScenario,
 ) -> Result<(String, Vec<RuntimeLoopbackStep>), crate::RuntimeLoopbackError> {
-    let RuntimeLoopbackScenario {
-        run_id,
-        admission_profile,
-        admission_bundle,
-        request,
-        steps,
-    } = scenario;
+    let RuntimeLoopbackScenario { run_id, steps } = scenario;
     if run_id.is_empty() || run_id.trim() != run_id {
         return Err(crate::RuntimeLoopbackError::message(
             "Chio runtime loopback scenario runId must be non-empty and unpadded".to_string(),
         ));
     }
-    let steps = if steps.is_empty() {
-        let admission_profile = admission_profile.ok_or_else(|| {
-            crate::RuntimeLoopbackError::message(
-                "Chio runtime loopback scenario missing admissionProfile".to_string(),
-            )
-        })?;
-        let admission_bundle = admission_bundle.ok_or_else(|| {
-            crate::RuntimeLoopbackError::message(
-                "Chio runtime loopback scenario missing admissionBundle".to_string(),
-            )
-        })?;
-        let request = request.ok_or_else(|| {
-            crate::RuntimeLoopbackError::message(
-                "Chio runtime loopback scenario missing request".to_string(),
-            )
-        })?;
-        vec![RuntimeLoopbackStep {
-            admission_profile,
-            admission_bundle,
-            request,
-            arguments: None,
-        }]
-    } else {
-        if admission_profile.is_some() || admission_bundle.is_some() || request.is_some() {
-            return Err(crate::RuntimeLoopbackError::message(
-                "Chio runtime loopback scenario cannot mix top-level admission fields with steps"
-                    .to_string(),
-            ));
-        }
-        steps
-    };
+    if steps.is_empty() {
+        return Err(crate::RuntimeLoopbackError::message(
+            "Chio runtime loopback scenario requires at least one step".to_string(),
+        ));
+    }
     Ok((run_id, steps))
 }
 
@@ -120,22 +81,9 @@ mod tests {
         }
     }
 
-    fn runtime_step() -> super::RuntimeLoopbackStep {
-        let request = runtime_request();
-        super::RuntimeLoopbackStep {
-            admission_profile: runtime_profile(),
-            admission_bundle: runtime_bundle(request.clone()),
-            request,
-            arguments: None,
-        }
-    }
-
     fn scenario_with_run_id(run_id: &str) -> RuntimeLoopbackScenario {
         RuntimeLoopbackScenario {
             run_id: run_id.to_string(),
-            admission_profile: None,
-            admission_bundle: None,
-            request: None,
             steps: Vec::new(),
         }
     }
@@ -152,24 +100,32 @@ mod tests {
     }
 
     #[test]
-    fn scenario_rejects_mixed_legacy_fields_and_steps() {
-        let scenario = RuntimeLoopbackScenario {
-            run_id: "runtime-loopback-1".to_string(),
-            admission_profile: Some(runtime_profile()),
-            admission_bundle: None,
-            request: None,
-            steps: vec![runtime_step()],
-        };
-
-        let error = match normalize_runtime_loopback_steps(scenario) {
-            Ok(_) => panic!("accepted mixed top-level fields and step list"),
+    fn scenario_requires_steps() {
+        let error = match normalize_runtime_loopback_steps(scenario_with_run_id("runtime-loopback-1")) {
+            Ok(_) => panic!("accepted a scenario without steps"),
             Err(error) => error,
         };
+        assert_eq!(
+            error.to_string(),
+            "Chio runtime loopback scenario requires at least one step"
+        );
+    }
 
+    #[test]
+    fn scenario_with_top_level_admission_fields_is_refused() {
+        let request = runtime_request();
+        let scenario = serde_json::json!({
+            "runId": "runtime-loopback-1",
+            "admissionProfile": runtime_profile(),
+            "admissionBundle": runtime_bundle(request.clone()),
+            "request": request,
+        });
+        let error = match serde_json::from_value::<RuntimeLoopbackScenario>(scenario) {
+            Ok(_) => panic!("accepted top-level admission fields"),
+            Err(error) => error,
+        };
         assert!(
-            error
-                .to_string()
-                .contains("cannot mix top-level admission fields with steps"),
+            error.to_string().starts_with("unknown field `admissionProfile`"),
             "{error}"
         );
     }

@@ -137,15 +137,6 @@ async fn operator_reads_retained_data_without_live_authority_or_schema_writes() 
     Ok(())
 }
 
-#[test]
-fn legacy_limits_keep_their_serialized_identity() -> Result {
-    let old = json!({"max_processes":100,"max_depth":8,"max_calls":2});
-    let decoded: ProcessLimits = serde_json::from_value(old.clone())?;
-    assert_eq!(decoded.state, ProcessStateLimits::default());
-    assert_eq!(serde_json::to_value(decoded)?, old);
-    Ok(())
-}
-
 #[tokio::test]
 async fn blobs_persist_are_owned_and_detect_corruption() -> Result {
     let dir = tempfile::tempdir()?;

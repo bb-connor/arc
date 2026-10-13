@@ -20,101 +20,34 @@ use support::Result;
 
 struct Unused;
 
-#[tokio::test]
-async fn pre_sender_and_claim_schema_migrates_without_assigning_historical_ownership() -> Result {
+#[test]
+fn mailbox_store_without_sender_and_claim_columns_is_refused() -> Result {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("mailboxes.db");
-    let payload = "{\"text\":\"legacy\"}";
     {
         let db = rusqlite::Connection::open(&path)?;
         db.execute_batch("CREATE TABLE mailboxes(id TEXT PRIMARY KEY,last_sequence INTEGER NOT NULL DEFAULT 0,acknowledged_through INTEGER NOT NULL DEFAULT 0);
-            CREATE TABLE mailbox_messages(channel TEXT NOT NULL REFERENCES mailboxes(id),sequence INTEGER NOT NULL,message_key TEXT NOT NULL,payload_hash TEXT NOT NULL,payload TEXT,payload_bytes INTEGER NOT NULL,PRIMARY KEY(channel,sequence),UNIQUE(channel,message_key));
-            INSERT INTO mailboxes VALUES('jobs',1,0);")?;
-        db.execute(
-            "INSERT INTO mailbox_messages VALUES('jobs',1,'legacy',?1,?2,17)",
-            rusqlite::params![
-                chio_core_types::crypto::sha256_hex(payload.as_bytes()),
-                payload
-            ],
-        )?;
+            CREATE TABLE mailbox_messages(channel TEXT NOT NULL REFERENCES mailboxes(id),sequence INTEGER NOT NULL,message_key TEXT NOT NULL,payload_hash TEXT NOT NULL,payload TEXT,payload_bytes INTEGER NOT NULL,PRIMARY KEY(channel,sequence),UNIQUE(channel,message_key));")?;
     }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
     }
-    {
-        let kernel = support::kernel(directory.path(), Box::new(Unused))?;
-        let server = MailboxServer::open(&path, &kernel, config())?;
-        let replay = server
-            .invoke(
-                "send_jobs",
-                json!({"message_key":"legacy","payload":{"text":"legacy"}}),
-                None,
-            )
-            .await?;
-        assert_eq!(replay, json!({"status":"sent","sequence":"1"}));
-    }
-    let kernel = attesting_kernel(directory.path())?;
-    let runtime = processes(directory.path(), kernel)?;
-    let read = invoke(
-        &runtime,
-        "receiver",
-        "read-legacy",
-        "receive_jobs",
-        json!({"after_sequence":"0","limit":1}),
-    )
-    .await?;
-    assert_eq!(
-        value(&read)?["messages"][0],
-        json!({"sequence":"1","payload":{"text":"legacy"},"sender":null})
-    );
-    let stolen = invoke(
-        &runtime,
-        "sender",
-        "steal-legacy",
-        "send_jobs",
-        json!({"message_key":"legacy","payload":{"text":"legacy"}}),
-    )
-    .await?;
-    assert_eq!(stolen.verdict, Verdict::Deny);
-    let claimed = invoke(
-        &runtime,
-        "worker_a",
-        "claim-legacy",
-        "claim_jobs",
-        json!({"limit":1,"lease_ms":300000}),
-    )
-    .await?;
-    assert_eq!(sequences(&claimed)?, vec![("1".into(), "1".into())]);
-    let complete = invoke(
-        &runtime,
-        "worker_a",
-        "complete-legacy",
-        "complete_jobs",
-        json!({"sequence":"1","claim":"1"}),
-    )
-    .await?;
-    assert_eq!(complete.verdict, Verdict::Allow);
-    drop(runtime);
-    let kernel = attesting_kernel(directory.path())?;
-    let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel)?;
+    let kernel = support::kernel(directory.path(), Box::new(Unused))?;
+    assert!(matches!(
+        MailboxServer::open(&path, &kernel, config()),
+        Err(ProcessError::Configuration(
+            "mailbox store layout does not match this runtime"
+        ))
+    ));
     let db = rusqlite::Connection::open(&path)?;
-    let historical: (Option<String>, i64, Option<String>) = db.query_row(
-        "SELECT sender,claim_generation,payload FROM mailbox_messages WHERE message_key='legacy'",
+    let runtime: bool = db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name = 'mailbox_runtime')",
         [],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        |row| row.get(0),
     )?;
-    assert_eq!(historical, (None, 1, None));
-    let stolen = invoke(
-        &runtime,
-        "sender",
-        "steal-drained",
-        "send_jobs",
-        json!({"message_key":"legacy","payload":{"text":"legacy"}}),
-    )
-    .await?;
-    assert_eq!(stolen.verdict, Verdict::Deny);
+    assert!(!runtime, "a refused open must not bind the store");
     Ok(())
 }
 
@@ -535,36 +468,6 @@ async fn renewal_requires_its_grant_and_replays_the_original_deadline_after_rest
     let plain_kernel = support::kernel(directory.path(), Box::new(Unused))?;
     let plain = MailboxServer::open(directory.path().join("plain.db"), &plain_kernel, channels)?;
     assert!(plain.invoke("renew_jobs", renewal, None).await.is_err());
-    Ok(())
-}
-
-#[test]
-fn renewal_opt_in_preserves_legacy_configuration_and_manifest() -> Result {
-    let directory = tempfile::tempdir()?;
-    let kernel = support::kernel(directory.path(), Box::new(Unused))?;
-    let legacy: MailboxConfig = serde_json::from_value(json!({"id": "jobs"}))?;
-    assert!(!legacy.renewable_leases);
-    assert_eq!(
-        serde_json::to_value(&legacy)?,
-        json!({"id": "jobs", "limits": MailboxLimits::default()})
-    );
-    let default = MailboxServer::open(
-        directory.path().join("old.db"),
-        &kernel,
-        vec![legacy.clone()],
-    )?;
-    let mut enabled = legacy;
-    enabled.renewable_leases = true;
-    let current = MailboxServer::open(directory.path().join("new.db"), &kernel, vec![enabled])?;
-    assert!(!current.tool_is_read_only("renew_jobs"));
-    let mut manifest = current.manifest();
-    chio_manifest::validate_manifest(&manifest)?;
-    assert_eq!(manifest.tools.len(), default.manifest().tools.len() + 1);
-    manifest.tools.retain(|tool| tool.name != "renew_jobs");
-    assert_eq!(
-        serde_json::to_value(manifest)?,
-        serde_json::to_value(default.manifest())?
-    );
     Ok(())
 }
 

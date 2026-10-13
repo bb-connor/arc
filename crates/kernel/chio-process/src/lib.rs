@@ -150,7 +150,8 @@ impl ProcessRuntime {
     /// kernel still verifies signed route authority; this API grants none.
     /// Each routed operation freezes the selected route in its existing journal
     /// binding. Reopening with a changed or missing route cannot redirect or
-    /// recover that operation. Unrouted legacy operations keep their binding.
+    /// recover that operation. An operation journaled without a route keeps
+    /// that binding and cannot gain one.
     pub fn with_routes(
         mut self,
         routes: impl IntoIterator<Item = (String, ProcessRoute)>,
