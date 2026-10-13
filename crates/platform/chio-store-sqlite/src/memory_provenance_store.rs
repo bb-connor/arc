@@ -102,7 +102,9 @@ impl SqliteMemoryProvenanceStore {
             fs::create_dir_all(&parent)?;
         }
         let manager = SqliteConnectionManager::file(path);
-        let pool = Pool::builder().max_size(8).build(manager)?;
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(8)
+            .build(manager)?;
         let store = Self { pool };
         store.run_migrations()?;
         Ok(store)
@@ -111,7 +113,9 @@ impl SqliteMemoryProvenanceStore {
     /// Open an in-memory store for tests.
     pub fn open_in_memory() -> Result<Self, SqliteMemoryProvenanceStoreError> {
         let manager = SqliteConnectionManager::memory();
-        let pool = Pool::builder().max_size(1).build(manager)?;
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(1)
+            .build(manager)?;
         let store = Self { pool };
         store.run_migrations()?;
         Ok(store)

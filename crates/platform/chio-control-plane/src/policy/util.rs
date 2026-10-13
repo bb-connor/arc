@@ -7,7 +7,7 @@ use super::types::{
     PolicyFormat, ReputationIssuancePolicy, RuntimeAssuranceIssuancePolicy,
 };
 
-const RUNTIME_POLICY_IDENTITY_SCHEMA: &str = "chio.runtime-policy.v3";
+const RUNTIME_POLICY_IDENTITY_SCHEMA: &str = "chio.runtime-policy.v1";
 
 pub(super) fn parse_operations(operations: &[String]) -> Result<Vec<Operation>, PolicyError> {
     operations

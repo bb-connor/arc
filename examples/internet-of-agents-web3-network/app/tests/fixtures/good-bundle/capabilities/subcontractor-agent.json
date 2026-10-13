@@ -35,6 +35,7 @@
   "id": "cap-ioa-web3-cipherworks-specialist",
   "issued_at": 1776995580,
   "issuer": "bff663535a5cf58658cc38595d20dc4501f6dfc076ddf07e20571d413a3ceb5a",
+  "schema": "chio.capability.v1",
   "scope": {
     "grants": [
       {

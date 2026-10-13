@@ -190,7 +190,7 @@ impl SqliteFindingPoolLedger {
                 connection.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")?;
                 Ok(())
             });
-        let pool = Pool::builder()
+        let pool = crate::pool::sqlite_pool_builder()
             .max_size(8)
             .build(manager)
             .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;

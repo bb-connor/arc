@@ -26,6 +26,7 @@ fn schema_path() -> PathBuf {
 
 fn good_token() -> Value {
     json!({
+        "schema": "chio.capability.v1",
         "id": "cap-smoke-001",
         "issuer": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         "subject": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
@@ -73,5 +74,24 @@ fn malformed_token_is_rejected() {
     assert!(
         message.contains("signature"),
         "violation should mention `signature`: {message}"
+    );
+}
+
+#[test]
+fn token_without_schema_is_rejected() {
+    let schema = schema_path();
+    let mut doc = good_token();
+    doc.as_object_mut()
+        .expect("token is an object")
+        .remove("schema");
+    let doc_path = PathBuf::from("<inline>");
+    let schema_value: Value =
+        serde_json::from_str(&std::fs::read_to_string(&schema).expect("schema file exists"))
+            .expect("schema parses");
+    let err = chio_spec_validate::validate_value(&schema, &schema_value, &doc_path, &doc)
+        .expect_err("a token without schema must violate the token schema");
+    assert!(
+        err.to_string().contains("schema"),
+        "violation should mention `schema`: {err}"
     );
 }

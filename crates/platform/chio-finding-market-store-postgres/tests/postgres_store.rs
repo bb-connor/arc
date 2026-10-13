@@ -37,10 +37,10 @@ use support::{
     assert_admission_and_accounting_invariants, assert_admission_binds_its_request,
     assert_atomic_purchase_recovery, assert_catalog_retractions,
     assert_concurrent_duplicates_replay, assert_disabled_tenant_blocks_worker_transitions,
-    assert_forged_job_digest_rejected, assert_legacy_delivery_upgrade_rejects,
-    assert_multi_replica_leases_and_shutdown_refunds, assert_paged_aggregate_history,
-    assert_prior_release_writes_keep_accumulators, assert_tenant_disablement_serializes,
-    assert_terminal_job_retention_gc, assert_worker_job_boundary, migrate_legacy_fixture,
+    assert_forged_job_digest_rejected, assert_multi_replica_leases_and_shutdown_refunds,
+    assert_paged_aggregate_history, assert_prior_release_writes_keep_accumulators,
+    assert_tenant_disablement_serializes, assert_terminal_job_retention_gc,
+    assert_unauthenticated_delivery_rejected, assert_worker_job_boundary, migrate_fixture,
     signed_domain_payload, signed_principal_replication_event, ReplicationCheckSpec,
 };
 
@@ -95,7 +95,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
     )
     .execute(&admin_pool)
     .await?;
-    migrate_legacy_fixture(&admin_pool, &migrator_url).await?;
+    migrate_fixture(&admin_pool, &migrator_url).await?;
     sqlx::raw_sql(
         r#"
         DO $role$
@@ -464,7 +464,7 @@ async fn tenant_isolation_exact_replay_and_lease_recovery() -> Result<(), Box<dy
             1_700_000_000,
         )
         .await?;
-    assert_legacy_delivery_upgrade_rejects(&admin_pool, &tenant_a).await?;
+    assert_unauthenticated_delivery_rejected(&admin_pool, &tenant_a).await?;
     assert_worker_job_boundary(&worker_pool, &tenant_a).await?;
     assert_tenant_disablement_serializes(&store, &runtime_pool, &tenant_a).await?;
     assert_disabled_tenant_blocks_worker_transitions(&store, &worker_pool, nonce).await?;

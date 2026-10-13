@@ -45,6 +45,7 @@ CALLER_PUBLIC_KEY = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f70
 
 def _make_token_dict() -> dict:
     return {
+        "schema": "chio.capability.v1",
         "id": "tok-1",
         "issuer": "a" * 64,
         "subject": "b" * 64,

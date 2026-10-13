@@ -80,7 +80,8 @@ The upstream demo tool is a tiny MCP server that exposes `echo_text`:
 [examples/docker/mock_mcp_server.py](../../examples/docker/mock_mcp_server.py).
 
 Configure the [enforcing host inputs](../security/native-launch-examples.md),
-including reviewed Python runtime read grants, then provision the exact command.
+including the reviewed Python runtime read grants, runtime files and
+`native-standard-v1` syscall profile, then provision the exact command.
 Discovery itself is confined. Disabled and Shadow policies cannot authorize it.
 
 ```bash
