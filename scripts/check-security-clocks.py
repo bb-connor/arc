@@ -26,7 +26,7 @@ SCOPE_EVIDENCE_SHA256 = (
     "147bfd548e7b1a68e49a46f4f8fb62cd29c820eb3590b0270e57e63fb9dc4b5d"
 )
 INVENTORY = ROOT / "scripts/security-clock-inventory.json"
-LEGACY_ROOTS = (
+FIXED_ROOTS = (
     "crates/security/",
     "crates/economy/chio-anchor/src/witness/rekor.rs",
     "crates/economy/chio-anchor/src/witness/rekor/",
@@ -68,7 +68,7 @@ def clock_roots(root):
     paths = [*boundaries["signed_input_files"], *hardening["tcb_libraries"].values()]
     return tuple(
         sorted(
-            set(LEGACY_ROOTS)
+            set(FIXED_ROOTS)
             | {
                 "/".join(Path(path).parts[:3]) + "/"
                 for path in paths
@@ -252,14 +252,14 @@ def allowed_sites(root, baseline):
             "expanded clock scope evidence differs from reviewed base source"
         )
     evidence = json.loads(evidence_bytes)
-    legacy = Counter(baseline["sites"])
+    recorded = Counter(baseline["sites"])
     expanded = Counter(baseline["expanded_preexisting_sites"])
-    for category in (legacy, expanded):
+    for category in (recorded, expanded):
         if any(type(n) is not int or n <= 0 for n in category.values()):
             raise ValueError("clock debt counts must be positive integers")
-    if legacy.keys() & expanded.keys():
-        raise ValueError("legacy and expanded clock debt overlap")
-    debt = legacy + expanded
+    if recorded.keys() & expanded.keys():
+        raise ValueError("recorded and expanded clock debt overlap")
+    debt = recorded + expanded
     if debt - Counter(evidence["sites"]):
         raise ValueError("clock inventory permits observations absent from base source")
     if set(baseline["composition_sites"]) != set(COMPOSITION_CONTRACTS):

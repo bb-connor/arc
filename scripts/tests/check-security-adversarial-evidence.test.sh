@@ -16,11 +16,11 @@ if enterprise_promotion_output="$(
     python3 scripts/check-security-adversarial-evidence.py \
       --promote-outcome forbidden /candidate/outcomes.json 2>&1
 )"; then
-  echo "enterprise legacy outcome promotion passed unexpectedly" >&2
+  echo "enterprise outcome promotion passed unexpectedly" >&2
   exit 1
 fi
-grep -Fq \
-  "legacy --promote-outcome is forbidden in the enterprise boundary" \
+grep -Fq -e \
+  "--promote-outcome is forbidden in the enterprise boundary" \
   <<<"${enterprise_promotion_output}"
 
 full_validation="$(./scripts/check-security-adversarial-evidence.sh)"

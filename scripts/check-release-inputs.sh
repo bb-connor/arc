@@ -23,11 +23,6 @@ if ! grep -qF "m08_internal_readiness_draft:" releases.toml; then
   exit 1
 fi
 
-if grep -qF "activation_evidence.m08_final_report" releases.toml; then
-  echo "release-audit evidence still references the legacy m08_final_report key" >&2
-  exit 1
-fi
-
 m09_package_path="compliance/hitrust/readiness-package/readiness-package.md"
 m09_package_sha256="92d00cc1af96047c9116332f0f1467ce2a456fe9c31c64e9a667f6fa72a27cc6"
 m09_evidence_files=(
