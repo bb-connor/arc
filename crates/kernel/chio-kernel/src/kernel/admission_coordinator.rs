@@ -751,7 +751,7 @@ impl ChioKernel {
                 request_namespace_digest: namespace.digest().clone(),
                 request_id: AdmissionIdentifier::try_new("request_id", request.request_id.clone())?,
             };
-            let signing_identity = {
+            let (signing_identity, authority_profile) = {
                 let _mutation_guard = runtime.lock_mutations()?;
                 match runtime
                     .store
@@ -770,16 +770,19 @@ impl ChioKernel {
                                 Some(AdmissionTerminalReplay::Receipt { .. })
                             )
                         {
-                            self.terminal_refusal_original(&operation, trusted_now_unix_ms)?
-                                .frozen_receipt_signing_identity()
-                                .clone()
+                            let original =
+                                self.terminal_refusal_original(&operation, trusted_now_unix_ms)?;
+                            (
+                                original.frozen_receipt_signing_identity().clone(),
+                                original.authority_profile().clone(),
+                            )
                         } else {
-                            signing_identity
+                            (signing_identity, authority_profile)
                         }
                     }
                     None => {
                         receipt_disposition = Some(IdentityDisposition::Reusable);
-                        signing_identity
+                        (signing_identity, authority_profile)
                     }
                 }
             };
