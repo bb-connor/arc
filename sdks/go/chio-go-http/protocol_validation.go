@@ -349,7 +349,7 @@ func (t *CapabilityToken) UnmarshalJSON(data []byte) error {
 	if err := decodeProtocolObject(data, &decoded); err != nil {
 		return err
 	}
-	if decoded.Schema != nil && *decoded.Schema != "chio.capability.v1" {
+	if decoded.Schema != "chio.capability.v1" {
 		return fmt.Errorf("invalid capability schema domain")
 	}
 	*t = CapabilityToken(decoded)

@@ -157,6 +157,7 @@ func TestGeneratedProtocolPrimitivesConsumeSharedFixtures(t *testing.T) {
 func TestGeneratedCapabilityTokenUsesFixedWidthIntegers(t *testing.T) {
 	maxInvocations := int64(1 << 40)
 	token := CapabilityToken{
+		Schema:    CapabilityTokenSchemaChioCapabilityV1,
 		Id:        "tok-1",
 		Issuer:    "issuer",
 		Subject:   "subject",
@@ -217,6 +218,7 @@ func TestGeneratedCapabilityConstraintsPreserveValuePayload(t *testing.T) {
 		t.Fatalf("construct generic constraint: %v", err)
 	}
 	token := CapabilityToken{
+		Schema:    CapabilityTokenSchemaChioCapabilityV1,
 		Id:        "tok-constraint",
 		Issuer:    "issuer",
 		Subject:   "subject",
@@ -594,5 +596,34 @@ func TestGeneratedProvenanceVerdictLinkConstrainsOptionalFields(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("expected non-empty receiptId and known evidenceClass to pass: %v", err)
+	}
+}
+
+func TestGeneratedCapabilityTokenRequiresSchema(t *testing.T) {
+	token := CapabilityToken{
+		Schema:    CapabilityTokenSchemaChioCapabilityV1,
+		Id:        "tok-schema",
+		Issuer:    "issuer",
+		Subject:   "subject",
+		IssuedAt:  1,
+		ExpiresAt: 2,
+		Signature: "sig",
+	}
+	data, err := json.Marshal(token)
+	if err != nil {
+		t.Fatalf("marshal token: %v", err)
+	}
+	var object map[string]any
+	if err := json.Unmarshal(data, &object); err != nil {
+		t.Fatalf("decode token object: %v", err)
+	}
+	delete(object, "schema")
+	withoutSchema, err := json.Marshal(object)
+	if err != nil {
+		t.Fatalf("marshal token without schema: %v", err)
+	}
+	var decoded CapabilityToken
+	if err := json.Unmarshal(withoutSchema, &decoded); err == nil || !strings.Contains(err.Error(), `missing required security wire property "schema"`) {
+		t.Fatalf("expected schema refusal, got %v", err)
 	}
 }
