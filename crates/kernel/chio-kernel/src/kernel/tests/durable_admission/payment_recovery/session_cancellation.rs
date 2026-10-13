@@ -181,7 +181,8 @@ fn run(
 }
 
 /// Everything the shared pre-dispatch cleanup leaves behind. Identifiers that
-/// differ between fixtures are replaced by their role, and the per-receipt
+/// differ between fixtures, including the request binding that commits to each
+/// fixture's receipt signer, are replaced by their role, and the per-receipt
 /// signing nonce is dropped.
 fn cleanup_state(run: &Run) -> TestResult<serde_json::Value> {
     let operation = run.store.operation();
@@ -267,6 +268,14 @@ fn cleanup_state(run: &Run) -> TestResult<serde_json::Value> {
     let roles = [
         (hold_id, "<hold>"),
         (operation_id, "<operation>"),
+        (
+            operation
+                .binding()
+                .request_binding_hash()
+                .as_str()
+                .to_owned(),
+            "<request-binding>",
+        ),
         (run.request.capability.id.clone(), "<capability>"),
         (run.request.request_id.clone(), "<request>"),
         (run.request.capability.issuer.to_hex(), "<issuer>"),
