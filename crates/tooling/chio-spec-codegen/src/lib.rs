@@ -432,14 +432,16 @@ fn collect_local_schema_ref_roots(
     let mut referenced_roots = BTreeSet::new();
 
     for path in schema_files {
-        let raw =
-            fs::read_to_string(path).map_err(|err| CodegenError::Io(path.to_path_buf(), err))?;
-        let value: serde_json::Value = serde_json::from_str(&raw)
-            .map_err(|err| CodegenError::Json(path.to_path_buf(), err))?;
+        let value = catalog.resource(path)?;
         collect_local_schema_ref_roots_from_value(&value, path, catalog, &mut referenced_roots)?;
     }
 
     Ok(referenced_roots)
+}
+
+fn read_schema_file(path: &Path) -> Result<serde_json::Value> {
+    let raw = fs::read_to_string(path).map_err(|err| CodegenError::Io(path.to_path_buf(), err))?;
+    serde_json::from_str(&raw).map_err(|err| CodegenError::Json(path.to_path_buf(), err))
 }
 
 fn collect_local_schema_ref_roots_from_value(

@@ -40,7 +40,10 @@ impl RecoveryProfileRequirementsV1 {
         required_features: BoundedList<EnforcementFeature, 5>,
     ) -> Result<Self, ContractError> {
         let features = required_features.as_slice();
-        if features.windows(2).any(|pair| pair[0] >= pair[1]) {
+        if features
+            .windows(2)
+            .any(|pair| matches!(pair, [first, second] if first >= second))
+        {
             return Err(ContractError::UnsupportedProfile);
         }
         let baseline = [
@@ -74,7 +77,7 @@ impl RecoveryProfileRequirementsV1 {
         if enforced
             .as_slice()
             .windows(2)
-            .any(|pair| pair[0] >= pair[1])
+            .any(|pair| matches!(pair, [first, second] if first >= second))
             || self
                 .required_features
                 .as_slice()

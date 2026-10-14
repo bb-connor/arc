@@ -31,7 +31,7 @@ pub struct ExplanationLimitsV1 {
 impl ExplanationLimitsV1 {
     pub fn validate(&self) -> Result<(), ContractError> {
         if self.offers.get() == 0
-            || self.offers.get() > MAX_EXPLANATION_TEMPLATES as u64
+            || u64::try_from(MAX_EXPLANATION_TEMPLATES).map_or(true, |max| self.offers.get() > max)
             || self.work.get() == 0
             || self.work.get() > u64::from(MAX_RECOVERY_VERIFICATION_WORK)
         {

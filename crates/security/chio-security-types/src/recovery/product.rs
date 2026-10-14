@@ -57,7 +57,13 @@ impl DecisionReportV1 {
         }
         for (index, artifact) in self.attachments.as_slice().iter().enumerate() {
             require_artifact_scope(&self.scope, artifact)?;
-            if self.attachments.as_slice()[..index].contains(artifact) {
+            if self
+                .attachments
+                .as_slice()
+                .iter()
+                .take(index)
+                .any(|old| old == artifact)
+            {
                 return Err(ContractError::DuplicateIdentity);
             }
         }
@@ -211,7 +217,7 @@ fn require_text<const N: usize>(value: &ProtectedText<N>) -> Result<(), Contract
 }
 fn require_unique<T: PartialEq>(values: &[T]) -> Result<(), ContractError> {
     for (index, value) in values.iter().enumerate() {
-        if values[..index].contains(value) {
+        if values.iter().take(index).any(|old| old == value) {
             return Err(ContractError::DuplicateIdentity);
         }
     }

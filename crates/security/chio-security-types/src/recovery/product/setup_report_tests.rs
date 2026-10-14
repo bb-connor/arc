@@ -41,10 +41,10 @@ fn setup_writer_reattestation_may_outlive_the_initial_probe() -> TestResult {
 
 #[test]
 fn setup_report_still_requires_ordered_time_and_a_different_writer() -> TestResult {
-    assert!(report(999)?.validate().is_err());
+    assert_eq!(report(999)?.validate(), Err(ContractError::BindingMismatch));
     let mut same_writer = report(1_500)?;
     same_writer.current_serving_fence = same_writer.previous_serving_fence;
-    assert!(same_writer.validate().is_err());
+    assert_eq!(same_writer.validate(), Err(ContractError::BindingMismatch));
     report(1_500)?.validate()?;
     Ok(())
 }

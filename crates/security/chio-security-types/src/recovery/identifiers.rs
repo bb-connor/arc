@@ -32,7 +32,7 @@ macro_rules! identifier {
         impl $name {
             pub fn new(value: &str) -> Result<Self, ContractError> {
                 if value.is_empty() || value.len() > MAX_RECOVERY_IDENTIFIER_BYTES
-                    || !value.as_bytes()[0].is_ascii_alphanumeric()
+                    || !value.as_bytes().first().is_some_and(u8::is_ascii_alphanumeric)
                     || !value.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b':' | b'-')) {
                     return Err(ContractError::InvalidIdentifier);
                 }
@@ -234,16 +234,25 @@ mod tests {
                 value,
             );
         }
-        for value in [
-            String::new(),
-            "x".repeat(257),
-            "é".repeat(129),
-            String::from(" a"),
-            String::from("a\n"),
+        for (value, expected) in [
+            (String::new(), crate::ports::IdError::Blank),
+            ("x".repeat(257), crate::ports::IdError::TooLong),
+            ("é".repeat(129), crate::ports::IdError::TooLong),
+            (String::from(" a"), crate::ports::IdError::NonCanonical),
+            (String::from("a\n"), crate::ports::IdError::NonCanonical),
         ] {
-            assert!(crate::ports::RecordId::new(value.clone()).is_err());
-            assert!(RecoveryEffectProviderId::new(value.clone()).is_err());
-            assert!(RecoveryEffectAccountId::new(value).is_err());
+            assert_eq!(
+                crate::ports::RecordId::new(value.clone()).err(),
+                Some(expected)
+            );
+            assert_eq!(
+                RecoveryEffectProviderId::new(value.clone()).err(),
+                Some(ContractError::InvalidIdentifier)
+            );
+            assert_eq!(
+                RecoveryEffectAccountId::new(value).err(),
+                Some(ContractError::InvalidIdentifier)
+            );
         }
         Ok(())
     }

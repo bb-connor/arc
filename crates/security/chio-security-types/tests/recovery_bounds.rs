@@ -43,26 +43,49 @@ fn identifier_and_integer_boundaries_are_closed() -> Result {
         "é",
         &"a".repeat(129),
     ] {
-        assert!(WorkflowId::new(id).is_err());
+        assert_eq!(
+            WorkflowId::new(id).err(),
+            Some(ContractError::InvalidIdentifier)
+        );
     }
     assert!(SafeInteger::new(SafeInteger::MAX).is_ok());
-    assert!(SafeInteger::new(SafeInteger::MAX + 1).is_err());
+    assert_eq!(
+        SafeInteger::new(SafeInteger::MAX + 1).err(),
+        Some(ContractError::UnsafeInteger)
+    );
     assert_eq!(
         SafeInteger::new(SafeInteger::MAX)?.checked_add(SafeInteger::new(1)?),
         Err(ContractError::ArithmeticOverflow)
     );
-    assert!(ServingEpoch::new(0).is_err());
-    assert!(OperationRef::new(
-        OperationId::new("operation-a")?,
-        NativeAdmissionDigest::from_bytes([3; 32]),
-        SafeInteger::ZERO,
-    )
-    .is_err());
-    assert!(serde_json::from_str::<OperationRef>(
+    assert_eq!(
+        ServingEpoch::new(0).err(),
+        Some(ContractError::InvalidState)
+    );
+    assert_eq!(
+        OperationRef::new(
+            OperationId::new("operation-a")?,
+            NativeAdmissionDigest::from_bytes([3; 32]),
+            SafeInteger::ZERO,
+        )
+        .err(),
+        Some(ContractError::InvalidState)
+    );
+    let zero_version = serde_json::from_str::<OperationRef>(
         r#"{"operation_id":"operation-a","native_admission_digest":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],"operation_version":0}"#,
-    ).is_err());
-    assert!(serde_json::from_str::<VersionV1>("null").is_err());
-    assert!(serde_json::from_str::<VersionV1>("2").is_err());
+    );
+    assert_eq!(
+        zero_version.err().map(|error| error.to_string()),
+        Some(ContractError::InvalidState.to_string())
+    );
+    assert!(serde_json::from_str::<VersionV1>("null")
+        .err()
+        .is_some_and(|error| error.to_string().starts_with("invalid type: null")));
+    assert_eq!(
+        serde_json::from_str::<VersionV1>("2")
+            .err()
+            .map(|error| error.to_string()),
+        Some(ContractError::UnsupportedVersion.to_string())
+    );
     Ok(())
 }
 

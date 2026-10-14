@@ -82,7 +82,7 @@ impl RecoveryExplanationViewV1 {
         let candidates = self.projection.candidates.as_slice();
         if candidates
             .windows(2)
-            .any(|p| p[0].template_id >= p[1].template_id)
+            .any(|pair| matches!(pair, [first, second] if first.template_id >= second.template_id))
             || (matches!(
                 self.projection.summary,
                 ExplanationViewSummaryV1::AuthorizedInspectionRequired

@@ -71,14 +71,12 @@ fn recovery_shared_closed_wire_and_signature_corpus() -> Result {
                 continue;
             };
             registry = registry.add(&id, value.clone())?;
-            for domain in ["chio.world"] {
-                let file_id = format!(
-                    "https://{domain}/schemas/chio-wire/v1/{}",
-                    path.strip_prefix(&root)?.to_string_lossy()
-                );
-                if id != file_id {
-                    registry = registry.add(&file_id, value.clone())?;
-                }
+            let file_id = format!(
+                "https://chio.world/schemas/chio-wire/v1/{}",
+                path.strip_prefix(&root)?.to_string_lossy()
+            );
+            if id != file_id {
+                registry = registry.add(&file_id, value.clone())?;
             }
             schemas.insert(
                 path.file_name()

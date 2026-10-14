@@ -31,8 +31,11 @@ impl LabeledCheckpointV1 {
             return Err(ContractError::BindingMismatch);
         }
         for (index, context) in self.model_contexts.as_slice().iter().enumerate() {
-            if self.model_contexts.as_slice()[..index]
+            if self
+                .model_contexts
+                .as_slice()
                 .iter()
+                .take(index)
                 .any(|old| old.context == context.context)
             {
                 return Err(ContractError::BindingMismatch);

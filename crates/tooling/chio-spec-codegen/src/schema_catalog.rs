@@ -22,9 +22,7 @@ impl LocalSchemaCatalog {
         let mut ids = BTreeMap::new();
         let mut resources = BTreeMap::new();
         for path in files {
-            let raw = fs::read(&path).map_err(|err| CodegenError::Io(path.clone(), err))?;
-            let schema: serde_json::Value = serde_json::from_slice(&raw)
-                .map_err(|err| CodegenError::Json(path.clone(), err))?;
+            let schema = read_schema_file(&path)?;
             if let Some(id) = schema.get("$id").and_then(serde_json::Value::as_str) {
                 if ids.insert(id.to_owned(), path.clone()).is_some() {
                     return Err(CodegenError::SchemaRef(

@@ -12,8 +12,8 @@ pub(super) fn check(input: &[u8], limits: RecoveryDecodeLimits) -> Result<(), Co
     let mut nodes = 0usize;
     let mut strings = 0usize;
     let mut cursor = 0usize;
-    while cursor < input.len() {
-        match input[cursor] {
+    while let Some(&byte) = input.get(cursor) {
+        match byte {
             b' ' | b'\n' | b'\r' | b'\t' | b':' => {
                 cursor += 1;
             }
@@ -22,7 +22,8 @@ pub(super) fn check(input: &[u8], limits: RecoveryDecodeLimits) -> Result<(), Co
                 if depth >= limits.depth {
                     return Err(ContractError::LimitExceeded);
                 }
-                entries[depth] = 1; // Empty containers are conservatively one entry.
+                // Empty containers are conservatively one entry.
+                *entries.get_mut(depth).ok_or(ContractError::LimitExceeded)? = 1;
                 depth += 1;
                 cursor += 1;
             }
@@ -32,7 +33,11 @@ pub(super) fn check(input: &[u8], limits: RecoveryDecodeLimits) -> Result<(), Co
             }
             b',' => {
                 let frame = depth.checked_sub(1).ok_or(ContractError::Malformed)?;
-                charge(&mut entries[frame], 1, limits.container_entries)?;
+                charge(
+                    entries.get_mut(frame).ok_or(ContractError::Malformed)?,
+                    1,
+                    limits.container_entries,
+                )?;
                 cursor += 1;
             }
             b'"' => {
@@ -65,7 +70,7 @@ pub(super) fn check(input: &[u8], limits: RecoveryDecodeLimits) -> Result<(), Co
                 }) {
                     cursor += 1;
                 }
-                let token = &input[start..cursor];
+                let token = input.get(start..cursor).ok_or(ContractError::Malformed)?;
                 if !matches!(token, b"true" | b"false" | b"null") {
                     // Recovery metadata uses unsigned interoperable integers.
                     // Arbitrary tool payloads are bounded by their owning parser.

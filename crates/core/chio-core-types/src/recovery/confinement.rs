@@ -81,9 +81,13 @@ pub fn isolation_boundary_digest(
         .map(chio_security_types::recovery::CanonicalPayloadDigest::from_bytes)
 }
 
+fn max_input_bytes() -> usize {
+    usize::try_from(MAX_CONFINED_INPUT_BYTES).unwrap_or(0)
+}
+
 /// Exact canonical boolean projection, independently recomputed by the host.
 pub fn project_confined_boolean(input: &[u8], field: &str) -> Result<Vec<u8>> {
-    if input.len() > MAX_CONFINED_INPUT_BYTES as usize {
+    if input.len() > max_input_bytes() {
         return Err(invalid());
     }
     let value: serde_json::Value = serde_json::from_slice(input).map_err(|_| invalid())?;
@@ -109,17 +113,21 @@ pub fn encode_confined_input(
     let mut out = Vec::from(b"CHIOCF1\0".as_slice());
     append_frame(&mut out, field.as_bytes())?;
     append_frame(&mut out, observation)?;
-    out.extend_from_slice(&(seeds.len() as u32).to_be_bytes());
+    out.extend_from_slice(
+        &u32::try_from(seeds.len())
+            .map_err(|_| invalid())?
+            .to_be_bytes(),
+    );
     for seed in seeds {
         append_frame(&mut out, seed)?;
     }
-    if out.len() > MAX_CONFINED_INPUT_BYTES as usize {
+    if out.len() > max_input_bytes() {
         return Err(invalid());
     }
     Ok(out)
 }
 fn append_frame(out: &mut Vec<u8>, value: &[u8]) -> Result<()> {
-    if out.len().saturating_add(value.len()).saturating_add(4) > MAX_CONFINED_INPUT_BYTES as usize {
+    if out.len().saturating_add(value.len()).saturating_add(4) > max_input_bytes() {
         return Err(invalid());
     }
     out.extend_from_slice(
@@ -142,16 +150,16 @@ impl core::fmt::Debug for DecodedConfinedInput<'_> {
     }
 }
 pub fn decode_confined_input(mut bytes: &[u8]) -> Result<DecodedConfinedInput<'_>> {
-    if bytes.len() > MAX_CONFINED_INPUT_BYTES as usize || !bytes.starts_with(b"CHIOCF1\0") {
+    if bytes.len() > max_input_bytes() || !bytes.starts_with(b"CHIOCF1\0") {
         return Err(invalid());
     }
-    bytes = &bytes[8..];
+    bytes = bytes.get(8..).ok_or_else(invalid)?;
     let field = core::str::from_utf8(take_frame(&mut bytes)?).map_err(|_| invalid())?;
     if field.is_empty() || field.len() > 128 {
         return Err(invalid());
     }
     let observation = take_frame(&mut bytes)?;
-    let n = take_u32(&mut bytes)? as usize;
+    let n = usize::try_from(take_u32(&mut bytes)?).map_err(|_| invalid())?;
     if n > 8 {
         return Err(invalid());
     }
@@ -171,12 +179,12 @@ pub fn decode_confined_input(mut bytes: &[u8]) -> Result<DecodedConfinedInput<'_
 fn take_u32(bytes: &mut &[u8]) -> Result<u32> {
     let prefix = bytes.get(..4).ok_or_else(invalid)?;
     let number = u32::from_be_bytes(prefix.try_into().map_err(|_| invalid())?);
-    *bytes = &bytes[4..];
+    *bytes = bytes.get(4..).ok_or_else(invalid)?;
     Ok(number)
 }
 fn take_frame<'a>(bytes: &mut &'a [u8]) -> Result<&'a [u8]> {
-    let n = take_u32(bytes)? as usize;
+    let n = usize::try_from(take_u32(bytes)?).map_err(|_| invalid())?;
     let value = bytes.get(..n).ok_or_else(invalid)?;
-    *bytes = &bytes[n..];
+    *bytes = bytes.get(n..).ok_or_else(invalid)?;
     Ok(value)
 }

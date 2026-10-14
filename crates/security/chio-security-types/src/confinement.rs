@@ -101,7 +101,8 @@ impl ConfinedLimitsV1 {
             || self.input_bytes.get() == 0
             || self.input_bytes.get() > MAX_CONFINED_INPUT_BYTES
             || self.diagnostic_bytes.get() == 0
-            || self.diagnostic_bytes.get() > MAX_CONFINED_DIAGNOSTIC_BYTES as u64
+            || u64::try_from(MAX_CONFINED_DIAGNOSTIC_BYTES)
+                .map_or(true, |max| self.diagnostic_bytes.get() > max)
             || self.launches.get() != 1
             || self.tool_calls.get() != 0
             || self.model_calls.get() != 0
@@ -159,7 +160,8 @@ impl IsolationBoundaryV1 {
         if self.parent.scope != self.scope
             || self.child == self.scope.process_id
             || self.ancestry.as_slice().last() != Some(&self.scope.process_id)
-            || self.ancestry.as_slice().len() as u64 >= self.limits.depth.get()
+            || u64::try_from(self.ancestry.as_slice().len())
+                .map_or(true, |len| len >= self.limits.depth.get())
             || self.deadline_unix_ms.get() == 0
             || self.observation.scope != self.scope
             || self
@@ -168,7 +170,13 @@ impl IsolationBoundaryV1 {
                 .iter()
                 .enumerate()
                 .any(|(i, s)| {
-                    s.scope != self.scope || self.seed_artifacts.as_slice()[..i].contains(s)
+                    s.scope != self.scope
+                        || self
+                            .seed_artifacts
+                            .as_slice()
+                            .iter()
+                            .take(i)
+                            .any(|old| old == s)
                 })
         {
             return Err(ContractError::BindingMismatch);

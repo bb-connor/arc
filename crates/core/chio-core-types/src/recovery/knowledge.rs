@@ -120,11 +120,12 @@ pub fn verify_artifact_archive(
     }
     for (index, version) in body.versions.as_slice().iter().enumerate() {
         if version.scope != *scope
-            || !version
-                .dependencies
-                .as_slice()
-                .iter()
-                .all(|dependency| references[..index].contains(dependency))
+            || !version.dependencies.as_slice().iter().all(|dependency| {
+                references
+                    .iter()
+                    .take(index)
+                    .any(|known| known == dependency)
+            })
         {
             return Err(invalid());
         }

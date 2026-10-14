@@ -211,7 +211,13 @@ mod tests {
         assert_eq!(serde_json::to_value(action)?, action_value);
 
         binding["isolation_epoch"] = serde_json::json!(0);
-        assert!(serde_json::from_value::<RecoveryGrantBindingV1>(binding).is_err());
+        let refused = serde_json::from_value::<RecoveryGrantBindingV1>(binding)
+            .err()
+            .map(|error| error.to_string());
+        assert_eq!(
+            refused.as_deref(),
+            Some(ContractError::InvalidState.to_string().as_str())
+        );
 
         let mut without_origin = corpus["action"].clone();
         if let Some(fields) = without_origin.as_object_mut() {

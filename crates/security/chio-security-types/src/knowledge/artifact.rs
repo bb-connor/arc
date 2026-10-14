@@ -73,16 +73,19 @@ pub struct ArtifactVersionV1 {
 }
 impl ArtifactVersionV1 {
     pub fn validate(&self) -> Result<(), ContractError> {
-        if self.size_bytes.get() > super::MAX_ARTIFACT_BYTES as u64
-            || self.creation_sequence.get() == 0
-        {
+        if exceeds_artifact_bytes(self.size_bytes) || self.creation_sequence.get() == 0 {
             return Err(ContractError::LimitExceeded);
         }
         for (index, dependency) in self.dependencies.as_slice().iter().enumerate() {
             if dependency.scope.tenant_id != self.scope.tenant_id
                 || dependency.scope.authority_domain != self.scope.authority_domain
                 || (dependency.artifact == self.artifact && dependency.version == self.version)
-                || self.dependencies.as_slice()[..index].contains(dependency)
+                || self
+                    .dependencies
+                    .as_slice()
+                    .iter()
+                    .take(index)
+                    .any(|old| old == dependency)
             {
                 return Err(ContractError::BindingMismatch);
             }
@@ -133,7 +136,7 @@ pub struct ArtifactCertificateV1 {
 }
 impl ArtifactCertificateV1 {
     pub fn validate(&self) -> Result<(), ContractError> {
-        if self.size_bytes.get() > super::MAX_ARTIFACT_BYTES as u64
+        if exceeds_artifact_bytes(self.size_bytes)
             || self.issued_at_unix_ms.get() == 0
             || self.valid_until_unix_ms <= self.issued_at_unix_ms
             || self.valid_until_unix_ms.get() - self.issued_at_unix_ms.get() > 60_000
@@ -157,9 +160,7 @@ pub struct ArtifactArchiveManifestV1 {
 }
 impl ArtifactArchiveManifestV1 {
     pub fn validate(&self) -> Result<(), ContractError> {
-        if self.scope != self.root.scope
-            || self.total_bytes.get() > super::MAX_ARTIFACT_BYTES as u64
-        {
+        if self.scope != self.root.scope || exceeds_artifact_bytes(self.total_bytes) {
             return Err(ContractError::BindingMismatch);
         }
         let mut total = 0_u64;
@@ -167,7 +168,7 @@ impl ArtifactArchiveManifestV1 {
             version.validate()?;
             if version.scope.authority_domain != self.scope.authority_domain
                 || version.scope.tenant_id != self.scope.tenant_id
-                || self.versions.as_slice()[..index].iter().any(|old| {
+                || self.versions.as_slice().iter().take(index).any(|old| {
                     old.scope == version.scope
                         && old.artifact == version.artifact
                         && old.version == version.version
@@ -194,3 +195,7 @@ super::protected_debug!(
     ArtifactCertificateV1,
     ArtifactArchiveManifestV1
 );
+
+fn exceeds_artifact_bytes(size: SafeInteger) -> bool {
+    u64::try_from(super::MAX_ARTIFACT_BYTES).map_or(true, |max| size.get() > max)
+}
