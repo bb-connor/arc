@@ -1,7 +1,7 @@
 # Enforced native launches in examples
 
-Native MCP tools require an Enforced signed reference-runtime policy. Disabled
-and Shadow stages can prepare offline artifacts but cannot launch processes.
+Native MCP tools launch only under a signed reference-runtime policy bound to a
+registered enterprise migration ledger head.
 The shared shell helper, Python process SDK helper, Docker entrypoint and native
 conformance runner all use the same explicit operator configuration:
 
