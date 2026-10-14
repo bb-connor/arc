@@ -313,12 +313,6 @@ pub(super) fn require_public_request_binding_tx(
                 "public purchase request is bound to different durable state".to_owned(),
             ));
         }
-        if load_prebinding_terminal_tx(transaction, &reservation.reservation_id)?.is_some() {
-            return Err(FindingPurchaseStoreError::Conflict(
-                "prebinding purchase terminal has no authenticated public request ownership"
-                    .to_owned(),
-            ));
-        }
         return Err(FindingPurchaseStoreError::Conflict(
             "public purchase request has no durable reservation binding".to_owned(),
         ));
@@ -338,64 +332,6 @@ pub(super) fn require_public_request_binding_tx(
         return Err(FindingPurchaseStoreError::Conflict(
             "public purchase request is bound to different durable state".to_owned(),
         ));
-    }
-    Ok(())
-}
-
-fn load_prebinding_terminal_tx(
-    transaction: &Transaction<'_>,
-    reservation_id: &str,
-) -> Result<Option<(String, String, String)>, FindingPurchaseStoreError> {
-    transaction
-        .query_row(
-            r#"
-            SELECT terminal_kind, terminal_id, receipt_id
-            FROM prebinding_purchase_terminals WHERE reservation_id = ?1
-            "#,
-            [reservation_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .optional()
-        .map_err(sqlite_error)
-}
-
-pub(super) fn carry_prebinding_purchase_terminals(
-    transaction: &Transaction<'_>,
-    on_disk_version: i32,
-) -> Result<(), FindingPurchaseStoreError> {
-    if on_disk_version >= FINDING_PURCHASE_PUBLIC_REQUEST_VERSION {
-        return Ok(());
-    }
-    let expected: i64 = transaction
-        .query_row(
-            r#"
-            SELECT
-                (SELECT COUNT(*) FROM purchase_records)
-                + (SELECT COUNT(*) FROM failed_delivery_records)
-            "#,
-            [],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    let carried = transaction
-        .execute(
-            r#"
-            INSERT INTO prebinding_purchase_terminals (
-                reservation_id, terminal_kind, terminal_id, receipt_id
-            )
-            SELECT reservation_id, 'purchase_record', purchase_key, delivery_receipt_id
-            FROM purchase_records
-            UNION ALL
-            SELECT reservation_id, 'failed_delivery', failed_delivery_id, deny_receipt_id
-            FROM failed_delivery_records
-            "#,
-            [],
-        )
-        .map_err(sqlite_error)?;
-    if i64::try_from(carried).unwrap_or(i64::MAX) != expected {
-        return Err(invariant(format!(
-            "prebinding terminal migration carried {carried} of {expected} rows"
-        )));
     }
     Ok(())
 }

@@ -25,13 +25,44 @@ fn configure_pooled_connection(connection: &mut rusqlite::Connection) -> rusqlit
     connection.execute_batch("PRAGMA busy_timeout = 5000;")
 }
 
+fn verify_schema(connection: &rusqlite::Connection) -> Result<(), String> {
+    if crate::schema_catalog::matches_canonical_schema(connection, SCHEMA, SCHEMA_TABLES)
+        .map_err(|error| error.to_string())?
+    {
+        Ok(())
+    } else {
+        Err("finding operator payment schema differs from the canonical definition".to_owned())
+    }
+}
+
 const SCHEMA_KEY: &str = "finding_operator_payment";
-const SUPPORTED_SCHEMA_VERSION: i32 = 0;
+const SCHEMA_VERSION: i32 = 1;
 const SCHEMA_ANCHORS: &[&str] = &[
     "chio_finding_operator_bundles",
     "chio_finding_payloads",
     "chio_finding_operator_payments",
 ];
+const SCHEMA_TABLES: &[&str] = &["chio_finding_operator_payments"];
+const SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS chio_finding_operator_payments (
+    authorization_id TEXT PRIMARY KEY,
+    reference TEXT NOT NULL UNIQUE,
+    payer TEXT NOT NULL,
+    payee TEXT NOT NULL,
+    amount_units INTEGER NOT NULL CHECK(amount_units > 0),
+    currency TEXT NOT NULL CHECK(length(currency) = 3),
+    governed_intent_id TEXT,
+    governed_intent_hash TEXT,
+    state TEXT NOT NULL CHECK(state IN ('held', 'captured', 'released', 'refunded')),
+    transaction_id TEXT,
+    prior_transaction_id TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS chio_finding_operator_payments_governed_intent
+ON chio_finding_operator_payments(governed_intent_id)
+WHERE governed_intent_id IS NOT NULL;
+"#;
 const RAIL_ID: &str = "finding-operator-ledger";
 const MAX_TEXT_BYTES: usize = 512;
 
@@ -62,7 +93,7 @@ impl SqliteFindingOperatorPaymentAdapter {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         Ok(store)
     }
 
@@ -80,51 +111,31 @@ impl SqliteFindingOperatorPaymentAdapter {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         Ok(store)
     }
 
-    fn run_migrations(&self) -> Result<(), String> {
-        let conn = self.pool.get().map_err(|error| error.to_string())?;
-        crate::check_schema_version(&conn, SCHEMA_KEY, SUPPORTED_SCHEMA_VERSION, SCHEMA_ANCHORS)
+    fn initialize_schema(&self) -> Result<(), String> {
+        let mut conn = self.pool.get().map_err(|error| error.to_string())?;
+        let state = crate::check_current_schema(&conn, SCHEMA_KEY, SCHEMA_VERSION, SCHEMA_ANCHORS)
             .map_err(|error| error.to_string())?;
         conn.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-
-            CREATE TABLE IF NOT EXISTS chio_finding_operator_payments (
-                authorization_id TEXT PRIMARY KEY,
-                reference TEXT NOT NULL UNIQUE,
-                payer TEXT NOT NULL,
-                payee TEXT NOT NULL,
-                amount_units INTEGER NOT NULL CHECK(amount_units > 0),
-                currency TEXT NOT NULL CHECK(length(currency) = 3),
-                governed_intent_id TEXT,
-                governed_intent_hash TEXT,
-                state TEXT NOT NULL CHECK(state IN ('held', 'captured', 'released', 'refunded')),
-                transaction_id TEXT,
-                prior_transaction_id TEXT,
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            );
-            "#,
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
         )
         .map_err(|error| error.to_string())?;
-        ensure_payment_column(&conn, "governed_intent_id", "TEXT")?;
-        ensure_payment_column(&conn, "governed_intent_hash", "TEXT")?;
-        conn.execute_batch(
-            r#"
-            CREATE UNIQUE INDEX IF NOT EXISTS chio_finding_operator_payments_governed_intent
-            ON chio_finding_operator_payments(governed_intent_id)
-            WHERE governed_intent_id IS NOT NULL;
-            "#,
-        )
-        .map_err(|error| error.to_string())?;
-        crate::stamp_schema_version(&conn, SCHEMA_KEY, SUPPORTED_SCHEMA_VERSION)
+        if state == crate::SchemaState::Current {
+            return verify_schema(&conn);
+        }
+        let transaction = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| error.to_string())?;
-        Ok(())
+        transaction
+            .execute_batch(SCHEMA)
+            .map_err(|error| error.to_string())?;
+        crate::stamp_schema_version(&transaction, SCHEMA_KEY, SCHEMA_VERSION)
+            .map_err(|error| error.to_string())?;
+        verify_schema(&transaction)?;
+        transaction.commit().map_err(|error| error.to_string())
     }
 
     fn authorize_durable(
@@ -158,46 +169,10 @@ impl SqliteFindingOperatorPaymentAdapter {
             {
                 return Err("payment authorization conflicts with durable state".to_owned());
             }
-            match (
-                existing.governed_intent_id.as_deref(),
-                existing.governed_intent_hash.as_deref(),
-                governed_intent_id,
-                governed_intent_hash,
-            ) {
-                (None, None, Some(intent_id), Some(intent_hash)) => {
-                    tx.execute(
-                        r#"
-                        UPDATE chio_finding_operator_payments
-                        SET governed_intent_id = ?2, governed_intent_hash = ?3,
-                            updated_at = ?4
-                        WHERE authorization_id = ?1
-                          AND governed_intent_id IS NULL
-                          AND governed_intent_hash IS NULL
-                        "#,
-                        params![existing.authorization_id, intent_id, intent_hash, now],
-                    )
-                    .map_err(|error| error.to_string())?;
-                }
-                (Some(existing_id), None, Some(intent_id), Some(intent_hash))
-                    if existing_id == intent_id =>
-                {
-                    tx.execute(
-                        r#"
-                        UPDATE chio_finding_operator_payments
-                        SET governed_intent_hash = ?2, updated_at = ?3
-                        WHERE authorization_id = ?1
-                          AND governed_intent_id = ?4
-                          AND governed_intent_hash IS NULL
-                        "#,
-                        params![existing.authorization_id, intent_hash, now, intent_id],
-                    )
-                    .map_err(|error| error.to_string())?;
-                }
-                (existing_id, existing_hash, requested_id, requested_hash)
-                    if existing_id == requested_id && existing_hash == requested_hash => {}
-                _ => {
-                    return Err("payment authorization conflicts with durable state".to_owned());
-                }
+            if existing.governed_intent_id.as_deref() != governed_intent_id
+                || existing.governed_intent_hash.as_deref() != governed_intent_hash
+            {
+                return Err("payment authorization conflicts with durable state".to_owned());
             }
             tx.commit().map_err(|error| error.to_string())?;
             return Ok(held_authorization(existing.authorization_id, true));
@@ -367,39 +342,27 @@ impl SqliteFindingOperatorPaymentAdapter {
     }
 
     /// Reconcile the payment bound to one governed cognition-market intent.
-    /// Legacy rows without this binding fail closed if they could be live.
+    /// A live payment that matches the intent's payer, amount and currency but
+    /// carries no governed binding is refused rather than adopted.
     pub fn reconcile_expired_governed_intent(
         &self,
         governed_intent_id: &str,
-        request_id: &str,
         payer: &str,
         amount_units: u64,
         currency: &str,
     ) -> Result<(), String> {
-        let now = self.now_secs()?;
+        self.now_secs()?;
         validate_reconciliation_binding(payer, amount_units, currency)?;
         validate_text(governed_intent_id, "governed_intent_id")?;
-        validate_text(request_id, "request_id")?;
         let mut conn = self.pool.get().map_err(|error| error.to_string())?;
         let tx = conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| error.to_string())?;
-        let mut record = load_by_governed_intent_id(&tx, governed_intent_id)?;
-        if record.is_none() {
-            record = bind_legacy_payment_from_journal(
-                &tx,
-                governed_intent_id,
-                request_id,
-                payer,
-                amount_units,
-                currency,
-                now,
-            )?;
-        }
+        let record = load_by_governed_intent_id(&tx, governed_intent_id)?;
         if record.is_none() {
             let amount_units = i64::try_from(amount_units)
                 .map_err(|_| "payment amount exceeds SQLite integer range".to_owned())?;
-            let legacy_live: i64 = tx
+            let unbound_live: i64 = tx
                 .query_row(
                     r#"
                     SELECT COUNT(*) FROM chio_finding_operator_payments
@@ -411,9 +374,10 @@ impl SqliteFindingOperatorPaymentAdapter {
                     |row| row.get(0),
                 )
                 .map_err(|error| error.to_string())?;
-            if legacy_live != 0 {
+            if unbound_live != 0 {
                 return Err(
-                    "legacy live payment cannot be bound to the expired governed intent".to_owned(),
+                    "unbound live payment cannot be bound to the expired governed intent"
+                        .to_owned(),
                 );
             }
             tx.commit().map_err(|error| error.to_string())?;
@@ -484,78 +448,6 @@ impl SqliteFindingOperatorPaymentAdapter {
             .map_err(|error| error.to_string())?;
         u64::try_from(count).map_err(|_| "payment count was negative".to_owned())
     }
-}
-
-fn bind_legacy_payment_from_journal(
-    tx: &rusqlite::Transaction<'_>,
-    governed_intent_id: &str,
-    request_id: &str,
-    payer: &str,
-    amount_units: u64,
-    currency: &str,
-    now: i64,
-) -> Result<Option<PaymentRecord>, String> {
-    let journal_exists: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'payment_journal')",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(|error| error.to_string())?;
-    if !journal_exists {
-        return Ok(None);
-    }
-    let amount_units = i64::try_from(amount_units)
-        .map_err(|_| "payment amount exceeds SQLite integer range".to_owned())?;
-    let mut statement = tx
-        .prepare(
-            r#"
-            SELECT payment.authorization_id
-            FROM chio_finding_operator_payments AS payment
-            INNER JOIN payment_journal AS journal
-              ON journal.operation_id = payment.reference
-             AND journal.authorization_id = payment.authorization_id
-            WHERE journal.request_id = ?1
-              AND payment.payer = ?2
-              AND payment.amount_units = ?3
-              AND payment.currency = ?4
-              AND payment.governed_intent_id IS NULL
-              AND payment.governed_intent_hash IS NULL
-            ORDER BY payment.authorization_id
-            LIMIT 2
-            "#,
-        )
-        .map_err(|error| error.to_string())?;
-    let candidates = statement
-        .query_map(params![request_id, payer, amount_units, currency], |row| {
-            row.get::<_, String>(0)
-        })
-        .map_err(|error| error.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| error.to_string())?;
-    drop(statement);
-    let [authorization_id] = candidates.as_slice() else {
-        if candidates.is_empty() {
-            return Ok(None);
-        }
-        return Err("multiple legacy payments match the expired governed intent".to_owned());
-    };
-    let changed = tx
-        .execute(
-            r#"
-            UPDATE chio_finding_operator_payments
-            SET governed_intent_id = ?2, updated_at = ?3
-            WHERE authorization_id = ?1
-              AND governed_intent_id IS NULL
-              AND governed_intent_hash IS NULL
-            "#,
-            params![authorization_id, governed_intent_id, now],
-        )
-        .map_err(|error| error.to_string())?;
-    if changed != 1 {
-        return Err("legacy payment binding changed concurrently".to_owned());
-    }
-    load_by_authorization(tx, authorization_id)
 }
 
 impl PaymentAdapter for SqliteFindingOperatorPaymentAdapter {
@@ -754,30 +646,6 @@ fn load_record(
         },
     )
     .transpose()
-}
-
-fn ensure_payment_column(
-    conn: &rusqlite::Connection,
-    column: &str,
-    definition: &str,
-) -> Result<(), String> {
-    if !matches!(column, "governed_intent_id" | "governed_intent_hash") || definition != "TEXT" {
-        return Err("unsupported operator payment migration column".to_owned());
-    }
-    let exists: bool = conn
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('chio_finding_operator_payments') WHERE name = ?1)",
-            [column],
-            |row| row.get(0),
-        )
-        .map_err(|error| error.to_string())?;
-    if !exists {
-        conn.execute_batch(&format!(
-            "ALTER TABLE chio_finding_operator_payments ADD COLUMN {column} {definition}"
-        ))
-        .map_err(|error| error.to_string())?;
-    }
-    Ok(())
 }
 
 fn validate_request(request: &PaymentAuthorizeRequest) -> Result<(), String> {
@@ -1082,168 +950,79 @@ mod tests {
             )
             .unwrap();
         adapter
-            .reconcile_expired_governed_intent(
-                "intent-request-1",
-                "purchase-expired-capture",
-                "buyer-1",
-                25,
-                "USD",
-            )
+            .reconcile_expired_governed_intent("intent-request-1", "buyer-1", 25, "USD")
             .unwrap();
         assert_eq!(adapter.capture_count().unwrap(), 1);
         assert_eq!(adapter.refund_count().unwrap(), 1);
     }
 
     #[test]
-    fn legacy_authorization_replay_backfills_governed_intent_binding() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("legacy-operator.db");
-        let conn = rusqlite::Connection::open(&path).unwrap();
-        conn.execute_batch(
-            r#"
-            CREATE TABLE chio_finding_operator_payments (
-                authorization_id TEXT PRIMARY KEY,
-                reference TEXT NOT NULL UNIQUE,
-                payer TEXT NOT NULL,
-                payee TEXT NOT NULL,
-                amount_units INTEGER NOT NULL CHECK(amount_units > 0),
-                currency TEXT NOT NULL CHECK(length(currency) = 3),
-                state TEXT NOT NULL CHECK(state IN ('held', 'captured', 'released', 'refunded')),
-                transaction_id TEXT,
-                prior_transaction_id TEXT,
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            );
-            "#,
-        )
-        .unwrap();
-        let request = governed_request("durable-operation-migrated", "intent-request-migrated");
-        let authorization_id = authorization_id(&request);
-        conn.execute(
-            "INSERT INTO chio_finding_operator_payments (authorization_id, reference, payer, payee, amount_units, currency, state, transaction_id, prior_transaction_id, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'held', NULL, NULL, 1, 1)",
-            params![
-                authorization_id,
-                request.reference,
-                request.payer,
-                request.payee,
-                i64::try_from(request.amount_units).unwrap(),
-                request.currency,
-            ],
-        )
-        .unwrap();
-        drop(conn);
+    fn replay_cannot_attach_a_governed_binding_to_an_unbound_authorization() {
+        let adapter = SqliteFindingOperatorPaymentAdapter::open_in_memory().unwrap();
+        let unbound = request("durable-operation-unbound");
+        adapter.authorize(&unbound).unwrap();
+        let governed = governed_request("durable-operation-unbound", "intent-request-unbound");
+        assert!(matches!(
+            adapter.authorize(&governed),
+            Err(PaymentError::RailError(message))
+                if message == "payment authorization conflicts with durable state"
+        ));
+    }
 
-        let adapter = SqliteFindingOperatorPaymentAdapter::open(&path).unwrap();
-        let replay = adapter.authorize(&request).unwrap();
-        assert_eq!(replay.authorization_id, authorization_id);
-        assert_eq!(replay.metadata["replay"], true);
-        let conn = rusqlite::Connection::open(&path).unwrap();
-        let governed_binding: (String, String) = conn
-            .query_row(
-                "SELECT governed_intent_id, governed_intent_hash FROM chio_finding_operator_payments WHERE authorization_id = ?1",
-                [&authorization_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .unwrap();
+    #[test]
+    fn expired_governed_intent_refuses_an_unbound_live_payment() {
+        let adapter = SqliteFindingOperatorPaymentAdapter::open_in_memory().unwrap();
+        let unbound = request("durable-operation-unbound-live");
+        adapter.authorize(&unbound).unwrap();
         assert_eq!(
-            governed_binding,
-            ("intent-request-migrated".to_owned(), "a".repeat(64))
+            adapter
+                .reconcile_expired_governed_intent("intent-request-unbound", "buyer-1", 25, "USD")
+                .unwrap_err(),
+            "unbound live payment cannot be bound to the expired governed intent"
+        );
+        assert_eq!(adapter.capture_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn payment_schema_other_than_current_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("operator.db");
+        drop(SqliteFindingOperatorPaymentAdapter::open(&path).unwrap());
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        crate::stamp_schema_version(&conn, SCHEMA_KEY, 0).unwrap();
+        drop(conn);
+        assert_eq!(
+            SqliteFindingOperatorPaymentAdapter::open(&path)
+                .err()
+                .unwrap(),
+            "database schema version 0 is not the current schema version 1; refusing to open"
         );
     }
 
     #[test]
-    fn expired_legacy_payment_uses_exact_journal_binding() {
+    fn current_stamp_over_a_retired_payment_table_shape_is_refused() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("legacy-expired-operator.db");
+        let path = dir.path().join("operator.db");
+        drop(SqliteFindingOperatorPaymentAdapter::open(&path).unwrap());
         let conn = rusqlite::Connection::open(&path).unwrap();
-        conn.execute_batch(
-            r#"
-            CREATE TABLE chio_finding_operator_payments (
-                authorization_id TEXT PRIMARY KEY,
-                reference TEXT NOT NULL UNIQUE,
-                payer TEXT NOT NULL,
-                payee TEXT NOT NULL,
-                amount_units INTEGER NOT NULL,
-                currency TEXT NOT NULL,
-                state TEXT NOT NULL,
-                transaction_id TEXT,
-                prior_transaction_id TEXT,
-                created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
-            );
-            CREATE TABLE payment_journal (
-                operation_id TEXT PRIMARY KEY,
-                request_id TEXT NOT NULL,
-                authorization_id TEXT
-            );
-            "#,
-        )
-        .unwrap();
-        let request = request("legacy-payment-operation");
-        let authorization_id = authorization_id(&request);
-        conn.execute(
-            "INSERT INTO chio_finding_operator_payments (authorization_id, reference, payer, payee, amount_units, currency, state, transaction_id, prior_transaction_id, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'held', NULL, NULL, 1, 1)",
-            params![
-                authorization_id,
-                request.reference,
-                request.payer,
-                request.payee,
-                i64::try_from(request.amount_units).unwrap(),
-                request.currency,
-            ],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO payment_journal (operation_id, request_id, authorization_id) VALUES (?1, ?2, ?3)",
-            params![request.reference, "purchase-request-legacy", authorization_id],
-        )
-        .unwrap();
+        conn.execute_batch("DROP INDEX chio_finding_operator_payments_governed_intent;")
+            .unwrap();
         drop(conn);
-
-        let adapter = SqliteFindingOperatorPaymentAdapter::open(&path).unwrap();
-        assert!(adapter
-            .reconcile_expired_governed_intent(
-                "expired-intent-legacy",
-                "wrong-request",
-                "buyer-1",
-                25,
-                "USD",
-            )
-            .is_err());
-        adapter
-            .reconcile_expired_governed_intent(
-                "expired-intent-legacy",
-                "purchase-request-legacy",
-                "buyer-1",
-                25,
-                "USD",
-            )
-            .unwrap();
-        adapter
-            .reconcile_expired_governed_intent(
-                "expired-intent-legacy",
-                "purchase-request-legacy",
-                "buyer-1",
-                25,
-                "USD",
-            )
-            .unwrap();
-
-        let conn = rusqlite::Connection::open(&path).unwrap();
-        let state: (String, String, Option<String>) = conn
-            .query_row(
-                "SELECT state, governed_intent_id, governed_intent_hash FROM chio_finding_operator_payments WHERE authorization_id = ?1",
-                [&authorization_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )
-            .unwrap();
         assert_eq!(
-            state,
-            (
-                "released".to_owned(),
-                "expired-intent-legacy".to_owned(),
-                None,
-            )
+            SqliteFindingOperatorPaymentAdapter::open(&path)
+                .err()
+                .unwrap(),
+            "finding operator payment schema differs from the canonical definition"
         );
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        let restored: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_schema \
+                 WHERE name = 'chio_finding_operator_payments_governed_intent'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(restored, 0, "a refused store is not repaired");
     }
 }

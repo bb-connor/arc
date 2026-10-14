@@ -150,33 +150,6 @@ BEGIN
     SELECT RAISE(ABORT, 'public purchase request must be retained');
 END;
 
--- Revision-12 compatibility roster for terminals written before public
--- request bindings existed. The first authenticated, reservation-compatible
--- replay promotes one row into public_purchase_requests atomically; this row
--- remains immutable evidence of the migration boundary.
-CREATE TABLE IF NOT EXISTS prebinding_purchase_terminals (
-    reservation_id TEXT NOT NULL PRIMARY KEY
-        REFERENCES purchase_reservations(reservation_id),
-    terminal_kind TEXT NOT NULL CHECK (
-        terminal_kind IN ('purchase_record', 'failed_delivery')
-    ),
-    terminal_id TEXT NOT NULL CHECK (length(terminal_id) BETWEEN 1 AND 512),
-    receipt_id TEXT NOT NULL CHECK (length(receipt_id) BETWEEN 1 AND 512),
-    UNIQUE (terminal_kind, terminal_id)
-);
-
-CREATE TRIGGER IF NOT EXISTS prebinding_purchase_terminals_immutable
-BEFORE UPDATE ON prebinding_purchase_terminals
-BEGIN
-    SELECT RAISE(ABORT, 'prebinding purchase terminal is immutable');
-END;
-
-CREATE TRIGGER IF NOT EXISTS prebinding_purchase_terminals_no_delete
-BEFORE DELETE ON prebinding_purchase_terminals
-BEGIN
-    SELECT RAISE(ABORT, 'prebinding purchase terminal must be retained');
-END;
-
 CREATE TABLE IF NOT EXISTS purchase_capture_intents (
     reservation_id TEXT NOT NULL PRIMARY KEY
         REFERENCES purchase_reservations(reservation_id),
@@ -200,15 +173,11 @@ END;
 CREATE TABLE IF NOT EXISTS purchase_payout_bindings (
     reservation_id TEXT NOT NULL PRIMARY KEY
         REFERENCES purchase_reservations(reservation_id),
-    destination TEXT NOT NULL CHECK (length(destination) BETWEEN 1 AND 512),
-    binding_kind TEXT NOT NULL CHECK (binding_kind IN ('evm', 'legacy_terminal')),
-    CHECK (
-        (binding_kind = 'evm'
-         AND length(destination) = 42
-         AND substr(destination, 1, 2) = '0x'
-         AND substr(destination, 3) NOT GLOB '*[^0-9a-f]*'
-         AND destination <> '0x0000000000000000000000000000000000000000')
-        OR binding_kind = 'legacy_terminal'
+    destination TEXT NOT NULL CHECK (
+        length(destination) = 42
+        AND substr(destination, 1, 2) = '0x'
+        AND substr(destination, 3) NOT GLOB '*[^0-9a-f]*'
+        AND destination <> '0x0000000000000000000000000000000000000000'
     )
 );
 
@@ -435,28 +404,3 @@ BEGIN
     SELECT RAISE(ABORT, 'admitted payout destination must be retained');
 END;
 
--- Retained pre-EVM payout rows are historical evidence only. They are never
--- returned by the actionable destination API or accepted for a new purchase.
-CREATE TABLE IF NOT EXISTS legacy_payout_destinations (
-    allocation_id TEXT NOT NULL
-        CHECK (length(allocation_id) = 64 AND allocation_id NOT GLOB '*[^0-9a-f]*'),
-    destination TEXT NOT NULL CHECK (length(destination) BETWEEN 3 AND 512),
-    slot_index INTEGER NOT NULL CHECK (slot_index BETWEEN 0 AND 15),
-    admitted_at INTEGER NOT NULL CHECK (admitted_at > 0),
-    PRIMARY KEY (allocation_id, destination)
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS legacy_payout_destinations_slot
-    ON legacy_payout_destinations(allocation_id, slot_index);
-
-CREATE TRIGGER IF NOT EXISTS legacy_payout_destinations_immutable
-BEFORE UPDATE ON legacy_payout_destinations
-BEGIN
-    SELECT RAISE(ABORT, 'legacy payout destination is immutable');
-END;
-
-CREATE TRIGGER IF NOT EXISTS legacy_payout_destinations_no_delete
-BEFORE DELETE ON legacy_payout_destinations
-BEGIN
-    SELECT RAISE(ABORT, 'legacy payout destination must be retained');
-END;

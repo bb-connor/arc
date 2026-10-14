@@ -23,13 +23,165 @@ fn configure_pooled_connection(connection: &mut rusqlite::Connection) -> rusqlit
     connection.execute_batch("PRAGMA busy_timeout = 5000;")
 }
 
+fn verify_schema(connection: &rusqlite::Connection) -> Result<(), FindingOperatorBundleStoreError> {
+    let canonical =
+        crate::schema_catalog::matches_canonical_schema(connection, SCHEMA, SCHEMA_TABLES)
+            .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
+    if canonical {
+        Ok(())
+    } else {
+        Err(FindingOperatorBundleStoreError::Unavailable(
+            "finding operator bundle schema differs from the canonical definition".to_owned(),
+        ))
+    }
+}
+
 const SCHEMA_KEY: &str = "finding_operator_bundle";
-const SUPPORTED_SCHEMA_VERSION: i32 = 0;
+const SCHEMA_VERSION: i32 = 1;
 const SCHEMA_ANCHORS: &[&str] = &[
     "chio_finding_operator_bundles",
     "chio_finding_payloads",
     "chio_finding_operator_payments",
 ];
+const SCHEMA_TABLES: &[&str] = &[
+    "chio_finding_operator_bundles",
+    "chio_finding_operator_bundle_artifacts",
+    "chio_finding_operator_artifact_authority_policies",
+    "chio_finding_operator_retained_challenge_policies",
+    "chio_finding_operator_audit_rounds",
+    "chio_finding_operator_terminals",
+    "chio_finding_operator_terminal_capacity",
+    "chio_finding_operator_proofs",
+    "chio_finding_operator_purchase_jobs",
+    "chio_finding_operator_seller_artifact_capacity",
+];
+const SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS chio_finding_operator_bundles (
+    finding_id TEXT PRIMARY KEY,
+    bundle_sha256 TEXT NOT NULL CHECK(length(bundle_sha256) = 64),
+    bundle_json BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chio_finding_operator_bundle_artifacts (
+    artifact_kind TEXT NOT NULL CHECK(
+        artifact_kind IN (
+            'fee_schedule',
+            'admission',
+            'verifier_profile',
+            'market_terms'
+        )
+    ),
+    envelope_sha256 TEXT NOT NULL CHECK(length(envelope_sha256) = 64),
+    finding_id TEXT NOT NULL,
+    PRIMARY KEY (artifact_kind, envelope_sha256, finding_id),
+    FOREIGN KEY (finding_id)
+        REFERENCES chio_finding_operator_bundles(finding_id)
+);
+
+CREATE INDEX IF NOT EXISTS chio_finding_operator_bundle_artifacts_by_finding
+ON chio_finding_operator_bundle_artifacts(finding_id, artifact_kind);
+
+CREATE TABLE IF NOT EXISTS chio_finding_operator_artifact_authority_policies (
+    artifact_kind TEXT NOT NULL CHECK(
+        artifact_kind IN ('admission', 'verifier_profile')
+    ),
+    envelope_sha256 TEXT NOT NULL CHECK(length(envelope_sha256) = 64),
+    finding_id TEXT NOT NULL,
+    policy_sha256 TEXT NOT NULL CHECK(length(policy_sha256) = 64),
+    policy_json BLOB NOT NULL,
+    PRIMARY KEY (artifact_kind, envelope_sha256, finding_id),
+    FOREIGN KEY (artifact_kind, envelope_sha256, finding_id)
+        REFERENCES chio_finding_operator_bundle_artifacts(
+            artifact_kind,
+            envelope_sha256,
+            finding_id
+        )
+);
+
+CREATE TABLE IF NOT EXISTS chio_finding_operator_retained_challenge_policies (
+    artifact_kind TEXT NOT NULL CHECK(
+        artifact_kind IN (
+            'governance_case',
+            'trust_activation',
+            'penalty',
+            'challenge_outcome',
+            'audit_epoch',
+            'audit_authorization'
+        )
+    ),
+    artifact_envelope_sha256 TEXT NOT NULL
+        CHECK(length(artifact_envelope_sha256) = 64),
+    policy_role TEXT NOT NULL CHECK(
+        policy_role IN (
+            'governance',
+            'penalty_authority',
+            'evaluator',
+            'audit_authority',
+            'randomness_witness'
+        )
+    ),
+    policy_sha256 TEXT NOT NULL CHECK(length(policy_sha256) = 64),
+    policy_json BLOB NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (artifact_kind, artifact_envelope_sha256, policy_role)
+);
+
+CREATE TABLE IF NOT EXISTS chio_finding_operator_audit_rounds (
+    epoch_envelope_sha256 TEXT PRIMARY KEY
+        CHECK(length(epoch_envelope_sha256) = 64),
+    round_sha256 TEXT NOT NULL CHECK(length(round_sha256) = 64),
+    round_json BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chio_finding_operator_terminals (
+    request_id TEXT PRIMARY KEY,
+    principal_id TEXT NOT NULL,
+    request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
+    result_sha256 TEXT NOT NULL CHECK(length(result_sha256) = 64),
+    result_json BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chio_finding_operator_terminal_capacity (
+    request_id TEXT PRIMARY KEY,
+    principal_id TEXT NOT NULL,
+    request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
+    reserved_bytes INTEGER NOT NULL CHECK(reserved_bytes > 0),
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chio_finding_operator_proofs (
+    finding_id TEXT PRIMARY KEY,
+    proof_sha256 TEXT NOT NULL CHECK(length(proof_sha256) = 64),
+    proof_json BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chio_finding_operator_purchase_jobs (
+    request_id TEXT PRIMARY KEY,
+    principal_id TEXT NOT NULL,
+    request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
+    job_sha256 TEXT NOT NULL CHECK(length(job_sha256) = 64),
+    job_json BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chio_finding_operator_seller_artifact_capacity (
+    request_id TEXT PRIMARY KEY,
+    principal_id TEXT NOT NULL,
+    request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
+    reserved_bytes INTEGER NOT NULL CHECK(reserved_bytes >= 0),
+    committed_finding_id TEXT,
+    created_at INTEGER NOT NULL,
+    CHECK(
+        (reserved_bytes > 0 AND committed_finding_id IS NULL)
+        OR
+        (reserved_bytes = 0 AND length(committed_finding_id) = 64)
+    )
+);
+"#;
 const MAX_BUNDLE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_ARTIFACT_AUTHORITY_POLICY_BYTES: usize = 16 * 1024;
 const MAX_RETAINED_CHALLENGE_POLICIES: i64 = 100_000;
@@ -276,7 +428,7 @@ impl SqliteFindingOperatorBundleStore {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         Ok(store)
     }
 
@@ -296,154 +448,34 @@ impl SqliteFindingOperatorBundleStore {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         Ok(store)
     }
 
-    fn run_migrations(&self) -> Result<(), FindingOperatorBundleStoreError> {
-        let conn = self
-            .pool
-            .get()
-            .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-        crate::check_schema_version(&conn, SCHEMA_KEY, SUPPORTED_SCHEMA_VERSION, SCHEMA_ANCHORS)
-            .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
+    fn initialize_schema(&self) -> Result<(), FindingOperatorBundleStoreError> {
+        let unavailable = |error: &dyn std::fmt::Display| {
+            FindingOperatorBundleStoreError::Unavailable(error.to_string())
+        };
+        let mut conn = self.pool.get().map_err(|error| unavailable(&error))?;
+        let state = crate::check_current_schema(&conn, SCHEMA_KEY, SCHEMA_VERSION, SCHEMA_ANCHORS)
+            .map_err(|error| unavailable(&error))?;
         conn.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-
-            CREATE TABLE IF NOT EXISTS chio_finding_operator_bundles (
-                finding_id TEXT PRIMARY KEY,
-                bundle_sha256 TEXT NOT NULL CHECK(length(bundle_sha256) = 64),
-                bundle_json BLOB NOT NULL,
-                created_at INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_finding_operator_bundle_artifacts (
-                artifact_kind TEXT NOT NULL CHECK(
-                    artifact_kind IN (
-                        'fee_schedule',
-                        'admission',
-                        'verifier_profile',
-                        'market_terms'
-                    )
-                ),
-                envelope_sha256 TEXT NOT NULL CHECK(length(envelope_sha256) = 64),
-                finding_id TEXT NOT NULL,
-                PRIMARY KEY (artifact_kind, envelope_sha256, finding_id),
-                FOREIGN KEY (finding_id)
-                    REFERENCES chio_finding_operator_bundles(finding_id)
-            );
-
-            CREATE INDEX IF NOT EXISTS chio_finding_operator_bundle_artifacts_by_finding
-            ON chio_finding_operator_bundle_artifacts(finding_id, artifact_kind);
-
-            CREATE TABLE IF NOT EXISTS chio_finding_operator_artifact_authority_policies (
-                artifact_kind TEXT NOT NULL CHECK(
-                    artifact_kind IN ('admission', 'verifier_profile')
-                ),
-                envelope_sha256 TEXT NOT NULL CHECK(length(envelope_sha256) = 64),
-                finding_id TEXT NOT NULL,
-                policy_sha256 TEXT NOT NULL CHECK(length(policy_sha256) = 64),
-                policy_json BLOB NOT NULL,
-                PRIMARY KEY (artifact_kind, envelope_sha256, finding_id),
-                FOREIGN KEY (artifact_kind, envelope_sha256, finding_id)
-                    REFERENCES chio_finding_operator_bundle_artifacts(
-                        artifact_kind,
-                        envelope_sha256,
-                        finding_id
-                    )
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_finding_operator_retained_challenge_policies (
-                artifact_kind TEXT NOT NULL CHECK(
-                    artifact_kind IN (
-                        'governance_case',
-                        'trust_activation',
-                        'penalty',
-                        'challenge_outcome',
-                        'audit_epoch',
-                        'audit_authorization'
-                    )
-                ),
-                artifact_envelope_sha256 TEXT NOT NULL
-                    CHECK(length(artifact_envelope_sha256) = 64),
-                policy_role TEXT NOT NULL CHECK(
-                    policy_role IN (
-                        'governance',
-                        'penalty_authority',
-                        'evaluator',
-                        'audit_authority',
-                        'randomness_witness'
-                    )
-                ),
-                policy_sha256 TEXT NOT NULL CHECK(length(policy_sha256) = 64),
-                policy_json BLOB NOT NULL,
-                created_at INTEGER NOT NULL,
-                PRIMARY KEY (artifact_kind, artifact_envelope_sha256, policy_role)
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_finding_operator_audit_rounds (
-                epoch_envelope_sha256 TEXT PRIMARY KEY
-                    CHECK(length(epoch_envelope_sha256) = 64),
-                round_sha256 TEXT NOT NULL CHECK(length(round_sha256) = 64),
-                round_json BLOB NOT NULL,
-                created_at INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_finding_operator_terminals (
-                request_id TEXT PRIMARY KEY,
-                principal_id TEXT NOT NULL,
-                request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
-                result_sha256 TEXT NOT NULL CHECK(length(result_sha256) = 64),
-                result_json BLOB NOT NULL,
-                created_at INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_finding_operator_terminal_capacity (
-                request_id TEXT PRIMARY KEY,
-                principal_id TEXT NOT NULL,
-                request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
-                reserved_bytes INTEGER NOT NULL CHECK(reserved_bytes > 0),
-                created_at INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_finding_operator_proofs (
-                finding_id TEXT PRIMARY KEY,
-                proof_sha256 TEXT NOT NULL CHECK(length(proof_sha256) = 64),
-                proof_json BLOB NOT NULL,
-                created_at INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_finding_operator_purchase_jobs (
-                request_id TEXT PRIMARY KEY,
-                principal_id TEXT NOT NULL,
-                request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
-                job_sha256 TEXT NOT NULL CHECK(length(job_sha256) = 64),
-                job_json BLOB NOT NULL,
-                created_at INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_finding_operator_seller_artifact_capacity (
-                request_id TEXT PRIMARY KEY,
-                principal_id TEXT NOT NULL,
-                request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
-                reserved_bytes INTEGER NOT NULL CHECK(reserved_bytes >= 0),
-                committed_finding_id TEXT,
-                created_at INTEGER NOT NULL,
-                CHECK(
-                    (reserved_bytes > 0 AND committed_finding_id IS NULL)
-                    OR
-                    (reserved_bytes = 0 AND length(committed_finding_id) = 64)
-                )
-            );
-            "#,
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
         )
-        .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-        crate::stamp_schema_version(&conn, SCHEMA_KEY, SUPPORTED_SCHEMA_VERSION)
-            .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-        Ok(())
+        .map_err(|error| unavailable(&error))?;
+        if state == crate::SchemaState::Current {
+            return verify_schema(&conn);
+        }
+        let transaction = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| unavailable(&error))?;
+        transaction
+            .execute_batch(SCHEMA)
+            .map_err(|error| unavailable(&error))?;
+        crate::stamp_schema_version(&transaction, SCHEMA_KEY, SCHEMA_VERSION)
+            .map_err(|error| unavailable(&error))?;
+        verify_schema(&transaction)?;
+        transaction.commit().map_err(|error| unavailable(&error))
     }
 
     pub fn put(
