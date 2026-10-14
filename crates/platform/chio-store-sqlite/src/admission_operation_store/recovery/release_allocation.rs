@@ -149,7 +149,7 @@ pub(in crate::admission_operation_store) fn save_auxiliary_captured_release(
     let allocation = WorkflowReleaseAllocation {
         record_digest: *source.digest(),
     };
-    allocation.verify(tx, &record.scope, &record.workflow_id)?;
+    allocation.load(tx, &record.scope, &record.workflow_id)?;
     quota.native_release = Some(allocation);
     save_quota(tx, owner, &quota)?;
     Ok(true)
