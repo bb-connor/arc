@@ -283,7 +283,7 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: MCP_LAUNCH_SOURCE,
         function: "StdioMcpTransport::spawn_with_timeouts",
-        target: "migration.require_enforced",
+        target: "migration.revalidate",
         minimum: 1,
     },
     CallContract {
@@ -484,7 +484,7 @@ fn require_native_launch_gate(source: &SourceFacts) -> Result<(), String> {
     // in a closure or after process release cannot satisfy the contract.
     let phases = [
         (
-            "ifletErr(error)=validate_cage_migration_identity(&server_id,&migration).and_then(|()|{migration.require_enforced().map_err(",
+            "ifletErr(error)=validate_cage_migration_identity(&server_id,&migration).and_then(|()|{migration.revalidate().map_err(",
             "returnErr(merge_cleanup_failures(error,",
         ),
         (
@@ -1309,7 +1309,7 @@ mod tests {
             impl StdioMcpTransport {
                 fn spawn_with_timeouts() {
                     if let Err(error) = validate_cage_migration_identity(&server_id, &migration)
-                        .and_then(|()| { migration.require_enforced().map_err(convert) }) {
+                        .and_then(|()| { migration.revalidate().map_err(convert) }) {
                         return Err(merge_cleanup_failures(error, []));
                     }
                     let launch_result = chio_cage::launch_prepared(prepared, launch_options);
@@ -1326,7 +1326,7 @@ mod tests {
         "#;
         require_native_launch_gate(&parse_source(safe, MCP_LAUNCH_SOURCE)?)?;
         for (from, to) in [
-            ("migration.require_enforced()", "Ok(())"),
+            ("migration.revalidate()", "Ok(())"),
             ("validate_cage_migration_identity", "ignore_migration_identity"),
             ("return Err(merge_cleanup_failures", "let _ = Err(merge_cleanup_failures"),
             ("validate_cage_evidence", "ignore_cage_evidence"),

@@ -1920,7 +1920,11 @@ pub(crate) mod tests {
         unanchored.heads[0].key.scope_id = RecordId::new("deployment.other").test_unwrap();
         assert_eq!(
             unanchored.validated_key().test_unwrap_err().to_string(),
-            "key-log migration requires one exact externally anchored deployment head"
+            CliError::cli_other_error(
+                "key-log migration requires one exact externally anchored deployment head"
+                    .to_string()
+            )
+            .to_string()
         );
     }
 
