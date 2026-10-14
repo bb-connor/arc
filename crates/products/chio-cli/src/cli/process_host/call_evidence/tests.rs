@@ -70,6 +70,18 @@ fn assert_incident_observation_rejected(
     Ok(())
 }
 
+fn assert_incident_dispatch_commit_refused(artifact: &str, public_key: &str) -> Result<(), CliError> {
+    let key = PublicKey::from_hex(public_key.trim()).map_err(error)?;
+    let signed = crate::receipt_verify::verify_original_receipt(artifact, &key)?;
+    assert_eq!(
+        serde_json::from_value::<Evidence>(signed.action.parameters.clone())
+            .err()
+            .map(|failure| failure.to_string()),
+        Some("missing field `dispatch_launch`".to_owned()),
+    );
+    Ok(())
+}
+
 #[test]
 fn issued_denial_incident_artifact_is_rejected() -> Result<(), CliError> {
     assert_incident_observation_rejected(
@@ -83,8 +95,8 @@ fn issued_denial_incident_artifact_is_rejected() -> Result<(), CliError> {
 }
 
 #[test]
-fn interrupted_incident_artifact_is_rejected() -> Result<(), CliError> {
-    assert_incident_observation_rejected(
+fn interrupted_incident_dispatch_commit_without_its_launch_is_refused() -> Result<(), CliError> {
+    assert_incident_dispatch_commit_refused(
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/process-call-observation/interrupted.json"
@@ -93,13 +105,12 @@ fn interrupted_incident_artifact_is_rejected() -> Result<(), CliError> {
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/process-call-observation/interrupted-kernel.pub"
         )),
-        UNKNOWN_ERROR,
     )
 }
 
 #[test]
-fn unknown_incident_artifact_is_rejected() -> Result<(), CliError> {
-    assert_incident_observation_rejected(
+fn unknown_incident_dispatch_commit_without_its_launch_is_refused() -> Result<(), CliError> {
+    assert_incident_dispatch_commit_refused(
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/process-call-observation/unknown.json"
@@ -108,7 +119,6 @@ fn unknown_incident_artifact_is_rejected() -> Result<(), CliError> {
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/process-call-observation/kernel.pub"
         )),
-        UNKNOWN_ERROR,
     )
 }
 
