@@ -21,21 +21,15 @@ Start the trust-control server, then open `http://localhost:<port>/` in a browse
 
 ### Authentication
 
-All API calls from the dashboard require a Bearer token. The token is read in this order:
+Receipt API calls require a bearer token. Open the dashboard and enter your
+trust-control service token in the **Bearer token** field, then select **Log in**.
+The dashboard sends the token in the `Authorization` header and keeps it in the
+tab's `sessionStorage` under `chio_token` for subsequent requests and reloads.
 
-1. `sessionStorage` key `chio_token` (set from a previous visit)
-2. URL query parameter `?token=<value>`
-
-When a token is found in the URL it is moved to `sessionStorage` and removed from the URL bar (using `window.history.replaceState`) to prevent it from appearing in browser history or the `Referer` header.
-
-Pass your service token on the initial URL:
-
-```
-http://localhost:7391/?token=my-service-token
-```
-
-After the first load the token is stored in `sessionStorage` for the session. Closing the tab clears it.
-If no token is present, the dashboard shows an explicit operator guidance state instead of issuing unauthenticated API requests.
+Select **Log out** to clear the token and displayed receipt data. Closing the tab
+also clears its session storage. Query-string tokens are removed from the URL
+and cannot authorize requests. The dashboard waits for explicit token entry
+when the tab has no stored token.
 
 ## Filtering Receipts
 

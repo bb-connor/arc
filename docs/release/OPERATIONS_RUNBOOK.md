@@ -351,8 +351,10 @@ Build it before deployment:
 Then load:
 
 ```text
-http://127.0.0.1:8940/?token=<service-token>
+http://127.0.0.1:8940/
 ```
+
+Enter your trust-control service token in the **Bearer token** field and select **Log in**.
 
 ## 3. Configuration Checks Before Promotion
 

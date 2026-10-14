@@ -44,8 +44,10 @@ only. Set your own tokens before changing that binding.
 Then open:
 
 ```text
-http://127.0.0.1:8940/?token=demo-control-token
+http://127.0.0.1:8940/
 ```
+
+Enter `demo-control-token` (or your configured `CHIO_SERVICE_TOKEN`) in the **Bearer token** field and select **Log in**.
 
 The smoke script performs one governed `echo_text` call through the hosted
 edge, queries the resulting receipt from the trust service, and prints the
