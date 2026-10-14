@@ -35,7 +35,6 @@ a `serde_json` round-trip masking it.
 tests/replay/
   Cargo.toml                  # crate manifest
   README.md                   # this file
-  release_compat_matrix.toml  # cross-version receipt-compatibility matrix
   corpus_pins.toml            # pinned corpus metadata
   src/
     lib.rs                    # crate root and module map
@@ -47,7 +46,6 @@ tests/replay/
     byte_compare.rs           # byte-equivalence harness
     fs_iter.rs                # deterministic LC_ALL=C directory enumeration
     bless.rs                  # --bless gate logic
-    cross_version/            # cross-version compat matrix loader, fetch, reverify
   test-key.seed               # 32-byte deterministic Ed25519 seed; non-production
   keys/                       # public verifying key for the seed above
   fixtures/                   # 50 input scenarios across 10 families

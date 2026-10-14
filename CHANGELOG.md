@@ -55,9 +55,8 @@ on `main` for that preview.
   (#1268, #1271, #1272, #1313).
 - Capability tokens require the schema member, and capability signatures are
   verified over one preimage (#1290, #1320).
-- Release Qualification runs on dispatch from `main`, `release-tagged.yml`
-  targets the default branch, and internal path dependencies pin exact versions
-  for packaging (#1258, #1291).
+- Release Qualification runs on dispatch from `main`, and internal path
+  dependencies pin exact versions for packaging (#1258, #1291).
 - `chio-kernel` provides both a synchronous `evaluate_tool_call_blocking`
   entrypoint and an asynchronous `evaluate_tool_call` entrypoint.
 - Consolidated the workspace clippy lint policy (`unwrap_used`/`expect_used`
