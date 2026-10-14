@@ -15,10 +15,14 @@ and
   `crates/protocol/chio-mcp-remote/src/remote_mcp/`. `chio-hosted-mcp`
   re-exports `serve_http` and `RemoteServeHttpConfig` and adds no
   authorization logic.
-- **Local authorization server.** `--auth-server-seed` enables the embedded
+- **Local authorization server.** `--auth-server-seed-file` enables the embedded
   OAuth authorization server in `remote_mcp/oauth/local_server.rs` and
   `remote_mcp/oauth/request_validation.rs`. Requirements that bind
-  authorization servers apply only to this mode. With `--auth-server`,
+  authorization servers apply only to this mode. It has no end-user
+  authentication: every token names the fixed `--auth-subject`, and anyone who
+  can reach the authorize endpoint can approve a request. It is for local or
+  operator-controlled deployments only. The consent nonce (AS-11) proves page
+  provenance, not who approved. With `--auth-server`,
   `--auth-jwt-*` or `--auth-introspection-url`, an external authorization
   server owns them.
 - **Upstream side.** `chio-mcp-adapter` launches the wrapped MCP server over
@@ -103,7 +107,7 @@ package's unit-test target.
 
 ## Local authorization server controls
 
-These apply when `--auth-server-seed` is set.
+These apply when `--auth-server-seed-file` is set.
 
 | ID | Requirement | Implementation | Test | Status |
 | --- | --- | --- | --- | --- |
@@ -114,10 +118,10 @@ These apply when `--auth-server-seed` is set.
 | AS-05 | Issued tokens carry the requested resource as `aud`. | `sign_access_token` | `chio-cli mcp_auth_server mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange`; `chio-mcp-remote lib hosted_tests::auth_flows::hosted_mcp_accepts_local_oauth_pkce_and_rejects_invalid_verifier` | PASS |
 | AS-06 | An authorization code is not a bearer token at the resource server. | Codes are opaque and never verify as JWTs | `chio-cli mcp_auth_server mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange` asserts `401` for the code as a bearer | PASS |
 | AS-07 | Codes are single use, short lived, and bound to `client_id` and `redirect_uri`. | `exchange_authorization_code` removes the code, checks the deadline and both bindings | none for reuse, expiry or binding mismatch | GAP |
-| AS-08 | Redirect URIs MUST be `https` or loopback. | `validate_redirect_uri` | none | GAP |
-| AS-09 | Authorization servers MUST validate exact redirect URIs against pre-registered values. | No client registry; any `client_id` with an `https` or loopback redirect is accepted | none; the requirement is not implemented | GAP |
+| AS-08 | Redirect URIs MUST be `https` or loopback. | `http_service_auth.rs` `build_client_registry` refuses at startup an `--auth-client` redirect URI that is not `https` or `http` on a loopback host, or that is not canonical, carries a fragment or contains a wildcard; the authorize endpoint accepts only registered URIs | `chio-mcp-remote lib hosted_tests::auth_config::local_authorization_server_refuses_invalid_client_registrations` | PASS |
+| AS-09 | Authorization servers MUST validate exact redirect URIs against pre-registered values. | Clients and their exact redirect URIs are declared at startup with `--auth-client CLIENT_ID=REDIRECT_URI`; the embedded server refuses to start without one. `validate_authorization_request` answers an unknown `client_id` or an unregistered `redirect_uri` with `400 invalid_request` and never redirects. There is no dynamic client registration | `chio-mcp-remote lib hosted_tests::auth_flows::local_authorization_server_rejects_unregistered_redirect_uri`; `chio-mcp-remote lib hosted_tests::auth_config::local_authorization_server_refuses_invalid_client_registrations` | PASS |
 | AS-10 | Consent: the user sees client, resource, subject and scopes and can approve or deny; denial redirects with `access_denied`. | `authorization_page`, `approve_authorization` | approval covered by `chio-cli mcp_auth_server mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange`; denial by `chio-mcp-remote lib tests::local_authorization::local_authorization_server_denial_redirects_access_denied_without_code` | PASS |
-| AS-11 | Approval is accepted only from the consent page the server rendered. | `authorization_page` stores the validated request under a single-use `consent_nonce` that the page carries; `approve_authorization` accepts only that nonce and the decision, consumes it on the first answer and approves the stored request. A missing, unknown, answered or expired nonce is `400 invalid_request` with no redirect | `chio-mcp-remote lib hosted_tests::auth_flows::local_authorization_server_rejects_approval_without_consent_nonce`; `chio-mcp-remote lib tests::clock_custody::local_authorization_server_consent_nonce_is_single_use_and_expiring` | PASS |
+| AS-11 | Approval is accepted only from the consent page the server rendered. | `authorization_page` stores the validated request under a single-use `consent_nonce` that the page carries; `approve_authorization` accepts only that nonce and the decision, consumes it on the first answer and approves the stored request. A missing, unknown, answered or expired nonce is `400 invalid_request` with no redirect. The nonce proves page provenance only: the embedded server has no end-user authentication | `chio-mcp-remote lib hosted_tests::auth_flows::local_authorization_server_rejects_approval_without_consent_nonce`; `chio-mcp-remote lib tests::clock_custody::local_authorization_server_consent_nonce_is_single_use_and_expiring` | PASS |
 | AS-12 | Authorization responses SHOULD include `iss` and advertise `authorization_response_iss_parameter_supported` (RFC 9207). | `approve_authorization` and `redirect_oauth_error` append `iss`; the local server metadata publishes `authorization_response_iss_parameter_supported: true` | `chio-mcp-remote lib tests::local_authorization::local_authorization_server_redirect_carries_iss` | PASS |
 | AS-13 | Access tokens SHOULD be short lived. | `sign_access_token` sets `exp = iat + access_token_ttl_secs` | none asserts `exp` | GAP |
 | AS-14 | Unsupported scopes are refused with `invalid_scope`; token exchange cannot widen the subject token's scopes. | `resolve_requested_scopes`, `resolve_exchange_scopes` | none | GAP |
@@ -153,8 +157,6 @@ change before it can pass.
 | AS-03 | `chio-mcp-remote lib local_authorization_server_rejects_missing_resource` | |
 | AS-04 | `chio-mcp-remote lib local_authorization_server_rejects_token_resource_mismatch` | |
 | AS-07 | `chio-mcp-remote lib local_authorization_server_codes_are_single_use_expiring_and_bound` | |
-| AS-08 | `chio-mcp-remote lib local_authorization_server_rejects_non_https_non_loopback_redirect_uri` | |
-| AS-09 | `chio-mcp-remote lib local_authorization_server_rejects_unregistered_redirect_uri` | code |
 | AS-13 | `chio-mcp-remote lib local_authorization_server_access_token_lifetime_is_bounded` | |
 | AS-14 | `chio-mcp-remote lib local_authorization_server_rejects_unsupported_and_widened_scopes` | |
 

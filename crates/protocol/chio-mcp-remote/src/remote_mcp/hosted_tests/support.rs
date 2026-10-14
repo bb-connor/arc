@@ -118,6 +118,14 @@ pub fn start_local_oauth_http_server(admin_token: &str) -> TestServer {
     )
 }
 
+/// The client the hosted local OAuth flows register and authorize as.
+pub fn local_oauth_test_client() -> crate::OAuthClientRegistration {
+    crate::OAuthClientRegistration {
+        client_id: "https://client.example/app".to_string(),
+        redirect_uri: "http://localhost:7777/callback".to_string(),
+    }
+}
+
 pub fn sign_jwt(keypair: &Keypair, claims: &Value) -> String {
     let header = URL_SAFE_NO_PAD.encode(
         serde_json::to_vec(&json!({
@@ -628,6 +636,7 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         auth_registration_endpoint: None,
         auth_jwks_uri: None,
         auth_scopes: vec![],
+        auth_clients: Vec::new(),
         auth_subject: "operator".to_string(),
         auth_code_ttl_secs: 300,
         auth_access_token_ttl_secs: 600,
@@ -777,6 +786,7 @@ fn spawn_local_oauth_http_server_thread(
     config.admin_token = Some(admin_token.to_string());
     config.public_base_url = Some(public_base_url);
     config.auth_scopes = vec!["mcp:invoke".to_string()];
+    config.auth_clients = vec![local_oauth_test_client()];
     spawn_server_thread(config)
 }
 

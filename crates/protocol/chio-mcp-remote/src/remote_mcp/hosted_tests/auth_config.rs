@@ -1,7 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use super::support::{
-    base_remote_config, create_private_test_directory, reserve_listen_addr, unique_test_dir,
+    base_remote_config, create_private_test_directory, local_oauth_test_client,
+    reserve_listen_addr, unique_test_dir,
 };
 use crate::RemoteServeHttpConfig;
 
@@ -16,6 +17,7 @@ fn local_oauth_config() -> RemoteServeHttpConfig {
     config.admin_token = Some("admin-token".to_string());
     config.public_base_url = Some(public_base_url);
     config.auth_scopes = vec!["mcp:invoke".to_string()];
+    config.auth_clients = vec![local_oauth_test_client()];
     config
 }
 
@@ -69,5 +71,70 @@ fn remote_auth_config_rejects_offline_access_scope() {
     assert_eq!(
         startup_refusal(config),
         cli_refusal("--auth-scope must not include offline_access")
+    );
+}
+
+#[test]
+fn local_authorization_server_refuses_invalid_client_registrations() {
+    let registration = |client_id: &str, redirect_uri: &str| crate::OAuthClientRegistration {
+        client_id: client_id.to_string(),
+        redirect_uri: redirect_uri.to_string(),
+    };
+    let cases = [
+        (
+            vec![],
+            "--auth-server-seed-file requires at least one --auth-client".to_string(),
+        ),
+        (
+            vec![registration(" ", "https://client.example/callback")],
+            "--auth-client client_id must be non-empty with no surrounding whitespace: ` `"
+                .to_string(),
+        ),
+        (
+            vec![registration("app", "/callback")],
+            "--auth-client redirect_uri is not an absolute URL: `/callback`".to_string(),
+        ),
+        (
+            vec![registration("app", "https://client.example")],
+            "--auth-client redirect_uri is not in canonical form: `https://client.example`"
+                .to_string(),
+        ),
+        (
+            vec![registration("app", "https://client.example/callback#done")],
+            "--auth-client redirect_uri must not carry a fragment: `https://client.example/callback#done`"
+                .to_string(),
+        ),
+        (
+            vec![registration("app", "https://client.example/*")],
+            "--auth-client redirect_uri must not contain a wildcard: `https://client.example/*`"
+                .to_string(),
+        ),
+        (
+            vec![registration("app", "http://client.example/callback")],
+            "--auth-client redirect_uri must use https or http on a loopback host: `http://client.example/callback`"
+                .to_string(),
+        ),
+        (
+            vec![
+                registration("app", "https://client.example/callback"),
+                registration("app", "https://client.example/callback"),
+            ],
+            "--auth-client redirect_uri is registered twice for this client: `https://client.example/callback`"
+                .to_string(),
+        ),
+    ];
+    for (clients, expected) in cases {
+        let mut config = local_oauth_config();
+        config.auth_clients = clients;
+        assert_eq!(startup_refusal(config), cli_refusal(&expected));
+    }
+
+    let mut config = local_oauth_config();
+    config.auth_server_seed_path = None;
+    config.auth_jwt_public_key = Some(chio_core::crypto::Keypair::generate().public_key().to_hex());
+    config.auth_jwt_issuer = Some("https://issuer.example".to_string());
+    assert_eq!(
+        startup_refusal(config),
+        cli_refusal("--auth-client requires --auth-server-seed-file")
     );
 }

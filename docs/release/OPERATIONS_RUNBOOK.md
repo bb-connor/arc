@@ -112,7 +112,20 @@ Optional auth and federation inputs:
 
 - one auth mode: `--auth-token`, `--auth-jwt-public-key`, or `--auth-introspection-url`
 - `--admin-token <token>` for remote admin APIs
-- `--auth-server-seed-file <path>` for local JWT issuance
+- `--auth-server-seed-file <path>` for the embedded authorization server,
+  with one `--auth-client CLIENT_ID=REDIRECT_URI` per accepted redirect URI.
+  Redirect URIs are exact `https` URLs, or `http` on a loopback host, with no
+  fragment or wildcard; the authorize endpoint refuses any other client or
+  redirect URI without redirecting. There is no dynamic client registration.
+
+The embedded authorization server does not authenticate the end user. Every
+token it issues names the fixed `--auth-subject`, and anyone who can reach
+`/oauth/authorize` can approve a request. Its single-use consent nonce proves
+only that an approval came from a consent page the server rendered. Run it
+only in local or operator-controlled deployments where reaching the endpoint
+already implies the operator; use an external authorization server
+(`--auth-server` with `--auth-jwt-*` or `--auth-introspection-url`) anywhere
+else.
 - `--identity-federation-seed-file <path>` for stable subject derivation
 - `--enterprise-providers-file <path>` for enterprise-origin federation lanes
 

@@ -659,13 +659,81 @@ fn resolve_local_auth_issuer(
     Ok(Some(format!("{base_url}/oauth")))
 }
 
+fn is_https_or_loopback_http(url: &Url) -> bool {
+    let loopback = match url.host() {
+        Some(url::Host::Domain(domain)) => domain == "localhost",
+        Some(url::Host::Ipv4(address)) => address.is_loopback(),
+        Some(url::Host::Ipv6(address)) => address.is_loopback(),
+        None => false,
+    };
+    url.scheme() == "https" || (url.scheme() == "http" && loopback)
+}
+
+/// Validates the `--auth-client` registrations and indexes them by client id.
+/// Every redirect URI is an absolute `https` URL, or `http` on a loopback
+/// host, with no fragment and no wildcard; the authorize endpoint matches it
+/// byte for byte.
+fn build_client_registry(
+    registrations: &[OAuthClientRegistration],
+) -> Result<HashMap<String, HashSet<String>>, CliError> {
+    if registrations.is_empty() {
+        return Err(CliError::cli_other_error(
+            "--auth-server-seed-file requires at least one --auth-client".to_string(),
+        ));
+    }
+    let mut clients: HashMap<String, HashSet<String>> = HashMap::new();
+    for registration in registrations {
+        let OAuthClientRegistration {
+            client_id,
+            redirect_uri,
+        } = registration;
+        if client_id.trim().is_empty() || client_id.trim() != client_id {
+            return Err(CliError::cli_other_error(format!(
+                "--auth-client client_id must be non-empty with no surrounding whitespace: `{client_id}`"
+            )));
+        }
+        let refuse = |reason: &str| {
+            CliError::cli_other_error(format!(
+                "--auth-client redirect_uri {reason}: `{redirect_uri}`"
+            ))
+        };
+        let parsed = Url::parse(redirect_uri).map_err(|_| refuse("is not an absolute URL"))?;
+        if parsed.as_str() != redirect_uri {
+            return Err(refuse("is not in canonical form"));
+        }
+        if parsed.fragment().is_some() {
+            return Err(refuse("must not carry a fragment"));
+        }
+        if redirect_uri.contains('*') {
+            return Err(refuse("must not contain a wildcard"));
+        }
+        if !is_https_or_loopback_http(&parsed) {
+            return Err(refuse("must use https or http on a loopback host"));
+        }
+        if !clients
+            .entry(client_id.clone())
+            .or_default()
+            .insert(redirect_uri.clone())
+        {
+            return Err(refuse("is registered twice for this client"));
+        }
+    }
+    Ok(clients)
+}
+
 fn build_local_auth_server(
     config: &RemoteServeHttpConfig,
     local_addr: SocketAddr,
 ) -> Result<Option<LocalAuthorizationServer>, CliError> {
     let Some(seed_path) = config.auth_server_seed_path.as_deref() else {
+        if !config.auth_clients.is_empty() {
+            return Err(CliError::cli_other_error(
+                "--auth-client requires --auth-server-seed-file".to_string(),
+            ));
+        }
         return Ok(None);
     };
+    let clients = build_client_registry(&config.auth_clients)?;
     let signing_key = load_or_create_authority_keypair(seed_path)?;
     let issuer = resolve_local_auth_issuer(config, local_addr)?.ok_or_else(|| {
         CliError::cli_other_error("failed to resolve local auth issuer".to_string())
@@ -684,6 +752,7 @@ fn build_local_auth_server(
         access_token_ttl_secs: config.auth_access_token_ttl_secs,
         codes: Arc::new(StdMutex::new(HashMap::new())),
         consents: Arc::new(StdMutex::new(HashMap::new())),
+        clients: Arc::new(clients),
         sender_dpop_nonce_store,
         sender_dpop_config,
     }))
@@ -701,13 +770,7 @@ fn normalize_public_base_url(
             "invalid --public-base-url for remote MCP edge: {error}"
         ))
     })?;
-    let loopback = match parsed.host() {
-        Some(url::Host::Domain(domain)) => domain == "localhost",
-        Some(url::Host::Ipv4(address)) => address.is_loopback(),
-        Some(url::Host::Ipv6(address)) => address.is_loopback(),
-        None => false,
-    };
-    if parsed.scheme() != "https" && !(parsed.scheme() == "http" && loopback) {
+    if !is_https_or_loopback_http(&parsed) {
         return Err(CliError::cli_other_error(format!(
             "--public-base-url must use https unless its host is loopback: {base_url}"
         )));
