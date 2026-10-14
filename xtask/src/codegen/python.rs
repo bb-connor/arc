@@ -52,7 +52,9 @@ pub(super) fn codegen_python(check_only: bool) -> Result<(), XtaskError> {
         .map_err(|err| XtaskError::Io("<temp staging dir for codegen python>".to_string(), err))?;
 
     let clean_input = staging.path().join("input");
-    mirror_schema_tree(&schemas_dir, &clean_input, &schema_files)?;
+    chio_spec_codegen::LocalSchemaCatalog::load(&schemas_dir)
+        .and_then(|catalog| catalog.mirror(&clean_input))
+        .map_err(XtaskError::Codegen)?;
 
     let staging_out = staging.path().join("output");
     fs::create_dir_all(&staging_out)
@@ -584,29 +586,6 @@ fn extract_top_level_python_classes(body: &str) -> Vec<String> {
     classes.sort();
     classes.dedup();
     classes
-}
-
-fn mirror_schema_tree(
-    src_root: &Path,
-    dst_root: &Path,
-    schema_files: &[PathBuf],
-) -> Result<(), XtaskError> {
-    fs::create_dir_all(dst_root).map_err(|err| XtaskError::Io(display_path(dst_root), err))?;
-    for path in schema_files {
-        let rel = path.strip_prefix(src_root).map_err(|_| {
-            XtaskError::Usage(format!(
-                "codegen python: schema file {} is not under {}",
-                display_path(path),
-                display_path(src_root)
-            ))
-        })?;
-        let dest = dst_root.join(rel);
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent).map_err(|err| XtaskError::Io(display_path(parent), err))?;
-        }
-        fs::copy(path, &dest).map_err(|err| XtaskError::Io(display_path(&dest), err))?;
-    }
-    Ok(())
 }
 
 fn invoke_datamodel_codegen(

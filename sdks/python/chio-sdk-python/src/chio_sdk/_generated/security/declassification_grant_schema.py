@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 33f75027d5869fde01689ddc8847f699f9d2b6912e599a8b6672a18c0f49adea
+# Schema sha256: 36374ae1d7b7dc22790c1af5565d3c1addac0491ef3b254c573b3f259bd7dd4a
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -74,6 +74,28 @@ class Body(BaseModel):
     authority_key_id: FlowIdentifier
 
 
+class Body2(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    domain_version: Literal[1]
+    grant_id: FlowIdentifier
+    capability_id: FlowIdentifier
+    tenant_id: FlowIdentifier
+    subject_id: FlowIdentifier
+    agent_id: FlowIdentifier
+    session_id: FlowIdentifier
+    source_label_hash: Digest32
+    target_label: TargetLabel
+    destination_id: FlowIdentifier
+    tool_name: FlowIdentifier
+    purpose: FlowIdentifier
+    request_hash: Digest32
+    issued_at_unix_seconds: conint(ge=0)
+    expires_at_unix_seconds: conint(ge=0)
+    authority_key_id: FlowIdentifier
+
+
 class SignedDeclassificationGrant(BaseModel):
     """
     One-shot, destination-bound authorization to lower the information label of one exact tool invocation.
@@ -82,7 +104,7 @@ class SignedDeclassificationGrant(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body
+    body: Body2
     authority_key: constr(
         pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
     )

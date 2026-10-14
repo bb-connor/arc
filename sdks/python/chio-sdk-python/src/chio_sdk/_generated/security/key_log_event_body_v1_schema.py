@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 33f75027d5869fde01689ddc8847f699f9d2b6912e599a8b6672a18c0f49adea
+# Schema sha256: 36374ae1d7b7dc22790c1af5565d3c1addac0491ef3b254c573b3f259bd7dd4a
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -46,14 +46,14 @@ class PublicKey(
     )
 
 
-class Operation3(BaseModel):
+class Operation11(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     type: Literal["genesis"]
 
 
-class Operation4(BaseModel):
+class Operation12(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -63,7 +63,7 @@ class Operation4(BaseModel):
     witness_roster_binding: Hash
 
 
-class Operation5(BaseModel):
+class Operation13(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -73,21 +73,21 @@ class Operation5(BaseModel):
     recovery_policy_binding: Hash | None = None
 
 
-class Operation6(BaseModel):
+class Operation14(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     type: Literal["retire"]
 
 
-class Operation7(BaseModel):
+class Operation15(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     type: Literal["revoke"]
 
 
-class Operation8(BaseModel):
+class Operation16(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -101,10 +101,22 @@ class Operation8(BaseModel):
 
 class Operation(
     RootModel[
-        Operation3 | Operation4 | Operation5 | Operation6 | Operation7 | Operation8
+        Operation11
+        | Operation12
+        | Operation13
+        | Operation14
+        | Operation15
+        | Operation16
     ]
 ):
-    root: Operation3 | Operation4 | Operation5 | Operation6 | Operation7 | Operation8
+    root: (
+        Operation11
+        | Operation12
+        | Operation13
+        | Operation14
+        | Operation15
+        | Operation16
+    )
 
 
 class ChioKeyLogEventBodyV1(BaseModel):

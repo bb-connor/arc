@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 33f75027d5869fde01689ddc8847f699f9d2b6912e599a8b6672a18c0f49adea
+# Schema sha256: 36374ae1d7b7dc22790c1af5565d3c1addac0491ef3b254c573b3f259bd7dd4a
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -83,13 +83,13 @@ class SocketIdentity(FileIdentity):
     kind: Literal["unix_socket"]
 
 
-class Kind5(Enum):
+class Kind8(Enum):
     regular_file = "regular_file"
     directory = "directory"
 
 
 class PathIdentity(FileIdentity):
-    kind: Kind5
+    kind: Kind8
 
 
 class BrokerPeerIdentity(BaseModel):
@@ -143,7 +143,7 @@ class PurposeTargetStderr(BaseModel):
     kind: Literal["target_stderr"]
 
 
-class Kind6(Enum):
+class Kind9(Enum):
     runtime_file = "runtime_file"
     read_grant = "read_grant"
     write_grant = "write_grant"
@@ -153,7 +153,7 @@ class PurposeIndexedResource(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    kind: Kind6
+    kind: Kind9
     index: conint(ge=0, le=63)
 
 
