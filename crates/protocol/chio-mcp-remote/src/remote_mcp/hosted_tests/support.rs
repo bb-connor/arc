@@ -48,9 +48,23 @@ pub struct TestServer {
     _guard: ServerGuard,
 }
 
+/// Owns a hosted server thread. Dropping it stops the server and joins the
+/// thread, so the listener, stores and runtime close with the test.
 struct ServerGuard {
-    _thread: JoinHandle<()>,
+    stop: Option<tokio::sync::oneshot::Sender<()>>,
+    thread: Option<JoinHandle<()>>,
     result_rx: Receiver<Result<(), String>>,
+}
+
+impl Drop for ServerGuard {
+    fn drop(&mut self) {
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
 }
 
 pub fn start_http_server(token: &str) -> TestServer {
@@ -768,25 +782,34 @@ fn spawn_local_oauth_http_server_thread(
 
 fn spawn_server_thread(config: RemoteServeHttpConfig) -> ServerGuard {
     let (result_tx, result_rx) = mpsc::channel();
+    let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
     let thread = thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .expect("HTTP test runtime");
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(2)
-                .enable_all()
-                .build()
-                .expect("HTTP test runtime")
-                .block_on(crate::serve_http_async(config))
+            runtime.block_on(async {
+                tokio::select! {
+                    result = crate::serve_http_async(config) => Some(result),
+                    _ = stop_rx => None,
+                }
+            })
         }));
+        runtime.shutdown_timeout(Duration::from_secs(5));
         let exit_result = match result {
-            Ok(Ok(())) => Err("hosted MCP server exited unexpectedly".to_string()),
-            Ok(Err(error)) => Err(error.to_string()),
+            Ok(None) => return,
+            Ok(Some(Ok(()))) => Err("hosted MCP server exited unexpectedly".to_string()),
+            Ok(Some(Err(error))) => Err(error.to_string()),
             Err(_) => Err("hosted MCP server panicked".to_string()),
         };
         let _ = result_tx.send(exit_result);
     });
 
     ServerGuard {
-        _thread: thread,
+        stop: Some(stop_tx),
+        thread: Some(thread),
         result_rx,
     }
 }
