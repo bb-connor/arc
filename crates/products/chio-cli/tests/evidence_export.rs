@@ -1,5 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+#[path = "support/trust_health.rs"]
+mod trust_health;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -114,14 +117,8 @@ fn spawn_trust_service(
 
 fn wait_for_trust_service(client: &Client, base_url: &str) {
     for _ in 0..100 {
-        if let Ok(response) = client.get(format!("{base_url}/health")).send() {
-            if response.status() == reqwest::StatusCode::OK
-                && response
-                    .json::<serde_json::Value>()
-                    .is_ok_and(|health| health["receiptQuerySnapshot"]["state"] == "ready")
-            {
-                return;
-            }
+        if trust_health::trust_service_ready(client, base_url) {
+            return;
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }

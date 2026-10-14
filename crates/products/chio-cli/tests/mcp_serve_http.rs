@@ -1,5 +1,8 @@
 #![allow(clippy::expect_used, clippy::too_many_arguments, clippy::unwrap_used)]
 
+#[path = "support/trust_health.rs"]
+mod trust_health;
+
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::net::SocketAddr;
@@ -1057,10 +1060,10 @@ fn wait_for_control_service_result(
                 read_child_stderr(&mut guard.child),
             ));
         }
-        match client.get(format!("{base_url}/health")).send() {
-            Ok(response) if response.status() == reqwest::StatusCode::OK => return Ok(()),
-            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(50)),
+        if trust_health::trust_service_ready(client, base_url) {
+            return Ok(());
         }
+        thread::sleep(Duration::from_millis(50));
     }
     Err(StartupError::Timeout(
         "trust control service did not become ready",
