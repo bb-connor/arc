@@ -87,6 +87,7 @@ const DOMAIN_SCHEMA_MAP: &[(&str, Option<&str>)] = &[
         "capability",
         Some("chio-wire/v1/capability/token.schema.json"),
     ),
+    ("computer", Some("chio-computer/v1/description.schema.json")),
     // The security subtree is an indexed multi-schema corpus. Each positive
     // fixture declares its exact schema identifier in the nearest index.json.
     ("security", None),
