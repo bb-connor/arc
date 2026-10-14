@@ -77,7 +77,7 @@ This mapping covers every Govern/Map/Measure/Manage subcategory in AI RMF 1.0. S
 | MP-1.6 | System requirements are elicited and documented | `ToolManifest` parameter schemas (`crates/platform/chio-manifest/src/lib.rs`) | partial | Requirements docs are external | Requirements documentation |
 | MP-2.1 | Task and method are identified and defined | `ToolDefinition` within `ToolManifest` | strong | None | Task ownership |
 | MP-2.2 | Knowledge limits of AI system documented | Tool descriptions may express limits; `chio-underwriting` risk reasons encode known-risk patterns | partial | Limits text not machine-enforced | Limits statement for each tool |
-| MP-2.3 | AI capabilities, targeted usage, assumptions documented | Tool manifests, agent passports (`docs/AGENT_PASSPORT_GUIDE.md`) | partial | Assumptions are free-text | Document assumptions |
+| MP-2.3 | AI capabilities, targeted usage, assumptions documented | Tool manifests, agent passports (`docs/reference/AGENT_PASSPORT_GUIDE.md`) | partial | Assumptions are free-text | Document assumptions |
 | MP-3.1 | Benefits of intended system use are examined | Out of scope | customer-responsibility | N/A | Benefit analysis |
 | MP-3.2 | Potential costs are examined | `FinancialReceiptMetadata` on every receipt; budget enforcement in `crates/kernel/chio-kernel/src/budget_store.rs` | strong | Non-monetary cost types not modeled | Broader cost modeling |
 | MP-3.3 | Scientific integrity and TEVV considerations documented | Out of scope | customer-responsibility | N/A | TEVV plan |
@@ -157,13 +157,13 @@ Items flagged as gaps or customer-responsibility that warrant reviewer attention
 - Receipt signing and verification: `crates/core/chio-core-types`, `crates/kernel/chio-kernel/src/receipt_support`
 - Guard pipeline: `crates/kernel/chio-kernel/src/kernel/mod.rs`, `crates/guards/chio-guards/src/pipeline.rs`
 - Velocity and spend buckets: `crates/guards/chio-guards/src/velocity.rs`
-- Budget store and metering: `crates/kernel/chio-kernel/src/budget_store.rs`, `crates/economy/chio-metering/src/budget.rs`
+- Budget store and metering: `crates/kernel/chio-kernel/src/budget_store.rs`
 - DPoP proof-of-possession: `crates/kernel/chio-kernel/src/dpop.rs`
 - Revocation runtime: `crates/kernel/chio-kernel/src/revocation_runtime.rs`, `crates/kernel/chio-kernel/src/revocation_store.rs`
 - Checkpoints and inclusion proofs: `crates/kernel/chio-kernel/src/checkpoint.rs`
 - Evidence export: `crates/kernel/chio-kernel/src/evidence_export.rs`, `crates/products/chio-cli`
 - Session compliance certificate: `crates/products/chio-cli/src/cert.rs`, `docs/protocols/SESSION-COMPLIANCE-CERTIFICATE.md`
 - SIEM export: `crates/observability/chio-siem/src/exporter.rs`
-- Agent passport: `docs/AGENT_PASSPORT_GUIDE.md`
+- Agent passport: `docs/reference/AGENT_PASSPORT_GUIDE.md`
 - Manifest signing: `crates/platform/chio-manifest/src/lib.rs`
 - Underwriting risk tiering: `crates/economy/chio-underwriting/`
