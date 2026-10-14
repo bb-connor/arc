@@ -206,10 +206,8 @@ impl Route {
         let mut kernel = kernel_recovery::kernel_with_signer(&fixture, self.signer.clone())?;
         kernel
             .set_governed_approval_policy(APPROVAL_TENANT.into(), vec![self.signer.public_key()])?;
-        kernel.set_operation_owned_governed_approval_source(
-            self.binding.clone(),
-            source.clone(),
-        )?;
+        kernel
+            .set_operation_owned_governed_approval_source(self.binding.clone(), source.clone())?;
         kernel.set_governed_approval_replay_store(Box::new(RefuseLegacy(self.legacy.clone())));
         kernel.register_tool_server(Box::new(Server(self.calls.clone())));
         Ok(Self {

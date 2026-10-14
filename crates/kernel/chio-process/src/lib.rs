@@ -419,11 +419,14 @@ impl ProcessRuntime {
                 "request id does not match the logical operation",
             ));
         }
-        // Freeze the entire request, including signed authorization extensions,
-        // under its first attempt's identity: every dispatch attempt of one key
-        // carries the same content. Transport-specific refresh/rebinding is
-        // deliberately not implicit.
-        let mut binding = request.clone();
+        // Freeze the request identity, including signed authorization
+        // extensions, under the first attempt: every dispatch attempt of one
+        // key authorizes the same content. Attempt-scoped credentials (DPoP
+        // proofs, execution nonces, approval tokens and threshold proposals)
+        // are not part of the identity, so a pending approval resumes under
+        // the same key with its collected approvals. Transport-specific
+        // refresh/rebinding is deliberately not implicit.
+        let mut binding = request.attempt_identity();
         binding.request_id = self.request_id(process_id, operation_key)?;
         let request_hash = digest(&binding)?;
         // Existing callers retain their original binding. A stricter operation

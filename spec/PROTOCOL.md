@@ -1040,6 +1040,14 @@ unchanged, so an exact replay returns the identical receipt. A retry whose
 metadata differs from the retained commitment is a conflicting request and
 MUST be refused without a new receipt.
 
+A caller that derives receipt metadata from the request MUST derive it from the
+request's attempt identity (`ToolCallRequest::attempt_identity`): the request
+with DPoP proofs, execution nonces, approval tokens and threshold proposals
+cleared. Those credentials are attempt-scoped and are not part of the request
+identity; supplemental authorization and declassification grants are. A
+pending approval therefore resumes under the same metadata with its collected
+approvals, and the kernel verifies the presented approvals at that attempt.
+
 Before a new claim, the kernel MUST check the original selection and the store
 MUST compare the requested authority with the retained profile inside the actual
 operation-lease transaction. Current configuration cannot replace an original

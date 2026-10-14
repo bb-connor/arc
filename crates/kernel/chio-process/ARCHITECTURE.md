@@ -28,7 +28,10 @@ and the security profile used for tenant and isolation attribution.
 `create_root` registers a root capability and tree limits.
 `spawn` attaches an authority-issued capability after validating the parent hop.
 `tool_request` derives request identity from namespace, process, operation, and attempt.
-`invoke_with_recovery` freezes the request and selected host context in the journal.
+`invoke_with_recovery` freezes the request identity and selected host context in the journal.
+The identity is `ToolCallRequest::attempt_identity`: DPoP proofs, execution
+nonces, approval tokens and threshold proposals are attempt-scoped, so a pending
+approval resumes under the same operation key with its collected approvals.
 It restores delegation ancestors before admitting work through the kernel.
 The retained kernel operation supplies replay and crash outcomes.
 A kernel-classified read-only call may receive a fresh attempt only when retry

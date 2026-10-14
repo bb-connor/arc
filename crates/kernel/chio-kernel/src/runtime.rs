@@ -125,6 +125,33 @@ pub struct ToolCallRequest {
 }
 
 impl ToolCallRequest {
+    /// The identity of this call across attempts: the request with its
+    /// attempt-scoped credentials cleared. DPoP proofs, execution nonces,
+    /// approval tokens and threshold proposals are presented per attempt;
+    /// every other field, including supplemental authorization and
+    /// declassification grants, defines what is being authorized.
+    pub fn attempt_identity(&self) -> Self {
+        // Explicit construction makes every new field an identity decision.
+        Self {
+            request_id: self.request_id.clone(),
+            capability: self.capability.clone(),
+            tool_name: self.tool_name.clone(),
+            server_id: self.server_id.clone(),
+            agent_id: self.agent_id.clone(),
+            arguments: self.arguments.clone(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: self.governed_intent.clone(),
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: self.supplemental_authorization.clone(),
+            model_metadata: self.model_metadata.clone(),
+            federated_origin_kernel_id: self.federated_origin_kernel_id.clone(),
+            declassification_grant: self.declassification_grant.clone(),
+        }
+    }
+
     /// Fail closed on extensions absent from the host-established peer profile.
     pub fn validate_peer_capabilities(
         &self,
@@ -471,3 +498,7 @@ mod byte_accounting_tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "runtime/attempt_identity_tests.rs"]
+mod attempt_identity_tests;

@@ -43,7 +43,8 @@ The journal contains capabilities and checkpoints; its directory is host-private
 - `ProcessRegistry::open` rejects kernels without all-call durable admission.
 - `Store::open` binds a versioned journal to the authority UUID and kernel key.
 - `spawn` and `validate_child` require one-hop capability attenuation.
-- `invoke_with_recovery` freezes request, route, and security-profile bindings.
+- `invoke_with_recovery` freezes request identity, route, and security-profile bindings;
+  attempt-scoped credentials are not part of the request identity.
 - `invoke_known_only` prevents fresh dispatch after an unknown outcome.
 - `read_blob` checks ownership and stored content hashes.
 
