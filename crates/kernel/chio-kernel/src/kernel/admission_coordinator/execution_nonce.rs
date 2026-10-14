@@ -654,7 +654,7 @@ impl ChioKernel {
                 expected.binding().operation_id().clone(),
                 expected.version(),
                 lease,
-                Vec::new(),
+                admission.dispatch_launch_attachments(),
                 Some(AdmissionOperationState::CapturePending),
                 None,
                 None,

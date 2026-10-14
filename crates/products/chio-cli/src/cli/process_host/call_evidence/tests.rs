@@ -181,6 +181,7 @@ impl SemanticRefusal {
                 .map_err(error)?;
         let dispatch_commit = if state == AdmissionOperationState::OutcomeUnknownAfterDispatch {
             Some(AdmissionDispatchCommitBindingV1 {
+                dispatch_launch: Default::default(),
                 committed_version: expected_dispatch_committed_version(
                     AdmissionOperationKind::ToolDispatch,
                     requirements,

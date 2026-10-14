@@ -1050,12 +1050,14 @@ from the `chio.tool-admission-request.v1` hash and from replay equality; every
 other admitted field, including the rest of `chio_process` and `route`, stays
 bound. A malformed entry MUST be refused before admission, and a replay of an
 admission that retained an entry MUST present it. Receipts signed during a live
-evaluation name the presenting attempt's launches. Canonical refusals signed
-from the retained admission, including recovery refusals with no live caller,
-name the launches retained at admission. A dispatch performed by a later,
-relaunched attempt of a retained admission is therefore named by its admitting
-launches if recovery signs its terminal refusal; the dispatch commit does not yet
-record its launches.
+evaluation name the presenting attempt's launches. The attempt that prepares
+dispatch capture records its launches with the operation, and the dispatch
+commitment carries them as a required `dispatch_launch` object whose
+`native_launch` and `worker_profile` are each the recorded entry or `null`. A
+dispatch commitment without `dispatch_launch` MUST be refused. Canonical refusals
+signed after dispatch, including recovery refusals with no live caller, name the
+launches of the attempt that committed dispatch; canonical refusals signed before
+dispatch name the launches retained at admission.
 
 A caller that derives receipt metadata from the request MUST derive it from the
 request's attempt identity (`ToolCallRequest::attempt_identity`): the request

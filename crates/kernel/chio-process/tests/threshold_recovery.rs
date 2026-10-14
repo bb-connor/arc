@@ -381,12 +381,11 @@ impl ToolServerConnection for ParkedWrite {
     }
 }
 
-/// Known limit: a pending call resumed by a relaunched host dispatches under
-/// launch b, but recovery with no live caller signs its refusal from the
-/// retained admission and names the admitting launch a, because the dispatch
-/// commit does not record its launch.
+/// A pending call admitted under launch a and resumed by a relaunched host
+/// dispatches under launch b. Recovery with no live caller names launch b,
+/// which the dispatch commitment recorded.
 #[test]
-fn recovery_after_a_relaunched_dispatch_names_the_admitting_launch() -> TestResult {
+fn recovery_after_a_relaunched_dispatch_names_the_dispatching_launch() -> TestResult {
     use std::future::Future;
     let fixture = Fixture::new()?;
     let executor = tokio::runtime::Builder::new_current_thread()
@@ -478,7 +477,12 @@ fn recovery_after_a_relaunched_dispatch_names_the_admitting_launch() -> TestResu
     );
     assert_eq!(
         metadata["native_launch"],
-        serde_json::to_value(&launch('a')?[0].1)?
+        serde_json::to_value(&launch('b')?[0].1)?
+    );
+    assert_eq!(
+        metadata["admission_operation"]["retained_dispatch_commit"]["dispatch_launch"]
+            ["native_launch"],
+        serde_json::to_value(&launch('b')?[0].1)?
     );
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     Ok(())

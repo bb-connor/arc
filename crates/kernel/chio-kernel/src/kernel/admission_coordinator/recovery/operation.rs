@@ -116,6 +116,8 @@ impl ChioKernel {
                 let retained_request =
                     self.load_original_request_for_finalization(operation, now)?;
                 let mut admission = DurableToolAdmission {
+                    attempt_launch: crate::admission_operation::AdmissionDispatchLaunchV1::default(
+                    ),
                     _live_owner: None,
                     operation: operation.clone(),
                     aggregate_quota: None,

@@ -53,6 +53,7 @@ impl ChioKernel {
         .ok_or_else(|| invalid("caller report original context is absent"))?;
         let request = original.request_for_revalidation().clone();
         let mut admission = DurableToolAdmission {
+            attempt_launch: crate::admission_operation::AdmissionDispatchLaunchV1::default(),
             operation,
             retained_request: Some(original),
             issued_nonce: Some(nonce.clone()),

@@ -41,7 +41,7 @@
             "dispatch_commit": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["committed_version", "coordinator_lease_id", "coordinator_lease_epoch", "store_fence", "provider_attempt"],
+              "required": ["committed_version", "coordinator_lease_id", "coordinator_lease_epoch", "store_fence", "provider_attempt", "dispatch_launch"],
               "properties": {
                 "committed_version": {"$ref": "#/$defs/callerPositiveInteger"},
                 "coordinator_lease_id": {"$ref": "#/$defs/callerIdentifier"},
@@ -66,7 +66,8 @@
                     "transport_id": {"type": "string", "minLength": 15, "maxLength": 512, "pattern": "^(caller-report:|native-caller-report:v1:)"},
                     "transport_key_epoch": {"$ref": "#/$defs/callerPositiveInteger"}
                   }
-                }
+                },
+                "dispatch_launch": {"$ref": "#/$defs/callerDispatchLaunch"}
               }
             }
           }
@@ -82,6 +83,15 @@
     "callerIdentifier": {"type": "string", "minLength": 1, "maxLength": 512, "description": "The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace."},
     "callerDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "callerPositiveInteger": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "callerDispatchLaunch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["native_launch", "worker_profile"],
+      "properties": {
+        "native_launch": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["receipt_id", "receipt_sha256"], "properties": {"receipt_id": {"$ref": "#/$defs/callerDigest"}, "receipt_sha256": {"$ref": "#/$defs/callerDigest"}}}]},
+        "worker_profile": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["kind", "launch_attempt", "launch_ref"], "properties": {"kind": {"const": "container"}, "launch_attempt": {"type": "integer", "minimum": 1, "maximum": 4294967295}, "launch_ref": {"type": "object", "additionalProperties": false, "required": ["record_id", "record_sha256"], "properties": {"record_id": {"$ref": "#/$defs/callerDigest"}, "record_sha256": {"$ref": "#/$defs/callerDigest"}}}}}]}
+      }
+    },
     "callerPublicKey": {"type": "string", "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"},
     "callerExecutor": {
       "type": "object",

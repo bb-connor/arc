@@ -34,8 +34,9 @@ nonces, approval tokens and threshold proposals are attempt-scoped, so a pending
 approval resumes under the same operation key with its collected approvals.
 The native launch receipt and the worker profile in a call's attribution are
 attempt-scoped evidence: a relaunched host or worker re-presents the same call
-under its own launches, live receipts name them, and recovery refusals name the
-launches that admitted the call. Every other attribution field is call identity.
+under its own launches, live receipts name them, and the dispatch commitment
+records the launches of the attempt that dispatched, so recovery refusals after
+dispatch name that attempt. Every other attribution field is call identity.
 It restores delegation ancestors before admitting work through the kernel.
 The retained kernel operation supplies replay and crash outcomes.
 A kernel-classified read-only call may receive a fresh attempt only when retry

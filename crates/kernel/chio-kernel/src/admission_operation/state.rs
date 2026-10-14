@@ -127,6 +127,7 @@ pub(super) fn attachment_supported(
                 && requirements.budget_capture
                 && requirements.broker_attempt
         }
+        AdmissionAttachment::DispatchLaunch(_) => kind == AdmissionOperationKind::ToolDispatch,
         AdmissionAttachment::RuntimeParticipantLedgerDigest(_)
         | AdmissionAttachment::GovernedApprovalLedgerDigest(_)
         | AdmissionAttachment::DpopReplayLedgerDigest(_) => {
@@ -182,6 +183,7 @@ pub(super) fn attachment_allowed(
         AdmissionAttachment::NativeDispatchLedgerDigest(_) => {
             state == AdmissionOperationState::CapturePending
         }
+        AdmissionAttachment::DispatchLaunch(_) => state == AdmissionOperationState::ReadyToDispatch,
         _ => matches!(
             state,
             AdmissionOperationState::Prepared
@@ -227,6 +229,15 @@ pub(super) fn validate_state_attachments(
                             AdmissionAttachment::CallerDispatchContextDigest(_)));
                     !(committed || caller_wait)
                 }
+                AdmissionAttachment::DispatchLaunch(_) => matches!(
+                    state,
+                    AdmissionOperationState::Prepared
+                        | AdmissionOperationState::BrokerAttemptRegistered
+                        | AdmissionOperationState::ApprovalRequired
+                        | AdmissionOperationState::BudgetAuthorized
+                        | AdmissionOperationState::ApprovalReserved
+                        | AdmissionOperationState::ReadyToDispatch
+                ),
                 AdmissionAttachment::CallerDispatchContextDigest(_) => !matches!(
                     state,
                     AdmissionOperationState::DispatchCommitted

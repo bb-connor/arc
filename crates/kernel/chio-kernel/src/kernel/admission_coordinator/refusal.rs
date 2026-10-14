@@ -227,11 +227,19 @@ impl ChioKernel {
             tool_outcome_version: None,
         };
         let timestamp = context.trusted_time_unix_ms / 1_000;
+        // After dispatch, attempt-scoped launch evidence names the attempt
+        // that committed dispatch rather than the one that admitted the call.
+        let admitted = original
+            .admitted_receipt_metadata()
+            .cloned()
+            .map(|mut admitted| {
+                if let Some(commit) = operation.dispatch_commit() {
+                    commit.dispatch_launch.apply_to(&mut admitted);
+                }
+                admitted
+            });
         let extra = merge_metadata_objects(
-            original
-                .admitted_receipt_metadata()
-                .cloned()
-                .map(serde_json::Value::Object),
+            admitted.map(serde_json::Value::Object),
             merge_metadata_objects(
                 response.metadata,
                 Some(serde_json::json!({ ADMISSION_RECEIPT_METADATA_KEY: metadata })),
