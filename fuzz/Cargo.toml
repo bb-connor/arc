@@ -26,7 +26,9 @@ path = "src/lib.rs"
 
 [patch.crates-io]
 aws-lc-rs = { path = "../third_party/aws-lc-rs-chio" }
+cpp_demangle = { path = "../third_party/cpp-demangle-chio" }
 enumflags2_derive = { path = "../third_party/enumflags2-derive-chio" }
+rusqlite = { path = "../third_party/rusqlite-chio" }
 seccompiler = { path = "../third_party/seccompiler-chio" }
 
 [features]

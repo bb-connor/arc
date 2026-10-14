@@ -63,6 +63,10 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "upstream unsupported nested CMP variant remains explicitly absent",
         "2026-12-31",
     ),
+    "third_party/cpp-demangle-chio/src/ast.rs": allow(
+        "upstream parser and back-reference review notes beside implemented demangling",
+        "2026-12-31",
+    ),
     "third_party/crmf-chio/src/pop.rs": allow(
         "upstream ASN.1 tag and manually implemented CHOICE maintenance notes",
         "2026-12-31",
@@ -89,6 +93,70 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     "third_party/nono-upstream-chio/src/state.rs": allow(
         "upstream cfg(test) Unix socket fixture file description",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/blob/mod.rs": allow(
+        "upstream SQLite zeroblob placeholder documentation",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/collation.rs": allow(
+        "upstream collation callback notes beside implemented comparison and registration",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/context.rs": allow(
+        "upstream note on an unwrapped SQLite result API",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/params.rs": allow(
+        "upstream note on a private parameter helper",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/raw_statement.rs": allow(
+        "upstream note on an unwrapped SQLite statement API",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/row.rs": allow(
+        "upstream iterator and tuple Debug notes",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/serialize.rs": allow(
+        "upstream commented-out serialization API sketch",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/session.rs": allow(
+        "upstream session extension validation and error propagation notes",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/statement.rs": allow(
+        "upstream note on an unwrapped SQLite bind API",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/trace.rs": allow(
+        "upstream SQL parameter placeholder documentation",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/transaction.rs": allow(
+        "upstream drop-behavior note beside implemented transaction finish",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/types/serde_json.rs": allow(
+        "upstream note on refused SQLite value types",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/types/to_sql.rs": allow(
+        "upstream error message detail notes",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/types/value_ref.rs": allow(
+        "upstream note on an unwrapped SQLite value API",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/vtab/csvtab.rs": allow(
+        "upstream CSV column affinity note",
+        "2026-12-31",
+    ),
+    "third_party/rusqlite-chio/src/vtab/mod.rs": allow(
+        "upstream virtual table argument and escaping notes",
         "2026-12-31",
     ),
     "third_party/regress-chio/regress_dfa_plan.txt": allow(
@@ -403,6 +471,19 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     "third_party/cmpv2-chio/src/body.rs": (
         "^// TODO address recursion error$",
     ),
+    "third_party/cpp-demangle-chio/src/ast.rs": (
+        "^//\\ TODO:\\ should\\ this\\ check/assert\\ that\\ subs\\[idx\\]\\ is\\ an$",
+        "^//\\ TODO:\\ do\\ we\\ need\\ to\\ check\\ that\\ the\\ idx\\ actually\\ points\\ to$",
+        "^//\\ XXX:\\ Not\\ an\\ impl\\ GetTemplateArgs\\ for\\ PrefixHandle\\ because\\ the\\ 'me$",
+        "^//\\ TODO:\\ no\\ idea\\ how\\ this\\ should\\ be\\ demangled\\.\\.\\.$",
+        "^//\\ TODO:\\ should\\ this\\ check\\ if\\ the\\ back\\ reference\\ actually\\ points$",
+        "^//\\ TODO:\\ This\\ should\\ probably\\ recurse\\ through\\ all\\ the\\ nested\\ type$",
+        "^//\\ TODO:\\ should\\ this\\ check\\ if\\ the\\ thing\\ at\\ idx\\ is\\ a$",
+        "^//\\ TODO:\\ should\\ we\\ detect\\ and\\ reject\\ this\\ during\\ parsing\\?$",
+        "^//\\ TODO:\\ factor\\ out\\ all\\ this\\ duplication\\ in\\ the\\ `new`\\ variants\\.$",
+        "^//\\ TODO:\\ factor\\ out\\ duplicated\\ code\\ from\\ cast\\ variants\\.$",
+        "^//\\ TODO:\\ should\\ this\\ check\\ that\\ the\\ back\\ reference\\ actually$",
+    ),
     "third_party/crmf-chio/src/pop.rs": (
         "^//todo review EXPLICIT tag here \\(does not compile as IMPLICIT\\)$",
         "^// TODO address requirement for fixed tag for CHOICE$",
@@ -429,6 +510,64 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     ),
     "third_party/regress-chio/regress_dfa_plan.txt": (
         "^Want me to turn Milestones 1\u20133 into concrete Rust stubs and tests so the scaffold is ready\\? Or pick a different slice to start with \\(e\\.g\\., 6\u20137: closure \\+ determinization core\\)\\.$",
+    ),
+    "third_party/rusqlite-chio/src/blob/mod.rs": (
+        "^///\\ Zeroblobs\\ are\\ intended\\ to\\ serve\\ as\\ placeholders\\ for\\ BLOBs\\ whose\\ content\\ is$",
+    ),
+    "third_party/rusqlite-chio/src/collation.rs": (
+        "^return\\ \\-1;\\ //\\ FIXME\\ How\\ \\?$",
+        "^//\\ TODO:\\ validate$",
+        "^return;\\ //\\ FIXME\\ How\\ \\?$",
+    ),
+    "third_party/rusqlite-chio/src/context.rs": (
+        "^//\\ TODO\\ sqlite3_result_zeroblob64\\ //\\ 3\\.8\\.11$",
+    ),
+    "third_party/rusqlite-chio/src/params.rs": (
+        "^//\\ XXX\\ not\\ public\\ api,\\ might\\ not\\ need\\ to\\ expose\\.$",
+    ),
+    "third_party/rusqlite-chio/src/raw_statement.rs": (
+        "^//\\ TODO\\ sqlite3_normalized_sql\\ \\(https://sqlite\\.org/c3ref/expanded_sql\\.html\\)\\ //\\ 3\\.27\\.0\\ \\+\\ SQLITE_ENABLE_NORMALIZE$",
+    ),
+    "third_party/rusqlite-chio/src/row.rs": (
+        "^//\\ FIXME\\ Hide\\ FallibleStreamingIterator::map$",
+        "^//\\ Debug\\ is\\ not\\ implemented\\ for\\ tuples\\ of\\ 16$",
+    ),
+    "third_party/rusqlite-chio/src/serialize.rs": (
+        "^/\\*\\ TODO$",
+    ),
+    "third_party/rusqlite-chio/src/session.rs": (
+        "^//\\ TODO\\ Validate:\\ same\\ struct$",
+        "^//\\ TODO\\ enum\\ \\?\\ Delete,\\ Insert,\\ Update,\\ \\.\\.\\.$",
+        "^\\*len\\ =\\ n\\ as\\ i32;\\ //\\ TODO\\ Validate:\\ n\\ =\\ 0\\ may\\ not\\ mean\\ the\\ reader\\ will\\ always\\ no\\ longer\\ be\\ able\\ to$",
+        "^Err\\(_\\)\\ =>\\ ffi::SQLITE_IOERR_READ,\\ //\\ TODO\\ check\\ if\\ err\\ is\\ a\\ \\(ru\\)sqlite\\ Error\\ =>\\ propagate$",
+        "^Err\\(_\\)\\ =>\\ ffi::SQLITE_IOERR_WRITE,\\ //\\ TODO\\ check\\ if\\ err\\ is\\ a\\ \\(ru\\)sqlite\\ Error\\ =>\\ propagate$",
+    ),
+    "third_party/rusqlite-chio/src/statement.rs": (
+        "^//\\ TODO\\ sqlite3_bind_zeroblob64\\ //\\ 3\\.8\\.11$",
+    ),
+    "third_party/rusqlite-chio/src/trace.rs": (
+        "^///\\ Prepared\\ statement\\ placeholders\\ are\\ replaced/logged\\ with\\ their\\ assigned$",
+    ),
+    "third_party/rusqlite-chio/src/transaction.rs": (
+        "^//\\ FIXME:\\ Not\\ ideal\\.\\.\\.$",
+    ),
+    "third_party/rusqlite-chio/src/types/serde_json.rs": (
+        "^_\\ =>\\ return\\ Err\\(FromSqlError::InvalidType\\),\\ //\\ FIXME$",
+    ),
+    "third_party/rusqlite-chio/src/types/to_sql.rs": (
+        "^//\\ TODO:\\ Include\\ the\\ values\\ in\\ the\\ error\\ message\\.$",
+    ),
+    "third_party/rusqlite-chio/src/types/value_ref.rs": (
+        "^//\\ TODO\\ sqlite3_value_frombind\\ //\\ 3\\.28\\.0$",
+    ),
+    "third_party/rusqlite-chio/src/vtab/csvtab.rs": (
+        "^//\\ TODO\\ Affinity$",
+    ),
+    "third_party/rusqlite-chio/src/vtab/mod.rs": (
+        "^xRowid:\\ Some\\(rust_rowid::<\\$ct>\\),\\ //\\ FIXME\\ optional$",
+        "^//\\ TODO\\ Make\\ the\\ distinction\\ between\\ argv\\[1\\]\\ ==\\ NULL\\ and\\ argv\\[1\\]\\ !=\\ NULL\\ \\?$",
+        "^Some\\(e\\)\\ if\\ e\\ ==\\ b\\ =>\\ \\&s\\[1\\.\\.s\\.len\\(\\)\\ \\-\\ 1\\],\\ //\\ FIXME\\ handle\\ inner\\ escaped\\ quote\\(s\\)$",
+        "^\\.map\\(\\|\\&cs\\|\\ CStr::from_ptr\\(cs\\)\\.to_bytes\\(\\)\\)\\ //\\ FIXME\\ \\.to_str\\(\\)\\ \\->\\ Result<\\&str,\\ Utf8Error>$",
     ),
     "third_party/regress-chio/src/api.rs": (
         "^/// Other flags are not implemented and are ignored\\.$",

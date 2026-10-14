@@ -1,0 +1,697 @@
+--- a/third_party/rusqlite-chio/Cargo.toml
++++ b/third_party/rusqlite-chio/Cargo.toml
+@@ -15,0 +16 @@
++publish = false
+@@ -350,0 +352,2 @@
++
++[workspace]
+--- a/third_party/rusqlite-chio/src/functions.rs
++++ b/third_party/rusqlite-chio/src/functions.rs
+@@ -72,0 +73,25 @@
++/// Borrow SQLite's argument-pointer array for one synchronous callback.
++///
++/// # Safety
++///
++/// `argc` must be SQLite's nonnegative actual argument count, not the registration
++/// arity (which may be -1). If positive, `argv` must be non-null, aligned and point
++/// to `argc` initialized pointer slots in one allocation, readable and unmodified
++/// for `'a`, with total size at most `isize::MAX`. When borrowing SQLite's array,
++/// callers must keep `'a` within that callback. SQLite's valueFromFunction and
++/// VDBE dispatch satisfy this contract.
++/// For zero arguments, `argv` is unused and may be null.
++unsafe fn callback_args<'a>(
++    argc: c_int,
++    argv: *mut *mut sqlite3_value,
++) -> &'a [*mut sqlite3_value] {
++    if argc == 0 {
++        // STAT4 valueFromFunction passes NULL for a zero-argument expression.
++        // Even an empty from_raw_parts slice would require a non-null pointer.
++        &[]
++    } else {
++        // SAFETY: SQLite supplies a positive count and a live argument array.
++        unsafe { slice::from_raw_parts(argv, argc as usize) }
++    }
++}
++
+@@ -593 +618 @@
+-            let args = slice::from_raw_parts(argv, argc as usize);
++            let args = callback_args(argc, argv);
+@@ -609,0 +635 @@
++        let c_name = fn_name.as_cstr()?;
+@@ -611 +636,0 @@
+-        let c_name = fn_name.as_cstr()?;
+@@ -639,0 +665 @@
++        let c_name = fn_name.as_cstr()?;
+@@ -641 +666,0 @@
+-        let c_name = fn_name.as_cstr()?;
+@@ -670,0 +696 @@
++        let c_name = fn_name.as_cstr()?;
+@@ -672 +697,0 @@
+-        let c_name = fn_name.as_cstr()?;
+@@ -739 +764 @@
+-            args: slice::from_raw_parts(argv, argc as usize),
++            args: callback_args(argc, argv),
+@@ -785 +810 @@
+-            args: slice::from_raw_parts(argv, argc as usize),
++            args: callback_args(argc, argv),
+@@ -1271,0 +1297,6 @@
++
++#[cfg(test)]
++mod registration_ownership;
++
++#[cfg(test)]
++mod empty_arguments_tests;
+--- /dev/null
++++ b/third_party/rusqlite-chio/src/functions/empty_arguments_tests.rs
+@@ -0,0 +1,202 @@
++//! Scalar, aggregate and window callback argument boundary regressions.
++use super::*;
++use std::sync::atomic::{AtomicUsize, Ordering};
++use std::sync::Mutex;
++
++type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
++
++#[test]
++fn null_zero_argument_array_is_empty() {
++    // No SQLite context or value is fabricated. This tests only the private
++    // pointer-array primitive under its explicitly permitted null/zero contract.
++    let args = unsafe { callback_args(0, ptr::null_mut()) };
++    assert!(args.is_empty());
++    assert_eq!(args.len(), 0);
++}
++
++#[test]
++fn nonempty_argument_array_preserves_slots_and_borrow() {
++    // The primitive borrows pointer slots, without dereferencing their values.
++    // Null slot values are initialized pointers, not fabricated SQLite values.
++    let mut slots: [*mut sqlite3_value; 2] = [ptr::null_mut(); 2];
++    let expected = slots.as_ptr();
++    let args = unsafe { callback_args(2, slots.as_mut_ptr()) };
++    assert_eq!(args.as_ptr(), expected);
++    assert_eq!(args.len(), 2);
++    assert_eq!(args, &slots);
++}
++
++#[test]
++fn ordinary_zero_argument_scalar_runs_for_each_row() -> TestResult {
++    let db = Connection::open_in_memory()?;
++    let calls = Arc::new(AtomicUsize::new(0));
++    let counted = calls.clone();
++    db.create_scalar_function("zero_scalar", 0, FunctionFlags::SQLITE_UTF8, move |ctx| {
++        assert!(ctx.is_empty());
++        assert_eq!(ctx.len(), 0);
++        counted.fetch_add(1, Ordering::SeqCst);
++        Ok(37_i64)
++    })?;
++    let mut stmt = db.prepare("SELECT zero_scalar() FROM (SELECT 1 UNION ALL SELECT 2)")?;
++    assert_eq!(calls.load(Ordering::SeqCst), 0);
++    let rows = stmt
++        .query_map([], |row| row.get::<_, i64>(0))?
++        .collect::<Result<Vec<_>>>()?;
++    assert_eq!(rows, vec![37, 37]);
++    assert_eq!(calls.load(Ordering::SeqCst), 2);
++    Ok(())
++}
++
++#[test]
++fn variable_arity_scalar_preserves_empty_and_nonempty_arguments() -> TestResult {
++    let db = Connection::open_in_memory()?;
++    db.create_scalar_function("variable_scalar", -1, FunctionFlags::SQLITE_UTF8, |ctx| {
++        if ctx.is_empty() {
++            assert_eq!(ctx.len(), 0);
++            Ok("empty".to_owned())
++        } else {
++            assert_eq!(ctx.len(), 2);
++            Ok(format!("{}:{}", ctx.get::<String>(0)?, ctx.get::<i64>(1)?))
++        }
++    })?;
++    assert_eq!(
++        db.query_row("SELECT variable_scalar()", [], |row| row
++            .get::<_, String>(0))?,
++        "empty"
++    );
++    let nonempty: String = db.query_row("SELECT variable_scalar('retained', 41)", [], |row| {
++        row.get(0)
++    })?;
++    assert_eq!(nonempty, "retained:41");
++    // SqlFnArg results still use the very same nonempty argument array.
++    db.create_scalar_function("return_argument", 1, FunctionFlags::SQLITE_UTF8, |ctx| {
++        assert_eq!(ctx.len(), 1);
++        Ok(ctx.get_arg(0))
++    })?;
++    assert_eq!(
++        db.query_row("SELECT return_argument('unchanged')", [], |row| row
++            .get::<_, String>(0))?,
++        "unchanged"
++    );
++    Ok(())
++}
++
++type Phases = Arc<Mutex<Vec<&'static str>>>;
++
++struct ZeroCount(Phases);
++
++impl ZeroCount {
++    fn record(&self, ctx: &Context<'_>, phase: &'static str) -> Result<()> {
++        assert!(ctx.is_empty());
++        assert_eq!(ctx.len(), 0);
++        self.0.lock().map_err(|_| Error::InvalidQuery)?.push(phase);
++        Ok(())
++    }
++}
++
++impl Aggregate<i64, i64> for ZeroCount {
++    fn init(&self, ctx: &mut Context<'_>) -> Result<i64> {
++        self.record(ctx, "init")?;
++        Ok(0)
++    }
++
++    fn step(&self, ctx: &mut Context<'_>, count: &mut i64) -> Result<()> {
++        self.record(ctx, "step")?;
++        *count += 1;
++        Ok(())
++    }
++
++    fn finalize(&self, ctx: &mut Context<'_>, count: Option<i64>) -> Result<i64> {
++        self.record(
++            ctx,
++            if count.is_some() {
++                "final"
++            } else {
++                "empty final"
++            },
++        )?;
++        Ok(count.unwrap_or(0))
++    }
++}
++
++#[cfg(feature = "window")]
++impl WindowAggregate<i64, i64> for ZeroCount {
++    fn inverse(&self, ctx: &mut Context<'_>, count: &mut i64) -> Result<()> {
++        self.record(ctx, "inverse")?;
++        *count -= 1;
++        Ok(())
++    }
++
++    fn value(&self, count: Option<&mut i64>) -> Result<i64> {
++        self.0
++            .lock()
++            .map_err(|_| Error::InvalidQuery)?
++            .push("value");
++        Ok(count.map_or(0, |value| *value))
++    }
++}
++
++#[test]
++fn zero_argument_aggregate_counts_rows_and_finalizes_empty_input() -> TestResult {
++    let db = Connection::open_in_memory()?;
++    db.execute_batch("CREATE TABLE source(x); INSERT INTO source VALUES(1),(2),(3),(4)")?;
++    let phases = Phases::default();
++    db.create_aggregate_function(
++        "zero_count",
++        0,
++        FunctionFlags::SQLITE_UTF8,
++        ZeroCount(phases.clone()),
++    )?;
++    assert_eq!(
++        db.query_row("SELECT zero_count() FROM source", [], |row| row
++            .get::<_, i64>(0))?,
++        4
++    );
++    assert_eq!(
++        *phases.lock().map_err(|_| "poisoned")?,
++        vec!["init", "step", "step", "step", "step", "final"]
++    );
++    phases.lock().map_err(|_| "poisoned")?.clear();
++    assert_eq!(
++        db.query_row("SELECT zero_count() FROM source WHERE 0", [], |row| row
++            .get::<_, i64>(0))?,
++        0
++    );
++    assert_eq!(*phases.lock().map_err(|_| "poisoned")?, vec!["empty final"]);
++    Ok(())
++}
++
++#[cfg(feature = "window")]
++#[test]
++fn zero_argument_window_runs_step_inverse_value_and_final() -> TestResult {
++    let db = Connection::open_in_memory()?;
++    db.execute_batch("CREATE TABLE source(x); INSERT INTO source VALUES(1),(2),(3),(4)")?;
++    let phases = Phases::default();
++    db.create_window_function(
++        "zero_window",
++        0,
++        FunctionFlags::SQLITE_UTF8,
++        ZeroCount(phases.clone()),
++    )?;
++    let rows = db
++        .prepare("SELECT zero_window() OVER (ORDER BY x ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) FROM source ORDER BY x")?
++        .query_map([], |row| row.get::<_, i64>(0))?
++        .collect::<Result<Vec<_>>>()?;
++    assert_eq!(rows, vec![1, 2, 2, 2]);
++    let recorded = phases.lock().map_err(|_| "poisoned")?;
++    for (phase, count) in [
++        ("init", 1),
++        ("step", 4),
++        ("inverse", 2),
++        ("value", 4),
++        ("final", 1),
++    ] {
++        assert_eq!(
++            recorded.iter().filter(|&&p| p == phase).count(),
++            count,
++            "{recorded:?}"
++        );
++    }
++    assert!(!recorded.contains(&"empty final"));
++    Ok(())
++}
+--- /dev/null
++++ b/third_party/rusqlite-chio/src/functions/registration_ownership.rs
+@@ -0,0 +1,426 @@
++//! Registration ownership controls. All resources are inert in-memory counters.
++
++#[cfg(feature = "window")]
++use crate::functions::WindowAggregate;
++use crate::functions::{Aggregate, Context, FunctionFlags};
++use crate::util::Named;
++use crate::{ffi, Connection, Error, Name, Result};
++use std::ffi::CString;
++use std::panic::{catch_unwind, AssertUnwindSafe};
++use std::sync::atomic::{AtomicUsize, Ordering};
++use std::sync::Arc;
++
++#[derive(Default)]
++struct Counts {
++    drops: AtomicUsize,
++    calls: AtomicUsize,
++    inverses: AtomicUsize,
++}
++
++struct Callback {
++    counts: Arc<Counts>,
++    bias: i64,
++}
++
++impl Callback {
++    fn new(counts: &Arc<Counts>, bias: i64) -> Self {
++        Self {
++            counts: Arc::clone(counts),
++            bias,
++        }
++    }
++
++    fn scalar(&self, ctx: &Context<'_>) -> Result<i64> {
++        self.counts.calls.fetch_add(1, Ordering::SeqCst);
++        Ok(ctx.get::<i64>(0)? + self.bias)
++    }
++}
++
++impl Drop for Callback {
++    fn drop(&mut self) {
++        self.counts.drops.fetch_add(1, Ordering::SeqCst);
++    }
++}
++
++impl Aggregate<i64, i64> for Callback {
++    fn init(&self, _: &mut Context<'_>) -> Result<i64> {
++        self.counts.calls.fetch_add(1, Ordering::SeqCst);
++        Ok(0)
++    }
++
++    fn step(&self, ctx: &mut Context<'_>, acc: &mut i64) -> Result<()> {
++        self.counts.calls.fetch_add(1, Ordering::SeqCst);
++        *acc += ctx.get::<i64>(0)?;
++        Ok(())
++    }
++
++    fn finalize(&self, _: &mut Context<'_>, acc: Option<i64>) -> Result<i64> {
++        self.counts.calls.fetch_add(1, Ordering::SeqCst);
++        Ok(acc.unwrap_or_default() + self.bias)
++    }
++}
++
++#[cfg(feature = "window")]
++impl WindowAggregate<i64, i64> for Callback {
++    fn value(&self, acc: Option<&mut i64>) -> Result<i64> {
++        self.counts.calls.fetch_add(1, Ordering::SeqCst);
++        Ok(acc.map(|value| *value).unwrap_or_default() + self.bias)
++    }
++
++    fn inverse(&self, ctx: &mut Context<'_>, acc: &mut i64) -> Result<()> {
++        self.counts.inverses.fetch_add(1, Ordering::SeqCst);
++        *acc -= ctx.get::<i64>(0)?;
++        Ok(())
++    }
++}
++
++#[derive(Clone, Copy)]
++enum Kind {
++    Scalar,
++    Aggregate,
++    #[cfg(feature = "window")]
++    Window,
++}
++
++impl Kind {
++    fn register<N: Name>(
++        self,
++        db: &Connection,
++        name: N,
++        arity: i32,
++        callback: Callback,
++    ) -> Result<()> {
++        let flags = FunctionFlags::SQLITE_UTF8;
++        match self {
++            // Calling a method captures the entire Drop-bearing value, even
++            // with disjoint closure capture enabled in Rust 2021.
++            Self::Scalar => {
++                db.create_scalar_function(name, arity, flags, move |ctx| callback.scalar(ctx))
++            }
++            Self::Aggregate => db.create_aggregate_function(name, arity, flags, callback),
++            #[cfg(feature = "window")]
++            Self::Window => db.create_window_function(name, arity, flags, callback),
++        }
++    }
++
++    fn call(self, db: &Connection) -> Result<i64> {
++        let sql = match self {
++            Self::Scalar | Self::Aggregate => "SELECT owned_callback(7)",
++            #[cfg(feature = "window")]
++            Self::Window => "SELECT owned_callback(7) OVER ()",
++        };
++        db.query_row(sql, [], |row| row.get(0))
++    }
++}
++
++fn assert_owned(counts: &Arc<Counts>, drops: usize, owners: usize) {
++    assert_eq!(counts.drops.load(Ordering::SeqCst), drops);
++    // This independently checks that a retained callback did not just update
++    // the counter while leaking its captured Arc.
++    assert_eq!(Arc::strong_count(counts), owners);
++}
++
++fn assert_uninvoked(counts: &Counts) {
++    assert_eq!(counts.calls.load(Ordering::SeqCst), 0);
++    assert_eq!(counts.inverses.load(Ordering::SeqCst), 0);
++}
++
++fn close(db: Connection) -> Result<()> {
++    db.close().map_err(|(_, error)| error)
++}
++
++#[derive(Debug)]
++struct ErrorName<'a>(&'a AtomicUsize);
++
++impl Name for ErrorName<'_> {
++    fn as_cstr(&self) -> Result<Named<'_>> {
++        self.0.fetch_add(1, Ordering::SeqCst);
++        Err(Error::InvalidParameterName("synthetic name error".into()))
++    }
++}
++
++#[derive(Debug)]
++struct PanicName<'a>(&'a AtomicUsize);
++
++impl Name for PanicName<'_> {
++    fn as_cstr(&self) -> Result<Named<'_>> {
++        self.0.fetch_add(1, Ordering::SeqCst);
++        panic!("synthetic name panic");
++    }
++}
++
++#[derive(Debug)]
++struct OwnedName(CString);
++
++impl Name for OwnedName {
++    fn as_cstr(&self) -> Result<Named<'_>> {
++        Ok(Named::C(self.0.as_c_str()))
++    }
++}
++
++fn invalid_str_name(kind: Kind) -> Result<()> {
++    for name in ["owned_callback\0suffix".to_owned(), "x".repeat(80) + "\0"] {
++        let db = Connection::open_in_memory()?;
++        let counts = Arc::new(Counts::default());
++        let result = kind.register(&db, name.as_str(), 1, Callback::new(&counts, 0));
++        assert!(matches!(result, Err(Error::NulError(_))));
++        // This assertion fails on upstream: zero drops and two Arc owners.
++        assert_owned(&counts, 1, 1);
++        assert_uninvoked(&counts);
++        assert!(kind.call(&db).is_err());
++        db.remove_function("owned_callback", 1)?;
++        close(db)?;
++        assert_owned(&counts, 1, 1);
++    }
++    Ok(())
++}
++
++fn custom_name_error(kind: Kind) -> Result<()> {
++    let db = Connection::open_in_memory()?;
++    let counts = Arc::new(Counts::default());
++    let conversions = AtomicUsize::new(0);
++    let result = kind.register(&db, ErrorName(&conversions), 1, Callback::new(&counts, 0));
++    assert!(
++        matches!(result, Err(Error::InvalidParameterName(ref name)) if name == "synthetic name error")
++    );
++    assert_eq!(conversions.load(Ordering::SeqCst), 1);
++    assert_owned(&counts, 1, 1);
++    assert_uninvoked(&counts);
++    close(db)?;
++    assert_owned(&counts, 1, 1);
++    Ok(())
++}
++
++fn custom_name_panic(kind: Kind) -> Result<()> {
++    let db = Connection::open_in_memory()?;
++    let counts = Arc::new(Counts::default());
++    let conversions = AtomicUsize::new(0);
++    let callback = Callback::new(&counts, 0);
++    let result = catch_unwind(AssertUnwindSafe(|| {
++        kind.register(&db, PanicName(&conversions), 1, callback)
++    }));
++    match result {
++        Err(payload) => assert_eq!(
++            payload.downcast_ref::<&str>(),
++            Some(&"synthetic name panic")
++        ),
++        Ok(_) => panic!("name conversion must unwind"),
++    }
++    assert_eq!(conversions.load(Ordering::SeqCst), 1);
++    assert_owned(&counts, 1, 1);
++    assert_uninvoked(&counts);
++    close(db)?;
++    assert_owned(&counts, 1, 1);
++    Ok(())
++}
++
++fn sqlite_rejects_arity(kind: Kind) -> Result<()> {
++    for arity in [-2, i32::MAX] {
++        let db = Connection::open_in_memory()?;
++        let counts = Arc::new(Counts::default());
++        let result = kind.register(&db, c"owned_callback", arity, Callback::new(&counts, 0));
++        assert!(
++            matches!(result, Err(Error::SqliteFailure(ref e, _)) if e.extended_code == ffi::SQLITE_MISUSE)
++        );
++        assert_owned(&counts, 1, 1);
++        assert_uninvoked(&counts);
++        assert!(kind.call(&db).is_err());
++        db.remove_function(c"owned_callback", 1)?;
++        close(db)?;
++        assert_owned(&counts, 1, 1);
++    }
++    Ok(())
++}
++
++fn sqlite_rejects_long_name(kind: Kind) -> Result<()> {
++    let db = Connection::open_in_memory()?;
++    let counts = Arc::new(Counts::default());
++    let name = "x".repeat(256);
++    let result = kind.register(&db, name.as_str(), 1, Callback::new(&counts, 0));
++    assert!(
++        matches!(result, Err(Error::SqliteFailure(ref e, _)) if e.extended_code == ffi::SQLITE_MISUSE)
++    );
++    assert_owned(&counts, 1, 1);
++    assert_uninvoked(&counts);
++    close(db)?;
++    assert_owned(&counts, 1, 1);
++    Ok(())
++}
++
++fn names_outlive_registration_only(kind: Kind) -> Result<()> {
++    let db = Connection::open_in_memory()?;
++    for form in 0..3 {
++        let counts = Arc::new(Counts::default());
++        match form {
++            0 => {
++                let name = String::from("owned_callback");
++                kind.register(&db, name.as_str(), 1, Callback::new(&counts, 10))?;
++            }
++            1 => {
++                let name = CString::new("owned_callback")?;
++                kind.register(&db, name.as_c_str(), 1, Callback::new(&counts, 10))?;
++            }
++            _ => kind.register(
++                &db,
++                OwnedName(CString::new("owned_callback")?),
++                1,
++                Callback::new(&counts, 10),
++            )?,
++        }
++        // Each name's backing storage has been dropped before this SQL.
++        assert_owned(&counts, 0, 2);
++        assert_uninvoked(&counts);
++        assert_eq!(kind.call(&db)?, 17);
++        assert!(counts.calls.load(Ordering::SeqCst) > 0);
++        assert_owned(&counts, 0, 2);
++        db.remove_function(c"owned_callback", 1)?;
++        assert_owned(&counts, 1, 1);
++        assert!(kind.call(&db).is_err());
++    }
++    close(db)
++}
++
++fn replace_remove_close(kind: Kind) -> Result<()> {
++    let db = Connection::open_in_memory()?;
++    let first = Arc::new(Counts::default());
++    let second = Arc::new(Counts::default());
++    kind.register(&db, c"owned_callback", 1, Callback::new(&first, 10))?;
++    assert_owned(&first, 0, 2);
++    assert_eq!(kind.call(&db)?, 17);
++    kind.register(&db, c"owned_callback", 1, Callback::new(&second, 20))?;
++    assert_owned(&first, 1, 1);
++    assert_owned(&second, 0, 2);
++    assert_eq!(kind.call(&db)?, 27);
++    db.remove_function(c"owned_callback", 1)?;
++    assert_owned(&second, 1, 1);
++    assert!(kind.call(&db).is_err());
++    db.remove_function(c"owned_callback", 1)?;
++    close(db)?;
++    assert_owned(&first, 1, 1);
++    assert_owned(&second, 1, 1);
++    Ok(())
++}
++
++fn close_retained_callback(kind: Kind) -> Result<()> {
++    let counts = Arc::new(Counts::default());
++    let db = Connection::open_in_memory()?;
++    kind.register(&db, c"owned_callback", 1, Callback::new(&counts, 10))?;
++    assert_eq!(kind.call(&db)?, 17);
++    assert_owned(&counts, 0, 2);
++    close(db)?;
++    assert_owned(&counts, 1, 1);
++    Ok(())
++}
++
++fn drop_connection(kind: Kind) -> Result<()> {
++    let counts = Arc::new(Counts::default());
++    {
++        let db = Connection::open_in_memory()?;
++        kind.register(&db, c"owned_callback", 1, Callback::new(&counts, 0))?;
++        assert_owned(&counts, 0, 2);
++        assert_uninvoked(&counts);
++    }
++    assert_owned(&counts, 1, 1);
++    assert_uninvoked(&counts);
++    Ok(())
++}
++
++fn busy_replacement_preserves_original(kind: Kind) -> Result<()> {
++    let db = Connection::open_in_memory()?;
++    let first = Arc::new(Counts::default());
++    let rejected = Arc::new(Counts::default());
++    kind.register(&db, c"owned_callback", 1, Callback::new(&first, 10))?;
++    {
++        let mut stmt = db.prepare("SELECT 1 UNION ALL SELECT 2")?;
++        let mut rows = stmt.query([])?;
++        assert!(rows.next()?.is_some());
++        let result = kind.register(&db, c"owned_callback", 1, Callback::new(&rejected, 20));
++        assert!(
++            matches!(result, Err(Error::SqliteFailure(ref e, _)) if e.extended_code == ffi::SQLITE_BUSY)
++        );
++        assert_owned(&rejected, 1, 1);
++        assert_uninvoked(&rejected);
++        assert_owned(&first, 0, 2);
++    }
++    assert_eq!(kind.call(&db)?, 17);
++    close(db)?;
++    assert_owned(&first, 1, 1);
++    assert_owned(&rejected, 1, 1);
++    Ok(())
++}
++
++macro_rules! ownership_controls {
++    ($module:ident, $kind:expr) => {
++        mod $module {
++            use super::*;
++            #[test]
++            fn invalid_name_drops_capture() -> Result<()> {
++                invalid_str_name($kind)
++            }
++            #[test]
++            fn custom_error_drops_capture() -> Result<()> {
++                custom_name_error($kind)
++            }
++            #[test]
++            fn custom_panic_drops_capture() -> Result<()> {
++                custom_name_panic($kind)
++            }
++            #[test]
++            fn invalid_arity_destroys_once() -> Result<()> {
++                sqlite_rejects_arity($kind)
++            }
++            #[test]
++            fn long_name_destroys_once() -> Result<()> {
++                sqlite_rejects_long_name($kind)
++            }
++            #[test]
++            fn borrowed_names_need_no_static_lifetime() -> Result<()> {
++                names_outlive_registration_only($kind)
++            }
++            #[test]
++            fn replacement_removal_and_close_destroy_once() -> Result<()> {
++                replace_remove_close($kind)
++            }
++            #[test]
++            fn explicit_close_destroys_once() -> Result<()> {
++                close_retained_callback($kind)
++            }
++            #[test]
++            fn implicit_close_destroys_once() -> Result<()> {
++                drop_connection($kind)
++            }
++            #[test]
++            fn busy_replacement_destroys_only_rejected_callback() -> Result<()> {
++                busy_replacement_preserves_original($kind)
++            }
++        }
++    };
++}
++
++ownership_controls!(scalar, Kind::Scalar);
++ownership_controls!(aggregate, Kind::Aggregate);
++#[cfg(feature = "window")]
++ownership_controls!(window, Kind::Window);
++
++#[cfg(feature = "window")]
++#[test]
++fn moving_window_keeps_callback_until_close() -> Result<()> {
++    let db = Connection::open_in_memory()?;
++    let counts = Arc::new(Counts::default());
++    Kind::Window.register(&db, c"owned_callback", 1, Callback::new(&counts, 10))?;
++    {
++        let mut stmt = db.prepare(
++            "WITH input(x) AS (VALUES (1), (2), (3))
++             SELECT owned_callback(x) OVER (
++                 ORDER BY x ROWS BETWEEN 1 PRECEDING AND CURRENT ROW
++             ) FROM input ORDER BY x",
++        )?;
++        let values: Result<Vec<i64>> = stmt.query_map([], |row| row.get(0))?.collect();
++        assert_eq!(values?, vec![11, 13, 15]);
++    }
++    assert!(counts.inverses.load(Ordering::SeqCst) > 0);
++    assert_owned(&counts, 0, 2);
++    close(db)?;
++    assert_owned(&counts, 1, 1);
++    Ok(())
++}

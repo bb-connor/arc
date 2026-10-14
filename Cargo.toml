@@ -217,6 +217,10 @@ members = [
     "integrations/editors/zed-chio",
 ]
 exclude = [
+    # Callback ownership on refused function registration and null zero-argument arrays.
+    "third_party/rusqlite-chio",
+    # Upstream repr(transparent) backport for borrowed demangler newtypes.
+    "third_party/cpp-demangle-chio",
     # DES parity normalization and effective-key checks for the selected release.
     "third_party/aws-lc-rs-chio",
     # Upstream UTF-8 search-start validation backported to the pinned release.
@@ -252,7 +256,9 @@ exclude = [
 
 [patch.crates-io]
 aws-lc-rs = { path = "third_party/aws-lc-rs-chio" }
+cpp_demangle = { path = "third_party/cpp-demangle-chio" }
 enumflags2_derive = { path = "third_party/enumflags2-derive-chio" }
+rusqlite = { path = "third_party/rusqlite-chio" }
 seccompiler = { path = "third_party/seccompiler-chio" }
 
 [workspace.package]
