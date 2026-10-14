@@ -9,7 +9,7 @@ use super::{
 
 const SECURITY_STATE_STORE_SCHEMA_KEY: &str = "security_state";
 pub(super) const SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
-const SECURITY_STATE_STORE_ANCHOR_TABLES: &[&str] = &[
+const SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
     "security_transitions",
     "security_flow_contexts",
     "security_response_effects",
@@ -91,7 +91,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
             connection,
             SECURITY_STATE_STORE_SCHEMA_KEY,
             SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION,
-            SECURITY_STATE_STORE_ANCHOR_TABLES,
+            SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES,
         )
         .map_err(schema_version_error)?;
         prepare_declassification_schema_migration(connection)?;

@@ -46,11 +46,9 @@ markets, FROST state, and fiscal state have dedicated modules.
 ## Construction and migrations
 
 `check_schema_version` inspects `PRAGMA application_id` and store-specific
-anchor tables. A database with application ID zero is stamped as Chio only
-when it has no user tables; a populated one is refused as foreign. A stamped
-populated file must still carry an accepted anchor. `check_current_schema` adds
-the single-schema contract: any recorded revision other than the current one is
-refused. Revisions live in
+anchor tables. An empty or recognized legacy database with application ID zero
+is stamped as Chio and reported as revision zero. A stamped populated file
+must still carry an accepted anchor. Revisions live in
 `chio_store_schema_versions`, keyed by store, so co-located stores have
 independent revisions. The helper validates provenance and returns a revision;
 the constructor owns migration and the later `stamp_schema_version` call.
