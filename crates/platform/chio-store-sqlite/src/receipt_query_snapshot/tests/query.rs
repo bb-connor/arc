@@ -589,8 +589,8 @@ fn nested_sqlite_resource_failures_are_unavailable_and_other_classes_keep_theirs
         );
     }
     assert!(matches!(
-        walker(ReceiptQuerySnapshotError::ExportRefused("legacy lineage".into()).into()),
-        WalkError::Unavailable(reason) if reason == "legacy lineage"
+        walker(ReceiptQuerySnapshotError::ExportRefused("unsupported lineage".into()).into()),
+        WalkError::Unavailable(reason) if reason == "unsupported lineage"
     ));
     // Interruption, contention, work budgets and integrity keep their class.
     assert!(matches!(

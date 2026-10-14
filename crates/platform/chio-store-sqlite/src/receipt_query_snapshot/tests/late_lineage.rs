@@ -32,11 +32,15 @@ fn late_subject() -> String {
 }
 
 fn token() -> CapabilityToken {
+    token_for(CAPABILITY, &holder())
+}
+
+fn token_for(capability: &str, subject: &Keypair) -> CapabilityToken {
     let issuer = keypair();
     let body = CapabilityTokenBody {
-        id: CAPABILITY.to_string(),
+        id: capability.to_string(),
         issuer: issuer.public_key(),
-        subject: holder().public_key(),
+        subject: subject.public_key(),
         scope: ChioScope {
             grants: vec![ToolGrant {
                 server_id: "shell".to_string(),
@@ -379,31 +383,6 @@ fn await_attributed(service: &ReceiptQuerySnapshots, id: &str) {
 }
 
 #[test]
-fn a_late_legacy_lineage_row_attributes_archived_history_alike() {
-    let history = history();
-    let fixture = &history.fixture;
-    let token = token();
-    fixture
-        .tamper()
-        .execute(
-            "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at,
-                expires_at, grants_json, delegation_depth, provenance)
-             VALUES (?1, ?2, ?3, 1700000000, 4000000000, ?4, 0, 'legacy_projection')",
-            params![
-                CAPABILITY,
-                late_subject(),
-                token.issuer.to_hex(),
-                serde_json::to_string(&token.scope).unwrap()
-            ],
-        )
-        .unwrap();
-    assert_per_call_reads(&history);
-    let service = rebuilt(fixture);
-    assert_snapshot_agrees(fixture, &service, "rebuilt");
-    service.shutdown();
-}
-
-#[test]
 fn a_later_rotation_keeps_a_late_lineage_consistent() {
     let history = history();
     let fixture = &history.fixture;
@@ -520,7 +499,7 @@ fn a_forged_archive_lineage_row_is_refused() {
             .execute(
                 "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at,
                     expires_at, grants_json, delegation_depth, provenance)
-                 VALUES (?1, 'forged-subject', ?2, 1700000000, 4000000000, ?3, 0, 'legacy_projection')",
+                 VALUES (?1, 'forged-subject', ?2, 1700000000, 4000000000, ?3, 0, 'signed_token')",
                 params![
                     CAPABILITY,
                     token.issuer.to_hex(),
@@ -568,21 +547,10 @@ fn an_archived_claim_edit_is_refused() {
 /// per-call attribution binds in one chunk.
 const LATE_CAPABILITIES: u64 = 300;
 
-fn insert_legacy_lineage(fixture: &Fixture, capability: &str, subject: &str) {
-    let token = token();
+fn record_signed_lineage(fixture: &Fixture, capability: &str, subject: &Keypair) {
     fixture
-        .tamper()
-        .execute(
-            "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at,
-                expires_at, grants_json, delegation_depth, provenance)
-             VALUES (?1, ?2, ?3, 1700000000, 4000000000, ?4, 0, 'legacy_projection')",
-            params![
-                capability,
-                subject,
-                token.issuer.to_hex(),
-                serde_json::to_string(&token.scope).unwrap()
-            ],
-        )
+        .store
+        .record_capability_snapshot(&token_for(capability, subject), None)
         .unwrap();
 }
 
@@ -618,7 +586,7 @@ fn a_subject_with_many_late_capabilities_pages_and_counts_alike() {
     };
     // Lineage that existed before its receipts were written.
     for current in 0..3 {
-        insert_legacy_lineage(&fixture, &format!("cap-current-{current}"), &subject);
+        record_signed_lineage(&fixture, &format!("cap-current-{current}"), &holder());
     }
     // Capabilities whose lineage arrives only after archival.
     for late in 0..LATE_CAPABILITIES {
@@ -645,7 +613,7 @@ fn a_subject_with_many_late_capabilities_pages_and_counts_alike() {
     fixture.flush();
     archive_before(&fixture, 1_800_000_000, 316);
     for late in 0..LATE_CAPABILITIES {
-        insert_legacy_lineage(&fixture, &format!("cap-late-{late}"), &subject);
+        record_signed_lineage(&fixture, &format!("cap-late-{late}"), &holder());
         if late == 200 {
             // A row the canonical reader refuses and a very large row, both
             // carrying the subject, for capabilities with no receipts: neither
@@ -665,13 +633,17 @@ fn a_subject_with_many_late_capabilities_pages_and_counts_alike() {
                     "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key,
                         issued_at, expires_at, grants_json, delegation_depth, provenance)
                      VALUES ('cap-large', ?1, 'issuer', 1700000000, 4000000000, ?2, 0,
-                        'legacy_projection')",
+                        'signed_token')",
                     params![subject, "g".repeat(8 * 1024 * 1024)],
                 )
                 .unwrap();
         }
     }
-    insert_legacy_lineage(&fixture, "cap-late-unrelated", "subject-unrelated");
+    record_signed_lineage(
+        &fixture,
+        "cap-late-unrelated",
+        &Keypair::from_seed(&[0x62; 32]),
+    );
     // Receipts written after the late lineage stay live.
     append("cap-late-1", None, true);
     append("cap-late-299", None, true);

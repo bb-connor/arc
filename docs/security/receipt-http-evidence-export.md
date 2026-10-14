@@ -27,7 +27,7 @@ empty-lineage behavior. Tenant exports omit child payloads that have no tenant
 join path, as in the local export.
 
 Populated legacy mutable receipt tables, or a transport-ineligible live lineage
-(including a supported legacy projection, malformed stored metadata, a cycle,
+(malformed stored metadata, a signed-token row without its token, a cycle,
 excessive depth or a missing parent), refuse only that export with a HTTP 422
 and code `receipt_query_export_refused`. No partial bundle or
 `Retry-After` is returned; changing the unsupported metadata requires operator

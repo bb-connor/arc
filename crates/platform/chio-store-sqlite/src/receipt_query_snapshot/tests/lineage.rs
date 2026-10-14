@@ -204,21 +204,3 @@ fn a_signed_lineage_row_still_attributes_a_receipt() {
     assert_eq!(state, ReceiptQuerySnapshotState::Ready);
     service.shutdown();
 }
-
-#[test]
-fn a_legacy_lineage_row_still_attributes_a_receipt() {
-    let (fixture, service, id) = unattributed_archived();
-    insert_row(
-        &fixture,
-        "legacy-subject",
-        "legacy-issuer",
-        "[]",
-        "legacy_projection",
-        None,
-    );
-    assert!(fixture.store.get_lineage(CAPABILITY).unwrap().is_some());
-    let (served, state) = await_refresh(&service, "legacy-subject", &id);
-    assert!(served, "a legacy lineage row did not attribute: {state:?}");
-    assert_eq!(state, ReceiptQuerySnapshotState::Ready);
-    service.shutdown();
-}

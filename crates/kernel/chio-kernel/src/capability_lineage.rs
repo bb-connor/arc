@@ -15,16 +15,13 @@ use crate::receipt_store::ReceiptStoreError;
 ///
 /// Stored in the `capability_lineage` table alongside `chio_tool_receipts`
 /// for efficient JOINs during audit queries.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CapabilitySnapshotProvenance {
     /// Projection derived from and bound to an exact signed capability token.
     SignedToken,
     /// Unsigned local anchor derived from a verified federated delegation policy.
     SyntheticAnchor,
-    /// Pre-provenance local projection retained only for migration compatibility.
-    #[default]
-    LegacyProjection,
 }
 
 impl CapabilitySnapshotProvenance {
@@ -33,7 +30,6 @@ impl CapabilitySnapshotProvenance {
         match self {
             Self::SignedToken => "signed_token",
             Self::SyntheticAnchor => "synthetic_anchor",
-            Self::LegacyProjection => "legacy_projection",
         }
     }
 }
@@ -45,7 +41,6 @@ impl std::str::FromStr for CapabilitySnapshotProvenance {
         match value {
             "signed_token" => Ok(Self::SignedToken),
             "synthetic_anchor" => Ok(Self::SyntheticAnchor),
-            "legacy_projection" => Ok(Self::LegacyProjection),
             _ => Err(format!(
                 "unsupported capability snapshot provenance {value:?}"
             )),
@@ -74,9 +69,7 @@ pub struct CapabilitySnapshot {
     /// Unsigned cross-federation parent edge, separate from signed token lineage.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub federated_parent_capability_id: Option<String>,
-    /// Evidence source for this projection. Missing legacy payloads deserialize
-    /// as `LegacyProjection` and are rejected at transport boundaries.
-    #[serde(default)]
+    /// Evidence source for this projection.
     pub provenance: CapabilitySnapshotProvenance,
     /// Exact signed capability token, when the snapshot originated from one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -84,18 +77,9 @@ pub struct CapabilitySnapshot {
 }
 
 impl CapabilitySnapshot {
-    /// Validate a snapshot crossing a replication or evidence trust boundary.
-    pub fn validate_for_transport(&self) -> Result<(), ReceiptStoreError> {
-        self.validate(false)
-    }
-
-    /// Validate a row read from the local store, including migrated projections
-    /// whose original signed token was not retained.
-    pub fn validate_for_local_read(&self) -> Result<(), ReceiptStoreError> {
-        self.validate(true)
-    }
-
-    fn validate(&self, allow_legacy: bool) -> Result<(), ReceiptStoreError> {
+    /// Validate a snapshot read from a store or crossing a replication or
+    /// evidence trust boundary.
+    pub fn validate(&self) -> Result<(), ReceiptStoreError> {
         if self
             .federated_parent_capability_id
             .as_deref()
@@ -107,15 +91,6 @@ impl CapabilitySnapshot {
         match self.provenance {
             CapabilitySnapshotProvenance::SignedToken => self.validate_signed_token(),
             CapabilitySnapshotProvenance::SyntheticAnchor => self.validate_synthetic_anchor(),
-            CapabilitySnapshotProvenance::LegacyProjection if allow_legacy => {
-                if self.signed_capability.is_some() {
-                    return Err(self.conflict("marks a signed token as a legacy projection"));
-                }
-                Ok(())
-            }
-            CapabilitySnapshotProvenance::LegacyProjection => Err(self.conflict(
-                "uses legacy projection provenance outside the local migration boundary",
-            )),
         }
     }
 
@@ -228,27 +203,41 @@ pub enum CapabilityLineageError {
 mod tests {
     use super::*;
 
-    #[test]
-    fn legacy_snapshot_json_defaults_to_local_only_provenance(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let snapshot: CapabilitySnapshot = serde_json::from_value(serde_json::json!({
-            "capability_id": "legacy-capability",
-            "subject_key": "legacy-subject",
-            "issuer_key": "legacy-issuer",
+    fn unsigned_snapshot_json() -> serde_json::Value {
+        serde_json::json!({
+            "capability_id": "capability",
+            "subject_key": "subject",
+            "issuer_key": "issuer",
             "issued_at": 1,
             "expires_at": 2,
             "grants_json": "{}",
             "delegation_depth": 0,
             "parent_capability_id": null
-        }))?;
+        })
+    }
 
+    #[test]
+    fn snapshot_without_provenance_is_refused() {
+        let error = serde_json::from_value::<CapabilitySnapshot>(unsigned_snapshot_json())
+            .err()
+            .map(|error| error.to_string());
+        assert_eq!(error.as_deref(), Some("missing field `provenance`"));
+    }
+
+    #[test]
+    fn unsigned_projection_provenance_is_refused() {
+        let mut value = unsigned_snapshot_json();
+        value["provenance"] = serde_json::json!("legacy_projection");
+        let error = serde_json::from_value::<CapabilitySnapshot>(value)
+            .err()
+            .map(|error| error.to_string());
         assert_eq!(
-            snapshot.provenance,
-            CapabilitySnapshotProvenance::LegacyProjection
+            error.as_deref(),
+            Some("unknown variant `legacy_projection`, expected `signed_token` or `synthetic_anchor`")
         );
-        assert!(snapshot.federated_parent_capability_id.is_none());
-        assert!(snapshot.validate_for_local_read().is_ok());
-        assert!(snapshot.validate_for_transport().is_err());
-        Ok(())
+        assert_eq!(
+            "legacy_projection".parse::<CapabilitySnapshotProvenance>(),
+            Err("unsupported capability snapshot provenance \"legacy_projection\"".to_string())
+        );
     }
 }

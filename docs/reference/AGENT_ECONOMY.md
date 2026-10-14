@@ -607,10 +607,9 @@ receipt's embedded signature and compare its identity, timestamp, capability,
 tool, decision, tenant, signed attribution, policy/content hashes, currency and
 cost projections with the canonical receipt body before aggregating. Legacy
 subject/issuer fallback is checked against the same snapshot's validated local
-capability lineage; an unsigned legacy lineage projection remains a diagnostic
-source, not independently authenticated attribution. Charged and attempted totals
-use exact unsigned arithmetic and refuse totals outside `u64`. No JSON-to-SQL
-integer cast is used for either total.
+capability lineage. Charged and attempted totals use exact unsigned arithmetic
+and refuse totals outside `u64`. No JSON-to-SQL integer cast is used for either
+total.
 
 This is selected-row consistency, not authorization of the reported history.
 Stored selectors can exclude a row before it is examined, and an embedded signer

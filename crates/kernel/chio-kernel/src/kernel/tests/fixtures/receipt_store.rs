@@ -329,11 +329,7 @@ impl SqliteReceiptStore {
                 delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
                 parent_capability_id: row.get::<_, Option<String>>(7)?,
                 federated_parent_capability_id: None,
-                provenance: if signed_capability.is_some() {
-                    crate::CapabilitySnapshotProvenance::SignedToken
-                } else {
-                    crate::CapabilitySnapshotProvenance::LegacyProjection
-                },
+                provenance: crate::CapabilitySnapshotProvenance::SignedToken,
                 signed_capability,
             })
         }
@@ -407,11 +403,7 @@ impl SqliteReceiptStore {
                         delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
                         parent_capability_id: row.get::<_, Option<String>>(7)?,
                         federated_parent_capability_id: None,
-                        provenance: if signed_capability.is_some() {
-                            crate::CapabilitySnapshotProvenance::SignedToken
-                        } else {
-                            crate::CapabilitySnapshotProvenance::LegacyProjection
-                        },
+                        provenance: crate::CapabilitySnapshotProvenance::SignedToken,
                         signed_capability,
                     })
                 },

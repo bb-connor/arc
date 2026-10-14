@@ -608,3 +608,66 @@ fn receipt_lineage_statement_links_parent_and_child_receipts() {
 
     let _ = fs::remove_file(path);
 }
+
+const UNSIGNED_PROJECTION_LINEAGE_DDL: &str = "CREATE TABLE capability_lineage (
+    capability_id TEXT PRIMARY KEY,
+    subject_key TEXT NOT NULL,
+    issuer_key TEXT NOT NULL,
+    issued_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    grants_json TEXT NOT NULL,
+    delegation_depth INTEGER NOT NULL DEFAULT 0,
+    parent_capability_id TEXT REFERENCES capability_lineage(capability_id),
+    federated_parent_capability_id TEXT,
+    provenance TEXT NOT NULL DEFAULT 'legacy_projection'
+        CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+    signed_capability_json TEXT
+)";
+
+#[test]
+fn lineage_rejects_the_unsigned_projection_provenance() -> Result<(), Box<dyn std::error::Error>> {
+    let (_directory, path) = temp_db("chio-lineage-unsigned-projection-row")?;
+    drop(SqliteReceiptStore::open(&path)?);
+    let connection = rusqlite::Connection::open(&path)?;
+    let error = connection
+        .execute(
+            "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at,
+                expires_at, grants_json, delegation_depth, provenance)
+             VALUES ('cap', 'subject', 'issuer', 1, 100, '{}', 0, 'legacy_projection')",
+            [],
+        )
+        .err()
+        .ok_or("an unsigned projection row was stored")?;
+    assert!(
+        error.to_string().starts_with("CHECK constraint failed"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
+fn store_admitting_unsigned_projection_lineage_is_refused_at_open(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (_directory, path) = temp_db("chio-lineage-unsigned-projection-schema")?;
+    drop(SqliteReceiptStore::open(&path)?);
+    {
+        let connection = rusqlite::Connection::open(&path)?;
+        connection.execute_batch(&format!(
+            "DROP TABLE capability_lineage; {UNSIGNED_PROJECTION_LINEAGE_DDL};"
+        ))?;
+    }
+    for opened in [
+        SqliteReceiptStore::open(&path).map(drop),
+        SqliteReceiptStore::open_existing(&path).map(drop),
+    ] {
+        assert!(
+            matches!(
+                &opened,
+                Err(ReceiptStoreError::Conflict(message))
+                    if message == "main.capability_lineage admits unsigned projection provenance; refusing to open"
+            ),
+            "{opened:?}"
+        );
+    }
+    Ok(())
+}

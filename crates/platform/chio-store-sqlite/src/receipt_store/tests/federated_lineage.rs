@@ -162,19 +162,12 @@ fn combined_delegation_chain_rejects_partial_and_cyclic_federated_lineage() {
 }
 
 #[test]
-fn federated_import_rejects_legacy_and_cross_share_divergence() {
+fn federated_import_rejects_cross_share_divergence() {
     let path = unique_db_path("federated-cross-share-conflict");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let issuer = Keypair::generate();
     let token = signed_token("shared-capability", &Keypair::generate(), &issuer);
     let snapshot = signed_snapshot(&token, None);
-
-    let mut legacy = snapshot.clone();
-    legacy.provenance = CapabilitySnapshotProvenance::LegacyProjection;
-    legacy.signed_capability = None;
-    assert!(store
-        .import_federated_evidence_share(&share_import("legacy", legacy))
-        .is_err());
 
     store
         .import_federated_evidence_share(&share_import("share-a", snapshot.clone()))
@@ -222,64 +215,6 @@ fn federated_import_rejects_legacy_and_cross_share_divergence() {
         Some(token.id.as_str())
     );
 
-    drop(store);
-    let _ = fs::remove_file(path);
-}
-
-#[test]
-fn federated_reimport_upgrades_only_the_matching_legacy_share_row() {
-    let path = unique_db_path("federated-legacy-reimport");
-    let store = SqliteReceiptStore::open(&path).test_unwrap();
-    let token = signed_token(
-        "legacy-reimport-capability",
-        &Keypair::generate(),
-        &Keypair::generate(),
-    );
-    let snapshot = signed_snapshot(&token, None);
-    for share_id in ["share-a", "share-b"] {
-        store
-            .import_federated_evidence_share(&share_import(share_id, snapshot.clone()))
-            .test_unwrap();
-    }
-    store
-        .connection()
-        .test_unwrap()
-        .execute(
-            "UPDATE federated_share_capability_lineage \
-             SET provenance = 'legacy_projection', signed_capability_json = NULL \
-             WHERE capability_id = ?1",
-            params![token.id],
-        )
-        .test_unwrap();
-
-    store
-        .import_federated_evidence_share(&share_import("share-a", snapshot))
-        .test_unwrap();
-
-    let connection = store.connection().test_unwrap();
-    let share_a: (String, Option<String>) = connection
-        .query_row(
-            "SELECT provenance, signed_capability_json \
-             FROM federated_share_capability_lineage \
-             WHERE share_id = 'share-a' AND capability_id = ?1",
-            params![token.id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .test_unwrap();
-    let share_b: (String, Option<String>) = connection
-        .query_row(
-            "SELECT provenance, signed_capability_json \
-             FROM federated_share_capability_lineage \
-             WHERE share_id = 'share-b' AND capability_id = ?1",
-            params![token.id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .test_unwrap();
-    assert_eq!(share_a.0, "signed_token");
-    assert!(share_a.1.is_some());
-    assert_eq!(share_b, ("legacy_projection".to_string(), None));
-
-    drop(connection);
     drop(store);
     let _ = fs::remove_file(path);
 }

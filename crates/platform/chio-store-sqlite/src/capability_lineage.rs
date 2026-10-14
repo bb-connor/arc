@@ -10,14 +10,7 @@ use crate::receipt_store::support::sqlite_i64;
 use crate::receipt_store::SqliteReceiptStore;
 
 pub(crate) fn snapshot_from_row(row: &Row<'_>) -> rusqlite::Result<CapabilitySnapshot> {
-    snapshot_from_row_with_boundary(row, true)
-}
-
-fn snapshot_from_row_with_boundary(
-    row: &Row<'_>,
-    allow_legacy: bool,
-) -> rusqlite::Result<CapabilitySnapshot> {
-    validate_snapshot_from_row(snapshot_columns_from_row(row)?, 10, allow_legacy)
+    validate_snapshot_from_row(snapshot_columns_from_row(row)?, 10)
 }
 
 /// Decode stored columns without validating the resulting lineage. The caller
@@ -42,14 +35,8 @@ pub(crate) fn snapshot_columns_from_row(row: &Row<'_>) -> rusqlite::Result<Capab
 pub(crate) fn validate_snapshot_from_row(
     snapshot: CapabilitySnapshot,
     signed_capability_column: usize,
-    allow_legacy: bool,
 ) -> rusqlite::Result<CapabilitySnapshot> {
-    let validation = if allow_legacy {
-        snapshot.validate_for_local_read()
-    } else {
-        snapshot.validate_for_transport()
-    };
-    validation.map_err(|error| {
+    snapshot.validate().map_err(|error| {
         rusqlite::Error::FromSqlConversionFailure(
             signed_capability_column,
             Type::Text,
@@ -60,6 +47,30 @@ pub(crate) fn validate_snapshot_from_row(
         )
     })?;
     Ok(snapshot)
+}
+
+/// Refuse a database whose lineage tables still admit unsigned projection rows.
+pub(crate) fn reject_unsigned_projection_lineage(
+    connection: &rusqlite::Connection,
+    schema: &str,
+) -> Result<(), chio_kernel::ReceiptStoreError> {
+    for table in ["capability_lineage", "federated_share_capability_lineage"] {
+        let sql: Option<String> = connection
+            .query_row(
+                &format!(
+                    "SELECT sql FROM {schema}.sqlite_master WHERE type = 'table' AND name = ?1"
+                ),
+                [table],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if sql.is_some_and(|sql| sql.contains("legacy_projection")) {
+            return Err(chio_kernel::ReceiptStoreError::Conflict(format!(
+                "{schema}.{table} admits unsigned projection provenance; refusing to open"
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn provenance_from_row(
@@ -93,7 +104,7 @@ pub(crate) fn signed_capability_from_row(
 pub(crate) fn validate_snapshot_for_transport(
     snapshot: &CapabilitySnapshot,
 ) -> Result<(), chio_kernel::ReceiptStoreError> {
-    snapshot.validate_for_transport()
+    snapshot.validate()
 }
 
 pub(crate) fn ensure_snapshots_compatible(
@@ -125,9 +136,7 @@ pub(crate) fn ensure_snapshots_compatible(
             incoming.capability_id
         )));
     }
-    if existing.provenance != incoming.provenance
-        && existing.provenance != CapabilitySnapshotProvenance::LegacyProjection
-    {
+    if existing.provenance != incoming.provenance {
         return Err(chio_kernel::ReceiptStoreError::Conflict(format!(
             "capability lineage {} has conflicting provenance",
             incoming.capability_id
@@ -194,41 +203,6 @@ pub(crate) fn persist_compatible_snapshot(
 
     if let Some(existing) = existing.as_ref() {
         ensure_snapshots_compatible(existing, incoming)?;
-        if existing.provenance == CapabilitySnapshotProvenance::LegacyProjection
-            && incoming.provenance != CapabilitySnapshotProvenance::LegacyProjection
-        {
-            let max_rowid: i64 = transaction.query_row(
-                "SELECT COALESCE(MAX(rowid), 0) FROM capability_lineage",
-                [],
-                |row| row.get(0),
-            )?;
-            let next_rowid = max_rowid.checked_add(1).ok_or_else(|| {
-                chio_kernel::ReceiptStoreError::Conflict(
-                    "capability lineage replication sequence is exhausted".to_string(),
-                )
-            })?;
-            let updated = transaction.execute(
-                r#"
-                UPDATE capability_lineage
-                SET signed_capability_json = ?2,
-                    provenance = ?3,
-                    rowid = ?4
-                WHERE capability_id = ?1
-                "#,
-                params![
-                    incoming.capability_id,
-                    signed_capability_json,
-                    provenance,
-                    next_rowid
-                ],
-            )?;
-            if updated != 1 {
-                return Err(chio_kernel::ReceiptStoreError::Conflict(format!(
-                    "capability lineage {} disappeared during signed-token upgrade",
-                    incoming.capability_id
-                )));
-            }
-        }
         return Ok(());
     }
 
@@ -662,7 +636,6 @@ impl SqliteReceiptStore {
                         signed_capability: signed_capability_from_row(row, 11)?,
                     },
                     11,
-                    false,
                 )?,
             })
         })?;

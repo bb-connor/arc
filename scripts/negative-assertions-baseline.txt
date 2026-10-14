@@ -75,7 +75,6 @@
 1	crates/kernel/chio-kernel/src/caller_delivery/tests.rs	signed_start_round_trips_exactly_and_has_a_half_open_execution_interval	verify(&fixture, &decoded, now).is_err()
 1	crates/kernel/chio-kernel/src/caller_delivery/tests.rs	start_rejects_each_substituted_binding_and_unpinned_signer	verify(&fixture, &decoded, 1_100).is_err()
 1	crates/kernel/chio-kernel/src/caller_delivery/tests.rs	start_rejects_each_substituted_binding_and_unpinned_signer	verify(&fixture, &forged, 1_100).is_err()
-1	crates/kernel/chio-kernel/src/capability_lineage.rs	legacy_snapshot_json_defaults_to_local_only_provenance	snapshot.validate_for_transport().is_err()
 1	crates/kernel/chio-kernel/src/dispatch_status_tests.rs	provider_event_times_after_trusted_observation_freeze_unknown	query(None, 1_u64 << 53).validate().is_err()
 1	crates/kernel/chio-kernel/src/dispatch_status_tests.rs	test_qualification_binds_the_security_components	qualify_dispatch_status_provider_for_test( Arc::new(FakeProvider::with_status( ProviderDispatchStatusObservation::Unknown )), verifier, anchor, high_water, domain, ) .is_err()
 1	crates/kernel/chio-kernel/src/dispatch_status_tests.rs	test_qualification_binds_the_security_components	qualify_dispatch_status_provider_for_test( Arc::new(invalid_transport), , , 1, , ) .is_err()
