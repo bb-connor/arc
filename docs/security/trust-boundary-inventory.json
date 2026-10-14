@@ -1510,6 +1510,7 @@
     "crates/products/chio-cli/src/cli/dispatch/finding/hosted.rs::read_canonical_private_json::from_wire",
     "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs::load_profile::from_wire",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::read_private_client_profile::from_wire",
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata::from_wire",
     "crates/products/chio-cli/src/cli/input.rs::canonical_ijson::from_wire",
     "crates/products/chio-cli/src/cli/input.rs::decode::from_wire",
     "crates/products/chio-cli/src/cli/input/config.rs::load_document::from_wire",
@@ -16854,6 +16855,7 @@
     "crates/products/chio-cli/src/cli/dispatch/finding/hosted.rs::read_canonical_private_json::from_wire#1::decode_canonical",
     "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs::load_profile::from_wire#1::decode_canonical",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::read_private_client_profile::from_wire#1::decode_canonical",
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata::from_wire#1::decode_document",
     "crates/products/chio-cli/src/cli/input.rs::canonical_ijson::from_wire#1::canonicalize+decode_canonical",
     "crates/products/chio-cli/src/cli/input.rs::decode::from_wire#1::decode_signed",
     "crates/products/chio-cli/src/cli/input/config.rs::load_document::from_wire#1::decode_document",
@@ -22421,6 +22423,11 @@
     "crates/platform/chio-store-sqlite/src/security_state/flow_state.rs": [
       "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label",
       "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label"
+    ],
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs": [
+      "add_npm_runtime::shared-reader::crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata",
+      "add_npm_runtime::shared-reader::crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata",
+      "read_package_metadata::original-json-reader::UntrustedJsonText"
     ],
     "crates/tooling/chio-conformance/src/runner/restart_probe.rs": [
       "open_subscribed_session::shared-reader::crates/tooling/chio-conformance/src/runner/restart_probe.rs::validate_initialize",

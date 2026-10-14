@@ -9,6 +9,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[path = "verified_fix_rust_runtime.rs"]
 mod rust_runtime;
 
+#[path = "verified_fix_npm_runtime.rs"]
+mod npm_runtime;
+
 const MAX_RUNTIME_TREE_ENTRIES: usize = 20_000;
 const MAX_COMMAND_OUTPUT_BYTES: usize = 4 * 1024 * 1024;
 const TEST_COMMAND_TIMEOUT: Duration = Duration::from_secs(300);
@@ -888,21 +891,7 @@ fn build_runtime_mount_spec(profile: RuntimeMountProfile) -> Result<RuntimeMount
 
     if builder.add_executable("node", false)?.is_some() {
         if let Some(npm) = executable_on_path("npm") {
-            let npm_root = bounded_runtime_path(&npm, &["root", "-g"], "npm runtime")?;
-            let npm_package = fs::canonicalize(npm_root.join("npm"))
-                .map_err(|error| format!("npm runtime is invalid: {error}"))?;
-            builder.add_tree_dependencies(&npm_package)?;
-            builder
-                .trees
-                .insert((npm_package, PathBuf::from("/runtime/npm")));
-            builder.symlinks.insert((
-                PathBuf::from("/runtime/npm/bin/npm-cli.js"),
-                PathBuf::from("/runtime/bin/npm"),
-            ));
-            builder.symlinks.insert((
-                PathBuf::from("/runtime/npm/bin/npx-cli.js"),
-                PathBuf::from("/runtime/bin/npx"),
-            ));
+            builder.add_npm_runtime(&npm)?;
         }
     }
     builder.add_rust_toolchain()?;
