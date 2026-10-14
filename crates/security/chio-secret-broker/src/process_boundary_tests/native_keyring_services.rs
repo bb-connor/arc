@@ -185,7 +185,10 @@ pub(super) fn migration_config(
         1,
         signer.public_key().to_hex(),
     )?;
-    store.register(&sign_enterprise_migration_transition(registration, &signer)?)?;
+    store.register(&sign_enterprise_migration_transition(
+        registration,
+        &signer,
+    )?)?;
     let state = store
         .load(&key)?
         .ok_or("key-log migration registration absent")?;

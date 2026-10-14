@@ -246,8 +246,12 @@ fn enforced_broker_migration(directory: &Path) -> BrokerDaemonMigrationConfig {
         };
         let registration = EnterpriseMigrationTransitionBody::enforced(
             key.clone(),
-            production_broker_migration_posture_digest(&deployment_id, &credential_provider, control)
-                .test_expect("enforced migration posture"),
+            production_broker_migration_posture_digest(
+                &deployment_id,
+                &credential_provider,
+                control,
+            )
+            .test_expect("enforced migration posture"),
             Digest32::new([seed; 32]),
             Digest32::new([seed.saturating_add(1); 32]),
             Digest32::new([seed.saturating_add(2); 32]),

@@ -451,9 +451,11 @@ mod tests {
         let fixture = ledger(None);
         let mut wrong_heads = fixture.heads.clone();
         wrong_heads[0].transition_digest = Digest32::new([0xee; 32]);
-        let policy =
-            SqliteEnterpriseMigrationOpenPolicy::new(vec![fixture.signer.public_key()], wrong_heads)
-                .test_expect("wrong-head open policy shape");
+        let policy = SqliteEnterpriseMigrationOpenPolicy::new(
+            vec![fixture.signer.public_key()],
+            wrong_heads,
+        )
+        .test_expect("wrong-head open policy shape");
         assert!(SqliteEnterpriseMigrationStateStore::open(&fixture.path, policy).is_err());
     }
 

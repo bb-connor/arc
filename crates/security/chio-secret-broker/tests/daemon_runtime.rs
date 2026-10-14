@@ -118,9 +118,8 @@ fn daemon_runtime_config_is_closed_and_rejects_partial_authority_or_storage() {
         .test_expect_err("migration heads must match the configured provider");
 
     let mut wrong_control = valid.clone();
-    wrong_control.enterprise_migration.heads[0]
-        .key
-        .control = chio_security_types::EnterpriseMigrationControl::BrokerQuotaEnforcement;
+    wrong_control.enterprise_migration.heads[0].key.control =
+        chio_security_types::EnterpriseMigrationControl::BrokerQuotaEnforcement;
     wrong_control
         .validate()
         .test_expect_err("migration heads must bind both exact controls");

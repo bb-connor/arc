@@ -538,8 +538,11 @@ fn an_enforced_provision_binds_the_helper_the_grants_and_a_registered_ledger() {
             fixture.repository.to_str().unwrap()
         ])
     );
-    let registration_path =
-        PathBuf::from(report["artifacts"]["migrationRegistration"].as_str().unwrap());
+    let registration_path = PathBuf::from(
+        report["artifacts"]["migrationRegistration"]
+            .as_str()
+            .unwrap(),
+    );
     assert_eq!(
         registration_path.file_name().unwrap(),
         "cage-migration-registration.json"

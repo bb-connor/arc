@@ -2213,7 +2213,6 @@
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/canonical.rs::from_str::Deserializer::from_str",
     "crates/core/chio-core-types/src/canonical.rs::write_canonical::custom_deserialize",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::custom_deserialize",
@@ -5577,7 +5576,6 @@
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
       "try_from::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/canonical/signed_json.rs": [
@@ -6652,7 +6650,7 @@
             "serde::Deserializer"
           ],
           "checked": true,
-          "instances": 559
+          "instances": 558
         }
       ]
     },
@@ -20869,7 +20867,6 @@
       "load_manifest_allowlist::format-toml::from_str"
     ],
     "crates/products/chio-cli/src/cli/mcp/provision.rs": [
-      "cmd_provision_native_mcp_demo::shared-reader::crates/products/chio-cli/src/cli/mcp/provision.rs::resolve_inputs",
       "decode_tools_fixture::original-json-reader::UntrustedJsonText",
       "resolve_inputs::shared-reader::crates/products/chio-cli/src/cli/mcp/provision.rs::decode_tools_fixture",
       "resolve_inputs::shared-reader::crates/products/chio-cli/src/cli/mcp/provision/discovery.rs::discover_tool_surface"

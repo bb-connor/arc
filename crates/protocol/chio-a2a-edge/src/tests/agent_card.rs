@@ -19,11 +19,9 @@ fn edge_rejects_manifest_with_unsupported_schema_version() {
         manifest.schema = unsupported.to_string();
         manifest.public_key = manifest_public_key(99);
 
-        let error = match ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]) {
-            Ok(_) => panic!("A2A edge must reject unsupported manifest schema versions"),
-            Err(error) => error,
+        let Err(error) = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]) else {
+            panic!("A2A edge must reject unsupported manifest schema versions");
         };
-
         assert!(matches!(
             error,
             A2aEdgeError::Manifest(chio_manifest::ManifestError::UnsupportedSchema(schema))

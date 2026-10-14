@@ -815,13 +815,12 @@ fn load_key_log_verification_migration_binding(
         )?,
     );
     let store: Arc<dyn EnterpriseMigrationStateStore> = concrete;
-    let binding = EnterpriseMigrationRuntimeBinding::load(&store, &key, posture_digest).map_err(
-        |error| {
+    let binding =
+        EnterpriseMigrationRuntimeBinding::load(&store, &key, posture_digest).map_err(|error| {
             CliError::cli_other_error(format!(
                 "key-log verification migration binding failed: {error}"
             ))
-        },
-    )?;
+        })?;
     Ok(KeyLogMigrationBinding(binding))
 }
 

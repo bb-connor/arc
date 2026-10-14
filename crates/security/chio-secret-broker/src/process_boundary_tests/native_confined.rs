@@ -339,8 +339,11 @@ impl ConfinedFactory {
             broker_binding_digest: digest(&canonical_json_bytes(&self.peer)?),
             migration_ledger_digest: digest(&canonical_json_bytes(&key)?),
         };
-        let posture =
-            chio_security_types::cage_migration_posture_digest(&key.deployment_id, &key.scope_id, &inputs)?;
+        let posture = chio_security_types::cage_migration_posture_digest(
+            &key.deployment_id,
+            &key.scope_id,
+            &inputs,
+        )?;
         let path = self.directory.join("cage-migration.sqlite3");
         let store = SqliteEnterpriseMigrationStateStore::open(
             &path,
@@ -359,10 +362,7 @@ impl ConfinedFactory {
             registration,
             &self.signer,
         )?)?;
-        let head = store
-            .load(&key)?
-            .ok_or("cage registration absent")?
-            .head();
+        let head = store.load(&key)?.ok_or("cage registration absent")?.head();
         drop(store);
         let store: Arc<dyn EnterpriseMigrationStateStore> =
             Arc::new(SqliteEnterpriseMigrationStateStore::open(
