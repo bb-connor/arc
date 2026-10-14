@@ -39,42 +39,6 @@ fn reopen(fixture: Fixture) -> (TempDir, SqliteAdmissionOperationStore) {
     (_temp, authority.admission_operation_store())
 }
 
-/// Shape a predecessor catalog. Only an empty stop chain may be removed.
-pub(in crate::admission_operation_store::tests) fn remove_empty_stop_chain(
-    connection: &Connection,
-) -> rusqlite::Result<()> {
-    let exists: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_schema
-             WHERE type = 'table' AND name = 'admission_operation_stop_epochs')",
-        [],
-        |row| row.get(0),
-    )?;
-    if exists {
-        let records: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM admission_operation_stop_epochs",
-            [],
-            |row| row.get(0),
-        )?;
-        assert_eq!(
-            records, 0,
-            "predecessor fixture cannot discard stop records"
-        );
-    }
-    let references: i64 = connection.query_row(
-        "SELECT COUNT(*) FROM authority_global_commits WHERE projection_kind = 'stop_epoch'",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(
-        references, 0,
-        "predecessor fixture cannot discard stop references"
-    );
-    connection.execute_batch(
-        "DROP TABLE IF EXISTS admission_operation_stop_epochs;
-         DROP TABLE IF EXISTS admission_operation_stop_notes;",
-    )
-}
-
 const EPOCH_ONE: StopEpochId = StopEpochId {
     chain_generation: 1,
     epoch: 1,
@@ -258,74 +222,5 @@ fn a_tampered_stop_record_fails_closed() {
     assert!(
         refused,
         "a tampered stop record must not load as a verified head"
-    );
-}
-
-#[test]
-fn a_v37_store_migrates_to_an_empty_stop_chain() {
-    let fixture = fixture();
-    let database = fixture.database.clone();
-    let Fixture {
-        _temp,
-        lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
-    let connection = Connection::open(&database).unwrap();
-    remove_empty_stop_chain(&connection).unwrap();
-    connection
-        .execute(
-            "UPDATE chio_store_schema_versions SET version = 37
-              WHERE store_key = 'admission_operation'",
-            [],
-        )
-        .unwrap();
-    drop(connection);
-    let authority = crate::test_authority::open_serving(&database, &lock_root).unwrap();
-    let store = authority.admission_operation_store();
-    assert_eq!(store.load_stop_head(StopScope::Kernel).unwrap(), None);
-    let version: i32 = Connection::open(&database)
-        .unwrap()
-        .query_row(
-            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert_eq!(version, 38);
-}
-
-#[test]
-fn a_store_stamped_past_v38_is_refused() {
-    let fixture = fixture();
-    let database = fixture.database.clone();
-    let Fixture {
-        _temp,
-        lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
-    Connection::open(&database)
-        .unwrap()
-        .execute(
-            "UPDATE chio_store_schema_versions SET version = 39
-              WHERE store_key = 'admission_operation'",
-            [],
-        )
-        .unwrap();
-    let Err(error) = crate::test_authority::open_serving(&database, &lock_root) else {
-        panic!("a store stamped past v38 must not open");
-    };
-    assert!(
-        error.to_string().contains(
-            "database schema version 39 is newer than this binary supports (38); refusing to open"
-        ),
-        "{error}"
     );
 }

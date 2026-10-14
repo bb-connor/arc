@@ -4,6 +4,8 @@ use super::*;
 #[cfg(unix)]
 use crate::security_state::SqliteSecurityParticipantSource;
 
+#[path = "security_participant_migration/barrier.rs"]
+mod barrier;
 #[cfg(unix)]
 #[path = "security_participant_migration/catalog_compat.rs"]
 mod catalog_compat;
@@ -19,8 +21,6 @@ mod legacy_owner_pair;
 #[cfg(unix)]
 #[path = "security_participant_migration/lifecycle.rs"]
 mod lifecycle;
-#[path = "security_participant_migration/migration.rs"]
-mod migration;
 
 thread_local! { static FAIL_AFTER: Cell<u8> = const { Cell::new(0) }; }
 
@@ -108,32 +108,4 @@ fn global_count(fixture: &Fixture) -> AnchoredTestResult<i64> {
         [],
         |row| row.get(0),
     )?)
-}
-
-/// Build genuine predecessors, not an older stamp on the current catalog.
-pub(super) fn remove_empty_v27_tables(connection: &Connection) -> rusqlite::Result<()> {
-    super::security_participant_state::remove_empty_v28_tables(connection)?;
-    for table in [
-        "security_participant_migration_rows",
-        "security_participant_migration_events",
-        "security_participant_migration_expectations",
-    ] {
-        let exists: bool = connection.query_row(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?1)",
-            [table],
-            |row| row.get(0),
-        )?;
-        if exists {
-            let count: i64 =
-                connection.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                    row.get(0)
-                })?;
-            assert_eq!(
-                count, 0,
-                "predecessor fixture cannot discard retained migration state"
-            );
-            connection.execute_batch(&format!("DROP TABLE {table}"))?;
-        }
-    }
-    Ok(())
 }

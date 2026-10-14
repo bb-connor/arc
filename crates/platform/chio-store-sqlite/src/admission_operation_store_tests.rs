@@ -60,8 +60,6 @@ mod budget_atomicity;
 #[cfg(unix)]
 #[path = "admission_operation_store_tests/budget_selector_corruption.rs"]
 mod budget_selector_corruption;
-#[path = "admission_operation_store_tests/clock_migration.rs"]
-mod clock_migration;
 #[path = "admission_operation_store_tests/credit_authorization.rs"]
 mod credit_authorization;
 #[path = "admission_operation_store_tests/credit_exposure.rs"]
@@ -78,10 +76,10 @@ mod governed_approval_replay;
 mod injected_clock;
 #[path = "admission_operation_store_tests/integrity.rs"]
 mod integrity;
-#[path = "admission_operation_store_tests/legacy_clock.rs"]
-pub(super) mod legacy_clock;
 #[path = "admission_operation_store_tests/obligation.rs"]
 mod obligation;
+#[path = "admission_operation_store_tests/observation_clock.rs"]
+mod observation_clock;
 #[path = "admission_operation_store_tests/recovery.rs"]
 mod recovery;
 #[path = "admission_operation_store_tests/retained_request.rs"]

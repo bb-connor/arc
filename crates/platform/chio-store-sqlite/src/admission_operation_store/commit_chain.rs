@@ -100,11 +100,7 @@ pub(crate) fn append_operation_commit_with_participant(
     let current = load_admission_commit_head(transaction)?;
     validate_trusted_time(recorded_at_unix_ms, "recorded_at_unix_ms")?;
     let authority_time = super::schema::observe_authority_time(transaction, owner)?;
-    #[cfg(not(test))]
     let observed_at_unix_ms = Some(authority_time);
-    #[cfg(test)]
-    let (authority_time, observed_at_unix_ms) =
-        super::tests::legacy_clock::fixture_clocks(authority_time, recorded_at_unix_ms);
     if authority_time < current.trusted_time_high_water_unix_ms {
         return Err(invariant("trusted admission authority time regressed"));
     }

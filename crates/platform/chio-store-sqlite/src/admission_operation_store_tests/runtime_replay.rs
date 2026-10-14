@@ -243,28 +243,3 @@ fn assert_record_equal(
     assert_eq!(actual.event_sequence(), expected.event_sequence());
     assert_eq!(actual.imported_inactive(), expected.imported_inactive());
 }
-
-/// Historical fixture shaping only. Dropping a nonempty migration namespace
-/// would erase security history and is never an acceptable schema downgrade.
-pub(super) fn remove_empty_v19_runtime_tables(connection: &Connection) -> rusqlite::Result<()> {
-    super::governed_approval_replay::remove_empty_v22_approval_tables(connection)?;
-    for table in [
-        "runtime_replay_claim_releases",
-        "runtime_replay_claim_resources",
-        "runtime_replay_claim_episodes",
-        "runtime_replay_legacy_tombstones",
-        "runtime_replay_migration_events",
-        "runtime_replay_migration_expectations",
-    ] {
-        let count: i64 =
-            connection.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                row.get(0)
-            })?;
-        assert_eq!(
-            count, 0,
-            "only an empty fixture may be shaped as historical schema"
-        );
-        connection.execute_batch(&format!("DROP TABLE {table};"))?;
-    }
-    Ok(())
-}

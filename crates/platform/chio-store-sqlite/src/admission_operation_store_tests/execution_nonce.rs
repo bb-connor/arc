@@ -582,60 +582,6 @@ fn durable_nonce_expired_reservation_remains_available_only_as_history() -> Test
 }
 
 #[test]
-fn durable_nonce_v11_migration_preserves_original_commits_without_inventing_reservations(
-) -> TestResult {
-    let Fixture {
-        _temp,
-        database,
-        lock_root,
-        authority,
-        store,
-        fence,
-        _clock,
-    } = fixture();
-    let (operation, original) = retained_request::original(&fence)?;
-    store.begin_with_retained_tool_request(&operation, &original, &fence, now_ms())?;
-    drop(store);
-    drop(authority);
-    let connection = Connection::open(&database)?;
-    let before: Vec<u8> = connection.query_row(
-        "SELECT operation_json FROM admission_operations",
-        [],
-        |row| row.get(0),
-    )?;
-    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
-    connection.execute_batch("DROP TABLE admission_execution_nonce_transitions;
-        DROP TABLE admission_execution_nonce_reservations;
-        UPDATE chio_store_schema_versions SET version = 11 WHERE store_key = 'admission_operation';")?;
-    drop(connection);
-    SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
-    let store = reopened.admission_operation_store();
-    let (_, retained) = store
-        .load_retained_tool_request(
-            operation.binding().operation_id(),
-            &reopened.mutation_fence(),
-            now_ms(),
-        )?
-        .ok_or("original request lost in migration")?;
-    assert_eq!(retained.canonical_bytes(), original.canonical_bytes());
-    let connection = Connection::open(&database)?;
-    let after: Vec<u8> = connection.query_row(
-        "SELECT operation_json FROM admission_operations",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(before, after);
-    let count: i64 = connection.query_row(
-        "SELECT COUNT(*) FROM admission_execution_nonce_reservations",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(count, 0);
-    Ok(())
-}
-
-#[test]
 fn durable_nonce_decoder_rejects_unbound_noncanonical_and_future_artifacts() -> TestResult {
     let fixture = nonce_fixture()?;
     let mut noncanonical = fixture.reservation.canonical_bytes().to_vec();

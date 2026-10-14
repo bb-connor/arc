@@ -9,8 +9,6 @@ mod kernel_recovery;
 mod kernel_routes;
 #[path = "claims/lifecycle.rs"]
 mod lifecycle;
-#[path = "claims/migration.rs"]
-mod migration;
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
     GovernedTransactionIntent,

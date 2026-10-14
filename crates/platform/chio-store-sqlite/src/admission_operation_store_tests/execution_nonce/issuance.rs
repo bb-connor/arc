@@ -432,53 +432,6 @@ fn durable_nonce_issuance_rolls_back_each_sql_cutpoint() -> TestResult {
 }
 
 #[test]
-fn durable_nonce_issuance_reopens_with_current_fences_and_migrates_absence() -> TestResult {
-    let mut fixture = unowned_prepared_nonce_fixture(None)?;
-    let original = fixture.original.canonical_bytes().to_vec();
-    crate::admission_operation_store::tests::runtime_replay::remove_empty_v19_runtime_tables(
-        &*fixture.fixture.store.connection()?,
-    )?;
-    fixture.fixture.store.connection()?.execute(
-        "UPDATE chio_store_schema_versions SET version = 14 WHERE store_key = 'admission_operation'", [],
-    )?;
-    let old_fence = fixture.fixture.fence.clone();
-    fixture = lifecycle::reopen(fixture)?;
-    assert_eq!(fixture.original.canonical_bytes(), original);
-    assert!(load(&fixture)?.is_none());
-    assert!(matches!(
-        fixture.fixture.store.load_execution_nonce_issuance(
-            fixture.operation.binding().operation_id(),
-            &old_fence,
-            now_ms(),
-        ),
-        Err(AdmissionOperationStoreError::Fenced)
-    ));
-    assert!(fixture
-        .operation
-        .execution_nonce_preflight_digest()
-        .is_none());
-    fixture.operation =
-        preflight::own_and_clean(&fixture.fixture, &fixture.operation, &fixture.key)?;
-    issue(&mut fixture)?;
-    let retained = fixture.reservation.canonical_bytes().to_vec();
-    fixture = lifecycle::reopen(fixture)?;
-    assert_eq!(
-        load(&fixture)?
-            .ok_or("lost issued nonce on reopen")?
-            .canonical_bytes(),
-        retained
-    );
-    issue(&mut fixture)?;
-    assert_eq!(
-        load(&fixture)?
-            .ok_or("lost issued nonce after retry")?
-            .canonical_bytes(),
-        retained
-    );
-    Ok(())
-}
-
-#[test]
 fn durable_nonce_issuance_reservation_requires_the_exact_retained_artifact() -> TestResult {
     let mut fixture = nonce_fixture()?;
     let retained = fixture.reservation.canonical_bytes().to_vec();
