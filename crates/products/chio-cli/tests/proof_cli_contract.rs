@@ -6,6 +6,8 @@ mod explain;
 mod export;
 #[path = "proof_cli_contract/fixture.rs"]
 mod fixture;
+#[path = "proof_cli_contract/regenerate.rs"]
+mod regenerate;
 #[path = "proof_cli_contract/serve.rs"]
 mod serve;
 #[path = "proof_cli_contract/support.rs"]

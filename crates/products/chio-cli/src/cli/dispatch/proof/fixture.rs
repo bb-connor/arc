@@ -25,6 +25,9 @@ mod fixture_cleanup;
 use fixture_cleanup::strip_collected_bundle_outputs;
 #[path = "fixture_regenerate.rs"]
 mod fixture_regenerate;
+#[path = "fixture_committed_disclosure.rs"]
+mod fixture_committed_disclosure;
+use fixture_committed_disclosure::keep_committed_selective_disclosure_proof;
 #[path = "fixture_public_settlement_runtime.rs"]
 mod fixture_public_settlement_runtime;
 use fixture_public_settlement_runtime::public_settlement_runtime_hashes;
@@ -3764,55 +3767,6 @@ fn add_disclosure_agent_web_crypto_context_material(
         "anchors",
     );
     Ok(())
-}
-
-thread_local! {
-    static COMMITTED_SELECTIVE_DISCLOSURE_PROOFS: std::cell::RefCell<
-        Vec<chio_selective_disclosure::SelectiveDisclosureProof>,
-    > = const { std::cell::RefCell::new(Vec::new()) };
-}
-
-/// Offers committed BBS proofs to [`keep_committed_selective_disclosure_proof`]
-/// for the rest of this thread's fixture generation.
-fn offer_committed_selective_disclosure_proofs(
-    proofs: Vec<chio_selective_disclosure::SelectiveDisclosureProof>,
-) {
-    COMMITTED_SELECTIVE_DISCLOSURE_PROOFS.with(|committed| *committed.borrow_mut() = proofs);
-}
-
-/// BBS proof generation draws fresh blinding scalars, so generation keeps a
-/// committed proof (the bundle's own or one offered by a regeneration) that
-/// proves exactly the derived disclosure. Any field drift or a proof that no
-/// longer verifies takes the freshly derived proof.
-fn keep_committed_selective_disclosure_proof(
-    proof_path: &Path,
-    derived: chio_selective_disclosure::SelectiveDisclosureProof,
-) -> Result<chio_selective_disclosure::SelectiveDisclosureProof, CliError> {
-    let mut candidates = Vec::new();
-    match fs::read(proof_path) {
-        Ok(bytes) => candidates.extend(
-            serde_json::from_slice::<chio_selective_disclosure::SelectiveDisclosureProof>(&bytes)
-                .ok(),
-        ),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => return Err(CliError::from(error)),
-    }
-    COMMITTED_SELECTIVE_DISCLOSURE_PROOFS
-        .with(|committed| candidates.extend(committed.borrow().iter().cloned()));
-
-    let mut registry = chio_selective_disclosure::InMemoryIssuerRegistry::default();
-    registry.insert(
-        derived.issuer_fingerprint.clone(),
-        derived.issuer_public_key_hex.clone(),
-    );
-    let kept = candidates.into_iter().find(|committed| {
-        let mut comparable = committed.clone();
-        comparable.proof_bytes_hex.clone_from(&derived.proof_bytes_hex);
-        comparable == derived
-            && chio_selective_disclosure::verify_selective_disclosure_proof(committed, &registry)
-                .is_ok()
-    });
-    Ok(kept.unwrap_or(derived))
 }
 
 fn disclosure_sensitivity_classes_json(
