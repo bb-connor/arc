@@ -4,9 +4,9 @@
   "description": "Cage wire-contract vectors. Every positive file is stored as canonical JSON bytes after generation; mutation cases distinguish JSON Schema rejection from cross-artifact or live-kernel semantic rejection.",
   "positive": [
     {
-      "id": "mcp_cage_launch_policy_v2",
-      "file": "positive/mcp-cage-launch-policy-v2.json",
-      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json"
+      "id": "mcp_cage_launch_policy_v1",
+      "file": "positive/mcp-cage-launch-policy-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json"
     },
     {
       "id": "signed_tool_manifest_v2",
@@ -14,14 +14,14 @@
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/signed-tool-manifest-v2.schema.json"
     },
     {
-      "id": "cage_init_plan_native_v2",
-      "file": "positive/cage-init-plan-native-v2.json",
-      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json"
+      "id": "cage_init_plan_native_v1",
+      "file": "positive/cage-init-plan-native-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json"
     },
     {
-      "id": "cage_init_plan_brokered_v2",
-      "file": "positive/cage-init-plan-brokered-v2.json",
-      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json"
+      "id": "cage_init_plan_brokered_v1",
+      "file": "positive/cage-init-plan-brokered-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json"
     },
     {
       "id": "cage_enforcement_prepared_v1",

@@ -71,7 +71,7 @@ creates an outside file; the service must stop without promoting that revision
 and remove all owned containers and volumes. The report separates the verified
 successful prefix from this refusal. No model runs in this profile.
 The existing `qualify_session.py` also accepts `--scoped` to exercise a complete
-session-config.v2 coding task and independently verify its package-scoped patch.
+`chio.mini-swe.scoped-session-config.v1` coding task and independently verify its package-scoped patch.
 
 ## Execution boundary
 

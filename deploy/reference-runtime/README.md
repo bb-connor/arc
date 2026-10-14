@@ -201,6 +201,10 @@ baseline is present, and the keylog example configs agree with the units.
    mountpoint -q /srv/chio-receipt-anchors
    install -d -m 0700 -o chio-edge -g chio-edge /var/lib/chio-mcp-edge \
      /srv/chio-receipt-anchors/mcp-edge
+   edge_groups=()
+   for gid in $(id -G chio-edge); do
+     [ "$gid" = "$(id -g chio-edge)" ] || edge_groups+=(--execution-supplementary-gid "$gid")
+   done
    chio security provision-reference-runtime \
      --output-dir /etc/chio/mcp-edge/provision \
      --runtime-security-dir /var/lib/chio-mcp-edge/security \
@@ -212,7 +216,7 @@ baseline is present, and the keylog example configs agree with the units.
      --target-arg --root --target-arg /srv/chio/repository \
      --read-path /srv/chio/repository \
      --working-directory /var/lib/chio-mcp-edge \
-     --execution-uid "$(id -u chio-edge)" --execution-gid "$(id -g chio-edge)" \
+     --execution-uid "$(id -u chio-edge)" --execution-gid "$(id -g chio-edge)" "${edge_groups[@]}" \
      --server-id chio-mcp-edge --server-name "Chio MCP edge" --server-version 1
    install -m 0640 -g chio-edge \
      /etc/chio/mcp-edge/provision/{signed-manifest.json,cage-launch-policy.json,cage-migration-genesis.json,cage-migration-shadow.json,cage-migration-enforced.json,reviewed-tools.json,target-command} \
@@ -227,6 +231,12 @@ baseline is present, and the keylog example configs agree with the units.
      /etc/chio/mcp-edge/chio-mcp-edge.env
    install -m 0640 -g chio-edge your-policy.yaml /etc/chio/mcp-edge/policy.yaml
    ```
+
+   The edge runs as `chio-edge` with the supplementary groups systemd takes
+   from the group database, and the unprivileged cage helper refuses a launch
+   whose observed groups differ from the bound identity. Bind every group of
+   `chio-edge` as above, never the root group, and provision again after
+   changing its group membership.
 
    The provisioner binds the helper's and the target's digests, the exact
    argument list and working directory, the read grant on the repository,

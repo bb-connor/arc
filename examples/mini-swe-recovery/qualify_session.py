@@ -130,7 +130,7 @@ def main():
         write(
             root / "config.json",
             {
-                "schema": "chio.mini-swe.session-config.v2"
+                "schema": "chio.mini-swe.scoped-session-config.v1"
                 if args.scoped
                 else "chio.mini-swe.session-config.v1",
                 **({"source_paths": ["package"]} if args.scoped else {}),
@@ -188,7 +188,7 @@ def main():
         write(
             root / "authorization.json",
             {
-                "schema": "chio.mini-swe.session-authorization.v2",
+                "schema": "chio.mini-swe.session-authorization.v1",
                 "servers": {
                     entry["id"]: {
                         key: entry[key]

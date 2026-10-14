@@ -91,8 +91,8 @@ Retained snapshots are checked against the same scope before any container
 receives them; a mismatch stops before dispatch and leaves the command journal
 unchanged.
 
-Scoped workspaces use configuration `chio.repository.workspace.v3` and the
-same shared snapshot storage as v2. Older packages reject v3. A recipient must
+Scoped workspaces use configuration `chio.repository.scoped-workspace.v1` and the
+same shared snapshot storage as `chio.repository.workspace.v1`. A recipient must
 pass the same independently selected `--source-path` values to `verify-export`;
 the verifier never takes its expected scope from the received bundle. The
 exported patch retains repository-relative paths and can be reviewed against
@@ -189,8 +189,8 @@ the command journal unchanged. A write failure after execution stops the workspa
 and retains the previous committed revision.
 
 The private configuration identifies this storage layout as
-`chio.repository.workspace.v2`; selected-source workspaces use v3 with the same
-shared snapshot store. The obsolete full-archive v1 layout is rejected. All
+`chio.repository.workspace.v1`; selected-source workspaces use
+`chio.repository.scoped-workspace.v1` with the same shared snapshot store. All
 new and reopened workspaces use the bounded content-addressed store.
 
 Containers use read-only root filesystems, no network, no capabilities and
@@ -262,7 +262,7 @@ Use the kernel key pinned during task preparation. This command independently
 verifies every supplied receipt with Chio, matches each execution command and
 its complete output hash, and checks the ordered snapshot transitions against
 retained archives. The output adds the original receipts, public key and
-`receipt-binding.json` and `command-outputs.json`. Binding v2 recomputes the
+`receipt-binding.json` and `command-outputs.json`. The binding recomputes the
 original broker envelope hash, then matches the command and configuration
 against the signed prepared request. The configuration and content digests in successful tool
 results are covered by the signed output hash.

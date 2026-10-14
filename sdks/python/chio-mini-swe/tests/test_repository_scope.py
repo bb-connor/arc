@@ -145,7 +145,7 @@ def test_workspace_cannot_change_scope_version_or_accept_unsorted_scope(reposito
         if mutation == "missing":
             del config["source_paths"]
         elif mutation == "wrong-version":
-            config["schema"] = "chio.repository.workspace.v2"
+            config["schema"] = "chio.repository.workspace.v1"
         else:
             config["source_paths"] = ["z", "a"]
         path.write_text(json.dumps(config))

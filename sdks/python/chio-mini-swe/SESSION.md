@@ -110,13 +110,13 @@ umask 077
   --state /tmp/project-session
 ```
 
-For a task in a large repository, use schema `chio.mini-swe.session-config.v2`
+For a task in a large repository, use schema `chio.mini-swe.scoped-session-config.v1`
 with the same fields plus a required `source_paths` array, for example
 `["sdks/python/chio-process"]`. This selects committed paths without importing
 the rest of the repository or changing the workspace limits. The
 [repository scope contract](REPOSITORY.md#prepare-images-and-a-workspace)
 defines literal path selection, publication checks and independent verification.
-The v1 schema retains its full-tree behavior and does not accept `source_paths`.
+`chio.mini-swe.session-config.v1` keeps the full tree and does not accept `source_paths`.
 
 The selected paths are available to the agent's templates as `source_paths`.
 For example, set `instance_template` to
@@ -136,7 +136,7 @@ installed Chio code are bound to this session; changing them requires a new
 session and deliberate provisioning.
 
 `provisioning-request.json` is a versioned **unsigned request**, with schema
-`chio.mini-swe.provisioning-request.v2`. It is suitable for an operator's
+`chio.mini-swe.provisioning-request.v1`. It is suitable for an operator's
 provisioning automation:
 
 | Field | Meaning |
@@ -163,7 +163,7 @@ tool authority.
 
 ## Supply authorization and prepare the host
 
-Provide a `chio.mini-swe.session-authorization.v2` document with exactly three
+Provide a `chio.mini-swe.session-authorization.v1` document with exactly three
 fields: `schema`, `servers` and `native_broker`.
 
 - `servers` contains exactly `model` and `sandbox`. Each entry contains the

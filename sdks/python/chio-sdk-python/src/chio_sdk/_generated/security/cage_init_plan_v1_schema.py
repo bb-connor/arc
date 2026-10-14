@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: d6aaec4ed51eb065046d70c889ee0c5ee55ba93a4e4d227df67e0404ba4fd9a5
+# Schema sha256: d9413b42552bab1306e06058c45fddfde82effd28a779300028dc434b7b7f0cc
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -395,7 +395,7 @@ class Environment(
     ]
 
 
-class ChioCageInitPlanV2(BaseModel):
+class ChioCageInitPlanV1(BaseModel):
     """
     Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.
     """
@@ -403,8 +403,8 @@ class ChioCageInitPlanV2(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Literal["chio.cage.init-plan.v2"] = Field(..., alias="schema")
-    compiler_version: Literal["chio-cage-compiler.v2"]
+    schema_: Literal["chio.cage.init-plan.v1"] = Field(..., alias="schema")
+    compiler_version: Literal["chio-cage-compiler.v1"]
     manifest_digest: Digest
     profile_digest: Digest
     plan_fd_slot: Literal[3]

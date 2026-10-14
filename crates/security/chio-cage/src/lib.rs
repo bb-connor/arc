@@ -60,7 +60,7 @@ pub use receipt::{
 use serde::{Deserialize, Serialize};
 
 /// Cage compiler schema emitted by this crate.
-pub const COMPILED_SANDBOX_PROFILE_SCHEMA: &str = "chio.cage.compiled-sandbox-profile.v2";
+pub const COMPILED_SANDBOX_PROFILE_SCHEMA: &str = "chio.cage.compiled-sandbox-profile.v1";
 const MAX_RUNTIME_RESOURCES: usize = 48;
 const MAX_READ_GRANTS: usize = 64;
 const MAX_WRITE_GRANTS: usize = 64;

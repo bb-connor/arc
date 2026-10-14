@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: db83e6bd2befb4deb3abeb172b043448979fbef56df41e932f6bb4ac78c7760a
+// Schema SHA: 9ad4818a321c54c0b3ef404efc2f3760edc9e3b3be196a5556a7079d63244c97
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -6007,16 +6007,16 @@ export namespace Security_CageFullyEnforcedEvidenceV1 {
 }
 
 // -----------------------------------------------------------------------------
-// Source: spec/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json
-export namespace Security_CageInitPlanV2 {
+// Source: spec/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json
+export namespace Security_CageInitPlanV1 {
   /**
    * Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.
    */
-  export type ChioCageInitPlanV2 = {
+  export type ChioCageInitPlanV1 = {
     [k: string]: unknown;
   } & {
-    schema: "chio.cage.init-plan.v2";
-    compiler_version: "chio-cage-compiler.v2";
+    schema: "chio.cage.init-plan.v1";
+    compiler_version: "chio-cage-compiler.v1";
     manifest_digest: Digest;
     profile_digest: Digest;
     plan_fd_slot: 3;
@@ -9381,8 +9381,8 @@ export namespace Security_LiftRollbackCompletionReceiptBodyV1 {
 }
 
 // -----------------------------------------------------------------------------
-// Source: spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json
-export namespace Security_McpCageLaunchPolicyV2 {
+// Source: spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json
+export namespace Security_McpCageLaunchPolicyV1 {
   export type PublicKey = string;
   export type AbsoluteCanonicalPath = string;
   export type EnvironmentVariable = string;
@@ -9554,13 +9554,13 @@ export namespace Security_McpCageLaunchPolicyV2 {
   /**
    * Canonical signed operator policy for a migration-enforced MCP stdio cage launch.
    */
-  export interface ChioSignedMCPCageLaunchPolicyV2 {
+  export interface ChioSignedMCPCageLaunchPolicyV1 {
     body: PolicyBody;
     signer_public_key: PublicKey;
     signature: Signature;
   }
   export interface PolicyBody {
-    schema: "chio.mcp.cage-launch-policy.v2";
+    schema: "chio.mcp.cage-launch-policy.v1";
     signed_manifest: ChioSignedToolManifestV2;
     registered_public_key: PublicKey;
     operator_ceilings: OperatorCeilings;

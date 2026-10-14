@@ -70,7 +70,7 @@ def bundle(tmp_path, monkeypatch, request):
             "checks": ["signature", "signer_pin", "action_parameter_hash"],
         }
         proof = {
-            "schema": "chio.repository.receipt-binding.v2",
+            "schema": "chio.repository.receipt-binding.v1",
             "server_id": "sandbox",
             "verification": verification,
             "transitions": bindings(workspace, receipts, "sandbox", outputs),

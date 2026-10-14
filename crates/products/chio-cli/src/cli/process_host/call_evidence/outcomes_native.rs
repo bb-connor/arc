@@ -204,8 +204,8 @@ mod tests {
             include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget-kernel.pub")
                 .trim(),
         )?;
-        // Preserve the original signed evidence. Its valid signature cannot
-        // qualify a runtime with different reviewed enforcement dependencies.
+        // The original signed evidence carries a retired launch policy schema id;
+        // its valid signature cannot qualify the current enforcement contract.
         let signed = crate::receipt_verify::verify_original_receipt(
             include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"),
             &key,
@@ -230,11 +230,12 @@ mod tests {
         let error = verify(&run, &pins)
             .err()
             .ok_or("accepted historical evidence from obsolete enforcement")?;
-        assert!(
-            error
-                .to_string()
-                .contains("unreviewed nono or seccompiler version"),
-            "unexpected rejection: {error}"
+        assert_eq!(
+            error.to_string(),
+            CliError::cli_other_error(
+                "native launch evidence: expected the pinned server's selected Enforced policy"
+            )
+            .to_string()
         );
         Ok(())
     }

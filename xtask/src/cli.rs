@@ -160,6 +160,13 @@ pub enum GenCommand {
         #[arg(long)]
         check: bool,
     },
+    /// Re-sign the cage launch policy binding vector with the fixed test signer.
+    #[command(name = "cage-vectors")]
+    CageVectors {
+        /// Compare the generated vector with the committed vector.
+        #[arg(long)]
+        check: bool,
+    },
     /// Generate the declared verification evidence matrix.
     #[command(name = "proof-coverage")]
     ProofCoverage {
