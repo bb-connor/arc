@@ -180,3 +180,26 @@ fn origin_signature_under_unpinned_key_is_rejected() {
     .expect_err("an Org A signature under an unpinned key must not verify");
     assert_eq!(err, BilateralCoSigningError::OrgASignatureInvalid);
 }
+
+#[test]
+fn dual_signed_receipt_shape_is_not_a_dsse_envelope() {
+    let tool_host_kp = Keypair::generate();
+    let receipt = sample_receipt(&tool_host_kp);
+    let signature = tool_host_kp.sign(b"bilateral");
+    let value = serde_json::json!({
+        "schema": "chio.bilateral.dual-signed-receipt.v1",
+        "body": receipt,
+        "orgAKernelId": ORIGIN_KERNEL_ID,
+        "orgBKernelId": TOOL_HOST_KERNEL_ID,
+        "orgASignature": signature,
+        "orgBSignature": signature,
+    });
+    let error = serde_json::from_value::<chio_federation::bilateral_dsse::DsseEnvelope>(value)
+        .expect_err("a dual-signed receipt is refused");
+    let message = error.to_string();
+    assert!(
+        message.starts_with("unknown field `")
+            && message.contains("expected one of `payloadType`, `payload`, `signatures`"),
+        "{message}"
+    );
+}
