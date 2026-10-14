@@ -30,13 +30,13 @@
     "m5_acceptance_complete": false
   },
   "current-native-budget": {
-    "runtime_source": "7ae740e8dab6fbc651b5076f0d0ca57601179ffd",
-    "runtime_binary_sha256": "b026b06f26165b2081d7b01544c19eca504afa03805920c57ea4c4fe120d528f",
+    "runtime_source": "412b823c451f97da5d435aabfa79a965796144fe",
+    "runtime_binary_sha256": "4b7d938a9103702b3ad7a38e58f171f8333db2fbacd07d8179e3fea073867afc",
     "cage_init_sha256": "f7ccbc443aff39be26cefda7982f0d4ca74a5cd9b855dc2939b1a070c15b3ed9",
     "probe_sha256": "8bdba2c6456b4c44cc2f8a214973444a8f8f63d1473c3b263571b95e76476e2b",
-    "runtime_id": "0a13fa22-c318-42b8-9953-d8cfae061d0c",
+    "runtime_id": "74f429a4-3852-443a-9366-ae94a9aa26d5",
     "campaign": "examples/reference-swarm/qualify-process-budget.py",
-    "sha256": "2d215939373e562b69ff8409f3ddcc64d8c4c3f80873d72fe3f99ce49429c1ed",
+    "sha256": "ae7a4e76f62828f196607f9f0602658ea1ce05ae7716aea1c6c0decfdd18c2a0",
     "private_keys_exported": false,
     "retrospective_observation": true,
     "m5_acceptance_complete": false

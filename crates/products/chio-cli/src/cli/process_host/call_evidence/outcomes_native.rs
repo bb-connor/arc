@@ -272,10 +272,11 @@ mod tests {
         super::super::verify_outcomes(&signed, &run, &key, runtime, &pins)?;
         let report = verify(&run, &pins)?;
         assert_eq!(report.len(), 4);
-        assert_eq!(report["alice"]["terminal_verified"], false);
-        assert_eq!(report["bob"]["terminal_verified"], true);
-        assert_eq!(report["carol"]["terminal_verified"], true);
-        assert_eq!(report["dave"]["terminal_verified"], false);
+        // Every attested response replays a receipt naming the original launch,
+        // which host death killed before any exit was recorded.
+        for worker in ["alice", "bob", "carol", "dave"] {
+            assert_eq!(report[worker]["terminal_verified"], false, "{worker}");
+        }
         assert!(verify(&run, &BTreeMap::new()).is_err());
         let mut extra_pin = pins.clone();
         extra_pin.insert("unused-server".into(), key.clone());
@@ -289,6 +290,16 @@ mod tests {
         let alice = report["alice"]["receipt_id"].as_str().ok_or("alice")?;
         let carol = report["carol"]["receipt_id"].as_str().ok_or("carol")?;
         let params = &signed.action.parameters;
+        // A genuine signed exit of another campaign's launch.
+        let foreign: Value = crate::input::text(include_str!(
+            "../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"
+        ))?;
+        let foreign_exit = foreign["action"]["parameters"]["confinement"]
+            .as_object()
+            .ok_or("foreign confinement")?
+            .values()
+            .find_map(|launch| (!launch["terminal"].is_null()).then(|| launch["terminal"].clone()))
+            .ok_or("foreign signed exit")?;
         let cases = [
             ("/confinement".to_owned(), json!({})),
             (
@@ -297,7 +308,7 @@ mod tests {
             ),
             (
                 format!("/confinement/{alice}/terminal"),
-                params["confinement"][carol]["terminal"].clone(),
+                foreign_exit.clone(),
             ),
             (
                 format!("/confinement/{carol}/terminal"),
@@ -326,17 +337,13 @@ mod tests {
             .insert("unreferenced".into(), run.confinement[alice].clone());
         assert!(verify(&changed, &pins).is_err());
 
-        // Withholding an exit can only reduce the reported claim to a start.
-        let mut changed: Outcomes = serde_json::from_value(params.clone())?;
-        changed
-            .confinement
-            .get_mut(carol)
-            .ok_or("carol launch")?
-            .terminal = None;
-        assert_eq!(
-            verify(&changed, &pins)?["carol"]["terminal_verified"],
-            false
-        );
+        // An exit cannot be supplied for a launch that never recorded one.
+        let mut changed = params.clone();
+        *changed
+            .pointer_mut(&format!("/confinement/{carol}/terminal"))
+            .ok_or("carol terminal")? = foreign_exit;
+        let changed: Outcomes = serde_json::from_value(changed)?;
+        assert!(verify(&changed, &pins).is_err());
         Ok(())
     }
 }
