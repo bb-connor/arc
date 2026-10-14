@@ -220,7 +220,7 @@ pub(crate) struct ShadowObservation {
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ManifestOutcome {
-    VerifiedV2,
+    Verified,
 }
 
 #[derive(Debug, Serialize)]
@@ -531,7 +531,7 @@ fn build_shadow_migration_report(
             signer_public_key: verified.registration.signed_envelope.signer_key.to_hex(),
             canonical_manifest_digest: verified.source_manifest_digest.clone(),
             signed_envelope_digest: verified.signed_envelope_digest.clone(),
-            outcome: ManifestOutcome::VerifiedV2,
+            outcome: ManifestOutcome::Verified,
         });
     }
 
@@ -1116,7 +1116,7 @@ fn verify_backfill_receipts(
                 .any(|tool| tool.name == receipt.tool_name)
         {
             return Err(ShadowMigrationError::Invalid(format!(
-                "receipt {} tool identity is absent from its verified v2 manifest",
+                "receipt {} tool identity is absent from its verified manifest",
                 receipt.id
             )));
         }

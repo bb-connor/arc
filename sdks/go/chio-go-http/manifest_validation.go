@@ -63,29 +63,29 @@ func decodeManifestObject(data []byte, target any, required, optional []string) 
 	return decodeProtocolObject(data, target)
 }
 
-func (m *SecuritySignedToolManifestV2) UnmarshalJSON(data []byte) error {
-	type wire SecuritySignedToolManifestV2
+func (m *SecuritySignedToolManifestV1) UnmarshalJSON(data []byte) error {
+	type wire SecuritySignedToolManifestV1
 	var decoded wire
 	if err := decodeManifestObject(data, &decoded, []string{"manifest", "signature", "signer_key"}, nil); err != nil {
 		return err
 	}
-	*m = SecuritySignedToolManifestV2(decoded)
+	*m = SecuritySignedToolManifestV1(decoded)
 	return nil
 }
 
-func (m *SecurityToolManifestV2) UnmarshalJSON(data []byte) error {
-	type wire SecurityToolManifestV2
+func (m *SecurityToolManifestV1) UnmarshalJSON(data []byte) error {
+	type wire SecurityToolManifestV1
 	var decoded wire
 	if err := decodeManifestObject(data, &decoded,
 		[]string{"schema", "server_id", "name", "version", "tools", "public_key"},
 		[]string{"description", "server_tools", "required_permissions"}); err != nil {
 		return err
 	}
-	if decoded.Schema != "chio.manifest.v2" || decoded.ServerId == "" || decoded.Name == "" || decoded.Version == "" || decoded.PublicKey == "" || len(decoded.Tools) == 0 {
+	if decoded.Schema != "chio.manifest.v1" || decoded.ServerId == "" || decoded.Name == "" || decoded.Version == "" || decoded.PublicKey == "" || len(decoded.Tools) == 0 {
 		return fmt.Errorf("invalid manifest schema or empty required field")
 	}
 	if decoded.ServerTools != nil {
-		seen := make(map[SecurityToolManifestV2ServerTools]bool)
+		seen := make(map[SecurityToolManifestV1ServerTools]bool)
 		if len(*decoded.ServerTools) == 0 {
 			return fmt.Errorf("server_tools must be omitted instead of empty")
 		}
@@ -96,12 +96,12 @@ func (m *SecurityToolManifestV2) UnmarshalJSON(data []byte) error {
 			seen[tool] = true
 		}
 	}
-	*m = SecurityToolManifestV2(decoded)
+	*m = SecurityToolManifestV1(decoded)
 	return nil
 }
 
-func (t *SecurityToolManifestV2ToolDefinition) UnmarshalJSON(data []byte) error {
-	type wire SecurityToolManifestV2ToolDefinition
+func (t *SecurityToolManifestV1ToolDefinition) UnmarshalJSON(data []byte) error {
+	type wire SecurityToolManifestV1ToolDefinition
 	var decoded wire
 	if err := decodeManifestObject(data, &decoded,
 		[]string{"name", "description", "input_schema", "annotations"},
@@ -118,18 +118,18 @@ func (t *SecurityToolManifestV2ToolDefinition) UnmarshalJSON(data []byte) error 
 			return fmt.Errorf("unknown manifest latency hint")
 		}
 	}
-	*t = SecurityToolManifestV2ToolDefinition(decoded)
+	*t = SecurityToolManifestV1ToolDefinition(decoded)
 	return nil
 }
 
-func (a *SecurityToolManifestV2ToolAnnotations) UnmarshalJSON(data []byte) error {
-	type wire SecurityToolManifestV2ToolAnnotations
+func (a *SecurityToolManifestV1ToolAnnotations) UnmarshalJSON(data []byte) error {
+	type wire SecurityToolManifestV1ToolAnnotations
 	var decoded wire
 	if err := decodeManifestObject(data, &decoded,
 		[]string{"read_only", "destructive", "idempotent", "requires_approval"}, nil); err != nil {
 		return err
 	}
-	*a = SecurityToolManifestV2ToolAnnotations(decoded)
+	*a = SecurityToolManifestV1ToolAnnotations(decoded)
 	return nil
 }
 
@@ -160,8 +160,8 @@ func (l *SecurityToolFlowDeclarationKnownLabel) UnmarshalJSON(data []byte) error
 	return nil
 }
 
-func (p *SecurityToolManifestV2RequiredPermissions) UnmarshalJSON(data []byte) error {
-	type wire SecurityToolManifestV2RequiredPermissions
+func (p *SecurityToolManifestV1RequiredPermissions) UnmarshalJSON(data []byte) error {
+	type wire SecurityToolManifestV1RequiredPermissions
 	var decoded wire
 	if err := decodeManifestObject(data, &decoded, []string{"native_syscall_profile"},
 		[]string{"read_paths", "write_paths", "network_destinations", "environment_variables"}); err != nil {
@@ -172,12 +172,12 @@ func (p *SecurityToolManifestV2RequiredPermissions) UnmarshalJSON(data []byte) e
 	default:
 		return fmt.Errorf("unknown native syscall profile")
 	}
-	*p = SecurityToolManifestV2RequiredPermissions(decoded)
+	*p = SecurityToolManifestV1RequiredPermissions(decoded)
 	return nil
 }
 
-func (d *SecurityToolManifestV2NetworkDestination) UnmarshalJSON(data []byte) error {
-	type wire SecurityToolManifestV2NetworkDestination
+func (d *SecurityToolManifestV1NetworkDestination) UnmarshalJSON(data []byte) error {
+	type wire SecurityToolManifestV1NetworkDestination
 	var decoded wire
 	if err := decodeManifestObject(data, &decoded, []string{"host", "port"}, nil); err != nil {
 		return err
@@ -185,12 +185,12 @@ func (d *SecurityToolManifestV2NetworkDestination) UnmarshalJSON(data []byte) er
 	if decoded.Host == "" || decoded.Port < 1 || decoded.Port > 65535 {
 		return fmt.Errorf("invalid manifest network destination")
 	}
-	*d = SecurityToolManifestV2NetworkDestination(decoded)
+	*d = SecurityToolManifestV1NetworkDestination(decoded)
 	return nil
 }
 
-func (p *SecurityToolManifestV2ToolPricing) UnmarshalJSON(data []byte) error {
-	type wire SecurityToolManifestV2ToolPricing
+func (p *SecurityToolManifestV1ToolPricing) UnmarshalJSON(data []byte) error {
+	type wire SecurityToolManifestV1ToolPricing
 	var decoded wire
 	if err := decodeManifestObject(data, &decoded, []string{"pricing_model"},
 		[]string{"base_price", "unit_price", "billing_unit"}); err != nil {
@@ -201,12 +201,12 @@ func (p *SecurityToolManifestV2ToolPricing) UnmarshalJSON(data []byte) error {
 	default:
 		return fmt.Errorf("unknown manifest pricing model")
 	}
-	*p = SecurityToolManifestV2ToolPricing(decoded)
+	*p = SecurityToolManifestV1ToolPricing(decoded)
 	return nil
 }
 
-func (a *SecurityToolManifestV2MonetaryAmount) UnmarshalJSON(data []byte) error {
-	type wire SecurityToolManifestV2MonetaryAmount
+func (a *SecurityToolManifestV1MonetaryAmount) UnmarshalJSON(data []byte) error {
+	type wire SecurityToolManifestV1MonetaryAmount
 	var decoded wire
 	if err := decodeManifestObject(data, &decoded, []string{"units", "currency"}, nil); err != nil {
 		return err
@@ -219,6 +219,6 @@ func (a *SecurityToolManifestV2MonetaryAmount) UnmarshalJSON(data []byte) error 
 			return fmt.Errorf("manifest currency must be uppercase ASCII")
 		}
 	}
-	*a = SecurityToolManifestV2MonetaryAmount(decoded)
+	*a = SecurityToolManifestV1MonetaryAmount(decoded)
 	return nil
 }

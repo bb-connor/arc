@@ -372,37 +372,31 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "manifest_roundtrip"
 path      = "fuzz/corpus/manifest_roundtrip/binding-duplicate_tool_name_manifest.json"
-sha256    = "45e502ec8a7cd90703c4cb22b692d23190c22205e0c7fa48f391c7d310305498"
+sha256    = "35dc70f96e9c38e2f2e04ec9a1d74178a6a8c40113d003635fc3d686c46f45d3"
 source    = "hand_curated_coverage"
 
 [[seed]]
 target    = "manifest_roundtrip"
 path      = "fuzz/corpus/manifest_roundtrip/binding-invalid_embedded_public_key.json"
-sha256    = "293b49c57c52faf228e920a8726d0db2c321af5aec68e06f18ba3623f8127d10"
+sha256    = "d212ae65859e26bc947ea1540406fefd81d310381ea2f54c08d04f62be2777ad"
 source    = "hand_curated_coverage"
 
 [[seed]]
 target    = "manifest_roundtrip"
 path      = "fuzz/corpus/manifest_roundtrip/binding-mismatched_embedded_public_key.json"
-sha256    = "913025cc736da0e9e7cda19ece0e37e94385fb82de4a9cc7c29528bef7cb4bed"
+sha256    = "6b165751562f63c51bb2fb70388b16a8faacc256fb707d81b9c7cb9c86a251da"
 source    = "hand_curated_coverage"
 
 [[seed]]
 target    = "manifest_roundtrip"
 path      = "fuzz/corpus/manifest_roundtrip/binding-tampered_manifest_signature.json"
-sha256    = "47e411ff4e24d3e8936de7021790e02fb81cd056aad100270414e597eb6b420c"
+sha256    = "98b2c15600dce8f38474808816adb1218a5f9bc8e4290c793e9d50ccd0e4bfe2"
 source    = "hand_curated_coverage"
 
 [[seed]]
 target    = "manifest_roundtrip"
 path      = "fuzz/corpus/manifest_roundtrip/binding-valid_signed_manifest.json"
-sha256    = "7f15478505943b38ce557539f9f453cf06d6deeea98d2dfce86aeb81060cc74a"
-source    = "hand_curated_coverage"
-
-[[seed]]
-target    = "manifest_roundtrip"
-path      = "fuzz/corpus/manifest_roundtrip/malformed-signed-manifest-unknown-fields.json"
-sha256    = "b1223a1b99742a380d4a1860278ce911856fa08d7f390d0237896de132b7e72f"
+sha256    = "7f8bca4f7270aceda004c4ca7acd50170f7457c9fd5bd32811d306c23f44c080"
 source    = "hand_curated_coverage"
 
 [[seed]]

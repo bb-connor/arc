@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.world/schemas/chio-wire/v1/security/tool-manifest-v2.schema.json",
-  "title": "Chio Tool Manifest v2",
+  "$id": "https://chio.world/schemas/chio-wire/v1/security/tool-manifest-v1.schema.json",
+  "title": "Chio Tool Manifest v1",
   "description": "Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "server_id", "name", "version", "tools", "public_key"],
   "properties": {
-    "schema": { "const": "chio.manifest.v2" },
+    "schema": { "const": "chio.manifest.v1" },
     "server_id": { "type": "string", "minLength": 1 },
     "name": { "type": "string", "minLength": 1 },
     "description": { "type": "string" },

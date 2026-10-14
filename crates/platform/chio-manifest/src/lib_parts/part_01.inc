@@ -17,7 +17,7 @@ pub use input_schema::{
 pub use validation::validate_manifest;
 
 /// Supported Chio tool-manifest schema identifier.
-pub const TOOL_MANIFEST_SCHEMA: &str = chio_core::signed_artifact::CHIO_TOOL_MANIFEST_V2_SCHEMA;
+pub const TOOL_MANIFEST_SCHEMA: &str = chio_core::signed_artifact::CHIO_TOOL_MANIFEST_SCHEMA;
 
 fn deserialize_present_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where

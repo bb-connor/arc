@@ -115,7 +115,7 @@ acceptance remains separate.
 | P06 | Provider adapter crates and `chio-tower` | Complete approval/proposal/DPoP/intent/opaque extension projection, no direct-provider fallback after denial, streaming release boundary |
 | P07 | `chio-api-protect/src/proxy/mediated/authenticated.rs`, caller control routes | Reserved/start/report lifecycle, configured executor pin, signed delivery and durable ledger replay |
 | P08 | `chio-kernel-core`, browser/mobile kernels, `chio-bindings-ffi`, `chio-cpp-kernel-ffi` | Portable schema/negotiation and request preservation; unsupported authenticated witness contracts deny |
-| P09 | `chio-manifest`, CLI shadow migration | Signed manifest v2 only; obsolete v1 input rejects and no conversion API remains. |
+| P09 | `chio-manifest`, CLI shadow migration | Signed `chio.manifest.v1` only; the v0.1.0 shape refuses structurally, retired ids refuse as unsupported schemas, and no conversion API exists. |
 | P10 | Remaining product dispatch/network roots and executable integrations | Discovery must establish reachability and selected authority profile, not infer support from crate names |
 
 ### Public profile mapping
@@ -139,7 +139,7 @@ the acceptance report separates those results from historical runs and hosted CI
 | P06 | `ChioOpenAiAdapter::{new,with_peer_capabilities,execute_tool_call,execute_tool_calls}`; `KernelService::{new,with_peer_capabilities}` and its `Service::call`; `HttpAuthority::{builder,evaluate,prepare}` via `authorize_via_kernel` | Ordinary host wrappers preserve typed requests and reject unnegotiated extensions before admission. OpenAI's unsigned-manifest constructor rejects flow-required tools; the verified cross-protocol host owns that profile. Provider `ProviderAdapter` implementations translate dialects, and registered tool-server implementations perform effects; neither independently grants Chio admission. The separate HTTP middleware's explicit fail-open option is unenforced operation and excluded from this profile. | OpenAI 46 and Tower 56 library cases passed, including counted-effect/receipt controls. HTTP, provider projection and exposed batch/stream suites passed in the final workspace run; the exact M3 gate also passed. |
 | P07 | API-protect `proxy/mediated/authenticated.rs::{start,report}` and caller routes in `proxy/mediated.rs`; native Rust `start_caller_execution_blocking_with_security_context` | Trusted executor pin and durable ledger, original nonce/credentials and exact signed delivery. Reservation alone never permits execution. Native release/declassification remain Rust-host-owned, not transport-local. | Final exact M3: 33 caller/store, 9 executor-ledger and 19 native-custody cases passed. Full Python client and hosted role-separation suites also passed. |
 | P08 | Browser `evaluate_pure` / wasm facade; mobile `evaluate`; C ABI `chio_kernel_evaluate_json` / `chio_kernel_verify_capability_with_context_json`; `chio-bindings-ffi` invariant exports | Portable verification, not native dispatch. Unsupported approval/proposal/intent extensions and unauthenticated witness profiles reject. Browser wasm and mobile FFI packaging are distinct from native unit execution. | Exact portable denials; browser 27, mobile 31 and C++ FFI 23 component tests passed. C ABI, installed external CMake consumer, five explicit live C++ protocol tests and pinned Drogon library/example/live gates also passed. |
-| P09 | `chio-manifest::verify_manifest`, CLI shadow migration | Signed manifest v2 is required with current typed permissions and registered signer pins. V1 conversion is removed. | Manifest-v2 verification and explicit obsolete-v1 rejection cases. |
+| P09 | `chio-manifest::verify_manifest`, CLI shadow migration | Signed `chio.manifest.v1` is required with typed permissions and registered signer pins. No conversion API exists. | Manifest verification, exact structural refusal of the v0.1.0 shape under the `chio.manifest.v1` id, and exact refusal of the retired `chio.manifest.v2` id. |
 | P10 | D001-D009, D045-D058 and D076-D079 plus C11-C25 | Arena/load/proof/replay/example hosts are explicit harness or ordinary profiles. Operator purchase execution uses configured signer/buyer pins and durable domain storage. Pure policy probes have no connector effect. These rows do not claim M5 swarm confinement, M6 enterprise topology, M9 packages or M11 public hosted production. | Workspace component suites plus their domain/proof gates; no new production deployment claim. |
 
 Raw `ToolServerConnection` / `HttpDispatcher` implementations are effect ports,
@@ -172,12 +172,12 @@ or native custody claims from a different package in the same language.
 | ID | Package / source | Actual role and required lane |
 | --- | --- | --- |
 | S01 | Python `sdks/python/chio-sdk-python` | Current generated Pydantic wire validators and authenticated caller HTTP client; full 193 tests and exact 15-case current-wire gate passed, separate from `check-chio-py.sh` |
-| S02 | Python `sdks/python/chio-py` | Invariant/signature and canonical helpers; manifest helper currently recognizes v1 only, so its legacy vectors are not v2 runtime evidence |
+| S02 | Python `sdks/python/chio-py` | Invariant/signature and canonical helpers; no manifest helper (manifests are S01) |
 | S03 | Python `sdks/python/chio-adapter-base` and affected users | Transport/receipt/security field preservation; no unsigned reserve/execute shortcut; all 199 adapter-base cases passed |
 | S04 | TypeScript `sdks/typescript/packages/node-http` and private `packages/conformance` | Public `node-http` wire validator is exercised through its freshly built package export; generated types/shared corpus remain in the private conformance package. Type compilation alone is insufficient |
-| S05 | TypeScript `sdks/typescript/chio-ts` | Public clients and canonical/signature helpers; current manifest invariant helper is v1-only, distinct from S04 |
+| S05 | TypeScript `sdks/typescript/chio-ts` | Public clients and canonical/signature helpers; no manifest helper (manifests are S04) |
 | S06 | Go `sdks/go/chio-go-http` | Generated current-wire types and public transactional security decoders, raw duplicate/size/depth/integer bounds; full suite and exact shared corpus passed. Bounded validation, not a complete JSON Schema or signature verifier |
-| S07 | Go `sdks/go/chio-go` | Canonical/signature invariants and clients; manifest v1 helper is not current-v2 validation |
+| S07 | Go `sdks/go/chio-go` | Canonical/signature invariants and clients; no manifest helper (manifests are S06) |
 | S08 | Rust `crates/sdk/chio-binding-helpers` | Normative current manifest verifier and canonical codec; verify current vectors and registered signer separately from schema acceptance |
 | S09 | C++ `sdks/cpp/chio-cpp`, `chio-cpp-kernel`, `chio-drogon` | Affected pure SDK, Rust-backed portable evaluator and HTTP middleware behavioral gates; no hardware/confinement claim |
 
@@ -250,7 +250,7 @@ composed workspace run also passed after the expanded corpus and subsequent
 readiness/review repairs, as recorded in the acceptance report.
 
 The current-manifest shared corpus has 14 cases in
-`tests/bindings/fixtures/manifest-v2-consumers.json`. Python initially accepted
+`tests/bindings/fixtures/manifest-consumers.json`. Python initially accepted
 explicit-null flow/latency aliases and numeric booleans; Go accepted 12 invalid
 security-object cases through ordinary `json.Unmarshal`. Python now obtains
 non-nullable object validation and strict booleans/integers through xtask-generated

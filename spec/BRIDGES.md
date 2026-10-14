@@ -50,8 +50,9 @@ entry in the MCP `tools/list` response. The mapping rules are:
 | Response schema (200/201) | `outputSchema` | Optional; included when `include_output_schemas` is set |
 | HTTP method | `annotations.readOnlyHint` | `true` for GET/HEAD/OPTIONS; `false` otherwise |
 
-The bridge MUST set `has_side_effects` to `false` for GET, HEAD, and
-OPTIONS operations and `true` for all other HTTP methods.
+The bridge MUST set `annotations.read_only` to `true` for GET, HEAD, and
+OPTIONS operations and `false` for all other HTTP methods, unless an
+`x-chio-side-effects` extension overrides the method default.
 
 When `x-chio-*` extensions are present in the OpenAPI spec, they are
 propagated to the corresponding `ToolDefinition` fields as specified in
@@ -175,7 +176,7 @@ skill entry. The mapping rules are:
 | (inferred) | `tags` | Empty by default; MAY be populated by operators |
 | (fixed) | `inputModes` | `["text"]` |
 | (fixed) | `outputModes` | `["text"]` |
-| `tool.has_side_effects` | `bridgeFidelity` | Used as fidelity signal |
+| `tool.annotations.read_only` | `bridgeFidelity` | Used as fidelity signal |
 
 When multiple manifests contain tools with the same name, the edge MUST NOT
 silently collapse them. Unqualified ambiguous names are withheld from the
@@ -305,7 +306,7 @@ mapping rules are:
 | `tool.name` | `id`, `name` | Capability ID matches the Chio tool name |
 | `tool.description` | `description` | Passed through unchanged |
 | (inferred) | `category` | See Section 3.3 |
-| `tool.has_side_effects` + config | `requiresPermission` | `true` if config requires permission OR tool has side effects |
+| `tool.annotations.read_only` + config | `requiresPermission` | `true` if config requires permission OR the tool is not read-only |
 | (evaluated) | `bridgeFidelity` | See Section 3.5 |
 
 When multiple manifests contain tools with the same name, the edge MUST NOT

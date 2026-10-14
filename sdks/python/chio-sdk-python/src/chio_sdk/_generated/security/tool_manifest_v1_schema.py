@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: d9413b42552bab1306e06058c45fddfde82effd28a779300028dc434b7b7f0cc
+# Schema sha256: 33f75027d5869fde01689ddc8847f699f9d2b6912e599a8b6672a18c0f49adea
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -131,7 +131,7 @@ class ToolDefinition(BaseModel):
     flow: tool_flow_declaration_schema.ToolFlowDeclaration | None = None
 
 
-class ChioToolManifestV2(BaseModel):
+class ChioToolManifestV1(BaseModel):
     """
     Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
     """
@@ -139,7 +139,7 @@ class ChioToolManifestV2(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Literal["chio.manifest.v2"] = Field(..., alias="schema")
+    schema_: Literal["chio.manifest.v1"] = Field(..., alias="schema")
     server_id: constr(min_length=1)
     name: constr(min_length=1)
     description: str | None = None

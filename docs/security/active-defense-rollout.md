@@ -13,7 +13,7 @@ not claims that those operational stages have run.
 
 ## Fixed invariants
 
-- Only re-signed `chio.manifest.v2` manifests may opt into flow enforcement.
+- Only signed `chio.manifest.v1` manifests may opt into flow enforcement.
 - Every constructor serving an opted-in tool installs one complete `SecurityRuntime` authority bundle atomically.
 - Unknown historical information is `Top`. It is never inferred as `Bottom`.
 - Principal and capability-lineage taint survives legacy session closure. Only a verified isolation-epoch transition starts an isolated successor.
@@ -26,7 +26,7 @@ not claims that those operational stages have run.
 
 Before shadow mode, run the Chio security migration command against every registered manifest and adapter. Retain its signed report with the release evidence. The report must contain:
 
-- manifest identity, signer, canonical v1 or v2 digest, and migration outcome;
+- manifest identity, signer, canonical digest, and migration outcome;
 - every effective-egress tool without a policy-owned destination clearance;
 - every tool with an unknown output declaration or an invalid purpose set;
 - every adapter that cannot preserve the exact flow declaration and authenticated security extensions;
@@ -54,11 +54,10 @@ Each manifest entry contains:
 - the original envelope fields `manifest`, `signature`, and `signer_key`;
 - exactly one deployment record for every tool in the signed body, including runtime egress, policy-owned clearances and purposes, adapter preservation results, and direct credential grants;
 - either a managed runtime declaration or a native runtime declaration with its independently supplied cage ceiling;
-- for a legacy permission shape only, explicit destination ports and the selected closed syscall profile.
 
-The verifier checks the original signature before decoding or converting the manifest. A signed v2 body is parsed as the strict normative type and verified again through the manifest verifier. A signed v1 body is verified as its original canonical body, converted deterministically, and emitted only as an unsigned v2 artifact. The command has no signing input and never emits a signature for a converted artifact. Every converted artifact carries its source digest, unsigned v2 digest, and `operator_resigning_required=true`.
+The verifier refuses any body whose schema id is not `chio.manifest.v1`, then parses the body as the closed normative type, so an older shape carrying that id is refused by structure. The parsed manifest is verified against the registered key through the manifest verifier. The command has no conversion path and no signing input.
 
-Backfill evidence is accepted only from the signed receipt metadata member `active_defense_backfill_v1`, whose schema is `chio.active-defense.backfill-evidence.v1`. The receipt key must match a registered receipt key, the receipt signature and parameter hash must verify, and the evidence must name the exact digest of a registered, successfully verified signed v2 manifest containing the receipt's server and tool. A converted unsigned v2 artifact cannot authorize backfill. A target without that evidence is assigned `Top`. If any inventoried legacy session for a principal or lineage lacks evidence, the durable principal or lineage record is also assigned `Top`, including when another signed receipt says that a legacy session closed.
+Backfill evidence is accepted only from the signed receipt metadata member `active_defense_backfill_v1`, whose schema is `chio.active-defense.backfill-evidence.v1`. The receipt key must match a registered receipt key, the receipt signature and parameter hash must verify, and the evidence must name the exact digest of a registered, successfully verified signed `chio.manifest.v1` manifest containing the receipt's server and tool. A target without that evidence is assigned `Top`. If any inventoried legacy session for a principal or lineage lacks evidence, the durable principal or lineage record is also assigned `Top`, including when another signed receipt says that a legacy session closed.
 
 The report is canonical JSON written by file synchronization plus atomic rename. No output file is changed until the complete input, every manifest, and every backfill receipt verifies. The report emits these metric names without embedding promotion thresholds:
 
@@ -102,7 +101,7 @@ The reviewed-finding minimum is not waived for an automatic-response cohort. A c
 
 ## Promotion sequence
 
-1. Enforce flow only for tools with explicit `flow_v1` policy, re-signed v2 manifests, and an atomically installed production runtime.
+1. Enforce flow only for tools with explicit `flow_v1` policy, signed `chio.manifest.v1` manifests, and an atomically installed production runtime.
 2. Reject every newly registered effective-egress tool that lacks its complete declaration.
 3. Arm tenant-specific production decoys after confirming that development markers and keys are absent.
 4. Enable signed dry-run response plans. Approval, capability, causal-scope, receipt, and rollback checks still execute, but no external effect is applied.
@@ -142,32 +141,31 @@ modes and mode changes under a retained digest are rejected.
 
 ## Enterprise hardening sequence
 
-Enterprise controls advance independently and converge before a provider-backed native server becomes fully enforced:
+Each enterprise control is registered enforced in the ledger before the
+process that depends on it publishes traffic. A provider-backed native server
+serves only when all of its controls are registered:
 
-1. Publish shadow key-log checkpoints, synchronize complete contiguous logs, and operate a strict-majority witness roster plus two independently keyed audit monitors.
-2. Complete witnessed rotation activation and abort recovery before enforcing the new key.
-3. Provision one credential through the encrypted broker backend and compare audit-only requests without releasing raw credential material.
-4. Enable the shared parent, aggregate, broker-capability quota hold and crash reconciliation before removing direct credential access.
-5. Compile sealed cage plans and retained descriptor tables in observation mode.
-6. Enforce cage-init for a canary server through the isolated ephemeral Linux x86_64 capture, then expand one signed manifest at a time.
-7. Enforce key-log pins only after witnessed continuity and trusted artifact-time checks pass.
-8. Delete legacy secret and launcher configuration only after all dependents are enforced.
+1. Synchronize complete contiguous key-log checkpoints and operate a strict-majority witness roster plus two independently keyed audit monitors before registering key-log verification.
+2. Complete witnessed rotation activation and abort recovery before a rotated key signs.
+3. Register broker credential custody once the credential is provisioned through the encrypted broker backend; the broker never releases raw credential material.
+4. Register broker quota enforcement with the shared parent, aggregate, and broker-capability quota hold and crash reconciliation in place.
+5. Register cage enforcement per tool server from its sealed cage plan and retained descriptor table, verified through the isolated ephemeral Linux x86_64 capture, one signed manifest at a time.
 
-The one-way stage authority is `SqliteEnterpriseMigrationStateStore`. Register
-each deployment, provider, or tool-server control at `disabled`, then advance it
-with generation-checked compare-and-swap through `shadow`, `enforced`, and
-`legacy_removed`. The database rejects skipped stages, reverse updates,
-identity rebinding, stale generations, and deletion. Key-log controls are
-deployment-scoped, broker custody and quota controls are provider-scoped, and
-cage controls are tool-server-scoped.
+The enforcement ledger is `SqliteEnterpriseMigrationStateStore`. Each
+deployment, provider, or tool-server control holds exactly one signed
+registration that pins the posture of its enforced contract. The database
+rejects a second registration for the same control, updates, and deletion.
+Key-log controls are deployment-scoped, broker custody and quota controls are
+provider-scoped, and cage controls are tool-server-scoped. The signed policy or
+configuration that names a control pins the registration digest as its head,
+so a replaced or restored ledger cannot satisfy it. Changing an enforced
+contract requires a new ledger and a newly pinned head.
 
 Every production process must load an exact
 `EnterpriseMigrationRuntimeBinding` before publishing traffic. A configured
-stage below durable state is a downgrade attempt. A configured stage above
-durable state is an uncommitted advance. A configuration digest mismatch is a
-rebind attempt. All three block startup. At `enforced` and `legacy_removed`,
-the binding returns `Deny` for operational failure and the caller must not
-select a legacy credential, verifier, quota, or launcher path.
+posture that differs from the registered posture blocks startup, and every
+protected operation revalidates the retained registration, so a replaced or
+changed ledger denies until the process is rebuilt.
 
 Repository mechanics evidence has four trust domains. The default-branch
 `pull_request_target` controller revalidates the owner, actor, workflow and run
@@ -230,47 +228,6 @@ The controller, capture, and finalizer definitions must already exist on the
 default branch. The pull request that introduces them cannot create trusted
 controller or finalizer evidence from its own workflow revision.
 
-The migration canary is the
-`chio.enterprise-migration-canary-evidence.v1` artifact. Its
-signed body fixes `repository_mechanics_only=true`, both production attestation
-fields to `false`, and `operator_attestation_required=true`. It binds the
-durable `shadow` generation for every proposed control and is governance input
-for the separate Shadow-to-Enforced promotion decision. The workflow first
-invokes `verify-committed-linux-evidence` with independently supplied source,
-runner, configuration, inventory, gate, binding, public-key, and freshness
-expectations. After the three files are committed as an evidence-only linear
-descendant, `scripts/check-committed-linux-evidence.py` additionally verifies
-the Git ancestry, exact tree modes, clean checkout, pinned verifier digest, and
-the same semantic expectations. The reusable enterprise lane runs those checker
-bytes from the exact `CHIO_AUTHORIZED_SECURITY_SOURCE_SHA` checkout in a fresh
-job against the detached `CHIO_COMMITTED_LINUX_EVIDENCE_SHA`; it does not run
-the candidate tree's checker. A separate no-checkout binding job fixes the
-source input to the event head, while the ordinary enterprise jobs exercise the
-event test commit (the pull-request synthetic merge or pushed commit). Neither
-verifier produces a cutover verdict.
-
-Production cutover evidence uses the distinct
-`chio.enterprise-migration-cutover-attestation.v1` signature domain. Verify it
-with an independently pinned operator public key and the exact retained canary:
-
-```bash
-chio-enterprise-evidence verify-cutover \
-  --canary enterprise-migration-canary.json \
-  --attestation enterprise-migration-cutover-attestation.json \
-  --runner-public-key "$PINNED_RUNNER_PUBLIC_KEY" \
-  --operator-public-key "$PINNED_OPERATOR_PUBLIC_KEY"
-```
-
-Verification fails if either signature is invalid, if the operator key is not
-the pinned key, if any commit, runner, configuration, inventory, durable state,
-generation, or gate digest differs. The operator attestation binds the exact
-pre-promotion canary and each exact `enforced` generation observed after
-production traffic. It also binds the digest of the separate governance
-authorization that promoted Shadow to Enforced. It fixes
-`authorizes_shadow_to_enforced=false` and can only authorize the subsequent
-Enforced-to-LegacyRemoved transition. The operator signature is the only
-artifact that can assert observed production traffic and completed cutover.
-
 ## Rollback sequence
 
 Rollback is fail-closed and preserves evidence:
@@ -286,4 +243,4 @@ Disabling new planning never deletes or weakens an existing containment contribu
 
 ## Release evidence
 
-The release record must include the exact commit, generated-schema manifest hashes, conformance and adversarial manifest hashes, formal proof manifest, Kani and loom results, Apalache results, unsigned Linux cage capture, committed migration-canary evidence, hosted runner and workflow run identities, default-branch workflow-definition commit, receipt-log checkpoint, and the full workspace build, test, clippy, formatting, dependency, and code-generation results. Unsupported, skipped, ignored, filtered-to-zero, or unavailable results do not count.
+The release record must include the exact commit, generated-schema manifest hashes, conformance and adversarial manifest hashes, formal proof manifest, Kani and loom results, Apalache results, unsigned Linux cage capture, hosted runner and workflow run identities, default-branch workflow-definition commit, receipt-log checkpoint, and the full workspace build, test, clippy, formatting, dependency, and code-generation results. Unsupported, skipped, ignored, filtered-to-zero, or unavailable results do not count.

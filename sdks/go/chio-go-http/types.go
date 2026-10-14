@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 25f6e5ab47f1dce4714abd0e6a2a927a45efeb35d3fc30fc971dfb741f11edfc
+// Schema content SHA-256: 15fd9badec053d4be81176ea27bf372e306c7fe113e7f4e48739ff1aa7112604
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -1969,14 +1969,6 @@ const (
 	SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4StateNoRollbackRequired SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State = "no_rollback_required"
 )
 
-// Defines values for SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage.
-const (
-	SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStageDisabled      SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage = "disabled"
-	SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStageEnforced      SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage = "enforced"
-	SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStageLegacyRemoved SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage = "legacy_removed"
-	SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStageShadow        SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage = "shadow"
-)
-
 // Defines values for SecurityMcpCageLaunchPolicyV1LimitsNofileHard.
 const (
 	SecurityMcpCageLaunchPolicyV1LimitsNofileHardN192 SecurityMcpCageLaunchPolicyV1LimitsNofileHard = 192
@@ -1995,14 +1987,6 @@ const (
 // Defines values for SecurityMcpCageLaunchPolicyV1MigrationKeyScopeKind.
 const (
 	SecurityMcpCageLaunchPolicyV1MigrationKeyScopeKindToolServer SecurityMcpCageLaunchPolicyV1MigrationKeyScopeKind = "tool_server"
-)
-
-// Defines values for SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration.
-const (
-	SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGenerationN0 SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration = 0
-	SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGenerationN1 SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration = 1
-	SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGenerationN2 SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration = 2
-	SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGenerationN3 SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration = 3
 )
 
 // Defines values for SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfiles.
@@ -2189,39 +2173,39 @@ const (
 	SecurityToolFlowDeclarationKnownLabelKindKnown SecurityToolFlowDeclarationKnownLabelKind = "known"
 )
 
-// Defines values for SecurityToolManifestV2Schema.
+// Defines values for SecurityToolManifestV1Schema.
 const (
-	SecurityToolManifestV2SchemaChioManifestV2 SecurityToolManifestV2Schema = "chio.manifest.v2"
+	SecurityToolManifestV1SchemaChioManifestV1 SecurityToolManifestV1Schema = "chio.manifest.v1"
 )
 
-// Defines values for SecurityToolManifestV2ServerTools.
+// Defines values for SecurityToolManifestV1ServerTools.
 const (
-	SecurityToolManifestV2ServerToolsBash        SecurityToolManifestV2ServerTools = "bash"
-	SecurityToolManifestV2ServerToolsComputerUse SecurityToolManifestV2ServerTools = "computer_use"
-	SecurityToolManifestV2ServerToolsTextEditor  SecurityToolManifestV2ServerTools = "text_editor"
+	SecurityToolManifestV1ServerToolsBash        SecurityToolManifestV1ServerTools = "bash"
+	SecurityToolManifestV1ServerToolsComputerUse SecurityToolManifestV1ServerTools = "computer_use"
+	SecurityToolManifestV1ServerToolsTextEditor  SecurityToolManifestV1ServerTools = "text_editor"
 )
 
-// Defines values for SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile.
+// Defines values for SecurityToolManifestV1RequiredPermissionsNativeSyscallProfile.
 const (
-	SecurityToolManifestV2RequiredPermissionsNativeSyscallProfileBrokeredNativeV1 SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile = "brokered_native_v1"
-	SecurityToolManifestV2RequiredPermissionsNativeSyscallProfileNativeMinimalV1  SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile = "native_minimal_v1"
-	SecurityToolManifestV2RequiredPermissionsNativeSyscallProfileNativeStandardV1 SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile = "native_standard_v1"
+	SecurityToolManifestV1RequiredPermissionsNativeSyscallProfileBrokeredNativeV1 SecurityToolManifestV1RequiredPermissionsNativeSyscallProfile = "brokered_native_v1"
+	SecurityToolManifestV1RequiredPermissionsNativeSyscallProfileNativeMinimalV1  SecurityToolManifestV1RequiredPermissionsNativeSyscallProfile = "native_minimal_v1"
+	SecurityToolManifestV1RequiredPermissionsNativeSyscallProfileNativeStandardV1 SecurityToolManifestV1RequiredPermissionsNativeSyscallProfile = "native_standard_v1"
 )
 
-// Defines values for SecurityToolManifestV2ToolDefinitionLatencyHint.
+// Defines values for SecurityToolManifestV1ToolDefinitionLatencyHint.
 const (
-	SecurityToolManifestV2ToolDefinitionLatencyHintFast     SecurityToolManifestV2ToolDefinitionLatencyHint = "fast"
-	SecurityToolManifestV2ToolDefinitionLatencyHintInstant  SecurityToolManifestV2ToolDefinitionLatencyHint = "instant"
-	SecurityToolManifestV2ToolDefinitionLatencyHintModerate SecurityToolManifestV2ToolDefinitionLatencyHint = "moderate"
-	SecurityToolManifestV2ToolDefinitionLatencyHintSlow     SecurityToolManifestV2ToolDefinitionLatencyHint = "slow"
+	SecurityToolManifestV1ToolDefinitionLatencyHintFast     SecurityToolManifestV1ToolDefinitionLatencyHint = "fast"
+	SecurityToolManifestV1ToolDefinitionLatencyHintInstant  SecurityToolManifestV1ToolDefinitionLatencyHint = "instant"
+	SecurityToolManifestV1ToolDefinitionLatencyHintModerate SecurityToolManifestV1ToolDefinitionLatencyHint = "moderate"
+	SecurityToolManifestV1ToolDefinitionLatencyHintSlow     SecurityToolManifestV1ToolDefinitionLatencyHint = "slow"
 )
 
-// Defines values for SecurityToolManifestV2ToolPricingPricingModel.
+// Defines values for SecurityToolManifestV1ToolPricingPricingModel.
 const (
-	SecurityToolManifestV2ToolPricingPricingModelFlat          SecurityToolManifestV2ToolPricingPricingModel = "flat"
-	SecurityToolManifestV2ToolPricingPricingModelHybrid        SecurityToolManifestV2ToolPricingPricingModel = "hybrid"
-	SecurityToolManifestV2ToolPricingPricingModelPerInvocation SecurityToolManifestV2ToolPricingPricingModel = "per_invocation"
-	SecurityToolManifestV2ToolPricingPricingModelPerUnit       SecurityToolManifestV2ToolPricingPricingModel = "per_unit"
+	SecurityToolManifestV1ToolPricingPricingModelFlat          SecurityToolManifestV1ToolPricingPricingModel = "flat"
+	SecurityToolManifestV1ToolPricingPricingModelHybrid        SecurityToolManifestV1ToolPricingPricingModel = "hybrid"
+	SecurityToolManifestV1ToolPricingPricingModelPerInvocation SecurityToolManifestV1ToolPricingPricingModel = "per_invocation"
+	SecurityToolManifestV1ToolPricingPricingModelPerUnit       SecurityToolManifestV1ToolPricingPricingModel = "per_unit"
 )
 
 // Defines values for SecurityTripwireObservationReceiptBodyV1Severity.
@@ -7289,15 +7273,11 @@ type SecurityMcpCageLaunchPolicyV1Digest = string
 
 // SecurityMcpCageLaunchPolicyV1EnterpriseMigration defines model for SecurityMcpCageLaunchPolicyV1EnterpriseMigration.
 type SecurityMcpCageLaunchPolicyV1EnterpriseMigration struct {
-	DeploymentId             SecurityMcpCageLaunchPolicyV1Identifier               `json:"deployment_id"`
-	MinimumHead              SecurityMcpCageLaunchPolicyV1MinimumHead              `json:"minimum_head"`
-	Stage                    SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage `json:"stage"`
-	StateDatabasePath        SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath    `json:"state_database_path"`
-	TrustedTransitionSigners []SecurityMcpCageLaunchPolicyV1PublicKey              `json:"trusted_transition_signers"`
+	DeploymentId             SecurityMcpCageLaunchPolicyV1Identifier            `json:"deployment_id"`
+	Head                     SecurityMcpCageLaunchPolicyV1MigrationHead         `json:"head"`
+	StateDatabasePath        SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath `json:"state_database_path"`
+	TrustedTransitionSigners []SecurityMcpCageLaunchPolicyV1PublicKey           `json:"trusted_transition_signers"`
 }
-
-// SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage defines model for SecurityMcpCageLaunchPolicyV1EnterpriseMigration.Stage.
-type SecurityMcpCageLaunchPolicyV1EnterpriseMigrationStage string
 
 // SecurityMcpCageLaunchPolicyV1EnvironmentVariable defines model for SecurityMcpCageLaunchPolicyV1EnvironmentVariable.
 type SecurityMcpCageLaunchPolicyV1EnvironmentVariable = string
@@ -7319,6 +7299,12 @@ type SecurityMcpCageLaunchPolicyV1LimitsNofileHard int64
 // SecurityMcpCageLaunchPolicyV1LimitsNofileSoft defines model for SecurityMcpCageLaunchPolicyV1Limits.NofileSoft.
 type SecurityMcpCageLaunchPolicyV1LimitsNofileSoft int64
 
+// SecurityMcpCageLaunchPolicyV1MigrationHead defines model for SecurityMcpCageLaunchPolicyV1MigrationHead.
+type SecurityMcpCageLaunchPolicyV1MigrationHead struct {
+	Key              SecurityMcpCageLaunchPolicyV1MigrationKey    `json:"key"`
+	TransitionDigest SecurityMcpCageLaunchPolicyV1NonzeroDigest32 `json:"transition_digest"`
+}
+
 // SecurityMcpCageLaunchPolicyV1MigrationKey defines model for SecurityMcpCageLaunchPolicyV1MigrationKey.
 type SecurityMcpCageLaunchPolicyV1MigrationKey struct {
 	Control      SecurityMcpCageLaunchPolicyV1MigrationKeyControl   `json:"control"`
@@ -7333,16 +7319,6 @@ type SecurityMcpCageLaunchPolicyV1MigrationKeyControl string
 // SecurityMcpCageLaunchPolicyV1MigrationKeyScopeKind defines model for SecurityMcpCageLaunchPolicyV1MigrationKey.ScopeKind.
 type SecurityMcpCageLaunchPolicyV1MigrationKeyScopeKind string
 
-// SecurityMcpCageLaunchPolicyV1MinimumHead defines model for SecurityMcpCageLaunchPolicyV1MinimumHead.
-type SecurityMcpCageLaunchPolicyV1MinimumHead struct {
-	Key               SecurityMcpCageLaunchPolicyV1MigrationKey                 `json:"key"`
-	MinimumGeneration SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration `json:"minimum_generation"`
-	TransitionDigest  SecurityMcpCageLaunchPolicyV1NonzeroDigest32              `json:"transition_digest"`
-}
-
-// SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration defines model for SecurityMcpCageLaunchPolicyV1MinimumHead.MinimumGeneration.
-type SecurityMcpCageLaunchPolicyV1MinimumHeadMinimumGeneration int64
-
 // SecurityMcpCageLaunchPolicyV1NonzeroDigest32 defines model for SecurityMcpCageLaunchPolicyV1NonzeroDigest32.
 type SecurityMcpCageLaunchPolicyV1NonzeroDigest32 = []int64
 
@@ -7351,7 +7327,7 @@ type SecurityMcpCageLaunchPolicyV1OperatorCeilings struct {
 	EnvironmentVariables  []SecurityMcpCageLaunchPolicyV1EnvironmentVariable                   `json:"environment_variables"`
 	ForbiddenPaths        []SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath                 `json:"forbidden_paths"`
 	NativeSyscallProfiles []SecurityMcpCageLaunchPolicyV1OperatorCeilingsNativeSyscallProfiles `json:"native_syscall_profiles"`
-	NetworkDestinations   []SecurityToolManifestV2NetworkDestination                           `json:"network_destinations"`
+	NetworkDestinations   []SecurityToolManifestV1NetworkDestination                           `json:"network_destinations"`
 	ReadPaths             []SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath                 `json:"read_paths"`
 	WritePaths            []SecurityMcpCageLaunchPolicyV1AbsoluteCanonicalPath                 `json:"write_paths"`
 }
@@ -7371,7 +7347,7 @@ type SecurityMcpCageLaunchPolicyV1PolicyBody struct {
 	Schema              SecurityMcpCageLaunchPolicyV1PolicyBodySchema    `json:"schema"`
 
 	// SignedManifest Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.
-	SignedManifest SecuritySignedToolManifestV2 `json:"signed_manifest"`
+	SignedManifest SecuritySignedToolManifestV1 `json:"signed_manifest"`
 }
 
 // SecurityMcpCageLaunchPolicyV1PolicyBodySchema defines model for SecurityMcpCageLaunchPolicyV1PolicyBody.Schema.
@@ -7784,10 +7760,10 @@ type SecuritySignedSecurityEventEnvelopeV1PublicKey = string
 // SecuritySignedSecurityEventEnvelopeV1Signature defines model for SecuritySignedSecurityEventEnvelopeV1Signature.
 type SecuritySignedSecurityEventEnvelopeV1Signature = string
 
-// SecuritySignedToolManifestV2 Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.
-type SecuritySignedToolManifestV2 struct {
+// SecuritySignedToolManifestV1 Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.
+type SecuritySignedToolManifestV1 struct {
 	// Manifest Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
-	Manifest  SecurityToolManifestV2 `json:"manifest"`
+	Manifest  SecurityToolManifestV1 `json:"manifest"`
 	Signature string                 `json:"signature"`
 	SignerKey string                 `json:"signer_key"`
 }
@@ -7813,84 +7789,84 @@ type SecurityToolFlowDeclarationKnownLabel struct {
 // SecurityToolFlowDeclarationKnownLabelKind defines model for SecurityToolFlowDeclarationKnownLabel.Kind.
 type SecurityToolFlowDeclarationKnownLabelKind string
 
-// SecurityToolManifestV2 Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
-type SecurityToolManifestV2 struct {
+// SecurityToolManifestV1 Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
+type SecurityToolManifestV1 struct {
 	Description         *string                                    `json:"description,omitempty"`
 	Name                string                                     `json:"name"`
 	PublicKey           string                                     `json:"public_key"`
-	RequiredPermissions *SecurityToolManifestV2RequiredPermissions `json:"required_permissions,omitempty"`
-	Schema              SecurityToolManifestV2Schema               `json:"schema"`
+	RequiredPermissions *SecurityToolManifestV1RequiredPermissions `json:"required_permissions,omitempty"`
+	Schema              SecurityToolManifestV1Schema               `json:"schema"`
 	ServerId            string                                     `json:"server_id"`
-	ServerTools         *[]SecurityToolManifestV2ServerTools       `json:"server_tools,omitempty"`
-	Tools               []SecurityToolManifestV2ToolDefinition     `json:"tools"`
+	ServerTools         *[]SecurityToolManifestV1ServerTools       `json:"server_tools,omitempty"`
+	Tools               []SecurityToolManifestV1ToolDefinition     `json:"tools"`
 	Version             string                                     `json:"version"`
 }
 
-// SecurityToolManifestV2Schema defines model for SecurityToolManifestV2.Schema.
-type SecurityToolManifestV2Schema string
+// SecurityToolManifestV1Schema defines model for SecurityToolManifestV1.Schema.
+type SecurityToolManifestV1Schema string
 
-// SecurityToolManifestV2ServerTools defines model for SecurityToolManifestV2.ServerTools.
-type SecurityToolManifestV2ServerTools string
+// SecurityToolManifestV1ServerTools defines model for SecurityToolManifestV1.ServerTools.
+type SecurityToolManifestV1ServerTools string
 
-// SecurityToolManifestV2MonetaryAmount defines model for SecurityToolManifestV2MonetaryAmount.
-type SecurityToolManifestV2MonetaryAmount struct {
+// SecurityToolManifestV1MonetaryAmount defines model for SecurityToolManifestV1MonetaryAmount.
+type SecurityToolManifestV1MonetaryAmount struct {
 	Currency string `json:"currency"`
 	Units    int64  `json:"units"`
 }
 
-// SecurityToolManifestV2NetworkDestination defines model for SecurityToolManifestV2NetworkDestination.
-type SecurityToolManifestV2NetworkDestination struct {
+// SecurityToolManifestV1NetworkDestination defines model for SecurityToolManifestV1NetworkDestination.
+type SecurityToolManifestV1NetworkDestination struct {
 	Host string `json:"host"`
 	Port int64  `json:"port"`
 }
 
-// SecurityToolManifestV2RequiredPermissions defines model for SecurityToolManifestV2RequiredPermissions.
-type SecurityToolManifestV2RequiredPermissions struct {
+// SecurityToolManifestV1RequiredPermissions defines model for SecurityToolManifestV1RequiredPermissions.
+type SecurityToolManifestV1RequiredPermissions struct {
 	EnvironmentVariables *[]string                                                     `json:"environment_variables,omitempty"`
-	NativeSyscallProfile SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile `json:"native_syscall_profile"`
-	NetworkDestinations  *[]SecurityToolManifestV2NetworkDestination                   `json:"network_destinations,omitempty"`
+	NativeSyscallProfile SecurityToolManifestV1RequiredPermissionsNativeSyscallProfile `json:"native_syscall_profile"`
+	NetworkDestinations  *[]SecurityToolManifestV1NetworkDestination                   `json:"network_destinations,omitempty"`
 	ReadPaths            *[]string                                                     `json:"read_paths,omitempty"`
 	WritePaths           *[]string                                                     `json:"write_paths,omitempty"`
 }
 
-// SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile defines model for SecurityToolManifestV2RequiredPermissions.NativeSyscallProfile.
-type SecurityToolManifestV2RequiredPermissionsNativeSyscallProfile string
+// SecurityToolManifestV1RequiredPermissionsNativeSyscallProfile defines model for SecurityToolManifestV1RequiredPermissions.NativeSyscallProfile.
+type SecurityToolManifestV1RequiredPermissionsNativeSyscallProfile string
 
-// SecurityToolManifestV2ToolAnnotations defines model for SecurityToolManifestV2ToolAnnotations.
-type SecurityToolManifestV2ToolAnnotations struct {
+// SecurityToolManifestV1ToolAnnotations defines model for SecurityToolManifestV1ToolAnnotations.
+type SecurityToolManifestV1ToolAnnotations struct {
 	Destructive      bool `json:"destructive"`
 	Idempotent       bool `json:"idempotent"`
 	ReadOnly         bool `json:"read_only"`
 	RequiresApproval bool `json:"requires_approval"`
 }
 
-// SecurityToolManifestV2ToolDefinition defines model for SecurityToolManifestV2ToolDefinition.
-type SecurityToolManifestV2ToolDefinition struct {
-	Annotations SecurityToolManifestV2ToolAnnotations `json:"annotations"`
+// SecurityToolManifestV1ToolDefinition defines model for SecurityToolManifestV1ToolDefinition.
+type SecurityToolManifestV1ToolDefinition struct {
+	Annotations SecurityToolManifestV1ToolAnnotations `json:"annotations"`
 	Description string                                `json:"description"`
 
 	// Flow Publisher-authenticated information-flow constraints retained across protocol bridges.
 	Flow         *SecurityToolFlowDeclaration                     `json:"flow,omitempty"`
 	InputSchema  map[string]interface{}                           `json:"input_schema"`
-	LatencyHint  *SecurityToolManifestV2ToolDefinitionLatencyHint `json:"latency_hint,omitempty"`
+	LatencyHint  *SecurityToolManifestV1ToolDefinitionLatencyHint `json:"latency_hint,omitempty"`
 	Name         string                                           `json:"name"`
 	OutputSchema *map[string]interface{}                          `json:"output_schema,omitempty"`
-	Pricing      *SecurityToolManifestV2ToolPricing               `json:"pricing,omitempty"`
+	Pricing      *SecurityToolManifestV1ToolPricing               `json:"pricing,omitempty"`
 }
 
-// SecurityToolManifestV2ToolDefinitionLatencyHint defines model for SecurityToolManifestV2ToolDefinition.LatencyHint.
-type SecurityToolManifestV2ToolDefinitionLatencyHint string
+// SecurityToolManifestV1ToolDefinitionLatencyHint defines model for SecurityToolManifestV1ToolDefinition.LatencyHint.
+type SecurityToolManifestV1ToolDefinitionLatencyHint string
 
-// SecurityToolManifestV2ToolPricing defines model for SecurityToolManifestV2ToolPricing.
-type SecurityToolManifestV2ToolPricing struct {
-	BasePrice    *SecurityToolManifestV2MonetaryAmount         `json:"base_price,omitempty"`
+// SecurityToolManifestV1ToolPricing defines model for SecurityToolManifestV1ToolPricing.
+type SecurityToolManifestV1ToolPricing struct {
+	BasePrice    *SecurityToolManifestV1MonetaryAmount         `json:"base_price,omitempty"`
 	BillingUnit  *string                                       `json:"billing_unit,omitempty"`
-	PricingModel SecurityToolManifestV2ToolPricingPricingModel `json:"pricing_model"`
-	UnitPrice    *SecurityToolManifestV2MonetaryAmount         `json:"unit_price,omitempty"`
+	PricingModel SecurityToolManifestV1ToolPricingPricingModel `json:"pricing_model"`
+	UnitPrice    *SecurityToolManifestV1MonetaryAmount         `json:"unit_price,omitempty"`
 }
 
-// SecurityToolManifestV2ToolPricingPricingModel defines model for SecurityToolManifestV2ToolPricing.PricingModel.
-type SecurityToolManifestV2ToolPricingPricingModel string
+// SecurityToolManifestV1ToolPricingPricingModel defines model for SecurityToolManifestV1ToolPricing.PricingModel.
+type SecurityToolManifestV1ToolPricingPricingModel string
 
 // SecurityTripwireObservationReceiptBodyV1 defines model for SecurityTripwireObservationReceiptBodyV1.
 type SecurityTripwireObservationReceiptBodyV1 struct {

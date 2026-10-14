@@ -1,4 +1,4 @@
-use super::{unique_manifest_path, v2_manifest};
+use super::{platform_manifest, unique_manifest_path};
 use chio_core::crypto::Keypair;
 use chio_manifest::{
     load_existing_verified_manifest_registry, sign_manifest, RuntimeToolTopology,
@@ -12,7 +12,7 @@ fn reject_alias(
     expected_reason: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let keypair = Keypair::from_seed(&[43; 32]);
-    let mut manifest = v2_manifest(keypair.public_key().to_hex());
+    let mut manifest = platform_manifest(keypair.public_key().to_hex());
     manifest.tools[0].input_schema = schema;
     let signed = sign_manifest(&manifest, &keypair)?;
     let original_json = serde_json::to_string(&signed)?;
@@ -23,7 +23,7 @@ fn reject_alias(
         load_existing_verified_manifest_registry(
             &path,
             &keypair.public_key().to_hex(),
-            "srv-v2",
+            "srv-platform",
             RuntimeToolTopology::remote(),
         )
     };
@@ -70,7 +70,7 @@ fn signed_file_rejects_fractional_precision_aliases() -> Result<(), Box<dyn std:
 fn signed_file_preserves_existing_numeric_schema_contract() -> Result<(), Box<dyn std::error::Error>>
 {
     let keypair = Keypair::from_seed(&[44; 32]);
-    let mut manifest = v2_manifest(keypair.public_key().to_hex());
+    let mut manifest = platform_manifest(keypair.public_key().to_hex());
     manifest.tools[0].input_schema = serde_json::json!({
         "type": "object",
         "properties": {
@@ -90,7 +90,7 @@ fn signed_file_preserves_existing_numeric_schema_contract() -> Result<(), Box<dy
         let loaded = load_existing_verified_manifest_registry(
             &path,
             &keypair.public_key().to_hex(),
-            "srv-v2",
+            "srv-platform",
             RuntimeToolTopology::remote(),
         );
         std::fs::remove_file(&path)?;

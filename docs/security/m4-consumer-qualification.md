@@ -209,19 +209,15 @@ remaining final gates are in the acceptance report.
   included test fragments require caller-context classification; fuzz and
   benchmark harnesses are separate from production authorities. This count does
   not cover all portable verifiers, SDKs, dispatch roots or macro-generated code.
-- Python `chio-py`, TypeScript `chio-ts` and Go `chio-go` manifest invariant
-  helpers still recognize only v1. Their v1 corpus is not v2 consumer evidence.
-  The generated-schema lanes also live in different packages: Python
+- Python `chio-py`, TypeScript `chio-ts` and Go `chio-go` carry no manifest
+  invariant helper. The generated-schema lanes live in different packages: Python
   `chio-sdk-python`, TypeScript `packages/conformance`, and Go `chio-go-http`.
   Baselines passed 179 Python tests, the TypeScript shared-corpus test and the Go
   HTTP suite. The subsequent shared 35-protocol/14-manifest corpus and actual
-  public parser lanes now pass; the legacy helper version limits remain explicit.
-- V2's schema rejected `annotations.estimated_duration_ms` while Rust accepted
-  it. Adding a runtime assertion reproduced the mismatch (22 manifest-v2 tests
-  passed, one failed). The public normative annotation field and its constructor
-  literals have now been removed; only the private v1 migration parser retains
-  it and converts it into `latency_hint`. This is an intentional Rust source
-  break aligned with the existing v2 wire schema, not a second latency authority.
+  public parser lanes pass.
+- The manifest schema rejects `annotations.estimated_duration_ms` and so does
+  the Rust type: `latency_hint` is the single latency authority, and no
+  conversion parser exists.
   The focused core, forward-compatibility and manifest suites passed 29, 7, 389,
   32 and 23 tests in `/tmp/chio-m4-manifest-single-latency.log`. Broad compilation,
   codegen and current-manifest parity subsequently passed. Final milestone
@@ -325,10 +321,10 @@ a gap.
   and lineage. Test omission, substitution and mixed-version peers. Apply the
   established portable multi-hop rejection until its authenticated witness
   contract exists; do not invent new portable delegation support in M4.
-- [x] Verify one normative public `ToolDefinition`, explicit v1 parsing/migration,
-  v2 re-signing requirements, strict nested fields and unambiguous latency and
-  side-effect annotations. Discovery data never substitutes for a verified v2
-  registry entry.
+- [x] Verify one normative public `ToolDefinition`, the single closed
+  `chio.manifest.v1` shape with no conversion path, strict nested fields and
+  unambiguous latency and side-effect annotations. Discovery data never
+  substitutes for a verified registry entry.
 - [x] Test publisher flow declarations against tenant/data-owner policy and
   mandatory runtime egress. A publisher cannot widen clearance, erase an output
   floor, invent declassification purposes or label a remote boundary local.

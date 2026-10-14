@@ -17,7 +17,6 @@ mod correlation;
 mod durability;
 mod event_consumer;
 mod migration;
-pub mod migration_evidence;
 mod orchestration;
 mod os_random;
 mod scheduler_worker;
@@ -70,18 +69,7 @@ pub use event_consumer::{
     TrustedSecurityEventReceiptProducer, VerifiedSecurityEventIngress,
     SECURITY_EVENT_RECEIPT_PROJECTION_VERSION,
 };
-pub use migration::{
-    EnterpriseMigrationRuntimeBinding, EnterpriseMigrationRuntimeError,
-    EnterpriseOperationalFailureDisposition,
-};
-pub use migration_evidence::{
-    DurableEnterpriseMigrationStateBinding, EnterpriseEvidenceRunnerIdentity,
-    EnterpriseMigrationCanaryEvidenceBody, EnterpriseMigrationCanaryVerificationPolicy,
-    EnterpriseMigrationCutoverAttestationBody, EnterpriseMigrationEvidenceBinding,
-    EnterpriseMigrationEvidenceError, EnterpriseMigrationGateResultDigests,
-    SignedEnterpriseMigrationCanaryEvidence, SignedEnterpriseMigrationCutoverAttestation,
-    ENTERPRISE_MIGRATION_CANARY_EVIDENCE_SCHEMA, ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_SCHEMA,
-};
+pub use migration::{EnterpriseMigrationRuntimeBinding, EnterpriseMigrationRuntimeError};
 pub use orchestration::{
     ProductionActiveDefenseBuildError, ProductionActiveDefenseConfig, ProductionActiveDefenseHost,
     ProductionActiveDefenseHostConfig, ProductionActiveDefenseHostError,

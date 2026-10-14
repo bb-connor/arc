@@ -97,7 +97,7 @@ def native_cage_arguments() -> list[str]:
         ("CHIO_CAGE_INIT", "--cage-init"),
         ("CHIO_RECEIPT_ANCHOR_ROOT", "--receipt-rollback-anchor-root"),
     )
-    arguments = ["--stage", "enforced"]
+    arguments = []
     for variable, flag in options:
         path = os.environ.get(variable, "")
         if not os.path.isabs(path):

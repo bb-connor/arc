@@ -134,7 +134,7 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
     assert!(
         verify_native_launch_evidence(&evidence, "other-server", &signer.public_key()).is_err()
     );
-    for field in ["helper", "target", "identity", "stage"] {
+    for field in ["helper", "target", "identity", "head"] {
         let mut policy = policy.clone();
         match field {
             "helper" => policy.runtime.cage_init_binding_digest = "a".repeat(64),
@@ -143,8 +143,8 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
                 policy.runtime.execution_identity = ExecutionIdentity::new(20001, 20001, vec![])?
             }
             _ => {
-                policy.enterprise_migration.stage =
-                    chio_security_types::EnterpriseMigrationStage::Disabled
+                policy.enterprise_migration.head.transition_digest =
+                    chio_security_types::ports::Digest32::new([0x5a; 32])
             }
         }
         let mut changed = evidence.clone();

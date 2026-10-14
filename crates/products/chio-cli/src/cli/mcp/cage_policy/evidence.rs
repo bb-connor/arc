@@ -121,11 +121,9 @@ fn verify_policy_bound_enforcement(
     )?;
     require(
         policy.schema == MCP_CAGE_LAUNCH_POLICY_SCHEMA
-            && policy.enterprise_migration.stage
-                == chio_security_types::EnterpriseMigrationStage::Enforced
             && policy.signed_manifest.manifest.server_id == server_id
             && policy.broker.is_some() == brokered,
-        "expected the pinned server's selected Enforced policy",
+        "expected the pinned server's selected policy",
     )?;
     if brokered {
         require(

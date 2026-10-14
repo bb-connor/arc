@@ -116,9 +116,8 @@ the original command. The adapter stops on kernel denial, incomplete outcome,
 an MCP error flag or an invalid result instead of requesting a replacement
 decision.
 
-The demo launch policy explicitly uses migration stage Disabled. It binds the
-bridge command and signed manifest, and provides no OS containment for the
-bridge or Python worker. Docker contains the tool commands. The default same-user
+The demo launch policy binds the bridge command and signed manifest. The bridge
+and the Python worker run outside the cage; Docker contains the tool commands. The default same-user
 qualification does not establish isolation of an adversarial Python worker from
 the host's Docker privileges. Deployments must put the worker in a separate
 security boundary without Docker access, keep the privileged bridge on the

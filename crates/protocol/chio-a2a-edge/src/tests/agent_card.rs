@@ -14,20 +14,22 @@ fn assert_invalid_agent_card_config_rejected(config: A2aEdgeConfig, expected: &s
 
 #[test]
 fn edge_rejects_manifest_with_unsupported_schema_version() {
-    let mut manifest = test_manifest();
-    manifest.schema = "chio.manifest.v0".to_string();
-    manifest.public_key = manifest_public_key(99);
+    for unsupported in ["chio.manifest.v0", "chio.manifest.v2"] {
+        let mut manifest = test_manifest();
+        manifest.schema = unsupported.to_string();
+        manifest.public_key = manifest_public_key(99);
 
-    let error = match ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]) {
-        Ok(_) => panic!("A2A edge must reject unsupported manifest schema versions"),
-        Err(error) => error,
-    };
+        let error = match ChioA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]) {
+            Ok(_) => panic!("A2A edge must reject unsupported manifest schema versions"),
+            Err(error) => error,
+        };
 
-    assert!(matches!(
-        error,
-        A2aEdgeError::Manifest(chio_manifest::ManifestError::UnsupportedSchema(schema))
-            if schema == "chio.manifest.v0"
-    ));
+        assert!(matches!(
+            error,
+            A2aEdgeError::Manifest(chio_manifest::ManifestError::UnsupportedSchema(schema))
+                if schema == unsupported
+        ));
+    }
 }
 
 #[test]

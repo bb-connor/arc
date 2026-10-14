@@ -10,9 +10,9 @@ use crate::{display_path, XtaskError};
 
 pub(super) fn harden(root: &Path) -> Result<(), XtaskError> {
     for (file, objects, non_null_properties) in [
-        ("security/tool_manifest_v2_schema.py", 7, true),
+        ("security/tool_manifest_v1_schema.py", 7, true),
         ("security/tool_flow_declaration_schema.py", 2, true),
-        ("security/signed_tool_manifest_v2_schema.py", 1, true),
+        ("security/signed_tool_manifest_v1_schema.py", 1, true),
         ("kernel/execution_nonce_schema.py", 3, true),
         ("kernel/combined_capture_metadata_schema.py", 2, true),
         ("kernel/caller_dispatch_authorization_schema.py", 8, true),

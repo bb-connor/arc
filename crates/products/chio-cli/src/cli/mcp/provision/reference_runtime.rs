@@ -1,36 +1,23 @@
 //! `chio security provision-reference-runtime`: signed launch material for
-//! one confined tool at an enforcing migration stage.
+//! one confined tool.
 //!
-//! The demo provisioner authorizes a launch without confining it. This
-//! command binds a static position-independent cage helper, the target's
-//! digest, argument list and working directory, the read and write grants
-//! the manifest declares, and a migration ledger promoted through Shadow to
-//! the requested stage, so the edge composes a cage-required launch from the
-//! result on an enforcing host.
+//! This command binds a static position-independent cage helper, the
+//! target's digest, argument list and working directory, the read and write
+//! grants the manifest declares, and an enforced migration ledger
+//! registration, so the edge composes a cage-required launch from the result
+//! on an enforcing host.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use super::{
-    provision, require_exact_canonical_path, resolve_inputs, CageInitSource, ProvisionProfile,
+    provision, require_exact_canonical_path, resolve_inputs, ProvisionProfile,
     ProvisionedBrokerBinding, ProvisionedCeilings, ToolSurfaceSource,
 };
 use crate::CliError;
 
 const REPORT_SCHEMA: &str = "chio.reference-runtime-provision-report.v1";
-const ENFORCED_SECURITY_MODE: &str = "enforced_cage";
-const ENFORCED_WARNING: &str = "The launch is confined only on a host that enforces the cage; the private signers in this directory belong to the operator and stay root-only.";
-const SHADOW_SECURITY_MODE: &str = "shadow_preparation_only";
-const SHADOW_WARNING: &str = "Shadow artifacts record the cage posture but cannot authorize native launch. Promote to Enforced before executing tools.";
-
-/// The migration stage the ledger is promoted to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
-pub(crate) enum ProvisionStage {
-    /// Preparation only. Runtime launch remains denied until Enforced.
-    Shadow,
-    /// Cage-required launch.
-    Enforced,
-}
+const WARNING: &str = "The launch is confined only on a host that enforces the cage; the private signers in this directory belong to the operator and stay root-only.";
 
 /// Reviewed closed syscall sets for targets without broker IPC.
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -69,13 +56,13 @@ pub(crate) struct ProvisionReferenceRuntimeArgs {
     #[arg(long, default_value_t = 1024 * 1024, value_parser = clap::value_parser!(u64).range(1..=268_435_456))]
     pub max_artifact_bytes: u64,
 
-    /// Private external receipt rollback anchor directory. Required for Enforced
-    /// launch; it must be on a different filesystem from the receipt database.
+    /// Private external receipt rollback anchor directory, on a different
+    /// filesystem from the receipt database.
     #[arg(long, value_name = "PATH")]
-    pub receipt_rollback_anchor_root: Option<PathBuf>,
+    pub receipt_rollback_anchor_root: PathBuf,
 
     /// Reviewed JSON socket path, authentication digest and broker peer identity.
-    /// Requires Enforced stage, a tools fixture and a static target without file grants.
+    /// Requires a tools fixture and a static target without file grants.
     #[arg(long, value_name = "PATH", conflicts_with_all = ["discover_tools", "read_paths", "write_paths", "runtime_files"])]
     pub broker_binding: Option<PathBuf>,
 
@@ -141,42 +128,22 @@ pub(crate) struct ProvisionReferenceRuntimeArgs {
 
     #[arg(long, default_value = "1")]
     pub server_version: String,
-
-    /// Stage the migration ledger is promoted to.
-    #[arg(long, value_enum, default_value_t = ProvisionStage::Enforced)]
-    pub stage: ProvisionStage,
 }
 
 pub(crate) fn cmd_provision_reference_runtime(
     args: &ProvisionReferenceRuntimeArgs,
 ) -> Result<(), CliError> {
-    if args.stage == ProvisionStage::Enforced && args.receipt_rollback_anchor_root.is_none() {
+    let receipt_rollback_anchor_root =
+        require_exact_canonical_path(&args.receipt_rollback_anchor_root, "receipt rollback anchor")?;
+    if !std::fs::metadata(&receipt_rollback_anchor_root)?.is_dir() {
         return Err(CliError::cli_other_error(
-            "Enforced provisioning requires --receipt-rollback-anchor-root on a separate persistent filesystem from the receipt database".to_string(),
+            "receipt rollback anchor must be a directory".to_string(),
         ));
     }
-    let receipt_rollback_anchor_root = args
-        .receipt_rollback_anchor_root
-        .as_ref()
-        .map(|path| {
-            let path = require_exact_canonical_path(path, "receipt rollback anchor")?;
-            if !std::fs::metadata(&path)?.is_dir() {
-                return Err(CliError::cli_other_error(
-                    "receipt rollback anchor must be a directory".to_string(),
-                ));
-            }
-            Ok(path)
-        })
-        .transpose()?;
     let broker = args
         .broker_binding
         .as_ref()
-        .map(|path| {
-            if args.stage != ProvisionStage::Enforced {
-                return Err(CliError::cli_other_error(
-                    "brokered provisioning requires Enforced stage".to_string(),
-                ));
-            }
+        .map(|path| -> Result<ProvisionedBrokerBinding, CliError> {
             let bytes = super::read_bounded_regular_file(path, 16 * 1024, false, "broker binding")?;
             let binding: ProvisionedBrokerBinding =
                 crate::input::json(&bytes).map_err(|error| {
@@ -221,29 +188,14 @@ pub(crate) fn cmd_provision_reference_runtime(
             file.display()
         )));
     }
-    let (stage, security_mode, warning) = match args.stage {
-        ProvisionStage::Shadow => (
-            chio_security_types::EnterpriseMigrationStage::Shadow,
-            SHADOW_SECURITY_MODE,
-            SHADOW_WARNING,
-        ),
-        ProvisionStage::Enforced => (
-            chio_security_types::EnterpriseMigrationStage::Enforced,
-            ENFORCED_SECURITY_MODE,
-            ENFORCED_WARNING,
-        ),
-    };
     let profile = ProvisionProfile {
         max_artifact_bytes: args.max_artifact_bytes,
         receipt_rollback_anchor_root,
         report_schema: REPORT_SCHEMA,
-        security_mode,
-        warning,
+        warning: WARNING,
         deployment_id_prefix: "chio.reference-runtime.",
         receipt_capability_id: "reference-runtime-launch",
-        receipt_tenant_id: None,
-        stage,
-        cage_init: CageInitSource::Helper(args.cage_init.clone()),
+        cage_init: args.cage_init.clone(),
         ceilings,
         broker,
         syscall_profile: args

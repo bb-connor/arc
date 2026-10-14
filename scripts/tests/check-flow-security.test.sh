@@ -28,7 +28,7 @@ for required in \
   'export RUST_TEST_THREADS=1' \
   'run_exact_target --label "security types library"' \
   'run_exact_target --label "flow lattice and enforcement engine"' \
-  'run_exact_target --label "strict manifest v2"' \
+  'run_exact_target --label "strict manifest"' \
   'run_exact_target --label "security kernel adapters"' \
   'generic_pre_invocation_adapter_fails_closed_without_declassification_store' \
   'run_exact_target --label "durable flow state"' \
@@ -111,7 +111,7 @@ expected_counts = {
     "security response types": 18,
     "security session-throttle types": 3,
     "flow lattice and enforcement engine": 48,
-    "strict manifest v2": 25,
+    "strict manifest": 28,
     "security kernel adapters": 49,
     "durable flow state": 44,
     "native flow custody": 145,
@@ -166,7 +166,7 @@ unfiltered = {
     "security response types",
     "security session-throttle types",
     "flow lattice and enforcement engine",
-    "strict manifest v2",
+    "strict manifest",
     "security kernel adapters",
     "durable flow state",
     "native authority admission integration",

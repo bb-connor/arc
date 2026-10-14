@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: d9413b42552bab1306e06058c45fddfde82effd28a779300028dc434b7b7f0cc
+# Schema sha256: 33f75027d5869fde01689ddc8847f699f9d2b6912e599a8b6672a18c0f49adea
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -18,8 +18,8 @@ from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
 from . import (
     cage_init_plan_v1_schema,
-    signed_tool_manifest_v2_schema,
-    tool_manifest_v2_schema,
+    signed_tool_manifest_v1_schema,
+    tool_manifest_v1_schema,
 )
 
 
@@ -149,27 +149,12 @@ class NonzeroDigest32(RootModel[list[NonzeroDigest32Item]]):
     root: list[NonzeroDigest32Item] = Field(..., max_length=32, min_length=32)
 
 
-class MinimumGeneration(Enum):
-    int_0 = 0
-    int_1 = 1
-    int_2 = 2
-    int_3 = 3
-
-
-class MinimumHead(BaseModel):
+class MigrationHead(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     key: MigrationKey
-    minimum_generation: MinimumGeneration
     transition_digest: NonzeroDigest32
-
-
-class Stage(Enum):
-    disabled = "disabled"
-    shadow = "shadow"
-    enforced = "enforced"
-    legacy_removed = "legacy_removed"
 
 
 class EnterpriseMigration(BaseModel):
@@ -178,11 +163,10 @@ class EnterpriseMigration(BaseModel):
     )
     state_database_path: AbsoluteCanonicalPath
     deployment_id: Identifier
-    stage: Stage
     trusted_transition_signers: list[PublicKey] = Field(
         ..., max_length=16, min_length=1
     )
-    minimum_head: MinimumHead
+    head: MigrationHead
 
 
 class BrokerPeerIdentity(BaseModel):
@@ -224,7 +208,7 @@ class OperatorCeilings(BaseModel):
     )
     read_paths: list[AbsoluteCanonicalPath]
     write_paths: list[AbsoluteCanonicalPath]
-    network_destinations: list[tool_manifest_v2_schema.NetworkDestination]
+    network_destinations: list[tool_manifest_v1_schema.NetworkDestination]
     environment_variables: list[EnvironmentVariable]
     native_syscall_profiles: list[NativeSyscallProfile] = Field(..., min_length=1)
     forbidden_paths: list[AbsoluteCanonicalPath]
@@ -235,7 +219,7 @@ class PolicyBody(BaseModel):
         extra="forbid",
     )
     schema_: Literal["chio.mcp.cage-launch-policy.v1"] = Field(..., alias="schema")
-    signed_manifest: signed_tool_manifest_v2_schema.ChioSignedToolManifestV2
+    signed_manifest: signed_tool_manifest_v1_schema.ChioSignedToolManifestV1
     registered_public_key: PublicKey
     operator_ceilings: OperatorCeilings
     runtime: Runtime

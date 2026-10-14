@@ -166,7 +166,6 @@
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs",
     "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs",
     "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs",
-    "crates/platform/chio-control-plane/src/security/migration_evidence.rs",
     "crates/platform/chio-control-plane/src/security/response_simulation.rs",
     "crates/platform/chio-control-plane/src/signed_input.rs",
     "crates/platform/chio-control-plane/src/signing_custody.rs",
@@ -1313,8 +1312,6 @@
     "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::parse_bound_body::from_wire",
     "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::verify_internal_event::from_wire",
     "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::verify_receipt_event::from_wire",
-    "crates/platform/chio-control-plane/src/security/migration_evidence.rs::from_canonical_bytes::from_wire",
-    "crates/platform/chio-control-plane/src/security/migration_evidence.rs::from_canonical_bytes::from_wire",
     "crates/platform/chio-control-plane/src/security/response_simulation.rs::capture::from_wire",
     "crates/platform/chio-control-plane/src/signed_input.rs::decode::from_wire",
     "crates/platform/chio-control-plane/src/transaction_passport_risk.rs::graph_bound_signed_risk_report::from_wire",
@@ -4811,7 +4808,7 @@
     "crates/platform/chio-http-core/src/authority.rs::evaluate::from_value": "Presented capabilities are bounded to 64 KiB and original-token validated. Typed input causes stay local in prepared/final evaluation while receipts contain safe denial text. Issuer, signature, revocation and scope checks remain. Token time, retry expiry and receipt time share the kernel fenced clock; internal guard Value projection follows kernel-owned request construction.",
     "crates/platform/chio-http-core/src/plan.rs::decode_plan::from_slice": "Plan bytes are bounded to 1 MiB and duplicate-aware unsigned document parsing preserves ordinary argument floats. The original borrowed capability subtree independently satisfies the 64 KiB lossless native signed contract before kernel evaluation. Native local causes project a fixed HTTP 400 body; the kernel retains aggregate capability and plan authority.",
     "crates/platform/chio-http-core/src/plan.rs::decode_plan::from_value": "Plan bytes are bounded to 1 MiB and duplicate-aware unsigned document parsing preserves ordinary argument floats. The original borrowed capability subtree independently satisfies the 64 KiB lossless native signed contract before kernel evaluation. Native local causes project a fixed HTTP 400 body; the kernel retains aggregate capability and plan authority.",
-    "crates/platform/chio-manifest/src/lib_parts/part_01.inc::as_str::custom_deserialize": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only.",
+    "crates/platform/chio-manifest/src/lib_parts/part_01.inc::as_str::custom_deserialize": "Only the closed chio.manifest.v1 types and signature verification exist. No converter, migration type or permission amendment API exists; the v0.1.0 shape under the chio.manifest.v1 id and the retired chio.manifest.v2 id are refused.",
     "crates/platform/chio-store-sqlite/src/channel_release_publisher_store/qualification.rs::qualify_root_publication_result::from_value": "Typed value conversion after its containing original-byte decoder and source verification; no new wire or database bytes enter at this conversion.",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_bundle::from_slice": "Strict I-JSON canonical preflight rejects duplicate keys and aliases before the closed DTO read; identity, canonical equality, manifest and digest checks remain mandatory.",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs::validate_canonical_json::from_slice": "Strict I-JSON canonical preflight rejects duplicate keys and aliases before the closed DTO read; identity, canonical equality, manifest and digest checks remain mandatory.",
@@ -4836,7 +4833,7 @@
     "crates/platform/chio-trust-market-context/src/evidence.rs::parse_artifact_from_value::from_value": "Original graphs, receipts and signed context artifacts use bounded native input. Graph cardinality is bounded before traversal. Fallible auxiliary receipt and risk lookups preserve native parsing causes. Selected signatures, signer roles, digests, terminal state and claim bindings remain mandatory.",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode_arguments::from_slice": "Bounded original RawValue slices preserve strict decoding for capability, nonce, approval, signed plan/outcome and delivery credentials. Arguments, parameters, governed context and normalized runtime evidence use unsigned document numbers. Reserved callChainUpstreamProof and callChainContinuation context members are validated from their original signed slices. Complete-document duplicate rejection precedes typed projection or authority; raw field maps never authorize requests.",
     "crates/products/chio-api-protect/src/proxy/input.rs::validate_governed_fields::from_str": "Bounded original RawValue slices preserve strict decoding for capability, nonce, approval, signed plan/outcome and delivery credentials. Arguments, parameters, governed context and normalized runtime evidence use unsigned document numbers. Reserved callChainUpstreamProof and callChainContinuation context members are validated from their original signed slices. Complete-document duplicate rejection precedes typed projection or authority; raw field maps never authorize requests.",
-    "crates/products/chio-cli/src/active_defense_migration.rs::strict_typed_value::from_value": "Bounded original strict I-JSON feeds typed migration records. Only currently signed manifest v2 is accepted with registered pinned keys; the v1 conversion and unsigned-output API are removed. Shadow telemetry remains diagnostic and cannot grant enforcement authority.",
+    "crates/products/chio-cli/src/active_defense_migration.rs::strict_typed_value::from_value": "Bounded original strict I-JSON feeds typed migration records. Only signed chio.manifest.v1 in the closed shape is accepted with registered pinned keys; no conversion or unsigned-output API exists. Shadow telemetry remains diagnostic and cannot grant enforcement authority.",
     "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs::parse_relay_peer_directory_json::from_value": "CLI directory schema selection uses bounded original native JSON and forwards the native input cause to the relay error. Existing signed directory/trusted issuer validation remains mandatory.",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::load_verification_market::from_slice": "Bounded exact canonical admission jobs preserve requested package/finding bindings. HTTP responses have actual-byte limits and request deadlines; oversized prefixes cannot decode as complete replies. Collateral evaluation increment is checked; existing profile, retained bundle and activation identities remain checked before completion.",
     "crates/products/chio-cli/src/cli/input.rs::literal::from_value": "Shared bounded original native JSON, separate canonical I-JSON and typed projection contracts. Input decoding grants no authentication authority.",
@@ -8583,7 +8580,7 @@
     },
     "crates/platform/chio-manifest/src/lib_parts/part_01.inc": {
       "kind": "parser-internal-or-typed",
-      "contract": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only.",
+      "contract": "Only the closed chio.manifest.v1 types and signature verification exist. No converter, migration type or permission amendment API exists; the v0.1.0 shape under the chio.manifest.v1 id and the retired chio.manifest.v2 id are refused.",
       "readers": [
         {
           "reader": "deserialize",
@@ -9020,7 +9017,7 @@
     },
     "crates/products/chio-cli/src/active_defense_migration.rs": {
       "kind": "reviewed-bounded-input",
-      "contract": "Bounded original strict I-JSON feeds typed migration records. Only currently signed manifest v2 is accepted with registered pinned keys; the v1 conversion and unsigned-output API are removed. Shadow telemetry remains diagnostic and cannot grant enforcement authority.",
+      "contract": "Bounded original strict I-JSON feeds typed migration records. Only signed chio.manifest.v1 in the closed shape is accepted with registered pinned keys; no conversion or unsigned-output API exists. Shadow telemetry remains diagnostic and cannot grant enforcement authority.",
       "readers": [
         {
           "reader": "strict_typed_value",
@@ -14324,22 +14321,6 @@
         "flush::from_slice"
       ]
     },
-    "crates/platform/chio-control-plane/src/security/migration_evidence.rs": {
-      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
-      "migrations": [
-        [
-          "from_canonical_bytes",
-          "decode_signed",
-          "MAX_EVIDENCE_BYTES"
-        ],
-        [
-          "from_canonical_bytes",
-          "decode_signed",
-          "MAX_EVIDENCE_BYTES"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
     "crates/platform/chio-control-plane/src/security/response_simulation.rs": {
       "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
       "migrations": [
@@ -15634,7 +15615,7 @@
     },
     "crates/platform/chio-manifest/src/lib_parts/part_01.inc": {
       "kind": "parser-internal-or-typed",
-      "contract": "Only current manifest v2 types and signature verification remain. The obsolete v1 converter, migration type, legacy schema and permission amendment APIs are removed; fixture v1 input is negative data only."
+      "contract": "Only the closed chio.manifest.v1 types and signature verification exist. No converter, migration type or permission amendment API exists; the v0.1.0 shape under the chio.manifest.v1 id and the retired chio.manifest.v2 id are refused."
     },
     "crates/platform/chio-risk-comptroller/src/evidence_refs.rs": {
       "contract": "Shared risk-reference traversal accepts fallible lookups so auxiliary reader causes reach callers. The existing infallible typed lookup API delegates to the same validation algorithm.",
@@ -15710,7 +15691,7 @@
     },
     "crates/products/chio-cli/src/active_defense_migration.rs": {
       "kind": "reviewed-bounded-input",
-      "contract": "Bounded original strict I-JSON feeds typed migration records. Only currently signed manifest v2 is accepted with registered pinned keys; the v1 conversion and unsigned-output API are removed. Shadow telemetry remains diagnostic and cannot grant enforcement authority."
+      "contract": "Bounded original strict I-JSON feeds typed migration records. Only signed chio.manifest.v1 in the closed shape is accepted with registered pinned keys; no conversion or unsigned-output API exists. Shadow telemetry remains diagnostic and cannot grant enforcement authority."
     },
     "crates/products/chio-cli/src/active_response_authority.rs": {
       "kind": "reviewed-bounded-input",
@@ -16696,8 +16677,6 @@
     "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::parse_bound_body::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::verify_internal_event::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs::verify_receipt_event::from_wire#1::decode_signed",
-    "crates/platform/chio-control-plane/src/security/migration_evidence.rs::from_canonical_bytes#1::from_wire#1::decode_signed",
-    "crates/platform/chio-control-plane/src/security/migration_evidence.rs::from_canonical_bytes#2::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/response_simulation.rs::capture::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/signed_input.rs::decode::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/transaction_passport_risk.rs::graph_bound_signed_risk_report::from_wire#1::decode_signed",
@@ -18141,10 +18120,6 @@
       "parse_bound_body::original-json-reader::UntrustedJsonText",
       "verify_internal_event::original-json-reader::UntrustedJsonText",
       "verify_receipt_event::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/platform/chio-control-plane/src/security/migration_evidence.rs": [
-      "from_canonical_bytes#1::original-json-reader::UntrustedJsonText",
-      "from_canonical_bytes#2::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-control-plane/src/security/response_simulation.rs": [
       "capture::original-json-reader::UntrustedJsonText",

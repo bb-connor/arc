@@ -39,7 +39,8 @@ tools.
 
 ## Trust and invariants
 
-Only v2 is supported. Optional manifest fields reject explicit null;
+The manifest schema id is `chio.manifest.v1`; every other id is refused.
+Optional manifest fields reject explicit null;
 optional server-tool lists reject explicit empty arrays. Typed permission
 values normalize hosts and constrain environment variables. Shape validation
 checks duplicate tool names and permission entries. Schema compilation
@@ -63,7 +64,7 @@ checks.
 ## Verification
 
 `tests/integration_smoke.rs` signs and verifies through public APIs.
-`manifest_v2.rs` and its JSON-boundary cases check strict fields, admission,
+`manifest_admission.rs` and its JSON-boundary cases check strict fields, admission,
 topology, and original signed input. `input_schema.rs` covers local
 references and external-reference rejection; `server_tools.rs` covers
 native-tool classification and allowlisting. Run `cargo test -p

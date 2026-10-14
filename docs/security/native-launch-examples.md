@@ -32,7 +32,7 @@ chio_provision_mcp_launch "$(command -v chio)" "$PWD/reader-security" \
   /absolute/path/to/chio-tool-repo-reader --root /absolute/reviewed/repository
 ```
 
-The helper uses `security provision-reference-runtime --stage enforced` and
+The helper uses `security provision-reference-runtime` and
 confines live tool discovery. It binds the invoking user with its supplementary
 groups, binds every target argument that names a regular file as a read path
 and retained runtime file at its canonical path, and signs an artifact bound

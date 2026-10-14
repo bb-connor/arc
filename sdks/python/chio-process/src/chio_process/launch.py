@@ -134,7 +134,7 @@ def provision_native_demo(
 
 
 def _native_cage_authority_arguments() -> list[str]:
-    arguments = ["--stage", "enforced", "--max-artifact-bytes", str(64 * 1024 * 1024)]
+    arguments = ["--max-artifact-bytes", str(64 * 1024 * 1024)]
     for variable, flag in (
         ("CHIO_CAGE_INIT", "--cage-init"),
         ("CHIO_RECEIPT_ANCHOR_ROOT", "--receipt-rollback-anchor-root"),

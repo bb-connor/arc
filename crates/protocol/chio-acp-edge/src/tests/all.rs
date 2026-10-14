@@ -1123,20 +1123,22 @@ mod tests {
 
     #[test]
     fn edge_rejects_manifest_with_unsupported_schema_version() {
-        let mut manifest = test_manifest();
-        manifest.schema = "chio.manifest.v0".to_string();
-        manifest.public_key = manifest_public_key(99);
+        for unsupported in ["chio.manifest.v0", "chio.manifest.v2"] {
+            let mut manifest = test_manifest();
+            manifest.schema = unsupported.to_string();
+            manifest.public_key = manifest_public_key(99);
 
-        let error = match new_test_edge(AcpEdgeConfig::default(), vec![manifest]) {
-            Ok(_) => panic!("ACP edge must reject unsupported manifest schema versions"),
-            Err(error) => error,
-        };
+            let error = match new_test_edge(AcpEdgeConfig::default(), vec![manifest]) {
+                Ok(_) => panic!("ACP edge must reject unsupported manifest schema versions"),
+                Err(error) => error,
+            };
 
-        assert!(matches!(
-            error,
-            AcpEdgeError::Manifest(chio_manifest::ManifestError::UnsupportedSchema(schema))
-                if schema == "chio.manifest.v0"
-        ));
+            assert!(matches!(
+                error,
+                AcpEdgeError::Manifest(chio_manifest::ManifestError::UnsupportedSchema(schema))
+                    if schema == unsupported
+            ));
+        }
     }
 
     #[test]

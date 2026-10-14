@@ -800,28 +800,30 @@ fn streaming_manifest() -> ToolManifest {
 
 #[test]
 fn edge_rejects_manifest_with_unsupported_schema_version() {
-    let (kernel, _) = make_kernel();
-    let agent = Keypair::generate();
-    let mut manifest = sample_manifest();
-    manifest.schema = "chio.manifest.v0".into();
-    manifest.public_key = Keypair::from_seed(&[11u8; 32]).public_key().to_hex();
+    for unsupported in ["chio.manifest.v0", "chio.manifest.v2"] {
+        let (kernel, _) = make_kernel();
+        let agent = Keypair::generate();
+        let mut manifest = sample_manifest();
+        manifest.schema = unsupported.into();
+        manifest.public_key = Keypair::from_seed(&[11u8; 32]).public_key().to_hex();
 
-    let err = match ChioMcpEdge::new(
-        McpEdgeConfig::default(),
-        kernel,
-        agent.public_key().to_hex(),
-        vec![],
-        vec![manifest],
-    ) {
-        Ok(_) => panic!("MCP edge discovery must reject unsupported manifest schema versions"),
-        Err(err) => err,
-    };
+        let err = match ChioMcpEdge::new(
+            McpEdgeConfig::default(),
+            kernel,
+            agent.public_key().to_hex(),
+            vec![],
+            vec![manifest],
+        ) {
+            Ok(_) => panic!("MCP edge discovery must reject unsupported manifest schema versions"),
+            Err(err) => err,
+        };
 
-    assert!(matches!(
-        err,
-        AdapterError::ManifestError(chio_manifest::ManifestError::UnsupportedSchema(schema))
-            if schema == "chio.manifest.v0"
-    ));
+        assert!(matches!(
+            err,
+            AdapterError::ManifestError(chio_manifest::ManifestError::UnsupportedSchema(schema))
+                if schema == unsupported
+        ));
+    }
 }
 
 #[test]

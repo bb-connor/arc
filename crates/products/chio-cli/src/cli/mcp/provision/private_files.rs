@@ -73,11 +73,11 @@ pub(super) fn require_private_directory_metadata(
     use std::os::unix::fs::MetadataExt as _;
     if metadata.uid() != operator {
         return Err(tampered(
-            "demo output directory is not owned by the provisioning user",
+            "provisioning output directory is not owned by the provisioning user",
         ));
     }
     if metadata.mode() & 0o777 != 0o700 {
-        return Err(tampered("demo output directory mode is not 0700"));
+        return Err(tampered("provisioning output directory mode is not 0700"));
     }
     Ok(())
 }

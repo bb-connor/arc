@@ -213,7 +213,8 @@ An incompatible change to any covered surface is a new ABI; state never
 migrates across ABIs implicitly, and hosts initialized before the field was
 recorded were written under the first ABI.
 
-ABI v2 adds signed native MCP launch policies and tool manifest v2 metadata.
+ABI v2 adds signed native MCP launch policies and `chio.manifest.v1` tool
+manifest metadata.
 ABI v1 state must be finished with its original compatible binary; it cannot
 be served, exported or imported by an ABI v2 host. The worker wire protocol
 remains `chio.process.v1`.

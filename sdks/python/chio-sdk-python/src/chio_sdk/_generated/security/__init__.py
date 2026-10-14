@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: d9413b42552bab1306e06058c45fddfde82effd28a779300028dc434b7b7f0cc
+# Schema sha256: 33f75027d5869fde01689ddc8847f699f9d2b6912e599a8b6672a18c0f49adea
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -80,7 +80,7 @@ from .key_log_witness_readiness_proof_v1_schema import Algorithm, ChioSignedKeyL
 from .key_log_witness_signature_v1_schema import Algorithm, ChioKeyLogWitnessSignatureV1
 from .keyring_artifact_signature_v1_schema import Algorithm, ChioKeyringArtifactSignatureEvidenceV1, Hash, Signature, U64
 from .lift_rollback_completion_receipt_body_v1_schema import ChioLiftOrRollbackCompletionReceiptBodyV1, Effect, FinalState, Header, LiftOutcome, LiftOutcome1, LiftOutcome2, LiftOutcome3, LiftOutcome4, LiftOutcome5
-from .mcp_cage_launch_policy_v1_schema import AbsoluteCanonicalPath, BrokerBinding, BrokerBinding1, BrokerBinding2, BrokerPeerIdentity, ChioSignedMcpCageLaunchPolicyV1, Digest, EnterpriseMigration, EnvironmentVariable, Identifier, Limits, MigrationKey, MinimumGeneration, MinimumHead, NativeSyscallProfile, NonzeroDigest32, NonzeroDigest32Item, OperatorCeilings, PolicyBody, PublicKey, ReceiptRuntime, Runtime, Signature, Stage, TargetArgvItem
+from .mcp_cage_launch_policy_v1_schema import AbsoluteCanonicalPath, BrokerBinding, BrokerBinding1, BrokerBinding2, BrokerPeerIdentity, ChioSignedMcpCageLaunchPolicyV1, Digest, EnterpriseMigration, EnvironmentVariable, Identifier, Limits, MigrationHead, MigrationKey, NativeSyscallProfile, NonzeroDigest32, NonzeroDigest32Item, OperatorCeilings, PolicyBody, PublicKey, ReceiptRuntime, Runtime, Signature, TargetArgvItem
 from .response_completion_receipt_body_v1_schema import ChioResponseCompletionReceiptBodyV1, CompletionOutcome, CompletionOutcome1, CompletionOutcome2, CompletionOutcome3, DispatchApproval, DispatchApproval1, DispatchApproval2, Effect, ExecutionDispatch, FinalState, Header
 from .response_effect_v1_schema import CanonicalContributionItem, ChioResponseEffectV1, Digest, DigestItem, Identifier, Kind, Target, Target5, Target6, Target7, Target8
 from .response_plan_receipt_body_v1_schema import ChioResponsePlanReceiptBodyV1
@@ -89,9 +89,9 @@ from .response_state_transition_receipt_body_v1_schema import Cause, ChioRespons
 from .scheduler_health_receipt_body_v1_schema import ChioSchedulerHealthReceiptBodyV1
 from .security_event_body_v1_schema import ChioSecurityEventBodyV1, EventKind, Identifier, Severity, Subject, Time, TrustClass
 from .signed_security_event_envelope_v1_schema import Algorithm, ChioSignedSecurityEventProvenanceEnvelopeV1, PublicKey, Signature
-from .signed_tool_manifest_v2_schema import ChioSignedToolManifestV2
+from .signed_tool_manifest_v1_schema import ChioSignedToolManifestV1
 from .tool_flow_declaration_schema import FlowIdentifier, KnownLabel, ToolFlowDeclaration
-from .tool_manifest_v2_schema import ChioToolManifestV2, EnvironmentVariable, LatencyHint, MonetaryAmount, NativeSyscallProfile, NetworkDestination, PricingModel, ReadPath, RequiredPermissions, ServerTool, ToolAnnotations, ToolDefinition, ToolPricing, WritePath
+from .tool_manifest_v1_schema import ChioToolManifestV1, EnvironmentVariable, LatencyHint, MonetaryAmount, NativeSyscallProfile, NetworkDestination, PricingModel, ReadPath, RequiredPermissions, ServerTool, ToolAnnotations, ToolDefinition, ToolPricing, WritePath
 from .tripwire_observation_receipt_body_v1_schema import ChioTripwireObservationReceiptBodyV1, Severity, TripwireKind
 
 __all__ = [
@@ -226,8 +226,8 @@ __all__ = [
     "ChioSignedKeyLogWitnessServiceReadinessProofV1",
     "ChioSignedMcpCageLaunchPolicyV1",
     "ChioSignedSecurityEventProvenanceEnvelopeV1",
-    "ChioSignedToolManifestV2",
-    "ChioToolManifestV2",
+    "ChioSignedToolManifestV1",
+    "ChioToolManifestV1",
     "ChioTripwireObservationReceiptBodyV1",
     "Code",
     "CompletionOutcome",
@@ -332,9 +332,8 @@ __all__ = [
     "LiveParent",
     "LiveParentResult",
     "Method",
+    "MigrationHead",
     "MigrationKey",
-    "MinimumGeneration",
-    "MinimumHead",
     "Mode",
     "MonetaryAmount",
     "NativeSyscallProfile",

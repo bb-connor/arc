@@ -473,7 +473,7 @@ def component_name_for(rel_path: Path) -> str:
 
 
 # Rewrite cross-file `$ref` strings (e.g. "../receipt/record.schema.json" and
-# "tool-manifest-v2.schema.json#/$defs/networkDestination") into local
+# "tool-manifest-v1.schema.json#/$defs/networkDestination") into local
 # component refs. JSON
 # Schema 2020-12 resolves a relative ref against the referencing file's own
 # location; oapi-codegen has no notion of the original directory layout

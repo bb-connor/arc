@@ -22,8 +22,7 @@ pub struct PreflightArgs {
 
     /// Fail when the host cannot enforce the cage or the launch material
     /// authorizes without confining. Without it those findings are warnings,
-    /// which is what a developer host provisioning at migration stage
-    /// Disabled expects.
+    /// which suits a host that only provisions launch material.
     #[arg(long, default_value_t = false)]
     pub require_enforcement: bool,
 

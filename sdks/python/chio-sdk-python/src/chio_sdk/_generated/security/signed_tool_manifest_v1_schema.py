@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: d9413b42552bab1306e06058c45fddfde82effd28a779300028dc434b7b7f0cc
+# Schema sha256: 33f75027d5869fde01689ddc8847f699f9d2b6912e599a8b6672a18c0f49adea
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -15,10 +15,10 @@ from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
 
 from pydantic import ConfigDict, constr
 
-from . import tool_manifest_v2_schema
+from . import tool_manifest_v1_schema
 
 
-class ChioSignedToolManifestV2(BaseModel):
+class ChioSignedToolManifestV1(BaseModel):
     """
     Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.
     """
@@ -26,7 +26,7 @@ class ChioSignedToolManifestV2(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    manifest: tool_manifest_v2_schema.ChioToolManifestV2
+    manifest: tool_manifest_v1_schema.ChioToolManifestV1
     signature: constr(
         pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
     )

@@ -8,7 +8,7 @@ use chio_secret_broker::migration::production_broker_migration_posture_digest;
 use chio_security_types::ports::{Digest32, RecordId};
 use chio_security_types::{
     EnterpriseMigrationControl, EnterpriseMigrationKey, EnterpriseMigrationScopeKind,
-    EnterpriseMigrationStage, EnterpriseMigrationStateStore, EnterpriseMigrationTransitionBody,
+    EnterpriseMigrationStateStore, EnterpriseMigrationTransitionBody,
 };
 use chio_store_sqlite::{
     sign_enterprise_migration_transition, SqliteEnterpriseMigrationOpenPolicy,
@@ -40,7 +40,7 @@ pub fn enforced_broker_migration(
     let deployment_id = RecordId::new(deployment_id).test_expect("migration deployment identifier");
     let credential_provider =
         RecordId::new(credential_provider).test_expect("migration provider identifier");
-    let mut minimum_heads = Vec::new();
+    let mut heads = Vec::new();
     for (control, seed) in [
         (EnterpriseMigrationControl::BrokerCredentialCustody, 0x41_u8),
         (EnterpriseMigrationControl::BrokerQuotaEnforcement, 0x51_u8),
@@ -51,63 +51,29 @@ pub fn enforced_broker_migration(
             scope_id: credential_provider.clone(),
             control,
         };
-        let genesis = EnterpriseMigrationTransitionBody::genesis(
+        let registration = EnterpriseMigrationTransitionBody::enforced(
             key.clone(),
-            production_broker_migration_posture_digest(
-                &deployment_id,
-                &credential_provider,
-                control,
-                EnterpriseMigrationStage::Disabled,
-            )
-            .test_expect("disabled migration posture"),
+            production_broker_migration_posture_digest(&deployment_id, &credential_provider, control)
+                .test_expect("enforced migration posture"),
             Digest32::new([seed; 32]),
             Digest32::new([seed.saturating_add(1); 32]),
             Digest32::new([seed.saturating_add(2); 32]),
             1,
             signer.public_key().to_hex(),
         )
-        .test_expect("migration genesis");
-        let genesis = sign_enterprise_migration_transition(genesis, &signer)
-            .test_expect("sign migration genesis");
+        .test_expect("migration registration");
+        let registration = sign_enterprise_migration_transition(registration, &signer)
+            .test_expect("sign migration registration");
         let _ = store
-            .register(&genesis)
-            .test_expect("register migration genesis");
-        let mut state = store
+            .register(&registration)
+            .test_expect("register migration registration");
+        let state = store
             .load(&key)
-            .test_expect("load migration genesis")
-            .test_expect("migration genesis exists");
-        while state.stage < EnterpriseMigrationStage::Enforced {
-            let next_stage = state.stage.next().test_expect("next migration stage");
-            let generation = next_stage.generation();
-            let promotion = EnterpriseMigrationTransitionBody::promotion(
-                &state,
-                production_broker_migration_posture_digest(
-                    &deployment_id,
-                    &credential_provider,
-                    control,
-                    next_stage,
-                )
-                .test_expect("promoted migration posture"),
-                Digest32::new([seed.saturating_add(generation as u8 * 3); 32]),
-                Digest32::new([seed.saturating_add(generation as u8 * 3 + 1); 32]),
-                Digest32::new([seed.saturating_add(generation as u8 * 3 + 2); 32]),
-                generation + 1,
-                signer.public_key().to_hex(),
-            )
-            .test_expect("migration promotion");
-            let promotion = sign_enterprise_migration_transition(promotion, &signer)
-                .test_expect("sign migration promotion");
-            let _ = store
-                .compare_and_promote(&promotion)
-                .test_expect("promote migration state");
-            state = store
-                .load(&key)
-                .test_expect("load promoted migration state")
-                .test_expect("promoted migration state exists");
-        }
-        minimum_heads.push(state.minimum_head());
+            .test_expect("load migration registration")
+            .test_expect("migration registration exists");
+        heads.push(state.head());
     }
-    minimum_heads.sort_unstable();
+    heads.sort_unstable();
     drop(store);
     fs::set_permissions(&state_database_path, fs::Permissions::from_mode(0o600))
         .test_expect("harden migration ledger");
@@ -116,8 +82,6 @@ pub fn enforced_broker_migration(
         deployment_id,
         credential_provider,
         trusted_transition_signers: vec![signer.public_key()],
-        minimum_heads,
-        credential_custody_stage: EnterpriseMigrationStage::Enforced,
-        quota_enforcement_stage: EnterpriseMigrationStage::Enforced,
+        heads,
     }
 }

@@ -157,7 +157,7 @@ def main():
         provision.extend(["--execution-supplementary-gid", gid])
     run("provision", provision)
     policy_report = json.loads((launch / "provision-report.json").read_text())
-    assert policy_report["securityMode"] == "enforced_cage", policy_report
+    assert policy_report["cageInitPath"] == str(helper), policy_report
     policy = output / "policy.yaml"
     policy.write_text("""kernel:
   max_capability_ttl: 3600

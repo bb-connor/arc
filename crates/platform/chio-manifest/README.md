@@ -1,6 +1,6 @@
 # chio-manifest
 
-Defines signed `chio.manifest.v2` tool discovery and admission. A tool
+Defines signed `chio.manifest.v1` tool discovery and admission. A tool
 manifest describes input/output schemas, behavioral annotations, pricing,
 provider-native tools, flow declarations, and host permissions.
 
