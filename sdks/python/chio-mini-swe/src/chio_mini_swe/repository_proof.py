@@ -216,7 +216,7 @@ def verify(workspace, *, binary, receipts_path, key_path, server_id, command_out
     outputs = json.loads(captured, object_pairs_hook=unique_object, parse_constant=reject_constant)
     receipts, verification = verified_receipts(binary, data, key)
     proof = {
-        "schema": "chio.repository.receipt-binding.v2",
+        "schema": "chio.repository.receipt-binding.v1",
         "server_id": server_id,
         "verification": verification,
         "transitions": bindings(workspace, receipts, server_id, outputs),

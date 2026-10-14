@@ -309,7 +309,7 @@ def native(directory, source, revision, image, binary, binary_digest, scenario):
         write(
             directory / "authorization.json",
             {
-                "schema": "chio.mini-swe.session-authorization.v2",
+                "schema": "chio.mini-swe.session-authorization.v1",
                 "servers": {
                     entry["id"]: {
                         key: entry[key]

@@ -68,7 +68,7 @@ def main():
         30,
         source_paths=SOURCE_PATHS,
     )
-    assert config["schema"] == "chio.repository.workspace.v3"
+    assert config["schema"] == "chio.repository.scoped-workspace.v1"
     initialization_seconds = time.monotonic() - started
     services = BrokerCampaign(
         binary, root, None, "repository-scope", workspace=root / "repository", repository_only=True

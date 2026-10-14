@@ -100,7 +100,7 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id, 
     )
     if (
         config["schema"]
-        not in ((SCOPED_SCHEMA,) if selected is not None else ("chio.repository.workspace.v2",))
+        not in ((SCOPED_SCHEMA,) if selected is not None else ("chio.repository.workspace.v1",))
         or config["source_commit"] != revision
     ):
         raise ValueError("Workspace configuration does not match the selected source commit")
@@ -235,7 +235,7 @@ def verify_export(bundle, *, binary, repository, revision, key_path, server_id, 
     matches(
         {**proof, "verification": verification_evidence(proof.get("verification"), len(receipts))},
         {
-            "schema": "chio.repository.receipt-binding.v2",
+            "schema": "chio.repository.receipt-binding.v1",
             "outputs": outputs,
             "server_id": server_id,
             "verification": verification_evidence(verification, len(receipts)),

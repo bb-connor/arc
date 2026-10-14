@@ -11,8 +11,8 @@ from chio_mini_swe.operator import private_directory
 from chio_mini_swe.provider_config import reject_constant, unique_object
 from chio_mini_swe.repository_archive import MAX_ARCHIVE, MAX_FILES, digest, entries
 
-STORAGE_SCHEMA = "chio.repository.workspace.v2"
-INDEX_SCHEMA = "chio.repository.snapshot.v2"
+STORAGE_SCHEMA = "chio.repository.workspace.v1"
+INDEX_SCHEMA = "chio.repository.snapshot-index.v1"
 MAX_STORAGE = 256 * 1024 * 1024
 MAX_COMMANDS = 128
 MAX_CHUNKS = 2 * MAX_FILES + 1

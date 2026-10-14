@@ -41,8 +41,8 @@ verify all segments before restoring the document. Long trajectories can still
 exhaust the host's cumulative byte or record quota and then stop; no history is
 discarded and storage reclamation is not implemented.
 
-The current `chio.mini-swe.v2` document retains original broker command-output
-envelopes alongside receipt references. Older checkpoint documents are rejected.
+The `chio.mini-swe.v1` document retains original broker command-output
+envelopes alongside receipt references. Any other checkpoint document is rejected.
 Snapshot references use `chio.process.json-snapshot.v1`; every restored segment
 is validated before the agent resumes.
 
