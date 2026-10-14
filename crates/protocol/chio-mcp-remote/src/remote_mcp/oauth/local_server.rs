@@ -26,11 +26,11 @@ struct SignedAccessTokenInput<'a> {
 fn reserve_capacity<T>(
     entries: &mut HashMap<String, T>,
     reading: chio_security_types::clock::ClockReading,
-    deadline: impl Fn(&T) -> &AuthorityDeadline,
+    deadline: impl Fn(&mut T) -> &mut AuthorityDeadline,
     exhausted: &str,
 ) -> Result<(), Response> {
     let mut expired = Vec::new();
-    for (id, entry) in entries.iter() {
+    for (id, entry) in entries.iter_mut() {
         match deadline(entry).remaining(reading) {
             Err(ClockError::Expired) => expired.push(id.clone()),
             Err(error) => return Err(clock::rejection(error)),
@@ -74,7 +74,7 @@ impl LocalAuthorizationServer {
         reserve_capacity(
             &mut consents,
             reading,
-            |consent| &consent.deadline,
+            |consent| &mut consent.deadline,
             "consent capacity exhausted",
         )?;
         consents.insert(
@@ -97,7 +97,7 @@ impl LocalAuthorizationServer {
             .map_err(|_| clock::rejection(ClockError::Unavailable))?;
         let reading = self.clock.read().map_err(clock::rejection)?;
         let pending = consents
-            .get(nonce)
+            .get_mut(nonce)
             .ok_or_else(|| consent_refusal("unknown or answered consent_nonce"))?;
         match pending.deadline.remaining(reading) {
             Ok(_) => {}
@@ -269,7 +269,7 @@ impl LocalAuthorizationServer {
         reserve_capacity(
             &mut codes,
             reading,
-            |grant| &grant.deadline,
+            |grant| &mut grant.deadline,
             "authorization grant capacity exhausted",
         )?;
         codes.insert(code.clone(), grant);
