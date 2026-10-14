@@ -1040,6 +1040,18 @@ unchanged, so an exact replay returns the identical receipt. A retry whose
 metadata differs from the retained commitment is a conflicting request and
 MUST be refused without a new receipt.
 
+Exactly one admitted key is attempt-scoped evidence rather than request
+identity: `native_launch`, the launch receipt (`receipt_id` and `receipt_sha256`,
+each 64 lowercase hex characters) of the native launch serving the presenting
+attempt. It is excluded from the `chio.tool-admission-request.v1` hash and from
+replay equality; a malformed value MUST be refused before admission, and a replay
+of an admission that retained one MUST present one. Receipts signed during a live
+evaluation name the presenting attempt's launch. Canonical refusals signed from
+the retained admission, including recovery refusals with no live caller, name the
+launch retained at admission. A dispatch performed by a later, relaunched attempt
+of a retained admission is therefore named by its admitting launch if recovery
+signs its terminal refusal; the dispatch commit does not yet record its launch.
+
 A caller that derives receipt metadata from the request MUST derive it from the
 request's attempt identity (`ToolCallRequest::attempt_identity`): the request
 with DPoP proofs, execution nonces, approval tokens and threshold proposals

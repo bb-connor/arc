@@ -891,6 +891,7 @@ impl ChioKernel {
                     trusted_now_unix_ms,
                 )
                 .map_err(durable_store_error)?;
+            let replayed = matches!(begun, AdmissionBeginResult::ExactReplay { .. });
             let operation = match begun {
                 AdmissionBeginResult::Created(operation) => operation,
                 AdmissionBeginResult::ExactReplay { operation, .. }
@@ -926,6 +927,26 @@ impl ChioKernel {
                         existing_operation_id.as_str()
                     )));
                 }
+            };
+            // A replay continues under the request retained at admission,
+            // including the launch evidence of the admitting attempt.
+            let retained_request = if replayed {
+                let (_, stored) = runtime
+                    .store
+                    .load_retained_tool_request(
+                        operation.binding().operation_id(),
+                        &runtime.fence,
+                        trusted_now_unix_ms,
+                    )
+                    .map_err(durable_store_error)?
+                    .ok_or_else(|| {
+                        KernelError::DurableAdmission(
+                            "replayed admission lost its retained request".into(),
+                        )
+                    })?;
+                Some(stored)
+            } else {
+                retained_request
             };
             if runtime
                 .store

@@ -183,6 +183,38 @@ fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option
         .find(|key| object.contains_key(*key))
 }
 
+/// Attempt-scoped launch evidence names exactly one launch receipt by its
+/// id and content digest.
+fn validate_attempt_launch_metadata(
+    metadata: Option<&serde_json::Value>,
+) -> Result<(), KernelError> {
+    let Some(launch) = metadata.and_then(|value| {
+        value.get(crate::admission_operation::ATTEMPT_SCOPED_RECEIPT_METADATA_KEY)
+    }) else {
+        return Ok(());
+    };
+    let digest = |field: &str| {
+        launch
+            .get(field)
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|value| {
+                value.len() == 64
+                    && value
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            })
+    };
+    if launch.as_object().is_none_or(|object| object.len() != 2)
+        || !digest("receipt_id")
+        || !digest("receipt_sha256")
+    {
+        return Err(KernelError::InvalidReceiptMetadata(
+            "native_launch must name one launch receipt id and sha256".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn validate_caller_receipt_metadata(
     metadata: Option<&serde_json::Value>,
 ) -> Result<(), KernelError> {
@@ -192,6 +224,7 @@ fn validate_caller_receipt_metadata(
         ));
     }
     crate::receipt_support::validate_caller_provenance_metadata(metadata)?;
+    validate_attempt_launch_metadata(metadata)?;
     let Some(key) = reserved_receipt_metadata_key(metadata) else {
         return Ok(());
     };

@@ -162,9 +162,11 @@ impl SqliteAdmissionOperationStore {
             } => {
                 let retained = load_retained_request_tx(&transaction, &operation)?;
                 if let Some(request) = request {
-                    if retained.as_ref().is_none_or(|retained| {
-                        retained.canonical_bytes() != request.canonical_bytes()
-                    }) {
+                    let matches = match retained.as_ref() {
+                        Some(retained) => retained.matches_replay(request)?,
+                        None => false,
+                    };
+                    if !matches {
                         return Err(invariant(
                             "original tool request replay is missing or changed",
                         ));

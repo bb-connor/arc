@@ -170,3 +170,128 @@ fn kernel_derived_metadata_keys_are_refused_before_admission() -> TestResult {
     }
     Ok(())
 }
+
+fn launched(id: char) -> serde_json::Value {
+    let mut metadata = admitted();
+    metadata[crate::admission_operation::ATTEMPT_SCOPED_RECEIPT_METADATA_KEY] = serde_json::json!({
+        "receipt_id": id.to_string().repeat(64),
+        "receipt_sha256": "d".repeat(64),
+    });
+    metadata
+}
+
+fn stored_receipt(
+    store: &TestAdmissionOperationStore,
+) -> Result<ChioReceipt, Box<dyn std::error::Error>> {
+    Ok(store
+        .state
+        .lock()
+        .map_err(|_| "state lock")?
+        .receipt
+        .clone()
+        .ok_or("canonical refusal receipt")?)
+}
+
+#[test]
+fn only_the_native_launch_is_attempt_scoped_admitted_metadata() {
+    assert_eq!(
+        crate::admission_operation::ATTEMPT_SCOPED_RECEIPT_METADATA_KEY,
+        "native_launch"
+    );
+}
+
+#[test]
+fn a_relaunched_caller_replays_the_admission_named_by_its_admitting_launch() -> TestResult {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("admitted-metadata-relaunch");
+    let admission = begin_admitted(&kernel, &request, &launched('a'))?;
+    drop(admission);
+    assert_eq!(kernel.reconcile_recoverable_admissions()?, 1);
+    let receipt = stored_receipt(&store)?;
+    assert!(receipt.verify_signature()?);
+    let metadata = receipt.metadata.as_ref().ok_or("receipt metadata")?;
+    assert_eq!(
+        metadata.get("native_launch"),
+        launched('a').get("native_launch"),
+        "a recovery refusal names the launch that admitted the call"
+    );
+    assert_eq!(metadata.get("chio_process"), admitted().get("chio_process"));
+
+    let receipts = kernel.receipt_log().len();
+    let replay = kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(launched('b')))?;
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert_eq!(canonical(&replay.receipt)?, canonical(&receipt)?);
+    assert_eq!(kernel.receipt_log().len(), receipts);
+
+    let missing = kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(admitted()));
+    assert!(
+        matches!(&missing, Err(KernelError::AdmissionRecovery(error))
+            if matches!(error.as_ref(), crate::admission_operation::AdmissionRecoveryError::Store(
+                crate::admission_operation::AdmissionOperationStoreError::Invariant(reason)
+            ) if reason == "original request is missing or changed")),
+        "{missing:?}"
+    );
+
+    let expected = format!(
+        "request id conflicts with retained operation {}",
+        store.operation().binding().operation_id().as_str()
+    );
+    for (field, value) in [
+        ("runtime_id", serde_json::json!("runtime-other")),
+        ("process_id", serde_json::json!("mallory")),
+        ("operation_key", serde_json::json!("operation-2")),
+        ("attempt", serde_json::json!(2)),
+        ("request_sha256", serde_json::json!("e".repeat(64))),
+    ] {
+        let mut changed = launched('b');
+        changed["chio_process"][field] = value;
+        let conflict = kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(changed));
+        assert!(
+            matches!(&conflict, Err(KernelError::DurableAdmission(reason)) if reason == &expected),
+            "{field}: {conflict:?}"
+        );
+    }
+    let mut routed = launched('b');
+    routed["route"] = serde_json::json!({"selectedRoute": "other"});
+    let conflict = kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(routed));
+    assert!(
+        matches!(&conflict, Err(KernelError::DurableAdmission(reason)) if reason == &expected),
+        "{conflict:?}"
+    );
+    assert_eq!(kernel.receipt_log().len(), receipts);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn malformed_native_launch_metadata_is_refused_before_admission() -> TestResult {
+    for launch in [
+        serde_json::json!("launch"),
+        serde_json::json!({"receipt_id": "a".repeat(64)}),
+        serde_json::json!({"receipt_id": "A".repeat(64), "receipt_sha256": "d".repeat(64)}),
+        serde_json::json!({"receipt_id": "a".repeat(63), "receipt_sha256": "d".repeat(64)}),
+        serde_json::json!({"receipt_id": "a".repeat(64), "receipt_sha256": "d".repeat(64), "extra": 1}),
+    ] {
+        let (kernel, request, store, invocations) =
+            durable_admission_fixture("admitted-metadata-malformed-launch");
+        let mut metadata = admitted();
+        metadata["native_launch"] = launch;
+        let error = kernel
+            .evaluate_tool_call_blocking_with_metadata(&request, Some(metadata))
+            .err()
+            .ok_or("malformed native launch was admitted")?;
+        assert!(
+            matches!(&error, KernelError::InvalidReceiptMetadata(reason)
+                if reason == "native_launch must name one launch receipt id and sha256"),
+            "{error:?}"
+        );
+        assert!(store
+            .state
+            .lock()
+            .map_err(|_| "state lock")?
+            .operation
+            .is_none());
+        assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    }
+    Ok(())
+}

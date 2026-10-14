@@ -32,6 +32,9 @@ and the security profile used for tenant and isolation attribution.
 The identity is `ToolCallRequest::attempt_identity`: DPoP proofs, execution
 nonces, approval tokens and threshold proposals are attempt-scoped, so a pending
 approval resumes under the same operation key with its collected approvals.
+The native launch receipt in a call's attribution is attempt-scoped evidence: a
+relaunched host re-presents the same call under its own launch, live receipts
+name that launch, and recovery refusals name the launch that admitted the call.
 It restores delegation ancestors before admitting work through the kernel.
 The retained kernel operation supplies replay and crash outcomes.
 A kernel-classified read-only call may receive a fresh attempt only when retry

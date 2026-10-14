@@ -67,11 +67,11 @@ impl TestAdmissionOperationStore {
         };
         Ok(match existing.classify_replay(operation) {
             AdmissionReplayClassification::Exact { terminal_replay } => {
-                if state
-                    .retained_request
-                    .as_ref()
-                    .is_none_or(|retained| retained.canonical_bytes() != request.canonical_bytes())
-                {
+                let matches = match state.retained_request.as_ref() {
+                    Some(retained) => retained.matches_replay(request)?,
+                    None => false,
+                };
+                if !matches {
                     return Err(AdmissionOperationStoreError::Invariant(
                         "original request is missing or changed".into(),
                     ));

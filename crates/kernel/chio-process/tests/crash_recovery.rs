@@ -84,6 +84,13 @@ impl ToolServerConnection for AppendServer {
     }
 }
 
+fn launch(id: char) -> Result<[(String, chio_process::ProcessLaunchReceipt); 1]> {
+    Ok([(
+        "tools".into(),
+        chio_process::ProcessLaunchReceipt::new(id.to_string().repeat(64), "d".repeat(64))?,
+    )])
+}
+
 fn phase(dir: &std::path::Path, phase: &str) -> Result<std::process::ExitStatus> {
     Ok(Command::new(std::env::current_exe()?)
         .args(["--exact", "subprocess_worker", "--nocapture"])
@@ -268,6 +275,13 @@ async fn subprocess_worker() -> Result {
         phase.ends_with("artifact-supplemental"),
     )?;
     let runtime = ProcessRuntime::open(dir.join("process.db"), kernel.clone())?;
+    // The recovering host relaunches its tools: the same logical call is
+    // re-presented with a different native launch receipt.
+    let runtime = match phase.as_str() {
+        "crash-in-tool" => runtime.with_launch_receipts(launch('a')?)?,
+        "recover-unknown" => runtime.with_launch_receipts(launch('b')?)?,
+        _ => runtime,
+    };
     if phase.contains("-artifact-") {
         let first = phase.starts_with("crash-");
         let request_path = dir.join("original-request.json");
@@ -565,6 +579,11 @@ async fn subprocess_worker() -> Result {
         assert_eq!(process["process_id"], json!("root"));
         assert_eq!(process["operation_key"], json!("publish"));
         assert_eq!(process["attempt"], json!(1));
+        assert_eq!(
+            metadata["native_launch"],
+            serde_json::to_value(&launch('a')?[0].1)?,
+            "a recovery refusal names the launch that admitted the call"
+        );
         let replay = runtime.invoke("root", "publish", &request).await?;
         assert_eq!(
             serde_json::to_value(&replay.receipt)?,

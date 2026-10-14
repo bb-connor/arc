@@ -16,6 +16,21 @@ use crate::ToolCallRequest;
 /// Caller-supplied receipt metadata admitted with the original request.
 pub type AdmittedReceiptMetadata = serde_json::Map<String, serde_json::Value>;
 
+/// The one admitted metadata key that is evidence of the presenting attempt
+/// rather than request identity: the native launch serving the call. It is
+/// excluded from the immutable request hash and from replay equality; every
+/// other admitted key stays bound.
+pub const ATTEMPT_SCOPED_RECEIPT_METADATA_KEY: &str = "native_launch";
+
+/// Admitted metadata without its attempt-scoped evidence.
+fn identity_receipt_metadata(
+    metadata: Option<&AdmittedReceiptMetadata>,
+) -> Option<AdmittedReceiptMetadata> {
+    let mut identity = metadata?.clone();
+    identity.remove(ATTEMPT_SCOPED_RECEIPT_METADATA_KEY);
+    (!identity.is_empty()).then_some(identity)
+}
+
 const SCHEMA: &str = "chio.retained-tool-admission-request.v1";
 const MAX_BYTES: usize = 262_144;
 
@@ -107,6 +122,7 @@ pub(crate) fn immutable_tool_request_hash(
     frozen_receipt_signing_identity
         .validate()
         .map_err(|_| invalid("retained request receipt signing identity is invalid"))?;
+    let identity_metadata = identity_receipt_metadata(admitted_receipt_metadata);
     let immutable = ImmutableToolAdmissionRequest {
         schema: "chio.tool-admission-request.v1",
         server_id: &request.server_id,
@@ -127,7 +143,7 @@ pub(crate) fn immutable_tool_request_hash(
         security_binding,
         authority_profile,
         frozen_receipt_signing_identity,
-        admitted_receipt_metadata,
+        admitted_receipt_metadata: identity_metadata.as_ref(),
     };
     let bytes = canonical_json_bytes(&immutable).map_err(invalid)?;
     AdmissionDigest::try_new("immutable_request_hash", sha256_hex(&bytes)).map_err(Into::into)
@@ -248,6 +264,33 @@ impl RetainedToolAdmissionRequestV1 {
     #[must_use]
     pub fn canonical_bytes(&self) -> &[u8] {
         &self.canonical
+    }
+
+    /// Whether `candidate` re-presents this admission. Equality covers every
+    /// retained field; attempt-scoped launch evidence may differ, but a launch
+    /// retained at admission must be presented again.
+    pub fn matches_replay(&self, candidate: &Self) -> Result<bool, AdmissionOperationStoreError> {
+        if self.canonical == candidate.canonical {
+            return Ok(true);
+        }
+        let launch = |request: &Self| {
+            request
+                .wire
+                .admitted_receipt_metadata
+                .as_ref()
+                .is_some_and(|metadata| metadata.contains_key(ATTEMPT_SCOPED_RECEIPT_METADATA_KEY))
+        };
+        if launch(self) != launch(candidate) {
+            return Ok(false);
+        }
+        Ok(self.identity_bytes()? == candidate.identity_bytes()?)
+    }
+
+    fn identity_bytes(&self) -> Result<Vec<u8>, AdmissionOperationStoreError> {
+        let mut identity = (*self.wire).clone();
+        identity.admitted_receipt_metadata =
+            identity_receipt_metadata(self.wire.admitted_receipt_metadata.as_ref());
+        canonical_json_bytes(&identity).map_err(invalid)
     }
 
     /// Historical binding from retained bytes, not a current host context.
