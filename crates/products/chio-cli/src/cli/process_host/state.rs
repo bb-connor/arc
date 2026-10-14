@@ -131,18 +131,12 @@ pub(super) struct Record {
     pub source_policy_hash: String,
     pub runtime_policy_hash: String,
     pub manifests: Vec<ToolManifest>,
-    /// The process ABI this host was initialized under. Hosts initialized
-    /// before the field was recorded were written under the first ABI.
-    #[serde(default = "first_abi")]
+    /// The process ABI this host was initialized under.
     pub abi: String,
     /// The build that initialized the host, for diagnostics only; the ABI is
     /// the compatibility contract.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub written_by: Option<String>,
-}
-
-pub(super) fn first_abi() -> String {
-    "chio.process.abi.v1".to_owned()
 }
 
 /// The build writing host state, recorded for diagnostics.
@@ -181,11 +175,11 @@ pub(super) fn read_current_record(path: &Path) -> Result<Record, CliError> {
     let value: serde_json::Value = read_json(path)?;
     let abi = match value.get("abi") {
         Some(serde_json::Value::String(abi)) => abi.clone(),
-        None => first_abi(),
+        None => return Err(error("host state lacks its process ABI")),
         Some(_) => return Err(error("host ABI must be a string")),
     };
-    // Check the version before decoding manifest or configuration fields that
-    // changed between ABIs. Legacy state cannot be silently upgraded on open.
+    // Check the ABI before decoding manifest or configuration fields, so state
+    // written under another ABI is refused rather than partially decoded.
     require_abi(&abi, "host state")?;
     crate::input::project(value)
 }
@@ -749,7 +743,47 @@ mod tests {
     use chio_core_types::crypto::Keypair;
     use serde_json::{json, Value};
 
-    use super::{Config, Server, SCHEMA};
+    use super::{read_current_record, Config, Server, SCHEMA};
+
+    #[test]
+    fn host_state_without_process_abi_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("host.json");
+        std::fs::write(&path, serde_json::to_vec(&json!({"config": {}}))?)?;
+        let error = match read_current_record(&path) {
+            Ok(_) => return Err("host state without an ABI was read".into()),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error.to_string(),
+            super::error("host state lacks its process ABI").to_string()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn host_state_under_another_process_abi_is_refused() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("host.json");
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&json!({"abi": "chio.process.abi.v1", "config": {}}))?,
+        )?;
+        let error = match read_current_record(&path) {
+            Ok(_) => return Err("host state under another ABI was read".into()),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error.to_string(),
+            super::error(format!(
+                "host state was recorded under process ABI chio.process.abi.v1; this build speaks {}",
+                chio_process::PROCESS_ABI
+            ))
+            .to_string()
+        );
+        Ok(())
+    }
 
     fn server_fixture() -> Value {
         json!({

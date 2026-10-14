@@ -8,7 +8,7 @@ use std::path::Path;
 use chio_control_plane::{prepare_private_directory, PreparedPrivateDirectory};
 use serde::{Deserialize, Serialize};
 
-use super::state::{error, first_abi, identifier, MAX_CONFIG_BYTES, SCHEMA};
+use super::state::{error, identifier, MAX_CONFIG_BYTES, SCHEMA};
 use crate::CliError;
 
 pub(super) const STATUS_FILE: &str = "run-status.json";
@@ -54,7 +54,6 @@ pub(super) struct WorkerStatus {
 #[derive(Deserialize)]
 struct RecordHeader {
     config: ConfigHeader,
-    #[serde(default = "first_abi")]
     abi: String,
     #[serde(default)]
     written_by: Option<String>,

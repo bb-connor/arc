@@ -41,7 +41,6 @@ enum SidecarPolicy {
 #[serde(deny_unknown_fields)]
 struct Manifest {
     schema: String,
-    #[serde(default = "super::state::first_abi")]
     abi: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     written_by: Option<String>,
