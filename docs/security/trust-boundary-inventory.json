@@ -2362,7 +2362,6 @@
     "crates/protocol/chio-a2a-adapter/src/invoke.rs::subscribe_task_jsonrpc::from_value",
     "crates/protocol/chio-a2a-adapter/src/mapping.rs::parse_tool_input::from_value",
     "crates/protocol/chio-a2a-edge/src/bridge.rs::extract_capability_ref::from_value",
-    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::parse_jsonrpc_send_message_params::from_value",
     "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs::respond_to_upstream_nested_flow::from_value",
     "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs::parse_requested_task::from_value",
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::call_tool_with_params::from_value",
@@ -4860,7 +4859,6 @@
     "crates/protocol/chio-a2a-adapter/src/invoke.rs::subscribe_task_jsonrpc::from_value": "SSE Values become typed A2A envelopes only after the bounded duplicate-aware transport reader. Protocol version, error precedence, task binding and kernel admission remain separate required checks.",
     "crates/protocol/chio-a2a-adapter/src/mapping.rs::parse_tool_input::from_value": "Tool arguments are already decoded untrusted Values projected into explicit A2A operation shapes. Caller capabilities remain the kernel responsibility; the projected invocation is not a proof.",
     "crates/protocol/chio-a2a-edge/src/bridge.rs::extract_capability_ref::from_value": "Capability-ref DTO conversion preserves parser causes. The kernel validates capability, peer and execution bindings before dispatch; projection alone establishes no authority.",
-    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::parse_jsonrpc_send_message_params::from_value": "Envelope and SendMessage conversions operate on Values already admitted by the bounded original-byte JSON-RPC reader. Conversion errors retain typed JSON causes, and parameters never mint authority.",
     "crates/protocol/chio-mcp-adapter/src/transport/handlers.rs::respond_to_upstream_nested_flow::from_value": "Sampling requests are shape conversions of bounded duplicate-checked frames. NestedFlowBridge performs the authenticated flow decision, and deferred tasks retain finite local deadlines and bounded capacity.",
     "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs::parse_requested_task::from_value": "Requested task metadata is untrusted, bounded to a finite TTL, and cannot authorize the bridge. Local private task state binds the actual owner request and operation; expiry and clock faults refuse before dispatch.",
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc::call_tool_with_params::from_value": "Tool, prompt, resource and completion replies are shape conversions after the bounded peer frame reader. Signed manifest validation and private launch evidence independently authorize subprocess exposure. These wire values are not proof results.",
@@ -6235,8 +6233,10 @@
     "crates/protocol/chio-a2a-edge/src/bridge.rs": [
       "extract_capability_ref::from_value"
     ],
-    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs": [
-      "parse_jsonrpc_send_message_params::from_value"
+    "crates/protocol/chio-a2a-edge/src/v1.rs": [
+      "handle_v1_send::from_value",
+      "handle_v1_task::from_value",
+      "v1_project_response::from_value"
     ],
     "crates/protocol/chio-acp-edge/src/bridge.rs": [
       "extract_capability_ref::from_value"
@@ -9680,12 +9680,32 @@
         }
       ]
     },
-    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs": {
+    "crates/protocol/chio-a2a-edge/src/v1.rs": {
       "kind": "reviewed-protocol-reader",
-      "contract": "Envelope and SendMessage conversions operate on Values already admitted by the bounded original-byte JSON-RPC reader. Conversion errors retain typed JSON causes, and parameters never mint authority.",
+      "contract": "A2A v1.0.0 SendMessage, GetTask and CancelTask parameters convert Values already admitted by the bounded original-byte JSON-RPC reader into closed deny-unknown-fields DTOs. Decode failures keep their typed cause locally and emit only its code. Task projection decodes the edge's own task response. Parameters and message metadata never mint authority.",
       "readers": [
         {
-          "reader": "parse_jsonrpc_send_message_params",
+          "reader": "handle_v1_send",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        },
+        {
+          "reader": "handle_v1_task",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        },
+        {
+          "reader": "v1_project_response",
           "decoders": [
             "from_value"
           ],
