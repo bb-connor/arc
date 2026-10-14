@@ -1,5 +1,5 @@
 //! The production A2A client discovers and calls the production kernel-backed edge.
-//! Loopback HTTP with a test credential resolver; no independent-company claim.
+//! Loopback HTTP with a test credential resolver.
 use chio_a2a_adapter::{A2aAdapter, A2aAdapterConfig};
 use chio_a2a_edge::{A2aEdgeConfig, A2aKernelExecutionContext, ChioA2aEdge};
 use chio_core::capability::{
