@@ -7,7 +7,7 @@ use chio_core_types::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     kinds::TrustLevel,
 };
-use chio_federation::bilateral::{co_sign_with_origin_full, InProcessCoSigner};
+use chio_federation::bilateral::{co_sign_with_origin, InProcessCoSigner};
 
 const ORG_A_KERNEL_ID: &str = "kernel.c4-org-a";
 const ORG_B_KERNEL_ID: &str = "kernel.c4-org-b";
@@ -45,7 +45,7 @@ fn write_artifact_fixture(dir: &std::path::Path) -> std::path::PathBuf {
     let kp_b = Keypair::generate();
     let receipt = sample_receipt(&kp_b);
     let cosigner = InProcessCoSigner::new(ORG_A_KERNEL_ID, kp_a.clone(), kp_b.public_key());
-    let envelope = co_sign_with_origin_full(
+    let envelope = co_sign_with_origin(
         ORG_A_KERNEL_ID,
         &kp_a.public_key(),
         ORG_B_KERNEL_ID,

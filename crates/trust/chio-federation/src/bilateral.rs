@@ -248,7 +248,7 @@ impl BilateralCoSigningProtocol for InProcessCoSigner {
 /// predicate extensions when the artifact must be accepted by the canonical
 /// verifier.
 #[allow(clippy::too_many_arguments)]
-pub fn co_sign_with_origin_full(
+pub fn co_sign_with_origin(
     origin_kernel_id: &str,
     origin_public_key: &PublicKey,
     tool_host_kernel_id: &str,

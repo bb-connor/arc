@@ -362,38 +362,29 @@ impl ChioKernel {
                 "terminal refusal federation artifact cache is unavailable".into(),
             )
         };
-        let mut dual = self
-            .federation_dual_receipts
-            .lock()
-            .map_err(|_| unavailable())?
-            .get(&receipt.id, now)
-            .cloned();
         let mut dsse = self
             .federation_dsse_envelopes
             .lock()
             .map_err(|_| unavailable())?
             .get(&receipt.id, now)
             .cloned();
-        if let Some(store) = self.federation_artifact_store.as_ref() {
-            if dual.is_none() {
-                dual = store.get_dual_signed(&receipt.id)?;
-            }
-            if dsse.is_none() {
+        if dsse.is_none() {
+            if let Some(store) = self.federation_artifact_store.as_ref() {
                 dsse = store.get_dsse(&receipt.id)?;
             }
         }
-        if let Some(dual) = dual.as_ref() {
-            let canonical = |value: &ChioReceipt| {
-                canonical_json_bytes(value)
-                    .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))
-            };
-            if canonical(&dual.body)? != canonical(receipt)? {
-                return Err(KernelError::Internal(
-                    "terminal refusal federation artifact conflicts with its receipt".into(),
-                ));
-            }
+        let Some(dsse) = dsse else {
+            return Ok(false);
+        };
+        let attests = dsse
+            .attests_receipt(receipt)
+            .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?;
+        if !attests {
+            return Err(KernelError::Internal(
+                "terminal refusal federation artifact conflicts with its receipt".into(),
+            ));
         }
-        Ok(dual.is_some() && dsse.is_some())
+        Ok(true)
     }
 
     pub(super) fn replay_durable_refusal(

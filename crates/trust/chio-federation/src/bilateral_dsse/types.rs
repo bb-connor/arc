@@ -360,4 +360,15 @@ impl DsseEnvelope {
                 })?;
         Ok((statement, bytes))
     }
+
+    /// Whether the envelope's single Statement subject names `receipt` and
+    /// carries the SHA-256 of its canonical body. Signatures are not checked.
+    pub fn attests_receipt(&self, receipt: &ChioReceipt) -> Result<bool, BilateralCoSigningError> {
+        let (statement, _) = self.decode_statement()?;
+        let [subject] = statement.subject.as_slice() else {
+            return Ok(false);
+        };
+        Ok(subject.name == super::receipt_subject_name(&receipt.id)
+            && subject.digest.sha256 == super::verify::receipt_body_digest_hex(receipt)?)
+    }
 }

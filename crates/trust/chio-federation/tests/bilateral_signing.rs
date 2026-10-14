@@ -13,7 +13,7 @@ use chio_core_types::receipt::{
     kinds::TrustLevel,
 };
 use chio_federation::{
-    bilateral::co_sign_with_origin_full, bilateral::BilateralCoSigningError,
+    bilateral::co_sign_with_origin, bilateral::BilateralCoSigningError,
     bilateral::InProcessCoSigner, bilateral_dsse::receipt_subject_name,
     bilateral_dsse::verify_dsse_envelope,
 };
@@ -67,7 +67,7 @@ fn origin_cosigns_dsse_envelope_verifiable_by_both_orgs() {
         tool_host_kp.public_key(),
     );
 
-    let envelope = co_sign_with_origin_full(
+    let envelope = co_sign_with_origin(
         ORIGIN_KERNEL_ID,
         &origin_kp.public_key(),
         TOOL_HOST_KERNEL_ID,
@@ -86,6 +86,11 @@ fn origin_cosigns_dsse_envelope_verifiable_by_both_orgs() {
     )
     .unwrap();
     assert_eq!(statement.subject[0].name, receipt_subject_name(&receipt.id));
+    assert!(envelope.attests_receipt(&receipt).unwrap());
+    let mut other = receipt.body();
+    other.id = "rcpt-fed-other".to_string();
+    let other = ChioReceipt::sign(other, &tool_host_kp).unwrap();
+    assert!(!envelope.attests_receipt(&other).unwrap());
     assert_eq!(
         statement.predicate.tool_server_a.kernel_id,
         ORIGIN_KERNEL_ID
@@ -110,7 +115,7 @@ fn cosigner_rejects_forged_org_b_signature() {
         tool_host_kp.public_key(),
     );
 
-    let err = co_sign_with_origin_full(
+    let err = co_sign_with_origin(
         ORIGIN_KERNEL_ID,
         &origin_kp.public_key(),
         TOOL_HOST_KERNEL_ID,
@@ -134,7 +139,7 @@ fn cosigner_rejects_unknown_origin_kernel_id() {
         tool_host_kp.public_key(),
     );
 
-    let err = co_sign_with_origin_full(
+    let err = co_sign_with_origin(
         "kernel.org-c",
         &origin_kp.public_key(),
         TOOL_HOST_KERNEL_ID,
@@ -162,7 +167,7 @@ fn origin_signature_under_unpinned_key_is_rejected() {
         tool_host_kp.public_key(),
     );
 
-    let err = co_sign_with_origin_full(
+    let err = co_sign_with_origin(
         ORIGIN_KERNEL_ID,
         &pinned_origin_kp.public_key(),
         TOOL_HOST_KERNEL_ID,

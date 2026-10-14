@@ -786,7 +786,7 @@ fn federation_emits_chio_federation_hop_total_and_latency() -> Result<(), Box<dy
         chio_federation::metrics::federation_hop_total(chio_federation::metrics::HOP_RESULT_OK);
     let before_latency = chio_federation::metrics::federation_hop_latency_count();
 
-    let envelope = chio_federation::bilateral::co_sign_with_origin_full(
+    let envelope = chio_federation::bilateral::co_sign_with_origin(
         "origin-kernel",
         &origin.public_key(),
         "tool-host-kernel",
@@ -1479,7 +1479,7 @@ fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {
             tool_host.public_key(),
         );
         let receipt = sample_receipt(&tool_host)?;
-        let _ = chio_federation::bilateral::co_sign_with_origin_full(
+        let _ = chio_federation::bilateral::co_sign_with_origin(
             "origin-kernel",
             &origin.public_key(),
             "tool-host-kernel",

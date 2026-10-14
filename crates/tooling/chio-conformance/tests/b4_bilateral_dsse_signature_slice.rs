@@ -12,7 +12,7 @@
 //! 2. **Tampered payload bytes are rejected** (changes LEN(payload) and the
 //!    payload bytes; PAE preimage diverges).
 //! 3. **Mismatched payloadType is rejected** (payload-type is part of PAE).
-//! 4. **The cosigner-routed emitter (`co_sign_with_origin_full`) produces
+//! 4. **The cosigner-routed emitter (`co_sign_with_origin`) produces
 //!    an envelope that verifies** under the signature-slice verifier.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -25,7 +25,7 @@ use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     kinds::TrustLevel,
 };
-use chio_federation::bilateral::{co_sign_with_origin_full, InProcessCoSigner};
+use chio_federation::bilateral::{co_sign_with_origin, InProcessCoSigner};
 use chio_federation::bilateral_dsse::{
     pae, receipt_subject_name, sign_dsse_envelope, verify_dsse_envelope, DsseEnvelope, Keyid,
     PAYLOAD_TYPE_IN_TOTO, PREDICATE_BODY_SCHEMA, PREDICATE_TYPE_BILATERAL,
@@ -338,7 +338,7 @@ fn cosigner_routed_emitter_produces_verifying_envelope() {
 
     let cosigner = InProcessCoSigner::new(ORG_A_KERNEL_ID, kp_a.clone(), kp_b.public_key());
 
-    let envelope = co_sign_with_origin_full(
+    let envelope = co_sign_with_origin(
         ORG_A_KERNEL_ID,
         &kp_a.public_key(),
         ORG_B_KERNEL_ID,
