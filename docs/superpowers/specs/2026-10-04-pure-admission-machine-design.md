@@ -736,7 +736,7 @@ pub enum IdentityDisposition {
     - Every refused check-only read is `Reusable`, independently of its reason-specific retry advice. It leaves no operation row, tombstone, custody or executed effect to burn the replay key. `retry: Never` tells a client not to automatically repeat the currently refused call; if an independently authorized policy change later permits a deliberate retry, the same id is freshly evaluated and may succeed. An adapter leaves its sealed submission unbound on that reusable receipt under spec 6 rule 10. No terminal-replay promise is made for a stateless read.
     - Spec 3's per-request predicates count only `Terminal` receipts (spec 3 section 4.11).
     - Spec 6 rule 10 binds a sealed submission only on a `Terminal` disposition, or on an allow or terminal outcome. On `Reusable` it lowers the deny and leaves the record sealed. On `Retained` it lowers an unresolved-status deny and also leaves the record sealed, so the later recovery terminal receipt binds normally.
-    - **Kernel-reserved metadata keys.** Two receipt-metadata keys are written only by the kernel. Caller-supplied metadata that carries either is rejected before evaluation through the existing `reject_reserved_receipt_metadata` path:
+    - **Kernel-reserved metadata keys.** Two receipt-metadata keys are written only by the kernel. Caller-supplied metadata that carries either is rejected before evaluation through the existing `validate_caller_receipt_metadata` path:
       - `receipt_context`, which gains a kernel-written `receipt_context.request_namespace_digest`. The kernel derives it from the authenticated evaluation context, exactly as `AuthenticatedRequestNamespace::bind` derives the replay-key namespace (M: `admission_operation/identity.rs:154`). Spec 6 R-6-05 compares it.
       - `chio_runtime`, including `chio_runtime.identity_disposition`, `chio_runtime.original_signer` (M11b), `chio_runtime.stop` (spec 8) and `chio_runtime.crossing` (spec 10).
 
@@ -868,7 +868,7 @@ pub struct EvaluationContext<'a> {
 The blocking mapping is pinned in phase 4 from the six blocking methods on M:. There is no blocking `metadata_and_security_context` form.
 
 **Metadata validation per source:**
-- Non-manifest sources run `reject_reserved_receipt_metadata` (M: `evaluation_entry.rs:118`, `:154`; `sync_evaluation_wrapper.rs:46`).
+- Non-manifest sources run `validate_caller_receipt_metadata` (M: `evaluation_entry.rs:118`, `:154`; `sync_evaluation_wrapper.rs:46`).
 - Manifest sources run `registry_validated_manifest_security_metadata` instead.
 
 **Combination validity.** Combinations with no legacy equivalent are refused at construction with `KernelError::InvalidEvaluationContext`. That covers caller dispositions with `Nested`, and `AuthenticatedSession` without `manifest`.

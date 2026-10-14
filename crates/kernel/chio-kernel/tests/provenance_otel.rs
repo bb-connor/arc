@@ -198,8 +198,9 @@ fn receipt_rejects_all_zero_otel_ids() -> Result<(), Box<dyn Error>> {
     };
 
     assert!(
-        error.to_string().contains("trace_id"),
-        "unexpected error: {error}"
+        matches!(&error, chio_kernel::KernelError::InvalidReceiptMetadata(reason)
+            if reason == "receipt provenance metadata trace_id must be 32 non-zero lowercase hex chars, got \"00000000000000000000000000000000\""),
+        "unexpected error: {error:?}"
     );
     assert_eq!(kernel.receipt_log().len(), 0);
 
@@ -233,8 +234,9 @@ fn receipt_rejects_null_supply_chain() -> Result<(), Box<dyn Error>> {
     };
 
     assert!(
-        error.to_string().contains("supply_chain"),
-        "unexpected error: {error}"
+        matches!(&error, chio_kernel::KernelError::InvalidReceiptMetadata(reason)
+            if reason == "receipt provenance metadata supply_chain must be an object"),
+        "unexpected error: {error:?}"
     );
     assert_eq!(kernel.receipt_log().len(), 0);
 
@@ -267,8 +269,9 @@ fn receipt_rejects_non_w3c_otel_trace_id() -> Result<(), Box<dyn Error>> {
     };
 
     assert!(
-        error.to_string().contains("trace_id"),
-        "unexpected error: {error}"
+        matches!(&error, chio_kernel::KernelError::InvalidReceiptMetadata(reason)
+            if reason == "receipt provenance metadata trace_id must be 32 non-zero lowercase hex chars, got \"0123456789ABCDEF0123456789ABCDEF\""),
+        "unexpected error: {error:?}"
     );
     assert_eq!(kernel.receipt_log().len(), 0);
 

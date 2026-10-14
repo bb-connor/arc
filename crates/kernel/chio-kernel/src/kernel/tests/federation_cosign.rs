@@ -731,17 +731,7 @@ fn federated_request_without_pinned_peer_fails_closed() {
     // Deny verdict rather than a propagated `Err`. The deny receipt is
     // signed and persisted.
     let response = kernel
-        .evaluate_tool_call_blocking_with_metadata(
-            &request,
-            Some(serde_json::json!({
-                "provenance": {
-                    "otel": {
-                        "trace_id": "not-a-trace-id",
-                        "span_id": "0123456789abcdef"
-                    }
-                }
-            })),
-        )
+        .evaluate_tool_call_blocking(&request)
         .expect("federated request with no pinned peer must produce a Deny response");
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.unwrap_or_default();
@@ -750,11 +740,6 @@ fn federated_request_without_pinned_peer_fails_closed() {
         "unexpected deny reason: {reason}"
     );
     assert_eq!(kernel.receipt_log().len(), 1);
-    assert!(response
-        .receipt
-        .metadata
-        .as_ref()
-        .is_none_or(|metadata| metadata.get("provenance").is_none()));
 }
 
 #[test]

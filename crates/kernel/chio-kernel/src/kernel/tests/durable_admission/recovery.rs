@@ -25,12 +25,20 @@ fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
     assert_eq!(replay.output, response.output);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 
+    let operation = store.operation();
+    let receipts = kernel.receipt_log().len();
     let mut conflict = request.clone();
     conflict.arguments = serde_json::json!({"record": "ledger-7", "value": "reopened"});
     let conflict = kernel
         .evaluate_tool_call_blocking(&conflict)
-        .expect("conflicting replay denial");
-    assert_eq!(conflict.verdict, Verdict::Deny);
+        .expect_err("conflicting replay must not mint another receipt");
+    assert!(
+        matches!(conflict, KernelError::DurableAdmission(ref reason)
+        if reason.contains("conflicts with retained operation")),
+        "{conflict:?}"
+    );
+    assert_eq!(store.operation(), operation);
+    assert_eq!(kernel.receipt_log().len(), receipts);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 
@@ -181,20 +189,19 @@ fn failed_tool_return_persistence_terminalizes_unknown_and_blocks_redispatch() {
         durable_admission_fixture("durable-return-write-failure");
     store.fail_next_outcome_write();
 
-    let denied = kernel
+    let response = kernel
         .evaluate_tool_call_blocking(&request)
-        .expect("unrecordable committed return yields a signed denial");
-    assert_eq!(denied.verdict, Verdict::Deny);
-    assert!(denied.output.is_none());
-    assert!(denied
-        .reason
-        .as_deref()
-        .is_some_and(|reason| { reason.contains("injected tool outcome write failure") }));
-    assert!(denied.receipt.verify_signature().expect("signed response"));
+        .expect("unrecordable return persists its original terminal refusal");
+    let expected = KernelError::AdmissionRecovery(Box::new(
+        crate::admission_operation::AdmissionRecoveryError::Outcome(
+            ToolOutcomeStoreError::Unavailable("injected tool outcome write failure".to_owned()),
+        ),
+    ));
     assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::OutcomeUnknownAfterDispatch
+        response.reason.as_deref(),
+        Some(expected.to_string().as_str())
     );
+    let retained = assert_original_unknown_incident(&store, &request);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     let usage = store
         .budget
@@ -211,21 +218,21 @@ fn failed_tool_return_persistence_terminalizes_unknown_and_blocks_redispatch() {
         .expect("outcome state")
         .raw_outcome
         .is_none());
-    let receipt_log = kernel.receipt_log();
-    assert_eq!(receipt_log.len(), 1);
-    let failure_receipt = receipt_log.get(0).expect("tool return failure receipt");
-    assert!(failure_receipt.is_denied());
-    assert!(failure_receipt.verify_signature().expect("signed receipt"));
+    assert_unknown_replay(Ok(response), &retained, &store);
+    assert_eq!(kernel.receipt_log().len(), 1);
 
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("retained dispatch must produce a denial");
-    assert_eq!(replay.verdict, Verdict::Deny);
-    assert!(replay
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("OutcomeUnknownAfterDispatch")));
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_blocking(&request),
+        &retained,
+        &store,
+    );
+    assert_eq!(kernel.receipt_log().len(), 1);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        store.operation(),
+        retained,
+        "replay keeps the exact original incident"
+    );
 }
 
 #[test]

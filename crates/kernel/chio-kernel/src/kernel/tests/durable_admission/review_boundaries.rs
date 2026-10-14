@@ -363,8 +363,13 @@ fn pre_dispatch_compensation_refuses_when_kernel_and_runtime_clocks_both_fail() 
     assert!(!original.state().is_terminal());
 
     clock.down.store(true, Ordering::SeqCst);
-    let refused =
-        kernel.compensate_durable_admission_after_pre_dispatch_cleanup(Some(&original), None, None);
+    let refused = kernel.compensate_durable_admission_after_pre_dispatch_cleanup(
+        Some(&original),
+        None,
+        None,
+        None,
+        compensation_response(),
+    );
     assert!(
         matches!(
             refused,
@@ -379,7 +384,13 @@ fn pre_dispatch_compensation_refuses_when_kernel_and_runtime_clocks_both_fail() 
 
     // The operation stays on its recovery path once trusted time returns.
     clock.down.store(false, Ordering::SeqCst);
-    kernel.compensate_durable_admission_after_pre_dispatch_cleanup(Some(&original), None, None)?;
+    kernel.compensate_durable_admission_after_pre_dispatch_cleanup(
+        Some(&original),
+        None,
+        None,
+        None,
+        compensation_response(),
+    )?;
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::CompensatedBeforeDispatch

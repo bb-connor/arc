@@ -4650,9 +4650,9 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/products/
 first_seen = "1b9620751d"
 
 [[schema]]
-value = "chio.retained-tool-admission-request.v4"
+value = "chio.retained-tool-admission-request.v1"
 files = ["crates/kernel/chio-kernel/src/admission_operation/retained_request.rs"]
-first_seen = "7e54c14a60"
+first_seen = "28d826e3e6"
 
 [[schema]]
 value = "chio.risk.adjudication-jurisdiction-receipt.v1"

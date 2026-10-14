@@ -1602,6 +1602,12 @@ fn session_operation_read_resource_enforces_session_roots_for_filesystem_resourc
         .unwrap();
     kernel.activate_session(&session_id).unwrap();
     kernel
+        .set_session_auth_context(
+            &session_id,
+            oauth_auth_with_enterprise_tenant("resource-tenant"),
+        )
+        .unwrap();
+    kernel
         .replace_session_roots(
             &session_id,
             vec![RootDefinition {
@@ -1646,6 +1652,26 @@ fn session_operation_read_resource_enforces_session_roots_for_filesystem_resourc
     }
     .expect("expected signed resource read denial");
     assert!(receipt.verify_signature().unwrap());
+    let metadata = receipt.metadata.as_ref().unwrap();
+    assert_eq!(metadata["chio_runtime"]["identity_disposition"], "reusable");
+    assert_eq!(
+        metadata["receipt_context"]["request_id"],
+        denied_context.request_id.as_str()
+    );
+    let namespace =
+        crate::admission_operation::AuthenticatedRequestNamespace::from_authentication_context(
+            crate::admission_operation::AdmissionIdentifier::try_new(
+                "coordinator_authority_id",
+                format!("kernel:{}", kernel.config.keypair.public_key().to_hex()),
+            )
+            .unwrap(),
+            "resource-tenant",
+        )
+        .unwrap();
+    assert_eq!(
+        metadata["receipt_context"]["request_namespace_digest"],
+        namespace.digest().as_str()
+    );
     assert!(receipt.is_denied());
     assert_eq!(receipt.tool_name, "resources/read");
     assert_eq!(receipt.tool_server, "session");

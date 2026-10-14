@@ -30,15 +30,29 @@
     "m5_acceptance_complete": false
   },
   "current-native-budget": {
-    "runtime_source": "7ae740e8dab6fbc651b5076f0d0ca57601179ffd",
-    "runtime_binary_sha256": "b026b06f26165b2081d7b01544c19eca504afa03805920c57ea4c4fe120d528f",
+    "runtime_source": "412b823c451f97da5d435aabfa79a965796144fe",
+    "runtime_binary_sha256": "4b7d938a9103702b3ad7a38e58f171f8333db2fbacd07d8179e3fea073867afc",
     "cage_init_sha256": "f7ccbc443aff39be26cefda7982f0d4ca74a5cd9b855dc2939b1a070c15b3ed9",
     "probe_sha256": "8bdba2c6456b4c44cc2f8a214973444a8f8f63d1473c3b263571b95e76476e2b",
-    "runtime_id": "0a13fa22-c318-42b8-9953-d8cfae061d0c",
+    "runtime_id": "74f429a4-3852-443a-9366-ae94a9aa26d5",
     "campaign": "examples/reference-swarm/qualify-process-budget.py",
-    "sha256": "2d215939373e562b69ff8409f3ddcc64d8c4c3f80873d72fe3f99ce49429c1ed",
+    "sha256": "ae7a4e76f62828f196607f9f0602658ea1ce05ae7716aea1c6c0decfdd18c2a0",
     "private_keys_exported": false,
     "retrospective_observation": true,
-    "m5_acceptance_complete": false
+    "m5_acceptance_complete": false,
+    "capture": "cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement; CARGO_TARGET_DIR=<target>/static-pie cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement; docker build --platform linux/amd64 --build-arg BASE=python:3.11-slim@sha256:d1053354624536b044162aaab1e418bd000ea35184fb1ae098ab3166b1072e72 -f examples/reference-swarm/QualificationWorker.Dockerfile -t chio-process-qualification .; python3 examples/reference-swarm/qualify-process-budget.py --chio <chio> --cage-init <chio-cage-init> --probe <enforcement-probe> --worker-image <image id> --output <dir>/campaign --receipt-rollback-anchor-root <private directory under /dev/shm, held by an open session>; chio process attest-outcomes --state <dir>/campaign/state --plan <dir>/campaign/run-plan.json --out outcomes.json; fixture = outcomes.json; kernel.pub = <dir>/campaign/state/authority.db.kernel.pub; pins = runtime_id plus each server's launch_policy_signer"
+  },
+  "current-native-clean": {
+    "runtime_source": "412b823c451f97da5d435aabfa79a965796144fe",
+    "runtime_binary_sha256": "4b7d938a9103702b3ad7a38e58f171f8333db2fbacd07d8179e3fea073867afc",
+    "cage_init_sha256": "f7ccbc443aff39be26cefda7982f0d4ca74a5cd9b855dc2939b1a070c15b3ed9",
+    "probe_sha256": "8bdba2c6456b4c44cc2f8a214973444a8f8f63d1473c3b263571b95e76476e2b",
+    "runtime_id": "28688e84-f35f-4e8f-86d8-1d56228b2505",
+    "campaign": "examples/reference-swarm/qualify-process-clean-exit.py",
+    "sha256": "51488e4e80be7ec24bf0966cef804f84063e794ce528f25d554fb0e699fe68a6",
+    "private_keys_exported": false,
+    "retrospective_observation": true,
+    "m5_acceptance_complete": false,
+    "capture": "cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement; CARGO_TARGET_DIR=<target>/static-pie cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement; docker build --platform linux/amd64 --build-arg BASE=python:3.11-slim@sha256:d1053354624536b044162aaab1e418bd000ea35184fb1ae098ab3166b1072e72 -f examples/reference-swarm/QualificationWorker.Dockerfile -t chio-process-qualification .; python3 examples/reference-swarm/qualify-process-clean-exit.py --chio <chio> --cage-init <chio-cage-init> --probe <enforcement-probe> --worker-image <image id> --output <dir>/campaign --receipt-rollback-anchor-root <private directory under /dev/shm, held by an open session>; chio process attest-outcomes --state <dir>/campaign/state --plan <dir>/campaign/run-plan.json --out outcomes.json; fixture = outcomes.json; kernel.pub = <dir>/campaign/state/authority.db.kernel.pub; pins = runtime_id plus each server's launch_policy_signer"
   }
 }

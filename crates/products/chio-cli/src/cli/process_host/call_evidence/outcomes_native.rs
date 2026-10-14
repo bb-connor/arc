@@ -272,10 +272,11 @@ mod tests {
         super::super::verify_outcomes(&signed, &run, &key, runtime, &pins)?;
         let report = verify(&run, &pins)?;
         assert_eq!(report.len(), 4);
-        assert_eq!(report["alice"]["terminal_verified"], false);
-        assert_eq!(report["bob"]["terminal_verified"], true);
-        assert_eq!(report["carol"]["terminal_verified"], true);
-        assert_eq!(report["dave"]["terminal_verified"], false);
+        // Every attested response replays a receipt naming the original launch,
+        // which host death killed before any exit was recorded.
+        for worker in ["alice", "bob", "carol", "dave"] {
+            assert_eq!(report[worker]["terminal_verified"], false, "{worker}");
+        }
         assert!(verify(&run, &BTreeMap::new()).is_err());
         let mut extra_pin = pins.clone();
         extra_pin.insert("unused-server".into(), key.clone());
@@ -289,6 +290,16 @@ mod tests {
         let alice = report["alice"]["receipt_id"].as_str().ok_or("alice")?;
         let carol = report["carol"]["receipt_id"].as_str().ok_or("carol")?;
         let params = &signed.action.parameters;
+        // A genuine signed exit of another campaign's launch.
+        let foreign: Value = crate::input::text(include_str!(
+            "../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"
+        ))?;
+        let foreign_exit = foreign["action"]["parameters"]["confinement"]
+            .as_object()
+            .ok_or("foreign confinement")?
+            .values()
+            .find_map(|launch| (!launch["terminal"].is_null()).then(|| launch["terminal"].clone()))
+            .ok_or("foreign signed exit")?;
         let cases = [
             ("/confinement".to_owned(), json!({})),
             (
@@ -297,7 +308,7 @@ mod tests {
             ),
             (
                 format!("/confinement/{alice}/terminal"),
-                params["confinement"][carol]["terminal"].clone(),
+                foreign_exit.clone(),
             ),
             (
                 format!("/confinement/{carol}/terminal"),
@@ -326,17 +337,91 @@ mod tests {
             .insert("unreferenced".into(), run.confinement[alice].clone());
         assert!(verify(&changed, &pins).is_err());
 
-        // Withholding an exit can only reduce the reported claim to a start.
-        let mut changed: Outcomes = serde_json::from_value(params.clone())?;
-        changed
+        // An exit cannot be supplied for a launch that never recorded one.
+        let mut changed = params.clone();
+        *changed
+            .pointer_mut(&format!("/confinement/{carol}/terminal"))
+            .ok_or("carol terminal")? = foreign_exit;
+        let changed: Outcomes = serde_json::from_value(changed)?;
+        assert!(verify(&changed, &pins).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn clean_exit_outcome_verifies_its_actual_launch_exit() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let key = PublicKey::from_hex(
+            include_str!("../../../../tests/fixtures/process-worker-outcomes/current-native-clean-kernel.pub")
+                .trim(),
+        )?;
+        let signed = crate::receipt_verify::verify_original_receipt(
+            include_str!(
+                "../../../../tests/fixtures/process-worker-outcomes/current-native-clean.json"
+            ),
+            &key,
+        )?;
+        let selected: Value = crate::input::text(include_str!(
+            "../../../../tests/fixtures/process-worker-outcomes/current-native-clean-pins.json"
+        ))?;
+        let pins: BTreeMap<String, PublicKey> = selected["launch_policy_signers"]
+            .as_object()
+            .ok_or("pins")?
+            .iter()
+            .map(|(server, value)| {
+                Ok((
+                    server.clone(),
+                    PublicKey::from_hex(value.as_str().ok_or("key")?)?,
+                ))
+            })
+            .collect::<Result<_, Box<dyn std::error::Error>>>()?;
+        let runtime = selected["runtime_id"].as_str().ok_or("runtime")?;
+        let run: Outcomes = serde_json::from_value(signed.action.parameters.clone())?;
+        super::super::verify_outcomes(&signed, &run, &key, runtime, &pins)?;
+        let report = verify(&run, &pins)?;
+        assert_eq!(report.len(), 2);
+        assert_eq!(report["erin"]["terminal_verified"], true);
+        assert_eq!(report["frank"]["terminal_verified"], true);
+
+        let erin = report["erin"]["receipt_id"].as_str().ok_or("erin")?;
+        let frank = report["frank"]["receipt_id"].as_str().ok_or("frank")?;
+        let params = &signed.action.parameters;
+        let mut matching = params.clone();
+        *matching
+            .pointer_mut(&format!("/confinement/{erin}/terminal"))
+            .ok_or("erin terminal")? = params["confinement"][erin]["terminal"].clone();
+        let matching: Outcomes = serde_json::from_value(matching)?;
+        assert_eq!(verify(&matching, &pins)?["erin"]["terminal_verified"], true);
+
+        let foreign: Value = crate::input::text(include_str!(
+            "../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"
+        ))?;
+        let foreign_exit = foreign["action"]["parameters"]["confinement"]
+            .as_object()
+            .ok_or("foreign confinement")?
+            .values()
+            .find_map(|launch| (!launch["terminal"].is_null()).then(|| launch["terminal"].clone()))
+            .ok_or("foreign signed exit")?;
+        for substituted in [
+            foreign_exit,
+            params["confinement"][frank]["terminal"].clone(),
+        ] {
+            let mut changed = params.clone();
+            *changed
+                .pointer_mut(&format!("/confinement/{erin}/terminal"))
+                .ok_or("erin terminal")? = substituted;
+            let changed: Outcomes = serde_json::from_value(changed)?;
+            assert!(verify(&changed, &pins).is_err());
+        }
+
+        let mut withheld: Outcomes = serde_json::from_value(params.clone())?;
+        withheld
             .confinement
-            .get_mut(carol)
-            .ok_or("carol launch")?
+            .get_mut(erin)
+            .ok_or("erin launch")?
             .terminal = None;
-        assert_eq!(
-            verify(&changed, &pins)?["carol"]["terminal_verified"],
-            false
-        );
+        let withheld = verify(&withheld, &pins)?;
+        assert_eq!(withheld["erin"]["terminal_verified"], false);
+        assert_eq!(withheld["frank"]["terminal_verified"], true);
         Ok(())
     }
 }

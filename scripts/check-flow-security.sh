@@ -972,7 +972,7 @@ run_exact_target --label "dispatch rejection payment custody" --allow-filtered -
   kernel::tests::durable_admission::dispatch_commit_failure::security_rejection_after_payment_preserves_actual_credential_disposition \
   kernel::tests::durable_admission::dispatch_commit_failure::unconfirmed_dispatch_commit_retains_payment_quota_and_approval \
   kernel::tests::durable_admission::dispatch_commit_failure::unconfirmed_payment_authorization_receipt_names_the_attempted_durable_operation \
-  kernel::tests::durable_admission::dispatch_commit_failure::unconfirmed_payment_unwind_receipt_names_the_attempted_durable_operation \
+  kernel::tests::durable_admission::dispatch_commit_failure::unconfirmed_payment_unwind_preserves_the_attempted_durable_operation \
   -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::dispatch_commit_failure::
 
 run_exact_target --label "security runtime composition" --allow-filtered --expected \

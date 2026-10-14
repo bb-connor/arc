@@ -11,8 +11,6 @@ const RUNTIME_REPORT_EXPIRED_AT_MS: u64 = 60_001;
 const RUNTIME_EXPIRED: &str =
     "internal error: runtime pheromone policy revalidation failed: runtime_pheromone_advisory_stale";
 const RECONCILIATION_REQUIRED: &str = "security dispatch outcome requires reconciliation: security native dispatch capture callback failed; authoritative recovery required";
-const COMPENSATED_REPLAY: &str =
-    "durable admission failed: request replay is retained in state CompensatedBeforeDispatch";
 const UNCONFIRMED_REPLAY: &str =
     "durable admission failed: native preparation requires original pre-budget authority";
 
@@ -189,11 +187,18 @@ fn native_declassification_credential_expiry_before_capture_consumes_no_authorit
         "a clean pre-commit rejection retained a native dispatch ledger"
     );
 
+    let receipts = fixture.kernel.receipt_log().len();
     let replay = fixture
         .kernel
         .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
     assert_eq!(replay.verdict, Verdict::Deny);
-    assert_eq!(replay.reason.as_deref(), Some(COMPENSATED_REPLAY));
+    assert_eq!(replay.reason, response.reason);
+    assert_eq!(
+        chio_core::canonical_json_bytes(&replay.receipt)?,
+        chio_core::canonical_json_bytes(&response.receipt)?,
+        "replay must return the original compensation receipt"
+    );
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
     assert!(replay.output.is_none());
     let replayed = custody(&fixture)?;
     assert_released(&replayed);

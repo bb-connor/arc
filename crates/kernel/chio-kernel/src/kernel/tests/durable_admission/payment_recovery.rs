@@ -42,6 +42,7 @@ fn review_payment_prepaid_compensation_refunds_original_payment() -> TestResult 
         serde_json::json!({"authority": "review-regression"}),
         current_unix_timestamp_ms(),
         None,
+        compensation_response(),
     )?;
     assert_eq!(
         store.operation().state(),
@@ -80,6 +81,7 @@ fn review_payment_compensation_retries_original_release_intent() -> TestResult {
             policy.clone(),
             current_unix_timestamp_ms(),
             None,
+            compensation_response(),
         )
         .err()
         .ok_or("release failure was accepted")?;
@@ -97,6 +99,7 @@ fn review_payment_compensation_retries_original_release_intent() -> TestResult {
         policy,
         current_unix_timestamp_ms(),
         None,
+        compensation_response(),
     )?;
     assert_eq!(
         store.operation().state(),

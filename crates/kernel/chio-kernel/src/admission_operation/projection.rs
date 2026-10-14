@@ -36,6 +36,8 @@ mod pre_dispatch_compensation;
 pub use pre_dispatch_compensation::*;
 mod outcome_unknown;
 pub use outcome_unknown::*;
+pub(super) mod refusal_receipt;
+use refusal_receipt::validate_refusal_receipt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AdmissionReceiptSchema {
@@ -70,44 +72,6 @@ pub struct AdmissionReceiptMetadataV1 {
     pub compensation_status: AdmissionCompensationStatus,
     pub tool_outcome_id: Option<AdmissionDigest>,
     pub tool_outcome_version: Option<u64>,
-}
-
-impl AdmissionReceiptMetadataV1 {
-    /// Observe an already-retained unknown outcome without claiming a new
-    /// transition or a live recovery lease. Unlike terminal-transition metadata,
-    /// the version is unchanged and the coordinator/fence tuple is the validated
-    /// historical dispatch tuple. This is not `VerifiedAdmissionReceipt` authority.
-    pub(crate) fn retained_unknown_dispatch(
-        operation: &AdmissionOperationV1,
-        trusted_time_unix_ms: u64,
-    ) -> Result<Self, AdmissionOperationError> {
-        operation.validate()?;
-        super::state::validate_positive_ijson("trusted_time_unix_ms", trusted_time_unix_ms)?;
-        if operation.state() != AdmissionOperationState::OutcomeUnknownAfterDispatch {
-            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
-        }
-        let dispatch = operation
-            .dispatch_commit()
-            .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
-        Ok(Self {
-            schema: AdmissionReceiptSchema::V1,
-            operation_id: operation.binding().operation_id().clone(),
-            request_id: operation.binding().request_id().clone(),
-            request_namespace_digest: operation.binding().request_namespace_digest().clone(),
-            request_binding_hash: operation.binding().request_binding_hash().clone(),
-            projected_operation_version: operation.version(),
-            projected_state: operation.state(),
-            projected_dispatch_state: operation.dispatch_state(),
-            trusted_time_unix_ms,
-            coordinator_lease_id: dispatch.coordinator_lease_id.clone(),
-            coordinator_lease_epoch: dispatch.coordinator_lease_epoch,
-            store_fence: dispatch.store_fence.clone(),
-            retained_dispatch_commit: Some(dispatch.clone()),
-            compensation_status: AdmissionCompensationStatus::NotCompensated,
-            tool_outcome_id: None,
-            tool_outcome_version: None,
-        })
-    }
 }
 
 /// A receipt qualified by the kernel against the exact admission projection.
@@ -1194,6 +1158,7 @@ pub enum AdmissionTerminalProjection {
     OutcomeUnknownAfterDispatch {
         context: AdmissionProjectionContext,
         incident: Box<AdmissionIncident>,
+        receipt: Box<VerifiedAdmissionReceipt>,
     },
     EconomicMutationApplied {
         context: AdmissionProjectionContext,
@@ -1259,6 +1224,18 @@ pub(super) fn validate_receipt_projection(
 ) -> Result<(), AdmissionOperationError> {
     let mismatch = || AdmissionOperationError::TerminalProjectionBindingMismatch;
     validate_projection_context(operation, context, projected_state)?;
+    if matches!(
+        projected_state,
+        AdmissionOperationState::CompensatedBeforeDispatch
+            | AdmissionOperationState::OutcomeUnknownAfterDispatch
+    ) {
+        validate_refusal_receipt(receipt)?;
+        if receipt.action.parameter_hash != operation.binding.action_parameter_hash().as_str()
+            || !receipt.action.verify_hash().map_err(|_| mismatch())?
+        {
+            return Err(mismatch());
+        }
+    }
     if projected_state == AdmissionOperationState::Completed {
         let tool_outcome_required = operation.binding.kind == AdmissionOperationKind::ToolDispatch;
         if tool_outcome.is_some() != tool_outcome_required {
@@ -1558,11 +1535,21 @@ impl AdmissionTerminalProjection {
                     )?);
                 }
             }
-            Self::OutcomeUnknownAfterDispatch { incident, .. } => {
+            Self::OutcomeUnknownAfterDispatch {
+                incident, receipt, ..
+            } => {
                 records.push(canonical_projection_record(
                     AdmissionProjectionRecordKind::Incident,
                     incident.record_id.clone(),
                     incident,
+                )?);
+                records.push(canonical_projection_record(
+                    AdmissionProjectionRecordKind::Receipt,
+                    AdmissionIdentifier::try_new(
+                        "projection_receipt_id",
+                        receipt.receipt().id.clone(),
+                    )?,
+                    receipt.receipt(),
                 )?);
             }
             Self::EconomicMutationApplied {
@@ -1877,16 +1864,28 @@ impl AdmissionOperationV1 {
                     evidence.replay(&projection_digest)?,
                 )
             }
-            AdmissionTerminalProjection::OutcomeUnknownAfterDispatch { incident, .. } => {
+            AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
+                incident, receipt, ..
+            } => {
                 incident.validate_against(
                     self,
                     context,
                     AdmissionOperationState::OutcomeUnknownAfterDispatch,
                 )?;
+                receipt.validate_against(
+                    self,
+                    context,
+                    AdmissionOperationState::OutcomeUnknownAfterDispatch,
+                    AdmissionCompensationStatus::NotCompensated,
+                    None,
+                )?;
                 (
                     AdmissionOperationState::OutcomeUnknownAfterDispatch,
-                    AdmissionTerminalReplay::Incident {
-                        incident_id: incident.record_id.clone(),
+                    AdmissionTerminalReplay::Receipt {
+                        receipt_id: AdmissionIdentifier::try_new(
+                            "receipt_id",
+                            receipt.receipt().id.clone(),
+                        )?,
                         projection_digest: projection_digest.clone(),
                     },
                 )
@@ -1943,7 +1942,7 @@ impl AdmissionOperationV1 {
                 to: next_state,
             });
         }
-        validate_terminal_replay(self.binding.kind, next_state, Some(&replay))?;
+        refusal_receipt::validate_terminal_replay(self.binding.kind, next_state, Some(&replay))?;
         let mut updated = self.clone();
         updated.state = next_state;
         updated.dispatch_state = dispatch_state_for(self.binding.kind, next_state)?;
@@ -1959,50 +1958,6 @@ pub struct AdmissionTerminal {
     pub operation_id: AdmissionOperationId,
     pub state: AdmissionOperationState,
     pub replay: AdmissionTerminalReplay,
-}
-pub(super) fn validate_terminal_replay(
-    kind: AdmissionOperationKind,
-    state: AdmissionOperationState,
-    terminal_replay: Option<&AdmissionTerminalReplay>,
-) -> Result<(), AdmissionOperationError> {
-    let valid = match (kind, state, terminal_replay) {
-        (_, state, None) if !state.is_terminal() => true,
-        (
-            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
-            AdmissionOperationState::Completed,
-            Some(AdmissionTerminalReplay::Receipt { .. }),
-        ) => true,
-        (
-            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
-            AdmissionOperationState::CompensatedBeforeDispatch
-            | AdmissionOperationState::NotAcceptedAfterDispatchCommit,
-            Some(
-                AdmissionTerminalReplay::Receipt { .. } | AdmissionTerminalReplay::Incident { .. },
-            ),
-        ) => true,
-        (
-            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
-            AdmissionOperationState::OutcomeUnknownAfterDispatch,
-            Some(AdmissionTerminalReplay::Incident { .. }),
-        ) => true,
-        (
-            AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse,
-            AdmissionOperationState::DeniedAfterDelivery,
-            Some(AdmissionTerminalReplay::Receipt { .. }),
-        ) => true,
-        (
-            AdmissionOperationKind::GovernedEconomicMutation,
-            AdmissionOperationState::EconomicMutationApplied
-            | AdmissionOperationState::EconomicMutationNotApplied,
-            Some(AdmissionTerminalReplay::EconomicMutation { .. }),
-        ) => true,
-        _ => false,
-    };
-    if valid {
-        Ok(())
-    } else {
-        Err(AdmissionOperationError::TerminalReplayMismatch)
-    }
 }
 
 #[cfg(test)]

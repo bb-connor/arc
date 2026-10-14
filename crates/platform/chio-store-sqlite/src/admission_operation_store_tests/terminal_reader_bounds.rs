@@ -67,14 +67,14 @@ fn rc2_terminal_receipt_point_refuses_native_byte_bound_before_authority_decode(
 fn rc2_terminal_receipt_page_refuses_native_byte_bound_without_partial_output() -> AnchoredTestResult
 {
     let (fixture, operation, _) = committed_fixture("rc2-page")?;
-    assert!(fixture
-        .store
-        .list_terminal_receipts_after(None, 1)?
-        .is_empty());
+    assert_eq!(
+        fixture.store.list_terminal_receipts_after(None, 1)?.len(),
+        1
+    );
     insert_oversized_receipt(&fixture, &operation)?;
     let error = fixture
         .store
-        .list_terminal_receipts_after(None, 1)
+        .list_terminal_receipts_after(None, 2)
         .err()
         .ok_or("oversized page record was accepted")?;
     assert_bounds(error);
@@ -134,10 +134,10 @@ fn rc2_terminal_healthy_sealed_replay_and_empty_paging_remain_supported() -> Anc
             .load_terminal_replay(&operation.replay_key())?,
         Some(first.replay.clone())
     );
-    assert!(fixture
-        .store
-        .list_terminal_receipts_after(None, 1)?
-        .is_empty());
+    assert_eq!(
+        fixture.store.list_terminal_receipts_after(None, 1)?.len(),
+        1
+    );
     let Fixture {
         _temp,
         database,
@@ -154,7 +154,7 @@ fn rc2_terminal_healthy_sealed_replay_and_empty_paging_remain_supported() -> Anc
         store.load_terminal_replay(&operation.replay_key())?,
         Some(first.replay)
     );
-    assert!(store.list_terminal_receipts_after(None, 1)?.is_empty());
+    assert_eq!(store.list_terminal_receipts_after(None, 1)?.len(), 1);
     drop(store);
     drop(reopened);
     drop(_temp);

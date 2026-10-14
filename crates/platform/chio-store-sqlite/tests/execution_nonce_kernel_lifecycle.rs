@@ -47,6 +47,26 @@ fn execute(
     Ok(runtime.kernel.evaluate_tool_call_blocking(&execution)?)
 }
 
+/// A refusal against a live retained operation returns the exact admission
+/// error and signs no receipt; the operation keeps its owner.
+fn assert_refused(
+    runtime: &Runtime,
+    request: &ToolCallRequest,
+    nonce: Option<&SignedExecutionNonce>,
+    reason: &str,
+) -> TestResult {
+    let mut presented = request.clone();
+    presented.execution_nonce = nonce.cloned();
+    let receipts = runtime.kernel.receipt_log().len();
+    let refused = runtime.kernel.evaluate_tool_call_blocking(&presented);
+    assert!(
+        matches!(&refused, Err(chio_kernel::KernelError::DurableAdmission(actual)) if actual == reason),
+        "{refused:?}"
+    );
+    assert_eq!(runtime.kernel.receipt_log().len(), receipts);
+    Ok(())
+}
+
 fn assert_state(fixture: &Fixture, request: &ToolCallRequest, state: &str) -> TestResult<String> {
     let (operation_id, actual) =
         operation_state(fixture, &request.request_id)?.ok_or("retained operation")?;
@@ -102,12 +122,12 @@ fn strict_preflight_issues_durable_nonce_then_executes_once() -> TestResult {
         .evaluate_tool_call_blocking(&fresh)
         .map(|response| response.verdict)?;
     assert_eq!(error, Verdict::Allow, "a new request preflights again");
-    let stale = execute(&runtime, &fresh, &nonce)?;
-    assert_eq!(stale.verdict, Verdict::Deny);
-    assert!(stale
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("does not match its retained issuance")));
+    assert_refused(
+        &runtime,
+        &fresh,
+        Some(&nonce),
+        "presented execution nonce does not match its retained issuance",
+    )?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }
@@ -155,22 +175,21 @@ fn execution_rejects_foreign_nonces_without_touching_the_operation() -> TestResu
             resigned
         },
     ] {
-        let denied = execute(&runtime, &request, &presented)?;
-        assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
-        assert!(denied
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("does not match its retained issuance")));
+        assert_refused(
+            &runtime,
+            &request,
+            Some(&presented),
+            "presented execution nonce does not match its retained issuance",
+        )?;
     }
     let mut missing = request.clone();
     missing.request_id = "never-preflighted".into();
-    missing.execution_nonce = Some(nonce.clone());
-    let denied = runtime.kernel.evaluate_tool_call_blocking(&missing)?;
-    assert_eq!(denied.verdict, Verdict::Deny);
-    assert!(denied
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("was never issued for this request")));
+    assert_refused(
+        &runtime,
+        &missing,
+        Some(&nonce),
+        "presented execution nonce was never issued for this request",
+    )?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     assert_state(&fixture, &request, "prepared")?;
 
@@ -222,18 +241,13 @@ fn expired_issuance_denies_execution_and_is_compensated_by_startup_recovery() ->
     let nonce = preflight(&runtime, &request)?;
     let _expired = chio_test_support::clock::scope_unix_secs(u64::try_from(nonce.expires_at())?);
 
-    let denied = execute(&runtime, &request, &nonce)?;
-    assert_eq!(denied.verdict, Verdict::Deny);
-    assert!(denied
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("execution nonce expired")));
-    let replay = runtime.kernel.evaluate_tool_call_blocking(&request)?;
-    assert_eq!(replay.verdict, Verdict::Deny, "{:?}", replay.reason);
-    assert!(replay
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("retained execution nonce expired")));
+    assert_refused(&runtime, &request, Some(&nonce), "execution nonce expired")?;
+    assert_refused(
+        &runtime,
+        &request,
+        None,
+        "retained execution nonce expired; retry with a fresh request",
+    )?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     assert_state(&fixture, &request, "prepared")?;
     drop(runtime);
@@ -285,17 +299,7 @@ fn unconfirmed_preflight_cleanup_is_compensated_by_startup_recovery() -> TestRes
     execute_sql(&fixture, &rollback_cutpoint("1"))?;
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "cleanup-cutpoint")?;
-    let denied = runtime.kernel.evaluate_tool_call_blocking(&request)?;
-    assert_eq!(denied.verdict, Verdict::Deny);
-    assert!(
-        denied
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("cleanup could not be confirmed")),
-        "{:?}",
-        denied.reason
-    );
-    assert!(denied.execution_nonce.is_none());
+    assert_unconfirmed_cleanup(&runtime, &request)?;
     assert_state(&fixture, &request, "prepared")?;
     assert_eq!(count_rows(&fixture, "admission_nonce_preflight_holds")?, 1);
     assert_eq!(
@@ -327,8 +331,7 @@ fn unconfirmed_preflight_cleanup_replays_on_the_next_preflight() -> TestResult {
     execute_sql(&fixture, &rollback_cutpoint("1"))?;
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "cleanup-retry")?;
-    let denied = runtime.kernel.evaluate_tool_call_blocking(&request)?;
-    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
+    assert_unconfirmed_cleanup(&runtime, &request)?;
     assert_eq!(grant_quota(&runtime, &request)?, (1, 0));
 
     let other = fixture.request(&runtime, "cleanup-other")?;
@@ -340,6 +343,23 @@ fn unconfirmed_preflight_cleanup_replays_on_the_next_preflight() -> TestResult {
     let executed = execute(&runtime, &request, &nonce)?;
     assert_eq!(executed.verdict, Verdict::Allow, "{:?}", executed.reason);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+/// Unconfirmed cleanup under a retained durable operation returns the typed
+/// store error and signs nothing; the operation keeps its original owner.
+fn assert_unconfirmed_cleanup(runtime: &Runtime, request: &ToolCallRequest) -> TestResult {
+    let receipts = runtime.kernel.receipt_log().len();
+    let error = runtime
+        .kernel
+        .evaluate_tool_call_blocking(request)
+        .err()
+        .ok_or("unconfirmed preflight cleanup signed a response")?;
+    assert_eq!(
+        format!("{error:?}"),
+        "BudgetStore(Sqlite(SqliteFailure(Error { code: ConstraintViolation, extended_code: 1811 }, Some(\"injected preflight rollback cutpoint\"))))"
+    );
+    assert_eq!(runtime.kernel.receipt_log().len(), receipts);
     Ok(())
 }
 
@@ -367,16 +387,19 @@ fn reserved_nonce_operation_is_compensated_by_startup_recovery() -> TestResult {
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "reserved-nonce")?;
     let nonce = preflight(&runtime, &request)?;
-    let denied = execute(&runtime, &request, &nonce)?;
-    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
-    assert!(
-        denied
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("injected capture cutpoint")),
-        "{:?}",
-        denied.reason
+    let receipts = runtime.kernel.receipt_log().len();
+    let mut execution = request.clone();
+    execution.execution_nonce = Some(nonce.clone());
+    let error = runtime
+        .kernel
+        .evaluate_tool_call_blocking(&execution)
+        .err()
+        .ok_or("a refused capture preparation signed a response")?;
+    assert_eq!(
+        format!("{error:?}"),
+        "AdmissionRecovery(Store(Unavailable(\"injected capture cutpoint\")))"
     );
+    assert_eq!(runtime.kernel.receipt_log().len(), receipts);
     assert_state(&fixture, &request, "ready_to_dispatch")?;
     assert_eq!(
         count_rows(&fixture, "admission_execution_nonce_reservations")?,
@@ -432,6 +455,9 @@ fn dropped_execution_after_dispatch_commit_never_redispatches() -> TestResult {
     tokio_runtime.shutdown_timeout(std::time::Duration::from_secs(5));
 
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    assert_state(&fixture, &request, "dispatch_committed")?;
+    drop(runtime);
+    let runtime = fixture.open()?;
     assert_state(&fixture, &request, "outcome_unknown_after_dispatch")?;
     assert_eq!(
         grant_quota(&runtime, &request)?,
@@ -440,10 +466,10 @@ fn dropped_execution_after_dispatch_commit_never_redispatches() -> TestResult {
     );
     let retry = execute(&runtime, &request, &nonce)?;
     assert_eq!(retry.verdict, Verdict::Deny, "{:?}", retry.reason);
-    assert!(retry
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("OutcomeUnknownAfterDispatch")));
+    assert_eq!(
+        retry.reason.as_deref(),
+        Some("dispatch outcome is unknown after recovery")
+    );
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     drop(runtime);
 

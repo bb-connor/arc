@@ -1,106 +1,28 @@
-//! Original dispatch custody until its return is recorded or terminal unknown.
+//! Authority-clock timing for an invocation owned by its post-effect obligation.
 use super::*;
-use crate::kernel::admission_coordinator::{DurableToolReturn, DurableToolReturnContext};
-use std::ops::ControlFlow;
-
-pub(super) struct EvaluationReturnRecording<'a> {
-    pub request: &'a ToolCallRequest,
-    pub output: &'a ToolServerOutput,
-    pub reported_cost: Option<ToolInvocationCost>,
-    pub context: Option<&'a DurableToolReturnContext>,
-    pub elapsed: Duration,
-    pub trusted_now_unix_ms: u64,
-    pub timestamp: u64,
-    pub matched_grant_index: usize,
-    pub budget: &'a PreExecutionBudgetMutation,
-    pub payment: Option<&'a PaymentAuthorization>,
-    pub metadata: Option<serde_json::Value>,
-    pub evidence: &'a [GuardEvidence],
-    pub payee: Option<&'a VerifiedGovernedPayeeBinding>,
-}
 
 impl ChioKernel {
     /// Time durable returns and streams on the authority clock's monotonic domain.
     /// An ordinary value has no elapsed-time consumer: stream limits ignore it,
     /// and no raw outcome is persisted. Preserve its observed value and cost
     /// without an unnecessary fallible end read; its unused duration is zero.
-    /// Callers own the dispatch through an armed, started drop guard first. The
-    /// dispatch future runs only after the start reading succeeds. A failed or
-    /// regressed reading reaches the caller's post-commit failure arm, which
-    /// keeps the operation and holds and records the outcome as unknown. An end
-    /// reading failure discards the observed output without recording a successful
-    /// return; the original committed operation remains authoritative for recovery.
+    /// The caller enters PostEffectObligation before polling this future. A
+    /// failed start reading prevents connector polling; a failed or regressed
+    /// end reading withholds output. The same owner retains evidence and holds,
+    /// and a durable failure remains bound to its original saga.
     pub(super) async fn timed_dispatch(
         &self,
-        admission: Option<&DurableToolAdmission>,
+        durable: bool,
         dispatch: impl std::future::Future<
             Output = Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError>,
         >,
     ) -> Result<((ToolServerOutput, Option<ToolInvocationCost>), Duration), KernelError> {
         let started = self.authority_clock_reading()?.monotonic();
         let output = dispatch.await?;
-        if admission.is_none() && matches!(output.0, ToolServerOutput::Value(_)) {
+        if !durable && matches!(output.0, ToolServerOutput::Value(_)) {
             return Ok((output, Duration::ZERO));
         }
         let finished = self.authority_clock_reading()?.monotonic();
         Ok((output, finished.duration_since(started)?))
-    }
-
-    pub(super) fn record_evaluation_return(
-        &self,
-        admission: Option<&mut DurableToolAdmission>,
-        guard: &mut PostAdmissionDropGuard<'_>,
-        input: EvaluationReturnRecording<'_>,
-    ) -> Result<ControlFlow<ToolCallResponse, Option<DurableToolReturn>>, KernelError> {
-        let Some(admission) = admission else {
-            guard.disarm();
-            return Ok(ControlFlow::Continue(None));
-        };
-        let context = input.context.ok_or_else(|| {
-            KernelError::DurableAdmission("tool return lost its frozen dispatch context".into())
-        })?;
-        let recorded_at = self
-            .read_authority_time()?
-            .get()
-            .max(input.trusted_now_unix_ms);
-        match self.record_durable_tool_return(
-            admission,
-            DurableToolReturnInput {
-                request: input.request,
-                output: input.output,
-                reported_cost: input.reported_cost,
-                context,
-                elapsed: input.elapsed,
-                trusted_now_unix_ms: recorded_at,
-            },
-        ) {
-            Ok(outcome) => {
-                guard.disarm();
-                Ok(ControlFlow::Continue(Some(outcome)))
-            }
-            Err(error) => {
-                warn!(request_id = %input.request.request_id, reason = %redacted!(&error),
-                    "tool return could not be durably recorded");
-                let metadata = self.ambiguous_dispatch_receipt_metadata(
-                    input.budget,
-                    input.payment,
-                    input.metadata,
-                );
-                self.terminalize_dispatch_committed_admission(admission.operation(), recorded_at)?;
-                guard.mark_durable_operation_terminalized();
-                guard.disarm();
-                let response = self.with_pre_invocation_guard_evidence(input.evidence, || {
-                    self.build_deny_response_with_metadata_and_payee_binding(
-                        input.request,
-                        &error.to_string(),
-                        input.timestamp,
-                        Some(input.matched_grant_index),
-                        metadata,
-                        input.payee,
-                    )
-                })?;
-                Ok(ControlFlow::Break(response))
-            }
-        }
     }
 }

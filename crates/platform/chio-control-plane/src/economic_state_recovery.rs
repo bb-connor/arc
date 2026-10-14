@@ -15,7 +15,7 @@ use chio_core::economic_continuity::{
     VerifiedEconomicTargetStatus,
 };
 use chio_kernel::admission_operation::{
-    expected_dispatch_committed_version, verified_pre_dispatch_compensation_projection,
+    expected_dispatch_committed_version, verified_pre_dispatch_incident_projection,
     AdmissionIdentifier, AdmissionMutationSequencer, AdmissionOperationError, AdmissionOperationId,
     AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStoreError,
     AdmissionProjectionContext, AdmissionTerminal, QualifiedAdmissionOperationStore,
@@ -511,6 +511,11 @@ impl EconomicStateRecovery {
                 stage: discarded,
             });
         }
+        if operation.binding().kind() == AdmissionOperationKind::ToolDispatch {
+            return Err(EconomicStateRecoveryError::CompensationRejected(
+                "tool dispatch compensation requires original receipt authority".to_owned(),
+            ));
+        }
         if operation.state() != binding.operation_state()
             || operation.version() != binding.operation_version()
             || operation.coordinator_lease_epoch() != binding.coordinator_lease_epoch()
@@ -539,7 +544,7 @@ impl EconomicStateRecovery {
             coordinator_lease_epoch: operation.coordinator_lease_epoch(),
             store_fence: self.active_fence.clone(),
         };
-        let projection = verified_pre_dispatch_compensation_projection(&operation, context)?;
+        let projection = verified_pre_dispatch_incident_projection(&operation, context)?;
         let terminal = self.operations.commit_admission_projection(&projection)?;
         if terminal.operation_id != operation_id
             || terminal.state != AdmissionOperationState::CompensatedBeforeDispatch

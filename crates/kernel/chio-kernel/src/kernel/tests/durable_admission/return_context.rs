@@ -54,7 +54,7 @@ fn changed_capture_participant_denies_before_tool_effect_and_retains_accounting(
     Ok(())
 }
 
-fn ordinary_return_context_has_no_caller_artifact_limit(nested: bool) -> TestResult {
+fn oversized_request_is_refused_before_admission(nested: bool) -> TestResult {
     let (kernel, mut request, store, invocations) =
         durable_admission_fixture("ordinary-frozen-return-context");
     request.arguments["payload"] = serde_json::Value::String("x".repeat(262_145));
@@ -69,48 +69,65 @@ fn ordinary_return_context_has_no_caller_artifact_limit(nested: bool) -> TestRes
         crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission(
             &request, &matching, &[], None,
             &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+            &kernel.freeze_receipt_signing_identity()?,
+        None,
         ),
         Err(crate::admission_operation::AdmissionOperationStoreError::Invariant(message))
             if message == "retained request exceeds its artifact bound"
     ));
-    let response = if nested {
+    let (response, receipts_before) = if nested {
         let session = kernel.open_session("context-parent".into(), Vec::new())?;
         kernel.activate_session(&session)?;
         let parent = make_operation_context(&session, "parent-request", "context-parent");
         kernel.begin_session_request(&parent, OperationKind::ToolCall, true)?;
-        kernel.evaluate_tool_call_with_nested_flow_client(
-            &parent,
-            &request,
-            &mut NoopNestedFlowClient,
-            None,
-        )?
+        let receipts = kernel.receipt_log().len();
+        (
+            kernel.evaluate_tool_call_with_nested_flow_client(
+                &parent,
+                &request,
+                &mut NoopNestedFlowClient,
+                None,
+            )?,
+            receipts,
+        )
     } else {
-        kernel.evaluate_tool_call_blocking(&request)?
+        let receipts = kernel.receipt_log().len();
+        (kernel.evaluate_tool_call_blocking(&request)?, receipts)
     };
-    assert_eq!(response.verdict, Verdict::Allow, "{response:?}");
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(response.verdict, Verdict::Deny, "{response:?}");
     assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Completed
+        response.reason.as_deref(),
+        Some("durable admission failed: admission operation invariant failed: retained request exceeds its artifact bound")
     );
-    assert!(store
-        .state
-        .lock()
-        .map_err(|_| "test lock")?
-        .raw_outcome
-        .is_some());
+    assert!(response.output.is_none());
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    let state = store.state.lock().map_err(|_| "test lock")?;
+    assert!(state.operation.is_none());
+    assert!(state.retained_request.is_none());
+    assert!(state.raw_outcome.is_none());
+    assert!(state.budget_authorization.is_none());
     assert!(response.receipt.verify_signature()?);
+    assert_eq!(
+        response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/identity_disposition"))
+            .and_then(serde_json::Value::as_str),
+        Some("reusable"),
+    );
+    assert_eq!(kernel.receipt_log().len(), receipts_before + 1);
     Ok(())
 }
 
 #[test]
-fn ordinary_return_context_preserves_large_request_behavior() -> TestResult {
-    ordinary_return_context_has_no_caller_artifact_limit(false)
+fn ordinary_oversized_request_is_refused_before_admission() -> TestResult {
+    oversized_request_is_refused_before_admission(false)
 }
 
 #[test]
-fn nested_return_context_preserves_large_request_behavior() -> TestResult {
-    ordinary_return_context_has_no_caller_artifact_limit(true)
+fn nested_oversized_request_is_refused_before_admission() -> TestResult {
+    oversized_request_is_refused_before_admission(true)
 }
 
 fn pending_admission(
@@ -127,7 +144,8 @@ fn pending_admission(
     .map_err(|error| KernelError::Internal(error.to_string()))?;
     let now = current_unix_timestamp_ms();
     let mut admission = kernel
-        .begin_durable_tool_admission(request, &matching, now)?
+        .begin_durable_tool_admission(request, &matching, now)
+        .map_err(|failure| *failure.error)?
         .ok_or_else(|| KernelError::Internal("test requires durable admission".into()))?;
     let (_, mutation) = kernel
         .check_and_increment_budget(

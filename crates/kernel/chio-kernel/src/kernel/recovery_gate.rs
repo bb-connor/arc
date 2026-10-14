@@ -1140,27 +1140,10 @@ mod tests {
             purchase_key: marker().purchase_key,
             original_subject_key_hex: request.capability.subject.to_hex(),
         };
-        let error = kernel
-            .finalize_ordinary_recovery_response(
-                crate::kernel::evaluation::evaluation_helpers::OrdinaryRecoveryFinalization {
-                    request: &request,
-                    output: crate::runtime::ToolServerOutput::Value(output),
-                    elapsed: std::time::Duration::ZERO,
-                    timestamp: 1,
-                    matched_grant_index: 0,
-                    cost: crate::kernel::responses::FinalizeToolOutputCostContext {
-                        charge_result: None,
-                        reported_cost: None,
-                        payment_authorization: None,
-                        cap: &request.capability,
-                    },
-                    metadata: None,
-                    guard_evidence: &[],
-                    payee_binding: None,
-                    recovery: Some(&verified),
-                    security_context: None,
-                },
-            )
+        let error =
+            crate::kernel::evaluation::evaluation_helpers::require_durable_finding_recovery(Some(
+                &verified,
+            ))
             .expect_err("ordinary recovery must require a durable terminal projection");
         assert!(error.to_string().contains("atomic durable admission"));
         assert_eq!(receipts.load(Ordering::SeqCst), 0);

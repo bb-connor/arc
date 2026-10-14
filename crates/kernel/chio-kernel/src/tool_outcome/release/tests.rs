@@ -1,6 +1,6 @@
 use super::*;
 use crate::admission_operation::{
-    verified_pre_dispatch_compensation_projection, verify_economic_cancellation_terminal_advance,
+    verified_pre_dispatch_incident_projection, verify_economic_cancellation_terminal_advance,
     AdmissionOperationBindingInputV1, AdmissionOperationBindingV1, AdmissionOperationError,
     AdmissionOperationKind, AdmissionParticipantRequirements, AdmissionProjectionCapabilities,
     AdmissionRequestBindingV1, AuthenticatedRequestNamespace, SideEffectClass,
@@ -241,9 +241,10 @@ fn channel_reservation_requires_typed_predispatch_cancellation(
             .channel,
         VerifiedParticipantNoEffectV1::NeverAcquired { .. }
     ));
-    assert!(
-        verified_pre_dispatch_compensation_projection(&prepared, prepared_context.clone()).is_ok()
-    );
+    assert!(matches!(
+        verified_pre_dispatch_incident_projection(&prepared, prepared_context.clone()),
+        Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+    ));
 
     let proposal = AdmissionAttachment::ChannelReservationProposalDigest(admission_digest(
         "channel-release-proposal",
@@ -291,11 +292,10 @@ fn channel_reservation_requires_typed_predispatch_cancellation(
                 "predispatch.channel_cancellation_required"
             ))
         );
-        assert!(verified_pre_dispatch_compensation_projection(
-            operation,
-            projection_context(operation),
-        )
-        .is_err());
+        assert!(matches!(
+            verified_pre_dispatch_incident_projection(operation, projection_context(operation)),
+            Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+        ));
     }
     Ok(())
 }

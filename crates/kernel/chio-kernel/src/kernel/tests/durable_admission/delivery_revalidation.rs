@@ -149,7 +149,55 @@ fn invocation_owned_connections_close_on_completion_denial_and_cancellation() ->
                     .poll(&mut Context::from_waker(Waker::noop()))
                     .is_pending());
                 assert_eq!(live.load(Ordering::SeqCst), 1);
+                let committed =
+                    matches!(outcome, OwnedOutcome::CancelDispatch).then(|| store.operation());
                 drop(evaluation);
+                if let Some(committed) = committed {
+                    assert_eq!(
+                        committed.state(),
+                        AdmissionOperationState::DispatchCommitted
+                    );
+                    assert_eq!(
+                        store.operation(),
+                        committed,
+                        "Drop retains the original saga for its real recovery driver"
+                    );
+                    assert!(kernel.receipt_log().is_empty());
+                    kernel.reconcile_recoverable_admissions()?;
+                    let terminal = assert_original_unknown_incident(&store, &request);
+                    assert_eq!(terminal.binding(), committed.binding());
+                    assert_eq!(terminal.dispatch_commit(), committed.dispatch_commit());
+                    assert_eq!(kernel.receipt_log().len(), 1);
+                    let receipt = store
+                        .state
+                        .lock()
+                        .map_err(|_| "test admission state lock")?
+                        .receipt
+                        .clone()
+                        .ok_or("missing original unknown-outcome receipt")?;
+                    kernel.reconcile_recoverable_admissions()?;
+                    assert_eq!(
+                        store.operation(),
+                        terminal,
+                        "recovery cannot replace the terminal projection"
+                    );
+                    assert_unknown_replay(
+                        kernel.evaluate_tool_call_blocking(&request),
+                        &terminal,
+                        &store,
+                    );
+                    assert_same_receipt(
+                        store
+                            .state
+                            .lock()
+                            .map_err(|_| "test admission state lock")?
+                            .receipt
+                            .as_ref()
+                            .ok_or("missing canonical unknown-outcome receipt")?,
+                        &receipt,
+                    );
+                    assert_eq!(kernel.receipt_log().len(), 1);
+                }
                 assert_eq!(
                     store.operation().state(),
                     if matches!(outcome, OwnedOutcome::CancelDispatch) {
@@ -362,7 +410,30 @@ fn suspended_delivery(nested: bool, outcome: SuspendedOutcome) -> TestResult {
             store.operation().state(),
             AdmissionOperationState::CompensatedBeforeDispatch
         );
-        assert!(kernel.receipt_log().receipts().is_empty());
+        let persisted = store
+            .state
+            .lock()
+            .map_err(|_| "state lock")?
+            .receipt
+            .clone()
+            .ok_or("persisted compensation receipt")?;
+        let logged = kernel.receipt_log().receipts();
+        assert_eq!(logged.len(), 1);
+        assert_eq!(
+            chio_core::canonical::canonical_json_bytes(&logged[0])?,
+            chio_core::canonical::canonical_json_bytes(&persisted)?
+        );
+        assert!(matches!(
+            persisted.decision,
+            Some(chio_core::receipt::decision::Decision::Cancelled { .. })
+        ));
+        assert_eq!(
+            persisted
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.pointer("/chio_runtime/identity_disposition")),
+            Some(&serde_json::json!("terminal"))
+        );
         return Ok(());
     }
     let _expired_clock = matches!(outcome, SuspendedOutcome::Expire)

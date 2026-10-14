@@ -160,10 +160,10 @@ fn prepared_credentials_cannot_rebind_the_original_authority_profile() {
 fn immutable_request_commits_to_every_original_profile_selection(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::admission_operation::{
-        immutable_tool_request_hash, immutable_tool_request_hash_with_profile,
-        AdmissionAuthorityProfileV1, RetainedToolAdmissionRequestV1,
+        immutable_tool_request_hash, AdmissionAuthorityProfileV1, RetainedToolAdmissionRequestV1,
     };
-    let (_, request, _, _) = durable_admission_fixture("profile-hash-contract");
+    let (kernel, request, _, _) = durable_admission_fixture("profile-hash-contract");
+    let signer = kernel.freeze_receipt_signing_identity()?;
     let matching = resolve_required_matching_grants(
         &request.capability,
         &request.tool_name,
@@ -184,20 +184,31 @@ fn immutable_request_commits_to_every_original_profile_selection(
         }
     });
     let profile: AdmissionAuthorityProfileV1 = serde_json::from_value(wire.clone())?;
-    let old_hash = immutable_tool_request_hash(&request, &matching, &[], None)?;
     let actual =
-        immutable_tool_request_hash_with_profile(&request, &matching, &[], None, Some(&profile))?;
+        immutable_tool_request_hash(&request, &matching, &[], None, &profile, &signer, None)?;
     let independent = serde_json::json!({
-        "schema": "chio.tool-admission-request.v4", "prior_request_hash": old_hash,
-        "authority_profile": wire
+        "schema": "chio.tool-admission-request.v1",
+        "server_id": request.server_id, "tool_name": request.tool_name,
+        "agent_id": request.agent_id, "arguments": request.arguments,
+        "governed_intent": request.governed_intent, "model_metadata": request.model_metadata,
+        "federated_origin_kernel_id": request.federated_origin_kernel_id,
+        "matching_grants": [{"index": 0, "grant": &request.capability.scope.grants[0]}],
+        "post_return_steps": [], "security_binding": null,
+        "authority_profile": wire, "frozen_receipt_signing_identity": signer,
     });
     assert_eq!(
         actual.as_str(),
         sha256_hex(&canonical_json_bytes(&independent)?)
     );
-    assert_ne!(actual, old_hash);
-    let retained =
-        RetainedToolAdmissionRequestV1::from_admission(&request, &matching, &[], None, &profile)?;
+    let retained = RetainedToolAdmissionRequestV1::from_admission(
+        &request,
+        &matching,
+        &[],
+        None,
+        &profile,
+        &signer,
+        None,
+    )?;
     let decoded = RetainedToolAdmissionRequestV1::from_canonical_bytes(retained.canonical_bytes())?;
     assert_eq!(decoded.authority_profile(), &profile);
     decoded.validate_request_material(&request)?;
@@ -250,13 +261,7 @@ fn immutable_request_commits_to_every_original_profile_selection(
             .ok_or("missing profile field")? = value;
         let profile: AdmissionAuthorityProfileV1 = serde_json::from_value(changed)?;
         assert_ne!(
-            immutable_tool_request_hash_with_profile(
-                &request,
-                &matching,
-                &[],
-                None,
-                Some(&profile)
-            )?,
+            immutable_tool_request_hash(&request, &matching, &[], None, &profile, &signer, None,)?,
             actual,
             "{pointer}"
         );
@@ -270,7 +275,7 @@ fn retained_current_profile_rejects_downgrades_duplicates_and_aliases(
     use crate::admission_operation::{
         AdmissionAuthorityProfileV1, AdmissionOperationStoreError, RetainedToolAdmissionRequestV1,
     };
-    let (_, mut request, _, _) = durable_admission_fixture("retained-current-contract");
+    let (kernel, mut request, _, _) = durable_admission_fixture("retained-current-contract");
     request.arguments = serde_json::json!({"private_sentinel": {"count": 1}});
     let matching = resolve_required_matching_grants(
         &request.capability,
@@ -285,6 +290,8 @@ fn retained_current_profile_rejects_downgrades_duplicates_and_aliases(
         &[],
         None,
         &AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+        &kernel.freeze_receipt_signing_identity()?,
+        None,
     )?;
     let bytes = retained.canonical_bytes();
     assert_eq!(
@@ -293,9 +300,9 @@ fn retained_current_profile_rejects_downgrades_duplicates_and_aliases(
     );
     let wire: serde_json::Value = serde_json::from_slice(bytes)?;
     for schema in [
-        "chio.retained-tool-admission-request.v1",
         "chio.retained-tool-admission-request.v2",
         "chio.retained-tool-admission-request.v3",
+        "chio.retained-tool-admission-request.v4",
     ] {
         let mut changed = wire.clone();
         changed["schema"] = schema.into();
@@ -304,21 +311,21 @@ fn retained_current_profile_rejects_downgrades_duplicates_and_aliases(
             Err(AdmissionOperationStoreError::Invariant(message)) if message == "retained request contains unsupported authority material")
         );
     }
-    let mut missing = wire.clone();
-    missing
-        .as_object_mut()
-        .ok_or("object")?
-        .remove("authority_profile");
-    let error =
-        RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(&missing)?)
-            .err()
-            .ok_or("missing profile accepted")?;
-    assert!(
-        matches!(&error, AdmissionOperationStoreError::Operation(crate::admission_operation::AdmissionOperationError::UntrustedInput(cause))
-        if cause.code() == "urn:chio:error:attest:signed-json-invalid-shape")
-    );
-    assert!(std::error::Error::source(&error).is_some());
-    assert!(!format!("{error:?} {error}").contains("private_sentinel"));
+    for field in ["authority_profile", "frozen_receipt_signing_identity"] {
+        let mut missing = wire.clone();
+        missing.as_object_mut().ok_or("object")?.remove(field);
+        let error =
+            RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(&missing)?)
+                .err()
+                .ok_or("missing authority accepted")?;
+        assert!(
+            matches!(&error, AdmissionOperationStoreError::Operation(crate::admission_operation::AdmissionOperationError::UntrustedInput(cause))
+            if cause.code() == "urn:chio:error:attest:signed-json-invalid-shape"),
+            "{field}: {error}"
+        );
+        assert!(std::error::Error::source(&error).is_some());
+        assert!(!format!("{error:?} {error}").contains("private_sentinel"));
+    }
     let text = std::str::from_utf8(bytes)?;
     for replacement in ["\"count\":1,\"count\":1", "\"count\":1e0"] {
         let changed = text.replace("\"count\":1", replacement);

@@ -109,7 +109,10 @@ fn startup_releases_expired_pre_dispatch_dpop_without_recreating_the_source() ->
             lock_root,
             _clock: Some(_clock),
         };
-        let kernel = kernel(&fixture, Keypair::generate())?;
+        let kernel = kernel(
+            &fixture,
+            super::super::super::super::retained_request::original_signer()?,
+        )?;
         // Startup cleans historical custody before any fresh serving profile
         // is selected. It cannot treat that history as a new proof or permit.
         assert_eq!(kernel.reconcile_durable_admission_startup()?, 1);

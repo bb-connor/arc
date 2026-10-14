@@ -10,14 +10,16 @@ mod allow_responses;
 mod deny_responses;
 mod finalization;
 mod pending_responses;
+mod prepared_response;
 mod receipt_persistence;
 mod terminal_responses;
 
 pub(crate) use allow_responses::{AllowResponseNonce, PreflightNonceSource, ReservedHoldStamp};
-pub(crate) use finalization::FinalizeToolOutputCostContext;
+pub(in crate::kernel) use finalization::PrepareToolOutputCostContext;
+pub(in crate::kernel) use prepared_response::PreparedResponse;
 
 #[derive(Clone, Copy)]
-enum ReceiptRecordMode {
+pub(in crate::kernel) enum ReceiptRecordMode {
     WithFederation,
     LocalOnly,
 }

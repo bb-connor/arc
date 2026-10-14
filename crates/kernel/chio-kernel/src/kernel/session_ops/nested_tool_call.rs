@@ -56,7 +56,7 @@ impl ChioKernel {
         client: &mut C,
         proofs: NestedToolCallProofs,
     ) -> Result<ToolCallResponse, KernelError> {
-        reject_reserved_receipt_metadata(operation.extra_metadata.as_ref())?;
+        validate_caller_receipt_metadata(operation.extra_metadata.as_ref())?;
         self.validate_web3_evidence_prerequisites()?;
         if let Some(response) = self.reject_conflicting_session_authorization(context, operation)? {
             return Ok(response);
@@ -149,7 +149,7 @@ impl ChioKernel {
         client: &mut C,
         proofs: NestedToolCallProofs,
     ) -> Result<ToolCallResponse, KernelError> {
-        reject_reserved_receipt_metadata(operation.extra_metadata.as_ref())?;
+        validate_caller_receipt_metadata(operation.extra_metadata.as_ref())?;
         self.validate_web3_evidence_prerequisites()?;
         if let Some(response) = self.reject_conflicting_session_authorization(context, operation)? {
             return Ok(response);

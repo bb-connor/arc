@@ -95,6 +95,24 @@ fn approve(
     Ok(())
 }
 
+/// A refusal against the live parked operation returns the exact typed error,
+/// signs no receipt and leaves the operation with its owner.
+fn assert_refused(
+    runtime: &Runtime,
+    request: &ToolCallRequest,
+    expected: &chio_kernel::KernelError,
+) -> TestResult {
+    let receipts = runtime.kernel.receipt_log().len();
+    let refused = runtime.kernel.evaluate_tool_call_blocking(request);
+    assert_eq!(
+        refused.as_ref().err().map(ToString::to_string),
+        Some(expected.to_string()),
+        "{refused:?}"
+    );
+    assert_eq!(runtime.kernel.receipt_log().len(), receipts);
+    Ok(())
+}
+
 fn evaluate(runtime: &Runtime, request: &ToolCallRequest) -> TestResult<ToolCallResponse> {
     Ok(runtime.kernel.evaluate_tool_call_blocking(request)?)
 }
@@ -107,16 +125,13 @@ fn execution_with_the_nonce_parks_for_approval_and_a_second_preflight_denies() -
 
     let mut replayed_preflight = execution.clone();
     replayed_preflight.execution_nonce = None;
-    let denied = evaluate(&runtime, &replayed_preflight)?;
-    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
-    assert!(
-        denied
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("cannot replay an operation in state")),
-        "{:?}",
-        denied.reason
-    );
+    assert_refused(
+        &runtime,
+        &replayed_preflight,
+        &chio_kernel::KernelError::DurableAdmission(
+            "execution nonce preflight cannot replay an operation in state ApprovalRequired".into(),
+        ),
+    )?;
     drop(runtime);
 
     let runtime = fixture.open()?;
@@ -183,16 +198,11 @@ fn unbound_issuance_still_expires_before_execution() -> TestResult {
     let request = fixture.request(&runtime, "expired-before-binding")?;
     let nonce = preflight(&runtime, &request)?;
     let _expired_clock = chio_test_support::clock::scope_unix_secs(issued_at + 2);
-    let denied = evaluate(&runtime, &with_nonce(&request, &nonce))?;
-    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
-    assert!(
-        denied
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("execution nonce expired")),
-        "{:?}",
-        denied.reason
-    );
+    assert_refused(
+        &runtime,
+        &with_nonce(&request, &nonce),
+        &chio_kernel::KernelError::DurableAdmission("execution nonce expired".into()),
+    )?;
     assert_state(&fixture, &request, "prepared")?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     drop(runtime);
@@ -207,8 +217,13 @@ fn foreign_tokens_keep_the_operation_parked() -> TestResult {
     execution.threshold_approval_proposal = Some(proposal.clone());
     execution.approval_tokens = vec![fixture.vote(&proposal, &Keypair::generate())?];
 
-    let denied = evaluate(&runtime, &execution)?;
-    assert_ne!(denied.verdict, Verdict::Allow, "{:?}", denied.reason);
+    assert_refused(
+        &runtime,
+        &execution,
+        &chio_kernel::KernelError::GovernedTransactionDenied(
+            "threshold approval verification denied: approval token signer is not valid".into(),
+        ),
+    )?;
     assert_state(&fixture, &execution, "approval_required")?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
 

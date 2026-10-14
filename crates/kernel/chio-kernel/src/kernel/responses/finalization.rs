@@ -1,10 +1,12 @@
 use super::*;
 
-pub(crate) struct FinalizeToolOutputCostContext<'a> {
-    pub(crate) charge_result: Option<BudgetChargeResult>,
-    pub(crate) reported_cost: Option<ToolInvocationCost>,
-    pub(crate) payment_authorization: Option<PaymentAuthorization>,
-    pub(crate) cap: &'a CapabilityToken,
+pub(in crate::kernel) struct PrepareToolOutputCostContext<'a> {
+    pub charge_result: Option<&'a BudgetChargeResult>,
+    pub reported_cost: Option<&'a ToolInvocationCost>,
+    pub payment_authorization: Option<&'a PaymentAuthorization>,
+    pub cap: &'a CapabilityToken,
+    pub fault_progress:
+        Option<&'a mut crate::kernel::effect_obligation::recovery::PreparedFaultReceipt>,
 }
 
 pub(crate) struct PostInvocationHandling {
@@ -17,9 +19,9 @@ pub(crate) struct PostInvocationHandling {
 impl ChioKernel {
     #[allow(
         clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+        reason = "Preparation preserves the existing finalization input contract."
     )]
-    pub(crate) fn finalize_tool_output_with_metadata_and_payee_binding(
+    pub(in crate::kernel) fn prepare_tool_output_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
         output: ToolServerOutput,
@@ -29,7 +31,7 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         security_context: Option<&SecurityInvocationContext>,
-    ) -> Result<ToolCallResponse, KernelError> {
+    ) -> Result<PreparedResponse, KernelError> {
         let output = self.apply_stream_limits(output, elapsed)?;
         let post_invocation = self.apply_post_invocation_pipeline(
             request,
@@ -41,19 +43,22 @@ impl ChioKernel {
         let _post_invocation_evidence_scope =
             scope_post_invocation_guard_evidence(post_invocation.evidence);
         if let Some(reason) = post_invocation.blocked_reason.as_deref() {
-            return self.build_deny_response_with_metadata_and_payee_binding(
+            return self.prepare_deny_response_with_metadata_and_payee_binding(
                 request,
                 reason,
                 timestamp,
                 Some(matched_grant_index),
-                // The tool already ran (a side effect may have committed)
-                // before this post-invocation guard blocked the returned
-                // output, so any runtime-admission lease consumed at admission
-                // is retained, not released. Mark it so the burned lease is
-                // recoverable from the receipt, matching the incomplete-stream
-                // and RequestIncomplete arms.
-                self.mark_runtime_admission_reservations_retained_fail_closed(
-                    post_invocation.extra_metadata,
+                RefusalReceiptMetadata::new(
+                    // The tool already ran (a side effect may have committed)
+                    // before this post-invocation guard blocked the returned
+                    // output, so any runtime-admission lease consumed at admission
+                    // is retained, not released. Mark it so the burned lease is
+                    // recoverable from the receipt, matching the incomplete-stream
+                    // and RequestIncomplete arms.
+                    self.mark_runtime_admission_reservations_retained_fail_closed(
+                        post_invocation.extra_metadata,
+                    ),
+                    IdentityDisposition::Terminal,
                 ),
                 verified_payee_binding,
             );
@@ -64,13 +69,16 @@ impl ChioKernel {
             &post_invocation.output,
             true,
         ) {
-            return self.build_deny_response_with_metadata_and_payee_binding(
+            return self.prepare_deny_response_with_metadata_and_payee_binding(
                 request,
                 &error.to_string(),
                 timestamp,
                 Some(matched_grant_index),
-                self.mark_runtime_admission_reservations_retained_fail_closed(
-                    post_invocation.extra_metadata,
+                RefusalReceiptMetadata::new(
+                    self.mark_runtime_admission_reservations_retained_fail_closed(
+                        post_invocation.extra_metadata,
+                    ),
+                    IdentityDisposition::Terminal,
                 ),
                 verified_payee_binding,
             );
@@ -78,7 +86,7 @@ impl ChioKernel {
 
         match post_invocation.output {
             ToolServerOutput::Value(value) => self
-                .build_allow_response_with_metadata_and_payee_binding(
+                .prepare_allow_response_with_metadata_and_payee_binding(
                     request,
                     ToolCallOutput::Value(value),
                     timestamp,
@@ -88,7 +96,7 @@ impl ChioKernel {
                     AllowResponseNonce::MintForAllow,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => self
-                .build_allow_response_with_metadata_and_payee_binding(
+                .prepare_allow_response_with_metadata_and_payee_binding(
                     request,
                     ToolCallOutput::Stream(stream),
                     timestamp,
@@ -98,19 +106,17 @@ impl ChioKernel {
                     AllowResponseNonce::MintForAllow,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => self
-                .build_incomplete_response_with_output_metadata_and_payee_binding(
+                .prepare_incomplete_response_with_output_metadata_and_payee_binding(
                     request,
                     Some(ToolCallOutput::Stream(stream)),
                     &reason,
                     timestamp,
                     Some(matched_grant_index),
-                    // The tool ran (a side effect may have committed) but the
-                    // stream ended incomplete, so any runtime-admission lease
-                    // consumed at admission is retained, not released. Mark it
-                    // so the burned lease is recoverable from the receipt,
-                    // matching the RequestIncomplete error arm.
-                    self.mark_runtime_admission_reservations_retained_fail_closed(
-                        post_invocation.extra_metadata,
+                    RefusalReceiptMetadata::new(
+                        self.mark_runtime_admission_reservations_retained_fail_closed(
+                            post_invocation.extra_metadata,
+                        ),
+                        IdentityDisposition::Terminal,
                     ),
                     verified_payee_binding,
                 ),

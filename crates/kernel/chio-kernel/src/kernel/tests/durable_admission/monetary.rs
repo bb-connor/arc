@@ -160,6 +160,7 @@ fn predispatch_payment_release_uses_the_durable_operation_reference() {
             serde_json::json!({"authority": "predispatch-reference-regression"}),
             now + 2,
             None,
+            compensation_response(),
         )
         .expect("durable pre-dispatch compensation");
 

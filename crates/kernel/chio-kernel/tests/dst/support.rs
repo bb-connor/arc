@@ -35,7 +35,7 @@ const TOOL_NAME: &str = "mutate";
 const GRANT_INDEX: usize = 0;
 const PRE_DISPATCH_DROP_REASON: &str =
     "tool evaluation future dropped before dispatch with cleanup fault";
-const POST_DISPATCH_DROP_REASON: &str = "tool evaluation future dropped after admission";
+const POST_DISPATCH_DROP_REASON: &str = "post-effect finalization failed; output withheld";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum EpisodeClass {
@@ -1022,6 +1022,10 @@ pub fn run_episode(seed: u64) -> Result<EpisodeSummary, String> {
         })?;
     }
 
+    match kernel.await_post_effect_evidence() {
+        Ok(()) | Err(KernelError::PostEffectEvidencePending { .. }) => {}
+        Err(error) => return Err(format!("post-effect evidence recovery stopped: {error}")),
+    }
     let receipts = receipt_store.receipts()?;
     oracle_receipt_before_allow(&trace.snapshot()?)?;
     oracle_drop_disposition(
@@ -1147,12 +1151,28 @@ fn oracle_drop_disposition(
             )?;
             let receipt = &receipts[0];
             require(
-                receipt.is_cancelled(),
-                "cleanup fault receipt is not cancelled",
+                receipt.receipt_kind == chio_core::receipt::kinds::ReceiptKind::TraceObservation
+                    && receipt.decision.is_none(),
+                "cleanup fault is not a decision-free observation",
             )?;
             require(
-                cancelled_reason(receipt) == Some(PRE_DISPATCH_DROP_REASON),
-                "cleanup fault receipt reason drift",
+                receipt
+                    .metadata
+                    .as_ref()
+                    .and_then(|metadata| {
+                        metadata.pointer("/chio_runtime/pre_dispatch_cleanup_reason")
+                    })
+                    .and_then(serde_json::Value::as_str)
+                    == Some(PRE_DISPATCH_DROP_REASON),
+                "cleanup fault observation reason drift",
+            )?;
+            require(
+                receipt
+                    .metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.pointer("/chio_runtime/identity_disposition"))
+                    .is_none(),
+                "cleanup fault observation claimed an identity disposition",
             )?;
             let cleanup_failed = receipt
                 .metadata

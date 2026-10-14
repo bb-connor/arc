@@ -252,9 +252,17 @@ fn signed_unknown_projection_for_lease(
         identifier("incident_id", incident_id),
         digest("incident_digest", 'e'),
     )?;
+    let receipt = refusal_receipt(
+        operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        signer,
+        &serde_json::json!({}),
+    )?;
     let projection = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
         context,
         incident: Box::new(incident),
+        receipt: Box::new(receipt),
     };
     Ok(SignedAdmissionTerminalProjectionV1::from_verified(
         operation,
@@ -911,4 +919,50 @@ fn receipt_lookup_rejects_records_outside_the_terminal_manifest() {
         Err(ReceiptStoreError::Conflict(detail))
             if detail.contains("record count differs from its manifest")
     ));
+}
+
+#[test]
+fn receipt_lookup_rejects_an_unknown_terminal_with_a_missing_incident() -> AnchoredTestResult {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let operation = finalizing_tool_operation(
+        &fixture,
+        "request-missing-incident",
+        "capability-missing-incident",
+        begun_at,
+    );
+    let projection = unknown_projection(
+        &fixture,
+        &operation,
+        "retained-unknown-incident",
+        'e',
+        begun_at + 20,
+    );
+    let terminal = fixture.store.commit_terminal_projection(&projection)?;
+    let AdmissionTerminalReplay::Receipt { receipt_id, .. } = terminal.replay else {
+        return Err("terminal receipt reference missing".into());
+    };
+    assert!(fixture
+        .store
+        .load_chio_receipt(receipt_id.as_str())?
+        .is_some());
+    let connection = fixture.store.connection()?;
+    let trigger: String = connection.query_row(
+        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'admission_operation_terminal_records_no_delete'",
+        [],
+        |row| row.get(0),
+    )?;
+    connection.execute_batch("DROP TRIGGER admission_operation_terminal_records_no_delete;")?;
+    assert_eq!(connection.execute(
+        "DELETE FROM admission_operation_terminal_records WHERE operation_id = ?1 AND record_kind = 'incident'",
+        [operation.binding().operation_id().as_str()],
+    )?, 1);
+    connection.execute_batch(&trigger)?;
+    drop(connection);
+    assert!(matches!(
+        fixture.store.load_chio_receipt(receipt_id.as_str()),
+        Err(ReceiptStoreError::Conflict(detail))
+            if detail == "terminal projection record count differs from its manifest"
+    ));
+    Ok(())
 }

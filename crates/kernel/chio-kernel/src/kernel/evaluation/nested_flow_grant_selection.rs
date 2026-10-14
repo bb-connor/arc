@@ -4,6 +4,7 @@ use std::ops::ControlFlow;
 
 use super::evaluation_helpers::PreDispatchCleanupDeny;
 use super::*;
+use crate::kernel::admission_coordinator::DurableRefusalResponse;
 
 /// Inputs to nested-flow grant selection: the matching grants in specificity
 /// order and the admission state every candidate is validated against.
@@ -172,23 +173,47 @@ impl ChioKernel {
                             .map(DurableToolAdmission::operation),
                         runtime_admission_metadata,
                     );
-                if runtime_release_confirmed {
-                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                        durable_admission
-                            .as_ref()
-                            .map(DurableToolAdmission::operation),
-                        None,
-                        None,
-                    )?;
+                if !runtime_release_confirmed && durable_admission.is_some() {
+                    return Err(KernelError::DurableAdmission(
+                        "runtime admission reservation release could not be confirmed".into(),
+                    ));
                 }
                 return self
                     .with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                        if runtime_release_confirmed && durable_admission.is_some() {
+                            if let Some(response) = self
+                                .compensate_durable_admission_after_pre_dispatch_cleanup(
+                                    durable_admission
+                                        .as_ref()
+                                        .map(DurableToolAdmission::operation),
+                                    None,
+                                    None,
+                                    None,
+                                    DurableRefusalResponse {
+                                        reason: &msg,
+                                        cancelled: false,
+                                        matched_grant_index: Some(matching.index),
+                                        metadata: runtime_admission_metadata.clone(),
+                                        verified_payee_binding: None,
+                                    },
+                                )?
+                            {
+                                return Ok(response);
+                            }
+                        }
                         self.build_runtime_admission_deny_response_with_metadata(
                             request,
                             &msg,
                             now,
                             Some(matching.index),
-                            runtime_admission_metadata,
+                            RefusalReceiptMetadata::new(
+                                runtime_admission_metadata,
+                                if durable_admission.is_some() || !runtime_release_confirmed {
+                                    IdentityDisposition::Terminal
+                                } else {
+                                    IdentityDisposition::Reusable
+                                },
+                            ),
                         )
                     })
                     .map(ControlFlow::Break);
@@ -308,26 +333,54 @@ impl ChioKernel {
                                 .map(DurableToolAdmission::operation),
                             runtime_admission_metadata,
                         );
-                    if runtime_release_confirmed {
-                        self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                            durable_admission
-                                .as_ref()
-                                .map(DurableToolAdmission::operation),
-                            None,
-                            None,
-                        )?;
+                    if !runtime_release_confirmed && durable_admission.is_some() {
+                        return Err(error);
                     }
+                    let receipt_metadata = self.merge_budget_receipt_metadata(
+                        runtime_admission_metadata,
+                        self.budget_backend_receipt_metadata()?,
+                    );
                     return self
                         .with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                            if runtime_release_confirmed && durable_admission.is_some() {
+                                let (matched_grant_index, financial_metadata) =
+                                    self.monetary_deny_metadata(matching_grants, cap)?;
+                                if let Some(response) = self
+                                    .compensate_durable_admission_after_pre_dispatch_cleanup(
+                                        durable_admission
+                                            .as_ref()
+                                            .map(DurableToolAdmission::operation),
+                                        None,
+                                        None,
+                                        None,
+                                        DurableRefusalResponse {
+                                            reason: &msg,
+                                            cancelled: false,
+                                            matched_grant_index,
+                                            metadata: merge_metadata_objects(
+                                                financial_metadata,
+                                                receipt_metadata.clone(),
+                                            ),
+                                            verified_payee_binding: None,
+                                        },
+                                    )?
+                                {
+                                    return Ok(response);
+                                }
+                            }
                             self.build_monetary_deny_response_with_metadata(
                                 request,
                                 &msg,
                                 now,
                                 matching_grants,
                                 cap,
-                                self.merge_budget_receipt_metadata(
-                                    runtime_admission_metadata,
-                                    self.budget_backend_receipt_metadata()?,
+                                RefusalReceiptMetadata::new(
+                                    receipt_metadata,
+                                    if durable_admission.is_some() || !runtime_release_confirmed {
+                                        IdentityDisposition::Terminal
+                                    } else {
+                                        IdentityDisposition::Reusable
+                                    },
                                 ),
                             )
                         })
@@ -352,23 +405,49 @@ impl ChioKernel {
             if budget_error.is_none() {
                 if let Some(denial) = guard_denial {
                     let msg = denial.error.to_string();
-                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                        durable_admission
-                            .as_ref()
-                            .map(DurableToolAdmission::operation),
-                        None,
-                        None,
-                    )?;
                     let receipt_metadata = Some(self.budget_backend_receipt_metadata()?);
                     return self
                         .with_pre_invocation_guard_evidence(&denial.evidence, || {
+                            if durable_admission.is_some() {
+                                let (matched_grant_index, financial_metadata) =
+                                    self.monetary_deny_metadata(matching_grants, cap)?;
+                                if let Some(response) = self
+                                    .compensate_durable_admission_after_pre_dispatch_cleanup(
+                                        durable_admission
+                                            .as_ref()
+                                            .map(DurableToolAdmission::operation),
+                                        None,
+                                        None,
+                                        None,
+                                        DurableRefusalResponse {
+                                            reason: &msg,
+                                            cancelled: false,
+                                            matched_grant_index,
+                                            metadata: merge_metadata_objects(
+                                                financial_metadata,
+                                                receipt_metadata.clone(),
+                                            ),
+                                            verified_payee_binding: None,
+                                        },
+                                    )?
+                                {
+                                    return Ok(response);
+                                }
+                            }
                             self.build_monetary_deny_response_with_metadata(
                                 request,
                                 &msg,
                                 now,
                                 matching_grants,
                                 cap,
-                                receipt_metadata,
+                                RefusalReceiptMetadata::new(
+                                    receipt_metadata,
+                                    if durable_admission.is_some() {
+                                        IdentityDisposition::Terminal
+                                    } else {
+                                        IdentityDisposition::Reusable
+                                    },
+                                ),
                             )
                         })
                         .map(ControlFlow::Break);
@@ -380,21 +459,48 @@ impl ChioKernel {
                 )
             });
             let msg = error.to_string();
-            // An unconfirmed runtime release keeps the operation on its
-            // recovery path, as at every other pre-dispatch denial.
-            if !runtime_release_retained
-                && durable_admission.as_ref().is_some_and(|admission| {
-                    admission.state()
-                    == crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
-                })
-            {
-                self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                    durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    None,
-                    None,
-                )?;
+            if durable_admission.as_ref().is_some_and(|admission| {
+                runtime_release_retained
+                    || !matches!(
+                        admission.state(),
+                        crate::admission_operation::AdmissionOperationState::Prepared
+                            | crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
+                    )
+            }) {
+                return Err(error);
+            }
+            let receipt_metadata = self.merge_budget_receipt_metadata(
+                error.rejection_metadata(merge_metadata_objects(
+                    extra_metadata.clone(),
+                    budget_error_metadata,
+                )),
+                self.budget_backend_receipt_metadata()?,
+            );
+            if durable_admission.is_some() {
+                let (matched_grant_index, financial_metadata) =
+                    self.monetary_deny_metadata(matching_grants, cap)?;
+                if let Some(response) = self
+                    .compensate_durable_admission_after_pre_dispatch_cleanup(
+                        durable_admission
+                            .as_ref()
+                            .map(DurableToolAdmission::operation),
+                        None,
+                        None,
+                        None,
+                        DurableRefusalResponse {
+                            reason: &msg,
+                            cancelled: false,
+                            matched_grant_index,
+                            metadata: merge_metadata_objects(
+                                financial_metadata,
+                                receipt_metadata.clone(),
+                            ),
+                            verified_payee_binding: None,
+                        },
+                    )?
+                {
+                    return Ok(ControlFlow::Break(response));
+                }
             }
             return self
                 .build_monetary_deny_response_with_metadata(
@@ -403,12 +509,13 @@ impl ChioKernel {
                     now,
                     matching_grants,
                     cap,
-                    self.merge_budget_receipt_metadata(
-                        error.rejection_metadata(merge_metadata_objects(
-                            extra_metadata.clone(),
-                            budget_error_metadata,
-                        )),
-                        self.budget_backend_receipt_metadata()?,
+                    RefusalReceiptMetadata::new(
+                        receipt_metadata,
+                        if durable_admission.is_some() || runtime_release_retained {
+                            IdentityDisposition::Terminal
+                        } else {
+                            IdentityDisposition::Reusable
+                        },
                     ),
                 )
                 .map(ControlFlow::Break);

@@ -43,13 +43,11 @@ fn changed_security_identity_cannot_recover_a_completed_operation() -> TestResul
         .evaluate_tool_call_blocking_with_security_context(&request, &context(&request, 1)?)?;
     assert_eq!(first.verdict, Verdict::Allow, "{first:?}");
     let operation = store.operation();
-    let replay = kernel
-        .evaluate_tool_call_blocking_with_security_context(&request, &context(&request, 2)?)?;
-    assert_eq!(
-        replay.verdict,
-        Verdict::Deny,
-        "changed identity recovered the old output: {replay:?}"
+    let receipts = kernel.receipt_log().len();
+    assert_conflict(
+        kernel.evaluate_tool_call_blocking_with_security_context(&request, &context(&request, 2)?),
     );
+    assert_eq!(kernel.receipt_log().len(), receipts);
     assert_eq!(store.operation(), operation);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     Ok(())
@@ -101,6 +99,15 @@ fn evaluate(
     }
 }
 
+fn assert_conflict(result: Result<ToolCallResponse, KernelError>) {
+    let error = result.expect_err("conflicting identity cannot mint another receipt");
+    assert!(
+        matches!(error, KernelError::DurableAdmission(ref reason)
+        if reason.contains("conflicts with retained operation")),
+        "{error:?}"
+    );
+}
+
 fn replay_matrix(nested: bool) -> TestResult {
     let (kernel, request, store, invocations) = durable_admission_fixture("security-matrix");
     let session = kernel.open_session(request.agent_id.clone(), vec![])?;
@@ -115,6 +122,7 @@ fn replay_matrix(nested: bool) -> TestResult {
     assert_eq!(first.verdict, Verdict::Allow, "{first:?}");
     let operation = store.operation();
 
+    let receipts = kernel.receipt_log().len();
     for (field, value) in [
         ("tenantId", serde_json::json!("another-tenant")),
         ("sessionId", serde_json::json!("another-session")),
@@ -127,14 +135,13 @@ fn replay_matrix(nested: bool) -> TestResult {
         changed["context"][field] = value;
         let changed = serde_json::from_value(changed)?;
         match evaluate(&kernel, &request, Some(&changed), parent) {
-            Ok(response) => {
-                assert_eq!(response.verdict, Verdict::Deny, "{field}: {response:?}");
-                assert!(response.output.is_none());
-                assert!(response
-                    .reason
-                    .as_deref()
-                    .is_some_and(|r| r.contains("conflicts with retained operation")));
+            Err(KernelError::DurableAdmission(reason)) => {
+                assert!(
+                    reason.contains("conflicts with retained operation"),
+                    "{field}: {reason}"
+                );
             }
+            Ok(response) => panic!("{field}: conflicting identity minted a receipt: {response:?}"),
             Err(KernelError::GuardDenied(_)) => {
                 assert!(
                     field == "principalId"
@@ -145,10 +152,10 @@ fn replay_matrix(nested: bool) -> TestResult {
             Err(error) => return Err(error.into()),
         }
         assert_eq!(store.operation(), operation, "{field}");
+        assert_eq!(kernel.receipt_log().len(), receipts, "{field}");
     }
-    let removed = evaluate(&kernel, &request, None, parent)?;
-    assert_eq!(removed.verdict, Verdict::Deny);
-    assert!(removed.output.is_none());
+    assert_conflict(evaluate(&kernel, &request, None, parent));
+    assert_eq!(kernel.receipt_log().len(), receipts);
     let advanced =
         SecurityInvocationContext::v1(original.as_v1().clone().with_flow_state_generation(7));
     let replay = evaluate(&kernel, &request, Some(&advanced), parent)?;
@@ -200,9 +207,9 @@ fn changed_security_requirements_cannot_recover_an_unbound_terminal() -> TestRes
         } else {
             kernel.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
         }
-        let retry = kernel.evaluate_tool_call_blocking(&request)?;
-        assert_eq!(retry.verdict, Verdict::Deny, "{retry:?}");
-        assert!(retry.output.is_none());
+        let receipts = kernel.receipt_log().len();
+        assert_conflict(kernel.evaluate_tool_call_blocking(&request));
+        assert_eq!(kernel.receipt_log().len(), receipts);
         assert_eq!(store.operation(), operation);
         assert_eq!(invocations.load(Ordering::SeqCst), 1);
     }
@@ -217,23 +224,44 @@ fn adding_security_context_cannot_recover_an_unbound_terminal() -> TestResult {
         Verdict::Allow
     );
     let operation = store.operation();
-    let replay = kernel
-        .evaluate_tool_call_blocking_with_security_context(&request, &context(&request, 1)?)?;
-    assert_eq!(replay.verdict, Verdict::Deny);
-    assert!(replay.output.is_none());
+    let receipts = kernel.receipt_log().len();
+    assert_conflict(
+        kernel.evaluate_tool_call_blocking_with_security_context(&request, &context(&request, 1)?),
+    );
+    assert_eq!(kernel.receipt_log().len(), receipts);
     assert_eq!(store.operation(), operation);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }
 
 #[test]
-fn security_binding_preserves_large_ordinary_requests() -> TestResult {
-    let (kernel, mut request, _, invocations) = durable_admission_fixture("security-large");
+fn security_bound_oversized_request_is_refused_before_admission() -> TestResult {
+    let (kernel, mut request, store, invocations) = durable_admission_fixture("security-large");
     request.arguments["payload"] = serde_json::json!("x".repeat(262_145));
+    let receipts = kernel.receipt_log().len();
     let response = kernel
         .evaluate_tool_call_blocking_with_security_context(&request, &context(&request, 1)?)?;
-    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("durable admission failed: admission operation invariant failed: retained request exceeds its artifact bound")
+    );
+    assert!(response.output.is_none());
+    assert!(response.receipt.verify_signature()?);
+    assert_eq!(
+        response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/identity_disposition"))
+            .and_then(serde_json::Value::as_str),
+        Some("reusable"),
+    );
+    assert_eq!(kernel.receipt_log().len(), receipts + 1);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    let state = store.state.lock().map_err(|_| "test lock")?;
+    assert!(state.operation.is_none());
+    assert!(state.retained_request.is_none());
     Ok(())
 }
 
@@ -250,6 +278,7 @@ fn changed_security_identity_is_rejected_before_dispatch_capture() -> TestResult
             &request,
             &matching,
             Some(&original),
+            None,
             now,
             DispatchTransport::KernelToolServer,
         )?

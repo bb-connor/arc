@@ -233,7 +233,84 @@ fn caller_start_and_report_select_original_operation_across_tenants() -> TestRes
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn reserve_for_caller_nonce_refusal_replays_one_canonical_compensation() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    fixture.strict_nonces();
+    let invocations = Arc::new(AtomicU64::new(0));
+    fixture
+        .kernel
+        .register_tool_server(Box::new(MutationServer {
+            invocations: invocations.clone(),
+        }));
+    let agent = Keypair::generate();
+    let capability = fixture
+        .kernel
+        .issue_capability(&agent.public_key(), scope(), 300)?;
+    let mut request = request(&capability);
+    request.request_id = "reserve-for-caller-terminal-refusal".into();
+    let initial = fixture
+        .kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&request, None)?;
+    assert_eq!(initial.verdict, Verdict::Deny);
+    assert_eq!(
+        initial.reason.as_deref(),
+        Some("durable execution nonces do not support reserve-for-caller authorization")
+    );
+    assert!(initial.output.is_none());
+    assert!(initial.execution_nonce.is_none());
+    assert!(initial.receipt.verify_signature()?);
+    let metadata: AdmissionReceiptMetadataV1 = serde_json::from_value(
+        initial
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get(ADMISSION_RECEIPT_METADATA_KEY))
+            .cloned()
+            .ok_or("canonical compensation metadata")?,
+    )?;
+    let store = fixture.authority.admission_operation_store();
+    let terminal = store
+        .load_by_operation_id(&metadata.operation_id)?
+        .ok_or("compensated operation")?;
+    assert_eq!(
+        terminal.state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert!(terminal.dispatch_commit().is_none());
+    let canonical = canonical_json_bytes(&initial.receipt)?;
+    assert_eq!(
+        canonical_json_bytes(
+            &store
+                .load_chio_receipt(&initial.receipt.id)?
+                .ok_or("stored refusal")?
+        )?,
+        canonical
+    );
+    assert_eq!(fixture.kernel.receipt_log().len(), 1);
+    for _ in 0..2 {
+        let replay = fixture
+            .kernel
+            .authorize_tool_call_reserving_blocking_with_metadata(&request, None)?;
+        assert_eq!(replay.verdict, initial.verdict);
+        assert_eq!(replay.reason, initial.reason);
+        assert_eq!(replay.output, initial.output);
+        assert_eq!(replay.terminal_state, initial.terminal_state);
+        assert!(replay.execution_nonce.is_none());
+        assert_eq!(canonical_json_bytes(&replay.receipt)?, canonical);
+        assert_eq!(
+            store.load_by_operation_id(&metadata.operation_id)?,
+            Some(terminal.clone())
+        );
+        assert_eq!(fixture.kernel.receipt_log().len(), 1);
+    }
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
 struct Requirement(ThresholdApprovalRequirement);
+
 impl chio_kernel::threshold_approval::ThresholdApprovalRequirementResolver for Requirement {
     fn resolve_requirement(
         &self,

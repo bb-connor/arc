@@ -28,15 +28,19 @@ mod admission_terminal_receipt;
 mod approval_cleanup;
 mod credential_reservation;
 mod effect_obligation;
+pub use effect_obligation::evidence::PostEffectEvidenceBudget;
 mod error;
 mod guard_invocation_attempt;
 pub(crate) use guard_invocation_attempt::GuardInvocationAttempt;
 mod kernel_drop_guard;
+mod nested_flow_bridge;
+use nested_flow_bridge::SessionNestedFlowBridge;
 mod kernel_scopes;
 mod kernel_struct;
 mod nonce_admission;
 mod output_guard;
 mod receipt_identity;
+use receipt_identity::{IdentityDisposition, RefusalReceiptMetadata};
 mod rejection_metadata;
 mod security_dispatch;
 mod security_runtime;
@@ -156,7 +160,9 @@ const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
 const PROTOCOL_REFUSAL_METADATA_KEY: &str = "protocol_refusal";
 const RUNTIME_ADMISSION_METADATA_KEY: &str = "chio_runtime";
 
-const RESERVED_RECEIPT_METADATA_KEYS: [&str; 10] = [
+const RESERVED_RECEIPT_METADATA_KEYS: [&str; 12] = [
+    crate::admission_operation::ADMISSION_RECEIPT_METADATA_KEY,
+    "attribution",
     MANIFEST_SECURITY_METADATA_KEY,
     PROTOCOL_ADMISSION_METADATA_KEY,
     BUDGET_AUTHORITY_METADATA_KEY,
@@ -177,7 +183,67 @@ fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option
         .find(|key| object.contains_key(*key))
 }
 
-fn reject_reserved_receipt_metadata(
+fn is_lower_sha256_hex(value: &serde_json::Value) -> bool {
+    value.as_str().is_some_and(|value| {
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
+/// Attempt-scoped launch evidence must be well formed: a native launch names
+/// one launch receipt, and a worker profile names one container launch record
+/// and its launch attempt.
+fn validate_attempt_launch_metadata(
+    metadata: Option<&serde_json::Value>,
+) -> Result<(), KernelError> {
+    let Some(metadata) = metadata else {
+        return Ok(());
+    };
+    if let Some(launch) = metadata.get("native_launch") {
+        if launch.as_object().is_none_or(|object| object.len() != 2)
+            || !launch.get("receipt_id").is_some_and(is_lower_sha256_hex)
+            || !launch
+                .get("receipt_sha256")
+                .is_some_and(is_lower_sha256_hex)
+        {
+            return Err(KernelError::InvalidReceiptMetadata(
+                "native_launch must name one launch receipt id and sha256".into(),
+            ));
+        }
+    }
+    if let Some(profile) = metadata
+        .get("chio_process")
+        .and_then(|process| process.get("worker_profile"))
+    {
+        let reference = profile.get("launch_ref");
+        if profile.as_object().is_none_or(|object| object.len() != 3)
+            || profile.get("kind").and_then(serde_json::Value::as_str) != Some("container")
+            || !profile
+                .get("launch_attempt")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(|attempt| (1..=u64::from(u32::MAX)).contains(&attempt))
+            || reference
+                .and_then(serde_json::Value::as_object)
+                .is_none_or(|object| object.len() != 2)
+            || !reference
+                .and_then(|reference| reference.get("record_id"))
+                .is_some_and(is_lower_sha256_hex)
+            || !reference
+                .and_then(|reference| reference.get("record_sha256"))
+                .is_some_and(is_lower_sha256_hex)
+        {
+            return Err(KernelError::InvalidReceiptMetadata(
+                "chio_process.worker_profile must name one container launch record and attempt"
+                    .into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_caller_receipt_metadata(
     metadata: Option<&serde_json::Value>,
 ) -> Result<(), KernelError> {
     if metadata.is_some_and(|value| !value.is_object()) {
@@ -185,6 +251,8 @@ fn reject_reserved_receipt_metadata(
             "receipt metadata must be a JSON object".into(),
         ));
     }
+    crate::receipt_support::validate_caller_provenance_metadata(metadata)?;
+    validate_attempt_launch_metadata(metadata)?;
     let Some(key) = reserved_receipt_metadata_key(metadata) else {
         return Ok(());
     };
@@ -211,7 +279,7 @@ fn registry_validated_manifest_security_metadata(
     security: &chio_manifest::BridgeSecurityMetadata,
     metadata: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, KernelError> {
-    reject_reserved_receipt_metadata(metadata.as_ref())?;
+    validate_caller_receipt_metadata(metadata.as_ref())?;
     registry
         .validate_invocation_arguments(
             &request.server_id,
@@ -1300,296 +1368,6 @@ impl PreExecutionBudgetMutation {
             Self::Charge(charge) | Self::InvocationHold(charge) => Some(charge),
             Self::Invocation { .. } | Self::None => None,
         }
-    }
-
-    fn into_charge_result(self) -> Option<BudgetChargeResult> {
-        match self {
-            Self::Charge(charge) => Some(charge),
-            Self::None | Self::Invocation { .. } | Self::InvocationHold(_) => None,
-        }
-    }
-}
-
-struct SessionNestedFlowBridge<'a, C> {
-    clock: Arc<dyn chio_security_types::clock::Clock>,
-    sessions: &'a DashMap<SessionId, Arc<Session>>,
-    child_receipts: &'a mut Vec<ChildRequestReceipt>,
-    nested_interaction_observed: &'a std::sync::atomic::AtomicBool,
-    parent_context: &'a OperationContext,
-    allow_sampling: bool,
-    allow_sampling_tool_use: bool,
-    allow_elicitation: bool,
-    policy_hash: &'a str,
-    kernel_keypair: &'a Keypair,
-    client: &'a mut C,
-}
-
-impl<C> SessionNestedFlowBridge<'_, C> {
-    fn mark_nested_interaction_observed(&self) {
-        self.nested_interaction_observed
-            .store(true, std::sync::atomic::Ordering::Release);
-    }
-
-    fn ensure_parent_not_cancelled(&self) -> Result<(), KernelError> {
-        let session = session_from_map(self.sessions, &self.parent_context.session_id)?;
-        let request_id = &self.parent_context.request_id;
-        let Some(parent) = session.inflight().get(request_id) else {
-            return Err(KernelError::RequestCancelled {
-                request_id: request_id.clone(),
-                reason: "parent session request completed during nested dispatch".to_string(),
-            });
-        };
-        if parent.cancellation_requested {
-            return Err(KernelError::RequestCancelled {
-                request_id: request_id.clone(),
-                reason: parent.cancellation_reason.unwrap_or_else(|| {
-                    "parent session request cancelled during nested dispatch".to_string()
-                }),
-            });
-        }
-        Ok(())
-    }
-
-    fn latch_matching_cancellation<T>(
-        &mut self,
-        result: &Result<T, KernelError>,
-        child_request_id: Option<&RequestId>,
-    ) -> Result<(), KernelError> {
-        let Err(KernelError::RequestCancelled { request_id, reason }) = result else {
-            return Ok(());
-        };
-        if request_id != &self.parent_context.request_id
-            && child_request_id.is_none_or(|child_request_id| request_id != child_request_id)
-        {
-            return Ok(());
-        }
-        session_from_map(self.sessions, &self.parent_context.session_id)?
-            .request_cancellation_with_reason(request_id, reason)?;
-        Ok(())
-    }
-
-    fn complete_child_request_with_receipt<T: serde::Serialize>(
-        &mut self,
-        child_context: &OperationContext,
-        operation_kind: OperationKind,
-        result: &Result<T, KernelError>,
-    ) -> Result<(), KernelError> {
-        let now = self.clock.unix_millis()?;
-        let terminal_state = child_terminal_state(&child_context.request_id, result);
-        complete_session_request_with_terminal_state_in_sessions(
-            self.sessions,
-            &child_context.session_id,
-            &child_context.request_id,
-            terminal_state.clone(),
-        )?;
-
-        let receipt = build_child_request_receipt(
-            self.policy_hash,
-            self.kernel_keypair,
-            child_context,
-            operation_kind,
-            terminal_state,
-            child_outcome_payload(result)?,
-            now,
-        )?;
-        self.child_receipts.push(receipt);
-        Ok(())
-    }
-}
-
-impl<C> Drop for SessionNestedFlowBridge<'_, C> {
-    fn drop(&mut self) {
-        if let Some(session) = self.sessions.get(&self.parent_context.session_id) {
-            session.mark_request_dispatch_finished(&self.parent_context.request_id);
-        }
-    }
-}
-
-impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
-    fn parent_request_id(&self) -> &RequestId {
-        &self.parent_context.request_id
-    }
-
-    fn poll_parent_cancellation(&mut self) -> Result<(), KernelError> {
-        self.ensure_parent_not_cancelled()?;
-        let result = self.client.poll_parent_cancellation(self.parent_context);
-        self.latch_matching_cancellation(&result, None)?;
-        result
-    }
-
-    fn list_roots(&mut self) -> Result<Vec<RootDefinition>, KernelError> {
-        self.ensure_parent_not_cancelled()?;
-        self.mark_nested_interaction_observed();
-        let (child_context, _start) = begin_child_request_in_sessions(
-            self.sessions,
-            self.parent_context,
-            nested_child_request_id(&self.parent_context.request_id, "roots"),
-            OperationKind::ListRoots,
-            None,
-            false,
-        )?;
-
-        let result = (|| {
-            let session = session_from_map(self.sessions, &child_context.session_id)?;
-            session.validate_context(&child_context)?;
-            session.ensure_operation_allowed(OperationKind::ListRoots)?;
-            if !session.peer_capabilities().supports_roots {
-                return Err(KernelError::RootsNotNegotiated);
-            }
-
-            let roots = self
-                .client
-                .list_roots(self.parent_context, &child_context)?;
-            session_from_map(self.sessions, &child_context.session_id)?
-                .replace_roots(roots.clone());
-            Ok(roots)
-        })();
-        if matches!(
-            &result,
-            Err(KernelError::RequestCancelled { request_id, .. })
-                if request_id == &child_context.request_id
-        ) {
-            session_from_map(self.sessions, &child_context.session_id)?
-                .request_cancellation(&child_context.request_id)?;
-        }
-        self.complete_child_request_with_receipt(
-            &child_context,
-            OperationKind::ListRoots,
-            &result,
-        )?;
-
-        result
-    }
-
-    fn create_message(
-        &mut self,
-        operation: CreateMessageOperation,
-    ) -> Result<CreateMessageResult, KernelError> {
-        self.ensure_parent_not_cancelled()?;
-        self.mark_nested_interaction_observed();
-        let (child_context, _start) = begin_child_request_in_sessions(
-            self.sessions,
-            self.parent_context,
-            nested_child_request_id(&self.parent_context.request_id, "sample"),
-            OperationKind::CreateMessage,
-            None,
-            true,
-        )?;
-
-        let result = (|| {
-            validate_sampling_request_in_sessions(
-                self.sessions,
-                self.allow_sampling,
-                self.allow_sampling_tool_use,
-                &child_context,
-                &operation,
-            )?;
-            self.client
-                .create_message(self.parent_context, &child_context, &operation)
-        })();
-        if matches!(
-            &result,
-            Err(KernelError::RequestCancelled { request_id, .. })
-                if request_id == &child_context.request_id
-        ) {
-            session_from_map(self.sessions, &child_context.session_id)?
-                .request_cancellation(&child_context.request_id)?;
-        }
-        self.complete_child_request_with_receipt(
-            &child_context,
-            OperationKind::CreateMessage,
-            &result,
-        )?;
-
-        result
-    }
-
-    fn create_elicitation(
-        &mut self,
-        operation: CreateElicitationOperation,
-    ) -> Result<CreateElicitationResult, KernelError> {
-        self.ensure_parent_not_cancelled()?;
-        self.mark_nested_interaction_observed();
-        let (child_context, _start) = begin_child_request_in_sessions(
-            self.sessions,
-            self.parent_context,
-            nested_child_request_id(&self.parent_context.request_id, "elicit"),
-            OperationKind::CreateElicitation,
-            None,
-            true,
-        )?;
-
-        let result = (|| {
-            validate_elicitation_request_in_sessions(
-                self.sessions,
-                self.allow_elicitation,
-                &child_context,
-                &operation,
-            )?;
-            self.client
-                .create_elicitation(self.parent_context, &child_context, &operation)
-        })();
-        if matches!(
-            &result,
-            Err(KernelError::RequestCancelled { request_id, .. })
-                if request_id == &child_context.request_id
-        ) {
-            session_from_map(self.sessions, &child_context.session_id)?
-                .request_cancellation(&child_context.request_id)?;
-        }
-        self.complete_child_request_with_receipt(
-            &child_context,
-            OperationKind::CreateElicitation,
-            &result,
-        )?;
-
-        result
-    }
-
-    fn notify_elicitation_completed(&mut self, elicitation_id: &str) -> Result<(), KernelError> {
-        self.ensure_parent_not_cancelled()?;
-        let session = session_from_map(self.sessions, &self.parent_context.session_id)?;
-        session.validate_context(self.parent_context)?;
-        session.ensure_operation_allowed(OperationKind::ToolCall)?;
-
-        self.mark_nested_interaction_observed();
-        let result = self
-            .client
-            .notify_elicitation_completed(self.parent_context, elicitation_id);
-        self.latch_matching_cancellation(&result, None)?;
-        result
-    }
-
-    fn notify_resource_updated(&mut self, uri: &str) -> Result<(), KernelError> {
-        self.ensure_parent_not_cancelled()?;
-        let session = session_from_map(self.sessions, &self.parent_context.session_id)?;
-        session.validate_context(self.parent_context)?;
-        session.ensure_operation_allowed(OperationKind::ToolCall)?;
-
-        if !session.is_resource_subscribed(uri) {
-            return Ok(());
-        }
-
-        self.mark_nested_interaction_observed();
-        let result = self
-            .client
-            .notify_resource_updated(self.parent_context, uri);
-        self.latch_matching_cancellation(&result, None)?;
-        result
-    }
-
-    fn notify_resources_list_changed(&mut self) -> Result<(), KernelError> {
-        self.ensure_parent_not_cancelled()?;
-        let session = session_from_map(self.sessions, &self.parent_context.session_id)?;
-        session.validate_context(self.parent_context)?;
-        session.ensure_operation_allowed(OperationKind::ToolCall)?;
-
-        self.mark_nested_interaction_observed();
-        let result = self
-            .client
-            .notify_resources_list_changed(self.parent_context);
-        self.latch_matching_cancellation(&result, None)?;
-        result
     }
 }
 

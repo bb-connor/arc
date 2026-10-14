@@ -84,6 +84,24 @@ impl ToolServerConnection for AppendServer {
     }
 }
 
+fn launch(id: char) -> Result<[(String, chio_process::ProcessLaunchReceipt); 1]> {
+    Ok([(
+        "tools".into(),
+        chio_process::ProcessLaunchReceipt::new(id.to_string().repeat(64), "d".repeat(64))?,
+    )])
+}
+
+fn worker_profile(attempt: u32, id: char) -> chio_process::WorkerProfile {
+    chio_process::WorkerProfile {
+        kind: chio_process::WorkerProfileKind::Container,
+        launch_ref: chio_process::LaunchRef {
+            record_id: id.to_string().repeat(64),
+            record_sha256: "e".repeat(64),
+        },
+        launch_attempt: attempt,
+    }
+}
+
 fn phase(dir: &std::path::Path, phase: &str) -> Result<std::process::ExitStatus> {
     Ok(Command::new(std::env::current_exe()?)
         .args(["--exact", "subprocess_worker", "--nocapture"])
@@ -268,6 +286,19 @@ async fn subprocess_worker() -> Result {
         phase.ends_with("artifact-supplemental"),
     )?;
     let runtime = ProcessRuntime::open(dir.join("process.db"), kernel.clone())?;
+    // The recovering host relaunches its tools: the same logical call is
+    // re-presented with a different native launch receipt.
+    let runtime = match phase.as_str() {
+        "crash-in-tool" => runtime.with_launch_receipts(launch('a')?)?,
+        "recover-unknown" => runtime.with_launch_receipts(launch('b')?)?,
+        _ => runtime,
+    };
+    // The relaunched worker container presents the call under its own launch.
+    match phase.as_str() {
+        "crash-in-tool" => runtime.bind_worker_profile("root", worker_profile(1, 'a'))?,
+        "recover-unknown" => runtime.bind_worker_profile("root", worker_profile(2, 'b'))?,
+        _ => {}
+    }
     if phase.contains("-artifact-") {
         let first = phase.starts_with("crash-");
         let request_path = dir.join("original-request.json");
@@ -295,11 +326,7 @@ async fn subprocess_worker() -> Result {
                 request.supplemental_authorization = Some(chio_core_types::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
                     signed_extension: support::supplemental::issue(&request)?,
                 });
-            } else if phase.ends_with("nonce") {
-                let preflight = kernel.evaluate_tool_call(&request).await?;
-                assert_eq!(preflight.verdict, Verdict::Allow, "{:?}", preflight.reason);
-                request.execution_nonce = Some(*preflight.execution_nonce.ok_or("issued nonce")?);
-            } else {
+            } else if !phase.ends_with("nonce") {
                 let mut intent: chio_core_types::capability::governance::GovernedTransactionIntent =
                     serde_json::from_value(
                         json!({"id": "read-intent", "server_id": "tools", "tool_name": "read", "purpose": "one recorded read"}),
@@ -450,25 +477,24 @@ async fn subprocess_worker() -> Result {
         assert_eq!(runtime.process("root")?.tree_calls, 1);
         let projection = &receipt["metadata"]["admission_operation"];
         let dispatch = &projection["retained_dispatch_commit"];
-        assert_eq!(projection["store_fence"], dispatch["store_fence"]);
         assert_eq!(
-            projection["coordinator_lease_id"],
-            dispatch["coordinator_lease_id"]
-        );
-        assert_eq!(
-            projection["coordinator_lease_epoch"],
-            dispatch["coordinator_lease_epoch"]
+            projection["store_fence"]["store_uuid"],
+            dispatch["store_fence"]["store_uuid"]
         );
         let connection = rusqlite::Connection::open(dir.join("authority.db"))?;
         let current_epoch: i64 =
             connection.query_row("SELECT owner_epoch FROM chio_serving_owner", [], |row| {
                 row.get(0)
             })?;
+        let projected_epoch = projection["store_fence"]["owner_epoch"]
+            .as_i64()
+            .ok_or("projection epoch")?;
+        assert_eq!(projected_epoch, current_epoch);
         assert!(
-            current_epoch
-                > projection["store_fence"]["owner_epoch"]
+            projected_epoch
+                > dispatch["store_fence"]["owner_epoch"]
                     .as_i64()
-                    .ok_or("historical epoch")?
+                    .ok_or("dispatch epoch")?
         );
         assert_eq!(retained_before, Some(retained_snapshot(&dir)?));
         return Ok(());
@@ -552,14 +578,38 @@ async fn subprocess_worker() -> Result {
         assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
         assert!(response.output.is_none());
         assert!(response.receipt.verify_signature()?);
-        assert!(
-            response
-                .reason
-                .as_deref()
-                .unwrap_or_default()
-                .contains("OutcomeUnknownAfterDispatch"),
-            "{:?}",
-            response.reason
+        assert_eq!(
+            response.reason.as_deref(),
+            Some("dispatch outcome is unknown after recovery")
+        );
+        let metadata = response
+            .receipt
+            .metadata
+            .as_ref()
+            .ok_or("receipt metadata")?;
+        assert_eq!(
+            metadata.pointer("/admission_operation/projected_state"),
+            Some(&json!("outcome_unknown_after_dispatch"))
+        );
+        let process = &metadata["chio_process"];
+        assert_eq!(process["runtime_id"], json!(runtime.runtime_id()));
+        assert_eq!(process["process_id"], json!("root"));
+        assert_eq!(process["operation_key"], json!("publish"));
+        assert_eq!(process["attempt"], json!(1));
+        assert_eq!(
+            metadata["native_launch"],
+            serde_json::to_value(&launch('a')?[0].1)?,
+            "a recovery refusal names the launch that admitted the call"
+        );
+        assert_eq!(
+            process["worker_profile"],
+            serde_json::to_value(worker_profile(1, 'a'))?,
+            "a recovery refusal names the worker launch that admitted the call"
+        );
+        let replay = runtime.invoke("root", "publish", &request).await?;
+        assert_eq!(
+            serde_json::to_value(&replay.receipt)?,
+            serde_json::to_value(&response.receipt)?
         );
     } else {
         assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);

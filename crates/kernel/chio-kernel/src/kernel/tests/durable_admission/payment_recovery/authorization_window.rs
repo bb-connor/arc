@@ -33,6 +33,7 @@ fn review_payment_authorization_window_never_attempted_can_compensate_without_qu
         serde_json::json!({"authority": "never-attempted-regression"}),
         now,
         None,
+        compensation_response(),
     )?;
     assert_eq!(
         store.operation().state(),
@@ -74,6 +75,7 @@ fn review_payment_authorization_window_lost_ack_queries_original_reference_befor
         serde_json::json!({"authority": "lost-ack-regression"}),
         current_unix_timestamp_ms(),
         None,
+        compensation_response(),
     )?;
     let original_reference = operation.binding().operation_id().as_str();
     assert_eq!(

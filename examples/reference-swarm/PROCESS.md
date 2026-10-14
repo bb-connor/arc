@@ -468,13 +468,16 @@ python3 examples/reference-swarm/qualify-process-filesystem.py \
 ```
 
 `qualify-process-network.py`, `qualify-process-authority.py`,
-`qualify-process-revocation.py`, `qualify-process-host-crash.py` and
-`qualify-process-budget.py` accept the same arguments. Run each on the
+`qualify-process-revocation.py`, `qualify-process-host-crash.py`,
+`qualify-process-budget.py` and `qualify-process-clean-exit.py` accept the same
+arguments. Run each on the
 supported Linux x86_64 cage profile as a non-root operator. The scripts retain
 commands, caller responses, signatures and external observations. Each reports
 `m5_acceptance_complete: false`; the complete scenario artifact and final
 qualification remain required. Crash and budget fixtures also retain original
-native launch files for the separate offline check above.
+native launch files for the separate offline check above. The clean-exit
+fixture completes its confined calls and lets the host exit, so its native
+launches record their terminal exits.
 
 ### Run and verify the complete local matrix
 

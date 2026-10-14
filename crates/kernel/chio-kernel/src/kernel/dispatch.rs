@@ -745,6 +745,7 @@ impl ChioKernel {
         self.ensure_federated_receipt_persistence_ready(
             request.federated_origin_kernel_id.as_deref(),
         )?;
+        self.ensure_post_effect_evidence_latch_clear()?;
         self.ensure_receipt_persistence_ready()?;
         self.validate_governed_transaction_pure(
             request,
@@ -1795,41 +1796,8 @@ impl ChioKernel {
         }
     }
 
-    /// Persist a single already-signed child receipt: a commit-bounded durable
-    /// append under the kernel-wide receipt write lock, then the in-process log.
-    /// Child receipts hold that lock, so an unbounded wait would let a wedged
-    /// writer pin every subsequent receipt write; the bounded append fails
-    /// closed on timeout. The in-process log is appended only after the durable
-    /// append succeeds, so a failed append never records a child receipt that is
-    /// absent from the durable log.
-    pub(crate) fn record_child_receipt(
-        &self,
-        receipt: &ChildRequestReceipt,
-    ) -> Result<(), KernelError> {
-        let receipt_store_write = self
-            .receipt_store_write_lock
-            .lock()
-            .map_err(|_| KernelError::Internal("receipt store write lock poisoned".to_string()))?;
-        self.with_receipt_store(|store| {
-            Ok(store.append_child_receipt_with_timeout(
-                receipt,
-                self.config.deadlines.receipt_append_budget(),
-            )?)
-        })?;
-        drop(receipt_store_write);
-        self.append_child_receipt_to_local_log(receipt.clone());
-        Ok(())
-    }
-
     pub(crate) fn append_chio_receipt_to_local_log(&self, receipt: ChioReceipt) {
         match self.receipt_log.lock() {
-            Ok(mut log) => log.append(receipt),
-            Err(poisoned) => poisoned.into_inner().append(receipt),
-        }
-    }
-
-    fn append_child_receipt_to_local_log(&self, receipt: ChildRequestReceipt) {
-        match self.child_receipt_log.lock() {
             Ok(mut log) => log.append(receipt),
             Err(poisoned) => poisoned.into_inner().append(receipt),
         }

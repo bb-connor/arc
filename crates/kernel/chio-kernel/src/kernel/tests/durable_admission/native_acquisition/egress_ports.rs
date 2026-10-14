@@ -26,6 +26,7 @@ fn unsupported_native_egress_ports_reject_commands_and_history_without_mutation(
             &request,
             &security_binding::matching(&request)?,
             Some(&context),
+            None,
             now,
             DispatchTransport::KernelToolServer,
         )?

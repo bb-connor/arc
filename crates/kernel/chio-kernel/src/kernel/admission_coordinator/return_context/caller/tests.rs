@@ -30,7 +30,7 @@ fn caller_observation_metadata_cannot_be_injected_before_dispatch() -> TestResul
         .request_for_revalidation();
     let metadata = serde_json::json!({"caller_delivery": {"report_digest": "a".repeat(64)}});
     assert!(matches!(
-        reject_reserved_receipt_metadata(Some(&metadata)),
+        validate_caller_receipt_metadata(Some(&metadata)),
         Err(KernelError::InvalidReceiptMetadata(_))
     ));
     let result = fixture.kernel.freeze_durable_tool_return_context(

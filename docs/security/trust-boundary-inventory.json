@@ -1206,6 +1206,7 @@
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars::from_wire",
+    "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_unknown_projection_body::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/runtime_replay.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-kernel/src/caller_delivery.rs::decode::from_wire",
@@ -6629,6 +6630,9 @@
     ],
     "crates/platform/chio-control-plane/src/keyring_runtime.rs": [
       "serialize::custom_deserialize"
+    ],
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/refusal.rs": [
+      "replay_durable_refusal::from_value"
     ]
   },
   "decoder_file_contracts": {
@@ -11579,6 +11583,22 @@
           "checked": true
         }
       ]
+    },
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/refusal.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Projects metadata from the canonical receipt returned by the fenced admission store. Replay checks the original retained request, frozen signer and signature floors, null content, exact terminal operation, lease, dispatch and namespace bindings before delivery. Conversion neither signs a new receipt nor establishes authority from untrusted bytes.",
+      "readers": [
+        {
+          "reader": "replay_durable_refusal",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
     }
   },
   "tenant_runtime_families": {
@@ -12161,7 +12181,7 @@
       ]
     },
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs": {
-      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
+      "contract": "Bounded signed JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation. Signature, canonical projection, manifest, record set, digest, identity, tenant and operation checks bind the receipt to its original terminal transition. Outcome-unknown projections require a closed body with both the canonical refusal receipt and the dispatch incident.",
       "migrations": [
         [
           "validate_denied_projection_body",
@@ -12205,6 +12225,11 @@
         ],
         [
           "validate_projection_body",
+          "decode_signed",
+          "crate::admission_operation::MAX_ADMISSION_TERMINAL_PROJECTION_BYTES"
+        ],
+        [
+          "validate_unknown_projection_body",
           "decode_signed",
           "crate::admission_operation::MAX_ADMISSION_TERMINAL_PROJECTION_BYTES"
         ]
@@ -16541,6 +16566,7 @@
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars::from_wire#1::decode_canonical",
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars::from_wire#2::decode_canonical",
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars::from_wire#3::decode_canonical",
+    "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_unknown_projection_body::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs::from_canonical_bytes::from_wire#1::decode_canonical",
     "crates/kernel/chio-kernel/src/admission_operation/runtime_replay.rs::from_canonical_bytes::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/caller_delivery.rs::decode::from_wire#1::decode_signed",
@@ -17449,6 +17475,7 @@
       "validate_record_set_shape::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::channel_terminal_charge",
       "validate_records::original-json-reader::UntrustedJsonText",
       "validate_sidecars::original-json-reader::UntrustedJsonText",
+      "validate_unknown_projection_body::original-json-reader::UntrustedJsonText",
       "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_channel_terminal_record",
       "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_denied_projection_body",
       "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_economic_mutation_result_record",
@@ -17456,7 +17483,8 @@
       "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_receipt_record",
       "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_record_set",
       "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_records",
-      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars"
+      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars",
+      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_unknown_projection_body"
     ],
     "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs": [
       "from_canonical_bytes::original-json-reader::UntrustedJsonText"

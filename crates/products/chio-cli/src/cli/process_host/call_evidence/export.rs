@@ -1,5 +1,6 @@
 use chio_core::receipt::decision::ToolCallAction;
 use chio_kernel::admission_operation::{AdmissionIdentifier, AdmissionOperationStore};
+use chio_kernel::receipt_store::ReceiptStore;
 
 use super::super::state::{read_json, write_secret, Host};
 use super::*;
@@ -128,6 +129,23 @@ pub(super) fn observe(
             current.to_persisted() == operation.to_persisted(),
             "operation changed during observation",
         )?;
+        if matches!(operation.state(),
+            AdmissionOperationState::CompensatedBeforeDispatch
+                | AdmissionOperationState::OutcomeUnknownAfterDispatch)
+        {
+            let Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) = operation.terminal_replay() else {
+                return Err(error("retained operation lacks its actual terminal receipt"));
+            };
+            let retained_receipt = store.load_chio_receipt(receipt_id.as_str())
+                .map_err(error)?
+                .ok_or_else(|| error("retained operation lacks its actual terminal receipt"))?;
+            require(
+                receipt_id.as_str() == call.id
+                    && canonical_json_bytes(&retained_receipt).map_err(error)?
+                        == canonical_json_bytes(&call).map_err(error)?,
+                "retained operation differs from its actual terminal receipt",
+            )?;
+        }
         Some(Operation {
             binding: operation.binding().to_persisted(),
             state: operation.state(),

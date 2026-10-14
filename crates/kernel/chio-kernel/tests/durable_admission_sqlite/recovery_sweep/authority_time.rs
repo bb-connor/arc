@@ -1,12 +1,14 @@
 //! A recovery sweep observes authority time for each page and each item.
 use super::*;
+use chio_core::capability::token::CapabilityTokenBody;
 use chio_kernel::admission_operation::{
-    AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingInputV1,
-    AdmissionOperationBindingV1, AdmissionOperationKind, AdmissionOperationV1,
-    AdmissionParticipantRequirements, AdmissionRecoveryDeferralV1, AdmissionRecoveryDeferralWrite,
-    AdmissionRecoveryFailureKind, AdmissionRecoveryPageQuery, AdmissionRecoveryPhase,
-    AdmissionRequestBindingV1, AuthenticatedRequestNamespace, QualifiedAdmissionOperationStoreExt,
-    SideEffectClass,
+    AdmissionAuthorityProfileV1, AdmissionAuthoritySelectionV1, AdmissionDigest,
+    AdmissionIdentifier, AdmissionOperationBindingInputV1, AdmissionOperationBindingV1,
+    AdmissionOperationKind, AdmissionOperationV1, AdmissionParticipantRequirements,
+    AdmissionRecoveryDeferralV1, AdmissionRecoveryDeferralWrite, AdmissionRecoveryFailureKind,
+    AdmissionRecoveryPageQuery, AdmissionRecoveryPhase, AdmissionRequestBindingV1,
+    AuthenticatedRequestNamespace, QualifiedAdmissionOperationStoreExt,
+    RetainedToolAdmissionRequestV1, SideEffectClass,
 };
 
 const PAGE: usize = 256;
@@ -25,32 +27,102 @@ struct Sweep {
     pending: Vec<AdmissionOperationV1>,
 }
 
-fn prepared(fence: &StoreMutationFence, index: usize) -> TestResult<AdmissionOperationV1> {
-    let digest = |field: &'static str, byte: &str| AdmissionDigest::try_new(field, byte.repeat(64));
+/// A prepared tool operation committed with original request material whose
+/// receipt signer is `signer`, so recovery can sign its canonical refusal.
+fn prepared(
+    fence: &StoreMutationFence,
+    index: usize,
+    signer: &Keypair,
+    issued_at_secs: u64,
+) -> TestResult<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)> {
+    let key = Keypair::generate();
+    let request_id = format!("sweep-time-{index:03}");
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: format!("sweep-time-capability-{index:03}"),
+            issuer: key.public_key(),
+            subject: key.public_key(),
+            scope: serde_json::from_value(serde_json::json!({"grants": [{
+                "server_id": "server", "tool_name": "tool", "operations": ["invoke"],
+            }]}))?,
+            issued_at: issued_at_secs,
+            expires_at: issued_at_secs + 3_600,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &key,
+    )?;
+    let request: ToolCallRequest = serde_json::from_value(serde_json::json!({
+        "request_id": request_id, "capability": capability,
+        "server_id": "server", "tool_name": "tool", "agent_id": key.public_key().to_hex(),
+        "arguments": {"sweep": index},
+    }))?;
+    let profile = AdmissionAuthorityProfileV1::new(AdmissionAuthoritySelectionV1 {
+        runtime_hook_installed: false,
+        swarm_admission_required: false,
+        runtime_enforces_swarm_authority: false,
+        runtime_requires_dispatch_revalidation: false,
+        runtime: None,
+        approval: None,
+        dpop: None,
+    })?;
+    let signing = serde_json::json!({
+        "public_key": signer.public_key(), "crypto_floor": "allow_classical",
+    });
+    let immutable = serde_json::json!({
+        "schema": "chio.tool-admission-request.v1",
+        "server_id": request.server_id, "tool_name": request.tool_name,
+        "agent_id": request.agent_id, "arguments": request.arguments,
+        "governed_intent": request.governed_intent, "model_metadata": request.model_metadata,
+        "federated_origin_kernel_id": request.federated_origin_kernel_id,
+        "matching_grants": [{"index": 0, "grant": request.capability.scope.grants[0]}],
+        "post_return_steps": [], "security_binding": null,
+        "authority_profile": profile, "frozen_receipt_signing_identity": signing,
+    });
+    let retained = RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(
+        &serde_json::json!({
+            "schema": "chio.retained-tool-admission-request.v1", "request": request,
+            "matching_grant_indices": [0], "post_return_steps": [],
+            "authority_profile": profile, "frozen_receipt_signing_identity": signing,
+        }),
+    )?)?;
+    let digest =
+        |field: &'static str, bytes: &[u8]| AdmissionDigest::try_new(field, sha256_hex(bytes));
     let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
         kind: AdmissionOperationKind::ToolDispatch,
         namespace: AuthenticatedRequestNamespace::for_local_system(AdmissionIdentifier::try_new(
             "coordinator_authority_id",
             fence.store_uuid.clone(),
         )?)?,
-        request_id: AdmissionIdentifier::try_new("request_id", format!("sweep-time-{index:03}"))?,
-        capability_id: AdmissionIdentifier::try_new(
-            "capability_id",
-            format!("sweep-time-capability-{index:03}"),
+        request_id: AdmissionIdentifier::try_new("request_id", request_id)?,
+        capability_id: AdmissionIdentifier::try_new("capability_id", &request.capability.id)?,
+        authorization_capability_hash: digest(
+            "authorization_capability_hash",
+            &canonical_json_bytes(&request.capability)?,
         )?,
-        authorization_capability_hash: digest("authorization_capability_hash", "a")?,
-        request_binding: AdmissionRequestBindingV1::new(
-            digest("immutable_request_hash", "b")?,
+        request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
+            digest("immutable_request_hash", &canonical_json_bytes(&immutable)?)?,
+            digest(
+                "action_parameter_hash",
+                &canonical_json_bytes(&request.arguments)?,
+            )?,
             AdmissionParticipantRequirements {
                 broker_attempt: true,
                 budget_capture: true,
                 ..AdmissionParticipantRequirements::NONE
             },
         )?,
-        policy_hash: digest("policy_hash", "c")?,
+        policy_hash: AdmissionDigest::try_new(
+            "policy_hash",
+            sha256_hex(b"sqlite-durable-admission-test-policy"),
+        )?,
         effect_class: SideEffectClass::SideEffecting,
     })?;
-    Ok(AdmissionOperationV1::prepare(binding, fence.owner_epoch)?)
+    retained.validate_binding(&binding)?;
+    Ok((
+        AdmissionOperationV1::prepare(binding, fence.owner_epoch)?,
+        retained,
+    ))
 }
 
 impl Sweep {
@@ -60,20 +132,30 @@ impl Sweep {
         let (directory, database, locks) = provision()?;
         let clock = SweepClock::new()?;
         let serving = Serving::open(&database, &locks, &clock)?;
-        let kernel = serving.kernel(Keypair::generate(), &clock)?;
+        let signer = Keypair::generate();
+        let kernel = serving.kernel(signer.clone(), &clock)?;
         let at = clock.now_ms()?;
         let count = deferred.checked_add(pending).ok_or("operation count")?;
-        let mut operations = (0..count)
-            .map(|index| prepared(&serving.fence, index))
+        let mut prepared = (0..count)
+            .map(|index| prepared(&serving.fence, index, &signer, at / 1_000))
             .collect::<TestResult<Vec<_>>>()?;
-        operations.sort_by(|left, right| {
+        prepared.sort_by(|(left, _), (right, _)| {
             left.binding()
                 .operation_id()
                 .cmp(right.binding().operation_id())
         });
-        for operation in &operations {
-            serving.operations.begin(operation, &serving.fence, at)?;
+        for (operation, retained) in &prepared {
+            serving.operations.begin_with_retained_tool_request(
+                operation,
+                retained,
+                &serving.fence,
+                at,
+            )?;
         }
+        let mut operations = prepared
+            .into_iter()
+            .map(|(operation, _)| operation)
+            .collect::<Vec<_>>();
         let pending = operations.split_off(deferred);
         let claimant = AdmissionIdentifier::try_new("claimant_id", "sweep-time-setup")?;
         for operation in &operations {

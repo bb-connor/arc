@@ -670,8 +670,12 @@ async fn a_duplicate_while_dispatch_is_live_does_not_create_a_second_effect() ->
     let concurrent_request = request.clone();
     let first = tokio::spawn(async move { a.invoke("root", "publish", &concurrent_request).await });
     tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified()).await?;
-    let duplicate = b.invoke("root", "publish", &request).await?;
-    assert_eq!(duplicate.verdict, Verdict::Deny);
+    let duplicate = b.invoke("root", "publish", &request).await;
+    assert!(
+        matches!(&duplicate, Err(chio_process::ProcessError::Kernel(chio_kernel::KernelError::DurableAdmission(reason)))
+            if reason == "operation already has a live evaluation or recovery owner"),
+        "{duplicate:?}"
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     release.notify_one();
     let original = first.await??;

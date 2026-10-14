@@ -18,8 +18,6 @@ const EGRESS_EXPIRED: &str =
     "durable admission failed: native egress deadline is expired or invalid";
 const UNCONFIRMED_REPLAY: &str =
     "durable admission failed: native preparation requires original pre-budget authority";
-const COMPENSATED_REPLAY: &str =
-    "durable admission failed: request replay is retained in state CompensatedBeforeDispatch";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Fault {
@@ -365,11 +363,18 @@ fn native_direct_retention_fence_expiry_before_any_write_is_a_clean_rejection() 
     assert_released(&after, fault);
     assert!(!after.egress_committed);
     assert!(!after.ledger);
+    let receipts = fixture.kernel.receipt_log().len();
     let replay = fixture
         .kernel
         .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
     assert_eq!(replay.verdict, Verdict::Deny);
-    assert_eq!(replay.reason.as_deref(), Some(COMPENSATED_REPLAY));
+    assert_eq!(replay.reason, response.reason);
+    assert_eq!(
+        chio_core::canonical_json_bytes(&replay.receipt)?,
+        chio_core::canonical_json_bytes(&response.receipt)?,
+        "replay must return the original compensation receipt"
+    );
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
     assert!(replay.output.is_none());
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     assert_eq!(hook.outcomes()?, [EGRESS_EXPIRED]);

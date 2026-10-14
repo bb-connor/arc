@@ -335,6 +335,7 @@ fn nested_bridge_cancellation_blocks_next_child_and_drop_clears_dispatch_scope(
         .is_some_and(|session| session.is_request_dispatch_active(&parent_context.request_id)));
 
     let mut child_receipts = Vec::new();
+    let mut evidence_slot = None;
     let mut client = NoopNestedFlowClient;
     let nested_interaction_observed = AtomicBool::new(false);
     {
@@ -342,6 +343,10 @@ fn nested_bridge_cancellation_blocks_next_child_and_drop_clears_dispatch_scope(
             clock: kernel.authority_clock(),
             sessions: &kernel.sessions,
             child_receipts: &mut child_receipts,
+            evidence_slot: &mut evidence_slot,
+            kernel: &kernel,
+            started_children: 0,
+            max_child_receipts: kernel.config.memory_budget.max_post_effect_child_receipts,
             nested_interaction_observed: &nested_interaction_observed,
             parent_context: &parent_context,
             allow_sampling: false,

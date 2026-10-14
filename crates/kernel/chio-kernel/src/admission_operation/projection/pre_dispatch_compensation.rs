@@ -12,9 +12,22 @@ struct PreDispatchCompensationReplayBinding<'a> {
     proof: &'a VerifiedPreDispatchNoEffect,
 }
 
+pub fn verified_pre_dispatch_incident_projection(
+    operation: &AdmissionOperationV1,
+    context: AdmissionProjectionContext,
+) -> Result<AdmissionTerminalProjection, AdmissionOperationError> {
+    if operation.binding().kind() != AdmissionOperationKind::GovernedActiveResponse {
+        return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
+    }
+    let proof = VerifiedPreDispatchNoEffect::from_qualified_operation_snapshot(operation, &context)
+        .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    pre_dispatch_incident_projection(operation, context, proof)
+}
+
 pub fn verified_pre_dispatch_compensation_projection(
     operation: &AdmissionOperationV1,
     context: AdmissionProjectionContext,
+    receipt: VerifiedAdmissionReceipt,
 ) -> Result<AdmissionTerminalProjection, AdmissionOperationError> {
     if !matches!(
         operation.binding().kind(),
@@ -24,13 +37,14 @@ pub fn verified_pre_dispatch_compensation_projection(
     }
     let proof = VerifiedPreDispatchNoEffect::from_qualified_operation_snapshot(operation, &context)
         .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
-    pre_dispatch_compensation_projection(operation, context, proof)
+    pre_dispatch_compensation_projection(operation, context, proof, receipt)
 }
 
 pub(crate) fn verified_released_pre_dispatch_compensation_projection(
     operation: &AdmissionOperationV1,
     context: AdmissionProjectionContext,
     verifier_policy: serde_json::Value,
+    receipt: VerifiedAdmissionReceipt,
 ) -> Result<AdmissionTerminalProjection, AdmissionOperationError> {
     if !matches!(
         operation.binding().kind(),
@@ -44,7 +58,7 @@ pub(crate) fn verified_released_pre_dispatch_compensation_projection(
         verifier_policy,
     )
     .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
-    pre_dispatch_compensation_projection(operation, context, proof)
+    pre_dispatch_compensation_projection(operation, context, proof, receipt)
 }
 
 #[cfg(any(test, feature = "admission-test-support"))]
@@ -52,11 +66,37 @@ pub fn verified_released_pre_dispatch_compensation_projection_for_test(
     operation: &AdmissionOperationV1,
     context: AdmissionProjectionContext,
     verifier_policy: serde_json::Value,
+    receipt: VerifiedAdmissionReceipt,
 ) -> Result<AdmissionTerminalProjection, AdmissionOperationError> {
-    verified_released_pre_dispatch_compensation_projection(operation, context, verifier_policy)
+    verified_released_pre_dispatch_compensation_projection(
+        operation,
+        context,
+        verifier_policy,
+        receipt,
+    )
 }
 
 fn pre_dispatch_compensation_projection(
+    operation: &AdmissionOperationV1,
+    context: AdmissionProjectionContext,
+    proof: VerifiedPreDispatchNoEffect,
+    receipt: VerifiedAdmissionReceipt,
+) -> Result<AdmissionTerminalProjection, AdmissionOperationError> {
+    receipt.validate_against(
+        operation,
+        &context,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        AdmissionCompensationStatus::CompensatedBeforeDispatch,
+        None,
+    )?;
+    Ok(AdmissionTerminalProjection::CompensatedBeforeDispatch {
+        context,
+        proof: Box::new(proof),
+        evidence: Box::new(AdmissionReceiptOrIncident::Receipt(Box::new(receipt))),
+    })
+}
+
+fn pre_dispatch_incident_projection(
     operation: &AdmissionOperationV1,
     context: AdmissionProjectionContext,
     proof: VerifiedPreDispatchNoEffect,

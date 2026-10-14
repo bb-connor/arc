@@ -58,15 +58,20 @@ impl TestAdmissionOperationStore {
         let Some(existing) = state.operation.as_ref() else {
             state.operation = Some(operation.clone());
             state.retained_request = Some(request.clone());
+            if self.lose_next_begin_ack.swap(false, Ordering::SeqCst) {
+                return Err(AdmissionOperationStoreError::OutcomeUnknown(
+                    "injected begin acknowledgement loss".into(),
+                ));
+            }
             return Ok(AdmissionBeginResult::Created(operation.clone()));
         };
         Ok(match existing.classify_replay(operation) {
             AdmissionReplayClassification::Exact { terminal_replay } => {
-                if state
-                    .retained_request
-                    .as_ref()
-                    .is_none_or(|retained| retained.canonical_bytes() != request.canonical_bytes())
-                {
+                let matches = match state.retained_request.as_ref() {
+                    Some(retained) => retained.matches_replay(request)?,
+                    None => false,
+                };
+                if !matches {
                     return Err(AdmissionOperationStoreError::Invariant(
                         "original request is missing or changed".into(),
                     ));
@@ -710,6 +715,11 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         let mut state = self.state.lock().expect("test admission state lock");
         let Some(existing) = state.operation.as_ref() else {
             state.operation = Some(operation.clone());
+            if self.lose_next_begin_ack.swap(false, Ordering::SeqCst) {
+                return Err(AdmissionOperationStoreError::OutcomeUnknown(
+                    "injected begin acknowledgement loss".into(),
+                ));
+            }
             return Ok(AdmissionBeginResult::Created(operation.clone()));
         };
         Ok(match existing.classify_replay(operation) {
@@ -745,6 +755,19 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         &self,
         replay_key: &AdmissionReplayKey,
     ) -> Result<Option<AdmissionOperationV1>, AdmissionOperationStoreError> {
+        if self.fail_next_replay_read.swap(false, Ordering::SeqCst) {
+            return Err(AdmissionOperationStoreError::Unavailable(
+                "injected replay lookup failure".into(),
+            ));
+        }
+        if let Some(operation) = self
+            .replay_lookup_override
+            .lock()
+            .expect("test replay lookup override lock")
+            .take()
+        {
+            return Ok(Some(operation));
+        }
         Ok(self
             .state
             .lock()
@@ -781,9 +804,30 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         {
             return Err(AdmissionOperationStoreError::Fenced);
         }
+        let capture_failure =
+            if command.next_state() == Some(AdmissionOperationState::CapturePending) {
+                self.capture_pending_failure.swap(0, Ordering::SeqCst)
+            } else {
+                0
+            };
+        if capture_failure == 1 {
+            return Err(AdmissionOperationStoreError::Unavailable(
+                "injected capture pre-write refusal".into(),
+            ));
+        }
         let result = operation.apply_command(command, trusted_now_unix_ms)?;
         state.operation = Some(result.clone().into_operation());
         state.claim = None;
+        if capture_failure == 2 {
+            return Err(AdmissionOperationStoreError::OutcomeUnknown(
+                "injected capture acknowledgement loss".into(),
+            ));
+        }
+        if self.lose_next_command_ack.swap(false, Ordering::SeqCst) {
+            return Err(AdmissionOperationStoreError::OutcomeUnknown(
+                "injected command acknowledgement loss".into(),
+            ));
+        }
         Ok(result)
     }
 

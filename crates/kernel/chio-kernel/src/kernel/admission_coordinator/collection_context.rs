@@ -165,7 +165,9 @@ impl ChioKernel {
             &matching,
             &current_plan,
             retained.security_binding(),
-            Some(retained.authority_profile()),
+            retained.authority_profile(),
+            retained.frozen_receipt_signing_identity(),
+            retained.admitted_receipt_metadata(),
         )
         .map_err(denied)?
             != *binding.immutable_request_hash()

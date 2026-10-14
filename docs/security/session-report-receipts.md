@@ -9,9 +9,11 @@ and configured receipt persistence contract.
 An incompatible approval shape is rejected by the kernel before it registers a
 new request or claims an existing threshold continuation. The normalized,
 blocking nested-flow and async nested-flow entrypoints use the same shape check
-as the wire message. The signed denial names `session_authorization`; the stdio
-error projects that signed guard. This rejects the submitted attempt without
-completing or releasing the original pending operation.
+as the wire message. The response denies the submitted attempt with the `kernel`
+guard. Its signed `trace_observation` records `authorization_conflict` and the
+exact refusal reason. It carries no execution decision or identity disposition,
+so it cannot bind a terminal receipt over an existing pending operation. The
+original approval continuation remains available.
 
 An arbitrary evaluator error does not establish whether a tool executed. The
 host calls `ChioKernel::record_session_tool_failure` with the original normalized

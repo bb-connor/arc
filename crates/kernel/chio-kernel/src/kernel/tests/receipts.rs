@@ -1102,8 +1102,8 @@ fn redaction_reapplies_stream_chunk_cap() {
         }],
     }));
 
-    let response = kernel
-        .finalize_tool_output_with_metadata_and_payee_binding(
+    let prepared = kernel
+        .prepare_tool_output_with_metadata_and_payee_binding(
             &request,
             output,
             std::time::Duration::from_secs(0),
@@ -1113,6 +1113,9 @@ fn redaction_reapplies_stream_chunk_cap() {
             None,
             None,
         )
+        .unwrap();
+    let response = kernel
+        .publish_prepared_response(&request, prepared)
         .unwrap();
 
     // The redacted 5-chunk stream must be truncated to the 2-chunk cap and marked

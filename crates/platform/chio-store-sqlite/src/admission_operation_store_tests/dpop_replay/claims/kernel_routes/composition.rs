@@ -245,9 +245,14 @@ fn unsupported_caller_retry_keeps_issued_nonce_and_composed_history_usable_by_ke
     assert!(request.execution_nonce.is_some());
     let before = route.history(&request)?;
     let counts = route.counts()?;
-    let denied = route.kernel.reserve_caller_execution_blocking(&request)?;
-    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
-    assert!(denied.execution_nonce.is_none());
+    let receipts = route.kernel.receipt_log().len();
+    let denied = route.kernel.reserve_caller_execution_blocking(&request);
+    assert!(
+        matches!(&denied, Err(chio_kernel::KernelError::DurableAdmission(reason))
+            if reason == "request identity is already owned by a durable operation"),
+        "{denied:?}"
+    );
+    assert_eq!(route.kernel.receipt_log().len(), receipts);
     assert_eq!(route.history(&request)?, before);
     assert_eq!(route.counts()?, counts);
     assert_eq!(route.calls.load(Ordering::SeqCst), 0);

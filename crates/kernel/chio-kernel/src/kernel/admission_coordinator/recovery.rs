@@ -208,14 +208,14 @@ impl ChioKernel {
         &self,
         operation: &AdmissionOperationV1,
         trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
+    ) -> Result<bool, KernelError> {
         let deadline_unix_ms = operation
             .parked_approval_deadline_unix_ms()
             .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
         let Some(deadline_unix_ms) =
             deadline_unix_ms.filter(|deadline| *deadline <= trusted_now_unix_ms)
         else {
-            return Ok(());
+            return Ok(false);
         };
         self.compensate_durable_admission_before_dispatch(
             operation,
@@ -226,7 +226,15 @@ impl ChioKernel {
             }),
             trusted_now_unix_ms,
             None,
-        )
+            DurableRefusalResponse {
+                reason: "approval proposal deadline elapsed before dispatch",
+                cancelled: false,
+                matched_grant_index: None,
+                metadata: None,
+                verified_payee_binding: None,
+            },
+        )?;
+        Ok(true)
     }
 
     /// Terminalize a dispatch-committed admission whose outcome is unknown.
@@ -240,12 +248,26 @@ impl ChioKernel {
         &self,
         operation: &AdmissionOperationV1,
         trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
+        return_context: Option<&DurableToolReturnContext>,
+        response: DurableRefusalResponse<'_>,
+    ) -> Result<ToolCallResponse, KernelError> {
         let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
+        let mutation_guard = runtime.lock_mutations()?;
         // Dispatch may have advanced durable time since evaluation began.
         // Claim and project with one fresh authority observation under the lock.
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
+        let original = self.terminal_refusal_original(operation, trusted_now_unix_ms)?;
+        let federation = return_context
+            .and_then(|context| context.federation_context.as_ref())
+            .map(|context| {
+                self.decode_retained_federation_context(
+                    context.canonical_json().as_bytes(),
+                    operation,
+                    original.request_for_revalidation(),
+                    trusted_now_unix_ms,
+                )
+            })
+            .transpose()?;
         if runtime
             .outcome_store
             .lookup_by_operation(operation.binding().operation_id())
@@ -257,6 +279,8 @@ impl ChioKernel {
             ));
         }
         let lease = self.claim_admission_recovery(operation, trusted_now_unix_ms)?;
+        let mut mutation_lock =
+            ExternalCallLock::new(runtime, mutation_guard, operation, trusted_now_unix_ms)?;
         let context = AdmissionProjectionContext {
             operation_id: operation.binding().operation_id().clone(),
             request_id: operation.binding().request_id().clone(),
@@ -266,7 +290,17 @@ impl ChioKernel {
             coordinator_lease_epoch: lease.coordinator_lease_epoch(),
             store_fence: runtime.fence.clone(),
         };
-        let projection = verified_outcome_unknown_after_dispatch_projection(operation, context)?;
+        let (response, receipt) = mutation_lock.call_unlocked(operation, &lease, || {
+            self.prepare_durable_refusal(
+                operation,
+                &original,
+                &context,
+                AdmissionOperationState::OutcomeUnknownAfterDispatch,
+                response,
+            )
+        })??;
+        let projection =
+            verified_outcome_unknown_after_dispatch_projection(operation, context, receipt)?;
         self.finalize_finding_pool_claim_after_unknown_dispatch(
             operation.binding().operation_id().as_str(),
             trusted_now_unix_ms,
@@ -287,6 +321,11 @@ impl ChioKernel {
                 "admission recovery committed a different terminal operation".to_owned(),
             ));
         }
-        Ok(())
+        drop(mutation_lock);
+        self.deliver_durable_refusal(
+            original.request_for_revalidation(),
+            response,
+            federation.as_ref(),
+        )
     }
 }

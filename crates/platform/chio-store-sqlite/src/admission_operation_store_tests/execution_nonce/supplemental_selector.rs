@@ -106,15 +106,7 @@ impl SelectionFixture {
         wire["security_binding"] = security;
         let retained =
             RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(&wire)?)?;
-        let prior = sha256_hex(&canonical_json_bytes(&serde_json::json!({
-            "schema": "chio.tool-admission-request.v3",
-            "unbound_request_hash": retained_request::base_request_hash(retained.request_for_revalidation())?,
-            "security_binding": wire["security_binding"],
-        }))?);
-        let immutable = sha256_hex(&canonical_json_bytes(&serde_json::json!({
-            "schema": "chio.tool-admission-request.v4", "prior_request_hash": prior,
-            "authority_profile": profile,
-        }))?);
+        let immutable = retained_request::immutable_request_hash(&wire)?;
         let old = base.to_persisted().binding;
         let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
             kind: old.kind,

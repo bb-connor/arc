@@ -34,6 +34,7 @@ mod sequencer;
 mod state;
 mod store;
 
+use projection::refusal_receipt::validate_terminal_replay;
 use state::*;
 
 pub use authority_profile::{AdmissionAuthorityProfileV1, AdmissionAuthoritySelectionV1};
@@ -73,11 +74,11 @@ pub use nonce_preflight::{
 pub use projection::*;
 pub use recovery::*;
 pub use remote_projection::*;
-#[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash;
-pub(crate) use retained_request::immutable_tool_request_hash_with_profile;
 pub(crate) use retained_request::AdmissionSecurityBindingV1;
-pub use retained_request::RetainedToolAdmissionRequestV1;
+pub use retained_request::{
+    AdmittedReceiptMetadata, RetainedToolAdmissionRequestV1, ATTEMPT_SCOPED_RECEIPT_METADATA_PATHS,
+};
 pub use runtime_replay::{
     RuntimeReplayParticipantKind, RuntimeReplaySourceMarkerV1, RuntimeReplaySourcePort,
     RuntimeReplaySourceSnapshotV1, MAX_RUNTIME_REPLAY_SOURCE_BYTES,

@@ -1702,3 +1702,6 @@ mod tests;
 
 #[cfg(all(test, unix))]
 pub(crate) use tests::security_participant_state::with_flow_sql_fixture;
+
+#[cfg(test)]
+pub(crate) use tests::refusal_receipt;

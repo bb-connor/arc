@@ -278,15 +278,17 @@ fn removing_hook_configuration_cannot_erase_a_pending_release() -> TestResult {
         chio_core::sha256_hex(expected_failure.to_string().as_bytes())
     );
     drop(store);
-    let conflict = runtime.kernel.evaluate_tool_call_blocking(&request)?;
-    assert_eq!(conflict.verdict, chio_kernel::Verdict::Deny);
-    assert_eq!(
-        conflict.reason,
-        Some(format!(
-            "durable admission failed: request id conflicts with retained operation {}",
-            original.0
-        ))
+    let receipts = runtime.kernel.receipt_log().len();
+    let conflict = runtime.kernel.evaluate_tool_call_blocking(&request);
+    let expected = format!(
+        "request id conflicts with retained operation {}",
+        original.0
     );
+    assert!(
+        matches!(&conflict, Err(KernelError::DurableAdmission(reason)) if reason == &expected),
+        "{conflict:?}"
+    );
+    assert_eq!(runtime.kernel.receipt_log().len(), receipts);
     assert_eq!(grant_quota(&runtime, &request)?, (0, 1));
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     assert_eq!(
@@ -318,16 +320,16 @@ fn removing_hook_configuration_cannot_erase_a_pending_release() -> TestResult {
         runtime.kernel.reconcile_durable_admission_startup(),
         Err(KernelError::SecurityDispatchOutcomeRecoveryRequired(_))
     ));
+    let receipts = runtime.kernel.receipt_log().len();
     let pending = runtime
         .kernel
-        .evaluate_tool_call_blocking_with_security_context(&request, &context(&request)?)?;
-    assert_eq!(pending.verdict, chio_kernel::Verdict::Deny);
-    assert_eq!(
-        pending.reason.as_deref(),
-        Some(
-            "durable admission failed: request maps to a retained admission awaiting background recovery"
-        )
+        .evaluate_tool_call_blocking_with_security_context(&request, &context(&request)?);
+    assert!(
+        matches!(&pending, Err(KernelError::DurableAdmission(reason))
+            if reason == "request maps to a retained admission awaiting background recovery"),
+        "{pending:?}"
     );
+    assert_eq!(runtime.kernel.receipt_log().len(), receipts);
     assert_eq!(
         operation_state(&fixture, &request.request_id)?,
         Some(original)

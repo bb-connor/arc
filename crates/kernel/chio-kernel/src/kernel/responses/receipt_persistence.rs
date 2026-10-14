@@ -1,5 +1,6 @@
 use super::*;
 use crate::kernel::effect_obligation::publication::{ReceiptAppendFailure, ReceiptCommit};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 fn require_receipt_body_fields_coupled(
     body: &ChioReceiptBody,
@@ -103,7 +104,7 @@ impl ChioKernel {
 
     fn build_and_sign_receipt_with_authority(
         &self,
-        params: ReceiptParams<'_>,
+        mut params: ReceiptParams<'_>,
         authority: &dyn chio_core::crypto::SigningBackend,
         expected_key: Option<&chio_core::PublicKey>,
     ) -> Result<ChioReceipt, KernelError> {
@@ -117,6 +118,44 @@ impl ChioKernel {
                 "receipt authority does not satisfy the boot signing floor".into(),
             ));
         }
+        let canonical_content = std::mem::take(&mut params.canonical_content);
+        let body = self.prepare_receipt_body(
+            params,
+            expected_key
+                .cloned()
+                .unwrap_or_else(|| authority.public_key()),
+        )?;
+
+        // The signing handle binds the canonical content to body.content_hash.
+        // Body assembly and persistence are outside the portable signing boundary.
+        let handle = ReceiptSigningHandle::from_content_preimage(canonical_content);
+        chio_kernel_core::sign_receipt_with_handle(body, authority, handle).map_err(|error| {
+            use chio_kernel_core::ReceiptSigningError;
+            let message = match error {
+                ReceiptSigningError::KernelKeyMismatch => {
+                    "kernel signing key does not match receipt body kernel_key".to_string()
+                }
+                ReceiptSigningError::ContentHashMismatch {
+                    recomputed,
+                    claimed,
+                } => format!(
+                    "receipt content_hash mismatch: body claimed {claimed} but signer \
+                     recomputed {recomputed} over the canonical content (WYSIWYS refused)"
+                ),
+                ReceiptSigningError::SigningFailed(reason) => reason,
+            };
+            KernelError::ReceiptSigningFailed(message)
+        })
+    }
+
+    /// Prepare the exact unsigned body, including authenticated receipt scope.
+    /// Recovery can sign this owned body without borrowing the kernel or
+    /// reconstructing any caller-controlled request material.
+    pub(in crate::kernel) fn prepare_receipt_body(
+        &self,
+        params: ReceiptParams<'_>,
+        expected_key: chio_core::PublicKey,
+    ) -> Result<ChioReceiptBody, KernelError> {
         let expected_action = params.action.clone();
         let expected_decision = params.decision.clone();
         let expected_content_hash = params.content_hash.clone();
@@ -168,9 +207,7 @@ impl ChioKernel {
             metadata,
             trust_level: params.trust_level,
             tenant_id,
-            kernel_key: expected_key
-                .cloned()
-                .unwrap_or_else(|| authority.public_key()),
+            kernel_key: expected_key,
             bbs_projection_version: None,
         };
         let expected = ReceiptCouplingExpectation {
@@ -185,42 +222,7 @@ impl ChioKernel {
         };
         require_receipt_body_fields_coupled(&body, &expected)?;
 
-        // WYSIWYS: bind the signature to the exact content this receipt's
-        // `content_hash` was derived from. The handle recomputes
-        // `sha256_hex(canonical_content)` and the signing primitive refuses to
-        // sign if it disagrees with `body.content_hash`, closing the
-        // render-A / sign-B hole on the production path. The
-        // canonical_content is the same preimage `receipt_content_for_output`
-        // hashed to produce `content_hash`.
-        let handle = ReceiptSigningHandle::from_content_preimage(params.canonical_content);
-
-        // Delegate the pure signing step to chio-kernel-core so the portable
-        // TCB stays in one place. The full kernel still owns body construction
-        // (tenant scope resolution, policy_hash injection, evidence assembly)
-        // because those are std/tokio-aware concerns.
-        //
-        // Verified-core boundary note:
-        // `formal/proof-manifest.toml` includes this shell method only for the
-        // direct call into `chio_kernel_core::sign_receipt_with_handle`. Receipt
-        // body assembly, metadata shaping, and persistence remain
-        // operational-shell behavior outside the current bounded proof claim.
-        chio_kernel_core::sign_receipt_with_handle(body, authority, handle).map_err(|error| {
-            use chio_kernel_core::ReceiptSigningError;
-            let message = match error {
-                ReceiptSigningError::KernelKeyMismatch => {
-                    "kernel signing key does not match receipt body kernel_key".to_string()
-                }
-                ReceiptSigningError::ContentHashMismatch {
-                    recomputed,
-                    claimed,
-                } => format!(
-                    "receipt content_hash mismatch: body claimed {claimed} but signer \
-                     recomputed {recomputed} over the canonical content (WYSIWYS refused)"
-                ),
-                ReceiptSigningError::SigningFailed(reason) => reason,
-            };
-            KernelError::ReceiptSigningFailed(message)
-        })
+        Ok(body)
     }
 
     /// Record the receipt and drive the bilateral co-signing hook when the
@@ -380,6 +382,28 @@ impl ChioKernel {
     fn record_chio_receipt_during_trace_transition(
         &self,
         receipt: &ChioReceipt,
+        trace_transition: &std::sync::MutexGuard<'_, ()>,
+        settlement_eligible: bool,
+        suppress_exact_durable_replay: bool,
+    ) -> Result<ReceiptCommit, ReceiptAppendFailure> {
+        let committed = self.append_terminal_receipt_during_trace_transition(
+            receipt,
+            trace_transition,
+            settlement_eligible,
+            suppress_exact_durable_replay,
+        )?;
+        Ok(self.project_acknowledged_receipt_during_trace_transition(
+            receipt,
+            committed,
+            trace_transition,
+        ))
+    }
+
+    /// Return immediately after the authoritative append acknowledges. No
+    /// local projection or host callback runs before the owner can discharge.
+    pub(in crate::kernel) fn append_terminal_receipt_during_trace_transition(
+        &self,
+        receipt: &ChioReceipt,
         _trace_transition: &std::sync::MutexGuard<'_, ()>,
         settlement_eligible: bool,
         suppress_exact_durable_replay: bool,
@@ -399,10 +423,12 @@ impl ChioKernel {
         let mut projected = true;
         if let Some(store) = self.receipt_store.as_ref() {
             if suppress_exact_durable_replay && settlement_visible_at_ms.is_none() {
-                match store
-                    .load_retained_chio_receipt(&receipt.id)
-                    .map_err(KernelError::from)?
-                {
+                let existing = catch_unwind(AssertUnwindSafe(|| {
+                    store.load_retained_chio_receipt(&receipt.id)
+                }))
+                .map_err(|_| KernelError::Internal("receipt readback panicked".into()))?
+                .map_err(KernelError::from)?;
+                match existing {
                     Some(existing) if receipts_match(&existing, receipt)? => projected = false,
                     Some(_) => {
                         return Err(KernelError::DurableAdmission(format!(
@@ -415,7 +441,9 @@ impl ChioKernel {
                 }
             }
             if projected {
-                let appended = match settlement_visible_at_ms {
+                // Catch inside both publication locks. Once the append is
+                // entered, a panic cannot establish that nothing committed.
+                let appended = catch_unwind(AssertUnwindSafe(|| match settlement_visible_at_ms {
                     Some(next_visible_at_ms) => store
                         .append_chio_receipt_with_pending_observation_and_timeout(
                             receipt,
@@ -426,36 +454,52 @@ impl ChioKernel {
                         receipt,
                         self.config.deadlines.receipt_append_budget(),
                     ),
-                };
+                }))
+                .map_err(|_| KernelError::Internal("receipt append panicked".into()))
+                .and_then(|result| result.map_err(KernelError::from));
                 appended.map_err(|source| {
                     if settlement_visible_at_ms.is_some() {
                         crate::settlement_routing::record_unresolved_claim_missed(&receipt.id);
                     }
                     // Once entered, a store error does not prove non-commit.
                     // In particular a timed-out writer may still own the append.
-                    ReceiptAppendFailure::unknown(&receipt.id, source.into())
+                    ReceiptAppendFailure::unknown(&receipt.id, source)
                 })?;
             }
         }
-        if projected {
+        // An ephemeral kernel's local append is the authoritative commit.
+        if projected && self.receipt_store.is_none() {
             self.append_chio_receipt_to_local_log(receipt.clone());
         }
-        // Allocate under the transition lock to preserve receipt/revocation
-        // ordering. Failure here is carried by an acknowledged commit.
-        let trace_source_sequence = if projected && self.runtime_trace_observer.is_some() {
-            self.allocate_runtime_trace_source_sequence().map(Some)
-        } else {
-            Ok(None)
-        };
         Ok(ReceiptCommit {
             receipt_id: receipt.id.clone(),
             projected,
-            trace_source_sequence,
+            trace_source_sequence: Ok(None),
             settlement_visible_at_ms,
         })
     }
 
-    fn finish_record_chio_receipt(
+    pub(in crate::kernel) fn project_acknowledged_receipt_during_trace_transition(
+        &self,
+        receipt: &ChioReceipt,
+        mut committed: ReceiptCommit,
+        _trace_transition: &std::sync::MutexGuard<'_, ()>,
+    ) -> ReceiptCommit {
+        if committed.projected && self.receipt_store.is_some() {
+            self.append_chio_receipt_to_local_log(receipt.clone());
+        }
+        // Allocate under the transition lock to preserve receipt/revocation
+        // ordering. Failure here is carried by an acknowledged commit.
+        committed.trace_source_sequence =
+            if committed.projected && self.runtime_trace_observer.is_some() {
+                self.allocate_runtime_trace_source_sequence().map(Some)
+            } else {
+                Ok(None)
+            };
+        committed
+    }
+
+    pub(in crate::kernel) fn finish_record_chio_receipt(
         &self,
         receipt: &ChioReceipt,
         committed: ReceiptCommit,
@@ -476,17 +520,23 @@ impl ChioKernel {
                 source: Box::new(source),
             })?
         {
-            self.observe_runtime_trace(RuntimeTraceEvent::ReceiptAppended {
-                source_sequence,
-                receipt: Box::new(receipt.clone()),
-            });
+            crate::kernel::security_dispatch::receipt_delivery(
+                &receipt_id,
+                ReceiptDeliveryStep::Trace,
+                || {
+                    self.observe_runtime_trace(RuntimeTraceEvent::ReceiptAppended {
+                        source_sequence,
+                        receipt: Box::new(receipt.clone()),
+                    });
+                    Ok(())
+                },
+            )?;
         }
-        self.finish_receipt_settlement(receipt, settlement_visible_at_ms)
-            .map_err(|source| KernelError::DeliveryFailedAfterReceipt {
-                receipt_id,
-                step: ReceiptDeliveryStep::Settlement,
-                source: Box::new(source),
-            })
+        crate::kernel::security_dispatch::receipt_delivery(
+            &receipt_id,
+            ReceiptDeliveryStep::Settlement,
+            || self.finish_receipt_settlement(receipt, settlement_visible_at_ms),
+        )
     }
 
     fn finish_receipt_settlement(

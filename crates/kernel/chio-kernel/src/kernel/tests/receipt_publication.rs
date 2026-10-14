@@ -4,6 +4,7 @@ use super::*;
 enum AppendMode {
     Acknowledged,
     CommittedThenTimeout,
+    CommittedThenPanic,
     QueuedThenTimeout,
 }
 
@@ -27,6 +28,11 @@ impl ReceiptStore for PublicationStore {
                 return Ok(());
             }
             AppendMode::CommittedThenTimeout => journal.committed.push(receipt.clone()),
+            AppendMode::CommittedThenPanic => {
+                journal.committed.push(receipt.clone());
+                drop(journal);
+                panic!("append committed before callback panic");
+            }
             AppendMode::QueuedThenTimeout => journal.queued.push(receipt.clone()),
         }
         Err(ReceiptStoreError::Timeout {
@@ -68,11 +74,12 @@ fn signed_receipt() -> ChioReceipt {
     );
     let request = make_request("publication-test", &capability, "read_file", "srv-a");
     kernel
-        .build_deny_response(
+        .build_deny_response_with_metadata(
             &request,
             "publication fixture",
             current_unix_timestamp(),
             None,
+            RefusalReceiptMetadata::new(None, IdentityDisposition::Reusable),
         )
         .unwrap()
         .receipt
@@ -147,4 +154,30 @@ fn acknowledged_append_records_one_receipt() {
     kernel.record_chio_receipt(&receipt).unwrap();
     assert_eq!(journal.lock().unwrap().committed.len(), 1);
     assert_eq!(kernel.receipt_log().len(), 1);
+}
+
+#[test]
+fn producer_append_panic_preserves_unknown_identity_and_recovery_locks() {
+    let receipt = signed_receipt();
+    let (kernel, journal) = fixture(AppendMode::CommittedThenPanic);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        kernel.record_chio_receipt(&receipt)
+    }));
+    assert_eq!(journal.lock().unwrap().committed.len(), 1);
+    assert!(
+        kernel.receipt_store_write_lock.try_lock().is_ok(),
+        "producer poisoned receipt write lock"
+    );
+    assert!(
+        kernel.runtime_trace_transition_lock.try_lock().is_ok(),
+        "producer poisoned trace transition lock"
+    );
+    let error = result
+        .expect("append panic must become an unknown publication result")
+        .unwrap_err();
+    assert_eq!(
+        error.report().code,
+        "CHIO-KERNEL-RECEIPT-APPEND-OUTCOME-UNKNOWN"
+    );
+    assert_eq!(error.report().context["receipt_id"], receipt.id);
 }

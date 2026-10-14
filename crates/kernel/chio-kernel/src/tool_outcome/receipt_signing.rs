@@ -48,37 +48,6 @@ impl FrozenReceiptSigningIdentityV1 {
 }
 
 impl RawInvocationOutcomeV1 {
-    /// Original basic-profile equality with the authenticated admission and
-    /// evaluation. No profile or retained-request row is invented. The caller
-    /// must require an actually NULL begin participant digest for this path.
-    pub fn matches_unprofiled_compacted_admission(
-        &self,
-        operation: &AdmissionOperationV1,
-        evaluation: &PostReturnEvaluationRecordV1,
-    ) -> bool {
-        let Ok(Some(request)) = self.recovery_request() else {
-            return false;
-        };
-        let Ok(matching) = crate::request_matching::resolve_required_matching_grants(
-            &request.capability,
-            &request.tool_name,
-            &request.server_id,
-            &request.arguments,
-            request.model_metadata.as_ref(),
-        ) else {
-            return false;
-        };
-        crate::admission_operation::RetainedToolAdmissionRequestV1::validate_request_binding(
-            operation.binding(),
-            &request,
-            &matching,
-            evaluation.retained_frozen_steps(),
-            None,
-            None,
-        )
-        .is_ok()
-    }
-
     /// Historical request equality only. A false result holds raw custody;
     /// the enclosing store must separately verify the retained begin commit.
     pub fn matches_compacted_original_request(

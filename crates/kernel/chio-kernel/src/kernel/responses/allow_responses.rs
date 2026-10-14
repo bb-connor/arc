@@ -37,9 +37,9 @@ pub(crate) enum PreflightNonceSource {
 impl ChioKernel {
     #[allow(
         clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+        reason = "Preparation preserves the existing response input contract."
     )]
-    pub(crate) fn build_allow_response_with_metadata_and_payee_binding(
+    pub(in crate::kernel) fn prepare_allow_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
         output: ToolCallOutput,
@@ -48,17 +48,17 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
         nonce: AllowResponseNonce,
-    ) -> Result<ToolCallResponse, KernelError> {
+    ) -> Result<PreparedResponse, KernelError> {
         let cap = &request.capability;
         if let Err(error) = self.check_revocation(cap) {
             let reason =
                 format!("capability authorization changed before allow finalization: {error}");
-            return self.build_deny_response_with_metadata_and_payee_binding(
+            return self.prepare_deny_response_with_metadata_and_payee_binding(
                 request,
                 &reason,
                 timestamp,
                 matched_grant_index,
-                extra_metadata,
+                RefusalReceiptMetadata::new(extra_metadata, IdentityDisposition::Terminal),
                 verified_payee_binding,
             );
         }
@@ -122,54 +122,19 @@ impl ChioKernel {
             tenant_id: None,
         })?;
 
-        self.record_chio_receipt_with_federation(request, &receipt)?;
-
-        info!(
-            request_id = %request.request_id,
-            tool = %request.tool_name,
-            receipt_id = %receipt.id,
-            "tool call allowed"
-        );
-
-        // For governed writes, append an entry to the provenance chain once
-        // the receipt is signed. A failure here is fatal (fail-closed): we
-        // do not want to acknowledge the write to the caller while silently
-        // dropping provenance.
-        if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
-            memory_action_kind.as_ref()
-        {
-            self.append_memory_provenance_for_write(store, key, request, &receipt)
-                .map_err(|source| KernelError::DeliveryFailedAfterReceipt {
-                    receipt_id: receipt.id.clone(),
-                    step: ReceiptDeliveryStep::Provenance,
-                    source: Box::new(source),
-                })?;
-        }
-
-        // Mint a short-lived, single-use execution nonce for allow responses
-        // that did not already present one. A request that consumed a nonce
-        // to execute must not chain-mint a replacement for the same call.
-        let execution_nonce = match nonce {
-            AllowResponseNonce::Preminted(nonce) => Some(nonce),
-            AllowResponseNonce::MintForAllow => self
-                .mint_execution_nonce_for_allow(request, cap, &receipt)
-                .map_err(|source| KernelError::DeliveryFailedAfterReceipt {
-                    receipt_id: receipt.id.clone(),
-                    step: ReceiptDeliveryStep::ExecutionNonce,
-                    source: Box::new(source),
-                })?,
-            AllowResponseNonce::Suppressed => None,
-        };
-
-        Ok(ToolCallResponse {
-            request_id: request.request_id.clone(),
-            verdict: Verdict::Allow,
-            output: Some(output),
-            reason: None,
-            terminal_state: OperationTerminalState::Completed,
-            receipt,
-            execution_nonce,
-        })
+        Ok(PreparedResponse::allow(
+            ToolCallResponse {
+                request_id: request.request_id.clone(),
+                verdict: Verdict::Allow,
+                output: Some(output),
+                reason: None,
+                terminal_state: OperationTerminalState::Completed,
+                receipt,
+                execution_nonce: None,
+            },
+            memory_action_kind,
+            nonce,
+        ))
     }
 
     #[allow(

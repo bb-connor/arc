@@ -1,11 +1,20 @@
 //! One trusted clock fence for kernel evaluation and its durable runtime.
 
 use chio_security_types::clock::{Clock, ClockError, ClockFence, ClockReading, UnixMillis};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, Mutex};
 
 pub(super) fn read(clock: &dyn Clock, fence: &Mutex<ClockFence>) -> Result<UnixMillis, ClockError> {
+    Ok(read_fenced(clock, fence)?.unix_millis())
+}
+
+fn read_fenced(clock: &dyn Clock, fence: &Mutex<ClockFence>) -> Result<ClockReading, ClockError> {
     let mut fence = fence.lock().map_err(|_| ClockError::Unavailable)?;
-    Ok(fence.observe(clock.read()?)?.unix_millis())
+    // Keep clock observations ordered without letting a provider panic poison
+    // the fence needed by subsequent recovery attempts.
+    let reading =
+        catch_unwind(AssertUnwindSafe(|| clock.read())).map_err(|_| ClockError::Unavailable)??;
+    fence.observe(reading)
 }
 
 struct AuthorityClock {
@@ -14,8 +23,7 @@ struct AuthorityClock {
 }
 impl Clock for AuthorityClock {
     fn read(&self) -> Result<ClockReading, ClockError> {
-        let mut fence = self.fence.lock().map_err(|_| ClockError::Unavailable)?;
-        fence.observe(self.source.read()?)
+        read_fenced(self.source.as_ref(), &self.fence)
     }
 }
 
@@ -31,10 +39,7 @@ impl super::ChioKernel {
     /// Observe the kernel's fenced clock for protocol deadlines. A caller must
     /// retain the resulting deadline across retries, never resample its origin.
     pub fn authority_clock_reading(&self) -> Result<ClockReading, ClockError> {
-        self.clock_fence
-            .lock()
-            .map_err(|_| ClockError::Unavailable)?
-            .observe(self.clock.read()?)
+        read_fenced(self.clock.as_ref(), &self.clock_fence)
     }
 
     pub(crate) fn read_authority_time(&self) -> Result<UnixMillis, ClockError> {

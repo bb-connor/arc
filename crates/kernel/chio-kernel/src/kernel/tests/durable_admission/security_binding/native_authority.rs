@@ -65,9 +65,11 @@ fn historical_native_response(
             request,
             &matching,
             Some(security_context),
+            None,
             now,
             DispatchTransport::KernelToolServer,
-        )?
+        )
+        .map_err(|failure| *failure.error)?
         .ok_or_else(|| KernelError::Internal("historical native admission missing".into()))?;
     kernel.run_native_admission_preparation(
         request,
@@ -158,11 +160,11 @@ fn replay(nested: bool) -> TestResult {
     retained.validate_native_security_authority(&selected)?;
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(retained.canonical_bytes())?["schema"],
-        "chio.retained-tool-admission-request.v4"
+        "chio.retained-tool-admission-request.v1"
     );
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(retained.canonical_bytes())?["schema"],
-        "chio.retained-tool-admission-request.v4"
+        "chio.retained-tool-admission-request.v1"
     );
     for changed in [
         None,
@@ -171,9 +173,9 @@ fn replay(nested: bool) -> TestResult {
         Some(binding("native-store", "source", b"replacement")?),
     ] {
         hook.select(changed);
-        let denied = evaluate(&kernel, &request, Some(&original), parent)?;
-        assert_eq!(denied.verdict, Verdict::Deny, "{denied:?}");
-        assert!(denied.output.is_none());
+        let receipts = kernel.receipt_log().len();
+        assert_conflict(evaluate(&kernel, &request, Some(&original), parent));
+        assert_eq!(kernel.receipt_log().len(), receipts);
         assert_eq!(store.operation(), operation);
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
     }
@@ -210,9 +212,9 @@ fn native_selection_cannot_be_added_to_context_only_history() -> TestResult {
     );
     let operation = store.operation();
     hook.select(Some(binding("native-store", "source", b"initialization")?));
-    let denied = evaluate(&kernel, &request, Some(&original), None)?;
-    assert_eq!(denied.verdict, Verdict::Deny);
-    assert!(denied.output.is_none());
+    let receipts = kernel.receipt_log().len();
+    assert_conflict(evaluate(&kernel, &request, Some(&original), None));
+    assert_eq!(kernel.receipt_log().len(), receipts);
     assert_eq!(store.operation(), operation);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     Ok(())
@@ -345,6 +347,7 @@ fn native_selection_requires_retained_admission_outside_mode_coverage() -> TestR
             &request,
             &matching(&request)?,
             Some(&original),
+            None,
             current_unix_timestamp_ms(),
             DispatchTransport::KernelToolServer,
         )?;
@@ -362,7 +365,7 @@ fn native_selection_requires_retained_admission_outside_mode_coverage() -> TestR
         retained.validate_native_security_authority(&selected)?;
         assert_eq!(
             serde_json::from_slice::<serde_json::Value>(retained.canonical_bytes())?["schema"],
-            "chio.retained-tool-admission-request.v4"
+            "chio.retained-tool-admission-request.v1"
         );
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
     }
@@ -392,6 +395,7 @@ fn native_selection_cannot_fall_back_without_a_durable_store() -> TestResult {
             &request,
             &matching(&request)?,
             Some(&original),
+            None,
             current_unix_timestamp_ms(),
             DispatchTransport::KernelToolServer,
         );
@@ -424,6 +428,7 @@ fn native_selection_change_is_rejected_before_dispatch_capture() -> TestResult {
             &request,
             &matching,
             Some(&original),
+            None,
             now,
             DispatchTransport::KernelToolServer,
         )?

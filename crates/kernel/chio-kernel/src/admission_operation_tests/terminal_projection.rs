@@ -5,6 +5,89 @@ use chio_credit::obligation::{
     ObligationCreditElectionV1,
 };
 
+fn prepared_refusal_operation(request_id: &str) -> AdmissionOperationV1 {
+    let base = binding(AdmissionOperationKind::ToolDispatch);
+    let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+        kind: AdmissionOperationKind::ToolDispatch,
+        namespace: namespace("tenant-123"),
+        request_id: identifier("request_id", request_id),
+        capability_id: base.capability_id,
+        authorization_capability_hash: base.authorization_capability_hash,
+        request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
+            digest("immutable_request_hash", REQUEST_HASH),
+            digest("action_parameter_hash", EMPTY_PARAMETER_HASH),
+            base.request_binding.participant_requirements,
+        )
+        .expect("request binding derives"),
+        policy_hash: base.policy_hash,
+        effect_class: base.effect_class,
+    })
+    .expect("operation binding derives");
+    AdmissionOperationV1::prepare(binding, 7).expect("operation prepares")
+}
+
+fn signed_refusal_receipt(
+    operation: &AdmissionOperationV1,
+    context: &AdmissionProjectionContext,
+    projected_state: AdmissionOperationState,
+    decision: Decision,
+    kernel: &Keypair,
+) -> ChioReceipt {
+    let compensation = if projected_state == AdmissionOperationState::CompensatedBeforeDispatch {
+        AdmissionCompensationStatus::CompensatedBeforeDispatch
+    } else {
+        AdmissionCompensationStatus::NotCompensated
+    };
+    let metadata = receipt_metadata(operation, context, projected_state, compensation);
+    let tenant = (operation.binding.authenticated_tenant_id.as_str() != LOCAL_SYSTEM_TENANT_ID)
+        .then(|| {
+            operation
+                .binding
+                .authenticated_tenant_id
+                .as_str()
+                .to_owned()
+        });
+    let mut body = signed_projection_receipt_with_decision(
+        operation,
+        Some(metadata),
+        tenant,
+        decision,
+        kernel,
+    )
+    .body();
+    body.content_hash = sha256_hex(b"null");
+    ChioReceipt::sign(body, kernel).expect("refusal receipt signs")
+}
+
+fn verified_refusal_receipt(
+    operation: &AdmissionOperationV1,
+    context: &AdmissionProjectionContext,
+    projected_state: AdmissionOperationState,
+    kernel: &Keypair,
+) -> VerifiedAdmissionReceipt {
+    let decision = Decision::Deny {
+        reason: "operation refused".to_owned(),
+        guard: "kernel".to_owned(),
+    };
+    VerifiedAdmissionReceipt::from_kernel_verified_refusal(
+        signed_refusal_receipt(
+            operation,
+            context,
+            projected_state,
+            decision.clone(),
+            kernel,
+        ),
+        &kernel.public_key(),
+        &decision,
+        TOOL_SERVER,
+        TOOL_NAME,
+        operation,
+        context,
+        projected_state,
+    )
+    .expect("refusal binds exact terminal")
+}
+
 fn signed_authorization_source(
     operation: &AdmissionOperationV1,
     receipt: &ChioReceipt,
@@ -1033,10 +1116,16 @@ fn signed_terminal_projection_envelope_rejects_canonical_body_tampering() {
 #[test]
 fn resigned_compensation_envelope_rejects_semantically_tampered_release_proof(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let operation = prepared(AdmissionOperationKind::ToolDispatch);
-    let projection =
-        verified_pre_dispatch_compensation_projection(&operation, projection_context(&operation))?;
+    let operation = prepared_refusal_operation("req-123");
     let kernel = Keypair::generate();
+    let context = projection_context(&operation);
+    let receipt = verified_refusal_receipt(
+        &operation,
+        &context,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        &kernel,
+    );
+    let projection = verified_pre_dispatch_compensation_projection(&operation, context, receipt)?;
     let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
         &operation,
         &projection,
@@ -1088,7 +1177,7 @@ fn resigned_compensation_envelope_rejects_semantically_tampered_release_proof(
     let manifest_bytes = canonical_json_bytes(&manifest)?;
     encoded["body"]["manifest_json"] = serde_json::Value::String(STANDARD.encode(&manifest_bytes));
     let replay_digest = encoded
-        .pointer_mut("/body/terminal_operation/terminal_replay/incident/projection_digest")
+        .pointer_mut("/body/terminal_operation/terminal_replay/receipt/projection_digest")
         .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
     *replay_digest = serde_json::Value::String(chio_core::crypto::sha256_hex(&manifest_bytes));
 
@@ -1117,9 +1206,16 @@ fn signed_terminal_projection_rejects_channel_attachment_substitution(
         identifier("incident_id", "channel-outcome-unknown"),
         digest("incident_digest", POLICY_HASH),
     )?;
+    let receipt = verified_refusal_receipt(
+        &operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        &kernel,
+    );
     let projection = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
         context,
         incident: Box::new(incident),
+        receipt: Box::new(receipt),
     };
     let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
         &operation,
@@ -1275,7 +1371,7 @@ fn tool_outcome_attachment_is_required_and_exact_before_finalizing() {
 
 #[test]
 fn terminal_replay_reference_is_typed_and_retained() {
-    let mut operation = prepared(AdmissionOperationKind::ToolDispatch);
+    let mut operation = prepared_refusal_operation("req-123");
     for next in [
         AdmissionOperationState::BrokerAttemptRegistered,
         AdmissionOperationState::BudgetAuthorized,
@@ -1328,14 +1424,22 @@ fn terminal_replay_reference_is_typed_and_retained() {
         digest("incident_digest", POLICY_HASH),
     )
     .expect("incident must bind to the exact terminal projection");
+    let kernel = Keypair::generate();
+    let receipt = verified_refusal_receipt(
+        &operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        &kernel,
+    );
     let projection = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
         context: context.clone(),
         incident: Box::new(incident),
+        receipt: Box::new(receipt.clone()),
     };
     let canonical_projection = projection
         .canonical_projection()
         .expect("terminal projection must have a canonical commitment");
-    assert_eq!(canonical_projection.records().len(), 1);
+    assert_eq!(canonical_projection.records().len(), 2);
     assert_eq!(
         canonical_projection.records()[0].commitment().kind(),
         AdmissionProjectionRecordKind::Incident
@@ -1363,6 +1467,7 @@ fn terminal_replay_reference_is_typed_and_retained() {
     let substituted_projection = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
         context,
         incident: Box::new(substituted_incident),
+        receipt: Box::new(receipt.clone()),
     };
     assert_ne!(
         substituted_projection
@@ -1370,8 +1475,8 @@ fn terminal_replay_reference_is_typed_and_retained() {
             .expect("substituted projection must derive"),
         *canonical_projection.projection_digest()
     );
-    let replay = AdmissionTerminalReplay::Incident {
-        incident_id: identifier("incident_id", "incident-1"),
+    let replay = AdmissionTerminalReplay::Receipt {
+        receipt_id: identifier("receipt_id", &receipt.receipt().id),
         projection_digest: canonical_projection.projection_digest().clone(),
     };
     operation = operation
@@ -1380,8 +1485,17 @@ fn terminal_replay_reference_is_typed_and_retained() {
     assert_eq!(operation.dispatch_commit.as_ref(), Some(&dispatch_commit));
     assert!(operation.has_attachment(AdmissionAttachmentKind::ToolOutcome));
     assert_eq!(operation.terminal_replay(), Some(&replay));
+    let mut incident_only = operation.to_persisted();
+    incident_only.terminal_replay = Some(AdmissionTerminalReplay::Incident {
+        incident_id: identifier("incident_id", "incident-1"),
+        projection_digest: canonical_projection.projection_digest().clone(),
+    });
     assert_eq!(
-        operation.classify_replay(&prepared(AdmissionOperationKind::ToolDispatch)),
+        AdmissionOperationV1::from_persisted(incident_only),
+        Err(AdmissionOperationError::TerminalReplayMismatch),
+    );
+    assert_eq!(
+        operation.classify_replay(&prepared_refusal_operation("req-123")),
         AdmissionReplayClassification::Exact {
             terminal_replay: Some(replay)
         }
@@ -1590,4 +1704,255 @@ fn denied_after_delivery_projection_requires_participant_evidence() {
         ),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     ));
+}
+
+#[test]
+fn refusal_receipt_qualification_rejects_foreign_or_success_evidence() {
+    let operation = prepared_refusal_operation("req-123");
+    let context = projection_context(&operation);
+    let state = AdmissionOperationState::CompensatedBeforeDispatch;
+    let kernel = Keypair::generate();
+    let decision = Decision::Deny {
+        reason: "operation refused".to_owned(),
+        guard: "kernel".to_owned(),
+    };
+    let receipt = signed_refusal_receipt(&operation, &context, state, decision.clone(), &kernel);
+    let qualify = |receipt, expected_key: &chio_core::crypto::PublicKey| {
+        VerifiedAdmissionReceipt::from_kernel_verified_refusal(
+            receipt,
+            expected_key,
+            &decision,
+            TOOL_SERVER,
+            TOOL_NAME,
+            &operation,
+            &context,
+            state,
+        )
+    };
+    assert!(qualify(receipt.clone(), &kernel.public_key()).is_ok());
+    assert!(matches!(
+        qualify(receipt.clone(), &Keypair::generate().public_key()),
+        Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+    ));
+    for change in 0..7 {
+        let mut body = receipt.body();
+        match change {
+            0 => body.decision = Some(Decision::Allow),
+            1 => body.content_hash = CONTENT_HASH.to_owned(),
+            2 => body.tool_name = "different-tool".to_owned(),
+            3 => body.tenant_id = Some("different-tenant".to_owned()),
+            4 => {
+                body.action =
+                    ToolCallAction::from_parameters(serde_json::json!({"different": true}))
+                        .expect("action hashes")
+            }
+            5 => {
+                body.metadata.as_mut().expect("metadata")[ADMISSION_RECEIPT_METADATA_KEY]
+                    ["request_namespace_digest"] = serde_json::json!(AUTH_HASH)
+            }
+            6 => {
+                body.metadata.as_mut().expect("metadata")[ADMISSION_RECEIPT_METADATA_KEY]
+                    ["projected_operation_version"] = serde_json::json!(operation.version() + 2)
+            }
+            _ => unreachable!(),
+        }
+        let changed = ChioReceipt::sign(body, &kernel).expect("changed receipt signs");
+        assert!(
+            matches!(
+                qualify(changed, &kernel.public_key()),
+                Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+            ),
+            "change {change}"
+        );
+    }
+    let cancellation = Decision::Cancelled {
+        reason: "cancelled".to_owned(),
+    };
+    assert!(VerifiedAdmissionReceipt::from_kernel_verified_refusal(
+        signed_refusal_receipt(&operation, &context, state, cancellation.clone(), &kernel),
+        &kernel.public_key(),
+        &cancellation,
+        TOOL_SERVER,
+        TOOL_NAME,
+        &operation,
+        &context,
+        state,
+    )
+    .is_ok());
+}
+
+#[test]
+fn pre_dispatch_incident_projection_rejects_tool_dispatch() {
+    let operation = prepared_refusal_operation("incident-only-tool-compensation");
+    let result =
+        verified_pre_dispatch_incident_projection(&operation, projection_context(&operation));
+
+    assert!(
+        matches!(
+            &result,
+            Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+        ),
+        "tool compensation requires a signed refusal receipt: {result:?}"
+    );
+}
+
+#[test]
+fn tool_compensation_rejects_public_incident_projection() -> Result<(), Box<dyn std::error::Error>>
+{
+    let operation = prepared_refusal_operation("public-incident-tool-compensation");
+    let context = projection_context(&operation);
+    let proof =
+        crate::tool_outcome::VerifiedPreDispatchNoEffect::from_qualified_operation_snapshot(
+            &operation, &context,
+        )?;
+    let incident = AdmissionIncident::from_verified(
+        &operation,
+        &context,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        identifier("incident_id", "tool-compensation-incident"),
+        digest("incident_digest", POLICY_HASH),
+    )?;
+    let projection = AdmissionTerminalProjection::CompensatedBeforeDispatch {
+        context,
+        proof: Box::new(proof),
+        evidence: Box::new(AdmissionReceiptOrIncident::Incident(Box::new(incident))),
+    };
+
+    assert_eq!(
+        operation.apply_terminal_projection(&projection, &full_projection_capabilities()),
+        Err(AdmissionOperationError::TerminalReplayMismatch)
+    );
+    Ok(())
+}
+
+#[test]
+fn tool_compensation_rejects_persisted_incident_replay() -> Result<(), Box<dyn std::error::Error>> {
+    let operation = prepared_refusal_operation("persisted-incident-tool-compensation");
+    let context = projection_context(&operation);
+    let kernel = Keypair::generate();
+    let receipt = verified_refusal_receipt(
+        &operation,
+        &context,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        &kernel,
+    );
+    let projection = verified_pre_dispatch_compensation_projection(&operation, context, receipt)?;
+    let terminal =
+        operation.apply_terminal_projection(&projection, &full_projection_capabilities())?;
+    assert!(matches!(
+        terminal.terminal_replay(),
+        Some(AdmissionTerminalReplay::Receipt { .. })
+    ));
+    let mut persisted = terminal.to_persisted();
+    persisted.terminal_replay = Some(AdmissionTerminalReplay::Incident {
+        incident_id: identifier("incident_id", "tool-compensation-incident"),
+        projection_digest: projection.projection_digest()?,
+    });
+
+    assert_eq!(
+        AdmissionOperationV1::from_persisted(persisted),
+        Err(AdmissionOperationError::TerminalReplayMismatch)
+    );
+    Ok(())
+}
+
+#[test]
+fn compensation_projection_rejects_a_receipt_from_another_operation() {
+    let operation = prepared_refusal_operation("req-123");
+    let context = projection_context(&operation);
+    let kernel = Keypair::generate();
+    let receipt = verified_refusal_receipt(
+        &operation,
+        &context,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        &kernel,
+    );
+    let foreign = prepared_refusal_operation("another-request");
+    assert!(matches!(
+        verified_pre_dispatch_compensation_projection(
+            &foreign,
+            projection_context(&foreign),
+            receipt
+        ),
+        Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+    ));
+}
+
+#[test]
+fn unknown_terminal_envelope_requires_receipt_and_closed_body_shape(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let operation = finalizing_tool_operation_with(channel_requirements());
+    let context = projection_context(&operation);
+    let kernel = Keypair::generate();
+    let incident = AdmissionIncident::from_verified(
+        &operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        identifier("incident_id", "retained-unknown"),
+        digest("incident_digest", POLICY_HASH),
+    )?;
+    let receipt = verified_refusal_receipt(
+        &operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        &kernel,
+    );
+    let projection = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
+        context,
+        incident: Box::new(incident),
+        receipt: Box::new(receipt),
+    };
+    let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
+        &operation,
+        &projection,
+        &full_projection_capabilities(),
+        &kernel,
+    )?;
+    let verified = envelope.verify()?;
+    assert_eq!(
+        verified.terminal_operation().attachments(),
+        operation.attachments()
+    );
+    assert!(verified
+        .records()
+        .iter()
+        .all(|record| record.kind() != AdmissionProjectionRecordKind::ReleaseProof));
+    for omit_receipt in [true, false] {
+        let mut encoded = serde_json::to_value(&envelope)?;
+        let projection_bytes = STANDARD.decode(
+            encoded["body"]["projection_json"]
+                .as_str()
+                .ok_or("projection bytes")?,
+        )?;
+        let mut body: serde_json::Value = serde_json::from_slice(&projection_bytes)?;
+        if omit_receipt {
+            body.as_object_mut()
+                .ok_or("projection object")?
+                .remove("receipt");
+        } else {
+            body["extra"] = serde_json::json!(true);
+        }
+        let projection_bytes = canonical_json_bytes(&body)?;
+        encoded["body"]["projection_json"] = serde_json::json!(STANDARD.encode(&projection_bytes));
+        let manifest_bytes = STANDARD.decode(
+            encoded["body"]["manifest_json"]
+                .as_str()
+                .ok_or("manifest bytes")?,
+        )?;
+        let mut manifest: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
+        manifest["projection_body_digest"] = serde_json::json!(sha256_hex(&projection_bytes));
+        let manifest_bytes = canonical_json_bytes(&manifest)?;
+        encoded["body"]["manifest_json"] = serde_json::json!(STANDARD.encode(&manifest_bytes));
+        encoded["body"]["terminal_operation"]["terminal_replay"]["receipt"]["projection_digest"] =
+            serde_json::json!(sha256_hex(&manifest_bytes));
+        let mut preimage = b"chio.signed-admission-terminal-projection.v1\0".to_vec();
+        preimage.extend_from_slice(&canonical_json_bytes(&encoded["body"])?);
+        encoded["signature"] = serde_json::to_value(kernel.sign(&preimage))?;
+        let tampered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
+        assert_eq!(
+            tampered.verify(),
+            Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+        );
+    }
+    Ok(())
 }

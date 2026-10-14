@@ -36,7 +36,7 @@ fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_exp
             interrupted.is_err(),
             "the dispatch checkpoint must be reached"
         );
-        assert_state(&fixture, &first, "outcome_unknown_after_dispatch")?;
+        assert_state(&fixture, &first, "dispatch_committed")?;
         assert_eq!(grant_quota(&runtime, &first)?, (0, 1));
         assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
         (siblings, first)

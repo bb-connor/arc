@@ -176,6 +176,51 @@ impl Route {
         }))?)
     }
 
+    /// Reopen the serving owner and a kernel with the original signer and
+    /// approval authority, as a host restart does. Startup recovery is not run.
+    fn restarted(self) -> AnchoredTestResult<Self> {
+        let Fixture {
+            _temp,
+            database,
+            lock_root,
+            authority,
+            store,
+            ..
+        } = self.fixture;
+        drop(self.kernel);
+        let source_path = self.source.path.clone();
+        drop(self.source);
+        drop(store);
+        drop(authority);
+        let authority = crate::test_authority::open_serving(&database, &lock_root)?;
+        let fixture = Fixture {
+            store: authority.admission_operation_store(),
+            fence: authority.mutation_fence(),
+            authority,
+            _temp,
+            database,
+            lock_root,
+            _clock: None,
+        };
+        let source = Arc::new(Source::reopen(source_path, &fixture.store)?);
+        let mut kernel = kernel_recovery::kernel_with_signer(&fixture, self.signer.clone())?;
+        kernel
+            .set_governed_approval_policy(APPROVAL_TENANT.into(), vec![self.signer.public_key()])?;
+        kernel
+            .set_operation_owned_governed_approval_source(self.binding.clone(), source.clone())?;
+        kernel.set_governed_approval_replay_store(Box::new(RefuseLegacy(self.legacy.clone())));
+        kernel.register_tool_server(Box::new(Server(self.calls.clone())));
+        Ok(Self {
+            fixture,
+            source,
+            binding: self.binding,
+            signer: self.signer,
+            kernel,
+            calls: self.calls,
+            legacy: self.legacy,
+        })
+    }
+
     fn history(&self, request: &ToolCallRequest) -> AnchoredTestResult<(AdmissionOperationV1, Vec<chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalClaimHistoryV1>)>{
         let id: String = self.fixture.store.connection()?.query_row(
             "SELECT operation_id FROM admission_operations WHERE request_id = ?1",

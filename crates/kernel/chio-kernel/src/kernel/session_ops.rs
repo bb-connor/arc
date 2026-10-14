@@ -285,6 +285,7 @@ impl ChioKernel {
 
     pub(crate) fn build_resource_read_deny_receipt(
         &self,
+        request_id: &str,
         operation: &ReadResourceOperation,
         reason: &str,
     ) -> Result<ChioReceipt, KernelError> {
@@ -299,7 +300,7 @@ impl ChioKernel {
         })?;
 
         let receipt = self.build_and_sign_receipt(ReceiptParams {
-            request_id: None,
+            request_id: Some(request_id),
             capability_id: &operation.capability.id,
             tool_name: "resources/read",
             server_id: "session",
@@ -310,14 +311,20 @@ impl ChioKernel {
             action,
             content_hash: receipt_content.content_hash,
             canonical_content: receipt_content.canonical_content,
-            metadata: merge_metadata_objects(
-                Some(serde_json::json!({
-                    "resource": {
-                        "uri": &operation.uri,
-                    }
-                })),
-                receipt_attribution_metadata(&operation.capability, None)?,
-            ),
+            metadata: self.prepare_refusal_receipt_metadata(
+                request_id,
+                RefusalReceiptMetadata::new(
+                    merge_metadata_objects(
+                        Some(serde_json::json!({
+                            "resource": {
+                                "uri": &operation.uri,
+                            }
+                        })),
+                        receipt_attribution_metadata(&operation.capability, None)?,
+                    ),
+                    IdentityDisposition::Reusable,
+                ),
+            )?,
             timestamp: self.read_authority_time()?.as_secs(),
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,
@@ -738,25 +745,25 @@ impl ChioKernel {
     }
 
     /// Evaluate a normalized operation against a specific session.
-    ///
-    /// This is the higher-level entry point that future JSON-RPC or MCP edges
-    /// should target. The current stdio loop normalizes raw frames into these
-    /// operations before invoking the kernel.
     pub fn evaluate_session_operation(
         &self,
         context: &OperationContext,
         operation: &SessionOperation,
     ) -> Result<SessionOperationResponse, KernelError> {
+        super::kernel_scopes::RECEIPT_EVALUATION_SCOPE_KEY
+            .sync_scope(uuid::Uuid::new_v4().to_string(), || {
+                self.evaluate_session_operation_scoped(context, operation)
+            })
+    }
+
+    fn evaluate_session_operation_scoped(
+        &self,
+        context: &OperationContext,
+        operation: &SessionOperation,
+    ) -> Result<SessionOperationResponse, KernelError> {
         if let SessionOperation::ToolCall(tool_call) = operation {
-            reject_reserved_receipt_metadata(tool_call.extra_metadata.as_ref())?;
+            validate_caller_receipt_metadata(tool_call.extra_metadata.as_ref())?;
         }
-        // Install tenant_id scope for the duration of this session-scoped
-        // evaluation so every receipt signed here (tool call, resource read
-        // deny, etc.) is tagged with the session's tenant. The ToolCall
-        // branch also installs a scope via its sync_with_session_context
-        // path; the nested scope is a no-op because the value matches, but
-        // it keeps non-tool-call branches (e.g. evaluate_resource_read)
-        // covered.
         let tenant_id = self.resolve_tenant_id_for_session(Some(&context.session_id));
         let _tenant_request_scope = self
             .scope_receipt_tenant_id_for_request(context.request_id.as_str(), tenant_id.clone());
@@ -1026,7 +1033,11 @@ impl ChioKernel {
         match self.enforce_resource_roots(context, operation) {
             Ok(()) => {}
             Err(KernelError::ResourceRootDenied { reason, .. }) => {
-                let receipt = self.build_resource_read_deny_receipt(operation, &reason)?;
+                let receipt = self.build_resource_read_deny_receipt(
+                    context.request_id.as_str(),
+                    operation,
+                    &reason,
+                )?;
                 return Ok(SessionOperationResponse::ResourceReadDenied { receipt });
             }
             Err(error) => return Err(error),

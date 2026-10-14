@@ -47,6 +47,10 @@ use tempfile::TempDir;
 
 use super::*;
 
+#[path = "admission_operation_store_tests/terminal_receipts.rs"]
+mod terminal_receipts;
+pub(crate) use terminal_receipts::refusal_receipt;
+
 #[path = "admission_operation_store_tests/anchored_terminal.rs"]
 mod anchored_terminal;
 #[path = "admission_operation_store_tests/authority_clock.rs"]
@@ -205,8 +209,10 @@ fn prepared_operation(
         request_id: identifier("request_id", request_id),
         capability_id: identifier("capability_id", capability_id),
         authorization_capability_hash: digest("authorization_capability_hash", 'a'),
-        request_binding: AdmissionRequestBindingV1::new(
+        request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
             digest("immutable_request_hash", 'b'),
+            AdmissionDigest::try_new("action_parameter_hash", sha256_hex(b"{}"))
+                .expect("action parameter hash"),
             participant_requirements,
         )
         .expect("request binding"),
@@ -239,8 +245,10 @@ fn prepared_payment_operation(
         request_id: identifier("request_id", request_id),
         capability_id: identifier("capability_id", capability_id),
         authorization_capability_hash: digest("authorization_capability_hash", 'a'),
-        request_binding: AdmissionRequestBindingV1::new(
+        request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
             digest("immutable_request_hash", 'b'),
+            AdmissionDigest::try_new("action_parameter_hash", sha256_hex(b"{}"))
+                .expect("action parameter hash"),
             requirements,
         )
         .expect("request binding"),
@@ -443,9 +451,18 @@ fn unknown_projection(
         digest("incident_digest", incident_digest),
     )
     .expect("bind durable incident");
+    let receipt = refusal_receipt(
+        operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        &Keypair::generate(),
+        &serde_json::json!({}),
+    )
+    .expect("bound refusal receipt");
     AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
         context,
         incident: Box::new(incident),
+        receipt: Box::new(receipt),
     }
 }
 
@@ -456,6 +473,7 @@ fn unknown_projection_for_claimant(
     incident_digest: char,
     at: u64,
     claimant: &str,
+    signer: &Keypair,
 ) -> AdmissionTerminalProjection {
     let recovery = claim(fixture, operation, claimant, at);
     let context = AdmissionProjectionContext {
@@ -475,9 +493,18 @@ fn unknown_projection_for_claimant(
         digest("incident_digest", incident_digest),
     )
     .expect("bind durable incident");
+    let receipt = refusal_receipt(
+        operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        signer,
+        &serde_json::json!({}),
+    )
+    .expect("bound refusal receipt");
     AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
         context,
         incident: Box::new(incident),
+        receipt: Box::new(receipt),
     }
 }
 
@@ -728,7 +755,12 @@ fn terminal_projection_is_atomic_replayable_and_retained() {
         Some(second.clone())
     );
 
+    let AdmissionTerminalProjection::OutcomeUnknownAfterDispatch { receipt, .. } = &conflicting
+    else {
+        panic!("unknown terminal projection");
+    };
     let retry = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
+        receipt: receipt.clone(),
         context: conflicting.context().clone(),
         incident: Box::new(
             AdmissionIncident::from_verified(
@@ -787,6 +819,7 @@ fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
         'e',
         begun_at + 20_000,
         &claimant,
+        &signer,
     );
     let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
         &operation,
@@ -843,6 +876,7 @@ fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
     );
     let authorized = Keypair::generate();
     let authorized_claimant = format!("kernel:{}", authorized.public_key().to_hex());
+    let attacker = Keypair::generate();
     let second_projection = unknown_projection_for_claimant(
         &fixture,
         &second,
@@ -850,12 +884,13 @@ fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
         'd',
         second_begun_at + 20_000,
         &authorized_claimant,
+        &attacker,
     );
     let substituted = SignedAdmissionTerminalProjectionV1::from_verified(
         &second,
         &second_projection,
         &fixture.store.admission_projection_capabilities(),
-        &Keypair::generate(),
+        &attacker,
     )
     .expect("structurally valid substituted envelope");
     assert!(matches!(

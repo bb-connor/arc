@@ -993,43 +993,101 @@ setter or import API silently enables it.
 
 #### Original Authority Selection For Retained Admission
 
-New retained tool admissions use `chio.retained-tool-admission-request.v4` to
-commit to an explicit `chio.admission-authority-profile.v1`. The profile records
-runtime hook presence and declarations, the required-swarm policy, runtime and
-approval authority identifiers and migration expectations, and the DPoP replay
-domain including its immutable freshness policy. Each optional authority field
-MUST be present, including an explicit `null` for an absent selection. These
-records are configuration data, not activation credentials or execution permits.
+Every durable `ToolDispatch` admission MUST retain a bounded canonical
+`chio.retained-tool-admission-request.v1` record. The kernel MUST construct and
+validate this record before beginning the operation; the store MUST commit its
+exact bytes and digest with the original admission begin. The record includes
+the original capability and immutable request material, matching grant indices,
+post-return evaluation steps, the authority profile and
+`frozen_receipt_signing_identity`. The signing identity MUST contain the original
+public key and receipt cryptographic floor. Missing profile or signing material,
+unknown fields, invalid signing selections and records larger than 262,144 bytes
+MUST be rejected before admission or dispatch.
 
-Authenticated external callers use `chio.admission-authority-profile.v2`, with
-an additional `caller_executor` containing the independently selected executor
-identifier, public key and positive key epoch. That member MUST be present and
-non-null in v2 and absent in v1. Changing the current host pin cannot adopt an
-old operation, and a report cannot choose an authority profile.
+The authority profile records runtime hook presence and declarations, the
+required-swarm policy, selected runtime and approval authorities, and the DPoP
+replay domain with its immutable freshness policy. Runtime, approval and DPoP
+selection fields MUST each be present, including an explicit `null` for an
+absent selection. Authenticated external callers retain the independently
+selected executor identifier, public key and positive key epoch in their
+profile. A report cannot choose that selection. These records describe
+configuration; they are neither activation credentials nor execution permits.
 
 A trusted native security selection MUST retain its original admission even
 when the ordinary durable-admission mode excludes the call. Without a qualified
-admission store, that selection MUST fail closed; ephemeral receipts or a
-development-mode opt-out MUST NOT provide a non-durable fallback.
+admission store, that selection MUST fail closed. Ephemeral receipts and
+development configuration cannot waive the durable admission requirement.
 
-The domain-separated `chio.tool-admission-request.v4` commitment includes the
-prior immutable request hash and the complete profile. Stable security identity
-and native initialization remain bound by that prior hash. Serving-owner epochs
-and reusable request credentials MUST NOT be inserted into the profile. Legacy
-v1-v3 retained records remain readable with their original canonical bytes and
-hashes; they MUST NOT be upgraded in place or acquire new operation-owned runtime,
-approval, DPoP or native mutation authority from current configuration.
+The single canonical `chio.tool-admission-request.v1` commitment contains the
+server, tool and agent identities, arguments, governed intent, model metadata,
+federated origin, selected matching grants, post-return steps, security binding,
+complete authority profile and frozen receipt signing identity. An absent
+security binding is committed as `null`. Stable security identity and native
+initialization are included through that binding. The hash MUST cover the
+complete canonical object directly; another request hash cannot substitute for
+any of its fields. Serving-owner epochs and reusable credentials are excluded
+from the profile. Retained requests MUST omit DPoP proofs, execution nonces,
+approval credentials, supplemental authorization and declassification grants.
+
+Caller-supplied receipt metadata is admitted with the request. A non-empty
+object is retained as `admitted_receipt_metadata` and committed by the same
+`chio.tool-admission-request.v1` hash; it is omitted from both when the caller
+supplies none. Kernel-derived keys, including `admission_operation`,
+`attribution`, `chio_runtime` and `receipt_context`, MUST be refused before
+admission. Every canonical refusal the kernel signs for the operation
+(compensation, recovery and unknown outcome) MUST carry the retained metadata
+unchanged, so an exact replay returns the identical receipt. A retry whose
+metadata differs from the retained commitment is a conflicting request and
+MUST be refused without a new receipt.
+
+Exactly two admitted entries are attempt-scoped evidence rather than request
+identity: the top-level `native_launch`, the launch receipt (`receipt_id` and
+`receipt_sha256`) of the native launch serving the presenting attempt, and
+`chio_process.worker_profile`, the worker container launch presenting it (`kind`
+`container`, `launch_attempt` of at least 1 and a `launch_ref` with `record_id`
+and `record_sha256`). Digests are 64 lowercase hex characters. Both are excluded
+from the `chio.tool-admission-request.v1` hash and from replay equality; every
+other admitted field, including the rest of `chio_process` and `route`, stays
+bound. A malformed entry MUST be refused before admission, and a replay of an
+admission that retained an entry MUST present it. Receipts signed during a live
+evaluation name the presenting attempt's launches. Canonical refusals signed
+from the retained admission, including recovery refusals with no live caller,
+name the launches retained at admission. A dispatch performed by a later,
+relaunched attempt of a retained admission is therefore named by its admitting
+launches if recovery signs its terminal refusal; the dispatch commit does not yet
+record its launches.
+
+A caller that derives receipt metadata from the request MUST derive it from the
+request's attempt identity (`ToolCallRequest::attempt_identity`): the request
+with DPoP proofs, execution nonces, approval tokens and threshold proposals
+cleared. Those credentials are attempt-scoped and are not part of the request
+identity; supplemental authorization and declassification grants are. A
+pending approval therefore resumes under the same metadata with its collected
+approvals, and the kernel verifies the presented approvals at that attempt.
 
 Before a new claim, the kernel MUST check the original selection and the store
 MUST compare the requested authority with the retained profile inside the actual
 operation-lease transaction. Current configuration cannot replace an original
 selection or turn absence into authority. Final dispatch revalidation and caller
-context handling check the bound profile; post-effect recovery reloads original
-material through an exact fenced operation read. Cleanup continues to use
-retained custody, not a replacement hook or a decoded profile as authority.
-Non-retained legacy requests do not gain operation-owned authority through this
-format. This contract does not imply authenticated external start or native
-egress/declassification lifecycle completion.
+context handling check the bound profile. Post-effect recovery MUST reload the
+original request and signer through an exact fenced operation read. Missing or
+substituted material MUST deny recovery; the current signer cannot replace the
+original signer. Cleanup uses retained custody and cannot derive mutation
+authority from a decoded profile or a replacement hook.
+
+A terminal decision, its authoritative timestamp and its canonical signed
+receipt MUST be committed atomically under the original admission operation.
+That operation owns exactly one terminal receipt. Retries and recovery return
+the committed receipt without signing another terminal decision or changing its
+timestamp. Storage errors MUST preserve ownership and deny publication of an
+uncommitted terminal result.
+
+The retained decoder MUST reject an incomplete shape structurally, including
+one carrying the same `.v1` identifier. An identifier cannot select another
+shape, supply missing authority material or permit reinterpretation. Development
+databases containing another retained-request shape MUST be recreated. This
+contract does not itself authorize an authenticated external start or complete
+the native egress and declassification lifecycle.
 
 #### Native Dispatch Preparation History
 

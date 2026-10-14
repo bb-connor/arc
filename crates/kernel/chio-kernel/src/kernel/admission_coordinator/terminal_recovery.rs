@@ -19,6 +19,10 @@ impl ChioKernel {
                 self.completed_durable_tool_response(admission, request)
                     .map(Some)
             }
+            AdmissionOperationState::CompensatedBeforeDispatch
+            | AdmissionOperationState::OutcomeUnknownAfterDispatch => {
+                self.replay_durable_refusal(admission, request).map(Some)
+            }
             _ => Ok(None),
         }
     }

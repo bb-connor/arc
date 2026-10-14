@@ -246,6 +246,9 @@ pub fn run_child_flush_mutation(seed: u64, suppress_child_append: bool) -> Resul
         server_starts.load(Ordering::SeqCst) == 1,
         "nested mutation never reached the tool server",
     )?;
+    kernel
+        .await_post_effect_evidence()
+        .map_err(|error| format!("dropped nested evidence was not persisted: {error}"))?;
     let parent_receipts = receipt_store.receipts()?;
     require(
         parent_receipts.len() == 1 && parent_receipts[0].is_cancelled(),

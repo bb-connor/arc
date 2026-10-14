@@ -173,16 +173,14 @@ fn kernel_dispatch_cannot_resume_a_caller_reservation() -> TestResult {
     let fixture = Fixture::new()?;
     let runtime = fixture.open()?;
     let execution = reserve(&fixture, &runtime, "caller-not-kernel")?;
-    let denied = runtime.kernel.evaluate_tool_call_blocking(&execution)?;
-    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
+    let receipts = runtime.kernel.receipt_log().len();
+    let denied = runtime.kernel.evaluate_tool_call_blocking(&execution);
     assert!(
-        denied
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("provider attempt does not match")),
-        "{:?}",
-        denied.reason
+        matches!(&denied, Err(chio_kernel::KernelError::DurableAdmission(reason))
+            if reason == "retained provider attempt does not match this dispatch"),
+        "{denied:?}"
     );
+    assert_eq!(runtime.kernel.receipt_log().len(), receipts);
     assert_state(&fixture, &execution, "ready_to_dispatch")?;
     assert_eq!(grant_quota(&runtime, &execution)?, (1, 0));
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);

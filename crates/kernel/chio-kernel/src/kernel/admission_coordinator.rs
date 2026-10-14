@@ -1,3 +1,5 @@
+#[path = "admission_coordinator/receipt_namespace.rs"]
+mod receipt_namespace;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -84,6 +86,13 @@ mod return_context;
 pub(crate) use return_context::{
     DurableDispatchCommitError, DurableToolReturnContext, DurableToolReturnContextInput,
 };
+
+#[path = "admission_coordinator/start_failure.rs"]
+mod start_failure;
+use start_failure::AdmissionStartFailure;
+#[path = "admission_coordinator/refusal.rs"]
+mod refusal;
+pub(crate) use refusal::DurableRefusalResponse;
 
 use super::*;
 use crate::admission_operation::{
@@ -465,14 +474,18 @@ fn immutable_tool_admission_request_hash(
     matching_grants: &[MatchingGrant<'_>],
     post_return_plan: &DurablePostReturnPlan,
     security_binding: Option<&crate::admission_operation::AdmissionSecurityBindingV1>,
-    authority_profile: Option<&crate::admission_operation::AdmissionAuthorityProfileV1>,
+    authority_profile: &crate::admission_operation::AdmissionAuthorityProfileV1,
+    signing_identity: &crate::tool_outcome::FrozenReceiptSigningIdentityV1,
+    admitted_receipt_metadata: Option<&crate::admission_operation::AdmittedReceiptMetadata>,
 ) -> Result<AdmissionDigest, KernelError> {
-    crate::admission_operation::immutable_tool_request_hash_with_profile(
+    crate::admission_operation::immutable_tool_request_hash(
         request,
         matching_grants,
         &post_return_plan.frozen_steps,
         security_binding,
         authority_profile,
+        signing_identity,
+        admitted_receipt_metadata,
     )
     .map_err(durable_store_error)
 }
@@ -538,10 +551,11 @@ impl ChioKernel {
         request: &ToolCallRequest,
         matching_grants: &[MatchingGrant<'_>],
         trusted_now_unix_ms: u64,
-    ) -> Result<Option<DurableToolAdmission>, KernelError> {
+    ) -> Result<Option<DurableToolAdmission>, AdmissionStartFailure> {
         self.begin_durable_tool_admission_for_transport(
             request,
             matching_grants,
+            None,
             None,
             trusted_now_unix_ms,
             DispatchTransport::KernelToolServer,
@@ -553,26 +567,38 @@ impl ChioKernel {
         request: &ToolCallRequest,
         matching_grants: &[MatchingGrant<'_>],
         security_context: Option<&SecurityInvocationContext>,
+        admitted_receipt_metadata: Option<&serde_json::Value>,
         trusted_now_unix_ms: u64,
         transport: DispatchTransport,
-    ) -> Result<Option<DurableToolAdmission>, KernelError> {
-        self.validate_security_invocation_context_binding(request, security_context, None)?;
-        let security_binding = self.admission_security_binding(security_context)?;
-        let aggregate_quota =
-            self.verify_aggregate_quota_for_admission(request, trusted_now_unix_ms / 1_000)?;
-        let cumulative_matching_grant_count = matching_grants
-            .iter()
-            .filter(|matching| {
-                matching.grant.constraints.iter().any(|constraint| {
-                    matches!(
-                        constraint,
-                        Constraint::RequireCumulativeApprovalAbove { .. }
-                    )
+    ) -> Result<Option<DurableToolAdmission>, AdmissionStartFailure> {
+        let mut receipt_disposition = Some(IdentityDisposition::Reusable);
+        let result = (|| -> Result<_, KernelError> {
+            let admitted_receipt_metadata = admitted_receipt_metadata
+                .map(|metadata| {
+                    metadata.as_object().ok_or_else(|| {
+                        KernelError::InvalidReceiptMetadata(
+                            "receipt metadata must be a JSON object".into(),
+                        )
+                    })
                 })
-            })
-            .count();
-        let recovery_matching_grant_count =
-            matching_grants
+                .transpose()?
+                .filter(|metadata| !metadata.is_empty());
+            self.validate_security_invocation_context_binding(request, security_context, None)?;
+            let security_binding = self.admission_security_binding(security_context)?;
+            let aggregate_quota =
+                self.verify_aggregate_quota_for_admission(request, trusted_now_unix_ms / 1_000)?;
+            let cumulative_matching_grant_count = matching_grants
+                .iter()
+                .filter(|matching| {
+                    matching.grant.constraints.iter().any(|constraint| {
+                        matches!(
+                            constraint,
+                            Constraint::RequireCumulativeApprovalAbove { .. }
+                        )
+                    })
+                })
+                .count();
+            let recovery_matching_grant_count = matching_grants
                 .iter()
                 .filter(|matching| {
                     matching.grant.constraints.iter().any(|constraint| {
@@ -580,464 +606,563 @@ impl ChioKernel {
                     })
                 })
                 .count();
-        let finding_memory_terminal_required = request
-            .arguments
-            .get(crate::memory_provenance::FINDING_DELIVERY_RECEIPT_ID_ARGUMENT)
-            .is_some();
-        let authority_profile = self.admission_authority_profile()?;
-        let native_security_selected = security_binding
-            .as_ref()
-            .is_some_and(|binding| binding.native_authority().is_some());
-        let operation_owned_runtime = authority_profile.runtime().is_some();
-        let operation_owned_approval =
-            self.governed_approval_authority.is_some() && request.approval_token.is_some();
-        let operation_owned_dpop = self.dpop_authority.is_some()
-            && matching_grants
-                .iter()
-                .any(|matching| matching.grant.dpop_required == Some(true));
-        // Keep coverage, store requirements and retention on one decision.
-        // A selected authority cannot enter an unbound legacy path.
-        let requires_authority_admission = native_security_selected
-            || operation_owned_runtime
-            || operation_owned_approval
-            || operation_owned_dpop
-            || authority_profile.supplemental_participant().is_some();
-        // Only a grant that can serve this request may force the structured path. An
-        // unrelated cumulative grant elsewhere in the capability must not withdraw an
-        // otherwise exempt call.
-        let requires_structured_admission = aggregate_quota.is_some()
-            || request.supplemental_authorization.is_some()
-            || cumulative_matching_grant_count != 0
-            || recovery_matching_grant_count != 0
-            || finding_memory_terminal_required
-            || requires_authority_admission;
-        if request.supplemental_authorization.is_some()
-            && self.supplemental_quota_verifier.is_none()
-        {
-            return Err(KernelError::DurableAdmission(
-                SupplementalQuotaError::MissingVerifier.to_string(),
-            ));
-        }
-        let effect_class = if matching_grants.iter().all(|matching| {
-            matching.grant.max_cost_per_invocation.is_some()
-                || matching.grant.max_total_cost.is_some()
-        }) {
-            SideEffectClass::Monetary
-        } else if self
-            .tool_servers
-            .get(&request.server_id)
-            .is_some_and(|server| server.tool_is_read_only(&request.tool_name))
-        {
-            SideEffectClass::ReadOnly
-        } else {
-            SideEffectClass::SideEffecting
-        };
-        // A recovery can be read-only at the tool boundary, but execution has
-        // already been attempted under a durable retry quota. Always route it
-        // through the recoverable terminal projection so its Allow receipt and
-        // receipt-to-delivery lineage cannot disagree and trigger a duplicate
-        // execution after a later persistence failure.
-        if !self.durable_admission_mode.covers(effect_class)
-            && recovery_matching_grant_count == 0
-            && !finding_memory_terminal_required
-            && !requires_authority_admission
-        {
-            if requires_structured_admission {
+            let finding_memory_terminal_required = request
+                .arguments
+                .get(crate::memory_provenance::FINDING_DELIVERY_RECEIPT_ID_ARGUMENT)
+                .is_some();
+            let authority_profile = self.admission_authority_profile()?;
+            let native_security_selected = security_binding
+                .as_ref()
+                .is_some_and(|binding| binding.native_authority().is_some());
+            let operation_owned_runtime = authority_profile.runtime().is_some();
+            let operation_owned_approval =
+                self.governed_approval_authority.is_some() && request.approval_token.is_some();
+            let operation_owned_dpop = self.dpop_authority.is_some()
+                && matching_grants
+                    .iter()
+                    .any(|matching| matching.grant.dpop_required == Some(true));
+            // Keep coverage, store requirements and retention on one decision.
+            // A selected authority requires a bound admission path.
+            let requires_authority_admission = native_security_selected
+                || operation_owned_runtime
+                || operation_owned_approval
+                || operation_owned_dpop
+                || authority_profile.supplemental_participant().is_some();
+            // Only a grant that can serve this request may force the structured path. An
+            // unrelated cumulative grant elsewhere in the capability must not withdraw an
+            // otherwise exempt call.
+            let requires_structured_admission = aggregate_quota.is_some()
+                || request.supplemental_authorization.is_some()
+                || cumulative_matching_grant_count != 0
+                || recovery_matching_grant_count != 0
+                || finding_memory_terminal_required
+                || requires_authority_admission;
+            if request.supplemental_authorization.is_some()
+                && self.supplemental_quota_verifier.is_none()
+            {
                 return Err(KernelError::DurableAdmission(
+                    SupplementalQuotaError::MissingVerifier.to_string(),
+                ));
+            }
+            let effect_class = if matching_grants.iter().all(|matching| {
+                matching.grant.max_cost_per_invocation.is_some()
+                    || matching.grant.max_total_cost.is_some()
+            }) {
+                SideEffectClass::Monetary
+            } else if self
+                .tool_servers
+                .get(&request.server_id)
+                .is_some_and(|server| server.tool_is_read_only(&request.tool_name))
+            {
+                SideEffectClass::ReadOnly
+            } else {
+                SideEffectClass::SideEffecting
+            };
+            // A recovery can be read-only at the tool boundary, but execution has
+            // already been attempted under a durable retry quota. Always route it
+            // through the recoverable terminal projection so its Allow receipt and
+            // receipt-to-delivery lineage cannot disagree and trigger a duplicate
+            // execution after a later persistence failure.
+            if !self.durable_admission_mode.covers(effect_class)
+                && recovery_matching_grant_count == 0
+                && !finding_memory_terminal_required
+                && !requires_authority_admission
+            {
+                if requires_structured_admission {
+                    return Err(KernelError::DurableAdmission(
                     "aggregate, cumulative, supplemental, recovery, and Finding memory authorization requires durable admission coverage"
                         .to_string(),
                 ));
-            }
-            return Ok(None);
-        }
-        self.durable_stream_limits()?;
-        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
-            if self.config.allow_ephemeral_receipt_log && !requires_structured_admission {
+                }
                 return Ok(None);
             }
-            return Err(KernelError::DurableAdmission(
-                "no qualified admission operation store is configured".to_string(),
-            ));
-        };
-        let payment_required = effect_class == SideEffectClass::Monetary;
-        if payment_required {
-            let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "durable monetary admission requires a qualified payment adapter".to_owned(),
-                )
-            })?;
-            if adapter.rail_id().is_empty()
-                || adapter.rail_id() == "unspecified"
-                || adapter.rail_mode().is_none()
+            self.durable_stream_limits()?;
+            let Some(runtime) = self.durable_admission_runtime.as_ref() else {
+                if self.config.allow_ephemeral_receipt_log && !requires_structured_admission {
+                    return Ok(None);
+                }
+                return Err(KernelError::DurableAdmission(
+                    "no qualified admission operation store is configured".to_string(),
+                ));
+            };
+            let payment_required = effect_class == SideEffectClass::Monetary;
+            if payment_required {
+                let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "durable monetary admission requires a qualified payment adapter"
+                            .to_owned(),
+                    )
+                })?;
+                if adapter.rail_id().is_empty()
+                    || adapter.rail_id() == "unspecified"
+                    || adapter.rail_mode().is_none()
+                {
+                    return Err(KernelError::DurableAdmission(
+                        "durable monetary admission requires a recoverable payment rail identity"
+                            .to_owned(),
+                    ));
+                }
+                // An output-digest grant is honored only after the tool returns,
+                // which is past the prepay point on a final-settlement rail. Refuse
+                // to begin a durable operation for it here, before any hold is
+                // placed, rather than deny mid-flight and unwind a live payment.
+                let requires_output_digest =
+                    matching_grants.iter().any(|matching| {
+                        matching.grant.constraints.iter().any(|constraint| {
+                            matches!(constraint, Constraint::OutputDigestSha256(_))
+                        })
+                    });
+                if requires_output_digest
+                    && adapter.rail_mode() != Some(crate::payment::PaymentRailMode::ReversibleHold)
+                {
+                    return Err(KernelError::DurableAdmission(
+                        "output-digest delivery requires a reversible-hold payment rail".to_owned(),
+                    ));
+                }
+            }
+            let projection_capabilities = runtime.store.admission_projection_capabilities();
+            let nonce_participant =
+                self.durable_nonce_participant_required(&projection_capabilities)?;
+            let observer_required = self.settlement_observer.is_some();
+            if !projection_capabilities.operation_terminal
+                || !projection_capabilities.tool_outcome
+                || (payment_required && !projection_capabilities.payment_terminal)
+                || (observer_required && !projection_capabilities.observation_attempt_zero)
             {
                 return Err(KernelError::DurableAdmission(
-                    "durable monetary admission requires a recoverable payment rail identity"
+                    "admission store lacks atomic terminal tool-outcome projection support"
                         .to_owned(),
                 ));
             }
-            // An output-digest grant is honored only after the tool returns,
-            // which is past the prepay point on a final-settlement rail. Refuse
-            // to begin a durable operation for it here, before any hold is
-            // placed, rather than deny mid-flight and unwind a live payment.
-            let requires_output_digest = matching_grants.iter().any(|matching| {
-                matching
-                    .grant
-                    .constraints
-                    .iter()
-                    .any(|constraint| matches!(constraint, Constraint::OutputDigestSha256(_)))
-            });
-            if requires_output_digest
-                && adapter.rail_mode() != Some(crate::payment::PaymentRailMode::ReversibleHold)
+            let post_return_plan = self.durable_post_return_plan()?;
+
+            let supplemental_authorization_artifact_digest = request
+                .supplemental_authorization
+                .as_ref()
+                .map(|authorization| {
+                    supplemental_authorization_artifact_digest(
+                        authorization.signed_extension.as_bytes(),
+                    )
+                });
+            receipt_disposition = None;
+            let signing_identity = self.freeze_receipt_signing_identity()?;
+            let namespace = self.authenticated_receipt_namespace(&request.request_id)?;
+            let replay_key = crate::admission_operation::AdmissionReplayKey {
+                request_namespace_digest: namespace.digest().clone(),
+                request_id: AdmissionIdentifier::try_new("request_id", request.request_id.clone())?,
+            };
+            let (signing_identity, authority_profile) = {
+                let _mutation_guard = runtime.lock_mutations()?;
+                match runtime
+                    .store
+                    .load_by_replay_key(&replay_key)
+                    .map_err(durable_store_error)?
+                {
+                    Some(operation) => {
+                        if operation.replay_key() != replay_key {
+                            return Err(KernelError::DurableAdmission(
+                                "retained operation does not match its replay selector".into(),
+                            ));
+                        }
+                        if operation.state().is_terminal()
+                            && matches!(
+                                operation.terminal_replay(),
+                                Some(AdmissionTerminalReplay::Receipt { .. })
+                            )
+                        {
+                            let original =
+                                self.terminal_refusal_original(&operation, trusted_now_unix_ms)?;
+                            (
+                                original.frozen_receipt_signing_identity().clone(),
+                                original.authority_profile().clone(),
+                            )
+                        } else {
+                            (signing_identity, authority_profile)
+                        }
+                    }
+                    None => {
+                        receipt_disposition = Some(IdentityDisposition::Reusable);
+                        (signing_identity, authority_profile)
+                    }
+                }
+            };
+            let immutable_request_hash = immutable_tool_admission_request_hash(
+                request,
+                matching_grants,
+                &post_return_plan,
+                security_binding.as_ref(),
+                &authority_profile,
+                &signing_identity,
+                admitted_receipt_metadata,
+            )?;
+            let action =
+                ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
+                    KernelError::DurableAdmission(format!(
+                        "tool action parameters are invalid: {error}"
+                    ))
+                })?;
+            let action_parameter_hash =
+                AdmissionDigest::try_new("action_parameter_hash", action.parameter_hash.clone())?;
+            let authorization_capability_hash =
+                admission_digest("authorization_capability_hash", &request.capability)?;
+            let policy_hash =
+                AdmissionDigest::try_new("policy_hash", self.config.policy_hash.clone()).map_err(
+                    |_| {
+                        KernelError::DurableAdmission(
+                            "durable admission requires a canonical SHA-256 policy hash".to_owned(),
+                        )
+                    },
+                )?;
+            if cumulative_matching_grant_count != 0
+                && cumulative_matching_grant_count != matching_grants.len()
             {
                 return Err(KernelError::DurableAdmission(
-                    "output-digest delivery requires a reversible-hold payment rail".to_owned(),
+                    "matching grants disagree on cumulative approval requirements".to_owned(),
                 ));
             }
-        }
-        let projection_capabilities = runtime.store.admission_projection_capabilities();
-        let nonce_participant =
-            self.durable_nonce_participant_required(&projection_capabilities)?;
-        let observer_required = self.settlement_observer.is_some();
-        if !projection_capabilities.operation_terminal
-            || !projection_capabilities.tool_outcome
-            || (payment_required && !projection_capabilities.payment_terminal)
-            || (observer_required && !projection_capabilities.observation_attempt_zero)
-        {
-            return Err(KernelError::DurableAdmission(
-                "admission store lacks atomic terminal tool-outcome projection support".to_owned(),
-            ));
-        }
-        let post_return_plan = self.durable_post_return_plan()?;
-
-        let supplemental_authorization_artifact_digest = request
-            .supplemental_authorization
-            .as_ref()
-            .map(|authorization| {
-                supplemental_authorization_artifact_digest(
-                    authorization.signed_extension.as_bytes(),
-                )
-            });
-        let authority_profile = (cumulative_matching_grant_count != 0
-            || nonce_participant
-            || requires_authority_admission)
-            .then_some(authority_profile);
-        let immutable_request_hash = immutable_tool_admission_request_hash(
-            request,
-            matching_grants,
-            &post_return_plan,
-            security_binding.as_ref(),
-            authority_profile.as_ref(),
-        )?;
-        let action =
-            ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
-                KernelError::DurableAdmission(format!(
-                    "tool action parameters are invalid: {error}"
-                ))
+            let matching_grant_requires_cumulative_approval = cumulative_matching_grant_count != 0;
+            let requirements = AdmissionParticipantRequirements {
+                broker_attempt: true,
+                budget_capture: true,
+                approval: matching_grant_requires_cumulative_approval
+                    || request.approval_token.is_some()
+                    || !request.approval_tokens.is_empty(),
+                execution_nonce: nonce_participant,
+                payment: payment_required,
+                observation_attempt_zero: observer_required,
+                ..AdmissionParticipantRequirements::NONE
+            };
+            let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+                kind: AdmissionOperationKind::ToolDispatch,
+                namespace,
+                request_id: AdmissionIdentifier::try_new("request_id", request.request_id.clone())?,
+                capability_id: AdmissionIdentifier::try_new(
+                    "capability_id",
+                    request.capability.id.clone(),
+                )?,
+                authorization_capability_hash,
+                request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
+                    immutable_request_hash,
+                    action_parameter_hash,
+                    requirements,
+                )?,
+                policy_hash,
+                effect_class,
             })?;
-        let action_parameter_hash =
-            AdmissionDigest::try_new("action_parameter_hash", action.parameter_hash.clone())?;
-        let authorization_capability_hash =
-            admission_digest("authorization_capability_hash", &request.capability)?;
-        let policy_hash = AdmissionDigest::try_new("policy_hash", self.config.policy_hash.clone())
-            .map_err(|_| {
-                KernelError::DurableAdmission(
-                    "durable admission requires a canonical SHA-256 policy hash".to_owned(),
-                )
-            })?;
-        if cumulative_matching_grant_count != 0
-            && cumulative_matching_grant_count != matching_grants.len()
-        {
-            return Err(KernelError::DurableAdmission(
-                "matching grants disagree on cumulative approval requirements".to_owned(),
-            ));
-        }
-        let matching_grant_requires_cumulative_approval = cumulative_matching_grant_count != 0;
-        let requirements = AdmissionParticipantRequirements {
-            broker_attempt: true,
-            budget_capture: true,
-            approval: matching_grant_requires_cumulative_approval
-                || request.approval_token.is_some()
-                || !request.approval_tokens.is_empty(),
-            execution_nonce: nonce_participant,
-            payment: payment_required,
-            observation_attempt_zero: observer_required,
-            ..AdmissionParticipantRequirements::NONE
-        };
-        let coordinator_authority_id = AdmissionIdentifier::try_new(
-            "coordinator_authority_id",
-            runtime.fence.store_uuid.clone(),
-        )?;
-        let namespace = match self.receipt_tenant_id_for_request(Some(&request.request_id)) {
-            Some(tenant_id) => AuthenticatedRequestNamespace::from_authentication_context(
-                coordinator_authority_id,
-                tenant_id,
-            )?,
-            None => AuthenticatedRequestNamespace::for_local_system(coordinator_authority_id)?,
-        };
-        let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
-            kind: AdmissionOperationKind::ToolDispatch,
-            namespace,
-            request_id: AdmissionIdentifier::try_new("request_id", request.request_id.clone())?,
-            capability_id: AdmissionIdentifier::try_new(
-                "capability_id",
-                request.capability.id.clone(),
-            )?,
-            authorization_capability_hash,
-            request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
-                immutable_request_hash,
-                action_parameter_hash,
-                requirements,
-            )?,
-            policy_hash,
-            effect_class,
-        })?;
-        let supplemental_quota = self.verify_supplemental_quota_for_admission(
-            request,
-            &binding,
-            trusted_now_unix_ms / 1000,
-        )?;
-        let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
-        let live_owner = runtime
-            .mutation_sequencer
-            .try_own_operation(prepared.binding().operation_id())?
-            .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "operation already has a live evaluation or recovery owner".into(),
-                )
-            })?;
-        let retained_request = authority_profile
-            .as_ref()
-            .map(|profile| {
+            let supplemental_quota = self.verify_supplemental_quota_for_admission(
+                request,
+                &binding,
+                trusted_now_unix_ms / 1000,
+            )?;
+            let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
+            let retained_request = Some(
                 crate::admission_operation::RetainedToolAdmissionRequestV1::from_admission(
                     request,
                     matching_grants,
                     &post_return_plan.frozen_steps,
                     security_binding.as_ref(),
-                    profile,
+                    &authority_profile,
+                    &signing_identity,
+                    admitted_receipt_metadata,
                 )
-            })
-            .transpose()
-            .map_err(durable_store_error)?;
-        let mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
-        let begun = match retained_request.as_ref() {
-            Some(retained) => runtime.store.begin_with_retained_tool_request(
-                &prepared,
-                retained,
-                &runtime.fence,
-                trusted_now_unix_ms,
-            ),
-            None => runtime
+                .map_err(durable_store_error)?,
+            );
+            receipt_disposition = None;
+            let live_owner = runtime
+                .mutation_sequencer
+                .try_own_operation(prepared.binding().operation_id())?
+                .ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "operation already has a live evaluation or recovery owner".into(),
+                    )
+                })?;
+            let mutation_guard = runtime.lock_mutations()?;
+            let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
+            let begun = runtime
                 .store
-                .begin(&prepared, &runtime.fence, trusted_now_unix_ms),
-        }
-        .map_err(durable_store_error)?;
-        let operation = match begun {
-            AdmissionBeginResult::Created(operation) => operation,
-            AdmissionBeginResult::ExactReplay { operation, .. }
-                if matches!(
-                    operation.state(),
-                    AdmissionOperationState::Prepared
-                        | AdmissionOperationState::BrokerAttemptRegistered
-                        | AdmissionOperationState::ApprovalRequired
-                        | AdmissionOperationState::BudgetAuthorized
-                        | AdmissionOperationState::ApprovalReserved
-                        | AdmissionOperationState::ReadyToDispatch
-                        | AdmissionOperationState::CapturePending
-                        | AdmissionOperationState::Finalizing
-                        | AdmissionOperationState::Completed
-                        | AdmissionOperationState::DeniedAfterDelivery
-                ) =>
-            {
-                operation
-            }
-            AdmissionBeginResult::ExactReplay { operation, .. } => {
-                if operation.state() == AdmissionOperationState::OutcomeUnknownAfterDispatch {
-                    return Err(KernelError::DurableAdmissionRetained(Box::new(
-                        AdmissionReceiptMetadataV1::retained_unknown_dispatch(
-                            &operation,
-                            trusted_now_unix_ms,
-                        )?,
+                .begin_with_retained_tool_request(
+                    &prepared,
+                    retained_request.as_ref().ok_or_else(|| {
+                        KernelError::DurableAdmission(
+                            "terminal refusal original request is absent".into(),
+                        )
+                    })?,
+                    &runtime.fence,
+                    trusted_now_unix_ms,
+                )
+                .map_err(durable_store_error)?;
+            let replayed = matches!(begun, AdmissionBeginResult::ExactReplay { .. });
+            let operation = match begun {
+                AdmissionBeginResult::Created(operation) => operation,
+                AdmissionBeginResult::ExactReplay { operation, .. }
+                    if matches!(
+                        operation.state(),
+                        AdmissionOperationState::Prepared
+                            | AdmissionOperationState::BrokerAttemptRegistered
+                            | AdmissionOperationState::ApprovalRequired
+                            | AdmissionOperationState::BudgetAuthorized
+                            | AdmissionOperationState::ApprovalReserved
+                            | AdmissionOperationState::ReadyToDispatch
+                            | AdmissionOperationState::CapturePending
+                            | AdmissionOperationState::Finalizing
+                            | AdmissionOperationState::Completed
+                            | AdmissionOperationState::DeniedAfterDelivery
+                            | AdmissionOperationState::CompensatedBeforeDispatch
+                            | AdmissionOperationState::OutcomeUnknownAfterDispatch
+                    ) =>
+                {
+                    operation
+                }
+                AdmissionBeginResult::ExactReplay { operation, .. } => {
+                    return Err(KernelError::DurableAdmission(format!(
+                        "request replay is retained in state {:?}",
+                        operation.state()
                     )));
                 }
-                return Err(KernelError::DurableAdmission(format!(
-                    "request replay is retained in state {:?}",
-                    operation.state()
-                )));
+                AdmissionBeginResult::Conflict {
+                    existing_operation_id,
+                } => {
+                    return Err(KernelError::DurableAdmission(format!(
+                        "request id conflicts with retained operation {}",
+                        existing_operation_id.as_str()
+                    )));
+                }
+            };
+            // A replay continues under the request retained at admission,
+            // including the launch evidence of the admitting attempt.
+            let retained_request = if replayed {
+                let (_, stored) = runtime
+                    .store
+                    .load_retained_tool_request(
+                        operation.binding().operation_id(),
+                        &runtime.fence,
+                        trusted_now_unix_ms,
+                    )
+                    .map_err(durable_store_error)?
+                    .ok_or_else(|| {
+                        KernelError::DurableAdmission(
+                            "replayed admission lost its retained request".into(),
+                        )
+                    })?;
+                Some(stored)
+            } else {
+                retained_request
+            };
+            if runtime
+                .store
+                .load_recovery_status(
+                    operation.binding().operation_id(),
+                    &runtime.fence,
+                    trusted_now_unix_ms,
+                )
+                .map_err(recovery::failure::port_error)?
+                .is_some_and(|status| status.quarantined)
+            {
+                return Err(KernelError::DurableAdmission(
+                    "request maps to a retained admission awaiting background recovery".into(),
+                ));
             }
-            AdmissionBeginResult::Conflict {
-                existing_operation_id,
-            } => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "request id conflicts with retained operation {}",
-                    existing_operation_id.as_str()
-                )));
+            if matches!(
+                operation.state(),
+                AdmissionOperationState::CompensatedBeforeDispatch
+                    | AdmissionOperationState::OutcomeUnknownAfterDispatch
+            ) {
+                drop(mutation_guard);
+                return Ok(Some(DurableToolAdmission {
+                    _live_owner: Some(live_owner),
+                    operation,
+                    aggregate_quota,
+                    supplemental_quota,
+                    retained_request,
+                    issued_nonce: None,
+                    nonce_preflight: None,
+                }));
             }
-        };
-        if runtime
-            .store
-            .load_recovery_status(
-                operation.binding().operation_id(),
-                &runtime.fence,
-                trusted_now_unix_ms,
-            )
-            .map_err(recovery::failure::port_error)?
-            .is_some_and(|status| status.quarantined)
-        {
-            return Err(KernelError::DurableAdmission(
-                "request maps to a retained admission awaiting background recovery".into(),
-            ));
-        }
-        // A nonce operation binds the presented nonce to its retained issuance
-        // before any mutation. A preflight keeps the operation Prepared: the
-        // broker attempt and every executable participant belong to the
-        // execution request that presents the issued nonce.
-        let issued_nonce = if nonce_participant {
-            self.route_durable_nonce_admission(
-                &operation,
-                request.execution_nonce.as_ref(),
-                trusted_now_unix_ms,
-            )?
-        } else {
-            None
-        };
-        let nonce_preflight_pending = nonce_participant && issued_nonce.is_none();
-        let expected_operation_id = operation.binding().operation_id().as_str();
-        let expected_attempt_id = format!("attempt:{expected_operation_id}");
-        let expected_transport_id = if matches!(transport, DispatchTransport::CallerReport)
-            && retained_request
-                .as_ref()
-                .is_some_and(|original| original.native_security_authority_binding().is_some())
-        {
-            format!(
-                "{}{}",
-                ProviderAttemptBindingV1::NATIVE_CALLER_REPORT_TRANSPORT_PREFIX,
-                request.server_id
-            )
-        } else {
-            transport.transport_id(&request.server_id)
-        };
-        let executor_epoch = if matches!(transport, DispatchTransport::CallerReport) {
-            self.caller_executor
-                .as_ref()
-                .map(|executor| executor.key_epoch)
-        } else {
-            None
-        };
-        let operation = match operation.state() {
-            AdmissionOperationState::Prepared if nonce_preflight_pending => {
-                // Pin the verified artifact before the preflight hold without
-                // attaching an executable provider attempt. An existing nonce
-                // or preflight must never adopt a later supplemental artifact.
-                if operation.supplemental_authorization_digest().is_none()
-                    && operation.execution_nonce_preflight_digest().is_none()
-                    && operation.execution_nonce_issuance_digest().is_none()
-                {
-                    if let Some(digest) = supplemental_authorization_artifact_digest.as_ref() {
-                        self.apply_admission_command(
-                            operation,
-                            vec![AdmissionAttachment::SupplementalAuthorizationDigest(
-                                AdmissionDigest::try_new(
-                                    "supplemental_authorization_digest",
-                                    digest.clone(),
-                                )?,
-                            )],
-                            AdmissionOperationState::Prepared,
-                            trusted_now_unix_ms,
-                        )?
+            // A nonce operation binds the presented nonce to its retained issuance
+            // before any mutation. A preflight keeps the operation Prepared: the
+            // broker attempt and every executable participant belong to the
+            // execution request that presents the issued nonce.
+            let issued_nonce = if nonce_participant {
+                self.route_durable_nonce_admission(
+                    &operation,
+                    request.execution_nonce.as_ref(),
+                    trusted_now_unix_ms,
+                )?
+            } else {
+                None
+            };
+            let nonce_preflight_pending = nonce_participant && issued_nonce.is_none();
+            let expected_operation_id = operation.binding().operation_id().as_str();
+            let expected_attempt_id = format!("attempt:{expected_operation_id}");
+            let expected_transport_id = if matches!(transport, DispatchTransport::CallerReport)
+                && retained_request
+                    .as_ref()
+                    .is_some_and(|original| original.native_security_authority_binding().is_some())
+            {
+                format!(
+                    "{}{}",
+                    ProviderAttemptBindingV1::NATIVE_CALLER_REPORT_TRANSPORT_PREFIX,
+                    request.server_id
+                )
+            } else {
+                transport.transport_id(&request.server_id)
+            };
+            let executor_epoch = if matches!(transport, DispatchTransport::CallerReport) {
+                self.caller_executor
+                    .as_ref()
+                    .map(|executor| executor.key_epoch)
+            } else {
+                None
+            };
+            let operation = match operation.state() {
+                AdmissionOperationState::Prepared if nonce_preflight_pending => {
+                    // Pin the verified artifact before the preflight hold without
+                    // attaching an executable provider attempt. An existing nonce
+                    // or preflight must never adopt a later supplemental artifact.
+                    if operation.supplemental_authorization_digest().is_none()
+                        && operation.execution_nonce_preflight_digest().is_none()
+                        && operation.execution_nonce_issuance_digest().is_none()
+                    {
+                        if let Some(digest) = supplemental_authorization_artifact_digest.as_ref() {
+                            self.apply_admission_command(
+                                operation,
+                                vec![AdmissionAttachment::SupplementalAuthorizationDigest(
+                                    AdmissionDigest::try_new(
+                                        "supplemental_authorization_digest",
+                                        digest.clone(),
+                                    )?,
+                                )],
+                                AdmissionOperationState::Prepared,
+                                trusted_now_unix_ms,
+                            )?
+                        } else {
+                            operation
+                        }
                     } else {
                         operation
                     }
-                } else {
+                }
+                AdmissionOperationState::Prepared => {
+                    // The attempt binds to the operation's coordinator epoch, which is
+                    // the fence epoch that prepared it. A nonce operation registers
+                    // its attempt on the later execution request, possibly under a
+                    // newer serving owner, and a replay under any owner must still
+                    // find the attempt no newer than the operation itself.
+                    let expected_attempt = ProviderAttemptBindingV1 {
+                        operation_id: expected_operation_id.to_owned(),
+                        attempt_id: expected_attempt_id,
+                        transport_id: expected_transport_id,
+                        transport_key_epoch: executor_epoch
+                            .unwrap_or(operation.coordinator_lease_epoch()),
+                    };
+                    expected_attempt.validate().map_err(|error| {
+                        KernelError::DurableAdmission(format!(
+                            "provider attempt binding is invalid: {error}"
+                        ))
+                    })?;
+                    let mut attachments = Vec::with_capacity(2);
+                    if let Some(digest) = supplemental_authorization_artifact_digest.as_ref() {
+                        attachments.push(AdmissionAttachment::SupplementalAuthorizationDigest(
+                            AdmissionDigest::try_new(
+                                "supplemental_authorization_digest",
+                                digest.clone(),
+                            )?,
+                        ));
+                    }
+                    attachments.push(AdmissionAttachment::BrokerAttempt(expected_attempt));
+                    self.apply_admission_command(
+                        operation,
+                        attachments,
+                        AdmissionOperationState::BrokerAttemptRegistered,
+                        trusted_now_unix_ms,
+                    )?
+                }
+                _ if operation.provider_attempt().is_some_and(|attempt| {
+                    attempt.operation_id == expected_operation_id
+                        && attempt.attempt_id == expected_attempt_id
+                        && attempt.transport_id == expected_transport_id
+                        && executor_epoch.map_or(
+                            attempt.transport_key_epoch <= operation.coordinator_lease_epoch(),
+                            |epoch| attempt.transport_key_epoch == epoch,
+                        )
+                }) =>
+                {
                     operation
                 }
-            }
-            AdmissionOperationState::Prepared => {
-                // The attempt binds to the operation's coordinator epoch, which is
-                // the fence epoch that prepared it. A nonce operation registers
-                // its attempt on the later execution request, possibly under a
-                // newer serving owner, and a replay under any owner must still
-                // find the attempt no newer than the operation itself.
-                let expected_attempt = ProviderAttemptBindingV1 {
-                    operation_id: expected_operation_id.to_owned(),
-                    attempt_id: expected_attempt_id,
-                    transport_id: expected_transport_id,
-                    transport_key_epoch: executor_epoch
-                        .unwrap_or(operation.coordinator_lease_epoch()),
-                };
-                expected_attempt.validate().map_err(|error| {
-                    KernelError::DurableAdmission(format!(
-                        "provider attempt binding is invalid: {error}"
-                    ))
-                })?;
-                let mut attachments = Vec::with_capacity(2);
-                if let Some(digest) = supplemental_authorization_artifact_digest.as_ref() {
-                    attachments.push(AdmissionAttachment::SupplementalAuthorizationDigest(
-                        AdmissionDigest::try_new(
-                            "supplemental_authorization_digest",
-                            digest.clone(),
-                        )?,
+                _ => {
+                    return Err(KernelError::DurableAdmission(
+                        "retained provider attempt does not match this dispatch".to_string(),
                     ));
                 }
-                attachments.push(AdmissionAttachment::BrokerAttempt(expected_attempt));
-                self.apply_admission_command(
-                    operation,
-                    attachments,
-                    AdmissionOperationState::BrokerAttemptRegistered,
-                    trusted_now_unix_ms,
-                )?
-            }
-            _ if operation.provider_attempt().is_some_and(|attempt| {
-                attempt.operation_id == expected_operation_id
-                    && attempt.attempt_id == expected_attempt_id
-                    && attempt.transport_id == expected_transport_id
-                    && executor_epoch.map_or(
-                        attempt.transport_key_epoch <= operation.coordinator_lease_epoch(),
-                        |epoch| attempt.transport_key_epoch == epoch,
-                    )
-            }) =>
+            };
+            if operation
+                .supplemental_authorization_digest()
+                .map(AdmissionDigest::as_str)
+                != supplemental_authorization_artifact_digest.as_deref()
             {
-                operation
-            }
-            _ => {
                 return Err(KernelError::DurableAdmission(
-                    "retained provider attempt does not match this dispatch".to_string(),
+                    "retained supplemental authorization digest does not match request".to_string(),
                 ));
             }
-        };
-        if operation
-            .supplemental_authorization_digest()
-            .map(AdmissionDigest::as_str)
-            != supplemental_authorization_artifact_digest.as_deref()
-        {
-            return Err(KernelError::DurableAdmission(
-                "retained supplemental authorization digest does not match request".to_string(),
-            ));
-        }
-        // Consult mutable policy outside the mutation sequencer. The returned
-        // operation is a provisional snapshot; subsequent mutations still check
-        // its exact operation version and store fence.
-        drop(mutation_guard);
-        if operation.state() == AdmissionOperationState::ApprovalRequired {
-            if let Err(error) = self.revalidate_pending_threshold_proposal(
-                request,
-                &operation,
-                trusted_now_unix_ms / 1_000,
-            ) {
-                self.retire_expired_parked_admission(&operation, trusted_now_unix_ms)?;
-                return Err(error);
+            // Consult mutable policy outside the mutation sequencer. The returned
+            // operation is a provisional snapshot; subsequent mutations still check
+            // its exact operation version and store fence.
+            drop(mutation_guard);
+            if operation.state() == AdmissionOperationState::ApprovalRequired {
+                if let Err(error) = self.revalidate_pending_threshold_proposal(
+                    request,
+                    &operation,
+                    trusted_now_unix_ms / 1_000,
+                ) {
+                    if self.retire_expired_parked_admission(&operation, trusted_now_unix_ms)? {
+                        let operation = runtime
+                            .store
+                            .load_by_operation_id(operation.binding().operation_id())
+                            .map_err(durable_store_error)?
+                            .ok_or_else(|| {
+                                KernelError::DurableAdmission(
+                                    "retired approval admission is absent".into(),
+                                )
+                            })?;
+                        if operation.state() != AdmissionOperationState::CompensatedBeforeDispatch {
+                            return Err(KernelError::DurableAdmission(
+                                "retired approval admission has no terminal refusal".into(),
+                            ));
+                        }
+                        return Ok(Some(DurableToolAdmission {
+                            _live_owner: Some(live_owner),
+                            operation,
+                            aggregate_quota,
+                            supplemental_quota,
+                            retained_request,
+                            issued_nonce: None,
+                            nonce_preflight: None,
+                        }));
+                    }
+                    return Err(error);
+                }
             }
-        }
-        let nonce_preflight = self.load_durable_nonce_preflight(&operation, trusted_now_unix_ms)?;
-        Ok(Some(DurableToolAdmission {
-            _live_owner: Some(live_owner),
-            operation,
-            aggregate_quota,
-            supplemental_quota,
-            retained_request,
-            issued_nonce,
-            nonce_preflight,
-        }))
+            let nonce_preflight =
+                self.load_durable_nonce_preflight(&operation, trusted_now_unix_ms)?;
+            Ok(Some(DurableToolAdmission {
+                _live_owner: Some(live_owner),
+                operation,
+                aggregate_quota,
+                supplemental_quota,
+                retained_request,
+                issued_nonce,
+                nonce_preflight,
+            }))
+        })();
+        result.map_err(|error| {
+            if error.durable_commit_outcome_is_unknown() {
+                receipt_disposition = Some(IdentityDisposition::Retained);
+            }
+            AdmissionStartFailure {
+                error: Box::new(error),
+                receipt_disposition,
+            }
+        })
     }
 
     fn admission_security_binding(
@@ -1573,96 +1698,6 @@ impl ChioKernel {
             AdmissionOperationState::DispatchCommitted,
             trusted_now_unix_ms,
         )?;
-        Ok(())
-    }
-
-    pub(crate) fn compensate_durable_admission_before_dispatch(
-        &self,
-        operation: &AdmissionOperationV1,
-        verifier_policy: serde_json::Value,
-        trusted_now_unix_ms: u64,
-        confirmed_payment_unwind: Option<&PreDispatchPaymentUnwindEvidence>,
-    ) -> Result<(), KernelError> {
-        let runtime = self.durable_runtime()?;
-        let mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
-        let current = runtime
-            .store
-            .load_by_operation_id(operation.binding().operation_id())
-            .map_err(durable_store_error)?
-            .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "pre-dispatch admission disappeared during compensation".to_owned(),
-                )
-            })?;
-        if &current != operation
-            || current.state().is_terminal()
-            || current.dispatch_commit().is_some()
-        {
-            return Err(KernelError::DurableAdmission(
-                "pre-dispatch compensation operation changed".to_owned(),
-            ));
-        }
-        let mut mutation_lock =
-            ExternalCallLock::new(runtime, mutation_guard, &current, trusted_now_unix_ms)?;
-        let lease = self.claim_admission_recovery(&current, trusted_now_unix_ms)?;
-        // Runtime replay custody must be physically released before any
-        // compensation can assert no effect or unwind a monetary participant.
-        self.release_retained_runtime_participants(&current, &lease, trusted_now_unix_ms)?;
-        self.release_retained_governed_approval(&current, &lease, trusted_now_unix_ms)?;
-        self.release_retained_dpop(&current, &lease, trusted_now_unix_ms)?;
-        let context = AdmissionProjectionContext {
-            operation_id: current.binding().operation_id().clone(),
-            request_id: current.binding().request_id().clone(),
-            expected_operation_version: current.version(),
-            trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-            store_fence: runtime.fence.clone(),
-        };
-        self.compensate_retained_payment(
-            payment_compensation::DurablePaymentCompensationInput {
-                operation: &current,
-                runtime,
-                lease: &lease,
-                context: &context,
-                verifier_policy: &verifier_policy,
-                confirmed_unwind: confirmed_payment_unwind,
-            },
-            &mut mutation_lock,
-        )?;
-        self.release_finding_pool_claim_before_dispatch(
-            current.binding().operation_id().as_str(),
-            trusted_now_unix_ms,
-        )
-        .map_err(|error| {
-            KernelError::DurableAdmission(format!(
-                "pre-dispatch finding pool claim release failed: {error}"
-            ))
-        })?;
-        // Every budget the operation still holds is internal until dispatch
-        // commits. Both the executable hold and an owned preflight hold must be
-        // physically reversed before the terminal projection can claim no effect.
-        self.release_retained_executable_hold(&current)?;
-        if let Some(preflight) = self.load_durable_nonce_preflight(&current, trusted_now_unix_ms)? {
-            self.release_durable_nonce_preflight_hold(&current, &preflight)?;
-        }
-        let projection = verified_released_pre_dispatch_compensation_projection(
-            &current,
-            context,
-            verifier_policy,
-        )?;
-        let terminal = runtime
-            .store
-            .commit_admission_projection(&projection)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        if terminal.operation_id != *current.binding().operation_id()
-            || terminal.state != AdmissionOperationState::CompensatedBeforeDispatch
-        {
-            return Err(KernelError::DurableAdmission(
-                "pre-dispatch compensation committed a different terminal operation".to_owned(),
-            ));
-        }
         Ok(())
     }
 

@@ -1,6 +1,7 @@
 // Reopen the original stores. No imported lifecycle is activated on recovery.
 use super::*;
 use chio_kernel::admission_operation::{AdmissionOperationV1, RetainedToolAdmissionRequestV1};
+use chio_kernel::receipt_store::{QualifiedAdmissionProjectionStore, ReceiptStore};
 use chio_kernel::tool_outcome::ToolOutcomeStore;
 
 fn retained(
@@ -442,25 +443,50 @@ pub(super) fn verify(
     } else if matches!(point, Point::OutputJoined | Point::Finalization(_)) {
         assert!(replay.is_err(), "uncheckpointed output must never escape");
     } else {
-        match replay {
-            Ok(response) => {
-                assert_eq!(response.verdict, Verdict::Deny);
-                assert!(response.output.is_none());
-                assert!(response.receipt.verify_signature()?);
-                assert!(
-                    response
-                        .reason
-                        .as_deref()
-                        .is_some_and(|reason| reason.contains(&format!("{expected:?}"))),
-                    "retry must deny on the retained disposition: {:?}",
-                    response.reason
-                );
-            }
-            Err(KernelError::DurableAdmission(reason)) => {
-                assert!(reason.contains(&format!("{expected:?}")), "{reason}")
-            }
-            Err(error) => return Err(format!("unexpected retry failure: {error}").into()),
-        }
+        let response = replay?;
+        let reason = if point.captured() {
+            "dispatch outcome is unknown after recovery"
+        } else {
+            "admission recovered before dispatch"
+        };
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert!(response.output.is_none());
+        assert_eq!(response.reason.as_deref(), Some(reason));
+        assert!(response.receipt.verify_signature()?);
+        let persisted = store
+            .load_chio_receipt(&response.receipt.id)?
+            .ok_or("recovery terminal receipt is not persisted")?;
+        assert_eq!(
+            chio_core::canonical_json_bytes(&response.receipt)?,
+            chio_core::canonical_json_bytes(&persisted)?,
+            "retry must replay the persisted recovery receipt"
+        );
+        let metadata = response
+            .receipt
+            .metadata
+            .as_ref()
+            .ok_or("recovery receipt metadata")?;
+        assert_eq!(
+            metadata.pointer("/admission_operation/operation_id"),
+            Some(&serde_json::json!(after.binding().operation_id().as_str()))
+        );
+        assert_eq!(
+            metadata.pointer("/chio_runtime/identity_disposition"),
+            Some(&serde_json::json!("terminal"))
+        );
+        let receipts = store.list_admission_receipts_after(None, 256)?.len();
+        let second = kernel.evaluate_tool_call_blocking_with_security_context(
+            &witness.request,
+            &witness.context,
+        )?;
+        assert_eq!(
+            chio_core::canonical_json_bytes(&response.receipt)?,
+            chio_core::canonical_json_bytes(&second.receipt)?
+        );
+        assert_eq!(
+            store.list_admission_receipts_after(None, 256)?.len(),
+            receipts
+        );
     }
     assert_eq!(
         invocations.load(Ordering::SeqCst),

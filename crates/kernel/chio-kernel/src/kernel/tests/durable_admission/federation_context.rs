@@ -4,6 +4,8 @@ use super::*;
 mod evidence;
 #[path = "federation_context/recovery_isolation.rs"]
 mod recovery_isolation;
+#[path = "federation_context/refusal.rs"]
+mod refusal;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -116,7 +118,8 @@ fn recover(
     )
     .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
     let mut admission = kernel
-        .begin_durable_tool_admission(request, &matching, current_unix_timestamp_ms())?
+        .begin_durable_tool_admission(request, &matching, current_unix_timestamp_ms())
+        .map_err(|failure| *failure.error)?
         .ok_or_else(|| KernelError::DurableAdmission("missing test admission".into()))?;
     kernel
         .recover_durable_tool_admission(&mut admission, request)?
@@ -292,10 +295,19 @@ fn retained_federation_context_does_not_bypass_public_replay_revocation() -> Tes
     fixture
         .kernel
         .revoke_capability(&fixture.request.capability.id)?;
-    let response = fixture
+    let original = fixture.store.operation();
+    let receipts = fixture.kernel.receipt_log().len();
+    let error = fixture
         .kernel
-        .evaluate_tool_call_blocking(&fixture.request)?;
-    assert_eq!(response.verdict, Verdict::Deny);
+        .evaluate_tool_call_blocking(&fixture.request)
+        .expect_err("revoked replay must not release output or create a terminal");
+    assert!(
+        matches!(error, KernelError::DurableAdmission(ref reason)
+        if reason == "request identity is already owned by a durable operation"),
+        "{error:?}"
+    );
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
+    assert_eq!(fixture.store.operation(), original);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     assert_eq!(
         fixture.store.operation().state(),

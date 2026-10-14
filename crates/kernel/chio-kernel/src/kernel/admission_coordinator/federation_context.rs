@@ -137,7 +137,7 @@ impl ChioKernel {
         )))
     }
 
-    fn decode_retained_federation_context(
+    pub(super) fn decode_retained_federation_context(
         &self,
         bytes: &[u8],
         operation: &AdmissionOperationV1,

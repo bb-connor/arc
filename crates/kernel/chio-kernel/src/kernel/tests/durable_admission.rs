@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "durable_admission/cleanup_fault_ownership.rs"]
+mod cleanup_fault_ownership;
 #[path = "durable_admission/configuration.rs"]
 mod configuration;
 #[path = "durable_admission/cumulative_budget.rs"]
@@ -10,8 +12,17 @@ mod output_finalization;
 mod pre_dispatch;
 #[path = "durable_admission/recovery.rs"]
 mod recovery;
-use receipt_projection::AdmissionReceiptProjectionStore;
+#[path = "durable_admission/terminal_refusal.rs"]
+mod terminal_refusal;
+use terminal_refusal::compensation_response;
 
+#[path = "durable_admission/unknown_incident_assertions.rs"]
+mod unknown_incident_assertions;
+use receipt_projection::AdmissionReceiptProjectionStore;
+use unknown_incident_assertions::{assert_original_unknown_incident, assert_unknown_replay};
+
+#[path = "durable_admission/admitted_metadata.rs"]
+mod admitted_metadata;
 #[path = "durable_admission/authority_profile.rs"]
 mod authority_profile;
 #[path = "durable_admission/caller_budget_snapshot.rs"]
@@ -28,6 +39,8 @@ mod dpop_acquisition;
 mod federation_context;
 #[path = "durable_admission/governed_acquisition.rs"]
 mod governed_acquisition;
+#[path = "durable_admission/identity_disposition.rs"]
+mod identity_disposition;
 #[path = "durable_admission/monetary.rs"]
 mod monetary;
 #[path = "durable_admission/native_acquisition.rs"]
@@ -64,7 +77,7 @@ pub(super) struct TestAdmissionState {
     tool_outcome: Option<ToolOutcomeRecordV1>,
     post_return_evaluation: Option<PostReturnEvaluationRecordV1>,
     resolved_output: Option<CanonicalResolvedOutputBlobV1>,
-    receipt: Option<chio_core::receipt::body::ChioReceipt>,
+    pub(super) receipt: Option<chio_core::receipt::body::ChioReceipt>,
     budget_authorization: Option<crate::budget_store::BudgetAuthorizeHoldRequest>,
     payment_journal: Option<crate::payment::PaymentJournalRecord>,
     payment_release_evidence: Option<crate::tool_outcome::PersistedMonetaryReleaseEvidenceV1>,
@@ -82,6 +95,11 @@ pub(super) struct TestAdmissionOperationStore {
     approval_recovery: governed_acquisition::TestApproval,
     runtime_recovery: runtime_participant::TestRuntimeRecovery,
     pub(super) fence: std::sync::Mutex<StoreMutationFence>,
+    lose_next_begin_ack: std::sync::atomic::AtomicBool,
+    fail_next_replay_read: std::sync::atomic::AtomicBool,
+    replay_lookup_override: std::sync::Mutex<Option<AdmissionOperationV1>>,
+    capture_pending_failure: std::sync::atomic::AtomicU8,
+    lose_next_command_ack: std::sync::atomic::AtomicBool,
     fail_next_outcome_write: std::sync::atomic::AtomicBool,
     fail_next_evaluation_begin: std::sync::atomic::AtomicBool,
     fail_next_evaluation_stage: std::sync::atomic::AtomicBool,
@@ -108,6 +126,11 @@ impl TestAdmissionOperationStore {
             approval_recovery: governed_acquisition::TestApproval::default(),
             runtime_recovery: runtime_participant::TestRuntimeRecovery::default(),
             fence: std::sync::Mutex::new(fence),
+            lose_next_begin_ack: std::sync::atomic::AtomicBool::new(false),
+            fail_next_replay_read: std::sync::atomic::AtomicBool::new(false),
+            replay_lookup_override: std::sync::Mutex::new(None),
+            capture_pending_failure: std::sync::atomic::AtomicU8::new(0),
+            lose_next_command_ack: std::sync::atomic::AtomicBool::new(false),
             fail_next_outcome_write: std::sync::atomic::AtomicBool::new(false),
             fail_next_evaluation_begin: std::sync::atomic::AtomicBool::new(false),
             fail_next_evaluation_stage: std::sync::atomic::AtomicBool::new(false),
@@ -282,8 +305,22 @@ impl ReceiptStore for TestAdmissionOperationStore {
             .terminal_replay()
             .cloned()
             .ok_or_else(|| ReceiptStoreError::Conflict("terminal replay is absent".to_owned()))?;
-        if let AdmissionTerminalProjection::Completed(completed) = projection {
-            state.receipt = Some(completed.receipt.receipt().clone());
+        match projection {
+            AdmissionTerminalProjection::Completed(completed) => {
+                state.receipt = Some(completed.receipt.receipt().clone());
+            }
+            AdmissionTerminalProjection::DeniedAfterDelivery { evidence, .. }
+            | AdmissionTerminalProjection::CompensatedBeforeDispatch { evidence, .. } => {
+                if let crate::admission_operation::AdmissionReceiptOrIncident::Receipt(receipt) =
+                    evidence.as_ref()
+                {
+                    state.receipt = Some(receipt.receipt().clone());
+                }
+            }
+            AdmissionTerminalProjection::OutcomeUnknownAfterDispatch { receipt, .. } => {
+                state.receipt = Some(receipt.receipt().clone());
+            }
+            _ => {}
         }
         state.operation = Some(updated.clone());
         state.claim = None;

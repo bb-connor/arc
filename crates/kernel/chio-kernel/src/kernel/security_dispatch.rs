@@ -5,6 +5,31 @@ use super::{
     SecurityDispatchOutcomeRecorder, SecurityPreDispatchContext, SecurityRequestLifecyclePermit,
 };
 
+/// Delivery failures retain the original acknowledged receipt identity. Catch
+/// extension panics after commitment without re-entering terminal construction.
+pub(in crate::kernel) fn receipt_delivery<T>(
+    receipt_id: &str,
+    step: super::ReceiptDeliveryStep,
+    action: impl FnOnce() -> Result<T, KernelError>,
+) -> Result<T, KernelError> {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(action));
+    match result {
+        Ok(Ok(value)) => Ok(value),
+        Ok(Err(source)) => Err(KernelError::DeliveryFailedAfterReceipt {
+            receipt_id: receipt_id.to_owned(),
+            step,
+            source: Box::new(source),
+        }),
+        Err(_) => Err(KernelError::DeliveryFailedAfterReceipt {
+            receipt_id: receipt_id.to_owned(),
+            step,
+            source: Box::new(KernelError::Internal(
+                "post-receipt delivery callback panicked".into(),
+            )),
+        }),
+    }
+}
+
 pub(super) fn callback<T>(
     stage: &'static str,
     action: impl FnOnce() -> Result<T, KernelError>,
@@ -116,19 +141,6 @@ pub(crate) struct SecurityRequestLifecycleHandle {
 }
 
 impl SecurityRequestLifecycleHandle {
-    /// Final release gates response publication, including a signed denial
-    /// after tool execution. A failed response never asserts successful release.
-    pub(super) fn finish_response<T>(
-        response: Result<T, KernelError>,
-        permit: Option<Self>,
-    ) -> Result<T, KernelError> {
-        let response = response?;
-        if let Some(permit) = permit {
-            permit.ensure_final_release()?;
-        }
-        Ok(response)
-    }
-
     pub(super) fn new(
         permit: Box<dyn SecurityRequestLifecyclePermit>,
         context: &SecurityPreDispatchContext<'_>,

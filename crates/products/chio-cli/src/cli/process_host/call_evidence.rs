@@ -12,9 +12,10 @@ use chio_kernel::admission_operation::{
         RuntimeParticipantClaimEvidenceV1, RuntimeParticipantClaimReferenceV1,
         RuntimeParticipantDisposition, RuntimeParticipantPhase, MAX_RUNTIME_PARTICIPANT_EPISODES,
     },
-    AdmissionDigest, AdmissionDispatchCommitBindingV1, AdmissionDispatchState,
+    AdmissionCompensationStatus, AdmissionDigest, AdmissionDispatchCommitBindingV1, AdmissionDispatchState,
     AdmissionOperationBindingV1, AdmissionOperationKind, AdmissionOperationState,
     AdmissionReceiptMetadataV1, AdmissionTerminalReplay, PersistedAdmissionOperationBindingV1,
+    LOCAL_SYSTEM_TENANT_ID,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -345,34 +346,42 @@ fn verify_operation_with_runtime(
             true
         }
         AdmissionOperationState::OutcomeUnknownAfterDispatch => {
-            let recovery_refusal = projection.as_ref().is_some_and(|value| {
-                value.tool_outcome_id.is_none() && value.tool_outcome_version.is_none()
-            }) && matches!(&call.decision, Some(Decision::Deny { guard, .. }) if guard == "kernel")
-                && owned.is_null();
-            let original_interruption = projection.is_none()
-                && matches!(call.decision, Some(Decision::Incomplete { .. }))
-                && !owned.is_null();
+            let refusal = matches!(&call.decision,
+                Some(Decision::Deny { guard, .. }) if guard == "kernel")
+                || matches!(&call.decision, Some(Decision::Cancelled { .. }));
             require(
-                (recovery_refusal || original_interruption)
-                    && matches!(
-                        operation.terminal_replay,
-                        Some(AdmissionTerminalReplay::Incident { .. })
-                    ),
+                projection.as_ref().is_some_and(|value| {
+                    value.tool_outcome_id.is_none()
+                        && value.tool_outcome_version.is_none()
+                        && value.compensation_status == AdmissionCompensationStatus::NotCompensated
+                        && value.trusted_time_unix_ms / 1_000 == call.timestamp
+                }) && refusal,
+                "unknown operation must retain uncertainty without a terminal result",
+            )?;
+            require(
+                call.content_hash == hash(&Value::Null)?
+                    && matches!(&operation.terminal_replay,
+                        Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) if receipt_id.as_str() == call.id),
                 "unknown operation must retain uncertainty without a terminal result",
             )?;
             true
         }
         AdmissionOperationState::CompensatedBeforeDispatch => {
+            let refusal = matches!(&call.decision,
+                Some(Decision::Deny { guard, .. }) if guard == "kernel")
+                || matches!(&call.decision, Some(Decision::Cancelled { .. }));
             require(
-                matches!(call.decision, Some(Decision::Deny { .. }))
+                projection.as_ref().is_some_and(|value| {
+                    value.tool_outcome_id.is_none()
+                        && value.tool_outcome_version.is_none()
+                        && value.compensation_status == AdmissionCompensationStatus::CompensatedBeforeDispatch
+                        && value.trusted_time_unix_ms / 1_000 == call.timestamp
+                })
+                    && refusal
+                    && call.content_hash == hash(&Value::Null)?
                     && owned.is_null()
-                    && matches!(
-                        operation.terminal_replay,
-                        Some(
-                            AdmissionTerminalReplay::Receipt { .. }
-                                | AdmissionTerminalReplay::Incident { .. }
-                        )
-                    ),
+                    && matches!(&operation.terminal_replay,
+                        Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) if receipt_id.as_str() == call.id),
                 "compensated operation must be denied without retained dispatch custody",
             )?;
             false
@@ -383,6 +392,19 @@ fn verify_operation_with_runtime(
             ))
         }
     };
+    if matches!(operation.state,
+        AdmissionOperationState::CompensatedBeforeDispatch
+            | AdmissionOperationState::OutcomeUnknownAfterDispatch)
+    {
+        let tenant = operation.binding.authenticated_tenant_id.as_str();
+        let expected_tenant = (tenant != LOCAL_SYSTEM_TENANT_ID).then_some(tenant);
+        require(
+            metadata["receipt_context"]["request_namespace_digest"]
+                == binding.request_namespace_digest().as_str()
+                && call.tenant_id.as_deref() == expected_tenant,
+            "operation readback differs from original signed admission projection",
+        )?;
+    }
     require(
         operation.dispatch_commit.is_some() == committed,
         "operation dispatch commitment contradicts its observed outcome",
@@ -412,9 +434,7 @@ fn verify_operation_with_runtime(
     };
     let mut episodes = BTreeSet::new();
     let mut retained = 0;
-    // Recovery signs the historical dispatch projection and a refusal to retry.
-    // There was no completed tool receipt carrying a runtime claim reference.
-    // Custody in this case is explicitly the exporter's signed store readback.
+    // The host signs retained custody when the terminal receipt has no claim reference.
     let unknown_readback = operation.state == AdmissionOperationState::OutcomeUnknownAfterDispatch
         && reference.is_none();
     for evidence in &operation.history {

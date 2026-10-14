@@ -359,3 +359,155 @@ async fn cancelled_session_evaluation_releases_only_its_receipt_context() -> Tes
     // cancellation or durable tool-outcome recovery.
     Ok(())
 }
+
+struct SessionRevocationGate {
+    capability_id: String,
+    pause_next_read: AtomicBool,
+    started: mpsc::Sender<()>,
+    release: Mutex<mpsc::Receiver<()>>,
+}
+
+struct GatedSessionRevocationStore {
+    inner: InMemoryRevocationStore,
+    gates: Vec<SessionRevocationGate>,
+}
+
+impl RevocationStore for GatedSessionRevocationStore {
+    fn is_revoked(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+        for gate in &self.gates {
+            if gate.capability_id == capability_id
+                && gate.pause_next_read.swap(false, Ordering::SeqCst)
+            {
+                gate.started
+                    .send(())
+                    .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
+                gate.release
+                    .lock()
+                    .map_err(|error| RevocationStoreError::Sync(error.to_string()))?
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
+            }
+        }
+        self.inner.is_revoked(capability_id)
+    }
+
+    fn revoke(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+        self.inner.revoke(capability_id)
+    }
+}
+
+#[test]
+fn concurrent_resource_denials_keep_authenticated_tenant_namespaces() -> TestResult {
+    concurrent_resource_denials(Some("tenant-b"))
+}
+
+#[test]
+fn concurrent_resource_denials_with_anonymous_session_keep_authenticated_namespace() -> TestResult {
+    concurrent_resource_denials(None)
+}
+
+fn concurrent_resource_denials(second_tenant: Option<&str>) -> TestResult {
+    let mut kernel = make_kernel(make_config());
+    let subject = make_keypair();
+    let mut contexts = Vec::new();
+    let mut operations = Vec::new();
+    let mut gates = Vec::new();
+    let mut controls = Vec::new();
+    for tenant in [Some("tenant-a"), second_tenant] {
+        let capability = make_capability(
+            &kernel,
+            &subject,
+            ChioScope {
+                resource_grants: vec![ResourceGrant {
+                    uri_pattern: "file:///workspace/*".into(),
+                    operations: vec![Operation::Read],
+                }],
+                ..ChioScope::default()
+            },
+            300,
+        );
+        let session =
+            kernel.open_session(subject.public_key().to_hex(), vec![capability.clone()])?;
+        if let Some(tenant) = tenant {
+            kernel.set_session_auth_context(&session, oauth_auth_with_enterprise_tenant(tenant))?;
+        }
+        kernel.activate_session(&session)?;
+        contexts.push(make_operation_context(
+            &session,
+            "shared-resource-request",
+            &subject.public_key().to_hex(),
+        ));
+        let (started, observed) = mpsc::channel();
+        let (release, resumed) = mpsc::channel();
+        gates.push(SessionRevocationGate {
+            capability_id: capability.id.clone(),
+            pause_next_read: AtomicBool::new(true),
+            started,
+            release: Mutex::new(resumed),
+        });
+        controls.push((observed, release));
+        operations.push(SessionOperation::ReadResource(ReadResourceOperation {
+            capability,
+            uri: "file:///workspace/private/data.txt".into(),
+        }));
+    }
+    kernel.set_revocation_store(Box::new(GatedSessionRevocationStore {
+        inner: InMemoryRevocationStore::new(),
+        gates,
+    }));
+
+    let responses = std::thread::scope(|threads| -> TestResult<_> {
+        let first =
+            threads.spawn(|| kernel.evaluate_session_operation(&contexts[0], &operations[0]));
+        controls[0].0.recv_timeout(Duration::from_secs(5))?;
+        let second =
+            threads.spawn(|| kernel.evaluate_session_operation(&contexts[1], &operations[1]));
+        controls[1].0.recv_timeout(Duration::from_secs(5))?;
+        controls[0].1.send(())?;
+        let first = first
+            .join()
+            .map_err(|_| "first session evaluation panicked")?;
+        controls[1].1.send(())?;
+        let second = second
+            .join()
+            .map_err(|_| "second session evaluation panicked")?;
+        Ok([first?, second?])
+    })?;
+
+    for (response, tenant) in responses.into_iter().zip([Some("tenant-a"), second_tenant]) {
+        let SessionOperationResponse::ResourceReadDenied { receipt } = response else {
+            return Err("resource read did not produce a signed denial".into());
+        };
+        assert_eq!(
+            receipt.decision,
+            Some(Decision::Deny {
+                reason: "no enforceable filesystem roots are available for this session".into(),
+                guard: "session_roots".into(),
+            })
+        );
+        assert_eq!(receipt.tenant_id.as_deref(), tenant);
+        let authority = AdmissionIdentifier::try_new(
+            "coordinator_authority_id",
+            format!("kernel:{}", kernel.config.keypair.public_key().to_hex()),
+        )?;
+        let namespace = match tenant {
+            Some(tenant) => crate::admission_operation::AuthenticatedRequestNamespace::from_authentication_context(authority, tenant)?,
+            None => crate::admission_operation::AuthenticatedRequestNamespace::for_local_system(authority)?,
+        };
+        let metadata = receipt
+            .metadata
+            .as_ref()
+            .ok_or("missing receipt metadata")?;
+        assert_eq!(
+            metadata["receipt_context"]["request_id"],
+            "shared-resource-request"
+        );
+        assert_eq!(
+            metadata["receipt_context"]["request_namespace_digest"],
+            namespace.digest().as_str()
+        );
+        assert!(receipt.verify_signature()?);
+    }
+    assert!(kernel.receipt_tenant_ids.is_empty());
+    Ok(())
+}

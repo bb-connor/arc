@@ -220,6 +220,99 @@ fn cumulative_proposal_clock_rechecks_expiry_after_policy_lookup() -> TestResult
 }
 
 #[test]
+fn expired_parked_approval_replays_one_canonical_terminal_refusal() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let proposal = fixture.pending()?;
+    let parked = fixture.store.operation();
+    let pending_receipts = fixture.kernel.receipt_log().receipts();
+    assert_eq!(pending_receipts.len(), 1);
+    assert!(proposal.body.proposal_deadline < fixture.request.capability.expires_at);
+    let _clock = chio_test_support::clock::scope_unix_secs(proposal.body.proposal_deadline);
+
+    let initial = fixture
+        .kernel
+        .evaluate_tool_call_blocking(&fixture.request)?;
+    assert_eq!(initial.verdict, Verdict::Deny);
+    assert_eq!(
+        initial.reason.as_deref(),
+        Some("approval proposal deadline elapsed before dispatch")
+    );
+    assert!(initial.output.is_none());
+    assert!(initial.execution_nonce.is_none());
+    assert!(initial.receipt.verify_signature()?);
+    let terminal = fixture.store.operation();
+    assert_eq!(
+        terminal.state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(terminal.binding(), parked.binding());
+    assert_eq!(terminal.threshold_proposal(), Some(&proposal));
+    assert!(terminal.dispatch_commit().is_none());
+    let Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) = terminal.terminal_replay()
+    else {
+        return Err("expired approval omitted its terminal receipt binding".into());
+    };
+    assert_eq!(receipt_id.as_str(), initial.receipt.id);
+    assert_ne!(initial.receipt.id, pending_receipts[0].id);
+    let stored = fixture
+        .kernel
+        .load_durable_admission_receipt(receipt_id.as_str())?
+        .ok_or("expired approval omitted its canonical terminal receipt")?;
+    let canonical = canonical_json_bytes(&stored)?;
+    assert_eq!(canonical_json_bytes(&initial.receipt)?, canonical);
+    let metadata: crate::admission_operation::AdmissionReceiptMetadataV1 = serde_json::from_value(
+        stored
+            .metadata
+            .as_ref()
+            .and_then(|metadata| {
+                metadata.get(crate::admission_operation::ADMISSION_RECEIPT_METADATA_KEY)
+            })
+            .cloned()
+            .ok_or("terminal receipt omitted its admission metadata")?,
+    )?;
+    assert_eq!(&metadata.operation_id, parked.binding().operation_id());
+    assert_eq!(
+        &metadata.request_binding_hash,
+        parked.binding().request_binding_hash()
+    );
+    assert_eq!(metadata.projected_state, terminal.state());
+    assert_eq!(metadata.projected_operation_version, terminal.version());
+
+    for _ in 0..2 {
+        let replay = fixture
+            .kernel
+            .evaluate_tool_call_blocking(&fixture.request)?;
+        assert_eq!(replay.request_id, initial.request_id);
+        assert_eq!(replay.verdict, initial.verdict);
+        assert_eq!(replay.reason, initial.reason);
+        assert_eq!(replay.output, initial.output);
+        assert_eq!(replay.terminal_state, initial.terminal_state);
+        assert!(replay.execution_nonce.is_none());
+        assert_eq!(canonical_json_bytes(&replay.receipt)?, canonical);
+        let retained = fixture
+            .kernel
+            .load_durable_admission_receipt(receipt_id.as_str())?
+            .ok_or("replay lost the canonical terminal receipt")?;
+        assert_eq!(canonical_json_bytes(&retained)?, canonical);
+        assert_eq!(fixture.store.operation(), terminal);
+    }
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    let receipts = fixture.kernel.receipt_log().receipts();
+    assert_eq!(receipts.len(), 2);
+    assert_eq!(
+        canonical_json_bytes(&receipts[0])?,
+        canonical_json_bytes(&pending_receipts[0])?
+    );
+    let terminal_receipts = receipts
+        .iter()
+        .filter(|receipt| receipt.id != pending_receipts[0].id)
+        .collect::<Vec<_>>();
+    assert_eq!(terminal_receipts.len(), 1);
+    assert_eq!(canonical_json_bytes(terminal_receipts[0])?, canonical);
+    Ok(())
+}
+
+#[test]
 fn cumulative_proposal_clock_does_not_trust_future_artifact_time() -> TestResult {
     let mut fixture = Fixture::new()?;
     let proposal = fixture.pending()?;
@@ -554,10 +647,17 @@ fn pending_retry_rechecks_current_directory() -> TestResult {
                 120,
             )?,
         )));
-    let response = fixture
+    let receipts = fixture.kernel.receipt_log().len();
+    let error = fixture
         .kernel
-        .evaluate_tool_call_blocking(&fixture.request)?;
-    assert_eq!(response.verdict, Verdict::Deny);
+        .evaluate_tool_call_blocking(&fixture.request)
+        .expect_err("changed policy cannot terminalize the pending approval");
+    assert!(
+        matches!(error, KernelError::GovernedTransactionDenied(ref reason)
+        if reason.contains("threshold proposal does not match")),
+        "{error:?}"
+    );
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
     assert_eq!(
         fixture.store.operation().threshold_proposal(),
         Some(&proposal)

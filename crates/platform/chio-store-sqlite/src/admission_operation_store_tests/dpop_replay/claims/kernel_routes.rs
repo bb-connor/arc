@@ -51,7 +51,7 @@ fn kernel(fixture: &Fixture, signer: Keypair) -> AnchoredTestResult<ChioKernel> 
             keypair: signer,
             ca_public_keys: vec![],
             max_delegation_depth: 5,
-            policy_hash: sha256_hex(b"dpop-custody-kernel"),
+            policy_hash: super::super::retained_request::original_policy_hash(),
             allow_sampling: false,
             allow_sampling_tool_use: false,
             allow_elicitation: false,
@@ -160,6 +160,43 @@ impl Route {
             "request_id": id, "capability": capability, "agent_id": self.agent.public_key().to_hex(),
             "server_id": "dpop-server", "tool_name": "tool", "arguments": arguments, "dpop_proof": proof,
         }))?)
+    }
+
+    /// Reopen the serving owner and a kernel with the original signer and
+    /// DPoP authority, as a host restart does. Startup recovery is not run.
+    fn restarted(self) -> AnchoredTestResult<Self> {
+        let Fixture {
+            _temp,
+            database,
+            lock_root,
+            authority,
+            store,
+            ..
+        } = self.fixture;
+        drop(self.kernel);
+        drop(store);
+        drop(authority);
+        let authority = crate::test_authority::open_serving(&database, &lock_root)?;
+        let fixture = Fixture {
+            store: authority.admission_operation_store(),
+            fence: authority.mutation_fence(),
+            authority,
+            _temp,
+            database,
+            lock_root,
+            _clock: None,
+        };
+        let mut kernel = kernel(&fixture, self.signer.clone())?;
+        kernel.set_operation_owned_dpop_authority(self.domain.clone())?;
+        kernel.register_tool_server(Box::new(Server(self.calls.clone())));
+        Ok(Self {
+            fixture,
+            domain: self.domain,
+            signer: self.signer,
+            agent: self.agent,
+            kernel,
+            calls: self.calls,
+        })
     }
 
     fn history(

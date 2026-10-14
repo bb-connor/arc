@@ -1,4 +1,6 @@
 use super::*;
+use crate::kernel::tests::drop_guard_proptest::drop_owned_post_effect;
+use crate::kernel::tests::evidence_recovery::wait_for_post_effect_evidence;
 
 #[test]
 fn chio_runtime_admission_does_not_release_destructive_lease_after_dispatch_failure(
@@ -227,7 +229,7 @@ fn chio_runtime_admission_retains_reservations_on_ambiguous_incomplete(
 }
 
 #[test]
-fn chio_post_admission_drop_guard_retains_non_monetary_runtime_reservations(
+fn chio_post_effect_owner_retains_non_monetary_runtime_reservations(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
@@ -265,23 +267,12 @@ fn chio_post_admission_drop_guard_retains_non_monetary_runtime_reservations(
         }
     });
 
-    let mutation = PreExecutionBudgetMutation::None;
-    let mut guard = PostAdmissionDropGuard::new(
+    drop_owned_post_effect(
         &kernel,
         &request,
-        &cap,
-        Some(0),
-        &mutation,
-        None,
-        PostAdmissionReceiptContext {
-            extra_metadata: Some(metadata),
-            pre_invocation_guard_evidence: Vec::new(),
-            verified_payee_binding: None,
-        },
-        true,
-    );
-    guard.mark_dispatch_started();
-    drop(guard);
+        PreExecutionBudgetMutation::None,
+        Some(metadata),
+    )?;
 
     assert_eq!(admission_calls.load(Ordering::SeqCst), 0);
     assert_eq!(
@@ -302,7 +293,29 @@ fn chio_post_admission_drop_guard_retains_non_monetary_runtime_reservations(
     let Some(Decision::Cancelled { reason }) = &receipt.decision else {
         return Err("expected a cancelled decision on the drop receipt".into());
     };
-    assert_eq!(reason, "tool evaluation future dropped after admission");
+    assert_eq!(reason, "post-effect finalization failed; output withheld");
+    assert!(receipt.verify_signature()?);
+    assert_eq!(
+        receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/post_effect_fault/code")),
+        Some(&serde_json::json!("CHIO-KERNEL-POST-EFFECT-DROP"))
+    );
+    assert_eq!(
+        receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/retained_destructive_lease_id")),
+        Some(&serde_json::json!("lease-dropped"))
+    );
+    assert_eq!(
+        receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_runtime/retained_treaty_continuation_id")),
+        Some(&serde_json::json!("continuation-dropped"))
+    );
     Ok(())
 }
 
@@ -346,6 +359,7 @@ async fn drop_non_monetary_post_dispatch_records_cancellation_receipt(
     eval.abort();
     assert!(eval.await.is_err(), "aborted evaluation must not complete");
 
+    wait_for_post_effect_evidence(&kernel);
     let receipt_log = kernel.receipt_log();
     assert_eq!(
         receipt_log.len(),
@@ -359,7 +373,15 @@ async fn drop_non_monetary_post_dispatch_records_cancellation_receipt(
     let Some(Decision::Cancelled { reason }) = &receipt.decision else {
         return Err("expected a cancelled decision on the drop receipt".into());
     };
-    assert_eq!(reason, "tool evaluation future dropped after admission");
+    assert_eq!(reason, "post-effect finalization failed; output withheld");
+    assert_eq!(
+        receipt
+            .metadata
+            .as_ref()
+            .unwrap()
+            .pointer("/chio_runtime/post_effect_fault/code"),
+        Some(&serde_json::json!("CHIO-KERNEL-POST-EFFECT-DROP"))
+    );
     assert!(
         receipt.verify_signature()?,
         "drop receipt signature must verify"
@@ -426,6 +448,7 @@ async fn drop_post_dispatch_retains_and_marks_reservations(
         0,
         "a post-dispatch drop must retain runtime-admission reservations"
     );
+    wait_for_post_effect_evidence(&kernel);
     let receipt_log = kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
     let receipt = receipt_log

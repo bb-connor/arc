@@ -52,19 +52,28 @@ pub(super) fn compensate(
     ));
     let projection = || -> AnchoredTestResult<_> {
         let lease = renew(fixture, operation, &pending.lease)?;
+        let context = AdmissionProjectionContext {
+            operation_id: operation.binding().operation_id().clone(),
+            request_id: operation.binding().request_id().clone(),
+            expected_operation_version: operation.version(),
+            trusted_time_unix_ms: now_ms(),
+            coordinator_lease_id: lease.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            store_fence: fixture.fence.clone(),
+        };
+        let receipt = refusal_receipt(
+            operation,
+            &context,
+            AdmissionOperationState::CompensatedBeforeDispatch,
+            &Keypair::generate(),
+            &pending.request.arguments,
+        )?;
         Ok(
             verified_released_pre_dispatch_compensation_projection_for_test(
                 operation,
-                AdmissionProjectionContext {
-                    operation_id: operation.binding().operation_id().clone(),
-                    request_id: operation.binding().request_id().clone(),
-                    expected_operation_version: operation.version(),
-                    trusted_time_unix_ms: now_ms(),
-                    coordinator_lease_id: lease.coordinator_lease_id().clone(),
-                    coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-                    store_fence: fixture.fence.clone(),
-                },
+                context,
                 serde_json::json!({"policy": "native-egress-compensation"}),
+                receipt,
             )?,
         )
     };

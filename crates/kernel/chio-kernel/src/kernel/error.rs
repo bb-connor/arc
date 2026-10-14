@@ -100,6 +100,8 @@ pub enum ReceiptDeliveryStep {
     Federation,
     Provenance,
     ExecutionNonce,
+    SecurityOutcome,
+    SecurityRelease,
 }
 
 impl std::fmt::Display for ReceiptDeliveryStep {
@@ -110,6 +112,8 @@ impl std::fmt::Display for ReceiptDeliveryStep {
             Self::Federation => "federation",
             Self::Provenance => "provenance",
             Self::ExecutionNonce => "execution_nonce",
+            Self::SecurityOutcome => "security_outcome",
+            Self::SecurityRelease => "security_release",
         })
     }
 }
@@ -304,6 +308,18 @@ pub enum KernelError {
         source: Box<KernelError>,
     },
 
+    #[error("post-effect evidence capacity exhausted")]
+    PostEffectEvidenceCapacity,
+
+    #[error("post-effect evidence remains pending for {buffered} calls")]
+    PostEffectEvidencePending { buffered: usize },
+
+    #[error("post-effect terminal evidence is latched for request {request_id}")]
+    PostEffectFaultLatched { request_id: String },
+
+    #[error("durable outcome reconciliation remains pending for operation {operation_id}")]
+    DurableOutcomePending { operation_id: String },
+
     /// The receipt stands even though its subsequent delivery step failed.
     #[error("delivery failed after receipt {receipt_id} at {step}: {source}")]
     DeliveryFailedAfterReceipt {
@@ -327,11 +343,6 @@ pub enum KernelError {
     #[error("durable admission failed: {0}")]
     AdmissionRecovery(#[source] Box<crate::admission_operation::AdmissionRecoveryError>),
 
-    /// A replay observed a retained unknown outcome. Box the full historical
-    /// projection so refusal does not widen every kernel error. This metadata
-    /// neither claims a new terminal transition nor grants recovery authority.
-    #[error("durable admission failed: request replay is retained in state {:?}", .0.projected_state)]
-    DurableAdmissionRetained(Box<crate::admission_operation::AdmissionReceiptMetadataV1>),
     /// A consumed security mutation could not persist its terminal dispatch
     /// outcome, so callers must reconcile before any retry.
     #[error("security dispatch outcome requires reconciliation: {0}")]
@@ -740,6 +751,26 @@ impl KernelError {
                 serde_json::json!({ "receipt_id": receipt_id, "source": source.to_string() }),
                 "Drain the receipt writer and authenticate this receipt's retained record before considering replacement evidence.",
             ),
+            Self::PostEffectEvidenceCapacity => self.report_with_context(
+                "CHIO-KERNEL-POST-EFFECT-EVIDENCE-CAPACITY",
+                serde_json::json!({}),
+                "Wait for retained evidence to flush before admitting another non-durable tool call.",
+            ),
+            Self::PostEffectEvidencePending { buffered } => self.report_with_context(
+                "CHIO-KERNEL-POST-EFFECT-EVIDENCE-PENDING",
+                serde_json::json!({ "buffered": buffered }),
+                "Restore evidence persistence. Recovery and session reporting remain available.",
+            ),
+            Self::PostEffectFaultLatched { request_id } => self.report_with_context(
+                "CHIO-KERNEL-POST-EFFECT-FAULT-LATCHED",
+                serde_json::json!({ "request_id": request_id }),
+                "Reconcile the retained evidence before permitting new dispatch. Do not repeat this tool call.",
+            ),
+            Self::DurableOutcomePending { operation_id } => self.report_with_context(
+                "CHIO-KERNEL-DURABLE-OUTCOME-PENDING",
+                serde_json::json!({ "operation_id": operation_id }),
+                "Reconcile the original durable admission. Its saga remains the terminal owner.",
+            ),
             Self::DeliveryFailedAfterReceipt { receipt_id, step, source } => self.report_with_context(
                 "CHIO-KERNEL-DELIVERY-FAILED-AFTER-RECEIPT",
                 serde_json::json!({ "receipt_id": receipt_id, "step": step, "source": source.to_string() }),
@@ -769,11 +800,6 @@ impl KernelError {
                 "CHIO-KERNEL-DURABLE-ADMISSION",
                 serde_json::json!({ "reason": failure.to_string() }),
                 "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
-            ),
-            Self::DurableAdmissionRetained(projection) => self.report_with_context(
-                "CHIO-KERNEL-DURABLE-ADMISSION",
-                serde_json::json!({ "admission_operation": projection }),
-                "Inspect the retained operation. A fresh attempt requires the kernel's conservative eligibility classification, not merely read-only tool metadata.",
             ),
             Self::SecurityDispatchOutcomeRecoveryRequired(reason) => self.report_with_context(
                 "CHIO-KERNEL-SECURITY-DISPATCH-OUTCOME-RECOVERY-REQUIRED",
@@ -923,14 +949,6 @@ impl KernelError {
         match self {
             Self::FindingDenied(denial) => {
                 crate::finding_denial::record_finding_denial(metadata.clone(), denial.code())
-            }
-            Self::DurableAdmissionRetained(projection) => {
-                crate::receipt_support::merge_metadata_objects(
-                    metadata.clone(),
-                    Some(serde_json::json!({
-                        "admission_operation": projection
-                    })),
-                )
             }
             _ => metadata.clone(),
         }

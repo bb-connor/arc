@@ -749,3 +749,6 @@ pub use kernel::signing_task::METRIC_CHIO_SIGNING_QUEUE_BLOCK_TOTAL;
 
 #[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::active_response_test_support;
+
+#[cfg(not(loom))]
+pub use kernel::PostEffectEvidenceBudget;

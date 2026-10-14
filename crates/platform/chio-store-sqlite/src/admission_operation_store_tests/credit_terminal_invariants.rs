@@ -251,8 +251,15 @@ fn acquired_credit_rejects_unproven_compensation_before_store_mutation(
         coordinator_lease_epoch: recovery.coordinator_lease_epoch(),
         store_fence: recovery.store_fence().clone(),
     };
+    let receipt = refusal_receipt(
+        &operation,
+        &context,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        &Keypair::generate(),
+        &serde_json::json!({}),
+    )?;
     assert!(matches!(
-        verified_pre_dispatch_compensation_projection(&operation, context),
+        verified_pre_dispatch_compensation_projection(&operation, context, receipt),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     ));
     assert_eq!(account_state(&fixture)?, before_account);
@@ -307,10 +314,18 @@ fn verified_predispatch_projection_releases_reserved_credit_atomically(
         coordinator_lease_epoch: recovery.coordinator_lease_epoch(),
         store_fence: recovery.store_fence().clone(),
     };
+    let receipt = refusal_receipt(
+        &operation,
+        &context,
+        AdmissionOperationState::CompensatedBeforeDispatch,
+        &Keypair::generate(),
+        &serde_json::json!({}),
+    )?;
     let projection = verified_released_pre_dispatch_compensation_projection_for_test(
         &operation,
         context,
         serde_json::json!({"policy": "sqlite-credit-release-v1"}),
+        receipt,
     )?;
     // The compensation is refused while the executable hold is still authorized;
     // the coordinator reverses that hold first, then the projection releases the
@@ -395,6 +410,7 @@ fn outcome_unknown_credit_transition_is_exactly_bound_to_projection(
         '8',
         now + 20,
         "sqlite-credit-authorizer",
+        &Keypair::generate(),
     );
     fixture.store.commit_terminal_projection(&projection)?;
     let reservation = fixture

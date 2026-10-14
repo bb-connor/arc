@@ -298,20 +298,22 @@ impl ChioKernel {
             receipt_log: {
                 let gauge = chio_bounded::SizeGauge::new();
                 receipt_mirror_gauge = gauge.clone();
-                Mutex::new(ReceiptLog::with_capacity(receipt_mirror_capacity, gauge))
+                Arc::new(Mutex::new(ReceiptLog::with_capacity(receipt_mirror_capacity, gauge)))
             },
             child_receipt_log: {
                 let gauge = chio_bounded::SizeGauge::new();
                 child_receipt_mirror_gauge = gauge.clone();
-                Mutex::new(ChildReceiptLog::with_capacity(
+                Arc::new(Mutex::new(ChildReceiptLog::with_capacity(
                     receipt_mirror_capacity,
                     gauge,
-                ))
+                )))
             },
             receipt_mirror_gauge,
             child_receipt_mirror_gauge,
+            post_effect_evidence: Mutex::new(None),
+            post_effect_host_budget: super::effect_obligation::evidence::PostEffectEvidenceBudget::process_default(),
             receipt_store: None,
-            receipt_store_write_lock: Mutex::new(()),
+            receipt_store_write_lock: Arc::new(Mutex::new(())),
             retention_maintenance: None,
             payment_adapter: None,
             finding_purchase_verifier: None,
@@ -338,8 +340,8 @@ impl ChioKernel {
                 DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS,
             ),
             runtime_trace_observer: None,
-            runtime_trace_transition_lock: Mutex::new(()),
-            runtime_trace_sequence: AtomicU64::new(0),
+            runtime_trace_transition_lock: Arc::new(Mutex::new(())),
+            runtime_trace_sequence: Arc::new(AtomicU64::new(0)),
             attestation_trust_policy: None,
             capability_crypto_floor: KernelCryptoFloor::AllowClassical,
             checkpoint_batch_size,
@@ -846,6 +848,7 @@ impl ChioKernel {
         &mut self,
         receipt_store: Arc<dyn ReceiptStore>,
     ) -> Result<(), KernelError> {
+        self.invalidate_idle_post_effect_evidence_worker()?;
         #[cfg(feature = "finding-market")]
         if self.finding_pool_ledger.is_some() {
             return Err(KernelError::Internal(
@@ -1154,6 +1157,7 @@ impl ChioKernel {
         if let Some(receipt_store) = self.receipt_store.as_ref() {
             Self::validate_settlement_receipt_store(receipt_store.as_ref(), &runtime)?;
         }
+        self.invalidate_idle_post_effect_evidence_worker()?;
         self.settlement_observer = Some(runtime);
         Ok(())
     }
@@ -1958,14 +1962,14 @@ impl ChioKernel {
 
     /// Install an observer for implementation-trace evidence.
     pub fn set_runtime_trace_observer(&mut self, observer: Arc<dyn RuntimeTraceObserver>) {
-        self.runtime_trace_sequence.store(0, Ordering::SeqCst);
+        self.runtime_trace_sequence = Arc::new(AtomicU64::new(0));
         self.runtime_trace_observer = Some(observer);
     }
 
     /// Remove the implementation-trace observer.
     pub fn clear_runtime_trace_observer(&mut self) {
         self.runtime_trace_observer = None;
-        self.runtime_trace_sequence.store(0, Ordering::SeqCst);
+        self.runtime_trace_sequence = Arc::new(AtomicU64::new(0));
     }
 
     /// Register a tool server connection.

@@ -230,7 +230,7 @@ capabilities:
     missing = {key: value for key, value in other.items() if key != "abi"}
     host_record.write_text(json.dumps(missing))
     assert "host state lacks its process ABI" in cli("export", "--state", state, success=False)
-    assert "abi" in cli("status", "--state", state, success=False)
+    assert "host state lacks its process ABI" in cli("status", "--state", state, success=False)
     assert (state / "authority.db").read_bytes() == before_export
     host_record.write_bytes(recorded)
     socket = sockets / "first.sock"

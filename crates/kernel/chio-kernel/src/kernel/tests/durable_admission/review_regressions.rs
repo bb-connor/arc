@@ -80,32 +80,22 @@ fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
         store: store.clone(),
     }));
 
-    let result = kernel.evaluate_tool_call_blocking(&request);
-    assert!(
-        matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
-        "unexpected durable URL elicitation result: {result:?}"
+    assert_durable_url_elicitation(kernel.evaluate_tool_call_blocking(&request));
+    let retained = assert_original_unknown_incident(&store, &request);
+    assert_eq!(kernel.receipt_log().len(), 1);
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_blocking(&request),
+        &retained,
+        &store,
     );
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    assert_eq!(kernel.receipt_log().len(), 1);
+    let projection = assert_unknown_replay(
+        kernel.evaluate_tool_call_blocking(&request),
+        &retained,
+        &store,
     );
-    assert!(!kernel.receipt_log().receipts().is_empty());
-    let retained = store.operation();
-    for time in [0, (1_u64 << 53)] {
-        assert!(
-            crate::admission_operation::AdmissionReceiptMetadataV1::retained_unknown_dispatch(
-                &retained, time
-            )
-            .is_err(),
-            "unsafe observation time accepted: {time}"
-        );
-    }
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("signed replay refusal");
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.verify_signature().expect("signature"));
-    let metadata = &response.receipt.metadata.as_ref().expect("metadata")["admission_operation"];
+    assert_eq!(kernel.receipt_log().len(), 1);
+    let metadata = &serde_json::to_value(projection).expect("retained projection");
     let schema: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../../spec/schemas/chio-wire/v1/receipt/admission-metadata.schema.json"
@@ -114,7 +104,7 @@ fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
     jsonschema::validator_for(&schema)
         .expect("schema compiles")
         .validate(metadata)
-        .expect("signed projection validates against registered schema");
+        .expect("retained projection validates against registered schema");
     assert_eq!(
         metadata["projected_state"],
         "outcome_unknown_after_dispatch"
@@ -213,44 +203,33 @@ fn dpop_profile_removal_distinguishes_selected_authority_from_configuration() {
             );
         }
         assert!(!kernel.can_redispatch_unknown_read(&request));
-        assert!(matches!(
+        assert_durable_url_elicitation(kernel.evaluate_tool_call_blocking(&request));
+        let retained = assert_original_unknown_incident(&store, &request);
+        assert_eq!(kernel.receipt_log().len(), 1);
+        assert_unknown_replay(
             kernel.evaluate_tool_call_blocking(&request),
-            Err(KernelError::UrlElicitationsRequired { .. })
-        ));
-        let retained = store.operation();
-        assert_eq!(
-            retained.state(),
-            AdmissionOperationState::OutcomeUnknownAfterDispatch
+            &retained,
+            &store,
         );
+        assert_eq!(kernel.receipt_log().len(), 1);
         let claim = store.state.lock().expect("state").claim.clone();
         assert_eq!(retained.dpop_replay_ledger_digest().is_some(), selected);
-        assert_eq!(
-            store
-                .state
-                .lock()
-                .expect("state")
-                .retained_request
-                .is_some(),
-            selected
-        );
+        assert!(store
+            .state
+            .lock()
+            .expect("state")
+            .retained_request
+            .is_some());
         kernel.dpop_authority = None;
         assert_eq!(kernel.can_redispatch_unknown_read(&request), !selected);
-        let refusal = kernel
-            .evaluate_tool_call_blocking(&request)
-            .expect("signed refusal");
-        assert_eq!(refusal.verdict, Verdict::Deny);
-        assert!(refusal.receipt.verify_signature().expect("signature"));
-        assert_eq!(
-            refusal
-                .receipt
-                .metadata
-                .as_ref()
-                .and_then(|metadata| metadata.get("admission_operation"))
-                .is_none(),
-            selected,
-            "{:?}",
-            refusal.reason
-        );
+        let result = kernel.evaluate_tool_call_blocking(&request);
+        if selected {
+            result.expect_err("removed authority cannot advertise a retained identity as reusable");
+            assert_eq!(kernel.receipt_log().len(), 1);
+        } else {
+            assert_unknown_replay(result, &retained, &store);
+            assert_eq!(kernel.receipt_log().len(), 1);
+        }
         assert_eq!(store.operation(), retained);
         assert_eq!(store.state.lock().expect("state").claim, claim);
         assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -278,20 +257,33 @@ fn durable_server_url_elicitation_finalizes_the_pool_claim() {
         .set_finding_pool_ledger(ledger.clone())
         .expect("qualified finding pool ledger");
 
-    let error = kernel.evaluate_tool_call_blocking(&request);
-    assert!(
-        matches!(error, Err(KernelError::UrlElicitationsRequired { .. })),
-        "unexpected durable URL elicitation result: {error:?}"
-    );
-    let terminal = store.operation();
-    assert_eq!(
-        terminal.state(),
-        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    assert_durable_url_elicitation(kernel.evaluate_tool_call_blocking(&request));
+    let terminal = assert_original_unknown_incident(&store, &request);
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_blocking(&request),
+        &terminal,
+        &store,
     );
     assert!(ledger
         .list_claimed_admission_operations(None, 10)
         .expect("read finalized pool claims")
         .is_empty());
+    assert_eq!(
+        ledger.unknown_dispatch_finalizations(),
+        vec![terminal.binding().operation_id().as_str().to_owned()]
+    );
+    let receipts = kernel.receipt_log().len();
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_blocking(&request),
+        &terminal,
+        &store,
+    );
+    assert_eq!(kernel.receipt_log().len(), receipts);
+    assert_eq!(
+        store.operation(),
+        terminal,
+        "pool replay retains the exact original incident"
+    );
     assert_eq!(
         ledger.unknown_dispatch_finalizations(),
         vec![terminal.binding().operation_id().as_str().to_owned()]
@@ -445,21 +437,41 @@ fn nested_durable_url_elicitation_terminalizes_as_outcome_unknown() {
         .expect("begin parent request");
     let mut client = NoopNestedFlowClient;
 
-    let result = kernel.evaluate_tool_call_with_nested_flow_client(
+    assert_durable_url_elicitation(kernel.evaluate_tool_call_with_nested_flow_client(
         &parent_context,
         &request,
         &mut client,
         None,
+    ));
+    let retained = assert_original_unknown_incident(&store, &request);
+    assert_eq!(kernel.receipt_log().len(), 1);
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &request,
+            &mut client,
+            None,
+        ),
+        &retained,
+        &store,
     );
-    assert!(
-        matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
-        "unexpected nested durable URL elicitation result: {result:?}"
+    assert_eq!(kernel.receipt_log().len(), 1);
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &request,
+            &mut client,
+            None,
+        ),
+        &retained,
+        &store,
     );
+    assert_eq!(kernel.receipt_log().len(), 1);
     assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::OutcomeUnknownAfterDispatch
+        store.operation(),
+        retained,
+        "nested replay preserves the exact incident"
     );
-    assert!(!kernel.receipt_log().receipts().is_empty());
 }
 
 #[test]
@@ -688,6 +700,7 @@ fn an_unrelated_cumulative_grant_does_not_withdraw_an_exempt_admission() {
         kernel
             .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
             .map(|admission| admission.is_none())
+            .map_err(|failure| *failure.error)
     };
 
     // Neither exempt tool matches a cumulative grant, so the cumulative grants
@@ -747,6 +760,21 @@ fn a_missing_nested_session_root_compensates_the_durable_admission() {
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert!(response.receipt.verify_signature().unwrap());
+    let metadata = response.receipt.metadata.as_ref().unwrap();
+    assert_eq!(
+        metadata
+            .pointer("/chio_runtime/identity_disposition")
+            .and_then(serde_json::Value::as_str),
+        Some("terminal"),
+    );
+    let operation = store.operation();
+    assert_eq!(
+        metadata
+            .pointer("/receipt_context/request_namespace_digest")
+            .and_then(serde_json::Value::as_str),
+        Some(operation.binding().request_namespace_digest().as_str()),
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }

@@ -600,9 +600,6 @@ impl PostReturnEvaluationRecordV1 {
         &self.exact_inputs.normalized_request_context
     }
 
-    pub(crate) fn retained_frozen_steps(&self) -> &[FrozenEvaluationStepV1] {
-        &self.frozen_steps
-    }
     pub fn to_persisted(&self) -> PersistedPostReturnEvaluationRecordV1 {
         PersistedPostReturnEvaluationRecordV1 {
             schema: self.schema.to_owned(),
