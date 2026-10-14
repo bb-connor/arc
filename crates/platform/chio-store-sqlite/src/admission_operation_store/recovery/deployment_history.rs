@@ -101,7 +101,10 @@ pub(super) fn lookup(
         return Err(invariant("recovery historical deployment digest changed"));
     }
     validate_deployment(&profile, fence)?;
-    super::super::security_participant_state::verify_recovery_initialization(
+    // Every caller holds an owning store or startup-repair transaction that
+    // verified the serving owner and anchor after open authenticated the full
+    // native history. Configuration keeps the full replay.
+    super::super::security_participant_state::verify_current_recovery_initialization(
         tx,
         &profile.native_authority,
     )?;

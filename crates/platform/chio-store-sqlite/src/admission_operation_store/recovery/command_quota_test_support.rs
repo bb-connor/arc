@@ -505,9 +505,6 @@ pub fn apply_recovery_quota_fixture_resumptions(
         return Err(invariant("recovery resumption fixture command refused").into());
     }
     store.recovery_mutation_with_headroom(actor, fence, now, true, |tx, profile, now| {
-        let install_started = std::time::Instant::now();
-        install_fixture_observed_time_index(tx)?;
-        let install_ms = install_started.elapsed().as_millis();
         let apply_started = std::time::Instant::now();
         let mut command_ms = Vec::with_capacity(commands.len());
         let result = commands
@@ -521,15 +518,19 @@ pub fn apply_recovery_quota_fixture_resumptions(
             })
             .collect::<Result<Vec<_>, _>>()?;
         let apply_ms = apply_started.elapsed().as_millis();
-        let restore_started = std::time::Instant::now();
-        restore_fixture_canonical_schema(tx)?;
-        let restore_ms = restore_started.elapsed().as_millis();
+        // No fixture observed-time index is installed in this path. The
+        // current authority clock reads the final event by sequence, so no
+        // query in this writer consults an observed_at index, and the
+        // canonical schema plus full inventory are still verified after
+        // every batch exactly as the restore path verified them.
+        let verify_started = std::time::Instant::now();
+        super::super::schema::verify_admission_operation_invariants(tx)?;
+        let verify_ms = verify_started.elapsed().as_millis();
         eprintln!(
-            "RECOVERY_QUOTA_FLOOD_APPLY commands={} install_ms={} apply_ms={} restore_ms={} command_ms={:?}",
+            "RECOVERY_QUOTA_FLOOD_APPLY commands={} apply_ms={} verify_ms={} command_ms={:?}",
             commands.len(),
-            install_ms,
             apply_ms,
-            restore_ms,
+            verify_ms,
             command_ms
         );
         Ok(result)

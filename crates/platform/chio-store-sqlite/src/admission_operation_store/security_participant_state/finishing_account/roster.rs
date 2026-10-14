@@ -238,8 +238,16 @@ fn price_output_join(
         .collect::<Result<_, _>>()?;
     trees.extend(flow_tree_write_shapes(Some(rows))?);
     // A pending declassification consumption updates its use, tombstone and
-    // receipt outbox rows inside the same join.
-    for table in &row_plan::OUTPUT_TABLES[9..] {
+    // receipt outbox rows inside the same join. Only a declassified egress can
+    // leave one, and that egress presents the live request's grant; an
+    // original priced without it refuses that egress before any effect.
+    let declassifies = plan.request().declassification_grant.is_some();
+    let declassification_tables: &[&str] = if declassifies {
+        &row_plan::OUTPUT_TABLES[9..]
+    } else {
+        &[]
+    };
+    for table in declassification_tables {
         trees.push(
             tree(
                 Some(MAX_DECLASSIFICATION_ROW_BYTES),
@@ -388,7 +396,11 @@ fn price_output_join(
             (fanout_rows, fanout_bytes),
             (counter, width_class, class_floor, n_grow, growing_rows),
             (recipe.page_bucket, recipe.page_growth),
-            (MAX_OUTPUT_RECORD_BYTES, MAX_DECLASSIFICATION_ROW_BYTES),
+            (
+                MAX_OUTPUT_RECORD_BYTES,
+                MAX_DECLASSIFICATION_ROW_BYTES,
+                declassifies,
+            ),
             global.0,
             global.1,
             &liability,
@@ -398,8 +410,9 @@ fn price_output_join(
     let mut purpose = outstanding(NativeFinishingPurposeV1::OutputJoin, &profile, liability);
     purpose.page_recipe = Some(recipe);
     purpose.row_loans = rows.loans(
-        row_plan::OUTPUT_TABLES
+        row_plan::OUTPUT_TABLES[..9]
             .iter()
+            .chain(declassification_tables)
             .map(|&table| (table, 1))
             .chain([(row_plan::GLOBAL, 1), (row_plan::GLOBAL_META, 0)]),
     )?;
@@ -416,6 +429,20 @@ fn price_output_join(
         },
     );
     Ok(purpose)
+}
+
+/// Whether this account's Output join priced a declassification consumption:
+/// its loan then carries the declassification tables. A declassified egress
+/// of an account without it refuses before the effect.
+pub(super) fn output_join_prices_declassification(account: &NativeFinishingAccountV1) -> bool {
+    account
+        .liability(NativeFinishingPurposeV1::OutputJoin)
+        .is_some_and(|liability| {
+            liability
+                .row_loans
+                .iter()
+                .any(|loan| loan.table == row_plan::OUTPUT_TABLES[9])
+        })
 }
 
 /// The retained width class and its floor for one Output loan: with existing

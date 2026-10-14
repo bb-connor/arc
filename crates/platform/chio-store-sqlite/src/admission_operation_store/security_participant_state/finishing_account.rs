@@ -48,6 +48,25 @@ pub(in crate::admission_operation_store) use spend::{
     spend_native_payment_purpose, NativeFinishingSpend, NativePaymentJournalWrite,
 };
 
+/// A declassified egress of a native original requires the Output join its
+/// account priced to carry the declassification consumption it will leave.
+pub(in crate::admission_operation_store) fn require_priced_declassification(
+    tx: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    if !native_original(tx, operation)? {
+        return Ok(());
+    }
+    let retained = load_native_finishing_account(tx, operation.binding().operation_id().as_str())?
+        .ok_or_else(|| invalid("native declassified egress lacks its finishing account"))?;
+    if !roster::output_join_prices_declassification(&retained.account) {
+        return Err(invalid(
+            "native declassified egress was not priced by its finishing account",
+        ));
+    }
+    Ok(())
+}
+
 impl SqliteAdmissionOperationStore {
     /// Publish the complete before-effect Prepared account, or return the
     /// retained account for an exact replay of the same original.

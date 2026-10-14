@@ -251,6 +251,7 @@ impl SqliteAdmissionOperationStore {
         };
         let observed_at = super::super::observed_time(&tx, decision_at)?;
         if let NativeEgressCommand::CommitDeclassified { grant, .. } = &command {
+            super::super::finishing_account::require_priced_declassification(&tx, operation)?;
             let (snapshot, generation) = crate::security_state::observe_native_flow_state(
                 &tx,
                 actual.authority.as_str(),

@@ -9,7 +9,7 @@
 //! authority bank head are typed protected commands outside every generic pool.
 use super::super::resources::{
     check_funded_committing, check_intake_committing, physical_command_write_profile,
-    price_protected_command_liability, PhysicalLiabilityData, ProtectedCommandLiabilityPlan,
+    price_protected_command_with_row_limits, PhysicalLiabilityData, ProtectedCommandLiabilityPlan,
 };
 use super::native_finishing_bank::{
     reservation_shape, NativeFinishingWidthRecipeV1, NativeFinishingWidthReservationV1,
@@ -1065,6 +1065,27 @@ fn native_finishing_successor_bound(
     .min(NATIVE_FINISHING_ACCOUNT_MAX_BYTES))
 }
 
+/// The smallest retained row ceiling per table across every loan this account
+/// publishes. The bank enforces the smallest ceiling of every outstanding loan,
+/// so each value bounds its table's rows from this account's publication on.
+fn account_row_ceilings(
+    account: &NativeFinishingAccountV1,
+) -> std::collections::BTreeMap<String, u64> {
+    let mut ceilings = std::collections::BTreeMap::<String, u64>::new();
+    for loan in account
+        .liabilities
+        .iter()
+        .flat_map(|liability| liability.row_loans.iter())
+        .chain(account.transitions.row_loans.iter())
+    {
+        ceilings
+            .entry(loan.table.clone())
+            .and_modify(|ceiling| *ceiling = (*ceiling).min(loan.ceiling))
+            .or_insert(loan.ceiling);
+    }
+    ceilings
+}
+
 /// Exact current account with its protected record version.
 pub(in crate::admission_operation_store) struct RetainedNativeFinishingAccount {
     pub(in crate::admission_operation_store) account: NativeFinishingAccountV1,
@@ -1270,7 +1291,12 @@ pub(in crate::admission_operation_store) fn persist_prepared_native_finishing_ac
     } else {
         publication.add_new_command(tx, &bank_key, &bank_scope, NATIVE_FINISHING_BANK_MAX_BYTES)?;
     }
-    let liability = price_protected_command_liability(tx, &publication)?;
+    // This transaction publishes the account's row loans with the bank, and
+    // the committing bank enforces their ceilings on every history tree the
+    // publication writes before its COMMIT. The account's own loans therefore
+    // bound those trees' cursor depth exactly as they bound its later writers.
+    let liability =
+        price_protected_command_with_row_limits(tx, &publication, &account_row_ceilings(account))?;
     let frame = physical_command_write_profile(tx)?.page_size() + 24;
     let publication_price = AuthorityCurrentWritePrice {
         wal_bytes: liability.wal_bytes(),
