@@ -262,7 +262,7 @@ supervisor. Settling a successful child does not hide an unobserved failure
 below it. Merely exiting zero or registering a pending join cannot handle a
 failure. Every failed worker retains its original state, attempts and outcome.
 
-Supervised runs emit `chio.process.run-report.v2` with `failure_policy`,
+Supervised runs emit `chio.process.supervised-run-report.v1` with `failure_policy`,
 `handled_failures` and `unhandled_failures`. Each handled entry names the failed
 process, completed supervisor, settled child and settlement request ID. Thus
 `complete: true` may coexist with explicitly handled failed workers. Status and
@@ -478,7 +478,7 @@ a kernel, read signing keys or connect to tool servers.
 The host keeps private `runner.db` and `run-logs/` state. Short worker endpoints
 live outside it and retain their ownership records in `runner.db`.
 Command output uses `chio.process.run-report.v1` by default, or the explicit
-supervised `chio.process.run-report.v2` described above, as one JSON object
+supervised `chio.process.supervised-run-report.v1` described above, as one JSON object
 with completion state and each worker's attempt count, outcome and accounted
 resource use. A failed run
 can also emit this report before exiting nonzero. Per-attempt stdout/stderr

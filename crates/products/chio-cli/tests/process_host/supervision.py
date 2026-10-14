@@ -240,7 +240,7 @@ def run(binary, directory, success):
     )
     report = json.loads(result.stdout)
     assert report["complete"] == success
-    assert report["schema"] == "chio.process.run-report.v2"
+    assert report["schema"] == "chio.process.supervised-run-report.v1"
     assert report["failure_policy"] == "supervised"
     assert (
         report["pending_container_records"] == report["abandoned_socket_intents"] == 0

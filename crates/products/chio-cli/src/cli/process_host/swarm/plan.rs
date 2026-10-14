@@ -35,7 +35,7 @@ pub(super) struct Call {
 enum Document {
     #[serde(rename = "chio.process.swarm-plan.v1")]
     Single { graph_id: String, calls: Vec<Call> },
-    #[serde(rename = "chio.process.swarm-plan.v2")]
+    #[serde(rename = "chio.process.shared-family-swarm-plan.v1")]
     SharedFamily {
         profile_id: String,
         graphs: Vec<Graph>,

@@ -106,7 +106,7 @@ def exercise_supervision(binary, destination, temporary, consumer):
                 host_death(invoke, directory)
             report = json.loads(command(invoke, directory).stdout)
             states = {w["process"]: w for w in report["workers"]}
-            assert report["complete"] and report["schema"] == "chio.process.run-report.v2"
+            assert report["complete"] and report["schema"] == "chio.process.supervised-run-report.v1"
             assert report["pending_container_records"] == report["abandoned_socket_intents"] == 0
             assert states["dyn_1"]["state"] == "failed" and states["dyn_1"]["attempts"] == 1
             assert states["dyn_2"]["state"] == states["root"]["state"] == "completed"

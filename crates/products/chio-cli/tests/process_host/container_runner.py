@@ -420,7 +420,7 @@ def supervised_failure(binary, root, image):
     process = launch(binary, state, plan)
     try:
         report = finished(process)
-        assert report["complete"] and report["schema"] == "chio.process.run-report.v2"
+        assert report["complete"] and report["schema"] == "chio.process.supervised-run-report.v1"
         assert not report["unhandled_failures"] and len(report["handled_failures"]) == 1
         workers = {worker["process"]: worker for worker in report["workers"]}
         assert workers["dyn_1"]["state"] == "failed" and workers["dyn_1"]["attempts"] == 1

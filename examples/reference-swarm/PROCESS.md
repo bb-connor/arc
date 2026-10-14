@@ -72,9 +72,9 @@ results or future join/terminal receipts. The private state contains:
 
 ### Independent graphs sharing one family
 
-Use `chio.process.swarm-plan.v2` when independent graphs must compete for the
+Use `chio.process.shared-family-swarm-plan.v1` when independent graphs must compete for the
 same family invocation quota. It accepts `profile_id` and `graphs`; each graph
-has the same `graph_id` and `calls` fields as the v1 plan above. For example,
+has the same `graph_id` and `calls` fields as the single-graph plan above. For example,
 this writes two mailbox graphs for four configured direct children:
 
 ```sh
@@ -84,7 +84,7 @@ from pathlib import Path
 
 groups = [("first", ["alice", "bob"]), ("second", ["carol", "dave"])]
 plan = {
-    "schema": "chio.process.swarm-plan.v2",
+    "schema": "chio.process.shared-family-swarm-plan.v1",
     "profile_id": "shared-mailbox-family",
     "graphs": [
         {

@@ -416,7 +416,7 @@ mod plan_tests {
     #[test]
     fn independent_graphs_can_share_one_process_family() {
         let result = read_plan(json!({
-            "schema": "chio.process.swarm-plan.v2", "profile_id": "shared-family",
+            "schema": "chio.process.shared-family-swarm-plan.v1", "profile_id": "shared-family",
             "graphs": [graph("first", &["alice", "bob"]), graph("second", &["carol", "dave"])],
         }));
         match result {
@@ -427,6 +427,23 @@ mod plan_tests {
                 assert_eq!(plan.graphs[1].calls[0].process, "carol");
             }
             Err(error) => panic!("valid independent graphs were rejected: {error}"),
+        }
+    }
+
+    #[test]
+    fn retired_swarm_plan_schema_is_refused() {
+        let mut document = json!({
+            "schema": "chio.process.shared-family-swarm-plan.v1", "profile_id": "shared-family",
+            "graphs": [graph("first", &["alice", "bob"]), graph("second", &["carol", "dave"])],
+        });
+        assert!(read_plan(document.clone()).is_ok());
+        document["schema"] = json!("chio.process.swarm-plan.v2");
+        match read_plan(document) {
+            Ok(_) => panic!("retired swarm-plan.v2 schema was accepted"),
+            Err(error) => assert_eq!(
+                error.to_string(),
+                "urn:chio:error:attest:signed-json-invalid-shape"
+            ),
         }
     }
 
@@ -453,14 +470,14 @@ mod plan_tests {
             ],
         ] {
             assert!(read_plan(json!({
-                "schema": "chio.process.swarm-plan.v2", "profile_id": "shared-family", "graphs": graphs,
+                "schema": "chio.process.shared-family-swarm-plan.v1", "profile_id": "shared-family", "graphs": graphs,
             })).is_err());
         }
-        let mut legacy = graph("legacy", &["alice", "bob"]);
-        legacy["schema"] = json!("chio.process.swarm-plan.v1");
-        assert!(read_plan(legacy.clone()).is_ok());
-        legacy["graphs"] = json!([]);
-        assert!(read_plan(legacy).is_err());
+        let mut single = graph("single", &["alice", "bob"]);
+        single["schema"] = json!("chio.process.swarm-plan.v1");
+        assert!(read_plan(single.clone()).is_ok());
+        single["graphs"] = json!([]);
+        assert!(read_plan(single).is_err());
         let graphs = (0..9)
             .map(|index| {
                 graph(
@@ -470,14 +487,14 @@ mod plan_tests {
             })
             .collect::<Vec<_>>();
         assert!(read_plan(json!({
-            "schema": "chio.process.swarm-plan.v2", "profile_id": "too-many-graphs", "graphs": graphs,
+            "schema": "chio.process.shared-family-swarm-plan.v1", "profile_id": "too-many-graphs", "graphs": graphs,
         })).is_err());
         let children = (0..31)
             .map(|index| format!("worker-{index}"))
             .collect::<Vec<_>>();
         let children = children.iter().map(String::as_str).collect::<Vec<_>>();
         assert!(read_plan(json!({
-            "schema": "chio.process.swarm-plan.v2", "profile_id": "too-many-children",
+            "schema": "chio.process.shared-family-swarm-plan.v1", "profile_id": "too-many-children",
             "graphs": [graph("first", &children), graph("second", &["alice", "bob"])],
         }))
         .is_err());
