@@ -492,7 +492,7 @@ impl ChioA2aEdge {
             request,
             arguments,
             execution,
-            task_id.clone(),
+            format!("a2a-request-{request_id}"),
             request_id.to_string(),
         )?;
         let orchestrated = execute_orchestrated_a2a_request(
@@ -601,7 +601,7 @@ impl ChioA2aEdge {
             request,
             extract_arguments_from_message(&request.message)?,
             execution,
-            task_id.clone(),
+            request_id.map_or_else(|| task_id.clone(), |id| format!("a2a-request-{id}")),
             kernel_request_id,
         )?;
 
