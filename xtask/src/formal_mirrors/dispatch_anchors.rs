@@ -1077,7 +1077,6 @@ const RUNTIME_OWNERSHIP_SOURCES: &[RequiredSource] = &[
             "RetainedToolAdmissionRequestV1::security_binding",
             "RetainedToolAdmissionRequestV1::native_security_authority_binding",
             "RetainedToolAdmissionRequestV1::validate_binding",
-            "RetainedToolAdmissionRequestV1::validate_request_binding",
             "RetainedToolAdmissionRequestV1::validate_request_material",
         ],
     },

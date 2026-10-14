@@ -88,10 +88,16 @@ impl Observer {
             Err(TryLockError::WouldBlock) => true,
             Err(TryLockError::Error(failure)) => return Err(error(failure)),
         };
-        let record: RecordHeader = crate::input::decode(
+        let value: serde_json::Value = crate::input::decode(
             &read_private(&directory, Path::new("host.json"), MAX_CONFIG_BYTES)?,
             MAX_CONFIG_BYTES as usize,
         )?;
+        match value.get("abi") {
+            Some(serde_json::Value::String(_)) => {}
+            None => return Err(error("host state lacks its process ABI")),
+            Some(_) => return Err(error("host ABI must be a string")),
+        }
+        let record: RecordHeader = crate::input::project(value)?;
         if record.config.schema != SCHEMA {
             return Err(error("unsupported process host configuration"));
         }
