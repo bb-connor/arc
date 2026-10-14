@@ -78,7 +78,7 @@ impl SqliteReceiptStore {
                     grants_json TEXT NOT NULL,
                     delegation_depth INTEGER NOT NULL DEFAULT 0,
                     parent_capability_id TEXT,
-                    signed_capability_json TEXT NOT NULL
+                    signed_capability_json TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS credit_bonds (
