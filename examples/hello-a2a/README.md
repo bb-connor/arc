@@ -5,8 +5,8 @@ Minimal A2A example using [`crates/protocol/chio-a2a-edge`](../../crates/protoco
 ## What It Demonstrates
 
 - discovery through the generated agent card
-- authoritative `message/send`
-- deferred `message/stream` followed by `task/get`
+- authoritative A2A v1.0.0 `SendMessage` with JSON and text output modes
+- stream-capable tool output collated into the terminal task
 - receipt-bearing metadata on terminal results
 - direct library-level tests for the same JSON-RPC lifecycle
 

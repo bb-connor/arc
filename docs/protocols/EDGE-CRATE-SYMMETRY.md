@@ -103,19 +103,14 @@ from config and registered skills. Served at
 
 ### 2.4 Request Handling
 
-| A2A Method | Edge Behavior |
+| A2A v1.0.0 Method | Edge Behavior |
 |------------|---------------|
-| `SendMessage` | Extract `targetSkillId`, resolve binding, submit to the authoritative Chio path, return blocking A2A task/result payload |
-| `SendStreamingMessage` | Create a deferred authoritative task with `receiptPending = true` |
-| `GetTask` | Resolve a deferred task through the authoritative Chio path and return the terminal receipt-bearing task result |
-| `CancelTask` | Cancel a deferred task before execution |
+| `SendMessage` | Extract `targetSkillId`, resolve binding, submit to the authoritative Chio path, return the task; an approval-blocked task stays retained for owner continuation |
+| `GetTask` | Observe a retained task without executing it |
+| `CancelTask` | Cancel a retained task awaiting approval |
 
-The shipped authoritative A2A profile is now dual-surface: blocking
-`SendMessage` for immediate calls and deferred-task `SendStreamingMessage`
-plus `GetTask` / `CancelTask` for truthful lifecycle mediation without
-pretending push updates exist. Compatibility passthrough helpers remain
-explicitly non-authoritative and are compiled only when the crate's
-`compatibility-surface` feature is enabled.
+The edge serves no other method and does not advertise streaming;
+`configuration.returnImmediately: true` is refused before dispatch.
 
 ### 2.5 Authentication
 
@@ -371,7 +366,7 @@ signed observability to a second major runtime surface.
 
 | Phase | Scope |
 |-------|-------|
-| 1 | Agent Card generation + authoritative blocking `SendMessage` and deferred-task `SendStreamingMessage` |
+| 1 | Agent Card generation + authoritative blocking `SendMessage` with `GetTask` / `CancelTask` |
 | 2 | Compatibility-surface isolation and truthful narrowing of unsupported streaming/task lifecycle |
 | 3 | Authentication scheme validation |
 | 4 | Future richer lifecycle only if the shared protocol fabric can support it honestly |

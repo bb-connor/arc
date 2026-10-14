@@ -290,30 +290,18 @@ mod tests {
         assert!(output.is_empty());
     }
 
-    fn send_message_frame(id: u64) -> Value {
+    fn send_message_frame(id: u64, accepted_output_mode: &str) -> Value {
         json!({
             "jsonrpc": "2.0",
             "id": id,
-            "method": "message/send",
+            "method": "SendMessage",
             "params": {
                 "message": {
-                    "role": "user",
-                    "parts": [{"type": "text", "text": "world"}]
-                }
-            }
-        })
-    }
-
-    fn stream_message_frame(id: u64) -> Value {
-        json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "method": "message/stream",
-            "params": {
-                "message": {
-                    "role": "user",
-                    "parts": [{"type": "text", "text": "world"}]
-                }
+                    "messageId": format!("hello-{id}"),
+                    "role": "ROLE_USER",
+                    "parts": [{"text": "world"}]
+                },
+                "configuration": {"acceptedOutputModes": [accepted_output_mode]}
             }
         })
     }
@@ -334,55 +322,39 @@ mod tests {
         let card = agent_card_value()?;
 
         assert_eq!(card["skills"][0]["id"], TOOL_NAME);
-        assert_eq!(card["capabilities"]["streaming"], true);
+        assert_eq!(card["capabilities"]["streaming"], false);
         assert_eq!(card["supportedInterfaces"][0]["protocolBinding"], "JSONRPC");
         Ok(())
     }
 
     #[test]
-    fn direct_jsonrpc_send_stream_and_task_get_carry_receipts() -> HelloA2aResult<()> {
+    fn direct_jsonrpc_send_message_carries_receipts() -> HelloA2aResult<()> {
         let mut state = build_demo_state()?;
 
-        let send_response = state.edge.handle_jsonrpc(
-            &serde_json::to_vec(&send_message_frame(1))?,
+        let json_response = state.edge.handle_jsonrpc(
+            &serde_json::to_vec(&send_message_frame(1, "application/json"))?,
             &state.kernel,
             &state.execution,
         )?;
-        assert_eq!(send_response["result"]["status"], "completed");
+        let task = &json_response["result"]["task"];
+        assert_eq!(task["status"]["state"], "TASK_STATE_COMPLETED");
         assert_eq!(
-            send_response["result"]["metadata"]["chio"]["authorityPath"],
+            task["metadata"]["chio"]["authorityPath"],
             "cross_protocol_orchestrator"
         );
-        assert!(send_response["result"]["metadata"]["chio"]["receiptId"]
+        assert!(task["metadata"]["chio"]["receiptId"]
             .as_str()
             .is_some_and(|receipt_id| !receipt_id.is_empty()));
 
-        let stream_response = state.edge.handle_jsonrpc(
-            &serde_json::to_vec(&stream_message_frame(2))?,
+        let text_response = state.edge.handle_jsonrpc(
+            &serde_json::to_vec(&send_message_frame(2, "text/plain"))?,
             &state.kernel,
             &state.execution,
         )?;
-        assert_eq!(stream_response["result"]["status"], "working");
-        assert_eq!(
-            stream_response["result"]["metadata"]["chio"]["receiptPending"],
-            true
-        );
-        let task_id = stream_response["result"]["id"]
-            .as_str()
-            .ok_or_else(|| KernelError::ToolServerError("missing stream task id".to_string()))?;
-
-        let task_response = state.edge.handle_jsonrpc(
-            &serde_json::to_vec(&json!({
-                "jsonrpc": "2.0",
-                "id": 3,
-                "method": "task/get",
-                "params": { "taskId": task_id }
-            }))?,
-            &state.kernel,
-            &state.execution,
-        )?;
-        assert_eq!(task_response["result"]["status"], "completed");
-        assert!(task_response["result"]["metadata"]["chio"]["receiptId"]
+        let task = &text_response["result"]["task"];
+        assert_eq!(task["status"]["state"], "TASK_STATE_COMPLETED");
+        assert!(task["artifacts"][0]["parts"][0]["text"].is_string());
+        assert!(task["metadata"]["chio"]["receiptId"]
             .as_str()
             .is_some_and(|receipt_id| !receipt_id.is_empty()));
         Ok(())
@@ -391,8 +363,8 @@ mod tests {
     #[test]
     fn stdio_reader_writes_one_response_per_request_line() -> HelloA2aResult<()> {
         let input = [
-            send_message_frame(1).to_string(),
-            stream_message_frame(2).to_string(),
+            send_message_frame(1, "application/json").to_string(),
+            send_message_frame(2, "text/plain").to_string(),
         ]
         .join("\n");
         let mut output = Vec::new();
@@ -407,8 +379,12 @@ mod tests {
         assert_eq!(responses.len(), 2);
         assert_eq!(responses[0]["id"], 1);
         assert_eq!(responses[1]["id"], 2);
-        assert_eq!(responses[0]["result"]["status"], "completed");
-        assert_eq!(responses[1]["result"]["status"], "working");
+        for response in &responses {
+            assert_eq!(
+                response["result"]["task"]["status"]["state"],
+                "TASK_STATE_COMPLETED"
+            );
+        }
         Ok(())
     }
 

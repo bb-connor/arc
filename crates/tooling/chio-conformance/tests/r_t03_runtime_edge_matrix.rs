@@ -137,7 +137,7 @@ fn r_t03_runtime_edge_matrix_points_to_real_admission_tests() -> Result<(), Box<
         BTreeSet::from([
             "a2a_adapter_deferred_get_task".to_string(),
             "a2a_adapter_send_message".to_string(),
-            "a2a_edge_deferred_task_get".to_string(),
+            "a2a_edge_send_message".to_string(),
             "acp_edge_stream_resume".to_string(),
             "mcp_tools_call_route_metadata".to_string(),
             "openai_function_call".to_string(),

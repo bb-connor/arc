@@ -7,16 +7,15 @@
 //! Responsibilities:
 //!
 //! 1. Publish an A2A Agent Card at `/.well-known/agent-card.json`.
-//! 2. Accept `SendMessage` requests and route them through the Chio kernel by
-//!    default.
-//! 3. Expose a truthful blocking `message/send` surface plus deferred
-//!    receipt-bearing `message/stream` task lifecycle.
+//! 2. Serve the A2A v1.0.0 JSON-RPC methods `SendMessage`, `GetTask` and
+//!    `CancelTask`, routing every invocation through the Chio kernel.
+//! 3. Retain approval-blocked tasks so the owner can resume them with
+//!    `SendMessage` under the original message ID and task ID.
 //! 4. Evaluate `BridgeFidelity` per tool to signal translation quality.
 //!
-//! Kernel-backed entrypoints produce signed Chio receipts. The streaming
-//! surface is truthful but bounded: `message/stream` creates a deferred task,
-//! `task/get` resolves the terminal receipt-bearing result, and `task/cancel`
-//! can cancel a deferred task before execution.
+//! Kernel-backed entrypoints produce signed Chio receipts. `SendMessage`
+//! blocks until the kernel returns a result; `GetTask` observes a retained
+//! task and never executes it; `CancelTask` cancels a task awaiting approval.
 //!
 //! ## Modules
 //!
@@ -30,6 +29,7 @@
 //! - `bridge`: capability bridge, skill candidates, fidelity, orchestration.
 //! - `conversion`: message conversion and Chio metadata envelope builders.
 //! - `edge`: the [`ChioA2aEdge`] server.
+//! - `v1`: the A2A v1.0.0 JSON-RPC projection and owner continuation.
 
 #![forbid(unsafe_code)]
 

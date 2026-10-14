@@ -47,65 +47,42 @@ with (logs / "edge.log").open("w", encoding="utf-8") as edge_log:
             raise RuntimeError("edge exited before responding")
         return json.loads(line)
 
-    send_response = rpc(
-        {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "message/send",
-            "params": {
-                "message": {
-                    "role": "user",
-                    "parts": [{"type": "text", "text": "world"}],
-                }
-            },
-        }
-    )
+    def send(request_id: int, output_mode: str):
+        return rpc(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": "SendMessage",
+                "params": {
+                    "message": {
+                        "messageId": f"hello-{request_id}",
+                        "role": "ROLE_USER",
+                        "parts": [{"text": "world"}],
+                    },
+                    "configuration": {"acceptedOutputModes": [output_mode]},
+                },
+            }
+        )
 
-    stream_created = rpc(
-        {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "message/stream",
-            "params": {
-                "message": {
-                    "role": "user",
-                    "parts": [{"type": "text", "text": "world"}],
-                }
-            },
-        }
-    )
-    task_id = stream_created["result"]["id"]
-    task_resolved = rpc(
-        {
-            "jsonrpc": "2.0",
-            "id": 3,
-            "method": "task/get",
-            "params": {"taskId": task_id},
-        }
-    )
+    json_response = send(1, "application/json")
+    text_response = send(2, "text/plain")
 
     proc.terminate()
     proc.wait(timeout=30)
 
-(artifacts / "send-response.json").write_text(
-    json.dumps(send_response, indent=2), encoding="utf-8"
+(artifacts / "send-json-response.json").write_text(
+    json.dumps(json_response, indent=2), encoding="utf-8"
 )
-(artifacts / "stream-created.json").write_text(
-    json.dumps(stream_created, indent=2), encoding="utf-8"
-)
-(artifacts / "task-get-response.json").write_text(
-    json.dumps(task_resolved, indent=2), encoding="utf-8"
+(artifacts / "send-text-response.json").write_text(
+    json.dumps(text_response, indent=2), encoding="utf-8"
 )
 
-assert send_response["result"]["status"] == "completed", send_response
-assert send_response["result"]["metadata"]["chio"]["authorityPath"] == "cross_protocol_orchestrator", send_response
-assert send_response["result"]["metadata"]["chio"]["receiptId"], send_response
-
-assert stream_created["result"]["status"] == "working", stream_created
-assert stream_created["result"]["metadata"]["chio"]["receiptPending"] is True, stream_created
-
-assert task_resolved["result"]["status"] == "completed", task_resolved
-assert task_resolved["result"]["metadata"]["chio"]["receiptId"], task_resolved
+for response in (json_response, text_response):
+    task = response["result"]["task"]
+    assert task["status"]["state"] == "TASK_STATE_COMPLETED", response
+    assert task["metadata"]["chio"]["authorityPath"] == "cross_protocol_orchestrator", response
+    assert task["metadata"]["chio"]["receiptId"], response
+assert isinstance(text_response["result"]["task"]["artifacts"][0]["parts"][0]["text"], str), text_response
 
 print("hello-a2a smoke passed")
 print(f"artifacts: {artifacts}")

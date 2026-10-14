@@ -182,61 +182,57 @@ silently collapse them. Unqualified ambiguous names are withheld from the
 authoritative surface, and only deterministic qualified identifiers are
 published.
 
-### 2.4 SendMessage and SendStreamingMessage
+### 2.4 A2A v1.0.0 JSON-RPC Methods
 
-#### 2.4.1 SendMessage (Blocking)
+The edge serves the A2A v1.0.0 JSON-RPC methods `SendMessage`, `GetTask` and
+`CancelTask`. Any other method MUST return JSON-RPC error `-32601`. The edge
+MUST NOT advertise streaming in its Agent Card, and MUST refuse
+`configuration.returnImmediately: true` with `UnsupportedOperationError`
+(`-32004`) before creating a task or dispatching to the kernel.
 
-The edge handles `message/send` JSON-RPC requests by:
+#### 2.4.1 SendMessage
+
+The edge handles `SendMessage` by:
 
 1. Resolving the target skill ID from `params.metadata.chio.targetSkillId`.
    If only one skill is registered, the edge MAY infer the target
    automatically.
 2. If multiple skills are registered and no `targetSkillId` is provided,
-   the edge MUST return a JSON-RPC error (code `-32602`).
-3. Extracting arguments from the message parts. If a `Data` part is
-   present, it is used as the arguments object. Otherwise, `Text` parts
+   returning JSON-RPC error `-32602`.
+3. Requiring `message.role` to be `ROLE_USER` and `message.messageId` to be a
+   nonblank, unpadded identifier of at most 256 bytes. The message ID is the
+   kernel request ID.
+4. Extracting arguments from the message parts. If a `data` part is
+   present, it is used as the arguments object. Otherwise, `text` parts
    are concatenated and wrapped as `{"message": "<text>"}`.
-4. Invoking the tool through the `ToolServerConnection`.
-5. Returning a `TaskResponse` with a unique task ID.
+5. Retaining a task bound to the caller's capability subject and agent ID,
+   then evaluating it through the Chio kernel in the same call.
 
-The task response MUST include:
+The response carries the task under `result.task`. A terminal task has state
+`TASK_STATE_COMPLETED` or `TASK_STATE_FAILED`, carries the signed Chio receipt in
+its metadata, and is released after delivery. A result awaiting approval has
+state `TASK_STATE_INPUT_REQUIRED` and stays retained until its deadline.
 
-- `id`: a monotonically increasing task identifier (format: `a2a-task-{n}`)
-- `status`: `completed` on success; `failed` on tool server error
-- `message`: present when status is `completed`; contains the tool result
-  converted to A2A message parts
-- `statusMessage`: present when status is `failed`; contains the error
-  description
+The owner resumes an approval-blocked task with `SendMessage` carrying the
+original `messageId` and the returned `message.taskId`; an optional
+`message.contextId` MUST match the task. The tool, arguments, capability, intent
+and output mode MUST equal the retained request; only the signed approval
+artifacts supplied by the authenticated execution context may differ. Message
+metadata MUST NOT supply authority.
 
-#### 2.4.2 SendStreamingMessage
-
-The authoritative A2A surface exposes `message/stream` as a deferred
-receipt-bearing task lifecycle rather than a push-stream transport.
-
-`message/stream` MUST:
-
-1. Resolve the target skill using the same rules as `message/send`.
-2. Create a working `TaskResponse` with signed-authority metadata and
-   `receiptPending = true`.
-3. Persist the deferred execution request under the returned task ID.
-4. Require follow-up `task/get` or `task/cancel` calls to resolve or cancel
-   the task.
-
-#### 2.4.3 GetTask / CancelTask
-
-The authoritative A2A surface also exposes:
+#### 2.4.2 GetTask / CancelTask
 
 | Method | Purpose | Response |
 |---|---|---|
-| `task/get` | Resolve a deferred `message/stream` task | `TaskResponse` |
-| `task/cancel` | Cancel a deferred `message/stream` task before execution | `TaskResponse` |
+| `GetTask` | Observe a retained task | Task object |
+| `CancelTask` | Cancel a retained task awaiting approval | Task object |
 
-`task/get` MUST execute the deferred request through the authoritative Chio
-path the first time it is called for a working task and then persist the
-terminal result. Terminal task results MUST carry the same signed Chio receipt
-metadata as `message/send`.
+`GetTask` MUST NOT execute or resume a task. `CancelTask` MUST refuse a completed
+or failed task with `TaskNotCancelableError` (`-32002`). Both methods MUST return
+the same `TaskNotFoundError` (`-32001`) for absent tasks and for tasks owned by
+another agent or capability subject.
 
-#### 2.4.4 Result Conversion
+#### 2.4.3 Result Conversion
 
 Tool results are converted to A2A message parts using these rules:
 
@@ -254,8 +250,8 @@ indicates how faithfully a Chio tool maps to A2A semantics.
 
 | Fidelity Level | Criteria | Implications |
 |---|---|---|
-| `lossless` | Tool is publishable and does not depend on approval, deferred-stream, cancellation, or partial-output caveats | The current A2A edge can project the tool without semantic loss |
-| `adapted` | Tool is publishable but side-effect, deferred-stream, cancellation, or partial-output semantics require explicit caveats | The edge preserves the tool through A2A but must surface caveats in discovery metadata |
+| `lossless` | Tool is publishable and does not depend on approval, streaming, cancellation, or partial-output caveats | The current A2A edge can project the tool without semantic loss |
+| `adapted` | Tool is publishable but side-effect, streaming, cancellation, or partial-output semantics require explicit caveats | The edge preserves the tool through A2A but must surface caveats in discovery metadata |
 | `unsupported` | Tool requires interactive approval or explicit publication suppression (`x-chio-publish: false`) | The tool MUST NOT be auto-published on the A2A surface |
 
 The `bridgeFidelity` field is included in each skill entry in the Agent

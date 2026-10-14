@@ -218,7 +218,7 @@ fn cancellation_tool_is_adapted_with_truthful_caveats() {
     };
     assert!(caveats
         .iter()
-        .any(|c| c.contains("cancellation is available only for deferred `message/stream` tasks")));
+        .any(|c| c.contains("`CancelTask` applies only to tasks awaiting approval")));
 }
 
 #[test]

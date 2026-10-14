@@ -104,8 +104,8 @@ fn evaluate_bridge_fidelity(
     }
     if hints.streams_output {
         caveats.push(format!(
-            "stream-capable tools execute through `{}` deferred tasks; output is surfaced on follow-up `{}` rather than incremental transport updates",
-            lifecycle.stream_entrypoint, lifecycle.follow_up_entrypoint
+            "stream-capable tools execute through blocking `{}`; output is surfaced in the terminal task rather than incremental transport updates",
+            lifecycle.stream_entrypoint
         ));
         caveats.push(
             "stream chunks are collated into the terminal task payload instead of pushed as incremental A2A events".to_string(),
@@ -119,8 +119,8 @@ fn evaluate_bridge_fidelity(
     }
     if hints.supports_cancellation {
         caveats.push(format!(
-            "cancellation is available only for deferred `{}` tasks; blocking `{}` remains terminal",
-            lifecycle.stream_entrypoint, lifecycle.blocking_entrypoint
+            "`{}` applies only to tasks awaiting approval; a completed blocking `{}` is terminal",
+            lifecycle.cancel_entrypoint, lifecycle.blocking_entrypoint
         ));
     }
 

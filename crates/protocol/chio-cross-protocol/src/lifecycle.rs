@@ -27,10 +27,10 @@ pub fn runtime_lifecycle_contract(surface: RuntimeLifecycleSurface) -> RuntimeLi
     match surface {
         RuntimeLifecycleSurface::A2aAuthoritative => RuntimeLifecycleContract {
             surface: "a2a_authoritative".to_string(),
-            blocking_entrypoint: "message/send".to_string(),
-            stream_entrypoint: "message/stream".to_string(),
-            follow_up_entrypoint: "task/get".to_string(),
-            cancel_entrypoint: "task/cancel".to_string(),
+            blocking_entrypoint: "SendMessage".to_string(),
+            stream_entrypoint: "SendMessage".to_string(),
+            follow_up_entrypoint: "GetTask".to_string(),
+            cancel_entrypoint: "CancelTask".to_string(),
             stream_delivery: "collated_terminal_payload".to_string(),
             partial_output_delivery: "collated_terminal_payload".to_string(),
             claim_eligible: true,

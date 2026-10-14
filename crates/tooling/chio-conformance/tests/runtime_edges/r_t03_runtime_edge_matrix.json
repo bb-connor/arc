@@ -25,7 +25,7 @@
       "crateName": "chio-a2a-adapter",
       "sourcePath": "crates/protocol/chio-a2a-adapter/src/tests/kernel_receipts.rs",
       "testName": "kernel_e2e_a2a_runtime_admission_denies_before_send_message",
-      "entrypoint": "message/send",
+      "entrypoint": "SendMessage",
       "expected": {
         "runtimeAdmissionBeforeDispatch": true,
         "denyReceiptEmitted": true,
@@ -38,7 +38,7 @@
       "crateName": "chio-a2a-adapter",
       "sourcePath": "crates/protocol/chio-a2a-adapter/src/tests/kernel_receipts.rs",
       "testName": "kernel_e2e_a2a_deferred_get_task_runtime_admission_denies_before_remote_follow_up",
-      "entrypoint": "task/get",
+      "entrypoint": "GetTask",
       "expected": {
         "runtimeAdmissionBeforeDispatch": true,
         "denyReceiptEmitted": true,
@@ -60,11 +60,11 @@
       }
     },
     {
-      "surface": "a2a_edge_deferred_task_get",
+      "surface": "a2a_edge_send_message",
       "crateName": "chio-a2a-edge",
       "sourcePath": "crates/protocol/chio-a2a-edge/src/tests/all.rs",
-      "testName": "jsonrpc_task_get_runtime_admission_denies_before_deferred_dispatch",
-      "entrypoint": "message/stream task/get",
+      "testName": "jsonrpc_send_runtime_admission_denies_before_dispatch",
+      "entrypoint": "SendMessage",
       "expected": {
         "runtimeAdmissionBeforeDispatch": true,
         "denyReceiptEmitted": true,
