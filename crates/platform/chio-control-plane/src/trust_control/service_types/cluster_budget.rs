@@ -55,21 +55,35 @@ pub(crate) struct PeerStatusView {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ClusterReplicationHeadsView {
     pub(crate) tool_seq: u64,
     pub(crate) child_seq: u64,
     pub(crate) lineage_seq: u64,
     pub(crate) budget_seq: u64,
-    /// Explicit revocation delta contract, advertised even when the stream is
-    /// empty so a follower can distinguish an empty current stream from a
-    /// legacy peer that has no stream-epoch support.
+    /// The revocation stream contract, advertised even when the stream is empty
+    /// so a database replacement cannot masquerade as an empty page at an old
+    /// cursor. Absent only when the node has no revocation store.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) revocation_cursor_version: Option<u8>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) revocation_stream_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) revocation_cursor: Option<RevocationCursorView>,
+    pub(crate) revocation_stream: Option<RevocationStreamView>,
+}
+
+/// One node's dense append-only revocation stream: the cursor contract version,
+/// the durable stream-instance identity and the stream head, if any.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct RevocationStreamView {
+    pub(crate) cursor_version: u8,
+    pub(crate) stream_id: String,
+    pub(crate) head: Option<RevocationHeadView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct RevocationHeadView {
+    pub(crate) seq: u64,
+    pub(crate) revoked_at: i64,
+    pub(crate) capability_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -220,14 +234,10 @@ pub struct LeaseTerminateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct RevocationCursorView {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) cursor_version: Option<u8>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) stream_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) seq: Option<u64>,
+    pub(crate) stream_id: String,
+    pub(crate) seq: u64,
     pub(crate) revoked_at: i64,
     pub(crate) capability_id: String,
 }
@@ -284,48 +294,37 @@ pub(crate) struct BudgetMutationEventView {
 pub(crate) type AuthoritySnapshotView =
     chio_kernel::authority::replication::SignedAuthoritySnapshot;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct RevocationDeltaQuery {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) cursor_version: Option<u8>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) stream_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) after_seq: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) after_revoked_at: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) after_capability_id: Option<String>,
+    pub(crate) cursor_version: u8,
+    pub(crate) stream_id: String,
+    pub(crate) after_seq: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) limit: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct StoredRevocationView {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) seq: Option<u64>,
+    pub(crate) seq: u64,
     pub(crate) capability_id: String,
     pub(crate) revoked_at: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct RevocationDeltaResponse {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) cursor_version: Option<u8>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) stream_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) head_seq: Option<u64>,
+    pub(crate) cursor_version: u8,
+    pub(crate) stream_id: String,
+    pub(crate) head_seq: u64,
     pub(crate) records: Vec<StoredRevocationView>,
 }
 
-/// Dense append-only revocation stream contract. Version 2 exposed the mutable
-/// projection sequence, while version 3 omitted a durable stream-instance
-/// identity and could not detect database replacement or rollback.
-pub(crate) const REVOCATION_SEQUENCE_CURSOR_VERSION: u8 = 4;
+/// Revocation cursor contract: a dense append-only per-store sequence bound to
+/// a durable stream-instance identity, so a database replacement or rollback is
+/// detected instead of read as an empty page.
+pub(crate) const REVOCATION_CURSOR_VERSION: u8 = 1;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

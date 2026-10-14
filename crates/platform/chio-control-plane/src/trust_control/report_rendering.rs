@@ -76,7 +76,6 @@ pub(crate) fn authority_snapshot_view(
 
 pub(crate) fn revocation_cursor_view(cursor: RevocationCursor) -> RevocationCursorView {
     RevocationCursorView {
-        cursor_version: cursor.cursor_version,
         stream_id: cursor.stream_id,
         seq: cursor.seq,
         revoked_at: cursor.revoked_at,
@@ -90,16 +89,6 @@ pub(crate) fn budget_cursor_view(cursor: BudgetCursor) -> BudgetCursorView {
         updated_at: cursor.updated_at,
         capability_id: cursor.capability_id,
         grant_index: cursor.grant_index,
-    }
-}
-
-pub(crate) fn revocation_cursor_from_view(view: RevocationCursorView) -> RevocationCursor {
-    RevocationCursor {
-        cursor_version: view.cursor_version,
-        stream_id: view.stream_id,
-        seq: view.seq,
-        revoked_at: view.revoked_at,
-        capability_id: view.capability_id,
     }
 }
 

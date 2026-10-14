@@ -44,9 +44,9 @@ pub(crate) use self::cluster_budget::{
     LineageDeltaResponse, PeerStatusView, ReceiptDeltaQuery, ReceiptDeltaResponse,
     ReduceChargeCostRequest, ReduceChargeCostResponse, ReverseChargeCostRequest,
     ReverseChargeCostResponse, RevocationCursorView, RevocationDeltaQuery, RevocationDeltaResponse,
-    StoredLineageView, StoredReceiptView, StoredRevocationView, TryChargeCostRequest,
-    TryChargeCostResponse, TryIncrementBudgetRequest, TryIncrementBudgetResponse,
-    REVOCATION_SEQUENCE_CURSOR_VERSION,
+    RevocationHeadView, RevocationStreamView, StoredLineageView, StoredReceiptView,
+    StoredRevocationView, TryChargeCostRequest, TryChargeCostResponse, TryIncrementBudgetRequest,
+    TryIncrementBudgetResponse, REVOCATION_CURSOR_VERSION,
 };
 pub use self::cluster_budget::{
     LeaseHeartbeatRequest, LeaseTerminateRequest, LeaseTerminationReason,

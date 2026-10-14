@@ -1327,9 +1327,8 @@ mod cluster_and_reports_tests {
             &state,
             "https://node-b",
             RevocationCursor {
-                cursor_version: Some(REVOCATION_SEQUENCE_CURSOR_VERSION),
-                stream_id: Some("01991bb4-e2f7-7e21-b75d-a59be8fbc441".to_string()),
-                seq: Some(7),
+                stream_id: "01991bb4-e2f7-7e21-b75d-a59be8fbc441".to_string(),
+                seq: 7,
                 revoked_at: 5,
                 capability_id: "cap-1".to_string(),
             },
@@ -1802,11 +1801,12 @@ mod cluster_and_reports_tests {
         assert_eq!(
             snapshot
                 .replication
-                .revocation_cursor
+                .revocation_stream
                 .as_ref()
+                .and_then(|stream| stream.head.as_ref())
                 .test_unwrap()
                 .seq,
-            Some(3)
+            3
         );
         assert_eq!(snapshot.revocations.len(), 1);
         assert_eq!(snapshot.revocations[0].capability_id, "cap-1");
@@ -1823,13 +1823,19 @@ mod cluster_and_reports_tests {
         assert_eq!(
             snapshot
                 .replication
-                .revocation_cursor
+                .revocation_stream
                 .as_ref()
+                .and_then(|stream| stream.head.as_ref())
                 .test_unwrap()
                 .capability_id,
             "cap-1"
         );
 
+        let snapshot_stream_id = snapshot
+            .replication
+            .revocation_stream
+            .as_ref()
+            .map(|stream| stream.stream_id.clone());
         let generated_at = snapshot.generated_at;
         apply_cluster_snapshot(&target_state, "https://node-a", snapshot).test_unwrap();
 
@@ -1902,10 +1908,10 @@ mod cluster_and_reports_tests {
         let installed_revocation_cursor =
             peer_revocation_cursor(&target_state, "https://node-a").test_unwrap();
         assert_eq!(
-            installed_revocation_cursor.cursor_version,
-            Some(REVOCATION_SEQUENCE_CURSOR_VERSION)
+            Some(installed_revocation_cursor.stream_id.as_str()),
+            snapshot_stream_id.as_deref()
         );
-        assert_eq!(installed_revocation_cursor.seq, Some(3));
+        assert_eq!(installed_revocation_cursor.seq, 3);
         assert_eq!(
             with_peer_state(&target_state, "https://node-a", |peer| peer
                 .snapshot_applied_count),
