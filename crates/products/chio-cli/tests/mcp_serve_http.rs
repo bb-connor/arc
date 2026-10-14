@@ -3235,11 +3235,9 @@ fn mcp_serve_http_returns_error_when_wrapped_stream_ends_mid_call() {
     let message = terminal["result"]["content"][0]["text"]
         .as_str()
         .expect("interrupted stream text");
-    assert!(
-        message.contains("closed stdout")
-            || message.contains("upstream stream interrupted")
-            || message.contains("upstream MCP process exited before responding"),
-        "unexpected interrupted stream error: {message}"
+    assert_eq!(
+        message,
+        "dispatch outcome is unknown after transport_return: CHIO-KERNEL-REQUEST-INCOMPLETE"
     );
 }
 
