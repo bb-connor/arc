@@ -3597,7 +3597,6 @@ portable claim catalog covers:
 Each structured normalized claim carries:
 
 - portable claim `code`
-- compatibility `legacyAssertionKey`
 - claim `category`
 - claim `confidence`
 - claim `freshness`

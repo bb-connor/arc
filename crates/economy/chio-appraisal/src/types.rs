@@ -133,10 +133,9 @@ pub enum RuntimeAttestationAppraisalReasonDisposition {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeAttestationNormalizedClaim {
     pub code: RuntimeAttestationNormalizedClaimCode,
-    pub legacy_assertion_key: String,
     pub category: RuntimeAttestationNormalizedClaimCategory,
     pub confidence: RuntimeAttestationNormalizedClaimConfidence,
     pub freshness: RuntimeAttestationNormalizedClaimFreshness,
@@ -145,10 +144,9 @@ pub struct RuntimeAttestationNormalizedClaim {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeAttestationNormalizedClaimVocabularyEntry {
     pub code: RuntimeAttestationNormalizedClaimCode,
-    pub legacy_assertion_key: String,
     pub category: RuntimeAttestationNormalizedClaimCategory,
     pub confidence: RuntimeAttestationNormalizedClaimConfidence,
     pub freshness: RuntimeAttestationNormalizedClaimFreshness,
