@@ -1,6 +1,6 @@
 #[cfg(test)]
 use chio_mcp_adapter::edge::ingress::McpInboxReceiver;
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::convert::Infallible;
 use std::io::{self, Read, Write};
 use std::net::SocketAddr;
@@ -141,6 +141,29 @@ type NotificationTapQueue = Arc<StdMutex<VecDeque<Value>>>;
 type NotificationTapWeak = Weak<StdMutex<VecDeque<Value>>>;
 type NotificationSubscriberList = Arc<StdMutex<Vec<NotificationTapWeak>>>;
 
+/// One `--auth-client CLIENT_ID=REDIRECT_URI` registration for the embedded
+/// authorization server.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OAuthClientRegistration {
+    pub client_id: String,
+    pub redirect_uri: String,
+}
+
+impl std::str::FromStr for OAuthClientRegistration {
+    type Err = String;
+
+    /// Parses `CLIENT_ID=REDIRECT_URI`, splitting at the first `=`.
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let (client_id, redirect_uri) = value
+            .split_once('=')
+            .ok_or_else(|| format!("expected CLIENT_ID=REDIRECT_URI, got `{value}`"))?;
+        Ok(Self {
+            client_id: client_id.to_string(),
+            redirect_uri: redirect_uri.to_string(),
+        })
+    }
+}
+
 #[derive(Clone)]
 pub struct RemoteServeHttpConfig {
     pub clock: RemoteClock,
@@ -179,6 +202,9 @@ pub struct RemoteServeHttpConfig {
     pub auth_registration_endpoint: Option<String>,
     pub auth_jwks_uri: Option<String>,
     pub auth_scopes: Vec<String>,
+    /// Clients the embedded authorization server accepts, each with one exact
+    /// redirect URI. A client with several redirect URIs appears once per URI.
+    pub auth_clients: Vec<OAuthClientRegistration>,
     pub auth_subject: String,
     pub auth_code_ttl_secs: u64,
     pub auth_access_token_ttl_secs: u64,
@@ -876,6 +902,8 @@ struct LocalAuthorizationServer {
     access_token_ttl_secs: u64,
     codes: Arc<StdMutex<HashMap<String, AuthorizationCodeGrant>>>,
     consents: Arc<StdMutex<HashMap<String, PendingConsent>>>,
+    /// Registered client ids and the exact redirect URIs each may use.
+    clients: Arc<HashMap<String, HashSet<String>>>,
     sender_dpop_nonce_store: Arc<DpopNonceStore>,
     sender_dpop_config: DpopConfig,
 }

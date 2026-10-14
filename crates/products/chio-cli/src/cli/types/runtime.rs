@@ -888,6 +888,11 @@ pub(crate) enum McpCommands {
         #[arg(long = "auth-scope")]
         auth_scopes: Vec<String>,
 
+        /// Client the embedded authorization server accepts, as
+        /// CLIENT_ID=REDIRECT_URI. Repeat for each exact redirect URI.
+        #[arg(long = "auth-client")]
+        auth_clients: Vec<remote_mcp::OAuthClientRegistration>,
+
         /// Subject to embed in locally issued auth-server access tokens.
         #[arg(long, default_value = "operator")]
         auth_subject: String,
