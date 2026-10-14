@@ -1,0 +1,12 @@
+{
+  "cargo": "1.95.0",
+  "commit": "c9e4b0f4ed39a174125cd7dec98058753d6f999e",
+  "cores": 12,
+  "cpuModel": "Neoverse-N1",
+  "loadAverage1m": 20.67,
+  "memoryGiB": 46.94236373901367,
+  "os": "Linux 6.17.0-1020-oracle aarch64",
+  "rustc": "1.95.0",
+  "toolchainPin": "1.95.0",
+  "worktreeDirty": true
+}

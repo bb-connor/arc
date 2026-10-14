@@ -9,13 +9,13 @@ The protocol separates evidence produced by the sender from authority retained b
 A Chio receipt records the capability identifier, tool server and name, canonical action hash, allow or deny decision, policy hash, evidence, metadata, trust level, and kernel public key. The body is signed over canonical JSON. A valid vendor receipt proves only that the corresponding key signed that body. The receiver still has to decide whether the receipt belongs to the current action.
 
 \paragraph{Treaty scope and ladder.}
-A \emph{TreatyScope} fixes a treaty identifier, participant kernel identifiers and public keys, hashes of participant ladder manifests, allowed action classes, validity interval, revocation epoch, and trust-bundle digest. Each ladder manifest assigns an enforcement mode and evidence requirement to an action class. The finite order is observation, guarded, receipt-backed, partition-contingency, and quorum-required. Intersection takes the stricter participant mode and rejects a destructive class below receipt-backed. An unknown class denies.
+A \emph{TreatyScope} fixes a treaty identifier, participant kernel identifiers and public keys, hashes of participant ladder manifests, allowed action classes, validity interval, revocation epoch, and trust-bundle digest. Each ladder manifest assigns an enforcement mode and evidence requirement to an action class. The finite order is observation, guarded, receipt-backed, partition-contingency, and maintenance. Intersection takes the stricter participant mode and rejects a destructive class below receipt-backed. An unknown class denies. Each action class also declares a consistency model, one of crdt-commutative, totally-ordered, or quorum-required; quorum-required is a consistency model, not a ladder mode.
 
 \paragraph{Continuation and lineage.}
-A \emph{CrossKernelContinuation} links child work to a parent receipt and session anchor, capability, action class, target tool, nonce, source and target kernels, and validity interval. A \emph{ReceiptLineageStatement} binds the parent and child receipt digests to that continuation and to the bilateral invocation. The receiver reserves a continuation during admission, consumes it on the admitted path, and releases it when pre-dispatch execution aborts.
+A \emph{CrossKernelContinuation} links child work to a parent receipt and session anchor, capability, action class, target tool, nonce, source and target kernels, and validity interval. A \emph{ReceiptLineageStatement} binds the parent and child receipt digests to that continuation and to the bilateral invocation. The receiver consumes the continuation during admission evaluation, records the consumed identifier in the accepted result, and releases it only when pre-dispatch execution denies or aborts.
 
 \paragraph{Bilateral predicate.}
-The strict predicate type is \codepath{chio.bilateral-cosign-invocation.v1}. Its treaty reference binds the treaty scope and ladder-intersection digests; admission report; continuation; lineage bundle; action class and consistency model; request and outcome digests; local and remote receipt digests; lease and governance references; and participant kernel identifiers. DSSE signs the canonical statement through its PAE construction \cite{dsse}. The envelope contains exactly two signatures whose key identifiers must be distinct and match the configured public keys.
+The strict predicate type is \codepath{chio.bilateral-cosign-invocation.v1}. Its treaty reference binds the treaty scope and ladder-intersection digests; admission report; continuation; lineage bundle; action class and consistency model; request and outcome digests; local and remote receipt digests; lease and governance references; and participant kernel identifiers. DSSE signs the canonical statement through its pre-authentication encoding (PAE) \cite{dsse}. The envelope contains exactly two signatures whose key identifiers must be distinct and match the configured public keys. Figure~\ref{fig:treaty} shows the artifact.
 
 Two details matter. Both signatures must cover the same predicate bytes; two
 signatures over different statements do not compose into bilateral evidence.
@@ -36,18 +36,18 @@ custody.
 Figure~\ref{fig:admission} shows the receiver's control flow.
 
 \begin{enumerate}[noitemsep,topsep=2pt,leftmargin=1.4em]
-  \item The kernel first performs its ordinary capability, scope, revocation, budget, and guard checks.
+  \item The kernel first performs its ordinary capability, scope, revocation, and guard checks. Budget admission runs after the treaty hook, so a treaty denial never charges the budget.
   \item Trusted runtime state classifies the request. Local requests follow
   the ordinary local admission path. A request classified as federated without
   complete treaty context denies.
   \item The hook parses only identifiers and bindings from request context. Any attempt to carry a trust root, peer directory, signing key, or dynamic trust bundle in request metadata denies.
-  \item Receiver stores resolve the treaty scope, ladder intersection, continuation, lineage, bilateral invocation, receipts, leases, governance material, peer pins, and revocation state.
+  \item Receiver stores resolve the treaty scope, ladder intersection, continuation, lineage bundle, bilateral invocation, bilateral DSSE envelope, and the admission bundle that names the capability lease and governance receipt.
   \item Validators check schema, canonical hashes, freshness, participant sets, action class, consistency model, required evidence, continuation origin and target, and cross-artifact equality.
-  \item The strict DSSE verifier checks predicate type, canonical payload bytes, one subject, the embedded receipt, two distinct key identifiers, both signatures, policy agreement, lease and governance requirements, and every treaty binding.
+  \item The hook checks the policy summary, every treaty binding, the lease and governance references against its admission bundle, and the signer set against the treaty participants. The strict envelope verifier then checks the payload type, exactly two signatures, canonical payload bytes, statement and predicate types, one subject, two distinct key identifiers, and both signatures. The kernel separately requires the federated origin to be a pinned, fresh federation peer before the hook runs, while the key-fingerprint comparison against the pinned peer set, ladder-manifest freshness, and the revocation epoch are checked by the offline buyer verifier (Section~\ref{sec:implementation}).
   \item Admission either returns a named failure before tool invocation or permits dispatch. On the admitted path, the runtime emits bound receipt metadata and assembles buyer-review evidence.
 \end{enumerate}
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \resizebox{\columnwidth}{!}{\input{figures/admission-hook}}
   \caption{Receiver-side pre-dispatch admission. Trust material flows from receiver-owned stores, not from the request. Every denial terminal precedes the tool boundary.}
@@ -63,6 +63,6 @@ authorization path.
 
 \paragraph{Failure evidence.}
 The negative matrix assigns each attack a stable identifier, enforcement
-phase, and expected diagnostic. Tests of the complete hook also inspect the
-tool invocation counter. Envelope-only cases stop earlier, before entering an
-API that can dispatch a tool.
+phase, and expected diagnostic. Kernel tests and the dispatch-capable
+benchmark also inspect the tool invocation counter. Envelope-only cases stop
+earlier, before entering an API that can dispatch a tool.

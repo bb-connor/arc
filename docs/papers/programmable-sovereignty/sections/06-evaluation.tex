@@ -4,29 +4,42 @@
 We ask four questions. RQ1 tests whether the implementation rejects the
 attacks in the threat model before dispatch. RQ2 compares the independent Rust
 reference interpreter with the runtime bounded evaluator. RQ3 measures the
-pre-dispatch denial path, the complete local buyer workflow, and their main
-components. RQ4 reports replay coverage and package size.
+pre-dispatch admission path for admitted and denied calls, the complete local
+buyer workflow, and their main components. RQ4 reports replay coverage and
+package size.
 
 \subsection{Method}
 
-Experiments ran on Linux/aarch64 with eight Arm Neoverse-N1 cores and
-49.2~GB RAM, using rustc~1.93.0 and Cargo~1.93.0. Bilateral measurements use
-the release profile. The end-to-end workflow uses persistent SQLite stores on
-one host and includes process startup, package generation, CLI execution,
-schema validation, and semantic review.
+Experiments ran on one host: a \PSHostCores-core Arm \PSHostCpuModel{}
+workstation with \PSHostMemoryGiB~GiB of memory running \PSHostOs, with
+rustc~\PSRustcVersion{} as pinned by \codepath{rust-toolchain.toml}. The
+benchmark script records this identity beside the result files. The
+one-minute load average at benchmark start was \PSHostLoadAverage. All
+measurements use the release profile.
 
-\codepath{run-bilateral-admission.sh} performs two warmups,
-\PSPathSampleCount{} samples for each complete workflow, and
-\PSCriterionSampleCount{} samples for each component. It retains raw CSV,
-machine and toolchain metadata, a JSON summary, and generated \TeX{} macros.
-\codepath{run-replay-corpus.sh} reports the generic capability corpus and the
-bilateral negative matrix separately.
+Three kinds of sample appear below. Complete workflows are timed as
+\PSPathSampleCount{} runs per path after \PSWarmupCount{} warmups; each run
+starts release binaries, uses SQLite receipt and authority stores with a JSON
+runtime admission store on one host, and includes process startup, package
+generation, CLI execution, schema validation, and semantic review. The two
+pre-dispatch paths and the receipt append are timed per invocation inside the
+Criterion harness, so their percentiles are taken over every timed invocation
+and their sample counts are reported per row. The remaining components are
+Criterion batch means over \PSCriterionSampleCount{} samples; for those we
+report the median, the mean with its 95 percent confidence interval, and the
+largest batch mean, never a p99. We report p99 only where it is a true
+per-invocation or per-run percentile over at least 100 samples.
+
+\codepath{run-bilateral-admission.sh} retains raw per-run and per-invocation
+CSVs, Criterion estimates, machine and toolchain metadata, a JSON summary, and
+the generated \TeX{} macros. \codepath{run-replay-corpus.sh} reports the
+generic capability corpus and the bilateral negative matrix separately.
 
 \subsection{RQ1: Do Attacks Deny Before Dispatch?}
 
 The corpus contains \PSThreatCaseCount{} cases,
 \codepath{PS-TH-01} through \codepath{PS-TH-20}. Each entry names the test
-target, expected failure code, enforcement phase, and expected dispatch state.
+target, expected failure code, enforcement phase, and declared dispatch state.
 The runner rejects duplicate identifiers, empty selections, unexpected codes,
 and any case that expects dispatch.
 
@@ -57,11 +70,18 @@ Policy outcome
 \end{tabularx}
 \end{table}
 
-All \PSThreatCaseCount{} cases returned the expected denial code in both matrix
-runs. These focused cases stop at the validator or admission hook and do not
-install a tool server. The dispatch-capable denial benchmark supplies the
-separate non-invocation observation: its counter remained zero. Running the
-complete release matrix took \PSNegativeMatrixSeconds~s.
+All \PSThreatCaseCount{} cases in Table~\ref{tab:threat-matrix} returned the
+expected denial code in both matrix runs. The cases reach five surfaces: five
+run through \codepath{ChioRuntimeAdmissionHook::evaluate} (04, 15, 16, 17,
+20), three through the strict operational verifier
+\codepath{verify_chio_bilateral_invocation} (05, 06, 07), six through the
+envelope verifier or signer (08 to 12, 18), three through the partial verifier
+\codepath{verify_bilateral_cosign_invocation} (13, 14, 19), and three through
+pure runtime-core validators (01, 02, 03). None of them installs a tool
+server. The dispatch-capable benchmark supplies the separate non-invocation
+observation: its counter remained zero on every denial. Running the complete
+release matrix took \PSNegativeMatrixSeconds~s, most of it in one cargo
+invocation per case.
 
 One assumption cannot be tested by this corpus. If one actor controls both
 private keys that the receiver authorized for the two participants, the
@@ -86,75 +106,166 @@ admission hook is verified.
 \subsection{RQ3: What Does the Evaluated Path Cost?}
 
 \begin{table*}[t]
-\caption{Release-profile results. Complete workflows use \PSPathSampleCount{} samples; components use \PSCriterionSampleCount{}.}
+\caption{Release-profile results on the host described in the Method. Rows above the ``Criterion batch means'' sub-heading are per-invocation or per-run distributions with true percentiles; the rows under it are Criterion batch means, for which the largest batch mean replaces a percentile; the final row summarizes the sustained-load run. CI is the 95 percent confidence interval of the mean.}
 \label{tab:evaluation}
 \scriptsize
-\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{.31\textwidth}>{\raggedleft\arraybackslash}p{.13\textwidth}>{\raggedleft\arraybackslash}p{.13\textwidth}>{\raggedright\arraybackslash}X@{}}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{.19\textwidth}>{\raggedleft\arraybackslash}p{.075\textwidth}>{\raggedleft\arraybackslash}p{.075\textwidth}>{\raggedleft\arraybackslash}p{.215\textwidth}>{\raggedleft\arraybackslash}p{.045\textwidth}>{\raggedright\arraybackslash}X@{}}
 \toprule
-Measured path & p50 & p99 & Included work \\
+Measured path & p50 & p99 & mean [95\% CI] & $n$ & Included work \\
 \midrule
-Pre-dispatch treaty denial
+Pre-dispatch admission, allow
+& \PSPredispatchAllowPFiftyMs{} ms & \PSPredispatchAllowPNinetyNineMs{} ms
+& \PSPredispatchAllowMeanMs{} [\PSPredispatchAllowCiLowMs, \PSPredispatchAllowCiHighMs] ms
+& \PSPredispatchAllowSampleCount{}
+& Kernel checks, in-memory admission store, treaty hook with binding checks and envelope verification, dispatch to a counting tool server, signed SQLite receipt \\
+Pre-dispatch admission, denial
 & \PSPredispatchDenyPFiftyMs{} ms & \PSPredispatchDenyPNinetyNineMs{} ms
-& Kernel checks, receiver stores, treaty hook, signed SQLite denial receipt \\
-Complete local buyer workflow
-& \PSBuyerWorkflowPFiftyMs{} ms & \PSBuyerWorkflowPNinetyNineMs{} ms
-& Three-vendor producer, SQLite, buyer CLI, schema and semantic review \\
-Producer workflow
-& \PSProducerPFiftyMs{} ms & \PSProducerPNinetyNineMs{} ms
-& Three-vendor producer, SQLite, package generation and schema validation \\
-\midrule
-Receipt sign
-& \PSReceiptSignPFiftyUs{} \(\mu\)s & \PSReceiptSignPNinetyNineUs{} \(\mu\)s
-& Ed25519 over the evaluated receipt shape \\
-Receipt verify
-& \PSReceiptVerifyPFiftyUs{} \(\mu\)s & \PSReceiptVerifyPNinetyNineUs{} \(\mu\)s
-& Ed25519 over the evaluated receipt shape \\
-Strict bilateral DSSE verify
-& \PSBilateralVerifyPFiftyUs{} \(\mu\)s & \PSBilateralVerifyPNinetyNineUs{} \(\mu\)s
-& Two signatures and embedded treaty bindings \\
-Cross-boundary admission allow
-& \PSCrossBoundaryPFiftyUs{} \(\mu\)s & \PSCrossBoundaryPNinetyNineUs{} \(\mu\)s
-& Treaty scope and verified evidence \\
+& \PSPredispatchDenyMeanMs{} [\PSPredispatchDenyCiLowMs, \PSPredispatchDenyCiHighMs] ms
+& \PSPredispatchDenySampleCount{}
+& Kernel checks, in-memory admission store, treaty hook up to the policy-summary check, signed SQLite denial receipt \\
 SQLite receipt append
 & \PSReceiptAppendPFiftyUs{} \(\mu\)s & \PSReceiptAppendPNinetyNineUs{} \(\mu\)s
+& \PSReceiptAppendMeanUs{} [\PSReceiptAppendCiLowUs, \PSReceiptAppendCiHighUs] \(\mu\)s
+& \PSReceiptAppendSampleCount{}
 & Persistent receipt store; signing excluded \\
+Complete local buyer workflow
+& \PSBuyerWorkflowPFiftyMs{} ms & \PSBuyerWorkflowPNinetyNineMs{} ms
+& \PSBuyerWorkflowMeanMs{} [\PSBuyerWorkflowCiLowMs, \PSBuyerWorkflowCiHighMs] ms
+& \PSPathSampleCount{}
+& Three-vendor producer, SQLite receipt and authority stores, JSON admission store, buyer CLI, schema and semantic review \\
+Producer workflow
+& \PSProducerPFiftyMs{} ms & \PSProducerPNinetyNineMs{} ms
+& \PSProducerMeanMs{} [\PSProducerCiLowMs, \PSProducerCiHighMs] ms
+& \PSPathSampleCount{}
+& Three-vendor producer, SQLite receipt and authority stores, JSON admission store, package generation and schema validation \\
+\midrule
+Criterion batch means & median & max & mean [95\% CI] & batches & \\
+Receipt sign
+& \PSReceiptSignPFiftyUs{} \(\mu\)s & \PSReceiptSignMaxUs{} \(\mu\)s
+& \PSReceiptSignMeanUs{} [\PSReceiptSignCiLowUs, \PSReceiptSignCiHighUs] \(\mu\)s
+& \PSReceiptSignSampleCount{}
+& Ed25519 over the evaluated receipt shape \\
+Receipt verify
+& \PSReceiptVerifyPFiftyUs{} \(\mu\)s & \PSReceiptVerifyMaxUs{} \(\mu\)s
+& \PSReceiptVerifyMeanUs{} [\PSReceiptVerifyCiLowUs, \PSReceiptVerifyCiHighUs] \(\mu\)s
+& \PSReceiptVerifySampleCount{}
+& Ed25519 over the evaluated receipt shape \\
+Strict bilateral DSSE verify
+& \PSBilateralVerifyPFiftyUs{} \(\mu\)s & \PSBilateralVerifyMaxUs{} \(\mu\)s
+& \PSBilateralVerifyMeanUs{} [\PSBilateralVerifyCiLowUs, \PSBilateralVerifyCiHighUs] \(\mu\)s
+& \PSBilateralVerifySampleCount{}
+& Two signatures and embedded treaty bindings \\
+Cross-boundary admission allow
+& \PSCrossBoundaryPFiftyUs{} \(\mu\)s & \PSCrossBoundaryMaxUs{} \(\mu\)s
+& \PSCrossBoundaryMeanUs{} [\PSCrossBoundaryCiLowUs, \PSCrossBoundaryCiHighUs] \(\mu\)s
+& \PSCrossBoundarySampleCount{}
+& Pure treaty-scope and intersection evaluation over pre-verified evidence references; no store, signature, or hook work \\
 Offline buyer-package verify
-& \PSBuyerVerifyPFiftyUs{} \(\mu\)s & \PSBuyerVerifyPNinetyNineUs{} \(\mu\)s
+& \PSBuyerVerifyPFiftyUs{} \(\mu\)s & \PSBuyerVerifyMaxUs{} \(\mu\)s
+& \PSBuyerVerifyMeanUs{} [\PSBuyerVerifyCiLowUs, \PSBuyerVerifyCiHighUs] \(\mu\)s
+& \PSBuyerVerifySampleCount{}
 & Complete three-vendor package \\
+\midrule
+Sustained admitted load
+& \multicolumn{4}{>{\raggedright\arraybackslash}p{.40\textwidth}}{\PSSustainedCalls{} admitted calls in \PSSustainedSeconds{} s (\PSSustainedCallsPerSecond{} calls/s); \PSSustainedDispatchCount{} dispatches; \PSSustainedDenials{} denials; receipt store grew \PSSustainedReceiptStoreGrowthKiB{} KiB}
+& The allow path repeated back to back for the wall-clock window; store growth measured on disk \\
 \bottomrule
 \end{tabularx}
 \end{table*}
 
-The most direct measure of the paper's enforcement path is the pre-dispatch
-denial: \PSPredispatchDenyPFiftyMs~ms p50 and
-\PSPredispatchDenyPNinetyNineMs~ms p99. The timed body traverses the kernel's
-capability and federation checks, resolves the stored treaty, ladder,
-continuation, lineage, invocation, and bilateral statement, verifies a signed
-policy denial, and writes the signed denial receipt to SQLite. The tool counter
-remained zero.
+Table~\ref{tab:evaluation} reports the results. The headline enforcement cost
+is the pre-dispatch admission path for an admitted call:
+\PSPredispatchAllowPFiftyMs~ms p50, \PSPredispatchAllowPNinetyNineMs~ms p99,
+and a mean of \PSPredispatchAllowMeanMs~ms (95 percent CI
+\PSPredispatchAllowCiLowMs{} to \PSPredispatchAllowCiHighMs~ms) over
+\PSPredispatchAllowSampleCount{} invocations. The timed body traverses the
+kernel's capability and federation checks, resolves the stored treaty, ladder,
+continuation, lineage, invocation, and bilateral statement, checks every
+treaty binding, verifies the envelope's two signatures, consumes the
+continuation, dispatches to the counting tool server, and writes the signed
+receipt to SQLite. The counter equalled the iteration count.
 
-The complete local buyer workflow measured
-\PSBuyerWorkflowPFiftySec~s p50 and
-\PSBuyerWorkflowPNinetyNineSec~s p99. This number is not receiver-hook latency.
-It includes three-vendor process orchestration, package generation, persistent
-storage, buyer CLI startup, schema validation, and semantic review. Producer
-mode measured \PSProducerPFiftyMs~ms p50. The
-\PSBuyerPathMedianDifferenceMs~ms difference between the workflow medians is
-also not a clean ablation because full mode performs additional CLI and schema
-work. The isolated offline package verifier measured
-\PSBuyerVerifyPFiftyMs~ms p50.
+The denial beside it measured \PSPredispatchDenyPFiftyMs~ms p50,
+\PSPredispatchDenyPNinetyNineMs~ms p99, and a mean of
+\PSPredispatchDenyMeanMs~ms (95 percent CI \PSPredispatchDenyCiLowMs{} to
+\PSPredispatchDenyCiHighMs~ms) over \PSPredispatchDenySampleCount{}
+invocations, with the counter at zero. Its fixture signs a unanimous-deny
+policy summary, and the hook returns \codepath{chio_treaty_policy_denied} at
+the policy-summary check, before the DSSE treaty-binding-reference
+comparisons and before signature verification. The number therefore measures
+the cost of refusing a unanimous denial and writing the signed SQLite denial
+receipt, not the full verification path, and it is a lower bound on the hook
+work an admitted call performs. In both fixtures the runtime admission store
+is in memory with a fixed clock; only the receipt store is SQLite.
+
+Under sustained load, the same allow path admitted \PSSustainedCalls{} calls
+in \PSSustainedSeconds~s (\PSSustainedCallsPerSecond{} calls per second) with
+\PSSustainedDispatchCount{} dispatches and \PSSustainedDenials{} denials, and
+the receipt store grew by \PSSustainedReceiptStoreGrowthKiB~KiB.
+
+The complete local buyer workflow measured \PSBuyerWorkflowPFiftySec~s p50 and
+\PSBuyerWorkflowPNinetyNineSec~s p99 over \PSPathSampleCount{} runs, with a
+mean of \PSBuyerWorkflowMeanMs~ms and a standard deviation of
+\PSBuyerWorkflowStdMs~ms. This number is not receiver-hook latency. It includes
+three-vendor process orchestration, package generation, SQLite receipt and
+authority stores with a JSON admission store, buyer CLI startup, schema
+validation, and semantic review. Producer mode measured
+\PSProducerPFiftyMs~ms p50 with a standard deviation of \PSProducerStdMs~ms.
+The two workflows differ in CLI and schema work as well as in buyer review,
+so their difference is not an ablation. The isolated offline package verifier
+measured \PSBuyerVerifyPFiftyUs~\(\mu\)s median.
 
 Among the components, receipt signing measured
-\PSReceiptSignPFiftyUs~\(\mu\)s p50, strict bilateral DSSE verification
-measured \PSBilateralVerifyPFiftyUs~\(\mu\)s, and a persistent SQLite append
-measured \PSReceiptAppendPFiftyUs~\(\mu\)s. These measurements isolate real
-library functions, but their sum is not the complete workflow because it omits
-orchestration and validation outside the timed component bodies.
+\PSReceiptSignPFiftyUs~\(\mu\)s median, strict bilateral DSSE verification
+\PSBilateralVerifyPFiftyUs~\(\mu\)s median, and the per-invocation SQLite
+append \PSReceiptAppendPFiftyUs~\(\mu\)s p50. The cross-boundary row is the
+pure treaty-scope and intersection evaluation over pre-verified evidence
+references; it excludes store lookups, signature verification, and the hook's
+binding checks. These measurements isolate real library functions, but their
+sum is not the complete workflow because it omits orchestration and
+validation outside the timed component bodies.
+
+\begin{table*}[!t]
+\caption{Assumptions outside the evaluated receiver. Identifiers refer to the repository's assumption registry, \texttt{formal/assumptions.toml}.}
+\label{tab:assumptions}
+\scriptsize
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{.36\textwidth}>{\raggedright\arraybackslash}p{.27\textwidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+Assumption & Required for & Failure consequence \\
+\midrule
+Ed25519 and SHA-256 behave as specified, and DSSE binds payload and type (\codepath{ASSUME-ED25519}, \codepath{ASSUME-SHA256})
+& Signature, digest, and envelope integrity
+& Forgery or ambiguous identity invalidates the bindings \\
+Canonical JSON matches RFC~8785 on Unicode strings, bounded integers, arrays, and UTF-16-ordered objects (\codepath{ASSUME-CANONICAL-JSON}); float rendering outside that domain is assumed stable, and signed payloads carry integers above $2^{53}-1$ exactly rather than as doubles
+& Stable statement and receipt bytes \cite{rfc8785}
+& Equivalent data can acquire different identities \\
+The injected clock reports operator-accepted Unix time within the deployment tolerance (\codepath{ASSUME-OS-CLOCK})
+& Continuation, lease, and treaty validity intervals
+& Stale material admits, or fresh material denies \\
+SQLite commits each single-row write atomically (\codepath{ASSUME-SQLITE-ATOMICITY}); cross-row crash recovery is not assumed
+& Receipt append and single-use continuation consumption
+& A torn write can lose a receipt or permit a replay \\
+Tool-server subprocess and OS process boundaries hold (\codepath{ASSUME-SUBPROCESS-ISOLATION})
+& Non-dispatch of denied calls; the invocation counter observes only kernel-mediated calls
+& A tool reachable outside the kernel bypasses admission \\
+The receiving edge sets the federated origin class, and the caller cannot (\codepath{ASSUME-FEDERATED-ORIGIN-CLASSIFICATION})
+& Routing cross-organization requests into the treaty hook
+& A misclassified request follows the local path and bypasses treaty admission \\
+Receiver kernel and stores are trustworthy
+& Correct resolution and continuation state
+& A compromised receiver can admit or misrecord calls \\
+Authorized keys have the intended organizational custody (\codepath{PS-A-01})
+& Interpreting two signatures as bilateral control
+& One actor with two keys satisfies the cryptographic checks \\
+\bottomrule
+\end{tabularx}
+\end{table*}
 
 \subsection{RQ4: Replay and Package Size}
 
 The buyer package was \PSProofPackageBytes{} bytes
-(\PSProofPackageKiB~KiB). The replay script validated
+(\PSProofPackageKiB~KiB), identical across every workflow run because the
+scenario is deterministic. The replay script validated
 \PSGenericReplayCases{} generic capability fixtures in
 \PSGenericReplaySeconds~s and, separately,
 \PSBilateralReplayCases{} bilateral negative cases in

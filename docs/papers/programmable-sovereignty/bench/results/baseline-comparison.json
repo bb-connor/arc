@@ -1,0 +1,1938 @@
+{
+  "alternative": {
+    "denialCodes": [
+      {
+        "code": "peer.svid_unpinned",
+        "step": 1
+      },
+      {
+        "code": "peer.svid_proof_missing",
+        "step": 2
+      },
+      {
+        "code": "peer.svid_proof_invalid",
+        "step": 2
+      },
+      {
+        "code": "a2a.message_malformed",
+        "step": 3
+      },
+      {
+        "code": "mcp.request_malformed",
+        "step": 4
+      },
+      {
+        "code": "mcp.protocol_version_missing",
+        "step": 5
+      },
+      {
+        "code": "replay.message_id_seen",
+        "step": 6
+      },
+      {
+        "code": "token.absent",
+        "step": 7
+      },
+      {
+        "code": "token.malformed",
+        "step": 8
+      },
+      {
+        "code": "token.type_unrecognised",
+        "step": 9
+      },
+      {
+        "code": "token.signature_invalid",
+        "step": 10
+      },
+      {
+        "code": "replay.token_id_seen",
+        "step": 11
+      },
+      {
+        "code": "token.noncanonical",
+        "step": 12
+      },
+      {
+        "code": "signer.not_distinct",
+        "step": 13
+      },
+      {
+        "code": "token.not_yet_valid",
+        "step": 14
+      },
+      {
+        "code": "token.expired",
+        "step": 14
+      },
+      {
+        "code": "token.window_too_long",
+        "step": 15
+      },
+      {
+        "code": "token.audience_mismatch",
+        "step": 16
+      },
+      {
+        "code": "token.actor_mismatch",
+        "step": 17
+      },
+      {
+        "code": "token.issuer_mismatch",
+        "step": 18
+      },
+      {
+        "code": "scope.action_mismatch",
+        "step": 19
+      },
+      {
+        "code": "agreement.unnamed",
+        "step": 20
+      },
+      {
+        "code": "agreement.unknown",
+        "step": 20
+      },
+      {
+        "code": "agreement.receiver_not_party",
+        "step": 21
+      },
+      {
+        "code": "agreement.party_mismatch",
+        "step": 21
+      },
+      {
+        "code": "agreement.action_not_covered",
+        "step": 22
+      },
+      {
+        "code": "agreement.superseded",
+        "step": 23
+      },
+      {
+        "code": "agreement.version_mismatch",
+        "step": 24
+      },
+      {
+        "code": "private.agreement_version_mismatch",
+        "step": 24
+      },
+      {
+        "code": "context.request_supplied_attribute",
+        "step": 25
+      },
+      {
+        "code": "lineage.task_unknown",
+        "step": 26
+      },
+      {
+        "code": "policy.no_rule",
+        "step": 27
+      },
+      {
+        "code": "policy.assurance_insufficient",
+        "step": 28
+      },
+      {
+        "code": "policy.amount_over_ceiling",
+        "step": 29
+      },
+      {
+        "code": "policy.approval_missing",
+        "step": 30
+      }
+    ],
+    "documents": [
+      {
+        "id": "spiffe-id",
+        "name": "SPIFFE Identity and Verifiable Identity Document",
+        "url": "https://github.com/spiffe/spiffe/blob/main/standards/SPIFFE-ID.md",
+        "version": "SPIFFE-ID standard"
+      },
+      {
+        "id": "x509-svid",
+        "name": "X.509 SPIFFE Verifiable Identity Document",
+        "url": "https://github.com/spiffe/spiffe/blob/main/standards/X509-SVID.md",
+        "version": "X509-SVID standard"
+      },
+      {
+        "id": "jwt-svid",
+        "name": "JWT SPIFFE Verifiable Identity Document",
+        "url": "https://github.com/spiffe/spiffe/blob/main/standards/JWT-SVID.md",
+        "version": "JWT-SVID standard"
+      },
+      {
+        "id": "a2a",
+        "name": "Agent2Agent Protocol",
+        "url": "https://a2a-protocol.org/latest/specification/",
+        "version": "v1 (specification/a2a.proto, package lf.a2a.v1)"
+      },
+      {
+        "id": "mcp",
+        "name": "Model Context Protocol",
+        "url": "https://modelcontextprotocol.io/specification/2026-07-28",
+        "version": "2026-07-28"
+      },
+      {
+        "id": "rfc8693",
+        "name": "OAuth 2.0 Token Exchange",
+        "url": "https://www.rfc-editor.org/rfc/rfc8693",
+        "version": "RFC 8693"
+      },
+      {
+        "id": "rfc7519",
+        "name": "JSON Web Token",
+        "url": "https://www.rfc-editor.org/rfc/rfc7519",
+        "version": "RFC 7519"
+      },
+      {
+        "id": "rfc7515",
+        "name": "JSON Web Signature",
+        "url": "https://www.rfc-editor.org/rfc/rfc7515",
+        "version": "RFC 7515"
+      },
+      {
+        "id": "rfc6749",
+        "name": "The OAuth 2.0 Authorization Framework",
+        "url": "https://www.rfc-editor.org/rfc/rfc6749",
+        "version": "RFC 6749"
+      }
+    ],
+    "freeFormSlots": [
+      {
+        "attestedBy": "caller",
+        "document": "a2a",
+        "note": "A flexible key-value map for passing additional context or parameters.",
+        "path": "metadata",
+        "section": "SendMessageRequest.metadata"
+      },
+      {
+        "attestedBy": "caller",
+        "document": "a2a",
+        "note": "Any metadata to provide along with the message.",
+        "path": "message.metadata",
+        "section": "Message.metadata"
+      },
+      {
+        "attestedBy": "caller",
+        "document": "a2a",
+        "note": "Metadata associated with this part.",
+        "path": "message.parts[].metadata",
+        "section": "Part.metadata"
+      },
+      {
+        "attestedBy": "caller",
+        "document": "mcp",
+        "note": "The tool's own inputs, shaped by a schema the receiver publishes. The one open slot whose shape the receiver owns.",
+        "path": "message.parts[].data.params.arguments",
+        "section": "server/tools, Tool.inputSchema"
+      },
+      {
+        "attestedBy": "caller",
+        "document": "mcp",
+        "note": "Reserved for metadata. Keys whose second label is modelcontextprotocol or mcp belong to MCP; anything else takes a vendor prefix.",
+        "path": "message.parts[].data.params._meta",
+        "section": "basic, General fields, _meta"
+      },
+      {
+        "attestedBy": "issuing_authorization_server",
+        "document": "rfc6749",
+        "note": "Space-delimited case-sensitive strings whose values are defined by the authorization server. The only open slot a signature covers.",
+        "path": "scope",
+        "section": "3.3"
+      }
+    ],
+    "parts": [
+      "a tool call as the Model Context Protocol defines it",
+      "an agent-to-agent message as the A2A protocol defines it",
+      "a delegated credential as OAuth 2.0 token exchange defines it",
+      "a workload identity as SPIFFE defines it"
+    ],
+    "profiles": {
+      "composed": "each part wired the way its specification documents",
+      "hardened": "the same parts with every operator-authored check written in"
+    },
+    "requestFields": [
+      {
+        "document": "a2a",
+        "path": "tenant",
+        "section": "SendMessageRequest.tenant"
+      },
+      {
+        "document": "a2a",
+        "path": "message",
+        "section": "SendMessageRequest.message"
+      },
+      {
+        "document": "a2a",
+        "path": "message.messageId",
+        "section": "Message.message_id"
+      },
+      {
+        "document": "a2a",
+        "path": "message.contextId",
+        "section": "Message.context_id"
+      },
+      {
+        "document": "a2a",
+        "path": "message.taskId",
+        "section": "Message.task_id"
+      },
+      {
+        "document": "a2a",
+        "path": "message.role",
+        "section": "Message.role"
+      },
+      {
+        "document": "a2a",
+        "path": "message.parts",
+        "section": "Message.parts"
+      },
+      {
+        "document": "a2a",
+        "path": "message.parts[].data",
+        "section": "Part.data"
+      },
+      {
+        "document": "a2a",
+        "path": "message.parts[].mediaType",
+        "section": "Part.media_type"
+      },
+      {
+        "document": "a2a",
+        "path": "message.parts[].metadata",
+        "section": "Part.metadata"
+      },
+      {
+        "document": "a2a",
+        "path": "message.metadata",
+        "section": "Message.metadata"
+      },
+      {
+        "document": "a2a",
+        "path": "message.extensions",
+        "section": "Message.extensions"
+      },
+      {
+        "document": "a2a",
+        "path": "message.referenceTaskIds",
+        "section": "Message.reference_task_ids"
+      },
+      {
+        "document": "a2a",
+        "path": "configuration",
+        "section": "SendMessageRequest.configuration"
+      },
+      {
+        "document": "a2a",
+        "path": "configuration.acceptedOutputModes",
+        "section": "SendMessageConfiguration.accepted_output_modes"
+      },
+      {
+        "document": "a2a",
+        "path": "configuration.returnImmediately",
+        "section": "SendMessageConfiguration.return_immediately"
+      },
+      {
+        "document": "a2a",
+        "path": "metadata",
+        "section": "SendMessageRequest.metadata"
+      },
+      {
+        "document": "mcp",
+        "path": "message.parts[].data.jsonrpc",
+        "section": "basic, Requests"
+      },
+      {
+        "document": "mcp",
+        "path": "message.parts[].data.id",
+        "section": "basic, Requests"
+      },
+      {
+        "document": "mcp",
+        "path": "message.parts[].data.method",
+        "section": "basic, Requests"
+      },
+      {
+        "document": "mcp",
+        "path": "message.parts[].data.params",
+        "section": "basic, Requests"
+      },
+      {
+        "document": "mcp",
+        "path": "message.parts[].data.params.name",
+        "section": "server/tools, Calling Tools"
+      },
+      {
+        "document": "mcp",
+        "path": "message.parts[].data.params.arguments",
+        "section": "server/tools, Calling Tools"
+      },
+      {
+        "document": "mcp",
+        "path": "message.parts[].data.params._meta",
+        "section": "basic, General fields, _meta"
+      },
+      {
+        "document": "rfc8693",
+        "path": "access_token",
+        "section": "2.2.1"
+      },
+      {
+        "document": "rfc8693",
+        "path": "issued_token_type",
+        "section": "2.2.1, 3"
+      },
+      {
+        "document": "rfc8693",
+        "path": "token_type",
+        "section": "2.2.1"
+      },
+      {
+        "document": "rfc8693",
+        "path": "expires_in",
+        "section": "2.2.1"
+      },
+      {
+        "document": "rfc8693",
+        "path": "scope",
+        "section": "2.2.1"
+      },
+      {
+        "document": "rfc7519",
+        "path": "iss",
+        "section": "4.1.1"
+      },
+      {
+        "document": "rfc7519",
+        "path": "sub",
+        "section": "4.1.2"
+      },
+      {
+        "document": "rfc7519",
+        "path": "aud",
+        "section": "4.1.3"
+      },
+      {
+        "document": "rfc7519",
+        "path": "exp",
+        "section": "4.1.4"
+      },
+      {
+        "document": "rfc7519",
+        "path": "nbf",
+        "section": "4.1.5"
+      },
+      {
+        "document": "rfc7519",
+        "path": "iat",
+        "section": "4.1.6"
+      },
+      {
+        "document": "rfc7519",
+        "path": "jti",
+        "section": "4.1.7"
+      },
+      {
+        "document": "rfc8693",
+        "path": "scope",
+        "section": "4.2"
+      },
+      {
+        "document": "rfc8693",
+        "path": "client_id",
+        "section": "4.3"
+      },
+      {
+        "document": "rfc8693",
+        "path": "act",
+        "section": "4.1"
+      },
+      {
+        "document": "rfc8693",
+        "path": "act.sub",
+        "section": "4.1"
+      },
+      {
+        "document": "rfc8693",
+        "path": "act.iss",
+        "section": "4.1"
+      },
+      {
+        "document": "rfc7515",
+        "path": "alg",
+        "section": "4.1.1"
+      },
+      {
+        "document": "rfc7515",
+        "path": "typ",
+        "section": "4.1.9"
+      },
+      {
+        "document": "rfc7515",
+        "path": "kid",
+        "section": "4.1.4"
+      }
+    ],
+    "signatures": "Ed25519 and RFC 8785 canonical JSON, from the same Chio crate the receiver under comparison uses",
+    "store": "SQLite, WAL, synchronous = FULL"
+  },
+  "benchmarkInputTreeSha256": "ae4b5fef089f0d2d55978e6f524a2e795e6a2ee51bca12ea2353f7bfa4623696",
+  "carrierLedger": {
+    "entries": [
+      {
+        "attested_by": "caller",
+        "fact": "treaty_scope_sha256",
+        "invention": [
+          "a vendor-prefixed key in the tool call's metadata, or a key in the message's metadata map",
+          "a name agreed bilaterally, since the reserved prefixes belong to the protocol and the rest is vendor space",
+          "a rule in the receiver that reads the key and compares it against its own record",
+          "acceptance that the value is attested by the caller, because no signature in the set covers the message body"
+        ],
+        "note": "Which text of the agreement the call was decided under, so that two parties operating under different ones cannot both be admitted. This is the fact the three witnesses below drive, by the cheaper of its two routes: a key in the message body, which the caller writes and no signature in the set covers. The other route is a private claim of the issued token, which costs what every entry below costs and puts the value in the hands of the caller's own authorization server instead.",
+        "slot": "a vendor-prefixed key in the tool call's metadata",
+        "state": "absent"
+      },
+      {
+        "attested_by": "issuing_authorization_server",
+        "fact": "ladder_intersection_sha256",
+        "invention": [
+          "a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one",
+          "a private claim in the issued token, which that server must be changed to mint",
+          "a name for both, agreed bilaterally, since no registry defines one",
+          "a rule in the receiver that reads the claim and compares it against its own record"
+        ],
+        "note": "A digest of the bound both sides computed. Neither side of this composition computes one, so before the claim there would have to be an object for it to digest.",
+        "slot": "a private claim of the issued token",
+        "state": "absent"
+      },
+      {
+        "attested_by": "issuing_authorization_server",
+        "fact": "admission_report_sha256",
+        "invention": [
+          "a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one",
+          "a private claim in the issued token, which that server must be changed to mint",
+          "a name for both, agreed bilaterally, since no registry defines one",
+          "a rule in the receiver that reads the claim and compares it against its own record"
+        ],
+        "note": "Chio carries this and compares nothing against it, so its absence here costs the same as its presence there.",
+        "slot": "a private claim of the issued token",
+        "state": "absent"
+      },
+      {
+        "attested_by": "issuing_authorization_server",
+        "fact": "consistency_model",
+        "invention": [
+          "a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one",
+          "a private claim in the issued token, which that server must be changed to mint",
+          "a name for both, agreed bilaterally, since no registry defines one",
+          "a rule in the receiver that reads the claim and compares it against its own record"
+        ],
+        "note": "Which reading of cross-organization state the call was decided under. Nothing in the set names one, and a receiver cannot infer it.",
+        "slot": "a private claim of the issued token",
+        "state": "absent"
+      },
+      {
+        "attested_by": "issuing_authorization_server",
+        "fact": "request_sha256",
+        "invention": [
+          "a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one",
+          "a private claim in the issued token, which that server must be changed to mint",
+          "a name for both, agreed bilaterally, since no registry defines one",
+          "a rule in the receiver that reads the claim and compares it against its own record"
+        ],
+        "note": "A digest of the arguments the authority was granted for. The obstacle is not the claim but the order of events: the exchange happens before the call is assembled and the authorization server never sees the arguments, so the parameter would have to carry a digest the caller computes of a body it has not sent yet. A sender-constrained token binds the method and the target of the request, and a rich authorization request carries structured detail the server minted; neither covers the body.",
+        "slot": "a private claim of the issued token",
+        "state": "absent"
+      },
+      {
+        "attested_by": "issuing_authorization_server",
+        "fact": "outcome_sha256",
+        "invention": [
+          "a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one",
+          "a private claim in the issued token, which that server must be changed to mint",
+          "a name for both, agreed bilaterally, since no registry defines one",
+          "a rule in the receiver that reads the claim and compares it against its own record"
+        ],
+        "note": "What the prior call returned. There is no prior call in this composition's model of a request, so the claim would need a record that does not exist to digest.",
+        "slot": "a private claim of the issued token",
+        "state": "absent"
+      },
+      {
+        "attested_by": "issuing_authorization_server",
+        "fact": "local_receipt_sha256",
+        "invention": [
+          "a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one",
+          "a private claim in the issued token, which that server must be changed to mint",
+          "a name for both, agreed bilaterally, since no registry defines one",
+          "a rule in the receiver that reads the claim and compares it against its own record"
+        ],
+        "note": "A digest of the receiver's own record of an earlier call, named by this one. The receiver writes such records; nothing in the set carries one back to the caller for it to name.",
+        "slot": "a private claim of the issued token",
+        "state": "absent"
+      },
+      {
+        "attested_by": "issuing_authorization_server",
+        "fact": "remote_receipt_sha256",
+        "invention": [
+          "a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one",
+          "a private claim in the issued token, which that server must be changed to mint",
+          "a name for both, agreed bilaterally, since no registry defines one",
+          "a rule in the receiver that reads the claim and compares it against its own record"
+        ],
+        "note": "The counterparty's own record. It is not visible to the receiver and no format in the set makes it so.",
+        "slot": "a private claim of the issued token",
+        "state": "absent"
+      },
+      {
+        "attested_by": "issuing_authorization_server",
+        "fact": "continuation_sha256",
+        "invention": [
+          "a call before the call, since no method in the set returns a value for a caller to carry into its exchange",
+          "a way to consume the value exactly once, which no specification in the set provides for any identifier it defines"
+        ],
+        "note": "The two receiver-minted values in the set, a task identifier and the opaque state an MCP server hands back for a retry, both ride in the message body, are covered by no signature, and are multi-use by their own specifications. To make one a continuation the receiver could rely on, it would have to reach the caller's authorization server and come back inside the credential, and consuming it would have to become a rule the receiver wrote.",
+        "slot": "a private claim of the issued token, over a value the receiver minted",
+        "state": "without_receiver_reference"
+      },
+      {
+        "attested_by": "issuing_authorization_server",
+        "fact": "lineage_bundle_sha256",
+        "invention": [
+          "a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one",
+          "a private claim in the issued token, which that server must be changed to mint",
+          "a name for both, agreed bilaterally, since no registry defines one",
+          "a rule in the receiver that reads the claim and compares it against its own record"
+        ],
+        "note": "The reference list carries identifiers of tasks this receiver issued, which is more than nothing. What it does not carry is a digest of what happened in them, so a chain of prior calls cannot be checked, only named.",
+        "slot": "a private claim of the issued token, or the message's reference list",
+        "state": "without_receiver_reference"
+      },
+      {
+        "attested_by": "issuing_authorization_server",
+        "fact": "lease_refs",
+        "invention": [
+          "a parameter on the token exchange request, which the exchange does not define, so the counterparty's authorization server must be changed to accept one",
+          "a private claim in the issued token, which that server must be changed to mint",
+          "a name for both, agreed bilaterally, since no registry defines one",
+          "a rule in the receiver that reads the claim and compares it against its own record"
+        ],
+        "note": "The validity window is carried, as timestamps the issuer chose. A reference the receiver resolves would let it revoke and re-scope between calls; a timestamp lets it wait.",
+        "slot": "a private claim of the issued token, naming a lease the receiver registered",
+        "state": "without_receiver_reference"
+      }
+    ],
+    "private_key_name": "com.vendor.example/agreementVersion",
+    "witnesses": [
+      {
+        "description": "the caller carries the version it decided under in a vendor-prefixed key of the tool call's metadata, against a receiver that never agreed to read that name",
+        "note": "Both wirings admit. A slot the formats leave open is not a carrier: until the two organizations agree the name and the receiver writes the rule, a value in it is a string nobody reads.",
+        "observations": [
+          {
+            "observed": {
+              "admitted": true,
+              "dispatched": true
+            },
+            "wiring": "composed"
+          },
+          {
+            "observed": {
+              "admitted": true,
+              "dispatched": true
+            },
+            "wiring": "hardened"
+          }
+        ],
+        "witness_id": "invented-key-unread"
+      },
+      {
+        "description": "the same key, now one the receiver has agreed to read and compare, with the caller reporting the version it actually decided under",
+        "note": "The invention works, against a caller that tells the truth. This is what one field and one comparison buy.",
+        "observations": [
+          {
+            "observed": {
+              "admitted": false,
+              "denial_code": "private.agreement_version_mismatch",
+              "denial_step": 24,
+              "dispatched": false
+            },
+            "wiring": "hardened_private_profile"
+          }
+        ],
+        "witness_id": "invented-key-read-honest-caller"
+      },
+      {
+        "description": "the same key and the same rule, with the caller asserting the version the receiver holds while sending the call it prepared under the previous one",
+        "note": "Admitted. The invented field is written by the caller into a slot no signature in the set covers, so the comparison is against a value the adversary chooses. Adding the field moves the fact from absent to unverifiable, which is why the fifteen binding fields are not a list of fields to add: what the receiver has to bind is a value it minted, and nothing in these formats carries one back to it.",
+        "observations": [
+          {
+            "observed": {
+              "admitted": true,
+              "dispatched": true
+            },
+            "wiring": "hardened_private_profile"
+          }
+        ],
+        "witness_id": "invented-key-value-chosen-by-caller"
+      }
+    ]
+  },
+  "commit": "cc81f239a656ef63211634bbfcb58b04065546a9",
+  "cost": {
+    "alternative": {
+      "admittedCallMeanCiHighMs": 6.278995253499993,
+      "admittedCallMeanCiLowMs": 5.988713858174986,
+      "admittedCallMeanMs": 6.120750437999998,
+      "admittedCallP50Ms": 5.496186,
+      "admittedCallP99Ms": 13.896139419999997,
+      "checksOnlyP50Us": 394.882,
+      "checksShareOfAdmittedCall": 0.07184654958911507,
+      "decisionRecordBytes": 625,
+      "durableBytesPerCall": 776.192,
+      "durableClaimsP50Us": 2420.592,
+      "hardenedAdmittedCallP50Ms": 8.468361000000002,
+      "hardenedAdmittedCallVerdict": "separated",
+      "hardenedChecksOnlyMeanCiHighUs": 448.57134356250003,
+      "hardenedChecksOnlyMeanCiLowUs": 433.99547423750056,
+      "hardenedChecksOnlyP50Us": 412.52149999999995,
+      "hardenedDurableBytesPerCall": 876.544,
+      "hardenedDurableClaimsP50Us": 4969.9845000000005,
+      "hardeningChecksCostP50Us": 17.63949999999994,
+      "hardeningCostVerdict": "separated",
+      "hardeningCostWholePathP50Ms": 2.972175000000002,
+      "hardeningDurableClaimCostP50Us": 2549.3925000000004,
+      "hardeningDurableClaimVerdict": "separated",
+      "hardeningStorageCostBytesPerCall": 100.35199999999998,
+      "latencyPinnable": false,
+      "latencyUnpinnableBecause": [
+        "the benchmark input tree had uncommitted changes",
+        "the one-minute load average was 15.55, above 4.0"
+      ],
+      "orderingCostP50Ms": 2.355711,
+      "requestWireBytes": 1274,
+      "responseBeforeRecordP50Ms": 3.140475,
+      "samples": 2000
+    },
+    "chio": {
+      "admittedCallP50Ms": 13.863188000000001,
+      "crossBoundaryDecisionP50Us": 20.68814475051975,
+      "durableBytesPerCall": 11861.195596951737,
+      "envelopeVerifyP50Us": 339.12711184210525,
+      "receiptAppendP50Ms": 4.681643,
+      "source": "results/bilateral-admission.json",
+      "sustainedCalls": 3543
+    },
+    "ratios": {
+      "latencyChioOverAlternative": 2.5223287567051047,
+      "storageChioOverAlternativeUpperBound": 15.281264940828734
+    }
+  },
+  "environment": {
+    "cargo": "1.94.1",
+    "commit": "cc81f239a656ef63211634bbfcb58b04065546a9",
+    "cores": 12,
+    "cpuModel": "Neoverse-N1",
+    "loadAverage1m": 15.55,
+    "memoryGiB": 46.94236373901367,
+    "os": "Linux 6.17.0-1020-oracle aarch64",
+    "rustc": "1.94.1",
+    "toolchainPin": "1.94.1",
+    "worktreeDirty": true
+  },
+  "method": {
+    "attackCounts": "taken over the cases the corpus marks as attacks. The null case is a call that must be admitted, and an informational case is driven to record a difference between the wirings that is not a security difference; both are reported separately and neither is counted as an attack. Distinct drives counts the experiments behind those cases, since two Chio cases can collapse onto one baseline drive",
+    "bootstrap": {
+      "resamples": 10000,
+      "seed": 1
+    },
+    "carrierLedger": "for every binding field with no carrier, or none the receiver can resolve, the slot a value would have to travel in, whose signature covers that slot, and the work an operator would have to do. Three witnesses drive the invention rather than describing it: an agreed name the receiver does not read, the same name once it does, and the same name with the caller choosing the value",
+    "checksSpan": "the span from the start of peer resolution to the end of rule evaluation, less the durable replay claims that sit inside it. The argument digest, the decision parse, the record encoding and the record signature are outside it, so what is left over from an admitted call is everything that is not the checks span, dominated by the durable writes: two under the composed wiring, three under the hardened one",
+    "chioSide": "read from the committed bilateral-admission result rather than re-measured, so the two halves of the comparison cannot drift; the run refuses if that file is absent or its own counters disagree",
+    "confidence": 0.95,
+    "hardeningCost": "the hardened wiring runs seven checks the composed wiring does not, and makes one more durable write: the replay claim on the identifier the decision carries for itself. The checks are costed over the checks span alone, because against a store that fsyncs a whole-path delta of that size is not resolvable; the extra write is costed over the durable-claim span, which is measured separately for that reason. Each verdict is over the two mean intervals of its own span, and the whole-path pair carries a verdict of its own because the two wirings are measured in two separate conditions",
+    "interval": "the bootstrap interval is over the mean, so it brackets the mean and not the median; the two are reported separately and the distribution is right-skewed by the durable write's tail",
+    "latency": "the receiver's whole admission path in one process, from the arrival of a call to the return of a decision, including the durable append",
+    "percentile": "linear interpolation between order statistics",
+    "pinnableTimings": "a timing is written into the macros only from a run the paper could reproduce: a clean input tree, at least 1000 calls, and a one-minute load average no higher than 4.0. A run that misses any of these still writes its corpora and its property verdicts, which are exact functions of the source, and writes [unpinned] wherever a duration would go",
+    "profiles": "both wirings are reported. Reporting the hardened wiring alone would credit the composition with checks no part of it requires; reporting the composed wiring alone would understate what a careful operator can reach",
+    "propertyVerdicts": "derived from cases the run drove, not asserted: a property fails only when a driven case dispatched a call the property forbids",
+    "ratios": "the latency ratio compares two whole admission paths and attributes nothing: no measurement here isolates the cost of any individual property, and the two paths differ in more than the properties they reach. It is against the local Chio path (treaty_predispatch_allow) because the alternative is in-process, and never against the federated figure",
+    "specifications": "every field an admissible call serializes is a field one of the listed documents defines, or one of the slots they declare free-form; the corpora check the serialized call against that inventory, so what the alternative cannot carry is a fact about those documents and not about a schema in this repository",
+    "storage": "the two sides are read by two procedures and the ratio is a bound, not a measurement: the alternative's store is read after PRAGMA wal_checkpoint(TRUNCATE) on both the before and the after reading, so its delta is main-database growth with the write-ahead log excluded, while the Chio figure is read from the committed sustained-load record, which sums the database, its -wal and its -shm without checkpointing and so carries the log's high-water mark in its delta. The Chio side is inflated by that amount and the alternative's is not, so the ratio is an upper bound on how much more durable state a Chio admission leaves behind"
+  },
+  "negativeCorpus": {
+    "attacks": 23,
+    "cases": 29,
+    "chioThreatIds": 20,
+    "closedByHardening": 9,
+    "collapsedDrives": [],
+    "composedAdmits": 13,
+    "composedAdmittedCaseIds": [
+      "wrong-live-agreement",
+      "superseded-agreement",
+      "agreement-version-advanced-in-flight",
+      "asserted-version-matches-receiver-record",
+      "unresolvable-task-reference",
+      "call-unbound-to-its-resource",
+      "arguments-differ-from-authorized-call",
+      "one-key-for-svid-and-issuer",
+      "issuer-minted-decade-window",
+      "token-replay-under-fresh-message-id",
+      "task-handle-reused-across-calls",
+      "request-supplied-assurance-attribute",
+      "request-supplied-approval-object"
+    ],
+    "distinctDrives": 23,
+    "driven": 25,
+    "entries": [
+      {
+        "analogue": "direct",
+        "attack": "the credential's scope names an agreement the receiver does not hold",
+        "baseline_case_id": "unknown-agreement",
+        "chio_case_id": "wrong-treaty",
+        "chio_expected_code": "chio_treaty_scope_hash_mismatch",
+        "composed": {
+          "admitted": false,
+          "denial_code": "agreement.unknown",
+          "denial_step": 20,
+          "dispatched": false
+        },
+        "drive_id": "drive_unknown_agreement@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "agreement.unknown",
+          "denial_step": 20,
+          "dispatched": false
+        },
+        "note": "The composed receiver resolves the identifier in its own table, so an identifier it never provisioned denies. This is the one place the composition already practices receiver-side resolution, and it works because a scope value is opaque to everyone but the two organizations that agreed it.",
+        "role": "attack",
+        "threat_id": "PS-TH-01"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the credential's scope names a different agreement the receiver does hold with the same counterparty, with a higher ceiling, at the version the receiver holds for it",
+        "baseline_case_id": "wrong-live-agreement",
+        "chio_case_id": "wrong-treaty",
+        "chio_expected_code": "chio_treaty_scope_hash_mismatch",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_wrong_agreement@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "policy.approval_missing",
+          "denial_step": 30,
+          "dispatched": false
+        },
+        "note": "Nothing ties this call to the agreement it was prepared under: the identifier is a scope value the caller asked its own authorization server for, and any value that resolves and covers the subject and the action passes. The hardened wiring denies only incidentally, because the approval record it resolves names the other agreement.",
+        "role": "attack",
+        "threat_id": "PS-TH-01"
+      },
+      {
+        "analogue": "partial",
+        "attack": "the credential's scope names an agreement the receiver has marked retired",
+        "baseline_case_id": "superseded-agreement",
+        "chio_case_id": "stale-treaty",
+        "chio_expected_code": "chio_treaty_stale",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_superseded_agreement@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "agreement.superseded",
+          "denial_step": 23,
+          "dispatched": false
+        },
+        "note": "A weaker analogue than it looks: retirement is a flag on the receiver's own record, so the hardened wiring closes it with one condition on the lookup. It says nothing about which version of a live record the caller decided under, which is the next two cases.",
+        "role": "attack",
+        "threat_id": "PS-TH-02"
+      },
+      {
+        "analogue": "direct",
+        "attack": "a call whose credential asserts the version it was prepared under is presented against a receiver whose own record has moved to a later version",
+        "baseline_case_id": "agreement-version-advanced-in-flight",
+        "chio_case_id": "stale-treaty",
+        "chio_expected_code": "chio_treaty_stale",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_admissible@agreement_version_advanced",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "agreement.version_mismatch",
+          "denial_step": 24,
+          "dispatched": false
+        },
+        "note": "The hardened wiring closes this one, and it is worth being exact about how: the only place a version can travel is a scope value, and the check compares what the caller's authorization server asserted with what the receiver holds. Against a caller that reports its stale read honestly, the comparison works. The next case is the same attack from a caller that does not.",
+        "role": "attack",
+        "threat_id": "PS-TH-02"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the caller obtains a credential asserting the version the receiver currently holds and sends the call it prepared under the previous one",
+        "baseline_case_id": "asserted-version-matches-receiver-record",
+        "chio_case_id": "stale-treaty",
+        "chio_expected_code": "chio_treaty_stale",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_asserted_version_matches@agreement_version_advanced",
+        "hardened": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "note": "The structural failure, in its sharpest form. Every value that reaches this receiver was minted by the caller or by the caller's own authorization server, so a check against receiver-held state is a comparison with an assertion, and the assertion is the adversary's to choose. No wiring of these formats closes it: to bind the version the receiver would need a value it minted itself inside the signed credential, and the token exchange request has no parameter to carry one.",
+        "role": "attack",
+        "threat_id": "PS-TH-02"
+      },
+      {
+        "analogue": "none",
+        "attack": "none: no format in the set has an object standing for a bound two organizations jointly accept",
+        "baseline_case_id": "no-jointly-computed-bound",
+        "chio_case_id": "forged-intersection",
+        "chio_expected_code": "chio_treaty_intersection_mismatch",
+        "note": "The Chio case forges a digest of an intersection both kernels computed. Here each side has a policy of its own and there is no object representing their meet, so there is no digest to forge and no comparison to defeat. The nearest reachable attack is the claimed-attribute case under PS-TH-16.",
+        "role": "attack",
+        "threat_id": "PS-TH-03"
+      },
+      {
+        "analogue": "partial",
+        "attack": "the message references a task the receiver has no record of",
+        "baseline_case_id": "unresolvable-task-reference",
+        "chio_case_id": "missing-lineage",
+        "chio_expected_code": "chio_treaty_missing_required_evidence",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_unresolvable_task_reference@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "lineage.task_unknown",
+          "denial_step": 26,
+          "dispatched": false
+        },
+        "note": "A2A does carry a reference list: a message may name the task it belongs to and the tasks it references for additional context, and those identifiers were minted by this receiver. The hardened wiring resolves them and refuses one it never issued. What has no carrier is the part that matters: the reference is an identifier and not a digest, so a reference moved from one task the receiver holds to another is not a substitution anything notices, and nothing records that this call is the one the referenced task called for.",
+        "role": "attack",
+        "threat_id": "PS-TH-04"
+      },
+      {
+        "analogue": "partial",
+        "attack": "the call names an order unrelated to the one the credential was obtained for",
+        "baseline_case_id": "call-unbound-to-its-resource",
+        "chio_case_id": "receipt-mismatch",
+        "chio_expected_code": "predicate.schema_invalid",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_unbound_resource@default",
+        "hardened": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "note": "The composition carries no digest of a receipt the receiver holds, so the Chio attack has no target. What is reachable is the granularity of the credential: scope names an action class, and a token obtained for one order authorizes any order within that class. Both wirings admit, and no operator check closes it, because nothing in the credential names an instance. The standards-track answer is rich authorization requests, which would put structured detail in the token and would still be detail the caller's own authorization server minted.",
+        "role": "attack",
+        "threat_id": "PS-TH-05"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the arguments sent differ from the arguments the exchange was performed for",
+        "baseline_case_id": "arguments-differ-from-authorized-call",
+        "chio_case_id": "request-hash-mismatch",
+        "chio_expected_code": "predicate.schema_invalid",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_arguments_differ@default",
+        "hardened": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "note": "No claim in the credential covers the body of the call, and no field of the message or the tool call carries a digest of it. The exchange happens at the caller's authorization server, which never sees the arguments and whose request has no parameter for them, so there is nothing for an operator to compare. Both wirings admit an amount the exchange never saw, bounded only by the receiver's own ceiling.",
+        "role": "attack",
+        "threat_id": "PS-TH-06"
+      },
+      {
+        "analogue": "none",
+        "attack": "none: nothing in the set carries an outcome digest, because nothing carries a receipt of the prior call to bind one to",
+        "baseline_case_id": "no-outcome-object",
+        "chio_case_id": "outcome-hash-mismatch",
+        "chio_expected_code": "predicate.schema_invalid",
+        "note": "A delegated credential describes authority to act. It has no field for what a prior call returned, so there is nothing for a substituted outcome digest to contradict.",
+        "role": "attack",
+        "threat_id": "PS-TH-07"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the call arrives without proof of the private key of the SVID it claims",
+        "baseline_case_id": "missing-channel-authentication",
+        "chio_case_id": "missing-signature",
+        "chio_expected_code": "dsse.malformed",
+        "composed": {
+          "admitted": false,
+          "denial_code": "peer.svid_proof_missing",
+          "denial_step": 2,
+          "dispatched": false
+        },
+        "drive_id": "drive_missing_channel_proof@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "peer.svid_proof_missing",
+          "denial_step": 2,
+          "dispatched": false
+        },
+        "note": "Workload authentication is the composition's strongest part and it holds: a call that cannot prove possession never reaches the replay table.",
+        "role": "attack",
+        "threat_id": "PS-TH-08"
+      },
+      {
+        "analogue": "none",
+        "attack": "none: the composition carries one signature per role, so there is no set of signatures inside one envelope to populate with a duplicate key identifier",
+        "baseline_case_id": "no-signature-set",
+        "chio_case_id": "duplicate-signature-keyid",
+        "chio_expected_code": "dsse.malformed",
+        "note": "The attack exists in Chio because the envelope carries a signature array a verifier iterates. Here a call carries one channel authentication and one issuer signature over the credential, each verified against one key the bundle names, so a duplicate has nowhere to sit.",
+        "role": "attack",
+        "threat_id": "PS-TH-09"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the counterparty's SVID key and its authorization server's signing key are the same key, and the trust bundle carries it for both",
+        "baseline_case_id": "one-key-for-svid-and-issuer",
+        "chio_case_id": "repeated-signer-key",
+        "chio_expected_code": "signer.independence_required",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_collapsed_keys@collapsed_keys",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "signer.not_distinct",
+          "denial_step": 13,
+          "dispatched": false
+        },
+        "note": "Nothing in the composed wiring compares the two keys, so one party signing both halves passes. The check is distinctness, not independence, in either system: two different keys held by one operator pass both.",
+        "role": "attack",
+        "threat_id": "PS-TH-10"
+      },
+      {
+        "analogue": "direct",
+        "attack": "an identity token the same issuer signed for another purpose is presented as the exchanged credential",
+        "baseline_case_id": "token-type-confusion",
+        "chio_case_id": "wrong-predicate-type",
+        "chio_expected_code": "predicate.type_unrecognised",
+        "composed": {
+          "admitted": false,
+          "denial_code": "token.malformed",
+          "denial_step": 8,
+          "dispatched": false
+        },
+        "drive_id": "drive_token_type_confusion@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "token.malformed",
+          "denial_step": 8,
+          "dispatched": false
+        },
+        "note": "A strict parse of the claim set refuses it before any profile-specific check. Typed tokens and a strict parse hold in both wirings and cost nothing.",
+        "role": "attack",
+        "threat_id": "PS-TH-11"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the transmitted claim bytes carry the scope claim twice, honest value first and a wider value last, with the signature over exactly those bytes",
+        "baseline_case_id": "duplicate-claim-in-signed-token",
+        "chio_case_id": "noncanonical-payload",
+        "chio_expected_code": "statement.malformed",
+        "composed": {
+          "admitted": false,
+          "denial_code": "token.malformed",
+          "denial_step": 8,
+          "dispatched": false
+        },
+        "drive_id": "drive_duplicate_claim@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "token.malformed",
+          "denial_step": 8,
+          "dispatched": false
+        },
+        "note": "A strict parse rejects the duplicate before any profile-specific check, so the composition holds here without needing a canonicalization comparison.",
+        "role": "attack",
+        "threat_id": "PS-TH-12"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the claim set is transmitted in a semantically identical but non-canonical encoding",
+        "baseline_case_id": "reordered-token-encoding",
+        "chio_case_id": "noncanonical-payload",
+        "chio_expected_code": "statement.malformed",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_reordered_encoding@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "token.noncanonical",
+          "denial_step": 12,
+          "dispatched": false
+        },
+        "note": "Admitting this is not a defect: the parsed content is the same and the signature covers the bytes received. The case carries the informational role and is excluded from the attack counts for that reason. It is recorded because it is the one place the two wirings differ for a reason that is not a security difference.",
+        "role": "informational",
+        "threat_id": "PS-TH-12"
+      },
+      {
+        "analogue": "partial",
+        "attack": "the credential's validity window has closed",
+        "baseline_case_id": "expired-token",
+        "chio_case_id": "stale-lease",
+        "chio_expected_code": "capability.lease_expired_or_unknown",
+        "composed": {
+          "admitted": false,
+          "denial_code": "token.expired",
+          "denial_step": 14,
+          "dispatched": false
+        },
+        "drive_id": "drive_expired_token@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "token.expired",
+          "denial_step": 14,
+          "dispatched": false
+        },
+        "note": "The expiry holds, and it is required rather than optional: a JWT-SVID without an expiry is rejected outright. What does not translate is that the window is a pair of timestamps the issuer chose rather than a reference the receiver resolves: see the next case, where the same issuer mints a decade.",
+        "role": "attack",
+        "threat_id": "PS-TH-13"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the credential declares a ten-year validity window",
+        "baseline_case_id": "issuer-minted-decade-window",
+        "chio_case_id": "stale-lease",
+        "chio_expected_code": "capability.lease_expired_or_unknown",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_long_window@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "token.window_too_long",
+          "denial_step": 15,
+          "dispatched": false
+        },
+        "note": "The composed wiring admits: the only bound on the window is the one the issuer wrote. The hardened wiring refuses it against a maximum validity the receiver holds as a constant, which is what a maximum token age is in any verifier that enforces one. The residual difference is not that Chio bounds the window and the composition cannot, but what the bound is made of: a Chio lease reference resolves in the receiver's own registry, so the receiver can revoke and re-scope it per counterparty between calls, where the constant is the same for every credential the receiver ever sees.",
+        "role": "attack",
+        "threat_id": "PS-TH-13"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the call names an approval identifier the receiver does not hold, and presents nothing else",
+        "baseline_case_id": "approval-reference-unresolvable",
+        "chio_case_id": "missing-governance-receipt",
+        "chio_expected_code": "governance.receipt_required_missing",
+        "composed": {
+          "admitted": false,
+          "denial_code": "policy.approval_missing",
+          "denial_step": 30,
+          "dispatched": false
+        },
+        "drive_id": "drive_approval_unknown@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "policy.approval_missing",
+          "denial_step": 30,
+          "dispatched": false
+        },
+        "note": "This one holds, and the carrier is worth naming: the identifier travels as an argument of the tool, whose input schema the receiver publishes. It is the one open slot in the composition whose shape the receiver owns, and the only fact it can demand without extending any protocol. The requirement itself is still operator-authored: the composition supplies the place to write the rule, not the rule.",
+        "role": "attack",
+        "threat_id": "PS-TH-14"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the identical message is presented twice",
+        "baseline_case_id": "message-id-replay",
+        "chio_case_id": "replayed-continuation",
+        "chio_expected_code": "chio_treaty_continuation_replay",
+        "composed": {
+          "admitted": false,
+          "denial_code": "replay.message_id_seen",
+          "denial_step": 6,
+          "dispatched": false
+        },
+        "drive_id": "drive_message_id_replay@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "replay.message_id_seen",
+          "denial_step": 6,
+          "dispatched": false
+        },
+        "note": "The replay table holds: a single-row insert on a primary key admits the first presentation and denies the second. The identifier it is keyed by is created by the message creator.",
+        "role": "attack",
+        "threat_id": "PS-TH-15"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the same credential is presented again under a message identifier the caller created freshly",
+        "baseline_case_id": "token-replay-under-fresh-message-id",
+        "chio_case_id": "replayed-continuation",
+        "chio_expected_code": "chio_treaty_continuation_replay",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_token_replay@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "replay.token_id_seen",
+          "denial_step": 11,
+          "dispatched": false
+        },
+        "note": "The composed wiring's replay table is keyed by a value the caller creates, so it makes a message single-use and leaves the credential multi-use. The hardened wiring claims a second row on the token identifier, which is what a jti table does for a bearer token, and the second presentation denies. What remains is not the mechanism, which is the same single-row insert Chio uses, but who mints the value it is keyed by: the issuer mints token identifiers and can mint as many as it likes, where a Chio continuation is minted by the receiver before the request and named by the statement.",
+        "role": "attack",
+        "threat_id": "PS-TH-15"
+      },
+      {
+        "analogue": "direct",
+        "attack": "two calls name the same task the receiver minted, each with its own message identifier and its own credential",
+        "baseline_case_id": "task-handle-reused-across-calls",
+        "chio_case_id": "replayed-continuation",
+        "chio_expected_code": "chio_treaty_continuation_replay",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_task_handle_reuse@default",
+        "hardened": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "note": "This is the case that says what the one receiver-minted value in the composition is worth. A task identifier is generated by the server, and the caller echoes it, which is the shape of a receiver-minted continuation and is why it is worth driving. It bounds nothing: a task is a conversation that accepts many messages, no specification makes echoing one consume it, and nothing signs it. The same is true of the other receiver-minted value in the set, the opaque state an MCP server hands back for a retry, whose own specification says the measures that bound its replay window do not guarantee single use and that a server needing that must enforce it itself.",
+        "role": "attack",
+        "threat_id": "PS-TH-15"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the message's own metadata carries the assurance level the receiver's record assigns, and the rule that gates the action reads it",
+        "baseline_case_id": "request-supplied-assurance-attribute",
+        "chio_case_id": "request-smuggled-trust-root",
+        "chio_expected_code": "request_smuggled_trust_root",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_claimed_assurance@downgraded_assurance",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "context.request_supplied_attribute",
+          "denial_step": 25,
+          "dispatched": false
+        },
+        "note": "This is the composition's receiver-locality failure and it is not a defect in any part: a message carries a metadata map for exactly this, and handing the incoming request to the policy engine as its evaluation context is how a policy decision point is called. The hardened wiring refuses any supplied attribute whose name the receiver owns, in any of the slots the formats leave open, which is a denylist of exactly the kind the Chio receiver uses.",
+        "role": "attack",
+        "threat_id": "PS-TH-16"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the message presents the approval record inline instead of naming one the receiver holds",
+        "baseline_case_id": "request-supplied-approval-object",
+        "chio_case_id": "dynamic-trust-smuggling",
+        "chio_expected_code": "request_smuggled_dynamic_trust",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_approval_smuggled@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "context.request_supplied_attribute",
+          "denial_step": 25,
+          "dispatched": false
+        },
+        "note": "Presenting a claim rather than naming one is the ordinary way a claim travels, so the composed wiring accepts it. The hardened wiring refuses the supplied attribute at the context step, before it reaches the rule that would have resolved the identifier, so the denial code is the same one the assurance case produces.",
+        "role": "attack",
+        "threat_id": "PS-TH-17"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the credential declares a token type identifier the receiver does not accept",
+        "baseline_case_id": "unrecognised-issued-token-type",
+        "chio_case_id": "schema-mismatch",
+        "chio_expected_code": "dsse.malformed",
+        "composed": {
+          "admitted": false,
+          "denial_code": "token.type_unrecognised",
+          "denial_step": 9,
+          "dispatched": false
+        },
+        "drive_id": "drive_unrecognised_token_type@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "token.type_unrecognised",
+          "denial_step": 9,
+          "dispatched": false
+        },
+        "note": "Holds in both wirings. The token type identifier is a URI the exchange defines for exactly this: it says what was issued, so a receiver can refuse what it did not ask for.",
+        "role": "attack",
+        "threat_id": "PS-TH-18"
+      },
+      {
+        "analogue": "partial",
+        "attack": "the caller's authorization server refuses the exchange and the caller sends the call regardless",
+        "baseline_case_id": "exchange-refused-call-sent-anyway",
+        "chio_case_id": "policy-disagreement",
+        "chio_expected_code": "policy.verdict_disagreement",
+        "composed": {
+          "admitted": false,
+          "denial_code": "token.absent",
+          "denial_step": 7,
+          "dispatched": false
+        },
+        "drive_id": "drive_no_credential@default",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "token.absent",
+          "denial_step": 7,
+          "dispatched": false
+        },
+        "note": "The composition holds this, in the only form it can: a refusal is an error response at the token endpoint, so the caller has nothing to present and the receiver denies for absence. It is weaker than the Chio case in a way worth stating: the receiver learns that no authority was presented, never that the counterparty evaluated and said no, so a counterparty that never evaluated and one that refused are the same event here.",
+        "role": "attack",
+        "threat_id": "PS-TH-19"
+      },
+      {
+        "analogue": "none",
+        "attack": "none: no format in the set has a signed refusal, so there is no such object to present",
+        "baseline_case_id": "no-signed-refusal",
+        "chio_case_id": "signed-unanimous-deny",
+        "chio_expected_code": "chio_treaty_policy_denied",
+        "note": "The Chio case presents a validly signed deny as authorization. A token exchange answers a refusal with an OAuth error response, which is not signed, not addressed to the receiver, and never travels beyond the caller. There is nothing to forge and nothing to mistake for an allow.",
+        "role": "attack",
+        "threat_id": "PS-TH-20"
+      },
+      {
+        "analogue": "direct",
+        "attack": "the admissible call is presented unchanged to a second receiver that installed the same trust bundle and provisioned the same agreement identifier",
+        "baseline_case_id": "cross-receiver-presentation",
+        "chio_case_id": "audience-binding",
+        "chio_expected_code": "n/a",
+        "composed": {
+          "admitted": false,
+          "denial_code": "token.audience_mismatch",
+          "denial_step": 16,
+          "dispatched": false
+        },
+        "drive_id": "drive_admissible@second_receiver",
+        "hardened": {
+          "admitted": false,
+          "denial_code": "token.audience_mismatch",
+          "denial_step": 16,
+          "dispatched": false
+        },
+        "note": "Both wirings refuse, and this is the property the composition holds outright rather than by operator effort. The audience of a credential is not optional in either half of this set: a JWT-SVID validator rejects a token whose audience does not carry its own identifier, and a protected resource must establish that a token was issued for it. A second route closes it again: resolving the agreement means reading a participant list, and a receiver absent from it is not a party to what it just resolved. What is established is narrower than the Chio statement, which also requires a receipt the composition has nothing to represent.",
+        "role": "attack",
+        "threat_id": "PS-EXTRA-01"
+      },
+      {
+        "analogue": "direct",
+        "attack": "nothing is modified",
+        "baseline_case_id": "unmodified-admissible-call",
+        "chio_case_id": "null-case",
+        "chio_expected_code": "n/a",
+        "composed": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "drive_id": "drive_admissible@default",
+        "hardened": {
+          "admitted": true,
+          "dispatched": true
+        },
+        "note": "The null case. Without it the corpus could be denying everything for an unrelated reason.",
+        "role": "null",
+        "threat_id": "PS-EXTRA-02"
+      }
+    ],
+    "hardenedAdmits": 4,
+    "hardenedAdmittedCaseIds": [
+      "asserted-version-matches-receiver-record",
+      "call-unbound-to-its-resource",
+      "arguments-differ-from-authorized-call",
+      "task-handle-reused-across-calls"
+    ],
+    "informational": 1,
+    "informationalCaseIds": [
+      "reordered-token-encoding"
+    ],
+    "noAnalogue": 4,
+    "noAnalogueCaseIds": [
+      "no-jointly-computed-bound",
+      "no-outcome-object",
+      "no-signature-set",
+      "no-signed-refusal"
+    ]
+  },
+  "profile": "release",
+  "properties": [
+    {
+      "composed": "fails",
+      "hardened": "fails",
+      "note": "This is the one property the composition cannot reach by hardening, and the reason is structural. Eight of the fifteen binding fields have no field anywhere in the set, so for those facts there is nothing to compare. For the two that come closest, the hardened wiring does write the comparison: it refuses a retired agreement, and it refuses a credential whose scope asserts a version other than the one the receiver holds. Both comparisons are against values the caller's own authorization server minted, so an adversary asserts the version the receiver holds and passes, which is the case that dispatches under both wirings. The carrier ledger drives the same move once more with the operator's own invented field, and it ends the same way.",
+      "property": "admission binding",
+      "statement": "if the receiver dispatches, every binding field of the presented evidence equals the value the receiver computed for this request from its own state, and the continuation it names was unconsumed",
+      "step": "no step. The fields the composed receiver does check resolve identifiers in its own tables (steps 20, 26 and 30), compare a claim against the channel or against another claim (steps 16 to 19), or compare a claim against a clock (step 14); the one comparison against a receiver-held record is step 24, and the value it compares was chosen by the caller",
+      "weakened_to": "the call is bound to a workload the receiver's trust bundle names, to a credential issued for this receiver by an issuer it pinned, and to an agreement identifier and an approval identifier that resolve in the receiver's own tables; nothing binds it to the state of those records at the moment the authority was granted, and nothing binds the credential to the call it arrived with",
+      "witnesses": [
+        "asserted-version-matches-receiver-record",
+        "arguments-differ-from-authorized-call",
+        "token-replay-under-fresh-message-id",
+        "wrong-live-agreement",
+        "superseded-agreement"
+      ]
+    },
+    {
+      "composed": "fails",
+      "hardened": "holds",
+      "note": "The composed wiring fails this and it is not a defect in any part. A message carries a metadata map for additional context, and handing the incoming request to the policy engine as its evaluation context is the documented way to call a policy decision point. The hardened wiring refuses any supplied attribute whose name the receiver owns, in every slot the formats leave open, which is a name denylist of exactly the kind Chio uses, and it then holds. The same parts yield either outcome and nothing in the composition records which one an operator deployed.",
+      "property": "receiver locality",
+      "statement": "the roots, pins, agreements, tables and registries used to decide a request are a function of the receiver's state before the request arrived, and are independent of the request's content",
+      "step": "step 25, where the policy context is assembled",
+      "witnesses": [
+        "request-supplied-assurance-attribute",
+        "request-supplied-approval-object"
+      ]
+    },
+    {
+      "composed": "holds_weakened",
+      "hardened": "holds",
+      "note": "The mechanism is identical to Chio's under either wiring, and what separates them is whose value it is keyed by. The composed table is keyed by an identifier the message creator chose, so the caller picks a new one and presents the same credential again. The hardened wiring claims a second row on the token identifier, and the credential is then single-use as stated. What no wiring reaches is receiver-side minting: the identifiers made single-use are the caller's and the issuer's. The composition does carry two identifiers the receiver minted, a task and an MCP request state, and the task-handle case shows what they bound, which was nothing.",
+      "property": "single use",
+      "statement": "for a continuation identifier c, at most one admission ever reaches dispatch with c bound to it",
+      "step": "step 6 under both wirings, and step 11 under the hardened wiring: single-row inserts on a primary key",
+      "weakened_to": "under the composed wiring, at most one dispatch per message identifier, where the identifier is created by the caller, and the credential itself is reusable until it expires",
+      "witnesses": [
+        "message-id-replay",
+        "token-replay-under-fresh-message-id"
+      ]
+    },
+    {
+      "composed": "holds",
+      "hardened": "holds",
+      "note": "The composition holds this outright and it is not a differentiator, which is worth saying in the composition's favour: the audience of a credential is required rather than optional in this set, since a workload identity token without an audience is rejected and a protected resource must establish that a token was issued for it. A second route closes it again, because resolving an agreement means reading a participant list. The driven case is a second receiver holding the same trust bundle and the same agreement record, so it satisfies two of the statement's three conjuncts by construction and the composition has no receipt, which is the third.",
+      "property": "audience binding",
+      "statement": "a statement accepted by receiver R is not accepted by a different receiver R' unless R' separately pinned the same two keys, activated the same agreement, and holds the same receipt",
+      "step": "step 16 under both wirings, and step 21 as well",
+      "witnesses": [
+        "cross-receiver-presentation"
+      ]
+    }
+  ],
+  "propertySummary": {
+    "composed": {
+      "fails": 2,
+      "holds": 1,
+      "holdsWeakened": 1
+    },
+    "hardened": {
+      "fails": 1,
+      "holds": 3,
+      "holdsWeakened": 0
+    }
+  },
+  "schema": "chio.programmable-sovereignty.baseline-comparison.v1",
+  "specifications": {
+    "documents": [
+      {
+        "id": "spiffe-id",
+        "name": "SPIFFE Identity and Verifiable Identity Document",
+        "url": "https://github.com/spiffe/spiffe/blob/main/standards/SPIFFE-ID.md",
+        "version": "SPIFFE-ID standard"
+      },
+      {
+        "id": "x509-svid",
+        "name": "X.509 SPIFFE Verifiable Identity Document",
+        "url": "https://github.com/spiffe/spiffe/blob/main/standards/X509-SVID.md",
+        "version": "X509-SVID standard"
+      },
+      {
+        "id": "jwt-svid",
+        "name": "JWT SPIFFE Verifiable Identity Document",
+        "url": "https://github.com/spiffe/spiffe/blob/main/standards/JWT-SVID.md",
+        "version": "JWT-SVID standard"
+      },
+      {
+        "id": "a2a",
+        "name": "Agent2Agent Protocol",
+        "url": "https://a2a-protocol.org/latest/specification/",
+        "version": "v1 (specification/a2a.proto, package lf.a2a.v1)"
+      },
+      {
+        "id": "mcp",
+        "name": "Model Context Protocol",
+        "url": "https://modelcontextprotocol.io/specification/2026-07-28",
+        "version": "2026-07-28"
+      },
+      {
+        "id": "rfc8693",
+        "name": "OAuth 2.0 Token Exchange",
+        "url": "https://www.rfc-editor.org/rfc/rfc8693",
+        "version": "RFC 8693"
+      },
+      {
+        "id": "rfc7519",
+        "name": "JSON Web Token",
+        "url": "https://www.rfc-editor.org/rfc/rfc7519",
+        "version": "RFC 7519"
+      },
+      {
+        "id": "rfc7515",
+        "name": "JSON Web Signature",
+        "url": "https://www.rfc-editor.org/rfc/rfc7515",
+        "version": "RFC 7515"
+      },
+      {
+        "id": "rfc6749",
+        "name": "The OAuth 2.0 Authorization Framework",
+        "url": "https://www.rfc-editor.org/rfc/rfc6749",
+        "version": "RFC 6749"
+      }
+    ],
+    "freeFormSlots": [
+      {
+        "attestedBy": "caller",
+        "document": "a2a",
+        "note": "A flexible key-value map for passing additional context or parameters.",
+        "path": "metadata",
+        "section": "SendMessageRequest.metadata"
+      },
+      {
+        "attestedBy": "caller",
+        "document": "a2a",
+        "note": "Any metadata to provide along with the message.",
+        "path": "message.metadata",
+        "section": "Message.metadata"
+      },
+      {
+        "attestedBy": "caller",
+        "document": "a2a",
+        "note": "Metadata associated with this part.",
+        "path": "message.parts[].metadata",
+        "section": "Part.metadata"
+      },
+      {
+        "attestedBy": "caller",
+        "document": "mcp",
+        "note": "The tool's own inputs, shaped by a schema the receiver publishes. The one open slot whose shape the receiver owns.",
+        "path": "message.parts[].data.params.arguments",
+        "section": "server/tools, Tool.inputSchema"
+      },
+      {
+        "attestedBy": "caller",
+        "document": "mcp",
+        "note": "Reserved for metadata. Keys whose second label is modelcontextprotocol or mcp belong to MCP; anything else takes a vendor prefix.",
+        "path": "message.parts[].data.params._meta",
+        "section": "basic, General fields, _meta"
+      },
+      {
+        "attestedBy": "issuing_authorization_server",
+        "document": "rfc6749",
+        "note": "Space-delimited case-sensitive strings whose values are defined by the authorization server. The only open slot a signature covers.",
+        "path": "scope",
+        "section": "3.3"
+      }
+    ],
+    "requestFields": 44
+  },
+  "substitutionCorpus": {
+    "bindingFields": 15,
+    "carriedWithoutReceiverReferenceFieldNames": [
+      "continuation_sha256",
+      "lease_refs",
+      "lineage_bundle_sha256"
+    ],
+    "carriedWithoutReceiverReferenceFields": 3,
+    "entries": [
+      {
+        "basis": "resolution",
+        "carrier": {
+          "attested_by": "issuing_authorization_server",
+          "document": "rfc8693",
+          "field": "scope",
+          "section": "4.2, with the syntax of RFC 6749 section 3.3"
+        },
+        "chio_field": "treaty_id",
+        "note": "The one fact the composition already resolves against receiver-held state, and the carrier is the only open slot a signature covers: scope values are strings the authorization server defines, so two organizations can agree that one of them names an agreement. An identifier the receiver never provisioned denies. An identifier naming a different agreement it does hold does not, under the composed wiring, because resolving is all the composition does: nothing ties the call to the agreement it was prepared under. The hardened wiring denies that one incidentally, through the approval record it resolves.",
+        "noticed_composed": false,
+        "noticed_hardened": true,
+        "variants": [
+          {
+            "composed": {
+              "admitted": false,
+              "denial_code": "agreement.unknown",
+              "denial_step": 20,
+              "dispatched": false
+            },
+            "hardened": {
+              "admitted": false,
+              "denial_code": "agreement.unknown",
+              "denial_step": 20,
+              "dispatched": false
+            },
+            "label": "an agreement the receiver never provisioned"
+          },
+          {
+            "composed": {
+              "admitted": true,
+              "dispatched": true
+            },
+            "hardened": {
+              "admitted": false,
+              "denial_code": "policy.approval_missing",
+              "denial_step": 30,
+              "dispatched": false
+            },
+            "label": "a different agreement the receiver does hold"
+          }
+        ]
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "treaty_scope_sha256",
+        "note": "The receiver holds an agreement record with a scope. No field of any document in the set pins a digest of it, so a caller and a receiver disagreeing about the content of the agreement they are operating under produces no observable event.",
+        "noticed_composed": false,
+        "noticed_hardened": false,
+        "variants": []
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "ladder_intersection_sha256",
+        "note": "No object stands for a bound two organizations jointly accept, so there is no digest to substitute.",
+        "noticed_composed": false,
+        "noticed_hardened": false,
+        "variants": []
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "admission_report_sha256",
+        "note": "The one row where the two systems agree in outcome and differ in why. Chio carries this field and never compares it. No format in the set carries it at all. Neither notices a substitution, and in neither case does anything rest on it.",
+        "noticed_composed": false,
+        "noticed_hardened": false,
+        "variants": []
+      },
+      {
+        "basis": "carried_without_receiver_reference",
+        "carrier": {
+          "attested_by": "caller",
+          "document": "a2a",
+          "field": "Message.task_id, naming a Task.id generated by the server",
+          "section": "Message, Task"
+        },
+        "chio_field": "continuation_sha256",
+        "note": "The nearest carrier is real and is worth stating plainly: a task identifier is minted by this receiver and echoed by the caller, which is the shape of a receiver-minted continuation. It is not one. A task accepts many messages, so echoing it consumes nothing; no signature covers it, since it rides in the message body and the credential covers only its own claims; and it exists only after a first call created it, so the first call of any interaction has none. Moving it to another task the receiver also holds is admitted under both wirings.",
+        "noticed_composed": false,
+        "noticed_hardened": false,
+        "variants": [
+          {
+            "composed": {
+              "admitted": true,
+              "dispatched": true
+            },
+            "hardened": {
+              "admitted": true,
+              "dispatched": true
+            },
+            "label": "a different task the receiver also holds"
+          }
+        ]
+      },
+      {
+        "basis": "carried_without_receiver_reference",
+        "carrier": {
+          "attested_by": "caller",
+          "document": "a2a",
+          "field": "Message.reference_task_ids",
+          "section": "Message.reference_task_ids"
+        },
+        "chio_field": "lineage_bundle_sha256",
+        "note": "A message may name the tasks it references, and those identifiers were minted by this receiver, so the hardened wiring refuses a reference to a task it never issued. What it cannot refuse is a reference moved to another task it did issue: the field carries identifiers and no digest of what happened in them, and the specification calls them additional context rather than evidence.",
+        "noticed_composed": false,
+        "noticed_hardened": false,
+        "variants": [
+          {
+            "composed": {
+              "admitted": true,
+              "dispatched": true
+            },
+            "hardened": {
+              "admitted": true,
+              "dispatched": true
+            },
+            "label": "a reference moved to another task the receiver holds"
+          },
+          {
+            "composed": {
+              "admitted": true,
+              "dispatched": true
+            },
+            "hardened": {
+              "admitted": false,
+              "denial_code": "lineage.task_unknown",
+              "denial_step": 26,
+              "dispatched": false
+            },
+            "label": "a reference to a task the receiver never issued"
+          }
+        ]
+      },
+      {
+        "basis": "internal_consistency",
+        "carrier": {
+          "attested_by": "caller",
+          "document": "mcp",
+          "field": "params.name, against the action value of scope",
+          "section": "server/tools, Calling Tools"
+        },
+        "chio_field": "action_class_id",
+        "note": "Substituting the scope's action alone is caught, but that comparison is between a claim and a tool name the same party chose. The substitution that moves both is then decided by the receiver's own agreement record and rule table, so the composition does hold this field, by resolution rather than by the consistency check that fires first.",
+        "noticed_composed": true,
+        "noticed_hardened": true,
+        "variants": [
+          {
+            "composed": {
+              "admitted": false,
+              "denial_code": "scope.action_mismatch",
+              "denial_step": 19,
+              "dispatched": false
+            },
+            "hardened": {
+              "admitted": false,
+              "denial_code": "scope.action_mismatch",
+              "denial_step": 19,
+              "dispatched": false
+            },
+            "label": "the action value of scope alone"
+          },
+          {
+            "composed": {
+              "admitted": false,
+              "denial_code": "agreement.action_not_covered",
+              "denial_step": 22,
+              "dispatched": false
+            },
+            "hardened": {
+              "admitted": false,
+              "denial_code": "agreement.action_not_covered",
+              "denial_step": 22,
+              "dispatched": false
+            },
+            "label": "the action value and the tool name together"
+          }
+        ]
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "consistency_model",
+        "note": "Nothing in the set names a consistency model for cross-organization state, so there is nothing to substitute.",
+        "noticed_composed": false,
+        "noticed_hardened": false,
+        "variants": []
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "request_sha256",
+        "note": "The digest that would tie the authority to the call it arrived with, and nothing in the set carries it. No claim of a token exchange covers the body of the call, no field of a message or a tool call carries a digest of it, and the exchange request itself has no parameter through which one could reach the issuer. The arguments cross in the clear and nothing anywhere is compared against them.",
+        "noticed_composed": false,
+        "noticed_hardened": false,
+        "variants": []
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "outcome_sha256",
+        "note": "A delegated credential describes authority to act and carries nothing about what a prior call returned.",
+        "noticed_composed": false,
+        "noticed_hardened": false,
+        "variants": []
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "local_receipt_sha256",
+        "note": "The composition's audit record is written after the decision and is never named by a later call, so no receipt digest crosses the boundary and none can be substituted.",
+        "noticed_composed": false,
+        "noticed_hardened": false,
+        "variants": []
+      },
+      {
+        "basis": "not_carried",
+        "chio_field": "remote_receipt_sha256",
+        "note": "The counterparty's audit record is not visible to the receiver at all, so there is nothing for the call to point at.",
+        "noticed_composed": false,
+        "noticed_hardened": false,
+        "variants": []
+      },
+      {
+        "basis": "carried_without_receiver_reference",
+        "carrier": {
+          "attested_by": "issuing_authorization_server",
+          "document": "rfc7519",
+          "field": "exp and nbf, with expires_in beside them",
+          "section": "4.1.4, 4.1.5"
+        },
+        "chio_field": "lease_refs",
+        "note": "The window is carried and is compared, against the receiver's clock. It is not a reference the receiver resolves, so nothing about it is per-counterparty, revocable between calls, or narrowable: the issuer chooses the window and the composed wiring accepts whatever it chose. The hardened wiring refuses an extended one against a constant it holds, which is the same bound for every credential it will ever see.",
+        "noticed_composed": false,
+        "noticed_hardened": true,
+        "variants": [
+          {
+            "composed": {
+              "admitted": true,
+              "dispatched": true
+            },
+            "hardened": {
+              "admitted": false,
+              "denial_code": "token.window_too_long",
+              "denial_step": 15,
+              "dispatched": false
+            },
+            "label": "the issuer extends the window to a decade"
+          }
+        ]
+      },
+      {
+        "basis": "resolution",
+        "carrier": {
+          "attested_by": "caller",
+          "document": "mcp",
+          "field": "params.arguments, shaped by the tool's own inputSchema",
+          "section": "server/tools, Tool.inputSchema"
+        },
+        "chio_field": "governance_refs",
+        "note": "Held, and the carrier is the one open slot whose shape the receiver owns: a tool's input schema is published by the server that runs it, so the receiver can require an approval identifier and resolve it locally. The requirement is still operator-authored, and the composed wiring is additionally satisfied by an approval the message presents rather than one it names.",
+        "noticed_composed": true,
+        "noticed_hardened": true,
+        "variants": [
+          {
+            "composed": {
+              "admitted": false,
+              "denial_code": "policy.approval_missing",
+              "denial_step": 30,
+              "dispatched": false
+            },
+            "hardened": {
+              "admitted": false,
+              "denial_code": "policy.approval_missing",
+              "denial_step": 30,
+              "dispatched": false
+            },
+            "label": "an approval identifier the receiver does not hold"
+          }
+        ]
+      },
+      {
+        "basis": "internal_consistency",
+        "carrier": {
+          "attested_by": "issuing_authorization_server",
+          "document": "rfc8693",
+          "field": "act.sub beside sub, over SPIFFE IDs",
+          "section": "4.1, with SPIFFE-ID and JWT-SVID for the values"
+        },
+        "chio_field": "signer_kernel_ids, as a set",
+        "note": "Both identities of the delegation are carried, which is what the actor claim is for. Substituting the actor alone passes the composed wiring, because nothing in the exchange binds the credential to the workload presenting it; the hardened wiring adds that comparison, and the substitution that moves the presenting SVID too is then caught by the trust bundle. The standards-track way to get this without an operator writing it is a certificate-bound token, which is a further specification to adopt.",
+        "noticed_composed": false,
+        "noticed_hardened": true,
+        "variants": [
+          {
+            "composed": {
+              "admitted": true,
+              "dispatched": true
+            },
+            "hardened": {
+              "admitted": false,
+              "denial_code": "token.actor_mismatch",
+              "denial_step": 17,
+              "dispatched": false
+            },
+            "label": "the actor claim alone"
+          },
+          {
+            "composed": {
+              "admitted": false,
+              "denial_code": "peer.svid_unpinned",
+              "denial_step": 1,
+              "dispatched": false
+            },
+            "hardened": {
+              "admitted": false,
+              "denial_code": "peer.svid_unpinned",
+              "denial_step": 1,
+              "dispatched": false
+            },
+            "label": "the actor claim and the presenting SVID together"
+          }
+        ]
+      },
+      {
+        "basis": "internal_consistency",
+        "carrier": {
+          "attested_by": "issuing_authorization_server",
+          "document": "rfc8693",
+          "field": "the nesting of act",
+          "section": "4.1"
+        },
+        "chio_field": "signer_kernel_ids, in order",
+        "note": "Order is carried, and this is the row where the composition does something Chio's envelope does not have to: the actor claim nests, outermost being the current actor, so the delegation chain has a direction. Exchanging the two identities is refused under both wirings, by the participant list under the composed wiring and by the actor comparison under the hardened one.",
+        "noticed_composed": true,
+        "noticed_hardened": true,
+        "variants": [
+          {
+            "composed": {
+              "admitted": false,
+              "denial_code": "agreement.party_mismatch",
+              "denial_step": 21,
+              "dispatched": false
+            },
+            "hardened": {
+              "admitted": false,
+              "denial_code": "token.actor_mismatch",
+              "denial_step": 17,
+              "dispatched": false
+            },
+            "label": "the subject and the actor exchanged"
+          }
+        ]
+      }
+    ],
+    "notCarriedFieldNames": [
+      "admission_report_sha256",
+      "consistency_model",
+      "ladder_intersection_sha256",
+      "local_receipt_sha256",
+      "outcome_sha256",
+      "remote_receipt_sha256",
+      "request_sha256",
+      "treaty_scope_sha256"
+    ],
+    "notCarriedFields": 8,
+    "notCarriedRows": 8,
+    "noticedComposedRows": 3,
+    "noticedFields": 5,
+    "noticedHardenedRows": 6,
+    "resolvableFieldNames": [
+      "action_class_id",
+      "governance_refs",
+      "signer_kernel_ids",
+      "treaty_id"
+    ],
+    "resolvableFields": 4,
+    "rows": 16,
+    "unnoticedCarriedFields": 2
+  },
+  "worktreeDirty": true
+}
