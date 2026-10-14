@@ -14,6 +14,7 @@ use super::finding_market_snapshot_versions::{
     FindingMarketSnapshotShape,
 };
 use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
+use crate::admission_operation_store as admission_store;
 
 mod projection_reference;
 mod schema_migration;
@@ -44,7 +45,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight', 'security_participant_checkpoint')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight', 'security_participant_checkpoint', 'stop_epoch')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -1712,12 +1713,11 @@ fn without_factor_assignment_tables(tables: Vec<String>) -> Vec<String> {
 fn verify_global_projection_coverage(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    crate::admission_operation_store::verify_runtime_replay_projection_coverage(connection)?;
-    crate::admission_operation_store::verify_governed_approval_replay_projection_coverage(
-        connection,
-    )?;
-    crate::admission_operation_store::verify_dpop_replay_projection_coverage(connection)?;
-    crate::admission_operation_store::verify_security_participant_migration_coverage(connection)?;
+    admission_store::verify_runtime_replay_projection_coverage(connection)?;
+    admission_store::verify_governed_approval_replay_projection_coverage(connection)?;
+    admission_store::verify_dpop_replay_projection_coverage(connection)?;
+    admission_store::verify_security_participant_migration_coverage(connection)?;
+    admission_store::verify_stop_epoch_projection_coverage(connection)?;
     verify_channel_release_projection_coverage(connection)?;
     verify_finding_challenge_projection_coverage(connection)?;
     verify_finding_status_projection_coverage(connection)?;

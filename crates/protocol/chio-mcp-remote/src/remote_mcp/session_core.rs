@@ -91,6 +91,9 @@ const ADMIN_CHILD_RECEIPTS_PATH: &str = "/admin/receipts/children";
 const ADMIN_REVOCATIONS_PATH: &str = "/admin/revocations";
 const ADMIN_BUDGETS_PATH: &str = "/admin/budgets";
 const ADMIN_SESSIONS_PATH: &str = "/admin/sessions";
+const ADMIN_EMERGENCY_STOP_PATH: &str = "/admin/emergency-stop";
+const ADMIN_EMERGENCY_RESUME_PATH: &str = "/admin/emergency-resume";
+const ADMIN_EMERGENCY_STATUS_PATH: &str = "/admin/emergency-status";
 const AUTHORIZATION_SERVER_METADATA_PATH: &str = "/.well-known/oauth-authorization-server";
 const LOCAL_AUTHORIZATION_PATH: &str = "/oauth/authorize";
 const LOCAL_TOKEN_PATH: &str = "/oauth/token";
@@ -267,6 +270,8 @@ struct RemoteSessionFactory {
     resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
     shared_upstream_owner: Arc<StdMutex<Option<Arc<SharedUpstreamOwner>>>>,
     lifecycle_policy: SessionLifecyclePolicy,
+    /// One stop for every session kernel this edge constructs.
+    stop: chio_kernel::stop::StopControl,
 }
 
 #[derive(Clone, Debug)]

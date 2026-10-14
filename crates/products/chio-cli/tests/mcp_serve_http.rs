@@ -6051,3 +6051,6 @@ fn mcp_serve_http_refuses_a_wrapped_command_the_launch_policy_does_not_bind() {
         "unexpected stderr: {stderr}"
     );
 }
+
+#[path = "mcp_serve_http/durable_stop.rs"]
+mod durable_stop;

@@ -2952,9 +2952,31 @@ and Python peers, and the release-qualification wave corpus.
 - `/admin/receipts/...`
 - `/admin/revocations`
 - `/admin/budgets`
+- `/admin/emergency-stop`, `/admin/emergency-resume`, `/admin/emergency-status`
 
 These surfaces are part of the supported production-diagnostics contract for
 the hosted edge.
+
+The emergency routes drive one kernel-scope stop shared by every session
+kernel of the edge. With durable admission enabled, a stop is an append-only
+`chio.stop-epoch.v1` record in the admission store and survives restart.
+
+- `POST /admin/emergency-stop` takes `{"reason": string, "allow_containment"?:
+  bool}` (default `true`). The reason is 1 to 1024 bytes without control
+  characters.
+- `POST /admin/emergency-resume` takes `{"expected_epoch": {"chain_generation":
+  u32, "epoch": u64}}`, the stopped head being resumed.
+- `GET /admin/emergency-status` returns the status.
+
+A success returns the status: `scope`, `stopped`, `readiness` (`ready`,
+`ready_stopped`, or `not_ready` with a `reason`), `durability` (`durable`,
+`process_local`, `process_only` or `unverified`), the optional `head`, and
+`host_latch`. A refusal returns `{"error", "message"}` with `error` one of
+`bad_request` (400), `stop_head_moved` (409, with the current `head`),
+`stop_not_durable` (503, with the `status` of the stop this process still
+holds), `stop_not_ready` (503) or `resume_refused` (503). A tool call denied by
+a stop carries `chio_runtime.identity_disposition = "reusable"` and
+`chio_runtime.retryable_after_resume = true` in its signed receipt metadata.
 
 ### 8.4 HTTP egress contract enforcement (W2.2)
 

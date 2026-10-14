@@ -160,16 +160,21 @@ pub(super) fn serve(state: &Path, socket: &Path) -> Result<(), CliError> {
         let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
         let mut interrupt = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
         let listener = WorkerServer::bind(socket, worker_service(&host)?)?;
+        let control = super::stop_control::ControlServer::bind(&host.lease)?;
         host.lease.directory.validate_path_identity()?;
         println!("{}", serde_json::json!({"ready": true, "protocol": chio_process::worker::PROTOCOL,
-            "socket_path": std::fs::canonicalize(socket)?, "kernel_key": host.kernel.public_key().to_hex()}));
+            "socket_path": std::fs::canonicalize(socket)?, "control_socket_path": control.path(),
+            "stop": host.kernel.stop_control().status(), "kernel_key": host.kernel.public_key().to_hex()}));
         std::io::stdout().flush()?;
-        listener.serve(async {
+        let control = tokio::spawn(control.serve(host.kernel.stop_control().clone()));
+        let served = listener.serve(async {
             tokio::select! {
                 _ = terminate.recv() => {},
                 _ = interrupt.recv() => {},
             }
-        }).await?;
+        }).await;
+        control.abort();
+        served?;
         Ok::<_, CliError>(())
     })
 }

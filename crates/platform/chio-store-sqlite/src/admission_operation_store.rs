@@ -119,6 +119,11 @@ pub use security_participant_state::{
     SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
     SecurityParticipantStateInitialization,
 };
+mod stop_epoch;
+pub(crate) use stop_epoch::{
+    projection_reference as stop_epoch_projection_reference,
+    verify_projection_coverage as verify_stop_epoch_projection_coverage,
+};
 mod store;
 pub(crate) use store::claim_lease_tx;
 
@@ -227,7 +232,7 @@ pub use security_participant_migration::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 37;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 38;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",

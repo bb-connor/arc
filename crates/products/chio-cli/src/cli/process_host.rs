@@ -46,6 +46,9 @@ mod serving;
 #[path = "process_host/state.rs"]
 mod state;
 #[cfg(unix)]
+#[path = "process_host/stop_control.rs"]
+mod stop_control;
+#[cfg(unix)]
 #[path = "process_host/swarm.rs"]
 mod swarm;
 
@@ -186,6 +189,29 @@ pub(crate) enum ProcessCommands {
         /// Socket in a separate private directory exposed to worker sandboxes.
         #[arg(long)]
         socket: PathBuf,
+    },
+    /// Stop the host's kernel durably: through its control socket while it
+    /// serves, or by an offline append while it is down.
+    Stop {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        reason: String,
+        /// Refuse governed containment while stopped.
+        #[arg(long)]
+        forbid_containment: bool,
+    },
+    /// Resume a stopped kernel, naming the stopped head's epoch.
+    Resume {
+        #[arg(long)]
+        state: PathBuf,
+        #[arg(long)]
+        expected_epoch: u64,
+    },
+    /// Report the durable stop state of the host's kernel.
+    StopStatus {
+        #[arg(long)]
+        state: PathBuf,
     },
     /// Run a declared worker application with persistent, bounded restart attempts (Linux).
     Run {
@@ -344,6 +370,24 @@ pub(crate) fn dispatch(command: ProcessCommands) -> Result<(), CliError> {
                 swarm_plan.as_deref(),
             ),
             ProcessCommands::Serve { state, socket } => serving::serve(&state, &socket),
+            ProcessCommands::Stop {
+                state,
+                reason,
+                forbid_containment,
+            } => stop_control::run(
+                &state,
+                stop_control::Action::Stop {
+                    reason,
+                    allow_containment: !forbid_containment,
+                },
+            ),
+            ProcessCommands::Resume {
+                state,
+                expected_epoch,
+            } => stop_control::run(&state, stop_control::Action::Resume { expected_epoch }),
+            ProcessCommands::StopStatus { state } => {
+                stop_control::run(&state, stop_control::Action::Status)
+            }
             ProcessCommands::PrepareBrokerCall {
                 state,
                 process,

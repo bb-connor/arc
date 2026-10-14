@@ -712,24 +712,10 @@ pub struct ChioKernel {
         Option<crate::supplemental_quota::SupplementalQuotaVerifierRuntime>,
     pub(super) supplemental_admission_participant:
         Option<crate::supplemental_admission::SupplementalAdmissionParticipantRuntime>,
-    /// Emergency kill switch. When `true`, every evaluate entry point returns
-    /// `Verdict::Deny` without performing capability validation or guard
-    /// evaluation. Flipped by `emergency_stop` / `emergency_resume`.
-    ///
-    /// Reads use `Ordering::SeqCst` even on the hot path. The emergency check
-    /// is a single atomic load per evaluate call (negligible cost relative to
-    /// the guard pipeline) and `SeqCst` is the safest default for a rarely
-    /// taken control path.
-    pub(super) emergency_stopped: AtomicBool,
-    /// Unix timestamp (seconds) at which the kill switch was last engaged.
-    /// `0` means no trusted timestamp: never engaged, currently resumed or
-    /// time acquisition failed. The safety latch is independent of this
-    /// metadata and is published before attempting to read the clock.
-    pub(super) emergency_stopped_since: AtomicU64,
-    /// Operator-supplied reason for the most recent emergency stop. Set on
-    /// `emergency_stop`, cleared on `emergency_resume`. Stored behind
-    /// ArcSwap so health probes can read the current reason without blocking.
-    pub(super) emergency_stop_reason: ArcSwap<Option<String>>,
+    /// Stop heads and operator stop control shared by every kernel bound to
+    /// the same store. Every evaluate entry point denies while it reports a
+    /// stop, without capability validation or guard evaluation.
+    pub(super) stop_control: crate::stop::StopControl,
     /// Persistent degraded flag for the trusted computing base's locks. A
     /// poisoned budget-registry or session lock means a panic unwound
     /// mid-mutation, so the state it guarded may be half-updated. Tripping this

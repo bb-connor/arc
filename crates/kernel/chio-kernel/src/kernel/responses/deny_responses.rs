@@ -375,12 +375,28 @@ impl ChioKernel {
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        // A stop denial is definite and precedes any effect, so the request
+        // may be retried under the same id after resume.
+        let mut metadata = match extra_metadata {
+            Some(serde_json::Value::Object(object)) => object,
+            _ => serde_json::Map::new(),
+        };
+        if let Some(runtime) = metadata
+            .entry("chio_runtime")
+            .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()))
+            .as_object_mut()
+        {
+            runtime.insert(
+                "retryable_after_resume".into(),
+                serde_json::Value::Bool(true),
+            );
+        }
         self.build_local_v1_failclosed_deny_response_with_metadata(
             request,
             reason,
             timestamp,
             matched_grant_index,
-            extra_metadata,
+            Some(serde_json::Value::Object(metadata)),
             "kernel",
         )
     }

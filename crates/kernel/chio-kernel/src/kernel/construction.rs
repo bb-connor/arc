@@ -368,9 +368,7 @@ impl ChioKernel {
             governed_security_runtime_generation: 0,
             supplemental_quota_verifier: None,
             supplemental_admission_participant: None,
-            emergency_stopped: AtomicBool::new(false),
-            emergency_stopped_since: AtomicU64::new(0),
-            emergency_stop_reason: ArcSwap::from_pointee(Option::<String>::None),
+            stop_control: crate::stop::StopControl::process_local(),
             lock_poison: chio_supervisor::HealthFlag::new(true),
             memory_provenance: None,
             federation_peers: ArcSwap::from_pointee(HashMap::new()),
@@ -1661,32 +1659,26 @@ impl ChioKernel {
         Ok(())
     }
 
-    /// Engage the emergency kill switch.
+    /// Engage the process-local host latch.
     ///
-    /// After this call, every `evaluate_tool_call*` path returns a signed
-    /// deny receipt with reason `"kernel emergency stop active"` before
-    /// touching capability validation or the guard pipeline. The kernel
-    /// remains running so orchestrators and health probes see a live
-    /// process; it is inert. The stop latches even if time acquisition fails;
-    /// the returned clock error reports missing timing metadata, and
+    /// After this call, every `evaluate_tool_call*` path of every kernel bound
+    /// to the same stop heads returns a signed deny receipt with reason
+    /// `"kernel emergency stop active"` before touching capability validation
+    /// or the guard pipeline. The kernel remains running so orchestrators and
+    /// health probes see a live process; it is inert. The latch is published
+    /// before authority time is read, so it holds even if time acquisition
+    /// fails; the returned clock error reports missing timing metadata, and
     /// `emergency_stopped_since()` then returns `None`. Clock recovery never
-    /// resumes execution; only `emergency_resume()` clears the stop.
+    /// resumes execution; only `emergency_resume()` clears the latch.
     ///
-    /// The active capability set is NOT purged from the revocation store:
-    /// the current `RevocationStore` trait has no bulk revoke API and
-    /// capability expiration plus the kill-switch flag together
-    /// cover this surface. When a future revision adds `revoke_all`,
-    /// this method should call it; until then, capability revocation is
-    /// delegated to natural expiration.
+    /// The latch is not durable and a restart clears it. Trusted host code
+    /// uses it for component failure. Operator stops that must survive a
+    /// restart go through [`Self::stop_control`].
     pub fn emergency_stop(&self, reason: &str) -> Result<(), KernelError> {
-        // Revoking execution cannot depend on the clock that may have triggered
-        // this incident. Publish the stop before reading potentially faulty time.
-        self.emergency_stopped_since.store(0, Ordering::SeqCst);
-        self.emergency_stop_reason
-            .store(Arc::new(Some(reason.to_string())));
-        self.emergency_stopped.store(true, Ordering::SeqCst);
+        let heads = self.stop_control.heads();
+        heads.latch_host(reason);
         let now = self.read_authority_time()?.as_secs();
-        self.emergency_stopped_since.store(now, Ordering::SeqCst);
+        heads.record_host_latch_time(now);
 
         warn!(
             reason = %redacted!(reason),
@@ -1696,27 +1688,32 @@ impl ChioKernel {
         Ok(())
     }
 
-    /// Disengage the emergency kill switch and resume normal operation.
+    /// Release the host latch. A durable operator stop stays in force.
     ///
-    /// Subsequent `evaluate_tool_call*` calls follow the full validation
-    /// pipeline again. Capabilities that naturally expired while the
-    /// kernel was stopped remain expired; the kill switch does not
-    /// retroactively grant anything.
+    /// Capabilities that naturally expired while the kernel was stopped
+    /// remain expired; the kill switch does not retroactively grant anything.
     pub fn emergency_resume(&self) -> Result<(), KernelError> {
-        self.emergency_stopped.store(false, Ordering::SeqCst);
-        self.emergency_stopped_since.store(0, Ordering::SeqCst);
-
-        warn!("emergency stop disengaged -- evaluations will resume");
-
-        self.emergency_stop_reason
-            .store(Arc::new(Option::<String>::None));
+        self.stop_control.heads().release_host_latch();
+        warn!("emergency host latch released");
         Ok(())
     }
 
-    /// Return `true` when the emergency kill switch is engaged.
+    /// Return `true` when the host latch or any stop head stops execution.
     #[must_use]
     pub fn is_emergency_stopped(&self) -> bool {
-        self.emergency_stopped.load(Ordering::SeqCst)
+        self.stop_control.heads().is_stopped()
+    }
+
+    /// Operator stop control shared with every kernel bound to the same store.
+    #[must_use]
+    pub fn stop_control(&self) -> &crate::stop::StopControl {
+        &self.stop_control
+    }
+
+    /// Bind this kernel to the stop control its host shares. Bind before
+    /// startup reconciliation so the sweep observes the loaded heads.
+    pub fn set_stop_control(&mut self, control: crate::stop::StopControl) {
+        self.stop_control = control;
     }
 
     /// Return `true` when the RSS soft-ceiling sampler has flagged that process
@@ -1755,30 +1752,19 @@ impl ChioKernel {
         self.rss_shed.store(on, Ordering::Relaxed);
     }
 
-    /// Return the unix timestamp (seconds) at which the kill switch was
-    /// engaged, or `None` when running normally or trusted timing metadata is
-    /// unavailable. Use `is_emergency_stopped()` to inspect the safety latch.
+    /// Return the unix timestamp (seconds) at which the host latch engaged,
+    /// or `None` when it is released or trusted timing metadata is
+    /// unavailable. Use `is_emergency_stopped()` to inspect the stop.
     #[must_use]
     pub fn emergency_stopped_since(&self) -> Option<u64> {
-        if !self.is_emergency_stopped() {
-            return None;
-        }
-        let since = self.emergency_stopped_since.load(Ordering::SeqCst);
-        if since == 0 {
-            None
-        } else {
-            Some(since)
-        }
+        self.stop_control.heads().host_latched_since()
     }
 
-    /// Return the operator-supplied reason for the current emergency stop,
-    /// or `None` when the kernel is running normally.
+    /// Return the reason for the current host latch, or `None` when it is
+    /// released.
     #[must_use]
     pub fn emergency_stop_reason(&self) -> Option<String> {
-        if !self.is_emergency_stopped() {
-            return None;
-        }
-        self.emergency_stop_reason.load_full().as_ref().clone()
+        self.stop_control.heads().host_reason()
     }
 
     /// Install bounded volatile replay custody only when no store is configured.

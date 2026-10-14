@@ -110,6 +110,7 @@ pub(in crate::admission_operation_store::tests) fn remove_empty_checkpoint_catal
 pub(in crate::admission_operation_store::tests) fn remove_caller_share_index(
     connection: &Connection,
 ) -> rusqlite::Result<()> {
+    super::super::stop_epoch::remove_empty_stop_chain(connection)?;
     connection.execute_batch("DROP TABLE IF EXISTS admission_operation_caller_shares")
 }
 

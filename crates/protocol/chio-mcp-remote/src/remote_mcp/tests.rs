@@ -1858,3 +1858,6 @@ fn shared_upstream_notification_fanout_copies_notifications_and_prunes_dead_queu
 
 #[path = "tests/revocation_transport.rs"]
 mod revocation_transport;
+
+#[path = "tests/emergency_stop.rs"]
+mod emergency_stop;
