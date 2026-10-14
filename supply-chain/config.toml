@@ -411,6 +411,10 @@ audit-as-crates-io = true
 [policy.cmpv2]
 audit-as-crates-io = false
 
+[policy.cpp_demangle]
+audit-as-crates-io = false
+notes = "Unpublished path fork of the audited registry 0.5.1 with the upstream repr(transparent) backport. See third_party/cpp-demangle-chio/CHIO-PATCH.md."
+
 [policy.crmf]
 audit-as-crates-io = false
 
@@ -425,6 +429,10 @@ audit-as-crates-io = false
 
 [policy.regress]
 audit-as-crates-io = false
+
+[policy.rusqlite]
+audit-as-crates-io = false
+notes = "Unpublished path fork of registry 0.39.0 with callback ownership and zero-argument slice repairs. See third_party/rusqlite-chio/CHIO-PATCH.md."
 
 [policy.seccompiler]
 audit-as-crates-io = false

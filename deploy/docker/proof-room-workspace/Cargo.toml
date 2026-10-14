@@ -7,6 +7,7 @@ members = ["crates/products/chio-proof-room"]
 
 [patch.crates-io]
 aws-lc-rs = { path = "third_party/aws-lc-rs-chio" }
+rusqlite = { path = "third_party/rusqlite-chio" }
 
 [workspace.package]
 version = "0.1.0"

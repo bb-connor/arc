@@ -1,0 +1,77 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -13,6 +13,7 @@
+ edition = "2018"
+ name = "cpp_demangle"
+ version = "0.5.1"
++publish = false
+ authors = [
+     "Nick Fitzgerald <fitzgen@gmail.com>",
+     "Jim Blandy <jimb@red-bean.com>",
+@@ -86,3 +87,5 @@
+ 
+ [profile.release]
+ debug = 2
++
++[workspace]
+--- a/src/ast.rs
++++ b/src/ast.rs
+@@ -911,6 +911,7 @@
+ macro_rules! reference_newtype {
+     ( $newtype_name:ident , $oldtype:ty ) => {
+         #[derive(Debug)]
++        #[repr(transparent)]
+         struct $newtype_name($oldtype);
+ 
+         impl $newtype_name {
+@@ -918,6 +919,9 @@
+             #[allow(unsafe_code)]
+             fn new(types: &$oldtype) -> &$newtype_name {
+                 unsafe {
++                    // The transparent single-field representation preserves
++                    // the wrapped value's layout, including slice metadata.
++                    // The returned borrow inherits the input's lifetime.
+                     // This is safe because we only create an immutable
+                     // reference. We are not breaking unique mutable aliasing
+                     // requirements. An immutable reference does not allow
+@@ -962,6 +966,40 @@
+ // A newtype around a slice of type handles that we format as function
+ // arguments.
+ reference_newtype!(FunctionArgSlice, [TypeHandle]);
++
++#[cfg(test)]
++mod reference_newtype_tests {
++    use super::*;
++
++    #[test]
++    fn vector_views_keep_the_original_storage_and_layout() {
++        let values = vec![TypeHandle::Builtin(BuiltinType::Standard(
++            StandardBuiltinType::Void,
++        ))];
++        let args = FunctionArgList::new(&values);
++        let return_and_args = FunctionArgListAndReturnType::new(&values);
++        assert!(core::ptr::eq(&args.0, &values));
++        assert!(core::ptr::eq(&return_and_args.0, &values));
++        assert_eq!(core::mem::size_of_val(args), core::mem::size_of_val(&values));
++        assert_eq!(core::mem::align_of_val(args), core::mem::align_of_val(&values));
++        assert_eq!(args.len(), values.len());
++    }
++
++    #[test]
++    fn slice_views_keep_pointer_length_and_borrowed_storage() {
++        let values = [TypeHandle::Builtin(BuiltinType::Standard(
++            StandardBuiltinType::Void,
++        ))];
++        for slice in [&values[..0], &values[..]] {
++            let args = FunctionArgSlice::new(slice);
++            assert!(core::ptr::eq(&args.0, slice));
++            assert_eq!(args.as_ptr(), slice.as_ptr());
++            assert_eq!(args.len(), slice.len());
++            assert_eq!(core::mem::size_of_val(args), core::mem::size_of_val(slice));
++            assert_eq!(core::mem::align_of_val(args), core::mem::align_of_val(slice));
++        }
++    }
++}
+ 
+ // Demangle a slice of TypeHandle as a function argument list.
+ impl<'subs, W> Demangle<'subs, W> for FunctionArgSlice
