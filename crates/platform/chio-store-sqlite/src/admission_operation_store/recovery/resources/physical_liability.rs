@@ -52,6 +52,16 @@ impl PhysicalLiabilityData {
         Self::default()
     }
 
+    /// Every field at its widest encoding; sizes a record bound, never a price.
+    pub(in crate::admission_operation_store) fn saturated() -> Self {
+        Self {
+            wal_bytes: u64::MAX,
+            disk_bytes: u64::MAX,
+            recovery_appends: u64::MAX,
+            global_appends: u64::MAX,
+        }
+    }
+
     /// One priced transaction on the native authority file. Like every native
     /// frame price it retains the whole serving anchor as a disk margin.
     pub(in crate::admission_operation_store) fn native_transaction(

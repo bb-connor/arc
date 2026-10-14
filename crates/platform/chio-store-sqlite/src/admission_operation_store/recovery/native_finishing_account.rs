@@ -977,6 +977,68 @@ impl NativeFinishingAccountV1 {
     }
 }
 
+/// The largest record any version of an account with this immutable identity,
+/// roster and transition loans can encode to. Between versions only the
+/// revision, state, dispositions, transition price, count and page recipe,
+/// the purposes' page recipes and the Process enrollment change; each is taken
+/// at its widest encoding (every integer at `u64::MAX`, the longest state and
+/// disposition, every recipe and the selected enrollment present). The
+/// account writer refuses any version above it, so a transition priced at this
+/// bound covers every account rewrite the original can make.
+pub(in crate::admission_operation_store) fn native_finishing_account_bound(
+    identity: &NativeFinishingIdentityV1,
+    liabilities: &[NativeFinishingLiabilityV1],
+    transition_row_loans: &[NativeTableRowLoan],
+) -> Result<u64, AdmissionOperationStoreError> {
+    let widest_recipe = NativeFinishingPageRecipeV1 {
+        page_bucket: u64::MAX,
+        page_growth: u64::MAX,
+    };
+    let widest_digest = "0".repeat(64);
+    let widest = NativeFinishingAccountV1 {
+        schema: ACCOUNT_SCHEMA.to_owned(),
+        revision: u64::MAX,
+        state: NativeFinishingStateV1::Confirmed,
+        identity: identity.clone(),
+        liabilities: liabilities
+            .iter()
+            .cloned()
+            .map(|mut liability| {
+                liability.disposition = NativeFinishingDispositionV1::Outstanding;
+                if liability.page_recipe.is_some()
+                    || liability.purpose.file_role() == NativeFinishingFileRoleV1::Native
+                {
+                    liability.page_recipe = Some(widest_recipe);
+                }
+                liability
+            })
+            .collect(),
+        transitions: NativeFinishingTransitionAllowanceV1 {
+            profile_digest: widest_digest.clone(),
+            per_transition: PhysicalLiabilityData::saturated(),
+            remaining: u64::MAX,
+            page_recipe: Some(widest_recipe),
+            row_loans: transition_row_loans.to_vec(),
+        },
+        process_enrollment: identity
+            .process
+            .as_ref()
+            .map(|_| NativeFinishingProcessEnrollmentV1 {
+                account_digest: widest_digest.clone(),
+                event_sequence: u64::MAX,
+                event_digest: widest_digest.clone(),
+            }),
+    };
+    let bytes = u64::try_from(encode(&widest)?.len())
+        .map_err(|_| invariant("native finishing account bound exhausted"))?;
+    if bytes > NATIVE_FINISHING_ACCOUNT_MAX_BYTES {
+        return Err(invariant(
+            "native finishing account exceeds its record bound",
+        ));
+    }
+    Ok(bytes)
+}
+
 /// Exact current account with its protected record version.
 pub(in crate::admission_operation_store) struct RetainedNativeFinishingAccount {
     pub(in crate::admission_operation_store) account: NativeFinishingAccountV1,
@@ -1133,7 +1195,14 @@ pub(in crate::admission_operation_store) fn persist_prepared_native_finishing_ac
         .filter(|count| *count <= MAX_OUTSTANDING_ACCOUNTS)
         .ok_or_else(|| invariant("native finishing bank account capacity exhausted"))?;
     bank.apply(None, Some(account))?;
-    let payload = bounded(account, NATIVE_FINISHING_ACCOUNT_MAX_BYTES)?;
+    let payload = bounded(
+        account,
+        native_finishing_account_bound(
+            &account.identity,
+            &account.liabilities,
+            &account.transitions.row_loans,
+        )?,
+    )?;
     let alias = if let Some(process) = &identity.process {
         Some((
             native_finishing_source_key(&process.source_digest),
@@ -1279,7 +1348,14 @@ pub(in crate::admission_operation_store) fn persist_native_finishing_transition(
         &native_finishing_account_key(&next.identity.operation_id),
         &next.identity.flow_scope_digest,
         "command",
-        &bounded(next, NATIVE_FINISHING_ACCOUNT_MAX_BYTES)?,
+        &bounded(
+            next,
+            native_finishing_account_bound(
+                &next.identity,
+                &next.liabilities,
+                &next.transitions.row_loans,
+            )?,
+        )?,
         None,
     )?;
     persist_bank(tx, owner, &bank)?;

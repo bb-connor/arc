@@ -61,17 +61,16 @@ pub(crate) use native_finishing_account::{
 };
 pub(in crate::admission_operation_store) use native_finishing_account::{
     load_native_finishing_account, load_native_finishing_account_for_source,
-    native_finishing_account_key, native_finishing_bank_key, native_finishing_bank_readback,
-    native_finishing_bank_scope, native_finishing_debt_for_file, native_finishing_flow_scope,
-    native_finishing_publication, native_finishing_version_commit,
+    native_finishing_account_bound, native_finishing_account_key, native_finishing_bank_key,
+    native_finishing_bank_readback, native_finishing_bank_scope, native_finishing_debt_for_file,
+    native_finishing_flow_scope, native_finishing_publication, native_finishing_version_commit,
     persist_native_finishing_transition, persist_prepared_native_finishing_account,
     process_file_enrollments, process_return_bank_readback, unsettled_native_only_accounts,
     NativeFinishingAccountV1, NativeFinishingDispositionV1, NativeFinishingFileRoleV1,
     NativeFinishingFileV1, NativeFinishingIdentityV1, NativeFinishingLiabilityV1,
     NativeFinishingPageRecipeV1, NativeFinishingProcessEnrollmentV1, NativeFinishingProcessV1,
     NativeFinishingPurposeV1, NativeFinishingStateV1, NativeFinishingTransitionAllowanceV1,
-    RetainedNativeFinishingAccount, NATIVE_FINISHING_ACCOUNT_MAX_BYTES,
-    NATIVE_FINISHING_BANK_MAX_BYTES,
+    RetainedNativeFinishingAccount, NATIVE_FINISHING_BANK_MAX_BYTES,
 };
 pub(in crate::admission_operation_store) use native_finishing_bank::NativeFinishingWidthRecipeV1;
 pub(crate) use native_finishing_bank::{

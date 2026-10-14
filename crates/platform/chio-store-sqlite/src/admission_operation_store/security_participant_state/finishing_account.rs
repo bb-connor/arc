@@ -13,14 +13,15 @@ use super::*;
 use crate::admission_operation_store::recovery::resources::PhysicalLiabilityData;
 use crate::admission_operation_store::recovery::storage::{
     load_native_finishing_account, load_native_finishing_account_for_source,
-    native_finishing_account_key, native_finishing_bank_key, native_finishing_bank_scope,
-    native_finishing_flow_scope, native_finishing_publication, native_finishing_version_commit,
-    persist_native_finishing_transition, persist_prepared_native_finishing_account,
-    NativeFinishingAccountV1, NativeFinishingDispositionV1, NativeFinishingFileRoleV1,
-    NativeFinishingFileV1, NativeFinishingIdentityV1, NativeFinishingLiabilityV1,
-    NativeFinishingProcessEnrollmentV1, NativeFinishingProcessV1, NativeFinishingPurposeV1,
-    NativeFinishingStateV1, NativeFinishingTransitionAllowanceV1, RetainedNativeFinishingAccount,
-    NATIVE_FINISHING_ACCOUNT_MAX_BYTES, NATIVE_FINISHING_BANK_MAX_BYTES,
+    native_finishing_account_bound, native_finishing_account_key, native_finishing_bank_key,
+    native_finishing_bank_scope, native_finishing_flow_scope, native_finishing_publication,
+    native_finishing_version_commit, persist_native_finishing_transition,
+    persist_prepared_native_finishing_account, NativeFinishingAccountV1,
+    NativeFinishingDispositionV1, NativeFinishingFileRoleV1, NativeFinishingFileV1,
+    NativeFinishingIdentityV1, NativeFinishingLiabilityV1, NativeFinishingProcessEnrollmentV1,
+    NativeFinishingProcessV1, NativeFinishingPurposeV1, NativeFinishingStateV1,
+    NativeFinishingTransitionAllowanceV1, RetainedNativeFinishingAccount,
+    NATIVE_FINISHING_BANK_MAX_BYTES,
 };
 use crate::serving_owner::NativeSourceTransactionOrigin;
 use chio_kernel::native_finishing::{
@@ -158,18 +159,6 @@ impl SqliteAdmissionOperationStore {
         let process_future = process_quote
             .as_ref()
             .map(|quote| quote.future_transactions_digest.clone());
-        let priced = roster::price_roster(
-            &tx,
-            &self.serving_owner,
-            &origin,
-            &plan,
-            &account_key,
-            &flow_scope,
-            process_quote,
-            receipt_quote,
-        )?;
-        // Every price was taken on this exact source cut; nothing was written.
-        plan.verify_before(&tx, &self.serving_owner, &origin)?;
         let native_file = chio_sqlite_file_identity::main_database_file_identity(&tx)
             .map_err(|error| invalid(error.to_string()))?;
         let mut files = vec![
@@ -221,12 +210,28 @@ impl SqliteAdmissionOperationStore {
             phase: phase.to_owned(),
             source_cut: plan.initial_source_head().0,
             source_cut_digest: plan.initial_source_head().1.clone(),
-            physical_recipe_digest: priced.recipe_digest,
+            // Set from the priced recipe below; a digest of the same width
+            // sizes the account bound the transition allowance is priced at.
+            physical_recipe_digest: "0".repeat(64),
             seal_allowance: plan.native_seal_price().clone(),
             files,
             receipt_registration_digest: Some(receipt_digest),
             process: process_member,
         };
+        let priced = roster::price_roster(
+            &tx,
+            &self.serving_owner,
+            &origin,
+            &plan,
+            &account_key,
+            &identity,
+            process_quote,
+            receipt_quote,
+        )?;
+        // Every price was taken on this exact source cut; nothing was written.
+        plan.verify_before(&tx, &self.serving_owner, &origin)?;
+        let mut identity = identity;
+        identity.physical_recipe_digest = priced.recipe_digest;
         let account =
             NativeFinishingAccountV1::prepared(identity, priced.liabilities, priced.transitions)?;
         persist_prepared_native_finishing_account(&tx, &self.serving_owner, &account)?;

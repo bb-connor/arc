@@ -55,10 +55,11 @@ pub(super) fn price_roster(
     origin: &NativeSourceTransactionOrigin<'_>,
     plan: &VerifiedNativeInitialFinishingPlan<'_, '_>,
     account_key: &str,
-    flow_scope: &str,
+    identity: &NativeFinishingIdentityV1,
     process: Option<ProcessQuote>,
     receipt: ReceiptSinkQuote,
 ) -> Result<PricedRoster, AdmissionOperationStoreError> {
+    let flow_scope = identity.flow_scope_digest.as_str();
     plan.verify_before(tx, owner, origin)?;
     let spill: i64 = tx
         .query_row("PRAGMA main.cache_spill", [], |row| row.get(0))
@@ -118,8 +119,15 @@ pub(super) fn price_roster(
         }
         None => None,
     };
-    let mut transitions =
-        price_transitions(tx, owner, account_key, flow_scope, &liabilities, &row_plan)?;
+    let mut transitions = price_transitions(
+        tx,
+        owner,
+        account_key,
+        flow_scope,
+        identity,
+        &liabilities,
+        &row_plan,
+    )?;
     reserve_complete_growth(tx, owner, &mut liabilities, &mut transitions)?;
     let profiles: Vec<_> = liabilities
         .iter()
@@ -647,23 +655,23 @@ fn solve_output_page_recipe(
 }
 
 /// Each later account version rewrites the account and the bank head. The
-/// allowance covers Confirmed, every native purpose and Settled.
+/// allowance covers Confirmed, every native purpose and Settled. The account
+/// rewrite is priced at this original's own account bound, which the account
+/// writer enforces on every version, not at the legal record maximum.
 fn price_transitions(
     tx: &Transaction<'_>,
     owner: &SqliteServingOwner,
     account_key: &str,
     flow_scope: &str,
+    identity: &NativeFinishingIdentityV1,
     liabilities: &[NativeFinishingLiabilityV1],
     rows: &NativeRowPlan,
 ) -> Result<NativeFinishingTransitionAllowanceV1, AdmissionOperationStoreError> {
     let store = &owner.fence.store_uuid;
+    let row_loans = rows.command_loans(2, false)?;
+    let account_bytes = native_finishing_account_bound(identity, liabilities, &row_loans)?;
     let mut command = ProtectedCommandLiabilityPlan::new();
-    command.add_owned_rewrite(
-        tx,
-        account_key,
-        flow_scope,
-        NATIVE_FINISHING_ACCOUNT_MAX_BYTES,
-    )?;
+    command.add_owned_rewrite(tx, account_key, flow_scope, account_bytes)?;
     command.add_owned_rewrite(
         tx,
         &native_finishing_bank_key(store),
@@ -682,7 +690,7 @@ fn price_transitions(
     let profile_digest = sha256_hex(
         &canonical_json_bytes(&(
             "chio.native-finishing-transition-price.v1",
-            NATIVE_FINISHING_ACCOUNT_MAX_BYTES,
+            account_bytes,
             NATIVE_FINISHING_BANK_MAX_BYTES,
             &per_transition,
             remaining,
@@ -694,7 +702,7 @@ fn price_transitions(
         per_transition,
         remaining,
         page_recipe: None,
-        row_loans: rows.command_loans(2, false)?,
+        row_loans,
     })
 }
 
