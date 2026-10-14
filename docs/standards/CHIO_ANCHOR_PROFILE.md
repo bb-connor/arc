@@ -36,8 +36,8 @@ runtime example at `docs/standards/CHIO_ANCHOR_RUNTIME_REPORT_EXAMPLE.json`.
 - canonical Solana memo publication descriptors and imported memo-anchor
   verification over the built-in Memo program
 - one shared proof-bundle normalization lane spanning the primary EVM proof and
-  optional Bitcoin or Solana secondary evidence: v1 bundles require a v1
-  inclusion proof, and v2 bundles require a chain-committed v2 inclusion proof;
+  optional Bitcoin or Solana secondary evidence: a bundle requires a
+  `chio.anchor-inclusion-proof.v1` primary proof carrying its on-chain anchor;
   Bitcoin linkage is validated against the declared super-root digest instead
   of metadata presence alone
 - canonical anchor-proof projection only from durable Chio evidence bundles

@@ -47,14 +47,14 @@ fn checkpoint_consistency_proof_with_forged_chain_root_is_rejected() {
 
     // Rewrite: the successor re-commits a chain root over fabricated
     // history and re-signs with the real kernel key.
+    let fabricated_root = checkpoint_chain_root(&[leaf_hash(b"fabricated-history")]).unwrap();
     let mut rewritten = second.clone();
-    rewritten.body.chain_root =
-        Some(checkpoint_chain_root(&[leaf_hash(b"fabricated-history")]).unwrap());
+    rewritten.body.chain_root = Some(fabricated_root);
     rewritten.signature = kp.sign(&canonical_json_bytes(&rewritten.body).unwrap());
 
     let mut forged = honest.clone();
     forged.to_checkpoint_sha256 = checkpoint_body_sha256(&rewritten.body).unwrap();
-    forged.to_chain_root = rewritten.body.chain_root;
+    forged.to_chain_root = fabricated_root;
 
     assert!(
         !verify_checkpoint_consistency_proof(&first, &rewritten, &forged).unwrap(),

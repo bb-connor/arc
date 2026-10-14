@@ -175,29 +175,30 @@ fn build_checkpoint_with_chain_frontier_accepts_canonical_successor() -> Result<
 }
 
 #[test]
-fn build_checkpoint_with_chain_frontier_rejects_foreign_legacy_predecessor_leaf(
+fn build_checkpoint_with_chain_frontier_rejects_a_rootless_predecessor(
 ) -> Result<(), CheckpointError> {
     let keypair = Keypair::generate();
-    let mut legacy = build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &keypair)?;
-    legacy.body.schema = CHECKPOINT_SCHEMA_V1.to_string();
-    legacy.body.chain_root = None;
-    legacy.signature = keypair.sign(&canonical_json_bytes(&legacy.body)?);
+    let detached = build_checkpoint(2, 4, 6, &make_receipt_bytes(3), &keypair)?;
+    assert_eq!(detached.body.chain_root, None);
+    let frontier = CheckpointChainFrontier::from_leaves(&[
+        Hash::zero(),
+        checkpoint_chain_leaf_hash(&detached.body)?,
+    ]);
 
-    let foreign_frontier = CheckpointChainFrontier::from_leaves(&[Hash::zero()]);
     let result = build_checkpoint_with_chain_frontier(
-        2,
-        4,
-        6,
+        3,
+        7,
+        9,
         &make_receipt_bytes(3),
         &keypair,
-        Some(&legacy),
-        &foreign_frontier,
+        Some(&detached),
+        &frontier,
     );
 
     assert!(matches!(
         result,
         Err(CheckpointError::Continuity(message))
-            if message.contains("legacy predecessor 1 is not the final supplied chain leaf")
+            if message == "predecessor 2 carries no chain commitment to extend"
     ));
     Ok(())
 }
@@ -924,8 +925,8 @@ fn checkpoint_consistency_proof_verifies_chain_growth() {
     assert_eq!(proof.to_log_tree_size, 6);
     assert_eq!(proof.appended_entry_start_seq, 4);
     assert_eq!(proof.appended_entry_end_seq, 6);
-    assert_eq!(proof.from_chain_root, first.body.chain_root);
-    assert_eq!(proof.to_chain_root, second.body.chain_root);
+    assert_eq!(Some(proof.from_chain_root), first.body.chain_root);
+    assert_eq!(Some(proof.to_chain_root), second.body.chain_root);
     assert!(
         verify_checkpoint_consistency_proof(&first, &second, &proof).expect("verify proof"),
         "chain-growth proof should verify"
@@ -961,48 +962,27 @@ fn checkpoint_consistency_proof_verifies_chain_growth() {
 }
 
 #[test]
-fn legacy_v1_consistency_record_deserializes_and_verifies_with_legacy_semantics() {
-    let kp = Keypair::generate();
-    let mut first =
-        build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("first checkpoint");
-    first.body.schema = CHECKPOINT_SCHEMA_V1.to_string();
-    first.body.chain_root = None;
-    first.signature =
-        kp.sign(&canonical_json_bytes(&first.body).expect("canonical legacy first body"));
-
-    let mut second = build_checkpoint_with_previous(
-        2,
-        4,
-        6,
-        &make_receipt_bytes(3),
-        &kp,
-        Some(&first),
-        &chain_leaves(&[&first]),
-    )
-    .expect("second checkpoint");
-    second.body.schema = CHECKPOINT_SCHEMA_V1.to_string();
-    second.body.chain_root = None;
-    second.signature =
-        kp.sign(&canonical_json_bytes(&second.body).expect("canonical legacy second body"));
-
-    let legacy_json = serde_json::json!({
-        "schema": CHECKPOINT_CONSISTENCY_PROOF_SCHEMA_V1,
-        "log_id": checkpoint_log_id(&second),
+fn consistency_proof_without_chain_commitments_is_refused_at_deserialization() {
+    let record = serde_json::json!({
+        "schema": CHECKPOINT_CONSISTENCY_PROOF_SCHEMA,
+        "log_id": "local-log-0",
         "from_checkpoint_seq": 1,
         "to_checkpoint_seq": 2,
-        "from_checkpoint_sha256": checkpoint_body_sha256(&first.body).expect("first digest"),
-        "to_checkpoint_sha256": checkpoint_body_sha256(&second.body).expect("second digest"),
+        "from_checkpoint_sha256": "00".repeat(32),
+        "to_checkpoint_sha256": "11".repeat(32),
         "from_log_tree_size": 3,
         "to_log_tree_size": 6,
         "appended_entry_start_seq": 4,
         "appended_entry_end_seq": 6
     });
-    let proof: CheckpointConsistencyProof =
-        serde_json::from_value(legacy_json).expect("legacy proof deserializes");
 
+    let error = serde_json::from_value::<CheckpointConsistencyProof>(record)
+        .expect_err("a metadata-only record must not deserialize as a consistency proof");
     assert!(
-        verify_checkpoint_consistency_proof(&first, &second, &proof).expect("legacy verification"),
-        "an exact legacy metadata record remains verifiable as legacy evidence"
+        error
+            .to_string()
+            .contains("missing field `from_chain_root`"),
+        "unexpected error: {error}"
     );
 }
 
@@ -1023,11 +1003,7 @@ fn consistency_proof_rejects_maximum_untrusted_leaf_index_without_panicking() {
     let mut proof =
         build_checkpoint_consistency_proof(&first, &second, &chain_leaves(&[&first, &second]))
             .expect("proof");
-    proof
-        .from_leaf_inclusion
-        .as_mut()
-        .expect("earlier leaf inclusion")
-        .leaf_index = usize::MAX;
+    proof.from_leaf_inclusion.leaf_index = usize::MAX;
 
     assert!(
         !verify_checkpoint_consistency_proof(&first, &second, &proof)
@@ -1102,46 +1078,6 @@ fn transparency_rejects_divergent_chain_root_at_key_rotation() {
 }
 
 #[test]
-fn transparency_derives_legacy_v1_consistency_records() {
-    let keypair = Keypair::generate();
-    let mut first =
-        build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &keypair).expect("first checkpoint");
-    first.body.schema = CHECKPOINT_SCHEMA_V1.to_string();
-    first.body.chain_root = None;
-    first.signature =
-        keypair.sign(&canonical_json_bytes(&first.body).expect("canonical first v1 body"));
-
-    let mut second = build_checkpoint_with_previous(
-        2,
-        4,
-        6,
-        &make_receipt_bytes(3),
-        &keypair,
-        Some(&first),
-        &chain_leaves(&[&first]),
-    )
-    .expect("second checkpoint");
-    second.body.schema = CHECKPOINT_SCHEMA_V1.to_string();
-    second.body.chain_root = None;
-    second.body.previous_checkpoint_sha256 =
-        Some(checkpoint_body_sha256(&first.body).expect("first v1 digest"));
-    second.signature =
-        keypair.sign(&canonical_json_bytes(&second.body).expect("canonical second v1 body"));
-
-    let transparency = validate_checkpoint_transparency(&[first.clone(), second.clone()])
-        .expect("legacy transparency");
-    assert_eq!(transparency.consistency_proofs.len(), 1);
-    let proof = &transparency.consistency_proofs[0];
-    assert_eq!(proof.schema, CHECKPOINT_CONSISTENCY_PROOF_SCHEMA_V1);
-    assert!(verify_checkpoint_consistency_proof(&first, &second, proof)
-        .expect("verify legacy metadata record"));
-    assert!(
-        verify_checkpoint_transparency_records(&[first, second], &transparency).is_ok(),
-        "a derived legacy record must round-trip through record verification"
-    );
-}
-
-#[test]
 fn checkpoint_consistency_proof_rejects_unrelated_chain_root() {
     let kp = Keypair::generate();
     let first = build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("first");
@@ -1171,7 +1107,7 @@ fn checkpoint_consistency_proof_rejects_unrelated_chain_root() {
     let mut forged = honest.clone();
     forged.to_checkpoint_sha256 =
         checkpoint_body_sha256(&rewritten.body).expect("rewritten digest");
-    forged.to_chain_root = rewritten.body.chain_root;
+    forged.to_chain_root = rewritten.body.chain_root.expect("rewritten chain root");
     assert!(
         !verify_checkpoint_consistency_proof(&first, &rewritten, &forged).expect("verify forged"),
         "a chain root with no append-only relation must not verify"
@@ -1179,7 +1115,7 @@ fn checkpoint_consistency_proof_rejects_unrelated_chain_root() {
 
     // Tampering any single field of an otherwise honest proof fails too.
     let mut tampered = honest.clone();
-    tampered.to_chain_root = Some(Hash::zero());
+    tampered.to_chain_root = Hash::zero();
     assert!(
         !verify_checkpoint_consistency_proof(&first, &second, &tampered).expect("verify tampered"),
         "a tampered to_chain_root must not verify"
@@ -1222,13 +1158,11 @@ fn checkpoint_consistency_proof_requires_the_committed_chain_to_end_in_this_chec
     let mut smuggled_proof = honest.clone();
     smuggled_proof.to_checkpoint_sha256 =
         checkpoint_body_sha256(&smuggled.body).expect("smuggled digest");
-    smuggled_proof.to_chain_root = Some(smuggled_chain.root());
+    smuggled_proof.to_chain_root = smuggled_chain.root();
     smuggled_proof.chain_proof_hashes = smuggled_chain.consistency_proof(1).expect("smuggled path");
-    smuggled_proof.to_leaf_inclusion = Some(
-        smuggled_chain
-            .inclusion_proof(1)
-            .expect("smuggled inclusion"),
-    );
+    smuggled_proof.to_leaf_inclusion = smuggled_chain
+        .inclusion_proof(1)
+        .expect("smuggled inclusion");
     assert!(
         !verify_checkpoint_consistency_proof(&first, &smuggled, &smuggled_proof)
             .expect("verify smuggled chain"),
@@ -1236,11 +1170,7 @@ fn checkpoint_consistency_proof_requires_the_committed_chain_to_end_in_this_chec
     );
 
     let mut wrong_index = honest.clone();
-    wrong_index
-        .to_leaf_inclusion
-        .as_mut()
-        .expect("later leaf inclusion")
-        .leaf_index = 0;
+    wrong_index.to_leaf_inclusion.leaf_index = 0;
     assert!(
         !verify_checkpoint_consistency_proof(&first, &second, &wrong_index)
             .expect("verify wrong index"),
@@ -1304,15 +1234,13 @@ fn checkpoint_consistency_proof_binds_the_earlier_endpoint_too() {
         from_checkpoint_sha256: checkpoint_body_sha256(&forged_second.body)
             .expect("forged from digest"),
         to_checkpoint_sha256: checkpoint_body_sha256(&forged_third.body).expect("forged to digest"),
-        from_chain_root: Some(forged_from_tree.root()),
-        to_chain_root: Some(forged_to_tree.root()),
+        from_chain_root: forged_from_tree.root(),
+        to_chain_root: forged_to_tree.root(),
         chain_proof_hashes: forged_to_tree.consistency_proof(2).expect("forged path"),
-        from_leaf_inclusion: Some(
-            forged_from_tree
-                .inclusion_proof(1)
-                .expect("forged from leaf"),
-        ),
-        to_leaf_inclusion: Some(forged_to_tree.inclusion_proof(2).expect("forged to leaf")),
+        from_leaf_inclusion: forged_from_tree
+            .inclusion_proof(1)
+            .expect("forged from leaf"),
+        to_leaf_inclusion: forged_to_tree.inclusion_proof(2).expect("forged to leaf"),
         ..honest
     };
 
@@ -1321,8 +1249,8 @@ fn checkpoint_consistency_proof_binds_the_earlier_endpoint_too() {
         verify_consistency_proof(
             2,
             3,
-            &forged.from_chain_root.expect("forged from root"),
-            &forged.to_chain_root.expect("forged to root"),
+            &forged.from_chain_root,
+            &forged.to_chain_root,
             &forged.chain_proof_hashes,
         ),
         "the forged chain is genuinely prefix-related, so only leaf binding can catch it"
@@ -1396,15 +1324,13 @@ fn mid_chain_consistency_proof_requires_an_anchored_prefix() {
         from_checkpoint_sha256: checkpoint_body_sha256(&forged_second.body)
             .expect("forged from digest"),
         to_checkpoint_sha256: checkpoint_body_sha256(&forged_third.body).expect("forged to digest"),
-        from_chain_root: Some(forged_from_tree.root()),
-        to_chain_root: Some(forged_to_tree.root()),
+        from_chain_root: forged_from_tree.root(),
+        to_chain_root: forged_to_tree.root(),
         chain_proof_hashes: forged_to_tree.consistency_proof(2).expect("forged path"),
-        from_leaf_inclusion: Some(
-            forged_from_tree
-                .inclusion_proof(1)
-                .expect("forged from leaf"),
-        ),
-        to_leaf_inclusion: Some(forged_to_tree.inclusion_proof(2).expect("forged to leaf")),
+        from_leaf_inclusion: forged_from_tree
+            .inclusion_proof(1)
+            .expect("forged from leaf"),
+        to_leaf_inclusion: forged_to_tree.inclusion_proof(2).expect("forged to leaf"),
         ..honest.clone()
     };
 
@@ -1455,24 +1381,19 @@ fn checkpoint_consistency_proof_requires_chain_commitment() {
     let leaves = chain_leaves(&[&first, &second]);
     let proof = build_checkpoint_consistency_proof(&first, &second, &leaves).expect("proof");
 
-    // A legacy pair cannot satisfy a v2 cryptographic proof.
-    let mut legacy_first = first.clone();
-    legacy_first.body.schema = CHECKPOINT_SCHEMA_V1.to_string();
-    legacy_first.body.chain_root = None;
-    legacy_first.signature =
-        kp.sign(&canonical_json_bytes(&legacy_first.body).expect("canonical legacy first body"));
-    let mut legacy_second = second.clone();
-    legacy_second.body.schema = CHECKPOINT_SCHEMA_V1.to_string();
-    legacy_second.body.previous_checkpoint_sha256 =
-        Some(checkpoint_body_sha256(&legacy_first.body).expect("legacy digest"));
-    legacy_second.body.chain_root = None;
-    legacy_second.signature =
-        kp.sign(&canonical_json_bytes(&legacy_second.body).expect("canonical legacy second body"));
+    let mut rootless_second = second.clone();
+    rootless_second.body.chain_root = None;
+    rootless_second.signature = kp.sign(
+        &canonical_json_bytes(&rootless_second.body).expect("canonical rootless second body"),
+    );
 
+    let error = verify_checkpoint_consistency_proof(&first, &rootless_second, &proof)
+        .expect_err("a rootless endpoint cannot carry a consistency proof");
     assert!(
-        !verify_checkpoint_consistency_proof(&legacy_first, &legacy_second, &proof)
-            .expect("legacy pair is denied"),
-        "a v2 proof must not verify against legacy checkpoints"
+        error
+            .to_string()
+            .contains("does not extend a chain commitment from its predecessor"),
+        "unexpected error: {error}"
     );
 }
 
@@ -1497,40 +1418,9 @@ fn validate_checkpoint_predecessor_rejects_chain_commitment_downgrade() {
     let error =
         validate_checkpoint_predecessor(&first, &second).expect_err("downgrade should fail");
     assert!(
-        error.to_string().contains("drops the chain commitment"),
-        "unexpected error: {error}"
-    );
-}
-
-#[test]
-fn validate_checkpoint_predecessor_requires_first_v2_successor_commitment() {
-    let kp = Keypair::generate();
-    let mut legacy_first = build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("first");
-    legacy_first.body.schema = CHECKPOINT_SCHEMA_V1.to_string();
-    legacy_first.body.chain_root = None;
-    legacy_first.signature =
-        kp.sign(&canonical_json_bytes(&legacy_first.body).expect("canonical legacy body"));
-
-    let mut v2_second = build_checkpoint_with_previous(
-        2,
-        4,
-        6,
-        &make_receipt_bytes(3),
-        &kp,
-        Some(&legacy_first),
-        &chain_leaves(&[&legacy_first]),
-    )
-    .expect("v2 successor");
-    v2_second.body.chain_root = None;
-    v2_second.signature =
-        kp.sign(&canonical_json_bytes(&v2_second.body).expect("canonical v2 body"));
-
-    let error = validate_checkpoint_predecessor(&legacy_first, &v2_second)
-        .expect_err("the first v2 successor must start the retained chain commitment");
-    assert!(
         error
             .to_string()
-            .contains("does not start or extend the chain commitment"),
+            .contains("does not extend a chain commitment from its predecessor"),
         "unexpected error: {error}"
     );
 }
@@ -1578,25 +1468,34 @@ fn checkpoint_body_rejects_unknown_fields() {
 }
 
 #[test]
-fn legacy_checkpoint_body_without_chain_root_still_roundtrips() {
+fn validate_checkpoint_rejects_a_first_checkpoint_without_chain_root() {
     let kp = Keypair::generate();
     let mut checkpoint =
         build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("build failed");
-    checkpoint.body.schema = CHECKPOINT_SCHEMA_V1.to_string();
     checkpoint.body.chain_root = None;
     checkpoint.signature =
-        kp.sign(&canonical_json_bytes(&checkpoint.body).expect("canonical legacy checkpoint body"));
+        kp.sign(&canonical_json_bytes(&checkpoint.body).expect("canonical rootless body"));
 
-    let json = serde_json::to_string(&checkpoint).expect("serialize");
-    assert!(
-        !json.contains("chain_root"),
-        "an absent chain commitment must not appear on the wire"
+    let error = validate_checkpoint(&checkpoint).expect_err("checkpoint 1 needs its chain root");
+    assert_eq!(
+        error.to_string(),
+        "invalid checkpoint: checkpoint 1 must carry chain_root"
     );
-    let restored: KernelCheckpoint = serde_json::from_str(&json).expect("deserialize");
-    assert_eq!(restored.body.chain_root, None);
-    assert!(
-        verify_checkpoint_signature(&restored).expect("verify"),
-        "legacy checkpoint signature must survive the roundtrip"
+}
+
+#[test]
+fn validate_checkpoint_rejects_retired_statement_schema() {
+    let kp = Keypair::generate();
+    let mut checkpoint =
+        build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("build failed");
+    checkpoint.body.schema = "chio.checkpoint_statement.v1".to_string();
+    checkpoint.signature =
+        kp.sign(&canonical_json_bytes(&checkpoint.body).expect("canonical retired body"));
+
+    let error = validate_checkpoint(&checkpoint).expect_err("retired schema must be refused");
+    assert_eq!(
+        error.to_string(),
+        "invalid checkpoint: unsupported checkpoint schema chio.checkpoint_statement.v1"
     );
 }
 
@@ -1648,10 +1547,11 @@ fn checkpoint_body_schema_field() {
 }
 
 #[test]
-fn checkpoint_schema_support_includes_legacy_v1_and_current_v2() {
-    assert!(is_supported_checkpoint_schema(CHECKPOINT_SCHEMA_V1));
-    assert!(is_supported_checkpoint_schema(CHECKPOINT_SCHEMA_V2));
+fn checkpoint_schema_support_is_exactly_the_current_schema() {
     assert!(is_supported_checkpoint_schema(CHECKPOINT_SCHEMA));
+    assert!(!is_supported_checkpoint_schema(
+        "chio.checkpoint_statement.v1"
+    ));
 }
 
 #[test]

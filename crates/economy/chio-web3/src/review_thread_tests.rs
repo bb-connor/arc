@@ -70,7 +70,7 @@ fn web3_checkpoint_statement_rejects_explicit_null_options_at_deserialization() 
 #[test]
 fn serialized_anchor_inclusion_proof_satisfies_the_published_schema() {
     let mut schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    schema_path.push("../../../spec/schemas/chio-web3/v2/anchor-inclusion-proof.schema.json");
+    schema_path.push("../../../spec/schemas/chio-web3/v1/anchor-inclusion-proof.schema.json");
     let schema_path = std::fs::canonicalize(&schema_path)
         .unwrap_or_else(|error| panic!("canonicalize {}: {error}", schema_path.display()));
     let schema = chio_spec_validate::load_json(&schema_path)
@@ -156,9 +156,9 @@ fn serialized_anchor_inclusion_proof_satisfies_the_published_schema() {
 }
 
 #[test]
-fn published_v2_anchor_schemas_require_canonical_signed_checkpoint_hashes() {
+fn published_anchor_schemas_require_canonical_signed_checkpoint_hashes() {
     let mut schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    schema_path.push("../../../spec/schemas/chio-web3/v2/anchor-inclusion-proof.schema.json");
+    schema_path.push("../../../spec/schemas/chio-web3/v1/anchor-inclusion-proof.schema.json");
     let schema_path = std::fs::canonicalize(&schema_path)
         .unwrap_or_else(|error| panic!("canonicalize {}: {error}", schema_path.display()));
     let schema = chio_spec_validate::load_json(&schema_path)
@@ -196,13 +196,13 @@ fn published_v2_anchor_schemas_require_canonical_signed_checkpoint_hashes() {
     }
 
     let mut bundle_schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    bundle_schema_path.push("../../../spec/schemas/chio-web3/v2/anchor-proof-bundle.schema.json");
+    bundle_schema_path.push("../../../spec/schemas/chio-web3/v1/anchor-proof-bundle.schema.json");
     let bundle_schema_path = std::fs::canonicalize(&bundle_schema_path)
         .unwrap_or_else(|error| panic!("canonicalize {}: {error}", bundle_schema_path.display()));
     let bundle_schema = chio_spec_validate::load_json(&bundle_schema_path)
         .unwrap_or_else(|error| panic!("load anchor proof bundle schema: {error}"));
     let bundle = json!({
-        "schema": "chio.anchor-proof-bundle.v2",
+        "schema": "chio.anchor-proof-bundle.v1",
         "primary_proof": canonical,
         "secondary_lanes": ["solana_memo"],
         "solana_anchor": {

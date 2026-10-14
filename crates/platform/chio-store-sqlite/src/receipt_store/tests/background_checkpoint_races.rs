@@ -504,14 +504,14 @@ fn cache_miss_holds_insert_lock_across_interior_projection_audit(
 }
 
 #[test]
-fn cache_miss_uses_locked_legacy_replacement_frontier_when_no_build_is_due(
+fn cache_miss_uses_locked_replacement_frontier_when_no_build_is_due(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (temp_dir, path) = temp_db("chio-checkpoint-cache-miss-legacy")?;
+    let (temp_dir, path) = temp_db("chio-checkpoint-cache-miss-replacement")?;
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..2u64 {
         store.append_chio_receipt_returning_seq(&sample_receipt_with_keypair(
-            &format!("cache-miss-legacy-{i}"),
+            &format!("cache-miss-replacement-{i}"),
             i + 1,
             &keypair,
         ))?;
@@ -521,20 +521,12 @@ fn cache_miss_uses_locked_legacy_replacement_frontier_when_no_build_is_due(
     let connection = store.connection()?;
     let mut head = seed_verified_head(&connection)?;
     drop(connection);
-    let mut checkpoint_a =
-        build_checkpoint(1, 1, 1, &canonical_receipt_bytes(&store, 1, 1), &keypair)?;
-    checkpoint_a.body.schema = chio_kernel::checkpoint::CHECKPOINT_SCHEMA_V1.to_string();
-    checkpoint_a.body.chain_root = None;
-    checkpoint_a.signature = keypair.sign(&canonical_json_bytes(&checkpoint_a.body)?);
+    let checkpoint_a = build_checkpoint(1, 1, 1, &canonical_receipt_bytes(&store, 1, 1), &keypair)?;
     insert_checkpoint_row(&store, &checkpoint_a, checkpoint_a.body.batch_end_seq);
 
     let mut connection = store.connection()?;
     let stale_frontier = rebuild_checkpoint_frontier(&mut connection, None)?;
-    let mut checkpoint_b =
-        build_checkpoint(1, 1, 2, &canonical_receipt_bytes(&store, 1, 2), &keypair)?;
-    checkpoint_b.body.schema = chio_kernel::checkpoint::CHECKPOINT_SCHEMA_V1.to_string();
-    checkpoint_b.body.chain_root = None;
-    checkpoint_b.signature = keypair.sign(&canonical_json_bytes(&checkpoint_b.body)?);
+    let checkpoint_b = build_checkpoint(1, 1, 2, &canonical_receipt_bytes(&store, 1, 2), &keypair)?;
     assert_ne!(
         chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint_a.body)?,
         chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint_b.body)?,
@@ -559,7 +551,7 @@ fn cache_miss_uses_locked_legacy_replacement_frontier_when_no_build_is_due(
     let adopted_frontier = head
         .chain_frontier
         .as_ref()
-        .ok_or("adopted legacy frontier missing")?;
+        .ok_or("adopted replacement frontier missing")?;
     assert_ne!(
         adopted_frontier.root(),
         stale_frontier.root(),

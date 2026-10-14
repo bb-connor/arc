@@ -525,12 +525,12 @@ mod tests {
     }
 
     #[test]
-    fn web3_v2_anchor_schema_rejects_empty_nested_payloads() {
-        let schema_path = workspace_schema_path("chio-web3/v2/anchor-inclusion-proof.schema.json");
-        let schema = load_json(&schema_path)
-            .unwrap_or_else(|error| panic!("load v2 anchor schema: {error}"));
+    fn web3_anchor_schema_rejects_empty_nested_payloads() {
+        let schema_path = workspace_schema_path("chio-web3/v1/anchor-inclusion-proof.schema.json");
+        let schema =
+            load_json(&schema_path).unwrap_or_else(|error| panic!("load anchor schema: {error}"));
         let document = json!({
-            "schema": "chio.anchor-inclusion-proof.v2",
+            "schema": "chio.anchor-inclusion-proof.v1",
             "receipt": {},
             "receipt_inclusion": {},
             "checkpoint_statement": {},
@@ -556,7 +556,7 @@ mod tests {
         let schema_path =
             workspace_schema_path("chio-transparency/v1/receipt-inclusion-proof.schema.json");
         let schema = load_json(&schema_path)
-            .unwrap_or_else(|error| panic!("load v2 transparency schema: {error}"));
+            .unwrap_or_else(|error| panic!("load transparency schema: {error}"));
         let algorithm_values = [
             ("a".repeat(64), "b".repeat(128)),
             (
@@ -639,7 +639,7 @@ mod tests {
         let schema_path =
             workspace_schema_path("chio-transparency/v1/receipt-inclusion-proof.schema.json");
         let schema = load_json(&schema_path)
-            .unwrap_or_else(|error| panic!("load v2 transparency schema: {error}"));
+            .unwrap_or_else(|error| panic!("load transparency schema: {error}"));
         let invalid_pairs = [
             (
                 format!("p256:{}", "a".repeat(130)),
@@ -701,18 +701,18 @@ mod tests {
     }
 
     #[test]
-    fn receipt_inclusion_proof_schema_enforces_checkpoint_version_chain_root_rules() {
+    fn receipt_inclusion_proof_schema_enforces_checkpoint_chain_root_rules() {
         let schema_path =
             workspace_schema_path("chio-transparency/v1/receipt-inclusion-proof.schema.json");
         let schema = load_json(&schema_path)
-            .unwrap_or_else(|error| panic!("load v2 transparency schema: {error}"));
+            .unwrap_or_else(|error| panic!("load transparency schema: {error}"));
         let invalid_documents = [
+            transparency_document("chio.checkpoint_statement.v2", 1, None),
             transparency_document(
                 "chio.checkpoint_statement.v1",
                 1,
                 Some(json!(format!("0x{}", "3".repeat(64)))),
             ),
-            transparency_document("chio.checkpoint_statement.v2", 1, None),
         ];
         for document in invalid_documents {
             assert!(matches!(
@@ -730,10 +730,10 @@ mod tests {
         validate_value(
             &schema_path,
             &schema,
-            Path::new("<detached-later-v2-checkpoint>"),
+            Path::new("<detached-later-checkpoint>"),
             &detached_later,
         )
-        .unwrap_or_else(|error| panic!("later detached v2 checkpoint must validate: {error}"));
+        .unwrap_or_else(|error| panic!("later detached checkpoint must validate: {error}"));
     }
 
     #[test]
@@ -741,7 +741,7 @@ mod tests {
         let schema_path =
             workspace_schema_path("chio-transparency/v1/receipt-inclusion-proof.schema.json");
         let schema = load_json(&schema_path)
-            .unwrap_or_else(|error| panic!("load v2 transparency schema: {error}"));
+            .unwrap_or_else(|error| panic!("load transparency schema: {error}"));
         let canonical_chain_root = json!(format!("0x{}", "3".repeat(64)));
         let canonical = transparency_document(
             "chio.checkpoint_statement.v2",
@@ -780,7 +780,7 @@ mod tests {
         let schema_path =
             workspace_schema_path("chio-transparency/v1/receipt-inclusion-proof.schema.json");
         let schema = load_json(&schema_path)
-            .unwrap_or_else(|error| panic!("load v2 transparency schema: {error}"));
+            .unwrap_or_else(|error| panic!("load transparency schema: {error}"));
         let mut document = transparency_document(
             "chio.checkpoint_statement.v2",
             1,
@@ -800,10 +800,10 @@ mod tests {
     }
 
     #[test]
-    fn web3_v2_anchor_bundle_excludes_the_primary_lane_from_secondary_lanes() {
-        let schema_path = workspace_schema_path("chio-web3/v2/anchor-proof-bundle.schema.json");
+    fn web3_anchor_bundle_excludes_the_primary_lane_from_secondary_lanes() {
+        let schema_path = workspace_schema_path("chio-web3/v1/anchor-proof-bundle.schema.json");
         let schema = load_json(&schema_path)
-            .unwrap_or_else(|error| panic!("load v2 anchor bundle schema: {error}"));
+            .unwrap_or_else(|error| panic!("load anchor bundle schema: {error}"));
         assert_eq!(
             schema.pointer("/properties/secondary_lanes/items/enum"),
             Some(&json!(["bitcoin_ots", "solana_memo"]))

@@ -173,19 +173,18 @@ pub fn build_checkpoint_with_chain_frontier_at(
                     previous.body.checkpoint_seq
                 )));
             }
-            // When the predecessor committed a chain, the frontier must
-            // reproduce exactly that commitment: this is what stops a stale or
-            // foreign frontier from being extended into a signed root.
-            if let Some(previous_chain_root) = previous.body.chain_root {
-                if prior_chain.root() != Some(previous_chain_root) {
-                    return Err(CheckpointError::Continuity(format!(
-                        "predecessor {} chain_root does not match the supplied chain",
-                        previous.body.checkpoint_seq
-                    )));
-                }
-            } else if prior_chain.last_leaf != Some(checkpoint_chain_leaf_hash(&previous.body)?) {
+            // The frontier must reproduce the predecessor's signed
+            // commitment exactly, so a stale or foreign frontier is never
+            // extended into a signed root.
+            let Some(previous_chain_root) = previous.body.chain_root else {
                 return Err(CheckpointError::Continuity(format!(
-                    "legacy predecessor {} is not the final supplied chain leaf",
+                    "predecessor {} carries no chain commitment to extend",
+                    previous.body.checkpoint_seq
+                )));
+            };
+            if prior_chain.root() != Some(previous_chain_root) {
+                return Err(CheckpointError::Continuity(format!(
+                    "predecessor {} chain_root does not match the supplied chain",
                     previous.body.checkpoint_seq
                 )));
             }

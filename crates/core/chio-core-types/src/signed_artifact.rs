@@ -27,9 +27,7 @@ use crate::session::{CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, CHIO_SESSION_ANCHOR_SCH
 /// can reject unknown signed artifacts before loading the `chio-anchor` crate.
 pub const CHIO_ANCHOR_BATCH_V1_SCHEMA: &str = "chio.anchor_batch.v1";
 pub const CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA: &str = "chio.anchor-inclusion-proof.v1";
-pub const CHIO_ANCHOR_INCLUSION_PROOF_V2_SCHEMA: &str = "chio.anchor-inclusion-proof.v2";
 pub const CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA: &str = "chio.anchor-proof-bundle.v1";
-pub const CHIO_ANCHOR_PROOF_BUNDLE_V2_SCHEMA: &str = "chio.anchor-proof-bundle.v2";
 pub const CHIO_BUDGET_SNAPSHOT_ANCHOR_PROVENANCE_V1_SCHEMA: &str =
     "chio.budget-snapshot-anchor-provenance.v1";
 pub const CHIO_BILATERAL_SIGNATURE_SLICE_V1_SCHEMA: &str = "chio.bilateral-signature-slice.v1";
@@ -358,19 +356,11 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA,
-        Some(("anchor_inclusion_proof", "public-settlement-v1")),
-    ),
-    (
-        CHIO_ANCHOR_INCLUSION_PROOF_V2_SCHEMA,
-        Some(("anchor_inclusion_proof", "checkpoint-transparency-v2")),
+        Some(("anchor_inclusion_proof", "checkpoint-transparency-v1")),
     ),
     (
         CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA,
-        Some(("anchor_proof_bundle", "public-settlement-v1")),
-    ),
-    (
-        CHIO_ANCHOR_PROOF_BUNDLE_V2_SCHEMA,
-        Some(("anchor_proof_bundle", "checkpoint-transparency-v2")),
+        Some(("anchor_proof_bundle", "checkpoint-transparency-v1")),
     ),
     (
         CHIO_BILATERAL_SIGNATURE_SLICE_V1_SCHEMA,
@@ -995,7 +985,7 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         CHIO_TRANSPARENCY_RECEIPT_INCLUSION_PROOF_V1_SCHEMA,
         Some((
             "transparency_anchored_inclusion_proof",
-            "checkpoint-transparency-v2",
+            "checkpoint-transparency-v1",
         )),
     ),
     (

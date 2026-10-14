@@ -121,20 +121,14 @@ different names for the same bytes.
 ## `chio.anchor-proof-bundle.v1` (3 declarations, 3 crates)
 
 - `crates/core/chio-core-types/src/signed_artifact.rs:31` `CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA`
-- `crates/economy/chio-anchor/src/bundle.rs:12` `CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA_V1`
+- `crates/economy/chio-anchor/src/bundle.rs:12` `CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA`
 - `crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs:58` `CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA`
-
-## `chio.checkpoint_statement.v1` (3 declarations, 3 crates)
-
-- `crates/economy/chio-web3/src/anchors.rs:18` `CHIO_CHECKPOINT_STATEMENT_SCHEMA_V1`
-- `crates/kernel/chio-kernel/src/checkpoint.rs:39` `CHECKPOINT_SCHEMA_V1`
-- `crates/platform/chio-transaction-passport/src/minimal.rs:798` `CHECKPOINT_STATEMENT_SCHEMA_V1_ID`
 
 ## `chio.checkpoint_statement.v2` (3 declarations, 3 crates)
 
-- `crates/economy/chio-web3/src/anchors.rs:19` `CHIO_CHECKPOINT_STATEMENT_SCHEMA_V2`
-- `crates/kernel/chio-kernel/src/checkpoint.rs:41` `CHECKPOINT_SCHEMA_V2`
-- `crates/platform/chio-transaction-passport/src/minimal.rs:799` `CHECKPOINT_STATEMENT_SCHEMA_V2_ID`
+- `crates/economy/chio-web3/src/anchors.rs:18` `CHIO_CHECKPOINT_STATEMENT_SCHEMA`
+- `crates/kernel/chio-kernel/src/checkpoint.rs:38` `CHECKPOINT_SCHEMA`
+- `crates/platform/chio-transaction-passport/src/minimal.rs:801` `CHECKPOINT_STATEMENT_SCHEMA_ID`
 
 ## `chio.proof-room.bundle.v1` (3 declarations, 3 crates)
 
@@ -298,17 +292,7 @@ different names for the same bytes.
 ## `chio.anchor-inclusion-proof.v1` (2 declarations, 2 crates)
 
 - `crates/core/chio-core-types/src/signed_artifact.rs:29` `CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA`
-- `crates/economy/chio-web3/src/anchors.rs:21` `CHIO_ANCHOR_INCLUSION_PROOF_SCHEMA_V1`
-
-## `chio.anchor-inclusion-proof.v2` (2 declarations, 2 crates)
-
-- `crates/core/chio-core-types/src/signed_artifact.rs:30` `CHIO_ANCHOR_INCLUSION_PROOF_V2_SCHEMA`
-- `crates/economy/chio-web3/src/anchors.rs:22` `CHIO_ANCHOR_INCLUSION_PROOF_SCHEMA_V2`
-
-## `chio.anchor-proof-bundle.v2` (2 declarations, 2 crates)
-
-- `crates/core/chio-core-types/src/signed_artifact.rs:32` `CHIO_ANCHOR_PROOF_BUNDLE_V2_SCHEMA`
-- `crates/economy/chio-anchor/src/bundle.rs:13` `CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA_V2`
+- `crates/economy/chio-web3/src/anchors.rs:19` `CHIO_ANCHOR_INCLUSION_PROOF_SCHEMA`
 
 ## `chio.attest.buyer-attestation-packet.v1` (2 declarations, 2 crates)
 

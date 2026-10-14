@@ -74,12 +74,7 @@
         "kernel_key"
       ],
       "properties": {
-        "schema": {
-          "enum": [
-            "chio.checkpoint_statement.v1",
-            "chio.checkpoint_statement.v2"
-          ]
-        },
+        "schema": { "const": "chio.checkpoint_statement.v2" },
         "checkpoint_seq": { "type": "integer", "minimum": 1 },
         "batch_start_seq": { "type": "integer", "minimum": 1 },
         "batch_end_seq": { "type": "integer", "minimum": 1 },
@@ -90,27 +85,11 @@
         "previous_checkpoint_sha256": { "$ref": "#/$defs/sha256" },
         "chain_root": { "$ref": "#/$defs/canonicalHash" }
       },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "schema": { "const": "chio.checkpoint_statement.v1" }
-            },
-            "required": ["schema"]
-          },
-          "then": { "not": { "required": ["chain_root"] } }
-        },
-        {
-          "if": {
-            "properties": {
-              "schema": { "const": "chio.checkpoint_statement.v2" },
-              "checkpoint_seq": { "const": 1 }
-            },
-            "required": ["schema", "checkpoint_seq"]
-          },
-          "then": { "required": ["chain_root"] }
-        }
-      ]
+      "if": {
+        "properties": { "checkpoint_seq": { "const": 1 } },
+        "required": ["checkpoint_seq"]
+      },
+      "then": { "required": ["chain_root"] }
     }
   }
 }

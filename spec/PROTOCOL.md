@@ -2616,19 +2616,18 @@ envelope at this stage.
 
 ### 6.5 Checkpoints
 
-Receipt batches can be committed to a Merkle checkpoint. New issuers use:
+Receipt batches can be committed to a Merkle checkpoint. Issuers use:
 
 ```text
 chio.checkpoint_statement.v2
 ```
 
-The v2 signed body may carry `chain_root`, the RFC 6962 commitment over the
-checkpoint chain. `chio.checkpoint_statement.v1` checkpoints remain valid for
-legacy verification and evidence import, but a v1 body MUST NOT carry
-`chain_root`. New cryptographic prefix proofs use
-`chio.checkpoint_consistency_proof.v2`; the v1 consistency record remains a
-legacy metadata-only continuity record and MUST NOT be interpreted as a
-cryptographic prefix proof. Checkpoint verification is part of exported
+The signed body carries `chain_root`, the RFC 6962 commitment over the
+checkpoint chain, on checkpoint 1 and on every checkpoint that extends a
+predecessor; only a detached checkpoint built without chain context omits it.
+Verifiers MUST refuse any other statement schema. Cryptographic prefix proofs
+use `chio.checkpoint_consistency_proof.v1`, which MUST carry both chain roots,
+the consistency path, and both endpoint leaf inclusions. Checkpoint verification is part of exported
 evidence and compliance-oriented operator reporting. Chio's web3 anchoring and
 settlement lanes additionally require durable local receipt storage and
 kernel-signed checkpoint issuance; append-only remote receipt mirrors are
@@ -4329,7 +4328,7 @@ instead of ambient.
 The shipped official web3 execution surface is artifact-driven rather than
 permissionless. It consists of `chio.web3-trust-profile.v1`,
 `chio.web3-contract-package.v1`, `chio.web3-chain-configuration.v1`,
-`chio.anchor-inclusion-proof.v1`, `chio.anchor-inclusion-proof.v2`,
+`chio.anchor-inclusion-proof.v1`,
 `chio.oracle-conversion-evidence.v1`,
 `chio.web3-settlement-dispatch.v1`,
 `chio.web3-settlement-execution-receipt.v1`, and

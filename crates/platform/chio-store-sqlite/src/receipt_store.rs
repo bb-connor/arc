@@ -2796,8 +2796,8 @@ fn catch_up_verified_head_to(
         // this adopted checkpoint's projection rows (O(b) for its batch, not full
         // history), fail closed on any divergence.
         validate_checkpoint_projection_rows(connection, &row, &checkpoint)?;
-        // Check any signed chain root before adopting. Legacy v1 leaves still
-        // extend the frontier so a later v2 root commits the complete history.
+        // The adopted checkpoint's signed chain root must extend the verified
+        // frontier before it becomes the head.
         head.chain_frontier = Some(advance_verified_checkpoint_chain_frontier(
             connection,
             head.chain_frontier.as_ref(),
