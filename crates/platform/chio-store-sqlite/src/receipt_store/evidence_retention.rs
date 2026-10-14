@@ -732,6 +732,7 @@ pub(super) fn create_archive_schema(
             "retention archive application_id {application_id:#x} is not a Chio store"
         )));
     }
+    crate::capability_lineage::reject_unsigned_projection_lineage(&transaction, "archive")?;
     let version_table_exists: bool = transaction.query_row(
         "SELECT EXISTS(SELECT 1 FROM archive.sqlite_master WHERE type = 'table' AND name = 'chio_store_schema_versions')",
         [],

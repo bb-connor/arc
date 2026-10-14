@@ -49,6 +49,30 @@ pub(crate) fn validate_snapshot_from_row(
     Ok(snapshot)
 }
 
+/// Refuse a database whose lineage tables still admit unsigned projection rows.
+pub(crate) fn reject_unsigned_projection_lineage(
+    connection: &rusqlite::Connection,
+    schema: &str,
+) -> Result<(), chio_kernel::ReceiptStoreError> {
+    for table in ["capability_lineage", "federated_share_capability_lineage"] {
+        let sql: Option<String> = connection
+            .query_row(
+                &format!(
+                    "SELECT sql FROM {schema}.sqlite_master WHERE type = 'table' AND name = ?1"
+                ),
+                [table],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if sql.is_some_and(|sql| sql.contains("legacy_projection")) {
+            return Err(chio_kernel::ReceiptStoreError::Conflict(format!(
+                "{schema}.{table} admits unsigned projection provenance; refusing to open"
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn provenance_from_row(
     row: &Row<'_>,
     column: usize,

@@ -580,6 +580,7 @@ impl SqliteReceiptStore {
                 RECEIPT_STORE_ANCHOR_TABLES,
             )
             .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+            crate::capability_lineage::reject_unsigned_projection_lineage(&connection, "main")?;
             if schema_state != crate::SchemaState::Current {
                 return Err(ReceiptStoreError::Conflict(
                     "receipt database carries no receipt schema version; open it with \
@@ -644,6 +645,7 @@ impl SqliteReceiptStore {
             RECEIPT_STORE_ANCHOR_TABLES,
         )
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        crate::capability_lineage::reject_unsigned_projection_lineage(&connection, "main")?;
         configure_sqlite_connection(&mut connection, options.pool.max_page_count)?;
         let schema_migration =
             connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
