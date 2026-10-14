@@ -7,6 +7,14 @@ struct DeferredA2aTask {
     request: CrossProtocolExecutionRequest,
     response: TaskResponse,
     deadline: AuthorityDeadline,
+    v1_output_mode: Option<V1OutputMode>,
+}
+
+impl DeferredA2aTask {
+    fn is_owned_by(&self, execution: &A2aKernelExecutionContext) -> bool {
+        self.owner_agent_id == execution.agent_id
+            && self.request.capability.subject == execution.capability.subject
+    }
 }
 
 /// The A2A edge server.
@@ -22,6 +30,7 @@ pub struct ChioA2aEdge {
     /// Maps ambiguous unqualified tool names to the qualified published IDs.
     ambiguous_skill_ids: BTreeMap<String, Vec<String>>,
     task_counter: u64,
+    task_namespace: String,
     tasks: BTreeMap<String, DeferredA2aTask>,
 }
 
@@ -228,8 +237,11 @@ impl ChioA2aEdge {
                         description: skill_candidate.description.clone(),
                         tags: skill_candidate.tags.clone(),
                         examples: None,
-                        input_modes: vec!["text".to_string()],
-                        output_modes: vec!["text".to_string()],
+                        input_modes: vec!["text/plain".to_string(), "application/json".to_string()],
+                        output_modes: vec![
+                            "text/plain".to_string(),
+                            "application/json".to_string(),
+                        ],
                         bridge_fidelity: skill_candidate.fidelity.clone(),
                     });
                 }
@@ -267,6 +279,10 @@ impl ChioA2aEdge {
             skill_bindings,
             ambiguous_skill_ids,
             task_counter: 0,
+            // A random identifier prevents stale client task records from
+            // aliasing unrelated work after this process loses its task table.
+            // This public value is not a trust root.
+            task_namespace: chio_core::crypto::Keypair::generate().public_key().to_hex(),
             tasks: BTreeMap::new(),
         })
     }
@@ -304,6 +320,9 @@ impl ChioA2aEdge {
             A2aEdgeError::ToolNotFound(message) | A2aEdgeError::InvalidRequest(message) => {
                 (-32602, message.clone())
             }
+            A2aEdgeError::UnsupportedOperation(message) => (-32004, (*message).to_string()),
+            A2aEdgeError::TaskNotFound(_) => (-32001, "task not found".to_string()),
+            A2aEdgeError::TaskNotCancelable(_) => (-32002, "task is not cancelable".to_string()),
             other => (-32603, other.to_string()),
         };
 
@@ -333,12 +352,12 @@ impl ChioA2aEdge {
                 protocol_version: "1.0".to_string(),
             }],
             capabilities: AgentCapabilities {
-                streaming: true,
+                streaming: false,
                 push_notifications: false,
                 state_transition_history: false,
             },
-            default_input_modes: vec!["text".to_string()],
-            default_output_modes: vec!["text".to_string()],
+            default_input_modes: vec!["text/plain".to_string(), "application/json".to_string()],
+            default_output_modes: vec!["text/plain".to_string(), "application/json".to_string()],
             skills: self.skills.clone(),
         }
     }
@@ -371,7 +390,10 @@ impl ChioA2aEdge {
             .task_counter
             .checked_add(1)
             .ok_or(A2aEdgeError::TaskCapacity)?;
-        Ok(format!("a2a-task-{}", self.task_counter))
+        Ok(format!(
+            "a2a-task-{}-{}",
+            self.task_namespace, self.task_counter
+        ))
     }
 
     fn prune_deferred_tasks(&mut self, now: ClockReading) -> Result<(), ClockError> {
@@ -389,9 +411,18 @@ impl ChioA2aEdge {
         Ok(())
     }
 
-    fn ensure_deferred_task_capacity(&mut self, now: ClockReading) -> Result<(), A2aEdgeError> {
+    fn ensure_deferred_task_capacity(
+        &mut self,
+        now: ClockReading,
+        execution: &A2aKernelExecutionContext,
+    ) -> Result<(), A2aEdgeError> {
         self.prune_deferred_tasks(now)?;
-        if self.tasks.len() >= MAX_DEFERRED_A2A_TASKS {
+        let subject_tasks = self.tasks.values().filter(|task| {
+            task.request.capability.subject == execution.capability.subject
+        }).count();
+        if self.tasks.len() >= MAX_DEFERRED_A2A_TASKS
+            || subject_tasks >= MAX_DEFERRED_A2A_TASKS_PER_SUBJECT
+        {
             return Err(A2aEdgeError::TaskCapacity);
         }
         Ok(())
@@ -591,7 +622,7 @@ impl ChioA2aEdge {
         let binding = self.resolve_skill_binding(skill_id)?;
         let now = kernel.authority_clock_reading()?;
         let deadline = AuthorityDeadline::for_timeout_ms(now, DEFERRED_A2A_TASK_TTL_MILLIS)?;
-        self.ensure_deferred_task_capacity(now)?;
+        self.ensure_deferred_task_capacity(now, execution)?;
         let task_id = self.next_task_id()?;
         let kernel_request_id =
             request_id.map_or_else(|| format!("a2a-stream-{task_id}"), str::to_string);
@@ -622,6 +653,7 @@ impl ChioA2aEdge {
                 request: orchestrated_request,
                 response: response.clone(),
                 deadline,
+                v1_output_mode: None,
             },
         );
         Ok(response)
@@ -644,6 +676,14 @@ impl ChioA2aEdge {
         };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
+        if matches!(method.as_str(), "SendMessage" | "GetTask" | "CancelTask") {
+            let response = self.handle_v1_jsonrpc(id, &method, params, kernel, execution);
+            return if should_respond {
+                response
+            } else {
+                response.suppress_wire_response()
+            };
+        }
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
             &id,
             &method,
@@ -743,89 +783,16 @@ impl ChioA2aEdge {
         }
 
         match self.resolve_task(&task_id, execution) {
+            Ok(response) if response.status == TaskStatus::Working => {
+                self.complete_task(&task_id, kernel, execution, id)
+            }
             Ok(response) => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&response).unwrap_or(Value::Null)
             })),
-            Err(A2aEdgeError::InvalidRequest(_)) if self.tasks.contains_key(&task_id) => {
-                self.complete_task(&task_id, kernel, execution, id)
-            }
             Err(error) => Self::jsonrpc_error_response(id, error),
         }
-    }
-
-    fn complete_task(
-        &mut self,
-        task_id: &str,
-        kernel: &ChioKernel,
-        execution: &A2aKernelExecutionContext,
-        id: Value,
-    ) -> A2aJsonRpcResponse {
-        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
-            return Self::jsonrpc_error_response(id, error);
-        }
-        let Some(task) = self.tasks.get_mut(task_id) else {
-            return Self::jsonrpc_error_response(
-                id,
-                A2aEdgeError::ToolNotFound(task_id.to_string()),
-            );
-        };
-        if task.owner_agent_id != execution.agent_id {
-            return Self::jsonrpc_error_response(
-                id,
-                A2aEdgeError::InvalidRequest("task is not owned by the current agent".to_string()),
-            );
-        }
-        if task.response.status != TaskStatus::Working {
-            return A2aJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": serde_json::to_value(&task.response).unwrap_or(Value::Null)
-            }));
-        }
-
-        if let Err(error) = kernel
-            .authority_clock_reading()
-            .and_then(|now| task.deadline.remaining(now))
-        {
-            if error == ClockError::Expired {
-                self.tasks.remove(task_id);
-            }
-            return Self::jsonrpc_error_response(id, error.into());
-        }
-        let request = task.request.clone();
-        let orchestrated = match execute_orchestrated_a2a_request(
-            &self.config.peer_capabilities,
-            kernel,
-            match self.manifest_registry() {
-                Ok(registry) => registry,
-                Err(error) => return Self::jsonrpc_error_response(id, error),
-            },
-            request,
-        ) {
-            Ok(orchestrated) => orchestrated,
-            Err(error) => return Self::jsonrpc_error_response(id, error),
-        };
-        let response = task_response_from_orchestrated(task_id.to_string(), orchestrated);
-        let response = match self.tasks.get_mut(task_id) {
-            Some(task) if task.response.status == TaskStatus::Working => {
-                task.response = response;
-                task.response.clone()
-            }
-            Some(task) => task.response.clone(),
-            None => {
-                return Self::jsonrpc_error_response(
-                    id,
-                    A2aEdgeError::ToolNotFound(task_id.to_string()),
-                );
-            }
-        };
-        A2aJsonRpcResponse::response(json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-        }))
     }
 
     fn handle_jsonrpc_task_cancel(
@@ -856,7 +823,7 @@ impl ChioA2aEdge {
                 A2aEdgeError::ToolNotFound(task_id.to_string()),
             );
         };
-        if task.owner_agent_id != execution.agent_id {
+        if !task.is_owned_by(execution) {
             return Self::jsonrpc_error_response(
                 id,
                 A2aEdgeError::InvalidRequest("task is not owned by the current agent".to_string()),
@@ -900,16 +867,11 @@ impl ChioA2aEdge {
             .tasks
             .get(task_id)
             .ok_or_else(|| A2aEdgeError::ToolNotFound(task_id.to_string()))?;
-        if task.owner_agent_id != execution.agent_id {
+        if !task.is_owned_by(execution) {
             return Err(A2aEdgeError::InvalidRequest(
                 "task is not owned by the current agent".to_string(),
             ));
         }
-        match task.response.status {
-            TaskStatus::Working => Err(A2aEdgeError::InvalidRequest(
-                "task is pending deferred execution".to_string(),
-            )),
-            _ => Ok(task.response.clone()),
-        }
+        Ok(task.response.clone())
     }
 }

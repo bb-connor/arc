@@ -8,6 +8,7 @@ static MCP_TARGET_EXECUTOR: McpTargetExecutor = McpTargetExecutor {
 };
 static OPENAI_TARGET_EXECUTOR: OpenAiTargetExecutor = OpenAiTargetExecutor;
 const MAX_DEFERRED_A2A_TASKS: usize = 1024;
+const MAX_DEFERRED_A2A_TASKS_PER_SUBJECT: usize = 128;
 const DEFERRED_A2A_TASK_TTL_MILLIS: u64 = 5 * 60 * 1000;
 
 #[derive(Debug, Clone)]
