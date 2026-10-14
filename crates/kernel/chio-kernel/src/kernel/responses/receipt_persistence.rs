@@ -240,7 +240,7 @@ impl ChioKernel {
         // Persistence uses the admission-time peer-key snapshot installed
         // by the evaluate path. Re-resolving freshness here is unsafe: the
         // tool has already executed, so a peer that expires mid-dispatch
-        // must not skip dual-sign evidence for the side effect admitted
+        // must not skip co-sign evidence for the side effect admitted
         // under the fresh snapshot.
         let request_admission = self.receipt_federation_admission_for_request(
             &request.request_id,

@@ -183,10 +183,9 @@ relay path, including catch-up and future replay endpoints.
   wording, and the relay gate rejects retired references in that runbook.
 - Generated help for normal public Chio federation, runtime, and pheromone
   commands uses Chio material names.
-- `chio receipt explain bilateral` JSON and human output now describe legacy
-  DualSignedReceipt as non-section-6 conformant and the DSSE artifact as
-  treaty-bound Chio bilateral invocation material without emitting the old
-  Chio bilateral spec path.
+- `chio receipt explain bilateral` JSON and human output describe the DSSE
+  envelope as treaty-bound Chio bilateral invocation material without emitting
+  the old Chio bilateral spec path.
 - `crates/trust/chio-attest-buyer/src/lib.rs` is now the Chio-named buyer proof API
   boundary. It now accepts live `chio.attest.buyer-attestation-packet.v1`
   packets and `chio.attest.buyer-attestation-review-package.v1` full review

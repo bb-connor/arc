@@ -23,7 +23,7 @@ pub(crate) fn cmd_receipt_explain(
     } else {
         load_receipt_for_explain(args.receipt_id, args.tenant, args.admin_all, &backend)?
     };
-    if is_bilateral_artifacts_value(&value) {
+    if is_dsse_envelope_value(&value) {
         return render_bilateral_explain(&value, &args, &backend);
     }
     let report = explain_receipt_value(args.receipt_id, value, args.depth, args.fanout_limit)?;
@@ -73,21 +73,11 @@ pub(crate) fn cmd_receipt_explain(
     Ok(())
 }
 
-pub(crate) fn is_bilateral_artifacts_value(value: &serde_json::Value) -> bool {
+pub(crate) fn is_dsse_envelope_value(value: &serde_json::Value) -> bool {
     let Some(obj) = value.as_object() else {
         return false;
     };
-    let has_dual = obj.contains_key("dual_signed_receipt") || obj.contains_key("dualSignedReceipt");
-    let has_dsse = obj.contains_key("dsse_envelope") || obj.contains_key("dsseEnvelope");
-    has_dual && has_dsse
-}
-
-pub(crate) fn bilateral_field<'a>(
-    value: &'a serde_json::Value,
-    snake: &str,
-    camel: &str,
-) -> Option<&'a serde_json::Value> {
-    value.get(snake).or_else(|| value.get(camel))
+    obj.contains_key("payloadType") && obj.contains_key("payload") && obj.contains_key("signatures")
 }
 
 pub(crate) fn render_bilateral_explain(
@@ -95,31 +85,19 @@ pub(crate) fn render_bilateral_explain(
     args: &ReceiptExplainArgs<'_>,
     backend: &QueryBackend<'_>,
 ) -> Result<(), CliError> {
-    let dual =
-        bilateral_field(value, "dual_signed_receipt", "dualSignedReceipt").ok_or_else(|| {
-            CliError::cli_other_error(
-                "bilateral artifact missing dual_signed_receipt section".to_string(),
-            )
-        })?;
-    let dsse = bilateral_field(value, "dsse_envelope", "dsseEnvelope").ok_or_else(|| {
-        CliError::cli_other_error("bilateral artifact missing dsse_envelope section".to_string())
-    })?;
-
-    let dual_section = explain_dual_signed_receipt(dual)?;
-    let dsse_section = explain_dsse_envelope(dsse)?;
+    let dsse_section = explain_dsse_envelope(value)?;
     // Emit a structural inspection trace, not a "verifier trace".
     // The CLI does not have org A / org B passport public keys in
     // scope and cannot perform real Ed25519 verification.
     let trace_section = if args.inspect_bilateral {
-        Some(inspect_bilateral_envelope_trace(dual, dsse)?)
+        Some(inspect_bilateral_envelope_trace(value)?)
     } else {
         None
     };
 
     let report = serde_json::json!({
         "schema": "chio.cli.receipt-explain.bilateral.v1",
-        "shape": "BilateralCoSignArtifacts",
-        "dual_signed_receipt": dual_section,
+        "shape": "DsseEnvelope",
         "dsse_envelope": dsse_section,
         "bilateral_inspection_trace": trace_section,
     });
@@ -132,47 +110,6 @@ pub(crate) fn render_bilateral_explain(
     // Pretty-print: boxed sections.
     print_bilateral_human(&report, args.inspect_bilateral);
     Ok(())
-}
-
-pub(crate) fn explain_dual_signed_receipt(
-    dual: &serde_json::Value,
-) -> Result<serde_json::Value, CliError> {
-    let body = dual.get("body").cloned().unwrap_or(serde_json::Value::Null);
-    let receipt_id = body
-        .get("id")
-        .and_then(|v| v.as_str())
-        .map(ToOwned::to_owned);
-    let org_a = dual
-        .get("org_a_kernel_id")
-        .or_else(|| dual.get("orgAKernelId"))
-        .and_then(|v| v.as_str())
-        .map(ToOwned::to_owned);
-    let org_b = dual
-        .get("org_b_kernel_id")
-        .or_else(|| dual.get("orgBKernelId"))
-        .and_then(|v| v.as_str())
-        .map(ToOwned::to_owned);
-    let org_a_sig = dual
-        .get("org_a_signature")
-        .or_else(|| dual.get("orgASignature"))
-        .cloned();
-    let org_b_sig = dual
-        .get("org_b_signature")
-        .or_else(|| dual.get("orgBSignature"))
-        .cloned();
-    let schema = dual
-        .get("schema")
-        .and_then(|v| v.as_str())
-        .map(ToOwned::to_owned);
-    Ok(serde_json::json!({
-        "schema": schema,
-        "receipt_id": receipt_id,
-        "org_a_kernel_id": org_a,
-        "org_b_kernel_id": org_b,
-        "org_a_signature": org_a_sig,
-        "org_b_signature": org_b_sig,
-        "non_section6_disclaimer": "DualSignedReceipt signs canonical JSON of CoSigningBody, not the DSSE PAE preimage required by section 6. This section is NOT section-6 conformant. For section-6 conformance use the dsse_envelope section.",
-    }))
 }
 
 pub(crate) fn explain_dsse_envelope(
@@ -233,7 +170,6 @@ pub(crate) fn explain_dsse_envelope(
 /// `chio_federation::bilateral_dsse::verify_dsse_envelope` against
 /// pinned passport keys.
 pub(crate) fn inspect_bilateral_envelope_trace(
-    dual: &serde_json::Value,
     dsse: &serde_json::Value,
 ) -> Result<serde_json::Value, CliError> {
     use chio_federation::bilateral_dsse;
@@ -248,21 +184,38 @@ pub(crate) fn inspect_bilateral_envelope_trace(
         }));
     };
 
-    // Step 1: receipt body present in dual artifact (subject anchor).
-    let body = dual.get("body");
-    if body.is_none() {
+    let payload_b64 = dsse.get("payload").and_then(|v| v.as_str()).unwrap_or("");
+    let payload_bytes = {
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+        use base64::Engine;
+        BASE64_STANDARD.decode(payload_b64.as_bytes()).ok()
+    };
+    let stmt_value: Option<serde_json::Value> = payload_bytes
+        .as_ref()
+        .and_then(|b| crate::input::json::<serde_json::Value>(b).ok());
+
+    // Step 1: the subject anchors a Chio receipt.
+    let subject_name = stmt_value
+        .as_ref()
+        .and_then(|s| s.get("subject"))
+        .and_then(|v| v.as_array())
+        .and_then(|a| a.first())
+        .and_then(|s0| s0.get("name"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if subject_name.starts_with(bilateral_dsse::RECEIPT_SUBJECT_NAME_PREFIX) {
         step(
             1,
-            "receipt_body_present",
-            "fail",
-            "dual_signed_receipt.body missing",
+            "receipt_subject_named",
+            "ok",
+            "subject[0].name names a Chio receipt",
         );
     } else {
         step(
             1,
-            "receipt_body_present",
-            "ok",
-            "dual_signed_receipt.body parsed",
+            "receipt_subject_named",
+            "fail",
+            "subject[0].name does not name a Chio receipt",
         );
     }
 
@@ -289,12 +242,6 @@ pub(crate) fn inspect_bilateral_envelope_trace(
     }
 
     // Step 3: payload base64 decodes.
-    let payload_b64 = dsse.get("payload").and_then(|v| v.as_str()).unwrap_or("");
-    let payload_bytes = {
-        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-        use base64::Engine;
-        BASE64_STANDARD.decode(payload_b64.as_bytes()).ok()
-    };
     if payload_bytes.is_some() {
         step(
             3,
@@ -312,9 +259,6 @@ pub(crate) fn inspect_bilateral_envelope_trace(
     }
 
     // Step 4: predicateType is the chio bilateral or its in-toto.io alias.
-    let stmt_value: Option<serde_json::Value> = payload_bytes
-        .as_ref()
-        .and_then(|b| crate::input::json::<serde_json::Value>(b).ok());
     let predicate_type = stmt_value
         .as_ref()
         .and_then(|s| s.get("predicateType"))
@@ -553,33 +497,9 @@ pub(crate) fn inspect_bilateral_envelope_trace(
 }
 
 pub(crate) fn print_bilateral_human(report: &serde_json::Value, with_trace: bool) {
-    println!("=== bilateral co-sign artifacts ===");
+    println!("=== bilateral co-sign envelope ===");
     println!("schema: {}", report["schema"].as_str().unwrap_or("?"));
     println!("shape:  {}", report["shape"].as_str().unwrap_or("?"));
-    println!();
-
-    println!("--- DualSignedReceipt (NON-SECTION-6-CONFORMANT) ---");
-    let dual = &report["dual_signed_receipt"];
-    println!(
-        "  receipt_id:       {}",
-        dual["receipt_id"].as_str().unwrap_or("?")
-    );
-    println!(
-        "  schema:           {}",
-        dual["schema"].as_str().unwrap_or("?")
-    );
-    println!(
-        "  org_a_kernel_id:  {}",
-        dual["org_a_kernel_id"].as_str().unwrap_or("?")
-    );
-    println!(
-        "  org_b_kernel_id:  {}",
-        dual["org_b_kernel_id"].as_str().unwrap_or("?")
-    );
-    println!(
-        "  disclaimer:       {}",
-        dual["non_section6_disclaimer"].as_str().unwrap_or("?")
-    );
     println!();
 
     println!("--- DSSE envelope (signature-slice API artifact) ---");

@@ -108,10 +108,6 @@ fn refusing_fixture(
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     assert_eq!(fixture.kernel.receipt_log().len(), 1);
     assert_eq!(
-        fixture.kernel.dual_signed_receipt(&receipt.id).is_some(),
-        cosign
-    );
-    assert_eq!(
         fixture
             .kernel
             .federation_dsse_envelope(&receipt.id)
@@ -164,11 +160,6 @@ fn federated_unknown_refusal_replays_existing_bilateral_artifacts() -> TestResul
         Some("tool server error: federated mutation is refused")
     );
     assert_same_receipt(&replay.receipt, &case.receipt);
-    assert!(case
-        .fixture
-        .kernel
-        .dual_signed_receipt(&case.receipt.id)
-        .is_some());
     let envelope = case
         .fixture
         .kernel
@@ -214,7 +205,6 @@ fn restarted_unknown_refusal_requires_its_original_federation_treaty() -> TestRe
         assert_same_receipt(&stored, &case.receipt);
         assert_eq!(case.fixture.store.operation(), case.operation);
         assert_eq!(kernel.receipt_log().len(), 1);
-        assert!(kernel.dual_signed_receipt(&case.receipt.id).is_none());
         assert!(kernel.federation_dsse_envelope(&case.receipt.id).is_none());
     }
     assert_eq!(admissions.load(Ordering::SeqCst), 0);
@@ -223,22 +213,22 @@ fn restarted_unknown_refusal_requires_its_original_federation_treaty() -> TestRe
 }
 
 #[test]
-fn federated_refusal_replay_rejects_a_conflicting_dual_receipt() -> TestResult {
+fn federated_refusal_replay_rejects_a_conflicting_dsse_envelope() -> TestResult {
     let case = refusing_fixture("federated-refusal-conflicting-artifact", true)?;
-    let mut dual = case
+    let other = refusing_fixture("federated-refusal-other-artifact", true)?;
+    let foreign = other
         .fixture
         .kernel
-        .dual_signed_receipt(&case.receipt.id)
-        .ok_or("original bilateral receipt")?;
-    dual.body.tool_name = "different-tool".into();
+        .federation_dsse_envelope(&other.receipt.id)
+        .ok_or("unrelated bilateral DSSE envelope")?;
     let now = case.fixture.kernel.trusted_now_millis()?.as_secs();
     let _ = case
         .fixture
         .kernel
-        .federation_dual_receipts
+        .federation_dsse_envelopes
         .lock()
-        .map_err(|_| "dual cache lock")?
-        .insert(case.receipt.id.clone(), dual, now);
+        .map_err(|_| "DSSE cache lock")?
+        .insert(case.receipt.id.clone(), foreign, now);
     let error = recover(&case.fixture.kernel, &case.fixture.request)
         .expect_err("conflicting bilateral body refuses delivery");
     assert_federation_failure(
@@ -264,9 +254,9 @@ fn federated_refusal_replay_rejects_a_conflicting_dual_receipt() -> TestResult {
 fn federated_refusal_replay_rejects_a_poisoned_artifact_cache() -> TestResult {
     let case = refusing_fixture("federated-refusal-poisoned-cache", true)?;
     std::thread::scope(|scope| {
-        let cache = &case.fixture.kernel.federation_dual_receipts;
+        let cache = &case.fixture.kernel.federation_dsse_envelopes;
         let poisoned = scope.spawn(move || {
-            let _cache = cache.lock().expect("dual cache lock");
+            let _cache = cache.lock().expect("DSSE cache lock");
             panic!("injected federation cache poison");
         });
         let panic = poisoned.join().expect_err("injected cache lock panic");
@@ -327,7 +317,6 @@ fn startup_recovery_terminalizes_a_federated_admission_without_its_original_trea
         .clone()
         .ok_or("recovery refusal receipt")?;
     assert!(receipt.verify_signature()?);
-    assert!(kernel.dual_signed_receipt(&receipt.id).is_none());
     assert!(kernel.federation_dsse_envelope(&receipt.id).is_none());
     assert_eq!(kernel.reconcile_recoverable_admissions()?, 0);
     let error = recover(&kernel, &fixture.request)

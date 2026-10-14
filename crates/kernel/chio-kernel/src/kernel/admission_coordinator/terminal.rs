@@ -611,10 +611,9 @@ impl ChioKernel {
                 })?;
         }
         if request.federated_origin_kernel_id.is_some()
-            && (self.dual_signed_receipt(&receipt.id).is_none()
-                || self.federation_dsse_envelope(&receipt.id).is_none())
+            && self.federation_dsse_envelope(&receipt.id).is_none()
         {
-            // Legacy outcomes have no retained federation evidence. A completed
+            // An outcome without retained federation evidence: a completed
             // replay enters recovery before the ordinary runtime
             // admission stage. Re-admit and reinstall the verified treaty
             // material before retrying the missing bilateral projection.

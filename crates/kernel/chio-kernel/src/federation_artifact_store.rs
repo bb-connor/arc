@@ -1,20 +1,17 @@
-//! Additive durable seam for bilateral co-sign artifacts. The kernel caches
-//! DualSignedReceipt / DsseEnvelope in a capped, idle-swept BoundedMap; when a
+//! Durable seam for bilateral co-sign artifacts. The kernel caches each
+//! DsseEnvelope in a capped, idle-swept BoundedMap; when a
 //! FederationArtifactStore is configured, the co-sign hook writes through to it
-//! first, and accessors fall through to it on a cache miss.
+//! first, and the accessor falls through to it on a cache miss.
 
 use chio_security_types::clock::{Clock, ClockError, ClockFence};
 use std::sync::{Arc, Mutex};
 
 use chio_bounded::{BoundedMap, SizeGauge};
-use chio_federation::bilateral::DualSignedReceipt;
 use chio_federation::bilateral_dsse::DsseEnvelope;
 
 use crate::KernelError;
 
 pub trait FederationArtifactStore: Send + Sync {
-    fn put_dual_signed(&self, id: &str, receipt: &DualSignedReceipt) -> Result<(), KernelError>;
-    fn get_dual_signed(&self, id: &str) -> Result<Option<DualSignedReceipt>, KernelError>;
     fn put_dsse(&self, id: &str, envelope: &DsseEnvelope) -> Result<(), KernelError>;
     fn get_dsse(&self, id: &str) -> Result<Option<DsseEnvelope>, KernelError>;
 
@@ -33,7 +30,7 @@ pub trait FederationArtifactStore: Send + Sync {
 }
 
 /// Hard cap and idle sweep for [`InMemoryFederationArtifactStore`]'s backing
-/// maps. Mirrors the kernel's own federation cache defaults
+/// map. Mirrors the kernel's own federation cache defaults
 /// (`MemoryBudgetConfig::federation_cache_capacity`) so the reference store
 /// carries the same footprint discipline as the caches it sits behind.
 const IN_MEMORY_FEDERATION_ARTIFACT_STORE_CAPACITY: usize = 8192;
@@ -41,15 +38,11 @@ const IN_MEMORY_FEDERATION_ARTIFACT_STORE_IDLE_TTL_SECS: u64 = 3600;
 
 /// Reference in-memory implementation (test double and default backing when a
 /// deployment wants durable bilateral evidence without a database). Capped,
-/// idle-swept, gauged instead of an unbounded HashMap: even though this store
-/// has no install seam today, it must not become a footgun once a follow-on
-/// wires one up. A deployment requiring persistence installs a database-backed
-/// impl instead.
+/// idle-swept, and gauged instead of an unbounded HashMap. A deployment
+/// requiring persistence installs a database-backed impl instead.
 pub struct InMemoryFederationArtifactStore {
     clock: Arc<dyn Clock>,
     clock_fence: Mutex<ClockFence>,
-    dual: Mutex<BoundedMap<String, DualSignedReceipt>>,
-    dual_gauge: SizeGauge,
     dsse: Mutex<BoundedMap<String, DsseEnvelope>>,
     dsse_gauge: SizeGauge,
 }
@@ -93,13 +86,10 @@ impl InMemoryFederationArtifactStore {
         idle_ttl_secs: u64,
         clock: Arc<dyn Clock>,
     ) -> Self {
-        let dual_gauge = SizeGauge::new();
         let dsse_gauge = SizeGauge::new();
         Self {
             clock,
             clock_fence: Mutex::new(ClockFence::default()),
-            dual: Mutex::new(BoundedMap::new(capacity, idle_ttl_secs, dual_gauge.clone())),
-            dual_gauge,
             dsse: Mutex::new(BoundedMap::new(capacity, idle_ttl_secs, dsse_gauge.clone())),
             dsse_gauge,
         }
@@ -107,18 +97,13 @@ impl InMemoryFederationArtifactStore {
 
     /// Construct from a CONFIGURED process memory budget so lowering
     /// `federation_cache_capacity` / `federation_cache_idle_ttl_secs` actually
-    /// bounds each backing map, rather than every deployment retaining the
+    /// bounds the backing map, rather than every deployment retaining the
     /// compiled-in 8192-entry default.
     pub fn from_memory_budget(budget: &crate::MemoryBudgetConfig) -> Self {
         Self::with_capacity(
             budget.federation_cache_capacity,
             budget.federation_cache_idle_ttl_secs,
         )
-    }
-
-    /// Live occupancy of the dual-signed-receipt backing map.
-    pub fn dual_signed_len(&self) -> usize {
-        self.dual_gauge.get()
     }
 
     /// Live occupancy of the DSSE-envelope backing map.
@@ -128,28 +113,6 @@ impl InMemoryFederationArtifactStore {
 }
 
 impl FederationArtifactStore for InMemoryFederationArtifactStore {
-    fn put_dual_signed(&self, id: &str, receipt: &DualSignedReceipt) -> Result<(), KernelError> {
-        let now = self.now()?;
-        let mut guard = match self.dual.lock() {
-            Ok(g) => g,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        // Drop-oldest at capacity (BoundedMap's default eviction): the
-        // evicted entry, if any, is intentionally discarded here since this
-        // reference store has no durable tier to spill it to.
-        let _evicted = guard.insert(id.to_string(), receipt.clone(), now);
-        Ok(())
-    }
-
-    fn get_dual_signed(&self, id: &str) -> Result<Option<DualSignedReceipt>, KernelError> {
-        let now = self.now()?;
-        let mut guard = match self.dual.lock() {
-            Ok(g) => g,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        Ok(guard.get(&id.to_string(), now).cloned())
-    }
-
     fn put_dsse(&self, id: &str, envelope: &DsseEnvelope) -> Result<(), KernelError> {
         let now = self.now()?;
         let mut guard = match self.dsse.lock() {
@@ -179,50 +142,7 @@ mod tests {
     )]
     use super::*;
 
-    use chio_core::crypto::{Ed25519Backend, Keypair, SigningBackend};
-    use chio_core::receipt::{
-        body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
-    };
     use chio_federation::bilateral_dsse::DsseSignature;
-
-    fn sample_dual_signed(id: &str) -> DualSignedReceipt {
-        let kp = Keypair::generate();
-        let body = ChioReceiptBody {
-            id: id.to_string(),
-            timestamp: 1_700_000_100,
-            capability_id: "cap-receipt".to_string(),
-            tool_server: "srv".to_string(),
-            tool_name: "echo".to_string(),
-            action: ToolCallAction::from_parameters(serde_json::json!({"message": "hello"}))
-                .expect("tool action"),
-            decision: Some(Decision::Allow),
-            receipt_kind: Default::default(),
-            boundary_class: Default::default(),
-            observation_outcome: None,
-            tool_origin: Default::default(),
-            redaction_mode: Default::default(),
-            actor_chain: Vec::new(),
-            content_hash: "0".repeat(64),
-            policy_hash: "1".repeat(64),
-            evidence: Vec::new(),
-            metadata: None,
-            trust_level: Default::default(),
-            tenant_id: None,
-            kernel_key: kp.public_key(),
-            bbs_projection_version: None,
-        };
-        let receipt = ChioReceipt::sign(body, &kp).expect("sign receipt");
-        let backend = Ed25519Backend::new(kp.clone());
-        let signature = backend.sign_bytes(id.as_bytes()).expect("sign bytes");
-        DualSignedReceipt {
-            schema: "test.dual-signed-receipt.v1".to_string(),
-            body: receipt,
-            org_a_kernel_id: "kernel.org-a".to_string(),
-            org_b_kernel_id: "kernel.org-b".to_string(),
-            org_a_signature: signature.clone(),
-            org_b_signature: signature,
-        }
-    }
 
     fn sample_dsse(id: &str) -> DsseEnvelope {
         let fixture_text = format!("payload-{id}");
@@ -240,7 +160,6 @@ mod tests {
     fn trait_object_round_trips_absence_and_presence() {
         let store: Box<dyn FederationArtifactStore> =
             Box::new(InMemoryFederationArtifactStore::default());
-        assert!(store.get_dual_signed("missing").unwrap().is_none());
         assert!(store.get_dsse("missing").unwrap().is_none());
     }
 
@@ -265,16 +184,6 @@ mod tests {
         // advertise that evicted artifacts remain resolvable.
         struct DurableStub;
         impl FederationArtifactStore for DurableStub {
-            fn put_dual_signed(
-                &self,
-                _id: &str,
-                _receipt: &DualSignedReceipt,
-            ) -> Result<(), KernelError> {
-                Ok(())
-            }
-            fn get_dual_signed(&self, _id: &str) -> Result<Option<DualSignedReceipt>, KernelError> {
-                Ok(None)
-            }
             fn put_dsse(&self, _id: &str, _envelope: &DsseEnvelope) -> Result<(), KernelError> {
                 Ok(())
             }
@@ -290,60 +199,16 @@ mod tests {
     }
 
     #[test]
-    fn dual_signed_backing_map_never_exceeds_cap_and_gauge_tracks_occupancy() {
-        let store = InMemoryFederationArtifactStore::default();
-        let inserts = IN_MEMORY_FEDERATION_ARTIFACT_STORE_CAPACITY + 16;
-        for i in 0..inserts {
-            let id = format!("rcpt-{i}");
-            store
-                .put_dual_signed(&id, &sample_dual_signed(&id))
-                .unwrap();
-            assert!(
-                store.dual_signed_len() <= IN_MEMORY_FEDERATION_ARTIFACT_STORE_CAPACITY,
-                "dual-signed backing map exceeded cap at insert {i}: len={}",
-                store.dual_signed_len()
-            );
-        }
-        assert_eq!(
-            store.dual_signed_len(),
-            IN_MEMORY_FEDERATION_ARTIFACT_STORE_CAPACITY,
-            "backing map should be saturated at cap after over-filling"
-        );
-        // Drop-oldest: the first-inserted id was evicted, the most recent survives.
-        assert!(store.get_dual_signed("rcpt-0").unwrap().is_none());
-        let last_id = format!("rcpt-{}", inserts - 1);
-        assert!(store.get_dual_signed(&last_id).unwrap().is_some());
-    }
-
-    #[test]
     fn from_memory_budget_honors_lowered_federation_cache_capacity() {
         // The CONFIGURED process memory budget must bound this reference store, not
         // a hard-coded default. A budget lowering `federation_cache_capacity` to 4
-        // must cap EACH backing map at 4, not the compiled-in 8192; otherwise a
-        // deployment retains 8192 entries per map regardless of the configured
-        // budget.
+        // must cap the backing map at 4, not the compiled-in 8192; otherwise a
+        // deployment retains 8192 entries regardless of the configured budget.
         let budget = crate::MemoryBudgetConfig {
             federation_cache_capacity: 4,
             ..crate::MemoryBudgetConfig::defaults()
         };
         let store = InMemoryFederationArtifactStore::from_memory_budget(&budget);
-
-        for i in 0..64 {
-            let id = format!("rcpt-{i}");
-            store
-                .put_dual_signed(&id, &sample_dual_signed(&id))
-                .unwrap();
-            assert!(
-                store.dual_signed_len() <= 4,
-                "configured federation_cache_capacity did not take effect: dual len={}",
-                store.dual_signed_len()
-            );
-        }
-        assert_eq!(
-            store.dual_signed_len(),
-            4,
-            "dual-signed backing map should saturate at the lowered cap"
-        );
 
         for i in 0..64 {
             let id = format!("dsse-{i}");

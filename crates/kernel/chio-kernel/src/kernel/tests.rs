@@ -85,9 +85,9 @@ use chio_core_types::session::{
 use chio_core_types::{PlanEvaluationRequest, PlanVerdict, PlannedToolCall, StepVerdictKind};
 use chio_federation::{
     bilateral::BilateralCoSigningError, bilateral::BilateralCoSigningProtocol,
-    bilateral::CoSigningRequest, bilateral::CoSigningResponse, bilateral::InProcessCoSigner,
-    trust_establishment::FederationPeer, trust_establishment::KernelTrustExchange,
-    trust_establishment::PeerHandshakeEnvelope,
+    bilateral::DsseCoSigningRequest, bilateral::DsseCoSigningResponse,
+    bilateral::InProcessCoSigner, trust_establishment::FederationPeer,
+    trust_establishment::KernelTrustExchange, trust_establishment::PeerHandshakeEnvelope,
 };
 use chio_link::{ExchangeRate, PriceOracle, PriceOracleError};
 use rusqlite::{params, Connection, OptionalExtension, Row};

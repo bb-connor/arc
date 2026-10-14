@@ -8,22 +8,12 @@
 //!
 //! ## What this fixture checks
 //!
-//! 1. **Byte-level non-overlap**: the `CoSigningBody` canonical bytes
-//!    and the DSSE PAE preimage bytes share zero positions (byte-stream
-//!    inequivalence).
-//! 2. **Signature-slice verifier accepts the envelope** under matching public keys.
-//! 3. **Tampered payload bytes are rejected** (changes LEN(payload) and the
+//! 1. **Signature-slice verifier accepts the envelope** under matching public keys.
+//! 2. **Tampered payload bytes are rejected** (changes LEN(payload) and the
 //!    payload bytes; PAE preimage diverges).
-//! 4. **Mismatched payloadType is rejected** (payload-type is part of PAE).
-//! 5. **A "DSSE envelope" forged by stuffing `DualSignedReceipt`
-//!    signature bytes into the `signatures` array is rejected** because
-//!    the DualSignedReceipt signatures cover a different preimage.
-//! 6. **The hot-path emitter (`co_sign_with_origin_full`) produces
-//!    artifacts that BOTH verify under their respective verifiers** - the
-//!    DualSignedReceipt verifier accepts the DualSignedReceipt artifact; the signature-slice verifier
-//!    accepts the DSSE envelope. Cross-acceptance (e.g. the DSSE verifier accepting
-//!    a `CoSigningBody`-shaped input) is structurally impossible:
-//!    the CoSigningBody bytes have no `payloadType` or `signatures` array.
+//! 3. **Mismatched payloadType is rejected** (payload-type is part of PAE).
+//! 4. **The cosigner-routed emitter (`co_sign_with_origin`) produces
+//!    an envelope that verifies** under the signature-slice verifier.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -35,9 +25,9 @@ use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     kinds::TrustLevel,
 };
-use chio_federation::bilateral::{co_sign_with_origin_full, CoSigningBody, InProcessCoSigner};
+use chio_federation::bilateral::{co_sign_with_origin, InProcessCoSigner};
 use chio_federation::bilateral_dsse::{
-    pae, receipt_subject_name, sign_dsse_envelope, verify_dsse_envelope, DsseEnvelope, Keyid,
+    pae, receipt_subject_name, sign_dsse_envelope, verify_dsse_envelope, Keyid,
     PAYLOAD_TYPE_IN_TOTO, PREDICATE_BODY_SCHEMA, PREDICATE_TYPE_BILATERAL,
 };
 use std::path::Path;
@@ -83,66 +73,6 @@ const ORG_B_KERNEL_ID: &str = "kernel.org-b";
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-
-/// Concrete byte-level proof: the `CoSigningBody`
-/// canonical bytes and the DSSE PAE preimage share zero header bytes; their
-/// shapes are entirely incompatible. A single signature cannot authenticate
-/// both, which is precisely why this path must be separate from the DualSignedReceipt
-/// receipt preimage.
-#[test]
-fn cosigning_body_preimage_and_dsse_pae_preimage_share_zero_bytes() {
-    let kp_a = Keypair::generate();
-    let kp_b = Keypair::generate();
-    let receipt = sample_receipt(&kp_b);
-
-    // CoSigningBody preimage: canonical JSON.
-    let cosigning_body =
-        CoSigningBody::from_receipt(&receipt, ORG_A_KERNEL_ID, ORG_B_KERNEL_ID).unwrap();
-    let cosigning_body_preimage = cosigning_body.canonical_bytes().unwrap();
-
-    // Signature-slice preimage: DSSE PAE bytes wrapping the in-toto Statement.
-    let envelope = sign_dsse_envelope(
-        &receipt,
-        &kp_a,
-        &kp_b,
-        ORG_A_KERNEL_ID,
-        ORG_B_KERNEL_ID,
-        "file_read",
-        1_734_000_000_000,
-    )
-    .unwrap();
-    let dsse_preimage = envelope.pae_bytes().unwrap();
-
-    // The two preimages are not the same bytes.
-    assert_ne!(
-        cosigning_body_preimage, dsse_preimage,
-        "CoSigningBody bytes and DSSE PAE bytes MUST differ; \
-         a signature-slice signature cannot authenticate the CoSigningBody preimage"
-    );
-
-    // Stronger: the DSSE PAE bytes start with the literal "DSSEv1 " prefix
-    // per DSSE v1, while canonical JSON starts with '{'. The
-    // intersection over the leading 7 bytes is empty.
-    assert!(
-        dsse_preimage.starts_with(b"DSSEv1 "),
-        "DSSE PAE preimage MUST begin with the literal 'DSSEv1 ' tag"
-    );
-    assert!(
-        cosigning_body_preimage.starts_with(b"{"),
-        "CoSigningBody canonical-JSON preimage MUST begin with '{{' (RFC 8785)"
-    );
-    let header_overlap_len = std::cmp::min(7, cosigning_body_preimage.len());
-    let no_position_overlaps = cosigning_body_preimage
-        .iter()
-        .take(header_overlap_len)
-        .zip(dsse_preimage.iter().take(header_overlap_len))
-        .all(|(a, b)| a != b);
-    assert!(
-        no_position_overlaps,
-        "no byte position in the leading 7 bytes overlaps; the preimages \
-         are structurally distinct"
-    );
-}
 
 /// The signature-slice verifier accepts a freshly-signed envelope when the
 /// public keys match the keyids carried in the envelope's signatures array.
@@ -400,110 +330,32 @@ fn mismatched_payload_type_rejected_by_signature_slice_verifier() {
     );
 }
 
-/// Cross-shape attack: an adversary takes the bytes of a
-/// `DualSignedReceipt` signature (which authenticates `canonical_json
-/// (CoSigningBody)`) and stuffs them into a DSSE envelope's
-/// `signatures` array. The signature-slice verifier MUST reject because the DualSignedReceipt
-/// signature does not authenticate the DSSE PAE preimage.
 #[test]
-fn forged_envelope_using_dual_signed_receipt_signature_bytes_is_rejected() {
-    let kp_a = Keypair::generate();
-    let kp_b = Keypair::generate();
-    let receipt = sample_receipt(&kp_b);
-
-    // Build the DualSignedReceipt artifact via the federation hot-path emitter.
-    let cosigner = InProcessCoSigner::new(ORG_A_KERNEL_ID, kp_a.clone(), kp_b.public_key());
-    let artifacts = co_sign_with_origin_full(
-        ORG_A_KERNEL_ID,
-        &kp_a,
-        ORG_B_KERNEL_ID,
-        &kp_b,
-        receipt.clone(),
-        &cosigner,
-        "file_read",
-        1_734_000_000_000,
-    )
-    .expect("hot path must produce both artifacts");
-
-    // The hot-path-produced DSSE envelope verifies under the signature-slice verifier
-    // (the test setup is healthy before forging).
-    verify_dsse_envelope(
-        &artifacts.dsse_envelope,
-        &kp_a.public_key(),
-        &kp_b.public_key(),
-    )
-    .expect("hot-path-emitted DSSE envelope must verify under the signature-slice verifier");
-
-    // Forge: build a DSSE envelope shape but stuff it with the DualSignedReceipt
-    // signature bytes. The DualSignedReceipt signatures authenticate
-    // `canonical_json(CoSigningBody)`, NOT the DSSE PAE bytes. A naive
-    // verifier that only checked "two signatures present, keyid present"
-    // would accept this; the signature-slice verifier rejects because Ed25519 fails
-    // against the wrong preimage.
-    let mut forged: DsseEnvelope = artifacts.dsse_envelope.clone();
-    let dual_signed_receipt_sig_a_bytes = artifacts.dual_signed_receipt.org_a_signature.to_bytes();
-    let dual_signed_receipt_sig_b_bytes = artifacts.dual_signed_receipt.org_b_signature.to_bytes();
-    forged.signatures[0].sig = BASE64_STANDARD.encode(dual_signed_receipt_sig_a_bytes);
-    forged.signatures[1].sig = BASE64_STANDARD.encode(dual_signed_receipt_sig_b_bytes);
-
-    let result = verify_dsse_envelope(&forged, &kp_a.public_key(), &kp_b.public_key());
-    assert!(
-        result.is_err(),
-        "DSSE envelope forged from DualSignedReceipt signatures MUST \
-         fail signature-slice verification because a DualSignedReceipt signature cannot \
-         authenticate the DSSE preimage"
-    );
-}
-
-#[test]
-fn hot_path_emits_both_artifacts_and_each_verifies() {
+fn cosigner_routed_emitter_produces_verifying_envelope() {
     let kp_a = Keypair::generate();
     let kp_b = Keypair::generate();
     let receipt = sample_receipt(&kp_b);
 
     let cosigner = InProcessCoSigner::new(ORG_A_KERNEL_ID, kp_a.clone(), kp_b.public_key());
 
-    let artifacts = co_sign_with_origin_full(
+    let envelope = co_sign_with_origin(
         ORG_A_KERNEL_ID,
-        &kp_a,
+        &kp_a.public_key(),
         ORG_B_KERNEL_ID,
         &kp_b,
-        receipt.clone(),
+        &receipt,
         &cosigner,
         "file_read",
         1_734_000_000_000,
     )
-    .expect("hot path must succeed");
+    .expect("co-sign must succeed");
 
-    // DualSignedReceipt verifier accepts the DualSignedReceipt artifact.
-    artifacts
-        .dual_signed_receipt
-        .verify(&kp_a.public_key(), &kp_b.public_key())
-        .expect("DualSignedReceipt verifies under DualSignedReceipt verifier");
-
-    // Signature-slice verifier accepts the DSSE artifact.
-    verify_dsse_envelope(
-        &artifacts.dsse_envelope,
-        &kp_a.public_key(),
-        &kp_b.public_key(),
-    )
-    .expect("DSSE envelope verifies under signature-slice verifier");
-
-    // The DualSignedReceipt verifier ONLY accepts a `DualSignedReceipt`; trying to
-    // hand it a `DsseEnvelope` is a structural type error and so cannot
-    // even compile. A runtime check states the intent instead:
-    // the DualSignedReceipt preimage bytes do not appear inside the DSSE preimage,
-    // so a DSSE envelope cannot be re-interpreted as a DualSignedReceipt artifact.
-    let cosigning_body_preimage =
-        CoSigningBody::from_receipt(&receipt, ORG_A_KERNEL_ID, ORG_B_KERNEL_ID)
-            .unwrap()
-            .canonical_bytes()
-            .unwrap();
-    let dsse_preimage = artifacts.dsse_envelope.pae_bytes().unwrap();
+    let statement = verify_dsse_envelope(&envelope, &kp_a.public_key(), &kp_b.public_key())
+        .expect("DSSE envelope verifies under signature-slice verifier");
+    assert_eq!(statement.subject[0].name, receipt_subject_name(&receipt.id));
     assert!(
-        !contains_subsequence(&dsse_preimage, &cosigning_body_preimage),
-        "the DSSE PAE preimage does NOT contain the CoSigningBody preimage as a \
-         substring; the two surfaces are not collapsible"
+        envelope.pae_bytes().unwrap().starts_with(b"DSSEv1 "),
+        "DSSE PAE preimage MUST begin with the literal 'DSSEv1 ' tag"
     );
 }
 
@@ -663,17 +515,4 @@ fn dsse_envelope_with_two_subjects_is_rejected() {
     // Suppress dead-code lint for DsseStatement field access in tests
     // that share this file.
     let _ = DsseStatement::canonical_bytes;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-fn contains_subsequence(haystack: &[u8], needle: &[u8]) -> bool {
-    if needle.is_empty() || needle.len() > haystack.len() {
-        return false;
-    }
-    haystack
-        .windows(needle.len())
-        .any(|window| window == needle)
 }

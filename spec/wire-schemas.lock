@@ -1630,16 +1630,6 @@ files = ["crates/trust/chio-federation/src/activation.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.federation-bilateral-cosigning.v1"
-files = ["crates/trust/chio-federation/src/bilateral.rs"]
-first_seen = "11e573d2d7"
-
-[[schema]]
-value = "chio.federation-dual-signed-receipt.v1"
-files = ["crates/trust/chio-federation/src/bilateral.rs"]
-first_seen = "11e573d2d7"
-
-[[schema]]
 value = "chio.federation-kernel-handshake.v1"
 files = ["crates/trust/chio-federation/src/trust_establishment.rs"]
 first_seen = "11e573d2d7"

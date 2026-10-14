@@ -2,8 +2,8 @@ use super::*;
 use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
 use chio_core::receipt::decision::{Decision, ToolCallAction};
 use chio_federation::bilateral::{
-    BilateralCoSigningError, BilateralCoSigningProtocol, CoSigningRequest, CoSigningResponse,
-    InProcessCoSigner,
+    BilateralCoSigningError, BilateralCoSigningProtocol, DsseCoSigningRequest,
+    DsseCoSigningResponse, InProcessCoSigner,
 };
 use chio_federation::trust_establishment::{KernelTrustExchange, PeerHandshakeEnvelope};
 use chio_kernel::{
@@ -20,10 +20,10 @@ use treaty_dsse::TreatyDsseAdmissionHook;
 struct UnavailableCosigner;
 
 impl BilateralCoSigningProtocol for UnavailableCosigner {
-    fn request_cosignature(
+    fn request_dsse_cosignature(
         &self,
-        _: &CoSigningRequest,
-    ) -> Result<CoSigningResponse, BilateralCoSigningError> {
+        _: &DsseCoSigningRequest,
+    ) -> Result<DsseCoSigningResponse, BilateralCoSigningError> {
         Err(BilateralCoSigningError::PeerRejected(
             "injected outage after local completion".into(),
         ))
@@ -196,7 +196,6 @@ fn sqlite_retained_federation_context_survives_owner_restart_without_redispatch(
             .invocation_count,
         1
     );
-    assert!(kernel.dual_signed_receipt(&response.receipt.id).is_some());
     assert!(kernel
         .federation_dsse_envelope(&response.receipt.id)
         .is_some());

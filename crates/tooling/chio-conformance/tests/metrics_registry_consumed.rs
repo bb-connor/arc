@@ -786,26 +786,32 @@ fn federation_emits_chio_federation_hop_total_and_latency() -> Result<(), Box<dy
         chio_federation::metrics::federation_hop_total(chio_federation::metrics::HOP_RESULT_OK);
     let before_latency = chio_federation::metrics::federation_hop_latency_count();
 
-    let dual = chio_federation::bilateral::co_sign_with_origin(
+    let envelope = chio_federation::bilateral::co_sign_with_origin(
         "origin-kernel",
         &origin.public_key(),
         "tool-host-kernel",
         &tool_host,
-        receipt,
+        &receipt,
         &cosigner,
+        &receipt.tool_name,
+        1_734_000_000_000,
     )?;
 
-    dual.verify(&origin.public_key(), &tool_host.public_key())?;
+    chio_federation::bilateral_dsse::verify_dsse_envelope(
+        &envelope,
+        &origin.public_key(),
+        &tool_host.public_key(),
+    )?;
     let after =
         chio_federation::metrics::federation_hop_total(chio_federation::metrics::HOP_RESULT_OK);
     let after_latency = chio_federation::metrics::federation_hop_latency_count();
     assert!(
         after > before,
-        "federation hop counter must advance through co_sign_with_origin"
+        "federation hop counter must advance through the DSSE co-sign"
     );
     assert!(
         after_latency > before_latency,
-        "federation hop latency must advance through co_sign_with_origin"
+        "federation hop latency must advance through the DSSE co-sign"
     );
     let body = chio_federation::metrics::render_federation_metrics_prometheus();
     assert!(body.contains(CHIO_FEDERATION_HOP_TOTAL));
@@ -1478,8 +1484,10 @@ fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {
             &origin.public_key(),
             "tool-host-kernel",
             &tool_host,
-            receipt,
+            &receipt,
             &cosigner,
+            &receipt.tool_name,
+            1_734_000_000_000,
         )?;
         return Ok(Some(
             chio_federation::metrics::render_federation_metrics_prometheus(),

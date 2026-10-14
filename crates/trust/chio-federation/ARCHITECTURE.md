@@ -21,7 +21,7 @@ and digests; structural validation does not fetch or authenticate their targets.
 | `qualification` | Scenario matrix shape and required requirement coverage. |
 | `trust_establishment` | Signed challenges, conformance tiers, peer pins, store interface. |
 | `treaty` | Governance ladders, intersections, and cross-boundary admission reports. |
-| `bilateral` | Co-sign protocol seam and detached-signature dual receipts. |
+| `bilateral` | DSSE co-sign protocol seam: cosigner trait and request/response exchange. |
 | `bilateral_dsse` | Statement construction, canonical payloads, PAE signatures, profile checks. |
 | `bilateral_verifier` | Receipt, lease, governance, revocation, and treaty-aware verification. |
 | `frost` | Typed action preimages, rosters, artifact trust, epoch and slot transitions. |
@@ -82,8 +82,6 @@ validator does not query remote reputation services or compute a global score.
 `verify_chio_bilateral_dsse_envelope` verifies the strict profile and both
 independent signer keys. The higher-level invocation verifier adds revocation,
 local receipt integrity, policy disposition, lease, and governance resolution.
-The signature-slice verifier and detached `DualSignedReceipt` APIs have
-distinct payload contracts.
 
 `RevocationRootGossip::validate_envelope` is structural. Consumers must call
 `SignedEpochRoot::verify` with a pinned oracle verifier before installation.
