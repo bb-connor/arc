@@ -39,7 +39,12 @@ edge's calls to the trust service's authority. Override them with
 `CHIO_WORKLOAD_TOKEN`; the edge refuses to start when any two share a value.
 
 These defaults are public strings, so every port is published on 127.0.0.1
-only. Set your own tokens before changing that binding.
+only. Set your own tokens before changing that binding. The `chio-trust-demo`
+image accepts the demo tokens only with `CHIO_DEMO=1`, which this compose file
+sets; without it the container refuses to start unless both trust tokens are
+set to other values. Outside the demo the listener needs `CHIO_TLS_CERT` and
+`CHIO_TLS_KEY` (owned by the image's `chio` user, UID 10001, with an owner-only
+key), or `CHIO_ALLOW_PLAINTEXT=1` when a proxy protects it.
 
 Then open:
 
