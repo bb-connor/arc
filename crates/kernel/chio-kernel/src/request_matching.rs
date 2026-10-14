@@ -425,7 +425,8 @@ fn constraint_matches(
                     "regex \"{pattern}\" failed to compile: {error}"
                 ))
             })?;
-            Ok(string_leaves.iter().any(|leaf| regex.is_match(&leaf.value)))
+            Ok(!string_leaves.is_empty()
+                && string_leaves.iter().all(|leaf| regex.is_match(&leaf.value)))
         }
         Constraint::MaxLength(max) => Ok(string_leaves.iter().all(|leaf| leaf.value.len() <= *max)),
         Constraint::MaxArgsSize(max) => Ok(arguments.to_string().len() <= *max),
@@ -453,7 +454,9 @@ fn constraint_matches(
                 "{key} must use its first-class constraint, not Custom"
             )))
         }
-        Constraint::Custom(key, expected) => Ok(argument_contains_custom(arguments, key, expected)),
+        Constraint::Custom(key, expected) => {
+            Ok(custom_constraint_matches(arguments, key, expected))
+        }
 
         // A global domain guard cannot prove enforcement of the signed
         // grant's narrower semantics. Never treat these as a match or as a
@@ -1351,18 +1354,35 @@ fn wildcard_matches(pattern: &str, candidate: &str) -> bool {
     pattern_idx == pattern_chars.len()
 }
 
-fn argument_contains_custom(arguments: &serde_json::Value, key: &str, expected: &str) -> bool {
-    match arguments {
-        serde_json::Value::Object(map) => map.iter().any(|(entry_key, value)| {
-            (entry_key == key && value.as_str() == Some(expected))
-                || argument_contains_custom(value, key, expected)
+/// Returns true when `key` occurs at least once in the arguments and every
+/// occurrence, at any depth, carries exactly the string `expected`.
+fn custom_constraint_matches(arguments: &serde_json::Value, key: &str, expected: &str) -> bool {
+    let mut observed = false;
+    custom_occurrences_match(arguments, key, expected, &mut observed) && observed
+}
+
+fn custom_occurrences_match(
+    value: &serde_json::Value,
+    key: &str,
+    expected: &str,
+    observed: &mut bool,
+) -> bool {
+    match value {
+        serde_json::Value::Object(map) => map.iter().all(|(entry_key, entry)| {
+            if entry_key == key {
+                *observed = true;
+                if entry.as_str() != Some(expected) {
+                    return false;
+                }
+            }
+            custom_occurrences_match(entry, key, expected, observed)
         }),
         serde_json::Value::Array(values) => values
             .iter()
-            .any(|value| argument_contains_custom(value, key, expected)),
+            .all(|entry| custom_occurrences_match(entry, key, expected, observed)),
         serde_json::Value::Null
         | serde_json::Value::Bool(_)
         | serde_json::Value::Number(_)
-        | serde_json::Value::String(_) => false,
+        | serde_json::Value::String(_) => true,
     }
 }
