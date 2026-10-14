@@ -740,6 +740,32 @@ mod delivery_spelling_tests {
     }
 
     #[test]
+    fn custom_requires_every_occurrence_of_its_key_to_carry_the_value() {
+        let scope = ChioScope {
+            grants: vec![grant(vec![Constraint::Custom(
+                "ticket".to_string(),
+                "INC-1".to_string(),
+            )])],
+            ..ChioScope::default()
+        };
+        for arguments in [
+            serde_json::json!({ "ticket": "INC-1", "meta": { "ticket": "INC-2" } }),
+            serde_json::json!({ "ticket": "INC-1", "items": [{ "ticket": 7 }] }),
+            serde_json::json!({ "ticket": "INC-1", "meta": { "ticket": ["INC-1", "INC-2"] } }),
+            serde_json::json!({ "other": "INC-1" }),
+        ] {
+            assert!(
+                resolve_matching_grants(&scope, "tool", "srv", &arguments)
+                    .is_ok_and(|matches| matches.is_empty()),
+                "{arguments} must match no grant"
+            );
+        }
+        let arguments = serde_json::json!({ "ticket": "INC-1", "meta": { "ticket": "INC-1" } });
+        assert!(resolve_matching_grants(&scope, "tool", "srv", &arguments)
+            .is_ok_and(|matches| matches.len() == 1));
+    }
+
+    #[test]
     fn first_class_delivery_constraints_still_deny_the_whole_evaluation() {
         let digest = "aa".repeat(32);
         for constraint in [
