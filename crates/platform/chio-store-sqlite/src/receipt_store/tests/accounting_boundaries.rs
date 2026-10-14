@@ -105,9 +105,12 @@ fn cost_attribution_propagates_corrupt_lineage_instead_of_reporting_a_gap() -> T
         read_context: Some(ReceiptReadContext::local_operator_admin_all()),
         ..CostAttributionQuery::default()
     });
+    let error = result.err().ok_or("corrupt lineage reported a gap")?;
     assert!(
-        matches!(result, Err(ReceiptStoreError::Conflict(_))),
-        "{result:?}"
+        format!("{error:?}").contains(
+            "capability lineage cap-cost claims signed-token provenance without a signed token"
+        ),
+        "{error:?}"
     );
     Ok(())
 }
