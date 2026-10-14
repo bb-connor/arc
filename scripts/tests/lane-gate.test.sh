@@ -1572,8 +1572,7 @@ if "actions: read" not in release_workflow or "GH_TOKEN: ${{ github.token }}" no
     raise SystemExit("release qualification lacks GitHub Actions read credentials")
 for msrv_contract in (
     "rustup toolchain install 1.95.0 --profile minimal",
-    "cargo +1.95.0 build --workspace",
-    "cargo +1.95.0 test --workspace",
+    "cargo +1.95.0 test -p chio-conformance -p chio-formal-diff-tests -p chio-wasm-guards",
 ):
     if msrv_contract not in release_workflow:
         raise SystemExit(f"release qualification MSRV contract lacks {msrv_contract}")

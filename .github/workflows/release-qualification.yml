@@ -259,8 +259,10 @@ jobs:
         if: always()
         run: ./scripts/stage-web3-release-artifacts.sh
 
-      - name: MSRV workspace lane
-        run: cargo +1.95.0 build --workspace && cargo +1.95.0 test --workspace
+      # ci.yml's MSRV workspace lane, required by check-release-source-gates.py,
+      # builds and tests the rest of the workspace on 1.95.0.
+      - name: MSRV tests outside the CI MSRV lane
+        run: cargo +1.95.0 test -p chio-conformance -p chio-formal-diff-tests -p chio-wasm-guards
 
       - name: Upload qualification artifacts
         if: always()
