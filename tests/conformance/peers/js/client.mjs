@@ -1216,6 +1216,14 @@ async function fetchJson(url) {
   return { status: response.status, headers, body };
 }
 
+function consentNonceFromPage(page) {
+  const match = /name="consent_nonce" value="([^"]+)"/.exec(page);
+  if (!match) {
+    throw new Error("authorization approval page carries no consent nonce");
+  }
+  return match[1];
+}
+
 async function performAuthorizationCodeFlow(baseUrl, authScope, authorizationServerMetadata, transcript) {
   const codeVerifier = "chio-conformance-js-verifier";
   const redirectUri = "http://localhost:7777/callback";
@@ -1251,14 +1259,7 @@ async function performAuthorizationCodeFlow(baseUrl, authScope, authorizationSer
   }
 
   const approvalBody = new URLSearchParams({
-    response_type: "code",
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    state,
-    resource,
-    scope: authScope,
-    code_challenge: challenge,
-    code_challenge_method: "S256",
+    consent_nonce: consentNonceFromPage(authorizePage),
     decision: "approve"
   }).toString();
   const approvalResponse = await fetch(authorizationEndpoint, {

@@ -24,8 +24,9 @@ fn token_form(code: &str) -> TokenRequestForm {
         "redirect_uri":"https://client.example/callback", "client_id":"client-abc", "code_verifier":"verifier"})).unwrap()
 }
 fn code(server: &LocalAuthorizationServer) -> String {
-    let mut form = test_authorization_approval_form();
-    form.code_challenge = pkce_s256("verifier");
+    let mut request = test_authorization_request();
+    request.code_challenge = Some(pkce_s256("verifier"));
+    let form = test_authorization_approval_form(server, &request, "approve");
     authorization_code_from_redirect(server.approve_authorization(form).unwrap())
 }
 #[test]
@@ -647,4 +648,82 @@ async fn finalized_terminal_record_survives_repeated_retire_cleanup_and_close() 
     assert_eq!(terminal.len(), 1);
     drop(lease);
     std::fs::remove_dir_all(store_directory).unwrap();
+}
+
+fn consent_refusal_detail(
+    server: &LocalAuthorizationServer,
+    form: AuthorizationApprovalForm,
+) -> String {
+    let response = server
+        .approve_authorization(form)
+        .expect_err("consent answer must be refused");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert!(response
+        .headers()
+        .get(axum::http::header::LOCATION)
+        .is_none());
+    let cause = response
+        .extensions()
+        .get::<Arc<OAuthRejection>>()
+        .expect("local OAuth cause");
+    assert_eq!(cause.kind, OAuthError::InvalidRequest);
+    cause.local_detail().to_string()
+}
+#[test]
+fn local_authorization_server_consent_nonce_is_single_use_and_expiring() {
+    let source = Arc::new(TestClock(StdMutex::new(reading(1_000_000, 0))));
+    let mut server = test_local_authorization_server();
+    server.clock = RemoteClock::new(source.clone());
+    let request = test_authorization_request();
+    let missing = AuthorizationApprovalForm {
+        consent_nonce: None,
+        decision: "approve".to_string(),
+    };
+    assert_eq!(
+        consent_refusal_detail(&server, missing),
+        "missing consent_nonce"
+    );
+    let forged = AuthorizationApprovalForm {
+        consent_nonce: Some("consent-forged".to_string()),
+        decision: "approve".to_string(),
+    };
+    assert_eq!(
+        consent_refusal_detail(&server, forged),
+        "unknown or answered consent_nonce"
+    );
+
+    let denied = test_authorization_approval_form(&server, &request, "deny");
+    let replayed = AuthorizationApprovalForm {
+        consent_nonce: denied.consent_nonce.clone(),
+        decision: "approve".to_string(),
+    };
+    assert_eq!(
+        server
+            .approve_authorization(denied)
+            .expect_err("denial redirects")
+            .status(),
+        StatusCode::SEE_OTHER
+    );
+    assert_eq!(
+        consent_refusal_detail(&server, replayed),
+        "unknown or answered consent_nonce"
+    );
+
+    let approved = test_authorization_approval_form(&server, &request, "approve");
+    let replayed = AuthorizationApprovalForm {
+        consent_nonce: approved.consent_nonce.clone(),
+        decision: "approve".to_string(),
+    };
+    authorization_code_from_redirect(server.approve_authorization(approved).unwrap());
+    assert_eq!(
+        consent_refusal_detail(&server, replayed),
+        "unknown or answered consent_nonce"
+    );
+
+    let late = test_authorization_approval_form(&server, &request, "approve");
+    *source.0.lock().unwrap() = reading(1_000_000, server.code_ttl_secs * 1_000_000_000);
+    assert_eq!(
+        consent_refusal_detail(&server, late),
+        "consent_nonce expired"
+    );
 }

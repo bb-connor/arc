@@ -37,14 +37,13 @@ fn pkce_challenge(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(hasher.finalize())
 }
 
-fn authorize_code(
+fn consent_page(
     server: &TestServer,
     redirect_uri: &str,
     resource: &str,
-    code_verifier: &str,
+    challenge: &str,
 ) -> String {
-    let challenge = pkce_challenge(code_verifier);
-    let authorize_page = server
+    let page = server
         .client
         .get(format!("{}/oauth/authorize", server.base_url))
         .query(&[
@@ -54,7 +53,7 @@ fn authorize_code(
             ("state", "state-123"),
             ("resource", resource),
             ("scope", "mcp:invoke"),
-            ("code_challenge", challenge.as_str()),
+            ("code_challenge", challenge),
             ("code_challenge_method", "S256"),
         ])
         .send()
@@ -63,37 +62,85 @@ fn authorize_code(
         .expect("authorize page ok")
         .text()
         .expect("authorize page text");
-    assert!(authorize_page.contains("Approve"));
+    assert!(page.contains("Approve"));
+    page
+}
 
-    let approval = server
+/// The hidden fields a browser submits from the rendered consent form.
+fn hidden_inputs(page: &str) -> Vec<(String, String)> {
+    let unescape = |value: &str| {
+        value
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+    };
+    page.split("<input type=\"hidden\" ")
+        .skip(1)
+        .map(|input| {
+            let name = input
+                .strip_prefix("name=\"")
+                .and_then(|rest| rest.split_once('"'))
+                .expect("hidden input name")
+                .0;
+            let value = input
+                .split_once("value=\"")
+                .and_then(|(_, rest)| rest.split_once('"'))
+                .expect("hidden input value")
+                .0;
+            (name.to_string(), unescape(value))
+        })
+        .collect()
+}
+
+fn submit_consent(
+    server: &TestServer,
+    fields: &[(String, String)],
+    decision: &str,
+) -> reqwest::blocking::Response {
+    let mut form = fields.to_vec();
+    form.push(("decision".to_string(), decision.to_string()));
+    server
         .client
         .post(format!("{}/oauth/authorize", server.base_url))
-        .form(&[
-            ("response_type", "code"),
-            ("client_id", "https://client.example/app"),
-            ("redirect_uri", redirect_uri),
-            ("state", "state-123"),
-            ("resource", resource),
-            ("scope", "mcp:invoke"),
-            ("code_challenge", challenge.as_str()),
-            ("code_challenge_method", "S256"),
-            ("decision", "approve"),
-        ])
+        .form(&form)
         .send()
-        .expect("submit approval");
-    assert!(approval.status().is_redirection());
+        .expect("submit consent")
+}
 
-    let location = approval
+fn redirect_query(response: &reqwest::blocking::Response) -> Vec<(String, String)> {
+    let location = response
         .headers()
         .get(LOCATION)
-        .expect("approval redirect")
+        .expect("consent redirect")
         .to_str()
         .expect("location string");
     Url::parse(location)
         .expect("parse redirect URL")
         .query_pairs()
+        .map(|(name, value)| (name.to_string(), value.to_string()))
+        .collect()
+}
+
+fn authorize_code(
+    server: &TestServer,
+    redirect_uri: &str,
+    resource: &str,
+    code_verifier: &str,
+) -> String {
+    let page = consent_page(
+        server,
+        redirect_uri,
+        resource,
+        &pkce_challenge(code_verifier),
+    );
+    let approval = submit_consent(server, &hidden_inputs(&page), "approve");
+    assert!(approval.status().is_redirection());
+    redirect_query(&approval)
+        .into_iter()
         .find(|(name, _)| name == "code")
-        .map(|(_, value)| value.to_string())
+        .map(|(_, value)| value)
         .expect("authorization code")
 }
 
@@ -280,4 +327,48 @@ fn hosted_mcp_accepts_local_oauth_pkce_and_rejects_invalid_verifier() {
 
     let session = server.initialize_session_with_token(&access_token);
     assert!(!session.id.is_empty());
+}
+
+#[test]
+fn local_authorization_server_rejects_approval_without_consent_nonce() {
+    let server = start_local_oauth_http_server("admin-token");
+    let metadata: Value = server
+        .get_protected_resource_metadata()
+        .json()
+        .expect("protected resource metadata");
+    let resource = metadata["resource"].as_str().expect("resource").to_string();
+    let redirect_uri = "http://localhost:7777/callback";
+    let challenge = pkce_challenge("chio-auth-verifier");
+    let forged = [
+        ("response_type", "code"),
+        ("client_id", "https://client.example/app"),
+        ("redirect_uri", redirect_uri),
+        ("state", "state-123"),
+        ("resource", resource.as_str()),
+        ("scope", "mcp:invoke"),
+        ("code_challenge", challenge.as_str()),
+        ("code_challenge_method", "S256"),
+    ]
+    .map(|(name, value)| (name.to_string(), value.to_string()));
+    let mut unknown_nonce = forged.to_vec();
+    unknown_nonce.push(("consent_nonce".to_string(), "consent-forged".to_string()));
+
+    let page = consent_page(&server, redirect_uri, &resource, &challenge);
+    let rendered = hidden_inputs(&page);
+    let approved = submit_consent(&server, &rendered, "approve");
+    assert!(approved.status().is_redirection());
+
+    for fields in [forged.to_vec(), unknown_nonce, rendered] {
+        let refused = submit_consent(&server, &fields, "approve");
+        assert_eq!(refused.status(), reqwest::StatusCode::BAD_REQUEST);
+        assert!(refused.headers().get(LOCATION).is_none());
+        let body: Value = refused.json().expect("refusal json");
+        assert_eq!(
+            body,
+            json!({
+                "error": "invalid_request",
+                "error_description": "urn:chio:error:transport:invalid-request-shape",
+            })
+        );
+    }
 }

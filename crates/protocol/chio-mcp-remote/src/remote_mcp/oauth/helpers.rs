@@ -47,6 +47,7 @@ pub(super) fn redirect_oauth_error(
     error: OAuthError,
     description: &str,
     state: Option<&str>,
+    issuer: &str,
 ) -> Response {
     let mut redirect = match Url::parse(redirect_uri) {
         Ok(url) => url,
@@ -59,6 +60,7 @@ pub(super) fn redirect_oauth_error(
         if let Some(state) = state {
             pairs.append_pair("state", state);
         }
+        pairs.append_pair("iss", issuer);
     }
     crate::input::with_source(
         Redirect::to(redirect.as_str()).into_response(),

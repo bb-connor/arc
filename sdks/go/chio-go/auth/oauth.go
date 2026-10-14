@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -181,16 +182,13 @@ func PerformAuthorizationCodeFlow(
 		return "", fmt.Errorf("authorization endpoint did not return an approval page")
 	}
 
+	consentNonce, err := consentNonceFromPage(authorizeBody)
+	if err != nil {
+		return "", err
+	}
 	approvalForm := url.Values{
-		"response_type":         []string{"code"},
-		"client_id":             []string{flowOptions.ClientID},
-		"redirect_uri":          []string{flowOptions.RedirectURI},
-		"state":                 []string{flowOptions.State},
-		"resource":              []string{resource},
-		"scope":                 []string{authScope},
-		"code_challenge":        []string{PKCEChallenge(flowOptions.CodeVerifier)},
-		"code_challenge_method": []string{"S256"},
-		"decision":              []string{"approve"},
+		"consent_nonce": []string{consentNonce},
+		"decision":      []string{"approve"},
 	}
 	approvalRequest, err := http.NewRequestWithContext(
 		ctx,
@@ -409,4 +407,20 @@ func coalesceFlowOptions(options *AuthorizationCodeFlowOptions) AuthorizationCod
 		merged.State = "chio-go-state"
 	}
 	return merged
+}
+
+// consentNonceFromPage reads the single-use nonce the authorization server
+// embeds in its consent form; the approval is accepted only with it.
+func consentNonceFromPage(page string) (string, error) {
+	const marker = `name="consent_nonce" value="`
+	start := strings.Index(page, marker)
+	if start < 0 {
+		return "", fmt.Errorf("authorization approval page carries no consent nonce")
+	}
+	rest := page[start+len(marker):]
+	end := strings.IndexByte(rest, '"')
+	if end <= 0 {
+		return "", fmt.Errorf("authorization approval page carries no consent nonce")
+	}
+	return html.UnescapeString(rest[:end]), nil
 }
