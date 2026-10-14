@@ -1742,7 +1742,7 @@ fn old_manifest_shape_under_the_current_id_is_refused_structurally() {
                 "required_permissions": {"network_hosts": ["api.example.com"]},
                 "public_key": public_key,
             })),
-            "PLACEHOLDER_PERMS",
+            "unknown field `network_hosts`, expected one of `read_paths`, `write_paths`, `network_destinations`, `environment_variables`, `native_syscall_profile` at line 1 column 176",
         ),
     ];
     for (input, expected) in cases {

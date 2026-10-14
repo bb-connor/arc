@@ -226,7 +226,7 @@ fn rejects_the_old_manifest_shape_under_the_current_id_even_when_signed() {
 
     assert!(matches!(build_shadow_migration_report(input.clone()),
         Err(ShadowMigrationError::Input(chio_core::canonical::UntrustedJsonError::Decode(error)))
-            if error.to_string() == "PLACEHOLDER_CLI"));
+            if error.to_string() == "unknown field `has_side_effects`, expected one of `name`, `description`, `input_schema`, `output_schema`, `pricing`, `annotations`, `latency_hint`, `flow`"));
 
     let mut forged = input;
     forged.manifests[0].signed_envelope.manifest["version"] =
