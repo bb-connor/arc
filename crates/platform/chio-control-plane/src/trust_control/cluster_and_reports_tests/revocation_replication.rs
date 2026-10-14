@@ -261,9 +261,13 @@ fn streamless_peer_is_a_transient_revocation_pull_error_that_applies_nothing() {
         Err(PullError::Transient(error)) => error,
         other => panic!("a streamless peer must be a transient pull error: {other:?}"),
     };
-    assert!(error
-        .to_string()
-        .ends_with("peer advertises no revocation stream; revocations are not replicated from it"));
+    let CliError::Chio(error) = error else {
+        panic!("a streamless peer must surface a registered pull error: {error:?}");
+    };
+    assert_eq!(
+        error.message(),
+        "peer advertises no revocation stream; revocations are not replicated from it"
+    );
     assert!(state
         .revocation_store()
         .test_unwrap()

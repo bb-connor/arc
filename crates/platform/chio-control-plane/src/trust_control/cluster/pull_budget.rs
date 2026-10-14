@@ -672,9 +672,18 @@ mod pull_budget_tests {
 
         assert_eq!(
             decode_error::<RevocationDeltaResponse>(serde_json::json!({
-                "records": [{"capabilityId": "cap-old", "revokedAt": 11}]
+                "records": []
             })),
             "missing field `cursorVersion`"
+        );
+        assert_eq!(
+            decode_error::<RevocationDeltaResponse>(serde_json::json!({
+                "cursorVersion": REVOCATION_CURSOR_VERSION,
+                "streamId": STREAM,
+                "headSeq": 1,
+                "records": [{"capabilityId": "cap-old", "revokedAt": 11}]
+            })),
+            "missing field `seq`"
         );
         assert_eq!(
             decode_error::<StoredRevocationView>(serde_json::json!({
