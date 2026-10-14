@@ -47,6 +47,9 @@ pub struct DurableAdmissionRuntime {
     fence: StoreMutationFence,
     kernel_keypair: Keypair,
     stop: StopControl,
+    /// Keeps the stop chain store open while this runtime serves; stop
+    /// controls handed to kernels do not.
+    _stop_store: Option<Arc<chio_store_sqlite::SqliteAdmissionOperationStore>>,
 }
 
 impl DurableAdmissionRuntime {
@@ -81,10 +84,8 @@ impl DurableAdmissionRuntime {
         let kernel_keypair =
             load_or_create_authority_keypair(&durable_admission_kernel_seed_path(path)?)?;
         bind_durable_admission_kernel_identity(path, &kernel_keypair.public_key())?;
-        let stop = StopControl::durable(
-            Arc::new(authority.admission_operation_store()),
-            authority.mutation_fence(),
-        );
+        let stop_store = Arc::new(authority.admission_operation_store());
+        let stop = StopControl::durable(&stop_store, authority.mutation_fence());
 
         Ok(Self {
             payload_maintenance: Arc::new(payload_maintenance::PayloadMaintenanceOwner::default()),
@@ -99,6 +100,7 @@ impl DurableAdmissionRuntime {
             fence: authority.mutation_fence(),
             kernel_keypair,
             stop,
+            _stop_store: Some(stop_store),
         })
     }
 
@@ -232,6 +234,7 @@ impl DurableAdmissionRuntime {
             fence: stores.fence,
             kernel_keypair,
             stop: StopControl::process_local(),
+            _stop_store: None,
         })
     }
 

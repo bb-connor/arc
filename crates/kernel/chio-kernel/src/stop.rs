@@ -11,7 +11,7 @@
 //! view, and a stop whose durable append fails stays in force in this process.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 
 use arc_swap::ArcSwap;
 use chio_core_types::StoreMutationFence;
@@ -565,8 +565,10 @@ impl StopControlError {
     }
 }
 
+const STOP_STORE_CLOSED: &str = "stop store is closed";
+
 struct DurableStopBinding {
-    store: Arc<dyn DurableStopStore>,
+    store: Weak<dyn DurableStopStore>,
     fence: StoreMutationFence,
     transitions: Mutex<()>,
 }
@@ -608,8 +610,15 @@ impl StopControl {
 
     /// Bind to a durable chain and load its verified head. A chain that
     /// cannot be loaded or verified installs a stopped, not-ready view.
+    ///
+    /// The control does not keep the store open; its owner does. Once the
+    /// owner closes the store, a stop holds only in this process and a resume
+    /// is refused.
     #[must_use]
-    pub fn durable(store: Arc<dyn DurableStopStore>, fence: StoreMutationFence) -> Self {
+    pub fn durable<S: DurableStopStore + 'static>(
+        store: &Arc<S>,
+        fence: StoreMutationFence,
+    ) -> Self {
         let (durability, head) = match store.load_stop_head(StopScope::Kernel) {
             Ok(head) => (StopDurability::Durable, head),
             Err(error) => {
@@ -622,6 +631,8 @@ impl StopControl {
                 )
             }
         };
+        let owned: Weak<S> = Arc::downgrade(store);
+        let store: Weak<dyn DurableStopStore> = owned;
         Self {
             heads: Arc::new(StopHeads::new(durability, head)),
             durable: Some(Arc::new(DurableStopBinding {
@@ -651,6 +662,12 @@ impl StopControl {
         let Some(durable) = &self.durable else {
             return Ok(self.status());
         };
+        let Some(store) = durable.store.upgrade() else {
+            return Err(StopControlError::NotDurable {
+                detail: STOP_STORE_CLOSED.to_owned(),
+                status: Box::new(self.status()),
+            });
+        };
         let _transition = durable
             .transitions
             .lock()
@@ -664,10 +681,7 @@ impl StopControl {
             requested_via: command.requested_via,
             allow_containment: command.allow_containment,
         };
-        match durable
-            .store
-            .append_stop_transition(&request, &durable.fence)
-        {
+        match store.append_stop_transition(&request, &durable.fence) {
             Ok(head) => {
                 self.heads.update(|snapshot| {
                     snapshot.head = head;
@@ -694,6 +708,9 @@ impl StopControl {
         if let StopDurability::Unverified { reason } = self.durability() {
             return Err(StopControlError::NotReady(reason));
         }
+        let Some(store) = durable.store.upgrade() else {
+            return Err(StopControlError::NotReady(STOP_STORE_CLOSED.to_owned()));
+        };
         let _transition = durable
             .transitions
             .lock()
@@ -707,10 +724,7 @@ impl StopControl {
             requested_via: command.requested_via,
             allow_containment: false,
         };
-        match durable
-            .store
-            .append_stop_transition(&request, &durable.fence)
-        {
+        match store.append_stop_transition(&request, &durable.fence) {
             Ok(head) => {
                 self.heads.update(|snapshot| {
                     snapshot.head = head;

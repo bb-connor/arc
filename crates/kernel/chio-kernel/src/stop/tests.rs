@@ -166,7 +166,7 @@ fn a_stop_without_authority_time_is_valid() {
 #[test]
 fn durable_stop_survives_rebinding_and_resume_clears_it() {
     let store = Arc::new(MemoryStopStore::default());
-    let control = StopControl::durable(store.clone(), fence());
+    let control = StopControl::durable(&store, fence());
     assert!(!control.heads().is_stopped());
 
     let status = control.stop(stop_command("incident")).unwrap();
@@ -176,7 +176,7 @@ fn durable_stop_survives_rebinding_and_resume_clears_it() {
     let head = status.head.unwrap();
     assert_eq!((head.chain_generation, head.epoch), (1, 1));
 
-    let restarted = StopControl::durable(store.clone(), fence());
+    let restarted = StopControl::durable(&store, fence());
     assert!(restarted.heads().is_stopped());
     assert_eq!(restarted.status().readiness, StopReadiness::ReadyStopped);
 
@@ -187,13 +187,13 @@ fn durable_stop_survives_rebinding_and_resume_clears_it() {
         })))
         .unwrap();
     assert!(!resumed.stopped);
-    assert!(!StopControl::durable(store, fence()).heads().is_stopped());
+    assert!(!StopControl::durable(&store, fence()).heads().is_stopped());
 }
 
 #[test]
 fn a_repeated_stop_appends_nothing() {
     let store = Arc::new(MemoryStopStore::default());
-    let control = StopControl::durable(store.clone(), fence());
+    let control = StopControl::durable(&store, fence());
     control.stop(stop_command("first")).unwrap();
     control.stop(stop_command("second")).unwrap();
     assert_eq!(store.records.lock().unwrap().len(), 1);
@@ -202,7 +202,7 @@ fn a_repeated_stop_appends_nothing() {
 #[test]
 fn resume_against_a_moved_head_is_refused() {
     let store = Arc::new(MemoryStopStore::default());
-    let control = StopControl::durable(store, fence());
+    let control = StopControl::durable(&store, fence());
     control.stop(stop_command("incident")).unwrap();
     for stale in [None, Some(StopEpochId::GENESIS)] {
         assert!(matches!(
@@ -222,7 +222,7 @@ fn resume_against_a_moved_head_is_refused() {
 fn a_failed_durable_append_still_stops_this_process() {
     let store = Arc::new(MemoryStopStore::default());
     store.fail_appends.store(true, Ordering::SeqCst);
-    let control = StopControl::durable(store.clone(), fence());
+    let control = StopControl::durable(&store, fence());
     let Err(StopControlError::NotDurable { status, .. }) = control.stop(stop_command("incident"))
     else {
         panic!("a failed append must report a non-durable stop");
@@ -244,7 +244,7 @@ fn a_failed_durable_append_still_stops_this_process() {
 fn an_unverified_chain_fails_closed_and_refuses_resume() {
     let store = Arc::new(MemoryStopStore::default());
     store.fail_loads.store(true, Ordering::SeqCst);
-    let control = StopControl::durable(store, fence());
+    let control = StopControl::durable(&store, fence());
     assert!(control.heads().is_stopped());
     let status = control.status();
     assert_eq!(status.durability, "unverified");
@@ -274,7 +274,8 @@ fn clones_share_one_stop() {
 
 #[test]
 fn the_host_latch_is_independent_of_operator_resume() {
-    let control = StopControl::durable(Arc::new(MemoryStopStore::default()), fence());
+    let store = Arc::new(MemoryStopStore::default());
+    let control = StopControl::durable(&store, fence());
     control.heads().latch_host("broker failed");
     assert!(control.status().host_latch);
     control.resume(resume_command(None)).unwrap();
@@ -298,4 +299,25 @@ fn stop_reasons_are_bounded() {
         Err(StopControlError::BadRequest(detail)) if detail == "stop reason is too long"
     ));
     assert!(!control.heads().is_stopped());
+}
+
+#[test]
+fn a_control_does_not_keep_its_store_open() {
+    let store = Arc::new(MemoryStopStore::default());
+    let control = StopControl::durable(&store, fence());
+    drop(store);
+
+    let Err(StopControlError::NotDurable { detail, status }) =
+        control.stop(stop_command("incident"))
+    else {
+        panic!("a stop without its store must report a non-durable stop");
+    };
+    assert_eq!(detail, "stop store is closed");
+    assert!(status.stopped);
+    assert!(control.heads().is_stopped());
+    assert!(matches!(
+        control.resume(resume_command(None)),
+        Err(StopControlError::NotReady(detail)) if detail == "stop store is closed"
+    ));
+    assert!(control.heads().is_stopped());
 }
