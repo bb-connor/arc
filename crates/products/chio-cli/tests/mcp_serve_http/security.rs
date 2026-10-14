@@ -10,6 +10,7 @@ pub(super) fn http_security_material(
     dir: &Path,
     script_path: &Path,
     startup_marker: Option<&Path>,
+    observation_log: Option<&Path>,
 ) -> mcp_security::NativeMcpSecurityMaterial {
     static MATERIALS: OnceLock<
         Mutex<HashMap<PathBuf, Arc<OnceLock<mcp_security::NativeMcpSecurityMaterial>>>>,
@@ -44,7 +45,13 @@ pub(super) fn http_security_material(
                 .test_unwrap("mock MCP server path is UTF-8")
                 .to_string()];
             let mut write_paths = Vec::new();
-            if let Some(marker) = startup_marker {
+            for (flag, path) in [
+                ("--startup-marker", startup_marker),
+                ("--observation-log", observation_log),
+            ] {
+                let Some(path) = path else {
+                    continue;
+                };
                 let mut options = fs::OpenOptions::new();
                 options.write(true).create_new(true);
                 #[cfg(unix)]
@@ -53,17 +60,16 @@ pub(super) fn http_security_material(
                     options.mode(0o600);
                 }
                 options
-                    .open(marker)
-                    .test_unwrap("create private startup marker");
-                let marker = fs::canonicalize(marker).test_unwrap("canonicalize startup marker");
+                    .open(path)
+                    .test_unwrap("create private wrapped-server log");
+                let path = fs::canonicalize(path).test_unwrap("canonicalize wrapped-server log");
                 target_args.extend([
-                    "--startup-marker".to_string(),
-                    marker
-                        .to_str()
-                        .test_unwrap("startup marker UTF-8")
+                    flag.to_string(),
+                    path.to_str()
+                        .test_unwrap("wrapped-server log UTF-8")
                         .to_string(),
                 ]);
-                write_paths.push(marker);
+                write_paths.push(path);
             }
             let material = mcp_security::materialize_mcp_security(
                 &canonical_dir.join("security"),
@@ -76,10 +82,10 @@ pub(super) fn http_security_material(
                 "0.1.0",
                 &write_paths,
             );
-            if let Some(marker) = startup_marker {
-                // Discovery used the same signed command. Count only the
-                // actual edge's launches in shared-owner assertions.
-                fs::write(marker, b"").test_unwrap("clear discovery startup marker");
+            // Discovery used the same signed command. Keep only the actual
+            // edge's launches and traffic.
+            for path in [startup_marker, observation_log].into_iter().flatten() {
+                fs::write(path, b"").test_unwrap("clear discovery wrapped-server log");
             }
             material
         })
@@ -97,8 +103,19 @@ pub(super) fn spawn_secured_http_command(
             .then(|| value.map(PathBuf::from))
             .flatten()
     });
+    let observation_log = command.get_envs().find_map(|(name, value)| {
+        (name == "CHIO_MCP_OBSERVATION_LOG_PATH")
+            .then(|| value.map(PathBuf::from))
+            .flatten()
+    });
     command.env_remove("CHIO_MCP_STARTUP_MARKER_PATH");
-    let security = http_security_material(dir, script_path, startup_marker.as_deref());
+    command.env_remove("CHIO_MCP_OBSERVATION_LOG_PATH");
+    let security = http_security_material(
+        dir,
+        script_path,
+        startup_marker.as_deref(),
+        observation_log.as_deref(),
+    );
     command
         .current_dir(dir)
         .args([

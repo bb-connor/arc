@@ -138,3 +138,19 @@ fn local_authorization_server_refuses_invalid_client_registrations() {
         cli_refusal("--auth-client requires --auth-server-seed-file")
     );
 }
+
+#[test]
+fn oauth_edge_without_authorization_server_refuses_to_start() {
+    let mut config = local_oauth_config();
+    config.auth_server_seed_path = None;
+    config.auth_clients = Vec::new();
+    config.auth_jwt_public_key = Some(chio_core::crypto::Keypair::generate().public_key().to_hex());
+    config.auth_jwt_issuer = None;
+    config.auth_servers = Vec::new();
+    assert_eq!(
+        startup_refusal(config),
+        cli_refusal(
+            "bearer-authenticated remote MCP edge requires --auth-server or --auth-jwt-issuer so protected-resource metadata can advertise an authorization server"
+        )
+    );
+}

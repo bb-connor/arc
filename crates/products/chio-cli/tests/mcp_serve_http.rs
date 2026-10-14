@@ -5963,6 +5963,8 @@ fn mcp_serve_http_sets_explicit_response_mode_headers() {
 
 #[path = "mcp_serve_http/malformed_initialize.rs"]
 mod malformed_initialize;
+#[path = "mcp_serve_http/token_passthrough.rs"]
+mod token_passthrough;
 
 /// Launch the edge with policy material bound to the mock server but a
 /// different wrapped script, and return the process for the caller to reap.
@@ -5971,7 +5973,7 @@ fn spawn_http_server_with_unbound_upstream(dir: &Path, token: &str) -> Child {
     let script_path = write_mock_server_script(dir);
     let unbound_script = dir.join("unbound-mock-server.py");
     fs::copy(&script_path, &unbound_script).expect("copy mock server script");
-    let security = http_security_material(dir, &script_path, None);
+    let security = http_security_material(dir, &script_path, None, None);
     let session_db_path = dir.join("unbound-sessions.sqlite3");
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
