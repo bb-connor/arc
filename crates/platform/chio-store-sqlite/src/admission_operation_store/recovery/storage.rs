@@ -57,7 +57,7 @@ pub(crate) use native_finishing_account::{
     authority_current_write_price, authority_current_write_profile, native_authority_debt,
     native_authority_file_page_debt, native_authority_table_row_debt, native_receipt_is_owed,
     native_registered_file_debt, AuthorityCurrentWritePrice, NativeAuthorityDebtData,
-    NativeAuthorityPageDebtData, NativeRegisteredFileDebtData,
+    NativeRegisteredFileDebtData,
 };
 pub(in crate::admission_operation_store) use native_finishing_account::{
     load_native_finishing_account, load_native_finishing_account_for_source,

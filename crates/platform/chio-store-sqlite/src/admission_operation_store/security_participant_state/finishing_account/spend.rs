@@ -348,7 +348,10 @@ pub(in crate::admission_operation_store) fn spend_native_payment_purpose(
         persist_native_finishing_transition(tx, owner, retained, &next)?;
         Ok(NativeFinishingSpend::Spent)
     };
-    match (write, account.map(|retained| retained.account.state)) {
+    match (
+        write,
+        account.as_ref().map(|retained| retained.account.state),
+    ) {
         // Genuinely pre-effect: the hold was cancelled before this original
         // had any funded account to spend, or while it was still Prepared.
         (

@@ -12,7 +12,6 @@ pub(in crate::admission_operation_store) use raw_custody_pricing::price_raw_cust
 pub(in crate::admission_operation_store) use raw_custody_pricing::raw_custody_price_algorithm_fingerprint;
 pub(in crate::admission_operation_store) use tool_outcome_pricing::{
     price_native_tool_outcome_phases, tool_outcome_price_algorithm_fingerprint,
-    ToolOutcomeTransactionPriceData,
 };
 mod pricing;
 #[cfg(test)]
