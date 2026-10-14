@@ -72,13 +72,13 @@ where
     let signalled = wait_for_shutdown(shutdown);
 
     let outcome = tokio::select! {
-        // Phase 1: serve until the server exits on its own or the signal fires.
+        // Serve until the server exits on its own or the signal fires.
         result = &mut server => match result {
             Ok(()) => DrainOutcome::Clean,
             Err(source) => return Err(ServeError::Io(source)),
         },
         () = signalled => {
-            // Phase 2: graceful shutdown has stopped the accept loop; bound only
+            // Graceful shutdown has stopped the accept loop; bound only
             // the remaining in-flight drain.
             match tokio::time::timeout(drain_timeout, &mut server).await {
                 Ok(Ok(())) => DrainOutcome::Clean,

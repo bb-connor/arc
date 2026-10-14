@@ -1118,12 +1118,12 @@ const NATIVE_USE_SOURCES: &[RequiredSource] = &[
         symbols: &["VerifiedNativeDispatchCredentials::execution_nonce", "DispatchCredentialReservation::verify_native_execution_nonce"],
     },
     RequiredSource {
-        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs",
-        symbols: &["PreparedNativeSecurityEgress::retain_for_declassified_capture", "PreparedNativeSecurityEgress::retain_for_capture_inner"],
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/prepared_commit.rs",
+        symbols: &["AcquiredNativeSecurityEgress::prepare_commit", "PreparedNativeSecurityEgressCommit::retain_for_declassified_capture", "consumption_at"],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress.rs",
-        symbols: &["AcquiredNativeSecurityEgress::commit_current_with_declassification"],
+        symbols: &["AcquiredNativeSecurityEgress::prepare_commit_context", "AcquiredNativeSecurityEgress::commit_prepared"],
     },
     RequiredSource {
         path: "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs",

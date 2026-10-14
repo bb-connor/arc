@@ -1,3 +1,4 @@
+pub(super) mod native_status;
 use super::obligation::{insert_obligation_projection, verify_obligation_projection};
 use super::*;
 

@@ -164,9 +164,9 @@ fn qualified_capability_snapshots_advance_the_external_rollback_generation(
     use std::os::unix::fs::PermissionsExt as _;
 
     let database_directory = tempfile::tempdir()?;
-    let anchor_directory = tempfile::Builder::new()
-        .prefix("capability-lineage-anchor")
-        .tempdir_in("/dev/shm")?;
+    let anchor_directory = crate::store_connection::test_support::rollback_anchor_tempdir(
+        "capability-lineage-anchor",
+    )?;
     for root in [database_directory.path(), anchor_directory.path()] {
         std::fs::set_permissions(root, std::fs::Permissions::from_mode(0o700))?;
     }

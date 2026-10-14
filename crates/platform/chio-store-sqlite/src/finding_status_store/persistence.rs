@@ -64,9 +64,7 @@ fn validate_intent_commit_liveness(
             "intent authority valid_until must follow valid_from",
         ));
     }
-    if input.issued_at < liveness.valid_from
-        || input.inclusion_deadline >= liveness.valid_until
-    {
+    if input.issued_at < liveness.valid_from || input.inclusion_deadline >= liveness.valid_until {
         return Err(FindingStatusStoreError::Conflict(
             "retraction intent is not covered through its inclusion deadline".to_owned(),
         ));
@@ -356,9 +354,7 @@ fn persist_epoch_tx(
         if epoch.operator_key_epoch == floor.operator_key_epoch
             && epoch.operator_key != floor.operator_key
         {
-            return Err(invariant(
-                "operator key changed without key-epoch rotation",
-            ));
+            return Err(invariant("operator key changed without key-epoch rotation"));
         }
         if epoch.operator_key_epoch == floor.operator_key_epoch
             && epoch.operator_authorization_sha256 != floor.operator_authorization_sha256
@@ -1927,6 +1923,10 @@ fn admission_error(error: AdmissionOperationStoreError) -> FindingStatusStoreErr
         }
         AdmissionOperationStoreError::Invariant(detail) => {
             FindingStatusStoreError::Invariant(detail)
+        }
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired => {
+            invariant("recovery preview refusal is outside this store")
         }
         AdmissionOperationStoreError::Operation(error) => invariant(error.to_string()),
     }

@@ -10,7 +10,7 @@ response is a kernel denial, not a completed tool result.
 key or private retained admission request is included. The artifact is a later
 signed readback of the fenced store. Its custody claim does not pretend an
 original completed-call commitment exists. This fixture supports offline
-signature and semantic regressions; it does not certify all M5 requirements.
+signature and semantic regressions; it does not certify full process qualification.
 
 `interrupted.json` records the distinct network case: the confined tool exited
 before responding. Its original signed receipt is incomplete and retains an

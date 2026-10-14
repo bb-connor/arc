@@ -1,4 +1,5 @@
 use super::{HttpEgressContract, HttpEgressError};
+
 use std::collections::BTreeSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -17,6 +18,136 @@ fn strict_contract(authority: &str) -> HttpEgressContract {
         max_redirect_chain: 3,
         max_response_bytes: 1024,
     }
+}
+
+#[test]
+fn default_authority_does_not_authorize_nondefault_port() {
+    let cases = [
+        (
+            "https",
+            "api.example.com",
+            "https://api.example.com:8443/report",
+        ),
+        (
+            "https",
+            "api.example.com",
+            "https://api.example.com:80/report",
+        ),
+        (
+            "http",
+            "api.example.com",
+            "http://api.example.com:8080/report",
+        ),
+        (
+            "http",
+            "api.example.com",
+            "http://api.example.com:443/report",
+        ),
+        ("https", "8.8.8.8", "https://8.8.8.8:8443/report"),
+        (
+            "https",
+            "[2001:4860:4860::8888]",
+            "https://[2001:4860:4860::8888]:8443/report",
+        ),
+    ];
+    let mut accepted = Vec::new();
+    for (scheme, authority, target) in cases {
+        let mut contract = strict_contract(authority);
+        contract.allowed_schemes = BTreeSet::from([scheme.to_owned()]);
+        match contract.enforce_url(target, 0) {
+            Err(HttpEgressError::AuthorityDenied { .. }) => {}
+            Ok(_) => accepted.push(target),
+            Err(error) => panic!("unexpected authority refusal: {error}"),
+        }
+    }
+    assert!(
+        accepted.is_empty(),
+        "bare authority approved nondefault ports: {accepted:?}"
+    );
+}
+
+#[test]
+fn declared_authority_accepts_only_its_default_or_explicit_effective_port() {
+    for (scheme, authority, target) in [
+        ("https", "api.example.com", "https://api.example.com/report"),
+        (
+            "https",
+            "api.example.com",
+            "https://api.example.com:443/report",
+        ),
+        (
+            "https",
+            "api.example.com:443",
+            "https://api.example.com/report",
+        ),
+        (
+            "https",
+            "api.example.com:443",
+            "https://api.example.com:443/report",
+        ),
+        (
+            "https",
+            "api.example.com:8443",
+            "https://api.example.com:8443/report",
+        ),
+        ("http", "api.example.com", "http://api.example.com/report"),
+        (
+            "http",
+            "api.example.com:80",
+            "http://api.example.com:80/report",
+        ),
+        (
+            "http",
+            "api.example.com:8080",
+            "http://api.example.com:8080/report",
+        ),
+        (
+            "https",
+            "[2001:4860:4860::8888]",
+            "https://[2001:4860:4860::8888]:443/report",
+        ),
+        (
+            "https",
+            "[2001:4860:4860::8888]:8443",
+            "https://[2001:4860:4860::8888]:8443/report",
+        ),
+        (
+            "https",
+            "api.example.com:8443",
+            "https://API.EXAMPLE.COM:8443/report",
+        ),
+    ] {
+        let mut contract = strict_contract(authority);
+        contract.allowed_schemes = BTreeSet::from([scheme.to_owned()]);
+        assert!(
+            contract.enforce_url(target, 0).is_ok(),
+            "explicitly approved target refused: {target}"
+        );
+    }
+    for (authority, target) in [
+        (
+            "api.example.com:8443",
+            "https://api.example.com:9443/report",
+        ),
+        ("api.example.com:8443", "https://api.example.com/report"),
+        (
+            "[2001:4860:4860::8888]:8443",
+            "https://[2001:4860:4860::8888]:9443/report",
+        ),
+    ] {
+        assert!(
+            matches!(
+                strict_contract(authority).enforce_url(target, 0),
+                Err(HttpEgressError::AuthorityDenied { .. })
+            ),
+            "undeclared effective port accepted: {target}"
+        );
+    }
+    assert!(matches!(
+        strict_contract("api.example.com:8443")
+            .enforce_url("https://credential@api.example.com:8443/report", 0),
+        Err(HttpEgressError::UserinfoDenied)
+    ));
 }
 
 #[test]

@@ -1,0 +1,106 @@
+{
+  "recorded_at_utc": "2026-10-10T06:07:59.673248+00:00",
+  "head": "4b9229dca4329141ba3c929264ef71aee12e37c6",
+  "base": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+  "source": "Immutable Git HEAD plus captured tracked dirty-file overlays; later live edits are outside this review until explicitly reconciled.",
+  "overlay": {
+    "Cargo.lock": {
+      "sha256": "e57c1c8cf39dab1024346f22eec05bd3e9c502045b122f5eef60fd33a134e43b",
+      "bytes": 376916,
+      "snapshot": "target/recovery-architecture-review/source-overlay/Cargo.lock"
+    },
+    "crates/platform/chio-control-plane/src/recovery/tests/command_quotas.rs": {
+      "sha256": "e34eb9416fe00adcbcbb5dcbf537f3ee2e5b2aab24546cecf5179cf984bca80b",
+      "bytes": 123504,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/platform/chio-control-plane/src/recovery/tests/command_quotas.rs"
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs": {
+      "sha256": "c1d199e1b09a1fb482dd8eb9bd1450d93b74e7cd48c039f8d44aea82b830d925",
+      "bytes": 28092,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs"
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/active_workflows.rs": {
+      "sha256": "3b24ec529ed993af8d605103ff932025fe77e4d256524571e31e6962d245c128",
+      "bytes": 31914,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/active_workflows.rs"
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/command_quota_test_support.rs": {
+      "sha256": "87ebc77910081743e45838a501b063adbcf21e21795dc81a794df41e0a4b6113",
+      "bytes": 38732,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/command_quota_test_support.rs"
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/write.rs": {
+      "sha256": "a24ff112280c90b7a16d644a33fbef63cc29240426b5e798025ab75f9b6267a2",
+      "bytes": 17551,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/write.rs"
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/mutations.rs": {
+      "sha256": "3fa568174988722911f682b61bf375c20c3d4144746e2c063872ab8987e047b5",
+      "bytes": 21573,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/mutations.rs"
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs": {
+      "sha256": "01dcb9de3a73a1808020ae2915f0a7848bfc8d9025c380e0dae497795235d997",
+      "bytes": 31386,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/platform/chio-store-sqlite/src/admission_operation_store/semantic/materialization.rs"
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state.rs": {
+      "sha256": "4f79c4fa0c1510c60e3861d25dc4634956d8210fb1dbdb8a5bef593b428eeb3b",
+      "bytes": 7806,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state.rs"
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/faults.rs": {
+      "sha256": "aab8366c3cf2db57ce43bcbb8c024e8e2ede7c59c962adf95a4aed29b841b509",
+      "bytes": 9819,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/faults.rs"
+    },
+    "crates/platform/chio-store-sqlite/src/security_state/declassification/tests/equivalence.rs": {
+      "sha256": "187803e361a60fb7bedfe444a8353f579ceec75c6f0fb01c95022ce7da7cfaaf",
+      "bytes": 15918,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/platform/chio-store-sqlite/src/security_state/declassification/tests/equivalence.rs"
+    },
+    "crates/platform/chio-store-sqlite/src/security_state/native_egress.rs": {
+      "sha256": "98b45dd57ebf3e65fb6aad6a45ba0284e8673860e5d1f62a1d3b345477c665e9",
+      "bytes": 13998,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/platform/chio-store-sqlite/src/security_state/native_egress.rs"
+    },
+    "crates/trust/chio-federation-transport-iroh/Cargo.toml": {
+      "sha256": "fe8f830285349fb604fda701a2da7276fab20eaa56937c14bb9c3b815f36b2b1",
+      "bytes": 4105,
+      "snapshot": "target/recovery-architecture-review/source-overlay/crates/trust/chio-federation-transport-iroh/Cargo.toml"
+    },
+    "docs/architecture/recoverable-agent-runtime/implementation/p1/OPERATIONS.md": {
+      "sha256": "599024c8db00ed2610ab6bc689d37a29fe74cfef72da06e5ed38fcf54d8bba97",
+      "bytes": 12421,
+      "snapshot": "target/recovery-architecture-review/source-overlay/docs/architecture/recoverable-agent-runtime/implementation/p1/OPERATIONS.md"
+    },
+    "docs/architecture/recoverable-agent-runtime/implementation/review-register.json": {
+      "sha256": "c6d962d591fee37274f583c6d9c1156916df1cd9a1a5869d7bdc323d12416294",
+      "bytes": 685293,
+      "snapshot": "target/recovery-architecture-review/source-overlay/docs/architecture/recoverable-agent-runtime/implementation/review-register.json"
+    },
+    "docs/architecture/recoverable-agent-runtime/implementation/review-register.md": {
+      "sha256": "f4a09623dccd60707f066ddb2df49e0f9b0fe8434b7ce6c40f7b305883a992ca",
+      "bytes": 32931,
+      "snapshot": "target/recovery-architecture-review/source-overlay/docs/architecture/recoverable-agent-runtime/implementation/review-register.md"
+    },
+    "scripts/compiled-gate-profiles.py": {
+      "sha256": "2dba56a46bb2e03fddabb15b2be2c2e3dd90aa6f9c3b5c1b38da65317c412820",
+      "bytes": 29358,
+      "snapshot": "target/recovery-architecture-review/source-overlay/scripts/compiled-gate-profiles.py"
+    },
+    "scripts/tests/compiled-gate-profiles.test.py": {
+      "sha256": "eec880d0eb61fa0f63e1efe84575a0268b7e5c13deb83a9e3d4a3073898044be",
+      "bytes": 18697,
+      "snapshot": "target/recovery-architecture-review/source-overlay/scripts/tests/compiled-gate-profiles.test.py"
+    },
+    "scripts/tests/verify-recovery-qualification.test.py": {
+      "sha256": "2f7f894491bb9e77e1467a03a89682af49af30457f038be37bf147fcb7de58fd",
+      "bytes": 212125,
+      "snapshot": "target/recovery-architecture-review/source-overlay/scripts/tests/verify-recovery-qualification.test.py"
+    }
+  },
+  "changed_paths": 7655,
+  "qualification": false,
+  "semantic_review_complete": false
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "chio.recovery-history-index.v1",
+  "archive": "a6ac2b0a3a28ff27cfee3647037cc35db423a74ed781ed40569a2b1c1b493d6d.tar.gz",
+  "sha256": "a6ac2b0a3a28ff27cfee3647037cc35db423a74ed781ed40569a2b1c1b493d6d",
+  "archive_bytes": 49583120,
+  "file_count": 5924,
+  "expanded_bytes": 72413962,
+  "source_commit": "4b9229dca4329141ba3c929264ef71aee12e37c6",
+  "original_roots": [
+    "docs/architecture/recoverable-agent-runtime/implementation/p0",
+    "docs/architecture/recoverable-agent-runtime/implementation/p1",
+    "docs/architecture/recoverable-agent-runtime/implementation/p2",
+    "docs/architecture/recoverable-agent-runtime/implementation/p3",
+    "docs/architecture/recoverable-agent-runtime/implementation/p4",
+    "docs/architecture/recoverable-agent-runtime/implementation/p5",
+    "docs/architecture/recoverable-agent-runtime/implementation/p6"
+  ],
+  "current_qualified": false,
+  "redactions": "Preserves the already published redacted bytes and REDACTIONS.md without rewriting historical seals."
+}

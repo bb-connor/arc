@@ -16,6 +16,9 @@ mod cutpoints;
 #[path = "security_participant_state/egress.rs"]
 mod egress;
 #[cfg(unix)]
+#[path = "security_participant_state/imported_influence.rs"]
+mod imported_influence;
+#[cfg(unix)]
 #[path = "security_participant_state/integrity.rs"]
 mod integrity;
 #[cfg(unix)]
@@ -29,10 +32,20 @@ mod mutations;
 #[cfg(unix)]
 pub(super) use mutations::prepare_issuance_fixture;
 #[cfg(unix)]
+#[path = "security_participant_state/native_live_state.rs"]
+mod native_live_state;
+#[cfg(unix)]
 #[path = "security_participant_state/observation.rs"]
 mod observation;
 
 thread_local! { static FAIL_AFTER: Cell<u8> = const { Cell::new(0) }; }
+thread_local! { static EGRESS_COMMIT_TIME: Cell<Option<u64>> = const { Cell::new(None) }; }
+
+pub(crate) fn egress_commit_clock() -> Option<chio_kernel::FixedRuntimeClockScope> {
+    EGRESS_COMMIT_TIME
+        .get()
+        .map(chio_kernel::scope_fixed_runtime_clock_for_current_thread)
+}
 
 pub(crate) fn cutpoint(stage: u8) -> Result<(), AdmissionOperationStoreError> {
     if FAIL_AFTER.get() == stage {
@@ -58,6 +71,7 @@ struct ResetCutpoint;
 impl Drop for ResetCutpoint {
     fn drop(&mut self) {
         FAIL_AFTER.set(0);
+        EGRESS_COMMIT_TIME.set(None);
     }
 }
 

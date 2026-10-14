@@ -35,10 +35,11 @@ use crate::store_connection::StoreConnection;
 mod authorization;
 mod composite;
 pub(crate) use composite::{
+    authenticate_native_budget_capture, composite_budget_text_bounds,
     preflight_authorization_commit_index, verify_compensated_budget_hold_tx,
     verify_nonce_budget_phase_tx, verify_preflight_hold, AdmissionAuthorizationBinding,
-    AdmissionCaptureBinding, NonceBudgetPhase, NoncePreflightAuthorizationBinding,
-    NoncePreflightHoldState,
+    AdmissionCaptureBinding, CompositeBudgetTextBounds, NonceBudgetPhase,
+    NoncePreflightAuthorizationBinding, NoncePreflightHoldState,
 };
 pub(crate) mod composite_schema;
 mod import_hold_state;

@@ -83,6 +83,13 @@ pub(crate) struct RollbackAnchor {
 }
 
 impl RollbackAnchor {
+    #[cfg(any(test, feature = "admission-test-support"))]
+    pub(crate) fn release_serving_lock_for_test(&self) -> Result<(), SqliteServingOwnerError> {
+        let _rotation = self.hold_rotation()?;
+        self.validate_identity()?;
+        self.file.unlock().map_err(Into::into)
+    }
+
     pub(crate) fn new(
         file: File,
         lock_root: &Path,

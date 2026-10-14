@@ -53,7 +53,7 @@ fn catalog(connection: &Connection) -> Result<Vec<CatalogEntry>, AdmissionOperat
 /// Absence is allowed only for historical, entirely absent migration schemas.
 /// Global coverage and the versioned admission catalog separately enforce that
 /// absence is not a way to erase an already anchored migration.
-pub(super) fn validate_bounds(
+pub(in crate::admission_operation_store) fn verify_catalog(
     connection: &Connection,
 ) -> Result<bool, AdmissionOperationStoreError> {
     let actual = catalog(connection)?;
@@ -62,6 +62,15 @@ pub(super) fn validate_bounds(
     }
     if actual != expected_catalog()? {
         return Err(invalid("migration catalog is not canonical"));
+    }
+    Ok(true)
+}
+
+pub(super) fn validate_bounds(
+    connection: &Connection,
+) -> Result<bool, AdmissionOperationStoreError> {
+    if !verify_catalog(connection)? {
+        return Ok(false);
     }
     for (table, columns, predicate, count_limit) in [
         ("security_participant_migration_expectations", vec![

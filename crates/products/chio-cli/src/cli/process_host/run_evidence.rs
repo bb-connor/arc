@@ -152,6 +152,7 @@ pub(super) fn verify_file(
             "captured_invocations": evidence.aggregate.captured_invocations,
             "verified_native_launches": evidence.confinement.len(), "checks": checks,
             "artifact_schema": evidence.schema, "unchecked": unchecked,
+            "qualification_complete": false,
             "m5_acceptance_complete": false,
         })
     );

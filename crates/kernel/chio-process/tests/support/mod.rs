@@ -79,6 +79,17 @@ pub fn kernel_with_artifacts(
     nonce: bool,
     supplemental: bool,
 ) -> Result<Arc<ChioKernel>> {
+    kernel_with_configuration(path, server, payment, nonce, supplemental, config())
+}
+
+pub fn kernel_with_configuration(
+    path: &Path,
+    server: Box<dyn ToolServerConnection>,
+    payment: bool,
+    nonce: bool,
+    supplemental: bool,
+    configuration: KernelConfig,
+) -> Result<Arc<ChioKernel>> {
     private_dir(path)?;
     let locks = path.join("locks");
     private_dir(&locks)?;
@@ -87,16 +98,26 @@ pub fn kernel_with_artifacts(
         SqliteAuthorityStore::provision(&database, &locks)?;
     }
     let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
-    let mut kernel = ChioKernel::new(config());
+    let mut kernel = ChioKernel::new(configuration);
     kernel.set_capability_trust_root(
         issuer().public_key(),
         scope_hash(&scope(&["append", "read"]))?,
     );
-    let receipts = SqliteReceiptStore::open(path.join("receipts.db"))?;
+    // The real native receipt construction, matching the production host's
+    // bootstrap: the bank is attached to the authority's admission operation
+    // store before the receipt store opens, then the native store registers
+    // with the kernel. No unregistered receipt producer remains.
+    let receipt_bank = authority
+        .admission_operation_store()
+        .native_receipt_bank_attachment()?;
+    let receipts =
+        SqliteReceiptStore::open_with_native_bank(path.join("receipts.db"), &receipt_bank)?;
     // Match the production host's startup barrier. A reopened writer verifies
     // its persisted head asynchronously and must stay closed until that ends.
     receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
-    kernel.set_receipt_store(Box::new(receipts))?;
+    kernel.set_native_receipt_store(
+        chio_kernel::receipt_store::NativeReceiptStoreRegistration::new(Arc::new(receipts)),
+    )?;
     kernel.set_revocation_store(Box::new(authority.revocation_store()));
     kernel.set_budget_store(Box::new(authority.budget_store()));
     kernel.set_durable_admission_store(

@@ -2,46 +2,34 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: d2b29cbbc9a0070d3666a33fd5a06bbda07a8e70f6d54bf33c15ca8b74893ff9
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
 # under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
 
-
 from __future__ import annotations
-
 from typing import Literal
-
 import re
-
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-_CHIO_FEATURE_NAME_RE = re.compile(r"^[a-z0-9_.-]{1,96}$")
-
+_CHIO_FEATURE_NAME_RE = re.compile('^[a-z0-9_.-]{1,96}$')
 
 class ChioCapabilityNegotiationV1(BaseModel):
     """
     Feature bitset exchanged during federation trust establishment, including aggregate budgets, cumulative approval, threshold approval, and governed active response. Malformed feature names and unsupported schema IDs fail closed.
     """
+    model_config = ConfigDict(extra='forbid')
+    schema_: Literal['chio.capabilities.v1'] = Field(..., alias='schema')
+    features: dict[str, bool] | None = Field(None, description='String-keyed feature bitset. Peers proceed only with the intersection of true values advertised by both sides.')
 
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Literal["chio.capabilities.v1"] = Field(..., alias="schema")
-    features: dict[str, bool] | None = Field(
-        None,
-        description="String-keyed feature bitset. Peers proceed only with the intersection of true values advertised by both sides.",
-    )
-
-    @model_validator(mode="after")
-    def _validate_feature_names(self) -> "ChioCapabilityNegotiationV1":
+    @model_validator(mode='after')
+    def _validate_feature_names(self) -> 'ChioCapabilityNegotiationV1':
         if self.features is None:
             return self
         for name in self.features:
             if not _CHIO_FEATURE_NAME_RE.match(name):
-                raise ValueError(
-                    f"capability feature name {name!r} does not match "
-                    f"propertyNames pattern ^[a-z0-9_.-]{{1,96}}$"
-                )
+                raise ValueError(f'capability feature name {name!r} does not match propertyNames pattern ^[a-z0-9_.-]{{1,96}}$')
         return self
+
+# Public compatibility aliases reference the actual current model classes.
+CapabilityCapabilitiesChioCapabilityNegotiationV1 = ChioCapabilityNegotiationV1

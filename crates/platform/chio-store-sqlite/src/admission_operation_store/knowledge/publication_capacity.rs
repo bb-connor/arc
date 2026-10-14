@@ -1,0 +1,541 @@
+//! Live publication slots are distinct from retained physical finishing debt.
+use super::reference_source::ReferenceCutoff;
+use super::references::{ReferenceAccount, SourceAnchor};
+use super::*;
+
+mod catalog;
+pub(super) mod collection;
+mod initialization;
+
+const MAX_LIVE_PUBLICATIONS: u64 = 512;
+const ACCOUNT_BYTES: usize = 4096;
+const LEASE_BYTES: usize = 16384;
+
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+enum CapacitySchema {
+    #[serde(rename = "chio.knowledge.publication-capacity.v1")]
+    V1,
+}
+
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapacityBaseline {
+    cutoff: ReferenceCutoff,
+}
+
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapacityRecord {
+    schema: CapacitySchema,
+    account: ReferenceAccount,
+    baseline: CapacityBaseline,
+    admitted: u64,
+    collected: u64,
+    changes: u64,
+}
+
+impl CapacityRecord {
+    fn live(&self) -> Result<u64, AdmissionOperationStoreError> {
+        self.admitted
+            .checked_sub(self.collected)
+            .ok_or_else(|| refused("publication live counter changed its original owners"))
+    }
+
+    fn original(&self) -> Self {
+        let mut original = self.clone();
+        original.admitted = 0;
+        original.collected = 0;
+        original.changes = 0;
+        original
+    }
+
+    fn validate(&self, version: u64) -> Result<(), AdmissionOperationStoreError> {
+        for value in [
+            self.admitted,
+            self.collected,
+            self.changes,
+            self.live()?,
+            version,
+        ] {
+            SafeInteger::new(value).map_err(refused)?;
+        }
+        if self.changes.checked_add(1) != Some(version)
+            || self.admitted.checked_add(self.collected) != Some(self.changes)
+            || self.live()? > MAX_LIVE_PUBLICATIONS
+        {
+            return Err(refused("publication live counter changed its closed bound"));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+enum ReadySchema {
+    #[serde(rename = "chio.knowledge.publication-ready.v1")]
+    V1,
+}
+
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReadyRecord {
+    schema: ReadySchema,
+    account: ReferenceAccount,
+    baseline: CapacityBaseline,
+    capacity: SourceAnchor,
+}
+
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PublicationIdentity {
+    reference: ArtifactVersionRefV1,
+    principal: chio_security_types::PrincipalId,
+    publication: CommandId,
+    object: ArtifactObjectId,
+    input: CanonicalPayloadDigest,
+    installation_generation: SafeInteger,
+}
+
+impl PublicationIdentity {
+    fn from_record(record: &NativeArtifactRecordV1) -> Result<Self, AdmissionOperationStoreError> {
+        Ok(Self {
+            reference: artifact_version_reference(&record.metadata).map_err(refused)?,
+            principal: record.publication_principal.clone(),
+            publication: record.input.publication.clone(),
+            object: record.object.clone(),
+            input: CanonicalPayloadDigest::from_bytes(
+                knowledge_digest(
+                    RecoveryDigestDomain::KnowledgeReferenceOwner,
+                    &("publication_original_input", &record.input),
+                )
+                .map_err(refused)?,
+            ),
+            installation_generation: record.installation_generation,
+        })
+    }
+
+    fn matches_native_allocation(
+        &self,
+        record: &NativeArtifactRecordV1,
+    ) -> Result<bool, AdmissionOperationStoreError> {
+        let current = Self::from_record(record)?;
+        // The original reference remains immutable. The owning metadata commit
+        // may change its provenance through a verified label or certificate.
+        Ok(self.reference.scope == current.reference.scope
+            && self.reference.artifact == current.reference.artifact
+            && self.reference.version == current.reference.version
+            && self.principal == current.principal
+            && self.publication == current.publication
+            && self.object == current.object
+            && self.input == current.input
+            && self.installation_generation == current.installation_generation)
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+enum LeaseSchema {
+    #[serde(rename = "chio.knowledge.publication-lease.v1")]
+    V1,
+}
+
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LeaseRecord {
+    schema: LeaseSchema,
+    account: ReferenceAccount,
+    identity: PublicationIdentity,
+    original: SourceAnchor,
+    collection: Option<SourceAnchor>,
+    changes: u64,
+}
+
+impl LeaseRecord {
+    fn original(&self) -> Self {
+        let mut original = self.clone();
+        original.collection = None;
+        original.changes = 0;
+        original
+    }
+
+    fn validate(&self, version: u64) -> Result<(), AdmissionOperationStoreError> {
+        let expected_changes = u64::from(self.collection.is_some());
+        if self.changes != expected_changes || self.changes.checked_add(1) != Some(version) {
+            return Err(refused(
+                "publication lease changed its original disposition",
+            ));
+        }
+        self.original.validate_ordinary()?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+enum ObjectSchema {
+    #[serde(rename = "chio.knowledge.publication-object.v1")]
+    V1,
+}
+
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ObjectRecord {
+    schema: ObjectSchema,
+    identity: PublicationIdentity,
+    publication: String,
+    original: SourceAnchor,
+}
+
+fn account(scope: &RecoveryScopeV1) -> ReferenceAccount {
+    ReferenceAccount::from_scope(scope)
+}
+
+fn capacity_key(account: &ReferenceAccount) -> Result<String, AdmissionOperationStoreError> {
+    Ok(format!(
+        "knowledge-publication-capacity:{}",
+        account.scope_key()?
+    ))
+}
+
+fn ready_key(account: &ReferenceAccount) -> Result<String, AdmissionOperationStoreError> {
+    Ok(format!(
+        "knowledge-publication-ready:{}",
+        account.scope_key()?
+    ))
+}
+
+fn lease_key(
+    account: &ReferenceAccount,
+    publication: &str,
+) -> Result<String, AdmissionOperationStoreError> {
+    Ok(format!(
+        "knowledge-publication-lease:{}:{}",
+        account.scope_key()?,
+        sha256_hex(publication.as_bytes()),
+    ))
+}
+
+fn object_key(
+    scope: &RecoveryScopeV1,
+    object: &ArtifactObjectId,
+) -> Result<String, AdmissionOperationStoreError> {
+    Ok(format!(
+        "knowledge-publication-object:{}:{}",
+        account(scope).scope_key()?,
+        hex::encode(
+            knowledge_digest(
+                RecoveryDigestDomain::KnowledgeObjectCustody,
+                &(scope, object)
+            )
+            .map_err(refused)?
+        ),
+    ))
+}
+
+fn checked_row<T: Serialize + serde::de::DeserializeOwned>(
+    tx: &Connection,
+    key: &str,
+    scope: &str,
+    maximum: usize,
+) -> Result<(T, protected::ProtectedSourceReference), AdmissionOperationStoreError> {
+    let row = protected::raw_checked(tx, key)?
+        .ok_or_else(|| refused("publication allocation source disappeared"))?;
+    let source = protected::source_reference(tx, key)?;
+    let ordinary: bool = tx.query_row(
+        "SELECT native_namespace IS NULL AND native_request IS NULL FROM admission_operation_recovery_records WHERE record_key=?1",
+        [key], |row| row.get(0),
+    ).map_err(sqlite_error)?;
+    if !ordinary || row.kind != "command" || row.scope != scope || row.payload.len() > maximum {
+        return Err(refused("publication allocation changed its exact header"));
+    }
+    Ok((protected::decode(&row.payload)?, source))
+}
+
+/// The canonical bytes of one allocation row within its closed envelope.
+fn bounded<T: Serialize>(
+    value: &T,
+    maximum: usize,
+) -> Result<Vec<u8>, AdmissionOperationStoreError> {
+    let bytes = protected::encode(value)?;
+    if bytes.len() > maximum {
+        return Err(refused(
+            "publication allocation exceeds its closed envelope",
+        ));
+    }
+    Ok(bytes)
+}
+
+fn current_capacity(
+    tx: &Connection,
+    scope: &RecoveryScopeV1,
+) -> Result<(CapacityRecord, protected::ProtectedSourceReference), AdmissionOperationStoreError> {
+    let identity = account(scope);
+    let capacity_key = capacity_key(&identity)?;
+    let (record, source) =
+        checked_row::<CapacityRecord>(tx, &capacity_key, &identity.scope_key()?, ACCOUNT_BYTES)?;
+    record.validate(source.version())?;
+    record.baseline.cutoff.verify(tx)?;
+    if record.account != identity
+        || !protected::matches_historical_command_payload(
+            tx,
+            &capacity_key,
+            source.scope_key(),
+            1,
+            &protected::encode(&record.original())?,
+        )?
+    {
+        return Err(refused(
+            "publication capacity changed its original initialization",
+        ));
+    }
+    let key = ready_key(&identity)?;
+    let (ready, ready_source) =
+        checked_row::<ReadyRecord>(tx, &key, &identity.scope_key()?, ACCOUNT_BYTES)?;
+    ready.capacity.verify_historical_identity(tx)?;
+    if ready_source.version() != 1
+        || ready.capacity.version() != 1
+        || ready.capacity.global_commit_sequence() <= record.baseline.cutoff.sequence()
+        || ready_source.global_commit_sequence() <= ready.capacity.global_commit_sequence()
+        || ready.account != identity
+        || ready.baseline != record.baseline
+        || ready.capacity.record_key() != capacity_key
+        || !ready.capacity.not_after(&SourceAnchor::capture(&source))
+        || ready_source.global_commit_sequence() <= record.baseline.cutoff.sequence()
+        || !protected::matches_historical_command_payload(
+            tx,
+            &key,
+            ready_source.scope_key(),
+            1,
+            &protected::encode(&ready)?,
+        )?
+    {
+        return Err(refused(
+            "publication readiness changed its authenticated activation",
+        ));
+    }
+    Ok((record, source))
+}
+
+pub(super) fn require_intake_capacity(
+    tx: &Connection,
+    scope: &RecoveryScopeV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    if current_capacity(tx, scope)?.0.live()? >= MAX_LIVE_PUBLICATIONS {
+        return Err(refused("artifact live quota"));
+    }
+    Ok(())
+}
+
+fn current_lease(
+    tx: &Connection,
+    record: &NativeArtifactRecordV1,
+) -> Result<(LeaseRecord, protected::ProtectedSourceReference), AdmissionOperationStoreError> {
+    record.metadata.validate().map_err(refused)?;
+    let identity = account(&record.metadata.scope);
+    let publication = record_publication_key(record)?;
+    let source = protected::source_reference(tx, &publication)?;
+    let (lease, lease_source) = checked_row::<LeaseRecord>(
+        tx,
+        &lease_key(&identity, &publication)?,
+        &identity.scope_key()?,
+        LEASE_BYTES,
+    )?;
+    lease.validate(lease_source.version())?;
+    lease.original.verify_historical_identity(tx)?;
+    if lease.account != identity
+        || !lease.identity.matches_native_allocation(record)?
+        || lease.original.record_key() != publication
+        || !lease.original.not_after(&SourceAnchor::capture(&source))
+        || !protected::matches_historical_command_payload(
+            tx,
+            lease_source.record_key(),
+            lease_source.scope_key(),
+            1,
+            &protected::encode(&lease.original())?,
+        )?
+    {
+        return Err(refused(
+            "publication lease changed its original native owner",
+        ));
+    }
+    let (capacity, _) = current_capacity(tx, &record.metadata.scope)?;
+    if lease.original.version() != 1
+        || lease.original.global_commit_sequence() <= capacity.baseline.cutoff.sequence()
+    {
+        return Err(refused("publication lease predates its native account"));
+    }
+    if let Some(collected) = &lease.collection {
+        collection::verify_retained_collection(tx, record, collected)?;
+    }
+    Ok((lease, lease_source))
+}
+
+/// Each genuine owning phase writer authenticates its original allocation.
+/// A transition to Retired preserves the live slot until actual collection.
+pub(super) fn validate_existing_allocation(
+    tx: &Connection,
+    record: &NativeArtifactRecordV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    let (lease, _) = current_lease(tx, record)?;
+    if lease.collection.is_some() {
+        return Err(refused(
+            "collected publication cannot resume its native writer",
+        ));
+    }
+    Ok(())
+}
+
+/// The reservation, its live slot and its reference owners are admitted in
+/// the one reserve transaction through the typed reservation sink. A full
+/// account refuses before any write.
+pub(super) fn admit_publication<'tx, 'conn>(
+    tx: &'tx Transaction<'conn>,
+    owner: &SqliteServingOwner,
+    intake: super::publication_source::VerifiedKnowledgePublicationIntake<'tx, 'conn>,
+) -> Result<(), AdmissionOperationStoreError> {
+    require_intake_capacity(tx, intake.scope())?;
+    protected::persist_knowledge_publication_reservation(tx, owner, &intake)?;
+    super::reference_custody::retain_publication_references(tx, owner, intake.record())
+}
+
+/// The new publication record of a verified reservation intake.
+pub(in crate::admission_operation_store) fn reservation_write(
+    intake: &super::publication_source::VerifiedKnowledgePublicationIntake<'_, '_>,
+) -> Result<DerivedWrite, AdmissionOperationStoreError> {
+    Ok(DerivedWrite {
+        key: intake.source_key().to_owned(),
+        scope_key: scope_key(intake.scope())?,
+        expected: None,
+        payload: protected::encode(intake.record())?,
+    })
+}
+
+/// The live slot of the publication this transaction just admitted: its new
+/// lease and object custody anchored to the written record, and the account
+/// counter advanced by one under CAS of its exact current head.
+pub(in crate::admission_operation_store) fn derive_allocation(
+    tx: &Connection,
+    scope: &RecoveryScopeV1,
+    publication: &str,
+) -> Result<Vec<DerivedWrite>, AdmissionOperationStoreError> {
+    let record: NativeArtifactRecordV1 =
+        load(tx, publication)?.ok_or_else(|| refused("publication allocation source absent"))?;
+    let source = protected::source_reference(tx, publication)?;
+    if record_publication_key(&record)? != publication
+        || record.metadata.scope != *scope
+        || record.state != ArtifactPublicationStateV1::Reserved
+        || source.version() != 1
+    {
+        return Err(refused("publication allocation source changed"));
+    }
+    require_intake_capacity(tx, scope)?;
+    let (mut capacity, previous) = current_capacity(tx, scope)?;
+    let key = lease_key(&capacity.account, publication)?;
+    let object = object_key(scope, &record.object)?;
+    if protected::raw_checked(tx, &key)?.is_some() || protected::raw_checked(tx, &object)?.is_some()
+    {
+        return Err(refused(
+            "publication intake cannot reuse a retained allocation",
+        ));
+    }
+    let original = SourceAnchor::capture(&source);
+    let identity = PublicationIdentity::from_record(&record)?;
+    let lease = LeaseRecord {
+        schema: LeaseSchema::V1,
+        account: capacity.account.clone(),
+        identity: identity.clone(),
+        original: original.clone(),
+        collection: None,
+        changes: 0,
+    };
+    let object_record = ObjectRecord {
+        schema: ObjectSchema::V1,
+        identity,
+        publication: publication.to_owned(),
+        original,
+    };
+    capacity.admitted = capacity
+        .admitted
+        .checked_add(1)
+        .ok_or_else(|| refused("publication admissions exhausted"))?;
+    capacity.changes = capacity
+        .changes
+        .checked_add(1)
+        .ok_or_else(|| refused("publication counter exhausted"))?;
+    capacity.validate(
+        previous
+            .version()
+            .checked_add(1)
+            .ok_or_else(|| refused("publication counter revision exhausted"))?,
+    )?;
+    let account_scope = capacity.account.scope_key()?;
+    Ok(vec![
+        DerivedWrite {
+            payload: bounded(&lease, LEASE_BYTES)?,
+            key,
+            scope_key: account_scope.clone(),
+            expected: None,
+        },
+        DerivedWrite {
+            payload: bounded(&object_record, LEASE_BYTES)?,
+            key: object,
+            scope_key: account_scope.clone(),
+            expected: None,
+        },
+        DerivedWrite {
+            payload: bounded(&capacity, ACCOUNT_BYTES)?,
+            key: capacity_key(&capacity.account)?,
+            scope_key: account_scope,
+            expected: Some(previous),
+        },
+    ])
+}
+
+pub(super) fn validate_retained_allocation(
+    tx: &Connection,
+    record: &NativeArtifactRecordV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    retained_allocation_source(tx, record).map(|_| ())
+}
+
+/// The current head of the validated original lease a terminal depends on.
+pub(super) fn retained_allocation_source(
+    tx: &Connection,
+    record: &NativeArtifactRecordV1,
+) -> Result<protected::ProtectedSourceReference, AdmissionOperationStoreError> {
+    current_lease(tx, record).map(|(_, source)| source)
+}
+
+pub(super) use catalog::verify_account;
+pub(in crate::admission_operation_store) use catalog::verify_catalog;
+pub(in crate::admission_operation_store) use initialization::bootstrap_write;
+pub(super) use initialization::initialize_account;
+
+#[cfg(feature = "admission-test-support")]
+impl SqliteAdmissionOperationStore {
+    /// Data-only native account observation. It supplies no collection grant.
+    pub fn inspect_live_publication_count(
+        &self,
+        actor: &AuthenticatedRecoveryActor,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<u64, AdmissionOperationStoreError> {
+        if actor.permission() != RecoveryPermission::KnowledgeAdmin {
+            return Err(refused("publication capacity inspection authority"));
+        }
+        let mut connection = self.connection()?;
+        let tx = self.begin_write(&mut connection, Some(fence))?;
+        let now = schema::authority_validation_time(&tx, now)?;
+        let deployment = protected::deployment_tx(&tx, actor.scope())?;
+        super::super::recovery::verify_actor(&tx, actor, &deployment, now)?;
+        let profile = installation(&tx, actor.scope())?;
+        validate_installation(&tx, &deployment, &profile)?;
+        traversal::ensure_audience(
+            &tx,
+            actor,
+            &source(&tx, &profile.native_authority, &profile.producer_context)?,
+        )?;
+        let count = current_capacity(&tx, actor.scope())?.0.live()?;
+        let later = schema::authority_validation_time(&tx, now)?;
+        super::super::recovery::verify_actor(&tx, actor, &deployment, later)?;
+        tx.rollback().map_err(sqlite_error)?;
+        Ok(count)
+    }
+}

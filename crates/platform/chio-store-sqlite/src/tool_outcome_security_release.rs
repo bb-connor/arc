@@ -148,7 +148,11 @@ pub(super) fn verify_projection(
     evaluation: Option<&PostReturnEvaluationRecordV1>,
 ) -> Result<Option<String>, ToolOutcomeStoreError> {
     let record = load(connection, operation.binding().operation_id().as_str())?;
-    let raw = match load_blob_state_connection(connection, outcome.raw_output_digest())? {
+    let raw = match load_blob_state_connection(
+        connection,
+        outcome.raw_output_digest(),
+        operation.binding().operation_id().as_str(),
+    )? {
         Some(StoredInvocationBlob::Present(blob)) => Some(
             RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())
                 .map_err(|error| invariant(error.to_string()))?,
@@ -192,8 +196,11 @@ pub(crate) fn require_terminal_release(
         else {
             return Ok(());
         };
-        let Some(StoredInvocationBlob::Present(blob)) =
-            load_blob_state_connection(connection, outcome.raw_output_digest())?
+        let Some(StoredInvocationBlob::Present(blob)) = load_blob_state_connection(
+            connection,
+            outcome.raw_output_digest(),
+            operation.binding().operation_id().as_str(),
+        )?
         else {
             // Existing terminal replay may outlive payload retention. Exact
             // checkpoint and admission-chain coverage remain mandatory.
@@ -232,6 +239,13 @@ impl SqliteToolOutcomeStore {
         let operation = load_operation_for_participant_tx(&transaction, record.operation_id())
             .map_err(admission_error)?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
+        crate::admission_operation_store::authorize_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &operation,
+            crate::admission_operation_store::NativeFinishingWrite::SecurityRelease,
+        )
+        .map_err(admission_error)?;
         crate::admission_operation_store::verify_participant_recovery_lease_tx(
             &transaction,
             &self.serving_owner,
@@ -245,8 +259,12 @@ impl SqliteToolOutcomeStore {
         require_finalizing_operation(&operation, &outcome)?;
         let evaluation = load_evaluation_tx(&transaction, record.operation_id())?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
-        let blob = load_blob_tx(&transaction, outcome.raw_output_digest())?
-            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        let blob = load_blob_tx(
+            &transaction,
+            outcome.raw_output_digest(),
+            record.operation_id().as_str(),
+        )?
+        .ok_or(ToolOutcomeStoreError::NotFound)?;
         let raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())
             .map_err(|error| invariant(error.to_string()))?;
         record
@@ -275,6 +293,13 @@ impl SqliteToolOutcomeStore {
             lease,
             &digest,
             now,
+        )
+        .map_err(admission_error)?;
+        crate::admission_operation_store::spend_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &operation,
+            crate::admission_operation_store::NativeFinishingWrite::SecurityRelease,
         )
         .map_err(admission_error)?;
         verify_outcome_projection(&transaction, record.operation_id().as_str())?;

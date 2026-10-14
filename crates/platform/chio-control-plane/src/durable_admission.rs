@@ -68,6 +68,22 @@ impl DurableAdmissionRuntime {
         })
     }
 
+    /// The native bank the receipt sink of this authority must preserve from
+    /// its first write.
+    pub fn native_receipt_bank(
+        &self,
+    ) -> Result<chio_store_sqlite::receipt_store::NativeReceiptBankAttachment, CliError> {
+        self.local_operations
+            .as_ref()
+            .ok_or_else(|| {
+                CliError::cli_other_error(
+                    "a native receipt sink requires the local durable admission store".to_string(),
+                )
+            })?
+            .native_receipt_bank_attachment()
+            .map_err(|error| CliError::cli_other_error(error.to_string()))
+    }
+
     /// Retire the authority at `path` and seal it for import at another
     /// location. Requires a stopped store; see `SqliteAuthorityStore::export_for_relocation`.
     pub fn export_relocation(path: &Path) -> Result<RelocationSeal, CliError> {

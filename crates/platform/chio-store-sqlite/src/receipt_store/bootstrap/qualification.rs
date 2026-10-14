@@ -2,7 +2,7 @@ use super::super::*;
 
 use std::path::{Path, PathBuf};
 
-use r2d2::{Pool, PooledConnection};
+use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 
 /// Exact database identity retained by a qualified finding-pool receipt store.
@@ -157,17 +157,19 @@ pub(in crate::receipt_store) struct ReceiptWriterQualification<'a> {
     pub(in crate::receipt_store) sink_qualification: Option<&'a ReceiptSinkQualification>,
 }
 
+/// Every pooled receipt connection is checked out here, under its file's
+/// native writer gate and page cap.
 pub(crate) fn receipt_pool_connection(
     pool: &Pool<SqliteConnectionManager>,
     qualification: Option<&ReceiptSinkQualification>,
-) -> Result<PooledConnection<SqliteConnectionManager>, ReceiptStoreError> {
+) -> Result<crate::receipt_store::SqliteStoreConnection, ReceiptStoreError> {
     let connection = pool
         .get()
         .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
     if let Some(qualification) = qualification {
         qualification.validate_connection(&connection)?;
     }
-    Ok(connection)
+    crate::receipt_store::native_finishing::gate_connection(connection)
 }
 
 pub(crate) fn verify_rollback(

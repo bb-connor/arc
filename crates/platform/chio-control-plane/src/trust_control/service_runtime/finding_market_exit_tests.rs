@@ -1335,7 +1335,7 @@ impl MarketWeb {
         let receipt_ids = vec![first.id.clone(), second.id.clone()];
         let finding = build_finding(
             &issuer,
-            "repo:backbay/chio#m2-exit-criterion",
+            "repo:backbay/chio#market-qualification-criterion",
             &recipe_sha256,
             &receipt_ids,
             &evidence_checkpoint_ref,
@@ -1344,7 +1344,7 @@ impl MarketWeb {
         let artifact_sha256 = sha256_hex(raw_finding.as_bytes());
         let second_finding = build_finding(
             &issuer,
-            "repo:backbay/chio#m2-exit-criterion-page-two",
+            "repo:backbay/chio#market-qualification-criterion-page-two",
             &recipe_sha256,
             &receipt_ids,
             &evidence_checkpoint_ref,
@@ -2890,7 +2890,7 @@ async fn future_issued_and_expired_findings_reject() -> TestResult {
     let now = unix_timestamp_now();
 
     let mut future = web.finding.clone();
-    future.descriptor.topic = "repo:backbay/chio#m2-exit-future".to_string();
+    future.descriptor.topic = "repo:backbay/chio#market-qualification-future".to_string();
     future.issued_at = now + 86_400;
     future.expires_at = now + 172_800;
     future.finding_id = compute_finding_id(&future)?;
@@ -2904,7 +2904,7 @@ async fn future_issued_and_expired_findings_reject() -> TestResult {
     assert!(String::from_utf8_lossy(&body).contains("future-issued"));
 
     let mut expired = web.finding.clone();
-    expired.descriptor.topic = "repo:backbay/chio#m2-exit-expired".to_string();
+    expired.descriptor.topic = "repo:backbay/chio#market-qualification-expired".to_string();
     expired.issued_at = ISSUED_AT;
     expired.expires_at = ISSUED_AT + 86_400;
     expired.finding_id = compute_finding_id(&expired)?;
@@ -2928,7 +2928,7 @@ async fn price_hint_ref_and_unretained_recipe_reject() -> TestResult {
 
     // A finding-scoped hint reference inside the finding is a hash cycle.
     let mut hinted = web.finding.clone();
-    hinted.descriptor.topic = "repo:backbay/chio#m2-exit-hinted".to_string();
+    hinted.descriptor.topic = "repo:backbay/chio#market-qualification-hinted".to_string();
     hinted.price_hint_ref = Some("pricing-hint/finding".to_string());
     hinted.finding_id = compute_finding_id(&hinted)?;
     let hinted = sign_finding(hinted, &issuer)?;
@@ -2943,7 +2943,7 @@ async fn price_hint_ref_and_unretained_recipe_reject() -> TestResult {
     // A deterministic-replay claim whose recipe preimage was never
     // retained cannot publish.
     let mut unretained = web.finding.clone();
-    unretained.descriptor.topic = "repo:backbay/chio#m2-exit-unretained".to_string();
+    unretained.descriptor.topic = "repo:backbay/chio#market-qualification-unretained".to_string();
     unretained.replay_recipe_sha256 = Some(hex64('d'));
     unretained.finding_id = compute_finding_id(&unretained)?;
     let unretained = sign_finding(unretained, &issuer)?;
@@ -3022,7 +3022,7 @@ async fn wrong_issuer_signature_rejects() -> TestResult {
     // The body names the real issuer but an interloper produced the
     // signature: strict verification against the embedded issuer denies.
     let mut forged = web.finding.clone();
-    forged.descriptor.topic = "repo:backbay/chio#m2-exit-forged".to_string();
+    forged.descriptor.topic = "repo:backbay/chio#market-qualification-forged".to_string();
     forged.finding_id = compute_finding_id(&forged)?;
     forged.signature.clear();
     let interloper = keypair(9);

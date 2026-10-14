@@ -1245,7 +1245,34 @@ def validate_created_container(
             "Propagation": "rprivate",
         },
     )
-    if not isinstance(mounts, list) or tuple(mounts) != expected_mounts:
+    mount_field_types = {
+        "Type": str,
+        "Source": str,
+        "Destination": str,
+        "Mode": str,
+        "RW": bool,
+        "Propagation": str,
+    }
+    if (
+        not isinstance(mounts, list)
+        or len(mounts) != len(expected_mounts)
+        or any(
+            not isinstance(mount, dict)
+            or set(mount) != set(mount_field_types)
+            or any(
+                type(mount[field]) is not field_type
+                for field, field_type in mount_field_types.items()
+            )
+            for mount in mounts
+        )
+    ):
+        raise BoundaryError("Docker changed the created container mount inventory")
+    destinations = [mount["Destination"] for mount in mounts]
+    if (
+        len(set(destinations)) != len(destinations)
+        or sorted(mounts, key=lambda mount: mount["Destination"])
+        != sorted(expected_mounts, key=lambda mount: mount["Destination"])
+    ):
         raise BoundaryError("Docker changed the created container mount inventory")
 
 

@@ -41,6 +41,6 @@
     ]
   },
   "notes": [
-    "Restored from the archived security roadmap. Current-source mutation execution is required before this case counts as coverage."
+    "Retained from archived design records. Current-source mutation execution is required before this case counts as coverage."
   ]
 }

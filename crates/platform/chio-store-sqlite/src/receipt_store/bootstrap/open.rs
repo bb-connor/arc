@@ -34,17 +34,48 @@ struct QualifiedReceiptSink {
     receipt_sink_qualification: Option<Arc<ReceiptSinkQualification>>,
 }
 
+use crate::receipt_store::native_finishing::{
+    authorize_opening_header_write, authorize_opening_wal_switch, begin_receipt_sink_open,
+    clear_opening_wal_switch, install_native_receipt_debt_hooks, with_commit_refusal,
+    NativeReceiptBankAttachment, NativeReceiptBankViewData, NativeReceiptDebtGuard,
+};
+
+/// Configure the opening connection. Each potentially committing header
+/// operation is a separate, identified statement, authorized on this
+/// connection before it runs and consumed by at most its own commit; an
+/// already initialized WAL database leaves the authorizations unconsumed.
+fn configure_opening_connection(
+    connection: &mut Connection,
+    max_page_count: Option<u32>,
+    native_debt: &Arc<NativeReceiptDebtGuard>,
+) -> Result<(), ReceiptStoreError> {
+    // Spill must be off before any mutation: the schema transaction's price
+    // counts every dirty page as at most one frame.
+    connection.execute_batch("PRAGMA cache_spill = OFF;")?;
+    // The one-time switch to WAL, at its exact rollback-journal price.
+    authorize_opening_wal_switch(connection, native_debt)?;
+    connection.execute_batch("PRAGMA journal_mode = WAL;")?;
+    clear_opening_wal_switch();
+    // The auto-vacuum header statement: one identified, authorized write.
+    authorize_opening_header_write(connection, native_debt, "auto-vacuum-header")?;
+    connection.execute_batch("PRAGMA auto_vacuum = INCREMENTAL;")?;
+    clear_opening_wal_switch();
+    configure_sqlite_connection(connection, max_page_count)
+}
+
 fn configure_sqlite_connection(
     connection: &mut Connection,
     max_page_count: Option<u32>,
 ) -> Result<(), ReceiptStoreError> {
+    // Connection-level, non-committing settings only; the two committing
+    // header operations (journal mode and auto-vacuum) run separately in
+    // `configure_opening_connection` under their own authorizations.
     connection.execute_batch(
         r#"
-        PRAGMA journal_mode = WAL;
         PRAGMA synchronous = FULL;
         PRAGMA busy_timeout = 5000;
         PRAGMA foreign_keys = ON;
-        PRAGMA auto_vacuum = INCREMENTAL;
+        PRAGMA cache_spill = OFF;
         "#,
     )?;
     assert_sqlite_durability_pragmas(connection)?;
@@ -99,6 +130,15 @@ fn assert_sqlite_durability_pragmas(connection: &Connection) -> Result<(), Recei
     if foreign_keys != 1 {
         return Err(ReceiptStoreError::Conflict(format!(
             "sqlite receipt store foreign_keys must be ON, got {foreign_keys}"
+        )));
+    }
+
+    // Spill must stay off: a spilled cache would write frames after the
+    // transaction price is taken.
+    let cache_spill: i64 = connection.query_row("PRAGMA cache_spill", [], |row| row.get(0))?;
+    if cache_spill != 0 {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "sqlite receipt store cache_spill must be OFF, got {cache_spill}"
         )));
     }
 
@@ -361,14 +401,54 @@ impl SqliteReceiptStore {
         path: impl AsRef<Path>,
         options: crate::SqliteStoreOptions,
     ) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config_and_flags(path, options, true, None)
+        Self::open_with_pool_config_and_flags(path, options, true, None, None)
     }
 
     pub fn open_existing_with_options(
         path: impl AsRef<Path>,
         options: crate::SqliteStoreOptions,
     ) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config_and_flags(path, options, false, None)
+        Self::open_with_pool_config_and_flags(path, options, false, None, None)
+    }
+
+    /// Open the receipt sink of a native authority. Its bank is attached
+    /// before this open's first write, so initialization, migration, backfill
+    /// and every later writer preserve the debt the bank owes on this file.
+    pub fn open_with_native_bank(
+        path: impl AsRef<Path>,
+        bank: &NativeReceiptBankAttachment,
+    ) -> Result<Self, ReceiptStoreError> {
+        bank.while_publication_is_held(|| {
+            with_commit_refusal(|| {
+                Self::open_with_pool_config_and_flags(
+                    path,
+                    crate::SqliteStoreOptions::default(),
+                    true,
+                    None,
+                    Some(bank.view()),
+                )
+            })
+        })
+    }
+
+    /// [`Self::open_for_finding_pool`] for the receipt sink of a native
+    /// authority, with its bank attached before the first write.
+    pub fn open_for_finding_pool_with_native_bank(
+        path: impl AsRef<Path>,
+        rollback_anchor_root: impl AsRef<Path>,
+        bank: &NativeReceiptBankAttachment,
+    ) -> Result<Self, ReceiptStoreError> {
+        bank.while_publication_is_held(|| {
+            with_commit_refusal(|| {
+                Self::open_with_pool_config_and_flags(
+                    path,
+                    crate::SqliteStoreOptions::default(),
+                    true,
+                    Some(rollback_anchor_root.as_ref()),
+                    Some(bank.view()),
+                )
+            })
+        })
     }
 
     /// Open a receipt store that may be bound to a qualified finding-pool
@@ -383,6 +463,7 @@ impl SqliteReceiptStore {
             crate::SqliteStoreOptions::default(),
             true,
             Some(rollback_anchor_root.as_ref()),
+            None,
         )
     }
 
@@ -398,6 +479,7 @@ impl SqliteReceiptStore {
             crate::SqliteStoreOptions::default(),
             false,
             Some(rollback_anchor_root.as_ref()),
+            None,
         )
     }
 
@@ -406,6 +488,7 @@ impl SqliteReceiptStore {
         options: crate::SqliteStoreOptions,
         create_if_missing: bool,
         rollback_anchor_root: Option<&Path>,
+        native_bank: Option<&NativeReceiptBankViewData>,
     ) -> Result<Self, ReceiptStoreError> {
         let path = path.as_ref();
         if rollback_anchor_root.is_some() {
@@ -463,25 +546,63 @@ impl SqliteReceiptStore {
             })?,
             None => Connection::open(path)?,
         };
+        // The file's one native bank is attached before this open's first
+        // write; every commit on this connection preserves its debt, and an
+        // opening migration is checked exactly before its COMMIT.
+        let native_debt =
+            NativeReceiptDebtGuard::for_file(&connection, options.pool.max_page_count);
+        if let Some(bank) = native_bank {
+            native_debt.attach(bank)?;
+        }
+        install_native_receipt_debt_hooks(&connection, &native_debt)?;
+        // Every commit of this open must carry an explicit one-shot
+        // authorization; the guard clears them all when the open ends.
+        let _opening_stage = native_debt
+            .has_bank()
+            .then(|| begin_receipt_sink_open(&connection))
+            .flatten();
         if !create_if_missing {
             require_existing_receipt_schema(path, &connection)?;
             // Validate provenance before configuring pragmas: a foreign or
             // future database must be refused before any write touches its
             // header, so a mistargeted path is never mutated into WAL mode.
-            let on_disk_schema_version = crate::check_schema_version(
-                &connection,
-                RECEIPT_STORE_SCHEMA_KEY,
-                RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
-                RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
-            )
-            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+            // An unstamped file stamps its application id in one identified,
+            // authorized header write; a stamped one leaves it unconsumed.
+            let on_disk_schema_version = {
+                authorize_opening_header_write(&connection, &native_debt, "application-id-header")?;
+                let checked = crate::check_schema_version(
+                    &connection,
+                    RECEIPT_STORE_SCHEMA_KEY,
+                    RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
+                    RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
+                )
+                .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+                clear_opening_wal_switch();
+                checked
+            };
             if on_disk_schema_version < RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION {
                 return Err(ReceiptStoreError::Conflict(format!(
                     "receipt database schema version {on_disk_schema_version} requires writable migration to version {RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION}; reopen it with SqliteReceiptStore::open"
                 )));
             }
-            configure_sqlite_connection(&mut connection, options.pool.max_page_count)?;
-            super::support::ensure_transparency_projection_guards(&connection)?;
+            configure_opening_connection(
+                &mut connection,
+                options.pool.max_page_count,
+                &native_debt,
+            )?;
+            // The projection guards are an explicit transaction: an intact
+            // sink proves a nonwrite (same schema, rolled back), a changed
+            // one is authorized like the schema migration.
+            let guard_migration =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            let guards_before = receipt_schema_manifest(&guard_migration)?;
+            super::support::ensure_transparency_projection_guards(&guard_migration)?;
+            if receipt_schema_manifest(&guard_migration)? == guards_before {
+                guard_migration.rollback()?;
+            } else {
+                native_debt.require_open_commit(&guard_migration)?;
+                guard_migration.commit()?;
+            }
             verify_receipt_cost_projection(&connection)?;
             let internal_sink_id = load_receipt_sink_identity(&connection)?;
             let QualifiedReceiptSink {
@@ -499,6 +620,7 @@ impl SqliteReceiptStore {
                 connection_flags,
                 options.pool.max_page_count,
                 receipt_sink_qualification.clone(),
+                &native_debt,
             )?;
             let writer_pool = build_receipt_pool(
                 path,
@@ -507,14 +629,16 @@ impl SqliteReceiptStore {
                 connection_flags,
                 options.pool.max_page_count,
                 receipt_sink_qualification.clone(),
+                &native_debt,
             )?;
 
-            return Ok(Self {
+            return Self {
                 receipt_commit_actor: ReceiptCommitActor::start(
                     writer_pool,
                     options.incremental_verification,
                     rollback_anchor.clone(),
                     receipt_sink_qualification.clone(),
+                    Arc::clone(&native_debt),
                 ),
                 rollback_anchor,
                 pool: reader_pool,
@@ -523,7 +647,9 @@ impl SqliteReceiptStore {
                 receipt_sink_qualification,
                 strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
                 incremental_verification: options.incremental_verification,
-            });
+                native_debt,
+            }
+            .with_native_page_cap();
         }
 
         // Validate provenance before configuring pragmas: an existing file that
@@ -533,66 +659,122 @@ impl SqliteReceiptStore {
         // name alone, so first reject one whose generic anchor lacks the receipt
         // shape, keeping a foreign file that merely reuses the name out.
         reject_foreign_legacy_receipt_anchor(&connection)?;
-        let on_disk_schema_version = crate::check_schema_version(
-            &connection,
-            RECEIPT_STORE_SCHEMA_KEY,
-            RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
-            RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
-        )
-        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
-        configure_sqlite_connection(&mut connection, options.pool.max_page_count)?;
+        // An unstamped fresh file stamps its application id in one identified,
+        // authorized header write; a stamped one leaves it unconsumed.
+        let on_disk_schema_version = {
+            authorize_opening_header_write(&connection, &native_debt, "application-id-header")?;
+            let checked = crate::check_schema_version(
+                &connection,
+                RECEIPT_STORE_SCHEMA_KEY,
+                RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
+                RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
+            )
+            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+            clear_opening_wal_switch();
+            checked
+        };
+        configure_opening_connection(&mut connection, options.pool.max_page_count, &native_debt)?;
         let schema_migration =
             connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        schema_migration.execute_batch(
-            r#"
-            CREATE TABLE IF NOT EXISTS chio_tool_receipts (
-                seq INTEGER PRIMARY KEY AUTOINCREMENT,
-                receipt_id TEXT NOT NULL UNIQUE,
-                timestamp INTEGER NOT NULL,
-                capability_id TEXT NOT NULL,
-                subject_key TEXT,
-                issuer_key TEXT,
-                grant_index INTEGER,
-                tool_server TEXT NOT NULL,
-                tool_name TEXT NOT NULL,
-                decision_kind TEXT NOT NULL,
-                policy_hash TEXT NOT NULL,
-                content_hash TEXT NOT NULL,
-                raw_json TEXT NOT NULL,
-                cost_currency TEXT CHECK (
-                    cost_currency IS NULL OR (
-                        typeof(cost_currency) = 'text' AND
-                        length(cost_currency) = 3 AND
-                        cost_currency NOT GLOB '*[^A-Z]*'
-                    )
-                ),
-                cost_charged_be BLOB CHECK (
-                    (cost_currency IS NULL AND cost_charged_be IS NULL) OR
-                    (
-                        cost_currency IS NOT NULL AND
-                        typeof(cost_charged_be) = 'blob' AND
-                        length(cost_charged_be) = 8
-                    )
-                ),
-                attempted_cost_be BLOB CHECK (
-                    attempted_cost_be IS NULL OR (
-                        typeof(attempted_cost_be) = 'blob' AND length(attempted_cost_be) = 8
-                    )
-                )
-            );
+        let schema_before = receipt_schema_manifest(&schema_migration)?;
+        let changes_before = schema_migration.total_changes();
+        let internal_sink_id = migrate_receipt_schema(&schema_migration, on_disk_schema_version)?;
+        // Reopening a current, intact sink changes no row and no schema object,
+        // so it writes nothing and cannot borrow a native loan the file owes
+        // before its bank is attached again.
+        if on_disk_schema_version == RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+            && schema_migration.total_changes() == changes_before
+            && receipt_schema_manifest(&schema_migration)? == schema_before
+        {
+            schema_migration.rollback()?;
+        } else {
+            native_debt.require_open_commit(&schema_migration)?;
+            schema_migration.commit()?;
+        }
 
-            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_timestamp
-                ON chio_tool_receipts(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_capability
-                ON chio_tool_receipts(capability_id);
-            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_subject
-                ON chio_tool_receipts(subject_key);
-            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_grant
-                ON chio_tool_receipts(capability_id, grant_index);
-            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_tool
-                ON chio_tool_receipts(tool_server, tool_name);
-            CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_decision
-                ON chio_tool_receipts(decision_kind);
+        let QualifiedReceiptSink {
+            durable_sink_id,
+            rollback_anchor,
+            receipt_sink_qualification,
+        } = qualify_receipt_sink(path, &connection, &internal_sink_id, rollback_anchor_root)?;
+
+        let settlement_store_binding = settlement_store_binding_if_ready(&connection)?;
+
+        drop(connection);
+
+        let reader_pool = build_receipt_pool(
+            path,
+            options.pool.reader_pool_max_size,
+            "reader",
+            connection_flags,
+            options.pool.max_page_count,
+            receipt_sink_qualification.clone(),
+            &native_debt,
+        )?;
+        let writer_pool = build_receipt_pool(
+            path,
+            options.pool.writer_pool_max_size,
+            "writer",
+            connection_flags,
+            options.pool.max_page_count,
+            receipt_sink_qualification.clone(),
+            &native_debt,
+        )?;
+
+        Self {
+            receipt_commit_actor: ReceiptCommitActor::start(
+                writer_pool,
+                options.incremental_verification,
+                rollback_anchor.clone(),
+                receipt_sink_qualification.clone(),
+                Arc::clone(&native_debt),
+            ),
+            rollback_anchor,
+            pool: reader_pool,
+            settlement_store_binding,
+            durable_sink_id,
+            receipt_sink_qualification,
+            strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
+            incremental_verification: options.incremental_verification,
+            native_debt,
+        }
+        .with_native_page_cap()
+    }
+
+    /// A sink with an attached bank applies its page cap before the first
+    /// pooled write.
+    fn with_native_page_cap(self) -> Result<Self, ReceiptStoreError> {
+        if self.native_debt.has_bank() {
+            self.refresh_native_page_cap()?;
+        }
+        Ok(self)
+    }
+
+    pub fn open_with_pool_sizes(
+        path: impl AsRef<Path>,
+        reader_pool_max_size: u32,
+        writer_pool_max_size: u32,
+    ) -> Result<Self, ReceiptStoreError> {
+        Self::open_with_pool_config(
+            path,
+            crate::SqlitePoolConfig {
+                reader_pool_max_size,
+                writer_pool_max_size,
+                max_page_count: None,
+            },
+        )
+    }
+}
+
+/// The receipt schema migration of `open`, in its exact order, inside one
+/// transaction. The canonical write catalog is this same function's result.
+fn migrate_receipt_schema(
+    schema_migration: &rusqlite::Transaction<'_>,
+    on_disk_schema_version: i32,
+) -> Result<String, ReceiptStoreError> {
+    schema_migration.execute_batch(super::receipt_write_schema::TOOL_RECEIPTS_SQL)?;
+    schema_migration.execute_batch(
+        r#"
 
             CREATE TABLE IF NOT EXISTS chio_security_evidence_index (
                 evidence_id TEXT NOT NULL PRIMARY KEY,
@@ -1079,87 +1261,11 @@ impl SqliteReceiptStore {
             CREATE INDEX IF NOT EXISTS idx_chio_child_receipts_request
                 ON chio_child_receipts(request_id);
 
-            CREATE TABLE IF NOT EXISTS claim_receipt_log_entries (
-                entry_seq INTEGER PRIMARY KEY AUTOINCREMENT,
-                receipt_id TEXT NOT NULL UNIQUE,
-                receipt_kind TEXT NOT NULL,
-                source_seq INTEGER NOT NULL,
-                timestamp INTEGER NOT NULL,
-                capability_id TEXT,
-                session_id TEXT,
-                parent_request_id TEXT,
-                request_id TEXT,
-                subject_key TEXT,
-                issuer_key TEXT,
-                tool_server TEXT,
-                tool_name TEXT,
-                raw_json TEXT NOT NULL,
-                CHECK (entry_seq > 0),
-                CHECK (source_seq > 0),
-                CHECK (receipt_kind IN ('tool_receipt', 'child_receipt')),
-                CHECK (
-                    (receipt_kind = 'tool_receipt'
-                        AND capability_id IS NOT NULL
-                        AND session_id IS NULL
-                        AND parent_request_id IS NULL
-                        AND request_id IS NULL
-                        AND tool_server IS NOT NULL
-                        AND tool_name IS NOT NULL)
-                    OR
-                    (receipt_kind = 'child_receipt'
-                        AND capability_id IS NULL
-                        AND session_id IS NOT NULL
-                        AND parent_request_id IS NOT NULL
-                        AND request_id IS NOT NULL
-                        AND tool_server IS NULL
-                        AND tool_name IS NULL)
-                )
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_claim_receipt_log_kind_source
-                ON claim_receipt_log_entries(receipt_kind, source_seq);
-            CREATE INDEX IF NOT EXISTS idx_claim_receipt_log_timestamp
-                ON claim_receipt_log_entries(timestamp, entry_seq);
-            CREATE INDEX IF NOT EXISTS idx_claim_receipt_log_tool
-                ON claim_receipt_log_entries(tool_server, tool_name, timestamp)
-                WHERE receipt_kind = 'tool_receipt';
-            CREATE INDEX IF NOT EXISTS idx_claim_receipt_log_child_request
-                ON claim_receipt_log_entries(session_id, request_id, timestamp)
-                WHERE receipt_kind = 'child_receipt';
-
-            DROP TRIGGER IF EXISTS chio_tool_receipts_project_claim_log_entry;
-            CREATE TRIGGER chio_tool_receipts_project_claim_log_entry
-            AFTER INSERT ON chio_tool_receipts
-            BEGIN
-                INSERT INTO claim_receipt_log_entries (
-                    receipt_id,
-                    receipt_kind,
-                    source_seq,
-                    timestamp,
-                    capability_id,
-                    session_id,
-                    parent_request_id,
-                    request_id,
-                    subject_key,
-                    issuer_key,
-                    tool_server,
-                    tool_name,
-                    raw_json
-                ) VALUES (
-                    NEW.receipt_id,
-                    'tool_receipt',
-                    NEW.seq,
-                    NEW.timestamp,
-                    NEW.capability_id,
-                    NULL,
-                    NULL,
-                    NULL,
-                    NEW.subject_key,
-                    NEW.issuer_key,
-                    NEW.tool_server,
-                    NEW.tool_name,
-                    NEW.raw_json
-                );
-            END;
+            "#,
+    )?;
+    schema_migration.execute_batch(super::receipt_write_schema::CLAIM_RECEIPT_LOG_SQL)?;
+    schema_migration.execute_batch(
+        r#"
 
             DROP TRIGGER IF EXISTS chio_child_receipts_project_claim_log_entry;
             CREATE TRIGGER chio_child_receipts_project_claim_log_entry
@@ -1235,38 +1341,11 @@ impl SqliteReceiptStore {
                 ON request_lineage(session_id, COALESCE(session_anchor_id, ''), request_fingerprint)
                 WHERE request_fingerprint IS NOT NULL;
 
-            CREATE TABLE IF NOT EXISTS receipt_lineage_statements (
-                receipt_id TEXT PRIMARY KEY,
-                statement_id TEXT,
-                request_id TEXT,
-                session_id TEXT,
-                session_anchor_id TEXT REFERENCES session_anchors(anchor_id),
-                chain_id TEXT,
-                parent_request_id TEXT,
-                parent_receipt_id TEXT,
-                evidence_class TEXT,
-                evidence_sources_json TEXT,
-                verified_session_anchor INTEGER NOT NULL DEFAULT 0,
-                verified_parent_request INTEGER NOT NULL DEFAULT 0,
-                verified_parent_receipt INTEGER NOT NULL DEFAULT 0,
-                replay_protected INTEGER NOT NULL DEFAULT 0,
-                recorded_at INTEGER NOT NULL,
-                source_kind TEXT NOT NULL,
-                json_sha256 TEXT NOT NULL,
-                raw_json TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_receipt_lineage_request
-                ON receipt_lineage_statements(session_id, request_id);
-            CREATE INDEX IF NOT EXISTS idx_receipt_lineage_parent_request
-                ON receipt_lineage_statements(session_id, parent_request_id);
-            CREATE INDEX IF NOT EXISTS idx_receipt_lineage_parent_receipt
-                ON receipt_lineage_statements(parent_receipt_id);
-            CREATE INDEX IF NOT EXISTS idx_receipt_lineage_anchor
-                ON receipt_lineage_statements(session_anchor_id);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_receipt_lineage_request_anchor
-                ON receipt_lineage_statements(session_id, COALESCE(session_anchor_id, ''), request_id)
-                WHERE session_id IS NOT NULL
-                  AND request_id IS NOT NULL;
+            "#,
+    )?;
+    schema_migration.execute_batch(super::receipt_write_schema::RECEIPT_LINEAGE_STATEMENTS_SQL)?;
+    schema_migration.execute_batch(
+        r#"
 
             CREATE TABLE IF NOT EXISTS kernel_checkpoints (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1498,100 +1577,84 @@ impl SqliteReceiptStore {
             );
 
             "#,
+    )?;
+    // Keep schema changes, projection backfills and the temporary removal
+    // of immutability guards in one transaction. A failed or interrupted
+    // open must leave the original schema and guards intact; another
+    // connection must never observe an unguarded intermediate state.
+    schema_migration.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
+    schema_migration.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
+    schema_migration.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
+    ensure_tool_receipt_attribution_columns(schema_migration)?;
+    super::support::migrate_indexed_security_evidence_schema(schema_migration)?;
+    super::support::ensure_receipt_lineage_statement_columns(schema_migration)?;
+    super::support::drop_transparency_projection_guards(schema_migration)?;
+    super::support::ensure_receipt_retention_watermark_table(schema_migration)?;
+    super::support::ensure_receipt_retention_tombstones(schema_migration)?;
+    backfill_tool_receipt_attribution_columns(schema_migration)?;
+    super::support::backfill_provenance_lineage_tables(schema_migration)?;
+    super::support::backfill_claim_receipt_log_entries(schema_migration)?;
+    super::support::backfill_checkpoint_transparency_projections(schema_migration)?;
+    if on_disk_schema_version < RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION {
+        migrate_receipt_cost_projection(
+            schema_migration,
+            on_disk_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION,
         )?;
-        // Keep schema changes, projection backfills and the temporary removal
-        // of immutability guards in one transaction. A failed or interrupted
-        // open must leave the original schema and guards intact; another
-        // connection must never observe an unguarded intermediate state.
-        schema_migration.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
-        schema_migration.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
-        schema_migration.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
-        ensure_tool_receipt_attribution_columns(&schema_migration)?;
-        super::support::migrate_indexed_security_evidence_schema(&schema_migration)?;
-        super::support::ensure_receipt_lineage_statement_columns(&schema_migration)?;
-        super::support::drop_transparency_projection_guards(&schema_migration)?;
-        super::support::ensure_receipt_retention_watermark_table(&schema_migration)?;
-        super::support::ensure_receipt_retention_tombstones(&schema_migration)?;
-        backfill_tool_receipt_attribution_columns(&schema_migration)?;
-        super::support::backfill_provenance_lineage_tables(&schema_migration)?;
-        super::support::backfill_claim_receipt_log_entries(&schema_migration)?;
-        super::support::backfill_checkpoint_transparency_projections(&schema_migration)?;
-        if on_disk_schema_version < RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION {
-            migrate_receipt_cost_projection(
-                &schema_migration,
-                on_disk_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION,
-            )?;
-        }
-        super::support::ensure_transparency_projection_guards(&schema_migration)?;
-        verify_receipt_cost_projection(&schema_migration)?;
-        ensure_capability_lineage_provenance_columns(&schema_migration)?;
-        let internal_sink_id = ensure_receipt_sink_identity(&schema_migration)?;
+    }
+    super::support::ensure_transparency_projection_guards(schema_migration)?;
+    verify_receipt_cost_projection(schema_migration)?;
+    ensure_capability_lineage_provenance_columns(schema_migration)?;
+    let internal_sink_id = ensure_receipt_sink_identity(schema_migration)?;
+    if on_disk_schema_version != RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION {
         crate::stamp_schema_version(
-            &schema_migration,
+            schema_migration,
             RECEIPT_STORE_SCHEMA_KEY,
             RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
         )
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
-        schema_migration.commit()?;
-
-        let QualifiedReceiptSink {
-            durable_sink_id,
-            rollback_anchor,
-            receipt_sink_qualification,
-        } = qualify_receipt_sink(path, &connection, &internal_sink_id, rollback_anchor_root)?;
-
-        let settlement_store_binding = settlement_store_binding_if_ready(&connection)?;
-
-        drop(connection);
-
-        let reader_pool = build_receipt_pool(
-            path,
-            options.pool.reader_pool_max_size,
-            "reader",
-            connection_flags,
-            options.pool.max_page_count,
-            receipt_sink_qualification.clone(),
-        )?;
-        let writer_pool = build_receipt_pool(
-            path,
-            options.pool.writer_pool_max_size,
-            "writer",
-            connection_flags,
-            options.pool.max_page_count,
-            receipt_sink_qualification.clone(),
-        )?;
-
-        Ok(Self {
-            receipt_commit_actor: ReceiptCommitActor::start(
-                writer_pool,
-                options.incremental_verification,
-                rollback_anchor.clone(),
-                receipt_sink_qualification.clone(),
-            ),
-            rollback_anchor,
-            pool: reader_pool,
-            settlement_store_binding,
-            durable_sink_id,
-            receipt_sink_qualification,
-            strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
-            incremental_verification: options.incremental_verification,
-        })
     }
+    Ok(internal_sink_id)
+}
 
-    pub fn open_with_pool_sizes(
-        path: impl AsRef<Path>,
-        reader_pool_max_size: u32,
-        writer_pool_max_size: u32,
-    ) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config(
-            path,
-            crate::SqlitePoolConfig {
-                reader_pool_max_size,
-                writer_pool_max_size,
-                max_page_count: None,
-            },
-        )
+/// Every schema object a migration can rewrite, in a stable order.
+fn receipt_schema_manifest(
+    connection: &Connection,
+) -> Result<Vec<(String, String, String, Option<String>)>, ReceiptStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT type,name,tbl_name,sql FROM main.sqlite_schema
+         ORDER BY type COLLATE BINARY,name COLLATE BINARY",
+    )?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+/// The canonical receipt schema: the exact `open` migration of an empty
+/// database plus the rollback generation when the owning sink is anchored, on a
+/// private in-memory connection. Catalog authentication compares against it.
+pub(in crate::receipt_store) fn canonical_receipt_schema_model(
+    anchored: bool,
+) -> Result<Connection, ReceiptStoreError> {
+    let mut model = Connection::open_in_memory()?;
+    model.execute_batch("PRAGMA foreign_keys = ON;")?;
+    let on_disk_schema_version = crate::check_schema_version(
+        &model,
+        RECEIPT_STORE_SCHEMA_KEY,
+        RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
+        RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
+    )
+    .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+    let schema_migration =
+        model.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    migrate_receipt_schema(&schema_migration, on_disk_schema_version)?;
+    if anchored {
+        ensure_receipt_rollback_generation(&schema_migration)?;
     }
+    schema_migration.commit()?;
+    Ok(model)
 }
 
 fn build_receipt_pool(
@@ -1601,6 +1664,7 @@ fn build_receipt_pool(
     flags: Option<rusqlite::OpenFlags>,
     max_page_count: Option<u32>,
     receipt_sink_qualification: Option<Arc<ReceiptSinkQualification>>,
+    native_debt: &Arc<NativeReceiptDebtGuard>,
 ) -> Result<Pool<SqliteConnectionManager>, ReceiptStoreError> {
     if max_size == 0 {
         return Err(ReceiptStoreError::Pool(format!(
@@ -1611,6 +1675,7 @@ fn build_receipt_pool(
     if let Some(flags) = flags {
         manager = manager.with_flags(flags);
     }
+    let native_debt = Arc::clone(native_debt);
     let manager = manager.with_init(move |connection| {
         configure_sqlite_connection(connection, max_page_count).map_err(|error| match error {
             ReceiptStoreError::Sqlite(error) => error,
@@ -1621,7 +1686,7 @@ fn build_receipt_pool(
                 .validate_connection(connection)
                 .map_err(|error| rusqlite::Error::InvalidParameterName(error.to_string()))?;
         }
-        Ok(())
+        install_native_receipt_debt_hooks(connection, &native_debt)
     });
     Pool::builder()
         .max_size(max_size)

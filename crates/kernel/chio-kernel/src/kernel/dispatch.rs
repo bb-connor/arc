@@ -1197,13 +1197,32 @@ impl ChioKernel {
                     })?,
             )
         } else {
-            Some(
-                self.reverse_budget_charge(&cap.id, charge)
-                    .map_err(|error| PreDispatchMonetaryUnwindFailure {
-                        error: Box::new(error),
-                        evidence: unwind_evidence.clone(),
-                    })?,
-            )
+            // After a native original's external authorization the hold is a
+            // post-effect write of its prepaid account: the durable
+            // compensation reverses it in the funded store transaction once
+            // the journal retains the release, never through ordinary intake.
+            let prepaid = match (durable_operation, payment_authorization) {
+                (Some(operation), Some(_)) => {
+                    self.prepaid_native_original(operation).map_err(|error| {
+                        PreDispatchMonetaryUnwindFailure {
+                            error: Box::new(error),
+                            evidence: unwind_evidence.clone(),
+                        }
+                    })?
+                }
+                _ => false,
+            };
+            if prepaid {
+                None
+            } else {
+                Some(
+                    self.reverse_budget_charge(&cap.id, charge)
+                        .map_err(|error| PreDispatchMonetaryUnwindFailure {
+                            error: Box::new(error),
+                            evidence: unwind_evidence.clone(),
+                        })?,
+                )
+            }
         };
         Ok((reverse, unwind_evidence))
     }

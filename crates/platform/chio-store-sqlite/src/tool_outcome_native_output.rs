@@ -22,7 +22,7 @@ pub(crate) fn verify_native_output_artifacts(
         if load_resolved_blob_connection(connection, &outcome)?.is_none() {
             return Err(invariant("native output has no physical signing preimage"));
         }
-        match load_blob_state_connection(connection, outcome.raw_output_digest())? {
+        match load_blob_state_connection(connection, outcome.raw_output_digest(), id)? {
             Some(StoredInvocationBlob::Present(blob)) => {
                 outcome
                     .validate_canonical_blob(operation, &blob)

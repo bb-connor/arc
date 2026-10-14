@@ -511,7 +511,9 @@ pub(super) fn connect(
     .map_err(error)?
     .with_captured_lifecycle();
     kernel.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
-    kernel.set_security_pre_dispatch_hook(Arc::new(resolver));
+    Arc::new(resolver)
+        .install_captured_on_kernel(kernel)
+        .map_err(error)?;
     let quota_binding = selected.verifier.binding().clone();
     kernel
         .set_supplemental_quota_verifier(Arc::new(selected.verifier), quota_binding)

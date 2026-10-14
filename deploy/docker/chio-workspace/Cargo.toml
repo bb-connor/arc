@@ -7,6 +7,7 @@ members = ["crates/products/chio-cli"]
 
 [patch.crates-io]
 aws-lc-rs = { path = "third_party/aws-lc-rs-chio" }
+cpp_demangle = { path = "third_party/cpp-demangle-chio" }
 regress = { path = "third_party/regress-chio" }
 ignore = { path = "third_party/ignore-chio" }
 nono = { path = "third_party/nono-upstream-chio" }
@@ -22,7 +23,7 @@ sigstore-trust-root = { path = "third_party/sigstore-trust-root-chio" }
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.94"
+rust-version = "1.95"
 license = "Apache-2.0"
 repository = "https://github.com/backbay-labs/chio"
 
@@ -56,10 +57,14 @@ rust_registry_public_crates = []
 # Downstream consumers can extract the manifest with `cargo audit -f <binary>`
 # to scan for known vulnerabilities without needing the source tree.
 
-# Canonical workspace lint policy. Every member crate inherits this block via
-# `[lints]\nworkspace = true` in its own manifest rather than hand-copying the
-# denies, so the policy lives in exactly one place. When tightening the policy
-# (for example adding `panic = "deny"`), edit it here only.
+# Canonical workspace lint policy. A member crate takes it with
+# `[lints]\nworkspace = true`. Cargo refuses to combine that line with any
+# local lint entry, so the crates that register `unexpected_cfgs` check-cfg
+# names (kani / loom / dhat / creusot) cannot inherit; they carry local
+# `[lints.rust]` and `[lints.clippy]` tables that mirror every entry here.
+# `scripts/check-lint-parity.py` fails when a mirror falls behind, so when
+# tightening the policy (for example adding `panic = "deny"`), edit it here
+# and in each mirror the gate names.
 #
 # `unwrap_used` / `expect_used` are denied because this is a fail-closed
 # security kernel: an unhandled `Option`/`Result` panic in a guard or receipt
@@ -67,23 +72,35 @@ rust_registry_public_crates = []
 # narrow, reviewed exception annotate the specific call site with
 # `#[allow(clippy::unwrap_used)]` instead of opting the whole crate out.
 #
-# No `[workspace.lints.rust]` floor is defined: the only per-crate rust-lint
-# usage today is bespoke `unexpected_cfgs` check-cfg registration (kani / loom /
-# dhat) that cannot be hoisted, so those stay as local `[lints.rust]` tables.
+# No `[workspace.lints.rust]` floor is defined yet. Adding one is a policy
+# change like any other: the mirrors must carry it, and the parity gate
+# compares the Rust table as well as the Clippy table.
 [workspace.lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
 
+# `overflow-checks` stays on in every profile that ships, for the same reason
+# `unwrap_used` is denied above: in a fail-closed security kernel a panic is an
+# availability fault, while a silent wrap is an authority grant. A `u64`
+# underflow in an exposure, budget or quota calculation does not produce a small
+# error, it produces the largest representable value, which a remaining-budget
+# comparison reads as unlimited authority. Leaving it at Cargo's release default
+# of `false` would also make the test suite structurally unable to find a
+# wrapping bug, because the wrap would only happen in a profile no test runs
+# under. `scripts/check-release-overflow.sh` is the check that does run under
+# it.
 [profile.release]
 codegen-units = 1
 lto = "fat"
 strip = "symbols"
 panic = "unwind"
+overflow-checks = true
 
 [profile.docker-release]
 inherits = "release"
 codegen-units = 16
 lto = "thin"
+overflow-checks = true
 
 # Dev/test debuginfo is disabled to keep `target/` from exploding. With ~130+
 # workspace members, the default `debug = 2` made a full `cargo test --workspace`
@@ -186,11 +203,11 @@ zeroize = "1.8"
 # `path = "..."` redeclaration.
 chio-metrics-spec = { version = "=0.1.0", path = "crates/observability/chio-metrics-spec" }
 
-# Internal Chio crates centralized here (Phase 2). Each member consumes them as
+# Internal Chio workspace dependencies. Each member consumes them as
 # `chio-x = { workspace = true }` (plus per-member features / default-features /
 # optional / package-rename) instead of a scattered `path = "../chio-x"`. Paths
-# point at the crates' CURRENT locations; the later folder move edits only this
-# block. Entries are path-only on purpose: the same crate is consumed with
+# point at the workspace crate locations. Entries are path-only on purpose:
+# the same crate is consumed with
 # differing default-features by different members, so feature/default-features
 # selection must stay on the member side.
 chio-a2a-adapter = { path = "crates/protocol/chio-a2a-adapter" }

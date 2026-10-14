@@ -310,3 +310,239 @@ fn fresh_observation_requires_current_owner_but_preserves_original_initializatio
     assert!(observation.snapshot().is_none());
     Ok(())
 }
+
+/// One unanchored mutation on the disposable fixture's own serving
+/// connection: drop the exact inactive_update/capture_update triggers of the
+/// flow contexts table, bump the current row generation by one, and restore
+/// the byte-exact trigger SQL, so the catalog itself stays canonical.
+fn unanchored_context_generation_bump(
+    fixture: &Fixture,
+    authority: &str,
+    tenant: &str,
+) -> TestResult<u64> {
+    let connection = fixture.store.connection()?;
+    let (index, table) = native::schema::TABLES
+        .iter()
+        .enumerate()
+        .find(|(_, table)| table.source == "security_flow_contexts")
+        .ok_or("context table")?;
+    let mut restore = Vec::new();
+    for suffix in ["inactive_update", "capture_update"] {
+        let name = format!("security_participant_state_{index}_{suffix}");
+        let sql: String = connection.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = ?1",
+            [&name],
+            |row| row.get(0),
+        )?;
+        connection.execute_batch(&format!("DROP TRIGGER {name}"))?;
+        restore.push((name, sql));
+    }
+    assert_eq!(connection.execute(&format!(
+        "UPDATE {} SET generation = generation + 1 WHERE security_authority_id = ?1 AND tenant_id = ?2", table.native),
+        params![authority, tenant]
+    )?, 1);
+    for (name, sql) in restore {
+        connection.execute_batch(&sql)?;
+        let restored: String = connection.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = ?1",
+            [&name],
+            |row| row.get(0),
+        )?;
+        assert_eq!(restored, sql);
+    }
+    let generation: i64 = connection.query_row(
+        &format!(
+            "SELECT generation FROM {} WHERE security_authority_id = ?1 AND tenant_id = ?2",
+            table.native
+        ),
+        params![authority, tenant],
+        |row| row.get(0),
+    )?;
+    Ok(u64::try_from(generation)?)
+}
+
+/// A legitimately rolled back local write advances the serving connection's
+/// change counter while every authenticated row stays valid, so the entry
+/// gate authenticates the unexplained delta once and keeps observing.
+#[test]
+fn rolled_back_local_writes_authenticate_and_keep_warm_observation_valid() -> TestResult {
+    let fixture = fixture();
+    let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let (context, request) = mutations::request("joined")?;
+    let (operation, lease) = mutations::setup(&fixture, "joined", &context)?;
+    let joined = fixture.store.join_security_participant_flow(
+        &operation,
+        &lease,
+        &initialized,
+        &context,
+        &request,
+        now_ms(),
+    )?;
+    let validations = fixture.authority.anchor_full_validations_for_test();
+    {
+        // One rolled back local write: SQLite's change counter advances even
+        // though no authenticated row changed.
+        let mut connection = fixture.store.connection()?;
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(
+            "CREATE TEMP TABLE rolled_back_local_write(value INTEGER);
+             INSERT INTO rolled_back_local_write VALUES (1);",
+        )?;
+        drop(transaction);
+    }
+    let before = footprint(&fixture)?;
+    // The unexplained delta forced exactly one full authenticating validation,
+    // never a blind watermark refresh, and the observation still returns the
+    // actual current state.
+    let observation = observe(&fixture, &initialized, &request.key)?;
+    assert_eq!(observation.snapshot(), Some(&joined));
+    assert_eq!(
+        observation.stored_context_generation(),
+        Some(joined.context_generation)
+    );
+    assert_eq!(
+        fixture.authority.anchor_full_validations_for_test(),
+        validations + 1
+    );
+    assert_eq!(footprint(&fixture)?, before);
+    // The re-based watermark keeps later warm observations bounded.
+    observe(&fixture, &initialized, &request.key)?;
+    assert_eq!(
+        fixture.authority.anchor_full_validations_for_test(),
+        validations + 1
+    );
+    Ok(())
+}
+
+/// An unanchored mutation on the serving connection cannot be laundered into
+/// the remembered watermark by a later legitimate writer: every entry gate
+/// refuses it first, no history advances, and the tampered row stays exactly
+/// as unanchored as the attack left it.
+#[test]
+fn an_unanchored_local_mutation_cannot_be_laundered_by_a_later_writer() -> TestResult {
+    let fixture = fixture();
+    let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let other = imported(&fixture, "other")?;
+    let (context, request) = mutations::request("first")?;
+    let (operation, lease) = mutations::setup(&fixture, "first", &context)?;
+    fixture.store.join_security_participant_flow(
+        &operation,
+        &lease,
+        &initialized,
+        &context,
+        &request,
+        now_ms(),
+    )?;
+    let validations = fixture.authority.anchor_full_validations_for_test();
+    let tampered = unanchored_context_generation_bump(
+        &fixture,
+        initialized.security_authority_id().as_str(),
+        request.key.tenant_id.as_str(),
+    )?;
+    let before = footprint(&fixture)?;
+    // The unrelated legitimate writer is the first gated operation after
+    // tampering. It must authenticate before writing, without an earlier
+    // observation having poisoned the owner on its behalf.
+    let refused = match hydrate(&fixture, &other) {
+        Err(error) => error.to_string(),
+        Ok(_) => return Err("a later writer laundered unanchored native state".into()),
+    };
+    assert!(
+        refused.contains("differs from anchored history"),
+        "{refused}"
+    );
+    assert!(observe(&fixture, &initialized, &request.key).is_err());
+    assert_eq!(footprint(&fixture)?, before);
+    let after = {
+        let connection = fixture.store.connection()?;
+        let generation: i64 = connection.query_row(
+            "SELECT generation FROM security_participant_state_flow_contexts
+             WHERE security_authority_id = ?1 AND tenant_id = ?2 AND principal_id = ?3
+               AND lineage_id = ?4 AND session_id = ?5 AND isolation_epoch_id = ?6",
+            params![
+                initialized.security_authority_id().as_str(),
+                request.key.tenant_id.as_str(),
+                request.key.principal_id.as_str(),
+                request.key.lineage_id.as_str(),
+                request.key.session_id.as_str(),
+                request.key.isolation_epoch_id.as_str()
+            ],
+            |row| row.get(0),
+        )?;
+        let mutations: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM security_participant_state_mutations",
+            [],
+            |row| row.get(0),
+        )?;
+        (u64::try_from(generation)?, mutations)
+    };
+    assert_eq!(after.0, tampered);
+    assert_eq!(after.1, 1);
+    // The first gate after the tamper authenticated exactly once; the poisoned
+    // owner refuses every later gate without revalidating.
+    assert_eq!(
+        fixture.authority.anchor_full_validations_for_test(),
+        validations + 1
+    );
+    assert!(observe(&fixture, &initialized, &request.key).is_err());
+    assert_eq!(
+        fixture.authority.anchor_full_validations_for_test(),
+        validations + 1
+    );
+    Ok(())
+}
+
+/// Normal anchored writes and their warm observations never revalidate the
+/// full store: the watermark advances with each synced writer commit, so the
+/// entry gate stays bounded after every legitimate mutation.
+#[test]
+fn warm_observations_and_synced_writes_never_revalidate_the_full_store() -> TestResult {
+    let fixture = fixture();
+    let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let (context, mut request) = mutations::request("joined")?;
+    let (operation, lease) = mutations::setup(&fixture, "joined", &context)?;
+    fixture.store.join_security_participant_flow(
+        &operation,
+        &lease,
+        &initialized,
+        &context,
+        &request,
+        now_ms(),
+    )?;
+    let validations = fixture.authority.anchor_full_validations_for_test();
+    // A warm observation right after the synced writer commit stays bounded.
+    let old = observe(&fixture, &initialized, &request.key)?;
+    assert_eq!(
+        fixture.authority.anchor_full_validations_for_test(),
+        validations
+    );
+    // One more real anchored write plus its warm observation stays bounded and
+    // still returns the actual current state, not the historical snapshot.
+    let advanced =
+        SecurityInvocationContext::v1(context.as_v1().clone().with_flow_state_generation(
+            old.stored_context_generation().ok_or("stored generation")?,
+        ));
+    let (second, second_lease) = mutations::setup(&fixture, "second", &advanced)?;
+    request.transition_id = chio_security_types::ports::RecordId::new("second")?;
+    request.lineage_join = InformationLabel::Top;
+    let changed = fixture.store.join_security_participant_flow(
+        &second,
+        &second_lease,
+        &initialized,
+        &advanced,
+        &request,
+        now_ms(),
+    )?;
+    let current = observe(&fixture, &initialized, &request.key)?;
+    assert_eq!(current.snapshot(), Some(&changed));
+    assert!(current.stored_context_generation() > old.stored_context_generation());
+    assert_eq!(
+        current.snapshot().ok_or("current state")?.lineage_label,
+        InformationLabel::Top
+    );
+    assert_eq!(
+        fixture.authority.anchor_full_validations_for_test(),
+        validations
+    );
+    Ok(())
+}

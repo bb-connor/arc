@@ -390,15 +390,11 @@ fn generated_call(bytes: &[u8]) -> Option<GeneratedCall> {
                     function_types.push(function_type.ok()?);
                 }
             }
-            wasmparser::Payload::ImportSection(section) => {
-                if section.count() != 0 {
-                    return None;
-                }
+            wasmparser::Payload::ImportSection(section) if section.count() != 0 => {
+                return None;
             }
-            wasmparser::Payload::FunctionSection(section) => {
-                if first_defined_type.is_none() {
-                    first_defined_type = section.into_iter().next().transpose().ok()?;
-                }
+            wasmparser::Payload::FunctionSection(section) if first_defined_type.is_none() => {
+                first_defined_type = section.into_iter().next().transpose().ok()?;
             }
             _ => {}
         }

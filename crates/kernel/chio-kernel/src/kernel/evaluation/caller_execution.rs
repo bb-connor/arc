@@ -222,7 +222,7 @@ impl ChioKernel {
         request.approval_token = credentials.approval_token;
         request.approval_tokens = credentials.approval_tokens;
         request.threshold_approval_proposal = credentials.threshold_approval_proposal;
-        request.declassification_grant = credentials.declassification_grant;
+        request.declassification_grant = credentials.declassification_grant.map(Into::into);
         let response =
             block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
                 &request,

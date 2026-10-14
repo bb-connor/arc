@@ -1,4 +1,4 @@
-// Native M2 process matrix. Only disposable test stores are provisioned here.
+// Native process recovery matrix. Only disposable test stores are provisioned here.
 use super::*;
 use chio_kernel::DurableFinalizationCutpoint as Finalization;
 use chio_store_sqlite::admission_operation_store::NativeDispatchCaptureTransactionTestCutpoint as TransactionPoint;
@@ -36,8 +36,8 @@ enum RecoveryMode {
     LateCallerReport,
 }
 
-const CHILD: &str = "CHIO_NATIVE_M2_PROCESS_CHILD";
-const ROOT: &str = "CHIO_NATIVE_M2_PROCESS_ROOT";
+const CHILD: &str = "CHIO_NATIVE_PROCESS_CHILD";
+const ROOT: &str = "CHIO_NATIVE_PROCESS_ROOT";
 
 pub(super) fn fixture_directory() -> std::io::Result<tempfile::TempDir> {
     match std::env::var_os(ROOT) {

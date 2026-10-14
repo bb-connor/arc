@@ -546,6 +546,8 @@ fn read_process_rss_bytes() -> Option<u64> {
 pub struct ChioKernel {
     pub(super) config: KernelConfig,
     pub(super) durable_admission_mode: crate::admission_operation::DurableAdmissionMode,
+    pub(super) native_output_retention:
+        Option<Box<crate::admission_operation::NativeOutputRetentionProfileV1>>,
     pub(super) durable_admission_runtime: Option<DurableAdmissionRuntime>,
     #[cfg(feature = "admission-test-support")]
     pub(super) durable_finalization_cutpoint_hook: Option<super::DurableFinalizationCutpointHook>,
@@ -555,6 +557,8 @@ pub struct ChioKernel {
     pub(super) native_egress_checkpoint_hook: Option<super::NativeSecurityEgressCheckpointHook>,
     #[cfg(feature = "admission-test-support")]
     pub(super) native_capture_checkpoint_hook: Option<super::NativeSecurityCaptureCheckpointHook>,
+    #[cfg(feature = "admission-test-support")]
+    pub(super) native_capture_observer: Option<super::NativeSecurityCaptureObserver>,
     /// Explicit compatibility escape for development fixtures that exercise the
     /// legacy non-durable financial lifecycle. Production construction leaves
     /// this false, so a financial hold cannot cross a connector boundary without
@@ -603,6 +607,8 @@ pub struct ChioKernel {
     pub(super) receipt_mirror_gauge: chio_bounded::SizeGauge,
     pub(super) child_receipt_mirror_gauge: chio_bounded::SizeGauge,
     pub(super) receipt_store: Option<Arc<dyn ReceiptStore>>,
+    pub(super) native_receipt_store_registration:
+        Option<crate::receipt_store::NativeReceiptStoreRegistration>,
     pub(super) receipt_store_write_lock: Mutex<()>,
     /// Retention maintenance worker, spawned at store attach when
     /// `config.retention_config` is `Some`. Owns a dedicated OS thread that
@@ -645,6 +651,8 @@ pub struct ChioKernel {
     pub(super) swarm_admission_required: bool,
     pub(super) security_pre_dispatch_policy: SecurityPreDispatchPolicy,
     pub(super) security_pre_dispatch_hook: Option<Arc<dyn SecurityPreDispatchHook>>,
+    pub(super) native_flow_policy_witness_registration:
+        Option<admission_coordinator::NativeFlowPolicyWitnessRegistration>,
     pub(super) runtime_admission_readiness_timeout: Duration,
     pub(super) runtime_trace_observer: Option<Arc<dyn RuntimeTraceObserver>>,
     pub(super) runtime_trace_transition_lock: Mutex<()>,

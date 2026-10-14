@@ -96,15 +96,18 @@ impl SqliteAdmissionOperationStore {
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
         observed_time(&tx, trusted_now_unix_ms)?;
-        verify_coverage(&tx).map_err(map_owner_error)?;
+        verify_current_catalogs(&tx)?;
         let Some(stored) = load_by_operation_id_tx(&tx, operation)? else {
             return Ok(None);
         };
         stored.verify_decision_time(trusted_now_unix_ms)?;
-        let history = history::load_for_operation(&tx, operation)?
+        let history = history::load_committed_for_operation(&tx, operation)?
             .map(|record| {
-                let initialized = records::load_metadata(&tx, record.authority.as_str())?
-                    .ok_or_else(|| invalid("native join initialization is absent"))?;
+                let initialized = records::load_current_named(
+                    &tx,
+                    record.authority.as_str(),
+                    &record.initialization,
+                )?;
                 decode(&record, &initialized)
             })
             .transpose()?;
@@ -124,10 +127,11 @@ impl SqliteAdmissionOperationStore {
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
         observed_time(&tx, trusted_now_unix_ms)?;
-        verify_coverage(&tx).map_err(map_owner_error)?;
-        let Some(record) = history::load_for_operation(&tx, operation)? else {
+        verify_current_catalogs(&tx)?;
+        let Some(record) = history::load_committed_for_operation(&tx, operation)? else {
             return Ok(None);
         };
+        records::load_current_named(&tx, record.authority.as_str(), &record.initialization)?;
         let result = SecurityParticipantFlowJoinHistory {
             authority: record.authority.clone(),
             operation: operation.clone(),

@@ -1,3 +1,4 @@
+use chio_sqlite_file_identity::{SqliteTransactionWriteShapeData, SqliteTreeWriteShapeData};
 use rusqlite::Connection;
 
 use super::{read_u64, SqliteServingOwnerError};
@@ -43,7 +44,12 @@ END;
 pub(super) fn initialize_serving_lease_schema(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    connection.execute_batch(SERVING_LEASE_SCHEMA)?;
+    // A serving restart authenticates its retained catalog. Even a no-op
+    // CREATE is a schema mutation to SQLite's authorizer, and outstanding
+    // native loans deliberately prohibit changing their priced catalog.
+    if serving_lease_schema_catalog(connection)?.is_empty() {
+        connection.execute_batch(SERVING_LEASE_SCHEMA)?;
+    }
     verify_serving_lease_schema(connection)
 }
 
@@ -212,4 +218,136 @@ pub(super) fn verify_serving_lease_history(
         ));
     }
     Ok(())
+}
+
+/// Conservative encoded overhead of one row or index entry beyond the actual
+/// variable text lengths the caller supplies: serial-type headers, integer
+/// varints and row slack.
+const LEASE_ROW_OVERHEAD_BYTES: u64 = 128;
+
+fn lease_text_bytes(value: &str) -> Result<u64, SqliteServingOwnerError> {
+    u64::try_from(value.len()).map_err(|_| {
+        SqliteServingOwnerError::Invalid("serving lease text exceeds SQLite range".to_string())
+    })
+}
+
+fn lease_shape_add(left: u64, right: u64) -> Result<u64, SqliteServingOwnerError> {
+    left.checked_add(right).ok_or_else(|| {
+        SqliteServingOwnerError::Invalid("serving lease shape bytes exhausted".to_string())
+    })
+}
+
+/// The complete write shape of one serving lease transition on the held
+/// authority transaction: the previous lease release (when a lease was open),
+/// the `chio_serving_owner` singleton row rewrite and the fresh
+/// `chio_serving_leases` row with both of its automatic index entries. The
+/// close-only and no-delete triggers only read; the owner row's UNIQUE
+/// `store_uuid` index key is unchanged and so is not written. Nothing in this
+/// shape reads the file's size, so its price stays exactly this transition's
+/// own rows whatever retained history the authority holds.
+///
+/// Every text length is the actual provisioned or minted value, so the
+/// payloads are real and bounded, never an invented fixed escape.
+pub(super) fn serving_lease_transition_shape(
+    closing_previous_lease: bool,
+    store_uuid: &str,
+    lease_id: &str,
+    database_path: &str,
+    lock_root: &str,
+) -> Result<SqliteTransactionWriteShapeData, SqliteServingOwnerError> {
+    let text = lease_text_bytes;
+    let owner_row = [
+        LEASE_ROW_OVERHEAD_BYTES,
+        text(store_uuid)?,
+        text(lease_id)?,
+        text(database_path)?,
+        text(lock_root)?,
+    ]
+    .into_iter()
+    .try_fold(0_u64, lease_shape_add)?;
+    let lease_row = [LEASE_ROW_OVERHEAD_BYTES, text(store_uuid)?, text(lease_id)?]
+        .into_iter()
+        .try_fold(0_u64, lease_shape_add)?;
+    // One automatic index entry carries the store UUID and the epoch or the
+    // lease ID; both are bounded by the same text sum.
+    let lease_index = [LEASE_ROW_OVERHEAD_BYTES, text(store_uuid)?, text(lease_id)?]
+        .into_iter()
+        .try_fold(0_u64, lease_shape_add)?;
+    let tree = |result: Result<SqliteTreeWriteShapeData, String>| {
+        result.map_err(SqliteServingOwnerError::Invalid)
+    };
+    // Releasing the previous lease rewrites one retained row under its
+    // unchanged key, and the ambiguous record shape keeps the existing-row
+    // cost; a first acquisition only appends a fresh record.
+    let lease_table = if closing_previous_lease {
+        tree(SqliteTreeWriteShapeData::record(
+            Some(lease_row),
+            lease_row,
+            2,
+        ))?
+    } else {
+        tree(SqliteTreeWriteShapeData::fresh_insertions(lease_row, 1))?
+    };
+    let trees = vec![
+        // The owner singleton row rewrite.
+        tree(SqliteTreeWriteShapeData::record(
+            Some(owner_row),
+            owner_row,
+            1,
+        ))?,
+        lease_table,
+        // The PRIMARY KEY (store_uuid, owner_epoch) automatic index entry.
+        tree(SqliteTreeWriteShapeData::fresh_insertions(lease_index, 1))?,
+        // The UNIQUE (lease_id) automatic index entry.
+        tree(SqliteTreeWriteShapeData::fresh_insertions(lease_index, 1))?,
+    ];
+    SqliteTransactionWriteShapeData::checked(trees).map_err(SqliteServingOwnerError::Invalid)
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod transition_shape_tests {
+    use super::*;
+    use chio_sqlite_file_identity::{price_transaction_write_shape, SqliteFramePriceProfileData};
+
+    const INTAKE_WAL_LIMIT_BYTES: u64 = 64 * 1024 * 1024;
+
+    fn priced(closing_previous_lease: bool) -> Result<u64, String> {
+        let profile = SqliteFramePriceProfileData::checked(4096, 0)?;
+        let shape = serving_lease_transition_shape(
+            closing_previous_lease,
+            "0123456789abcdef0123456789abcdef",
+            "ffffffff-ffff-7fff-8fff-ffffffffffff",
+            "/secure/authorities/authority.db",
+            "/secure/authorities/locks",
+        )
+        .map_err(|error| error.to_string())?;
+        Ok(price_transaction_write_shape(&profile, &shape)?.wal_bytes())
+    }
+
+    /// A lease transition prices only its own rows, whatever retained
+    /// history the authority holds: the price stays inside the original
+    /// fixed whole-file intake contract, and releasing a previous lease
+    /// costs strictly more than a first acquisition. The conservative
+    /// 20-level balance formulas price even this tiny transition at several
+    /// MiB of WAL headroom, so the asserted contract is the 64MiB intake
+    /// limit, not an invented tighter target.
+    #[test]
+    fn a_lease_transition_prices_its_own_rows_not_the_retained_file() -> Result<(), String> {
+        let fresh = priced(false)?;
+        let closing = priced(true)?;
+        assert!(
+            fresh < INTAKE_WAL_LIMIT_BYTES,
+            "a first lease acquisition must stay inside the intake contract, priced {fresh}"
+        );
+        assert!(
+            closing < INTAKE_WAL_LIMIT_BYTES,
+            "a lease release plus acquisition must stay inside the intake contract, priced {closing}"
+        );
+        assert!(
+            closing > fresh,
+            "releasing the previous lease must retain the existing-row cost"
+        );
+        Ok(())
+    }
 }

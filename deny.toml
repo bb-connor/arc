@@ -274,8 +274,8 @@ name = "core-foundation"
 [[bans.skip]]
 # `hashbrown` resolves to 0.12 (tonic 0.12 -> tower 0.4 -> indexmap 1),
 # 0.14 (wasmtime/cranelift 29.x), and 0.15/0.16 (everything else). Cannot
-# unify without bumping tonic or wasmtime, both gated on separate roadmap
-# items. Revisit when chio-envoy-ext-authz moves to tonic 0.13+.
+# unify without upgrading tonic or wasmtime independently. Revisit when
+# chio-envoy-ext-authz moves to tonic 0.13+.
 name = "hashbrown"
 
 [[bans.skip]]

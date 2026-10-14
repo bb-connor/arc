@@ -14,6 +14,36 @@ Phases are dependency boundaries, not calendar estimates. Each must produce revi
 | P5: confined returns | Host-issued lineage boundary, cage/broker launch, bounded parent returns and full channel mediation | Process/security profile; cage/broker; flow/artifact release; host/SDK | Verified enforced launch, useful parent decision, all return/error/log/stream canaries, restart/cancellation and aggregate limits |
 | P6: product and qualification | Guided setup, policy feedback/review, two-host integration, overload tests and comparative workloads | CLI/SDK/host; conformance/evaluation; operator tooling | Source/profile-bound supported matrix, utility/effect results, installation evidence, operational and required release gates |
 
+The current implementation state is [remediation and pending requalification](implementation/STATUS.md).
+P0-P6 implementation exists, but historical phase completion flags and scoped
+review closure do not qualify the changed working tree. The retained P0-P4
+verification records in the [historical packages](implementation/history/README.md#package-paths)
+preserve their exact source
+inventories, local acceptance, operating limits, broader failures and unavailable
+checks. Their original reviews remain historical evidence.
+
+The archived P5 review, operating contract and verification retain real GNU/musl Linux
+acceptance for the Boolean-only, model-disabled, no-provider profile at source
+binding `562a3c35`. Its ten recovery cases, 72 cage tests, 27 runtime probes,
+ten helper mutants and eleven measured images describe that archived campaign.
+The original review findings and author fix evidence retain separate scopes.
+
+The archived P6 review, verification and supported matrix retain local, Linux
+and finite live qualification at runtime binding `b1bcd48c` and qualification
+binding `3a13a9bc`. Those records preserve all five live attempts, failed
+performance profiles, unknown measurements and the limits of the original fresh
+review and subsequent author fix pass. Full binding values and archived-source
+hashes remain in the [historical packages](implementation/history/README.md).
+
+The [recorded source comparison](implementation/reviews/source-map-and-fixture-environment.md)
+at commit `c5f53a96dbfc836bfc42805c2fee2d393dd78821` found 581 of the 735 historical
+P6 source paths changed: 547 had different bytes and 34 were absent at their
+original paths. Later runtime repairs cause additional drift. Both retained
+package auditors refuse the current tree. The next work is to complete and review remediation, supply current runnable
+gates and requalify a new source/profile-bound candidate while preserving all
+historical records. Hosted CI, release integration and production acceptance
+remain separate gates. The architecture roadmap ends at P6.
+
 P2 and the contract-authoring portion of P3 can follow P0 independently of P1 development, but no live semantic remedy ships before its P1 authority/capture support. Persistent transform certificates require P4. Confined returns require P3/P4 and qualified platform enforcement. No feature flag may bypass these dependencies.
 
 P1's single connector uses a minimal pinned effect contract; the general package resolver remains P3. Every phase mediates all channels it enables and enforces bounded intake, safe diagnostics and recovery headroom. Later phases add new channels and scale qualification; they do not postpone those baseline protections. Phase gates refer to executable behavior under an explicitly supported profile.
@@ -77,10 +107,17 @@ The serving authority validates the active continuation at native capture rather
 | Numeric performance thresholds | Declare during P0 against a measured native baseline | Preapproved workload/hardware profile change, not post-result threshold adjustment |
 | Historical schema retirement | Keep read/reconcile support until references drain | Signed inventory proves no retained operation/reference requires the version |
 
-These questions do not reopen the core invariants. The package is ready for architectural review and phase planning. Execution readiness for a phase requires its explicit contracts, schema choices, migration treatment and fixtures to be checked against the then-current source.
+These questions do not reopen the core invariants. At revision 3, architectural review and phase planning were the next steps. Execution readiness for a phase requires its explicit contracts, schema choices, migration treatment and fixtures to be checked against the then-current source.
 
 ## Scope and closure
 
 No mandatory OpenAPPA runtime dependency, new general-purpose policy language, unbounded planner, independent replay coordinator, model-issued authority, or automatic policy weakening is part of this design. UI polish, broad provider catalogs and cross-platform expansion follow a working native vertical slice.
 
 Architecture acceptance requires every numbered obligation to have an owner/test/phase; source findings to be reproducible; every effect/authority transition to have a durable owner; every claimed data channel to have mediation; and unresolved assumptions to be explicit. Implementation acceptance requires the owning evidence, not a document checklist. Public availability and release qualification are separately demonstrated.
+
+Current source names and evidence replay are described in the
+[current reproduction overlay](implementation/current-reproduction.md). Original
+coverage, commands and seals remain historical inputs; published P6 metadata
+redactions preserve their documented original/published hash distinction. A
+local source correspondence or completed finding disposition does not qualify
+the changed implementation.

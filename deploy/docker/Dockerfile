@@ -3,11 +3,11 @@
 # stages. Base images are digest-pinned to match Dockerfile.sidecar /
 # Dockerfile.tee; bump the digests in lockstep with those files.
 
-ARG RUST_VERSION=1.94.1
+ARG RUST_VERSION=1.95.0
 ARG ALPINE_VERSION=3.22
 ARG NODE_VERSION=22
 
-FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7 AS rust-builder
+FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa AS rust-builder
 RUN apk add --no-cache build-base cmake openssl-dev openssl-libs-static pkgconf
 # The musl target links statically, so OpenSSL must be the static archive.
 ENV OPENSSL_STATIC=1 \
@@ -34,7 +34,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
  && cargo build --profile docker-release --locked -p chio-cli --bin chio \
  && cp target/docker-release/chio /chio
 
-FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7 AS proof-room-builder
+FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa AS proof-room-builder
 WORKDIR /workspace
 
 # The proof room builds from the repository workspace. Cargo loads every

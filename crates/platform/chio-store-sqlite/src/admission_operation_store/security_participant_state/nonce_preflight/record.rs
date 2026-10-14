@@ -68,7 +68,7 @@ impl Record {
             },
         })
     }
-    pub(super) fn validate(
+    pub(in crate::admission_operation_store::security_participant_state) fn validate(
         &self,
         connection: &Connection,
     ) -> Result<(), AdmissionOperationStoreError> {
@@ -92,8 +92,6 @@ impl Record {
             || self.initialization != initialized.digest
             || self.lease.fence.store_uuid != initialized.fence.store_uuid
             || !(1..=9_007_199_254_740_991).contains(&self.sequence)
-            || self.current_rows > 65_536
-            || self.current_bytes > 67_108_864
             || self.changes.is_empty()
         {
             return Err(invalid("native nonce preflight history is inconsistent"));
@@ -128,20 +126,11 @@ pub(in crate::admission_operation_store::security_participant_state) fn head(
     connection: &Connection,
     authority: &str,
 ) -> Result<u64, AdmissionOperationStoreError> {
-    let (count,first,last,bytes): (i64,i64,i64,i64) = connection.query_row(
-        "SELECT COUNT(*), COALESCE(MIN(sequence),0), COALESCE(MAX(sequence),0), COALESCE(SUM(length(canonical_record)),0)
-         FROM security_participant_nonce_preflight_events WHERE security_authority_id = ?1", [authority],
-        |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))).map_err(sqlite_error)?;
-    if !(0..=65_536).contains(&count)
-        || count != last
-        || (count > 0 && first != 1)
-        || !(0..=67_108_864).contains(&bytes)
-    {
-        return Err(invalid(
-            "native nonce preflight chain exceeds bounds or has gaps",
-        ));
-    }
-    u64::try_from(last).map_err(invalid)
+    super::super::history::segments::family_head(
+        connection,
+        super::super::history::segments::Family::NoncePreflight,
+        authority,
+    )
 }
 
 pub(in crate::admission_operation_store::security_participant_state) fn load(
@@ -214,4 +203,39 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_ope
         return Err(invalid("native nonce preflight operation index differs"));
     }
     Ok(Some(record))
+}
+
+impl Record {
+    /// The exact global commit this event's writer appended: projection, key,
+    /// sequence, mutation kind, reference digest and writer fence.
+    pub(in crate::admission_operation_store::security_participant_state) fn require_own_commit(
+        &self,
+        connection: &Connection,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM authority_global_commits WHERE projection_kind = ?1
+                 AND projection_key = ?2 AND projection_sequence = ?3 AND mutation_kind = ?4
+                 AND projection_reference_digest = ?5 AND store_uuid = ?6
+                 AND store_lease_id = ?7 AND store_owner_epoch = ?8",
+                params![
+                    PROJECTION,
+                    self.authority.as_str(),
+                    i64::try_from(self.sequence).map_err(invalid)?,
+                    MUTATION,
+                    self.digest()?,
+                    self.lease.fence.store_uuid,
+                    self.lease.fence.lease_id,
+                    i64::try_from(self.lease.fence.owner_epoch).map_err(invalid)?
+                ],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        if count != 1 {
+            return Err(invalid(
+                "native nonce preflight event lacks its exact global commit",
+            ));
+        }
+        Ok(())
+    }
 }

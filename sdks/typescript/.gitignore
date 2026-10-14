@@ -1,5 +1,7 @@
 node_modules/
 dist/
+!vendor/node-forge/dist/
+!vendor/node-forge/dist/**
 *.tsbuildinfo
 packages/mobile/build/
 packages/create-chio-app/templates/

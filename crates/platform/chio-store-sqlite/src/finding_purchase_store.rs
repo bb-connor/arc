@@ -3363,6 +3363,10 @@ fn admission_error(error: AdmissionOperationStoreError) -> FindingPurchaseStoreE
         AdmissionOperationStoreError::Invariant(detail) => {
             FindingPurchaseStoreError::Invariant(detail)
         }
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired => {
+            invariant("recovery preview refusal is outside this store")
+        }
         AdmissionOperationStoreError::Operation(error) => invariant(error.to_string()),
     }
 }

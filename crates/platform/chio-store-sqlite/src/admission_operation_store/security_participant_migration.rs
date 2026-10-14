@@ -19,11 +19,12 @@ pub(crate) use integrity::{
     verify_security_participant_migration_pristine,
 };
 pub(super) use records::verify_all;
+pub(in crate::admission_operation_store) use storage::verify_catalog;
 
 const PROJECTION_KIND: &str = "security_participant_migration";
 const MAX_MIGRATIONS: u64 = 16;
-const MAX_TOTAL_ROWS: u64 = 65_536;
-const MAX_TOTAL_BYTES: u64 = 64 * 1024 * 1024;
+pub(in crate::admission_operation_store) const MAX_TOTAL_ROWS: u64 = 65_536;
+pub(in crate::admission_operation_store) const MAX_TOTAL_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SecurityParticipantMigrationPhase {

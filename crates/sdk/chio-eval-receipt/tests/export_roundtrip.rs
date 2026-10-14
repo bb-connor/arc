@@ -36,7 +36,7 @@ fn exports_three_verdict_matrix_sample_receipts() -> Result<(), ExportError> {
 
     let bundle = export_scenario_run(&receipts, sample_meta()?);
 
-    assert_eq!(bundle.bundle_id, "urn:chio:eval-bundle:metr:p2-roundtrip");
+    assert_eq!(bundle.bundle_id, "urn:chio:eval-bundle:metr:roundtrip");
     assert_eq!(bundle.corpus.scenario_count, VERDICT_MATRIX_SCENARIO_COUNT);
     assert_eq!(bundle.corpus.corpus_sha256, VERDICT_MATRIX_CORPUS_SHA256);
     assert_eq!(bundle.eval_run.partner_slug, "metr");
@@ -64,11 +64,11 @@ fn assert_receipt(receipt: &chio_eval_receipt::ReceiptEntry, scenario_id: &str) 
 
 fn sample_meta() -> Result<EvalRunMeta, ExportError> {
     EvalRunMeta::from_parts(EvalRunMetaParts {
-        bundle_id: "urn:chio:eval-bundle:metr:p2-roundtrip",
+        bundle_id: "urn:chio:eval-bundle:metr:roundtrip",
         created_at: "2026-05-02T00:00:00Z",
-        producer_commit: "p2-test",
+        producer_commit: "roundtrip-test",
         workflow_run_url: "local-export-roundtrip",
-        run_id: "metr-p2-roundtrip",
+        run_id: "metr-roundtrip",
         partner: "METR",
         partner_slug: "metr",
         pipeline: "vivaria-trace-postprocess",

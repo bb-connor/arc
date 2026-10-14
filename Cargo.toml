@@ -14,6 +14,8 @@ members = [
     # Portable active-defense security
     "crates/security/chio-security-types",
     "crates/security/chio-flow",
+    "crates/security/chio-recovery",
+    "crates/security/chio-semantic-contracts",
     "crates/security/chio-decoy",
     "crates/security/chio-quarantine",
     "crates/security/chio-keyring",
@@ -213,6 +215,10 @@ members = [
     "integrations/editors/zed-chio",
 ]
 exclude = [
+    # Drop function callbacks when name conversion rejects registration.
+    "third_party/rusqlite-chio",
+    # Upstream transparent-layout repair for borrowed demangler newtypes.
+    "third_party/cpp-demangle-chio",
     # DES parity normalization and effective-key checks for the selected release.
     "third_party/aws-lc-rs-chio",
     # Upstream UTF-8 search-start validation backported to the pinned release.
@@ -247,7 +253,9 @@ exclude = [
 ]
 
 [patch.crates-io]
+rusqlite = { path = "third_party/rusqlite-chio" }
 aws-lc-rs = { path = "third_party/aws-lc-rs-chio" }
+cpp_demangle = { path = "third_party/cpp-demangle-chio" }
 regress = { path = "third_party/regress-chio" }
 ignore = { path = "third_party/ignore-chio" }
 nono = { path = "third_party/nono-upstream-chio" }
@@ -263,7 +271,7 @@ sigstore-trust-root = { path = "third_party/sigstore-trust-root-chio" }
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.94"
+rust-version = "1.95"
 license = "Apache-2.0"
 repository = "https://github.com/backbay-labs/chio"
 
@@ -443,11 +451,11 @@ zeroize = "1.8"
 # `path = "..."` redeclaration.
 chio-metrics-spec = { version = "=0.1.0", path = "crates/observability/chio-metrics-spec" }
 
-# Internal Chio crates centralized here (Phase 2). Each member consumes them as
+# Internal Chio workspace dependencies. Each member consumes them as
 # `chio-x = { workspace = true }` (plus per-member features / default-features /
 # optional / package-rename) instead of a scattered `path = "../chio-x"`. Paths
-# point at the crates' CURRENT locations; the later folder move edits only this
-# block. Entries are path-only on purpose: the same crate is consumed with
+# point at the workspace crate locations. Entries are path-only on purpose:
+# the same crate is consumed with
 # differing default-features by different members, so feature/default-features
 # selection must stay on the member side.
 chio-a2a-adapter = { path = "crates/protocol/chio-a2a-adapter" }

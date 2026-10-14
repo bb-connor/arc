@@ -17,8 +17,19 @@ pub(super) fn remove_empty_v31_ledger(connection: &Connection) -> rusqlite::Resu
 #[cfg(unix)]
 #[test]
 fn v30_upgrade_adds_empty_dispatch_ledger_without_rewriting_native_history() -> AnchoredTestResult {
-    let fixture = fixture();
-    let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let fixture = pre_recovery_fixture();
+    let source = imported(&fixture, "source")?;
+    // The v30 catalog predates recovery and the imported scope index. Build it
+    // while no recovery custody exists, then record the native initialization
+    // under the compiled catalog its recorded admission stamp selects.
+    {
+        let connection = fixture.store.connection()?;
+        remove_empty_v31_ledger(&connection)?;
+        connection.execute_batch("UPDATE chio_store_schema_versions SET version = 30 WHERE store_key = 'admission_operation'")?;
+    }
+    let initialized =
+        native::hydrate_predecessor_fixture(&fixture.store, &source, &fixture.fence, now_ms())?;
+    assert!(initialized.requires_imported_influence_upgrade()?);
     let Fixture {
         _temp,
         database,
@@ -30,8 +41,6 @@ fn v30_upgrade_adds_empty_dispatch_ledger_without_rewriting_native_history() -> 
     drop(store);
     drop(authority);
     let connection = Connection::open(&database)?;
-    remove_empty_v31_ledger(&connection)?;
-    connection.execute_batch("UPDATE chio_store_schema_versions SET version = 30 WHERE store_key = 'admission_operation'")?;
     let before: Vec<(i64, String)> = {
         let mut statement = connection.prepare("SELECT commit_sequence, chain_digest FROM authority_global_commits ORDER BY commit_sequence")?;
         let rows = statement
@@ -79,7 +88,7 @@ fn v30_dispatch_ledger_upgrade_rejects_partial_future_catalog_without_repair() -
             authority,
             store,
             ..
-        } = fixture();
+        } = pre_recovery_fixture();
         drop(store);
         drop(authority);
         let connection = Connection::open(&database)?;

@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from chio_sdk.errors import ChioValidationError
+from chio_sdk.errors import ChioDeniedError, ChioValidationError
 from chio_sdk.models import ChioScope, Operation, ToolGrant
 from chio_sdk.testing import MockChioClient, MockVerdict
 from crewai import Agent, Task
@@ -70,20 +70,13 @@ def _instrumented_client() -> MockChioClient:
     chio._tokens = {}  # type: ignore[attr-defined]
 
     original_create = chio.create_capability
-    original_attenuate = chio.attenuate_capability
 
     async def create_capability(**kwargs: Any) -> Any:
         token = await original_create(**kwargs)
         chio._tokens[token.id] = token  # type: ignore[attr-defined]
         return token
 
-    async def attenuate_capability(parent: Any, **kwargs: Any) -> Any:
-        child = await original_attenuate(parent, **kwargs)
-        chio._tokens[child.id] = child  # type: ignore[attr-defined]
-        return child
-
     chio.create_capability = create_capability  # type: ignore[method-assign]
-    chio.attenuate_capability = attenuate_capability  # type: ignore[method-assign]
     chio.set_policy(_capability_aware_policy(chio))
     return chio
 
@@ -233,15 +226,16 @@ class TestResearcherWriterScoping:
 
 
 class TestDelegationAttenuation:
-    async def test_child_capability_is_subset_of_parent(self) -> None:
+    async def test_delegation_attenuation_fails_closed(self) -> None:
         chio = _instrumented_client()
         search_tool, write_tool = _make_tools(chio)
+        junior_search_tool, _ = _make_tools(chio)
         lead = _make_agent(
             "lead",
             "lead the crew",
             [search_tool, write_tool],
         )
-        junior = _make_agent("junior", "help out", [])
+        junior = _make_agent("junior", "help out", [junior_search_tool])
 
         crew = ChioCrew(
             capability_scope={
@@ -258,20 +252,42 @@ class TestDelegationAttenuation:
                 )
             ],
         )
-        await crew.provision_capabilities()
+        tokens = await crew.provision_capabilities()
+        lead_token = tokens["lead"]
+        junior_token = tokens["junior"]
 
-        # Delegation narrows lead -> junior to just 'search'.
-        child = await crew.attenuate_for_delegation(
-            delegator_role="lead",
-            delegate_role="junior",
-            new_scope=_scope("search"),
-        )
-        parent = crew.token_for("lead")
-        assert parent is not None
-        assert child.scope.is_subset_of(parent.scope)
-        assert not parent.scope.is_subset_of(child.scope)
+        # The narrowed (subset) request is well-formed, but minting a
+        # child token requires the parent subject signer, which the mock
+        # does not hold, so the SDK denies it fail-closed.
+        with pytest.raises(ChioDeniedError) as denied:
+            await crew.attenuate_for_delegation(
+                delegator_role="lead",
+                delegate_role="junior",
+                new_scope=_scope("search"),
+            )
+        assert denied.value.reason_code == "chio_attenuation_requires_subject_signer"
 
-    async def test_child_cannot_escalate(self) -> None:
+        # The client saw exactly one well-formed narrowed request.
+        attenuate_calls = [
+            call for call in chio.calls if call.method == "attenuate_capability"
+        ]
+        assert len(attenuate_calls) == 1
+        assert attenuate_calls[0].context == {"parent_id": lead_token.id}
+
+        # No fabricated child on refusal: the delegate's tool stays
+        # bound to its provisioned capability, and the delegator's
+        # tokens and bindings are exactly what provisioning minted.
+        lead_after = crew.token_for("lead")
+        junior_after = crew.token_for("junior")
+        assert lead_after is not None
+        assert lead_after.id == lead_token.id
+        assert junior_after is not None
+        assert junior_after.id == junior_token.id
+        assert search_tool.capability_id == lead_token.id
+        assert write_tool.capability_id == lead_token.id
+        assert junior_search_tool.capability_id == junior_token.id
+
+    async def test_delegation_scope_escalation_rejected(self) -> None:
         chio = _instrumented_client()
         search_tool, write_tool = _make_tools(chio)
         lead = _make_agent("lead", "lead", [search_tool, write_tool])
@@ -290,10 +306,13 @@ class TestDelegationAttenuation:
         )
         await crew.provision_capabilities()
 
-        # Asking to attenuate to a broader scope is a bug; the SDK raises.
+        # The SDK rejects escalation before recording an attenuation request.
         with pytest.raises(ChioValidationError):
             await crew.attenuate_for_delegation(
                 delegator_role="lead",
                 delegate_role="phantom",
                 new_scope=_scope("search", "write"),
             )
+        assert all(
+            call.method != "attenuate_capability" for call in chio.calls
+        )

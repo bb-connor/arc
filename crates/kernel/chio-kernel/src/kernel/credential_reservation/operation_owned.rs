@@ -14,9 +14,50 @@ impl ChioKernel {
         now_unix_ms: u64,
         grant_index: usize,
         dpop_required: bool,
+        admission: Option<&mut DurableToolAdmission>,
+    ) -> RuntimeAdmissionDecision {
+        self.run_pre_budget_admission_with_native_finishing_provider(
+            None,
+            PreBudgetAdmissionContext {
+                request,
+                security_context,
+                metadata,
+                now,
+                now_unix_ms,
+                grant_index,
+                dpop_required,
+            },
+            admission,
+        )
+    }
+
+    pub(crate) fn run_pre_budget_admission_with_native_finishing_provider(
+        &self,
+        finishing_provider: Option<
+            &dyn crate::native_finishing::NativeProcessFinishingSourceProvider,
+        >,
+        inputs: PreBudgetAdmissionContext<'_, '_, '_>,
         mut admission: Option<&mut DurableToolAdmission>,
     ) -> RuntimeAdmissionDecision {
+        let PreBudgetAdmissionContext {
+            request,
+            security_context,
+            metadata,
+            now,
+            now_unix_ms,
+            grant_index,
+            dpop_required,
+        } = inputs;
         if let Err(error) = self.validate_live_admission_authority_profile(admission.as_deref()) {
+            return RuntimeAdmissionDecision::deny(error.to_string(), None);
+        }
+        if let Err(error) = self.prepare_original_native_finishing_before_first_purpose(
+            request,
+            security_context,
+            admission.as_deref(),
+            finishing_provider,
+            now_unix_ms,
+        ) {
             return RuntimeAdmissionDecision::deny(error.to_string(), None);
         }
         let prepared = if (self.governed_approval_authority.is_some()

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# M3 acceptance requires the complete authenticated caller and native custody
+# Authenticated delivery acceptance requires the complete authenticated caller and native custody
 # inventories, including real process loss. Missing, filtered or ignored cases
-# cannot silently satisfy the named milestone gate.
+# cannot silently satisfy the authenticated-delivery acceptance gate.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 022

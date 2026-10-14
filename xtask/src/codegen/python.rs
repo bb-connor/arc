@@ -19,6 +19,18 @@ mod root_models;
 #[path = "python_manifest_models.rs"]
 mod manifest_models;
 
+#[path = "python_recovery_models.rs"]
+mod recovery_models;
+
+#[path = "python_api_stability.rs"]
+mod api_stability;
+
+#[path = "python_utf8_models.rs"]
+mod utf8_models;
+
+#[path = "python_publish.rs"]
+mod publisher;
+
 /// Pinned tool spec for the Python codegen target. Reflected in
 /// `[python]` in `xtask/codegen-tools.lock.toml`. Bumping this is a
 /// spec-affecting change and must regenerate every `_generated/*.py` byte.
@@ -52,7 +64,9 @@ pub(super) fn codegen_python(check_only: bool) -> Result<(), XtaskError> {
         .map_err(|err| XtaskError::Io("<temp staging dir for codegen python>".to_string(), err))?;
 
     let clean_input = staging.path().join("input");
-    mirror_schema_tree(&schemas_dir, &clean_input, &schema_files)?;
+    chio_spec_codegen::LocalSchemaCatalog::load(&schemas_dir)
+        .and_then(|catalog| catalog.mirror(&clean_input))
+        .map_err(XtaskError::Codegen)?;
 
     let staging_out = staging.path().join("output");
     fs::create_dir_all(&staging_out)
@@ -62,8 +76,32 @@ pub(super) fn codegen_python(check_only: bool) -> Result<(), XtaskError> {
     fs::write(&header_path, build_python_file_header(&schema_digest))
         .map_err(|err| XtaskError::Io(display_path(&header_path), err))?;
 
-    invoke_datamodel_codegen(&clean_input, &staging_out, &header_path)?;
+    invoke_datamodel_codegen(&clean_input, &staging_out, &header_path, false)?;
+    let scoped_input = staging.path().join("identity-input");
+    let scoped_output = staging.path().join("identity-output");
+    let name_plan = staging.path().join("model-bindings.json");
+    api_stability::annotate(&workspace_root, &clean_input, &scoped_input)?;
+    fs::create_dir_all(&scoped_output)
+        .map_err(|err| XtaskError::Io(display_path(&scoped_output), err))?;
+    invoke_datamodel_codegen(&scoped_input, &scoped_output, &header_path, true)?;
+    // Discovery sees the immutable ordinary generator output. Only hardened
+    // ordinary bodies ship; the title-named output supplies schema identities.
+    api_stability::plan(&workspace_root, &staging_out, &scoped_output, &name_plan)?;
+    let raw_output = staging.path().join("ordinary-output");
+    copy_dir_recursive(&staging_out, &raw_output)?;
     harden_python_generated_models(&staging_out)?;
+    let utf8_report = staging.path().join("utf8-model-bounds.json");
+    utf8_models::harden(
+        &workspace_root,
+        utf8_models::ModelInputs {
+            schemas: &clean_input,
+            models: &staging_out,
+            raw: &raw_output,
+            oracle: &scoped_output,
+            bindings: &name_plan,
+            report: &utf8_report,
+        },
+    )?;
 
     // Walk the freshly-generated tree and rewrite each subpackage's
     // `__init__.py` to re-export its top-level model classes. The
@@ -79,6 +117,10 @@ pub(super) fn codegen_python(check_only: bool) -> Result<(), XtaskError> {
         build_python_top_init(&schema_digest, &subpackage_exports),
     )
     .map_err(|err| XtaskError::Io(display_path(&top_init), err))?;
+
+    // This gate applies real class aliases and checks protected HEAD meanings
+    // before either a drift comparison or any maintained output publication.
+    api_stability::apply(&workspace_root, &staging_out, &name_plan)?;
 
     if check_only {
         let drift = diff_python_trees(&staging_out, &final_out_dir)?;
@@ -99,15 +141,8 @@ pub(super) fn codegen_python(check_only: bool) -> Result<(), XtaskError> {
         return Ok(());
     }
 
-    if final_out_dir.exists() {
-        fs::remove_dir_all(&final_out_dir)
-            .map_err(|err| XtaskError::Io(display_path(&final_out_dir), err))?;
-    }
-    if let Some(parent) = final_out_dir.parent() {
-        fs::create_dir_all(parent).map_err(|err| XtaskError::Io(display_path(parent), err))?;
-    }
-    copy_dir_recursive(&staging_out, &final_out_dir)?;
-    let py_count = count_python_files(&final_out_dir)?;
+    let py_count = count_python_files(&staging_out)?;
+    publisher::publish(&staging_out, &final_out_dir)?;
     println!(
         "codegen python: wrote {} ({} python files; {} schema files; sha256={})",
         display_path(&final_out_dir),
@@ -135,6 +170,7 @@ fn build_python_file_header(schema_digest: &str) -> String {
 fn harden_python_generated_models(root_dir: &Path) -> Result<(), XtaskError> {
     root_models::harden(root_dir)?;
     manifest_models::harden(root_dir)?;
+    recovery_models::harden(root_dir)?;
     harden_python_jsonrpc_response(&root_dir.join("jsonrpc").join("response_schema.py"))?;
     harden_python_receipt_record(&root_dir.join("receipt").join("record_schema.py"))?;
     harden_python_provenance_verdict_link(
@@ -144,7 +180,51 @@ fn harden_python_generated_models(root_dir: &Path) -> Result<(), XtaskError> {
         &root_dir.join("capability").join("capabilities_schema.py"),
     )?;
     harden_python_capability_token(&root_dir.join("capability").join("token_schema.py"))?;
+    harden_python_disclosure_label(
+        &root_dir
+            .join("security")
+            .join("declassification_grant_schema.py"),
+    )?;
+    harden_python_semantic_nullable(&root_dir.join("recovery"))?;
     Ok(())
+}
+
+/// The pinned generator confuses required nullable fields with omittable ones.
+/// Keep omission distinct from an explicitly encoded null in the closed wire.
+fn harden_python_semantic_nullable(root: &Path) -> Result<(), XtaskError> {
+    for (file, before, after) in [
+        (
+            "semantic_prerequisite_schema.py",
+            "    lease: OpaqueId | None = None",
+            "    lease: OpaqueId | None = Field(...)",
+        ),
+        (
+            "semantic_invocation_schema.py",
+            "    ) = None\n    prerequisites:",
+            "    ) = Field(...)\n    prerequisites:",
+        ),
+    ] {
+        let path = root.join(file);
+        let mut body =
+            fs::read_to_string(&path).map_err(|err| XtaskError::Io(display_path(&path), err))?;
+        replace_python_codegen_snippet(&path, &mut body, before, after)?;
+        fs::write(&path, body).map_err(|err| XtaskError::Io(display_path(&path), err))?;
+    }
+    Ok(())
+}
+
+/// The pinned generator loses the referenced label members in this `allOf`.
+/// Preserve the complete signed label and restrict its discriminant to known.
+fn harden_python_disclosure_label(path: &Path) -> Result<(), XtaskError> {
+    let mut body =
+        fs::read_to_string(path).map_err(|err| XtaskError::Io(display_path(path), err))?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "class TargetLabel(BaseModel):\n    kind: Literal[\"known\"]",
+        "from .information_label_schema import InformationLabel1\n\n\nclass TargetLabel(InformationLabel1):\n    kind: Literal[\"known\"]",
+    )?;
+    fs::write(path, body).map_err(|err| XtaskError::Io(display_path(path), err))
 }
 
 fn harden_python_capability_token(path: &Path) -> Result<(), XtaskError> {
@@ -559,33 +639,11 @@ fn extract_top_level_python_classes(body: &str) -> Vec<String> {
     classes
 }
 
-fn mirror_schema_tree(
-    src_root: &Path,
-    dst_root: &Path,
-    schema_files: &[PathBuf],
-) -> Result<(), XtaskError> {
-    fs::create_dir_all(dst_root).map_err(|err| XtaskError::Io(display_path(dst_root), err))?;
-    for path in schema_files {
-        let rel = path.strip_prefix(src_root).map_err(|_| {
-            XtaskError::Usage(format!(
-                "codegen python: schema file {} is not under {}",
-                display_path(path),
-                display_path(src_root)
-            ))
-        })?;
-        let dest = dst_root.join(rel);
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent).map_err(|err| XtaskError::Io(display_path(parent), err))?;
-        }
-        fs::copy(path, &dest).map_err(|err| XtaskError::Io(display_path(&dest), err))?;
-    }
-    Ok(())
-}
-
 fn invoke_datamodel_codegen(
     input_dir: &Path,
     output_dir: &Path,
     header_path: &Path,
+    scoped_names: bool,
 ) -> Result<(), XtaskError> {
     let mut cmd = Command::new("uv");
     cmd.arg("tool")
@@ -610,6 +668,9 @@ fn invoke_datamodel_codegen(
         .arg("--disable-timestamp")
         .arg("--custom-file-header-path")
         .arg(header_path);
+    if scoped_names {
+        cmd.arg("--use-title-as-name");
+    }
 
     let output = cmd.output().map_err(|err| {
         if err.kind() == std::io::ErrorKind::NotFound {

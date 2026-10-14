@@ -9,6 +9,25 @@ use chio_kernel::admission_operation::{
 
 mod capture;
 mod policy;
+
+/// The connector's last local check uses original native policy custody. It
+/// cannot replace a completed capture or reopen spent native authority.
+pub(in crate::admission_operation_store) fn verify_semantic_dispatch_policy(
+    tx: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    now: u64,
+) -> Result<(), AdmissionOperationStoreError> {
+    if operation.native_dispatch_ledger_digest().is_none() {
+        return Err(invalid("semantic dispatch lacks physical capture ledger"));
+    }
+    verify_capture_attachment(tx, operation)?;
+    let record = storage::load(tx, operation.binding().operation_id().as_str())?
+        .ok_or_else(|| invalid("semantic dispatch lost native ledger"))?;
+    let (_, policy) = policy::decode(&canonical_json_bytes(&record.policy).map_err(invalid)?)?;
+    policy.validate_current(tx, now)?;
+    governed_approval_claim::verify_fresh_approval_tx(tx, operation, now)?;
+    dpop_claim::verify_fresh_dpop_tx(tx, operation, now)
+}
 mod record;
 mod storage;
 mod write;
@@ -93,4 +112,47 @@ impl SqliteAdmissionOperationStore {
             })
             .transpose()
     }
+}
+
+/// Data-only inherited scope from the exact authenticated captured ledger.
+/// This never checks or renews current dispatch authority or release clearance.
+pub(in crate::admission_operation_store) fn authenticated_status_key(
+    tx: &Connection,
+    operation: &AdmissionOperationV1,
+    original: &chio_kernel::admission_operation::RetainedToolAdmissionRequestV1,
+    binding: &NativeSecurityAuthorityBindingV1,
+) -> Result<chio_security_types::ports::FlowStateKey, AdmissionOperationStoreError> {
+    if operation.native_dispatch_ledger_digest().is_none() || operation.dispatch_commit().is_none()
+    {
+        return Err(invalid("native status lost original capture attachment"));
+    }
+    verify_capture_attachment(tx, operation)?;
+    let record = storage::load(tx, operation.binding().operation_id().as_str())?
+        .ok_or_else(|| invalid("native status ledger absent"))?;
+    record.validate(tx)?;
+    storage::verify_reference(tx, &record)?;
+    original.validate_native_security_authority(binding)?;
+    original.validate_native_security_context(&record.context)?;
+    let initialized = super::records::load_metadata(tx, binding.security_authority_id().as_str())?
+        .ok_or_else(|| invalid("native status initialization absent"))?;
+    if initialized.admission_binding()? != *binding {
+        return Err(invalid("native status original initialization changed"));
+    }
+    let key = chio_kernel::recovery::recovery_flow_key(&record.context);
+    let joined = super::history::load_for_operation(tx, operation.binding().operation_id())?
+        .ok_or_else(|| invalid("native status input history absent"))?;
+    // Mutable flow observation generation legitimately advances between input
+    // and dispatch. Stable admission identity is authenticated independently in
+    // both records; each journal validates its own actual snapshot generation.
+    original.validate_native_security_context(&joined.context)?;
+    if joined.request.key != key
+        || joined.authority != *binding.security_authority_id()
+        || joined.initialization != binding.initialization_digest().as_str()
+        || joined.digest()? != record.join_digest.as_str()
+    {
+        return Err(invalid(
+            "native status original scope differs from input history",
+        ));
+    }
+    Ok(key)
 }

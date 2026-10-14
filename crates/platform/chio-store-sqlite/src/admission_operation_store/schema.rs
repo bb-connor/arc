@@ -1,4 +1,12 @@
 use super::*;
+mod physical_write_catalog;
+mod recovery;
+mod release_codec_catalog;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use physical_write_catalog::command_catalog_difference_for_test;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use physical_write_catalog::current_command_catalog_model_for_test;
+pub(in crate::admission_operation_store) use physical_write_catalog::verify_physical_command_catalog;
 
 mod clock;
 mod migration_v17;
@@ -67,7 +75,13 @@ pub(crate) fn initialize_admission_operation_schema(
         ADMISSION_OPERATION_SCHEMA_ANCHORS,
     )
     .map_err(|error| invariant(error.to_string()))?;
+    // These were unqualified development formats introduced within the recovery
+    // PR. Refuse before any migration instead of guessing at retained custody.
+    if (35..ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION).contains(&on_disk) {
+        return Err(invariant("experimental recovery store format is unsupported; preserve the database and use its matching development revision for inspection"));
+    }
     if on_disk == ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
+        release_codec_catalog::complete_supported_transition(connection)?;
         return verify_admission_operation_invariants(connection);
     }
     migration_v17::preserving_parent_names(connection, |connection| {
@@ -127,7 +141,18 @@ fn migrate_schema(
     if on_disk < 33 {
         migration_v33::verify_pre_migration_schema(&transaction, on_disk)?;
     }
-    migration_v34::verify_pre_migration_schema(&transaction, on_disk)?;
+    if on_disk < 34 {
+        migration_v34::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk == 34 {
+        verify_admission_operation_schema(&transaction, 34)?;
+        verify_admission_operation_data_invariants(&transaction)?;
+        super::security_participant_state::verify_all(&transaction)?;
+    }
+    // Successor native DDL only extends a verified genuine predecessor
+    // catalog. Hydrated initializations keep their historical catalog digest,
+    // and this migration appends no global commit under any owner fence.
+    super::security_participant_state::schema::verify_predecessor_catalog(&transaction, on_disk)?;
     if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
         // The legacy report-after-effect contract could refund an executed
         // caller as pre-dispatch compensation. A refunded terminal is not
@@ -226,6 +251,7 @@ fn migrate_schema(
     transaction
         .execute_batch(super::security_participant_state::nonce_preflight::sql())
         .map_err(sqlite_error)?;
+    recovery::install(&transaction)?;
     crate::stamp_schema_version(
         &transaction,
         ADMISSION_OPERATION_SCHEMA_KEY,
@@ -242,6 +268,16 @@ fn migrate_schema(
         .map_err(sqlite_error)?;
     if foreign_key_violation {
         return Err(invariant("admission schema migration broke a foreign key"));
+    }
+    #[cfg(test)]
+    if on_disk == 34 {
+        if let Some(marker) = std::env::var_os("CHIO_RECOVERY_MIGRATION_MARKER") {
+            std::fs::write(marker, b"verified-upgrade-before-commit")
+                .map_err(|_| invariant("migration test marker is unavailable"))?;
+            // The fresh-process parent verifies SQLite crash rollback. No
+            // destructor, Rust unwind or transaction rollback callback runs.
+            std::process::abort();
+        }
     }
     transaction.commit().map_err(sqlite_error)
 }
@@ -553,8 +589,14 @@ pub(crate) fn verify_admission_operation_invariants(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
     verify_admission_operation_schema(connection, ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)?;
+    verify_admission_operation_inventory(connection)
+}
 
+fn verify_admission_operation_inventory(
+    connection: &Connection,
+) -> Result<(), AdmissionOperationStoreError> {
     verify_admission_operation_data_invariants(connection)?;
+    super::recovery::verify_all(connection)?;
     super::runtime_participant::verify_all(connection)?;
     super::governed_approval_claim::verify_all(connection)?;
     super::dpop_claim::verify_all(connection)?;
@@ -565,6 +607,8 @@ pub(crate) fn verify_admission_operation_invariants(
         .map(|_| ())
         .map_err(invariant)?;
     super::security_participant_migration::verify_all(connection)?;
+    super::knowledge::publication_capacity::verify_catalog(connection)?;
+    super::product::evidence_reclamation::verify_product_reclamation_inventory(connection)?;
     super::security_participant_state::egress::verify_catalog(connection)?;
     super::security_participant_state::output::verify_catalog(connection)?;
     super::security_participant_state::nonce_preflight::verify_catalog(connection)?;
@@ -587,9 +631,19 @@ fn verify_admission_operation_schema(
     Ok(())
 }
 
+/// Construct the fixed compiled current catalog DATA. This is not an actual
+/// source, reservation, financing role or successor-format acceptance.
+pub(in crate::admission_operation_store) fn current_admission_write_catalog_model(
+) -> Result<Connection, AdmissionOperationStoreError> {
+    expected_admission_operation_schema(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
+}
+
 fn expected_admission_operation_schema(
     version: i32,
 ) -> Result<Connection, AdmissionOperationStoreError> {
+    if version > 34 && version != ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
+        return Err(invariant("unsupported recovery catalog version"));
+    }
     let expected = Connection::open_in_memory().map_err(sqlite_error)?;
     expected
         .execute_batch(&if version < 20 {
@@ -657,12 +711,11 @@ fn expected_admission_operation_schema(
             .map_err(sqlite_error)?;
     }
     if version >= 28 {
+        let native = super::security_participant_state::schema::native_catalog_version(version)?;
         expected
-            .execute_batch(&if version == 28 {
-                super::security_participant_state::schema::predecessor_sql()
-            } else {
-                super::security_participant_state::schema::sql()?
-            })
+            .execute_batch(&super::security_participant_state::schema::sql_version(
+                native,
+            )?)
             .map_err(sqlite_error)?;
     }
     if version >= 30 {
@@ -684,6 +737,9 @@ fn expected_admission_operation_schema(
         expected
             .execute_batch(super::security_participant_state::nonce_preflight::sql())
             .map_err(sqlite_error)?;
+    }
+    if version == ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
+        recovery::install(&expected)?;
     }
     Ok(expected)
 }

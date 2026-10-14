@@ -568,7 +568,7 @@ pub(super) fn verify_file(
             (false, _) => "no_custody_claim",
         },
         "artifact_schema": evidence.schema, "checks": checks, "unchecked": unchecked,
-        "m5_acceptance_complete": false})
+        "qualification_complete": false, "m5_acceptance_complete": false})
     );
     Ok(())
 }

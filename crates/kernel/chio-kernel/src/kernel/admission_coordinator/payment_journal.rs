@@ -39,19 +39,24 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let recovery_lease =
-            self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
-        let journal = runtime
+        // The recovery claim commits only with the funded journal write it
+        // authorizes; an exact replay persists neither.
+        let claim =
+            Self::recovery_claim_request(runtime, &admission.operation, trusted_now_unix_ms)?;
+        let (journal, _) = runtime
             .store
-            .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                operation: &admission.operation,
-                recovery_lease: &recovery_lease,
-                expected,
-                transition,
-                release_evidence: None,
-                active_fence: &runtime.fence,
-                trusted_now_unix_ms,
-            })
+            .claim_and_advance_payment_journal(
+                crate::receipt_store::AdmissionPaymentJournalClaim {
+                    claim,
+                    operation: &admission.operation,
+                    expected,
+                    transition,
+                    release_evidence: None,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                },
+                &mut crate::admission_operation::qualified_lease(claim, trusted_now_unix_ms),
+            )
             .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
         journal
             .validate()

@@ -14,9 +14,25 @@ fn live_issuance_does_not_occupy_a_recovery_page() -> TestResult {
         "later-capability",
     );
     store.begin(&later, &fixture.fixture.fence, now_ms())?;
-    assert_eq!(store.list_recoverable(now_ms(), 1)?, vec![later]);
+    assert_eq!(
+        store.list_recoverable(now_ms(), None, 1)?,
+        vec![later.clone()]
+    );
     let expires = u64::try_from(fixture.reservation.signed_nonce().expires_at())? * 1_000;
-    assert_eq!(store.list_recoverable(expires, 1)?, vec![fixture.operation]);
+    let mut expected = [later, fixture.operation];
+    expected.sort_by_key(|operation| operation.binding().operation_id().clone());
+    let [first, second] = expected;
+    assert_eq!(
+        store.list_recoverable(expires, None, 1)?,
+        vec![first.clone()]
+    );
+    assert_eq!(
+        store.list_recoverable(expires, Some(first.binding().operation_id()), 1)?,
+        vec![second.clone()]
+    );
+    assert!(store
+        .list_recoverable(expires, Some(second.binding().operation_id()), 1)?
+        .is_empty());
     Ok(())
 }
 

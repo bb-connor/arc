@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/profile-requirements.schema.json",
+  "title": "Recovery profile requirements V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_version",
+    "deployment_digest",
+    "attachment_profile",
+    "required_features",
+    "schema"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": 1
+    },
+    "deployment_digest": {
+      "$ref": "observation.schema.json#/$defs/recoveryDigest32"
+    },
+    "attachment_profile": {
+      "type": "string",
+      "enum": [
+        "ordinary",
+        "operation_owned_nonce"
+      ]
+    },
+    "required_features": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "native_capture",
+          "recovery_bound_grant",
+          "exact_request_custody",
+          "current_audience",
+          "operation_owned_nonce"
+        ]
+      }
+    },
+    "schema": {
+      "const": "chio.recovery.profile-requirements.v1"
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "required_features": {
+          "contains": {
+            "const": "native_capture"
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "required_features": {
+          "contains": {
+            "const": "recovery_bound_grant"
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "required_features": {
+          "contains": {
+            "const": "exact_request_custody"
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "required_features": {
+          "contains": {
+            "const": "current_audience"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "attachment_profile": {
+            "const": "operation_owned_nonce"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "required_features": {
+            "contains": {
+              "const": "operation_owned_nonce"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "description": "Operator requirements. Canonical feature order follows the listed vocabulary and is checked by Rust. A matching inventory is not live enforcement qualification."
+}

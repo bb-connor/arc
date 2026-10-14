@@ -207,7 +207,7 @@ impl SqliteAdmissionOperationStore {
         Ok(Some(witness))
     }
 
-    fn native_capture_tx(
+    pub(in crate::admission_operation_store) fn native_capture_tx(
         &self,
         transaction: &Transaction<'_>,
         operation_id: &AdmissionOperationId,

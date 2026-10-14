@@ -24,7 +24,9 @@
     "packages/node-http",
     "packages/process",
     "packages/ai-sdk-process",
-    "packages/create-chio-app"
+    "packages/create-chio-app",
+    "vendor/braces",
+    "vendor/node-forge"
   ],
   "engines": {
     "node": ">=22"
@@ -35,26 +37,32 @@
   },
   "overrides": {
     "browserslist": "4.28.8",
-    "fast-uri": "3.1.6",
     "metro": "0.84.5",
     "metro-config": "0.84.5",
     "metro-transform-worker": "0.84.5",
     "miniflare": {
-      "undici": "7.29.0"
+      "undici": "7.29.1"
     },
     "next": {
-      ".": "15.5.26",
+      ".": "15.5.27",
       "postcss": "8.5.26"
     },
     "postcss": "8.5.26",
-    "sharp": "0.35.4",
-    "undici": "7.29.0",
+    "sharp": "0.35.5",
+    "undici": "7.29.1",
     "uuid": "11.1.1",
     "js-yaml": "4.3.2",
-    "vite": "7.3.6"
+    "vite": "7.3.6",
+    "source-map-js": "1.2.2",
+    "brace-expansion": "5.0.12",
+    "compression": "1.8.2",
+    "proxy-addr": "2.0.8",
+    "shell-quote": "1.11.0",
+    "fast-uri@^3.0.0": "3.1.8",
+    "fast-uri@^4.0.0": "4.1.5"
   },
   "devDependencies": {
-    "next": "15.5.26",
+    "next": "15.5.27",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   }

@@ -696,7 +696,7 @@ fn anchored_transparency_claims_verify_when_publications_carry_valid_bindings() 
         ),
         trust_anchor_ref: "anchor-root-1".to_string(),
         signer_cert_ref: "cert-chain-1".to_string(),
-        publication_profile_version: "phase4-pilot".to_string(),
+        publication_profile_version: "evidence-pilot.v1".to_string(),
     };
     transparency.publications = vec![
         chio_kernel::checkpoint::build_trust_anchored_checkpoint_publication(&checkpoint, binding)
@@ -734,7 +734,7 @@ fn evidence_export_fails_closed_on_stale_or_missing_publication() {
         ),
         trust_anchor_ref: "anchor-root-1".to_string(),
         signer_cert_ref: "cert-chain-1".to_string(),
-        publication_profile_version: "phase4-pilot".to_string(),
+        publication_profile_version: "evidence-pilot.v1".to_string(),
     };
     transparency.publications = vec![
         chio_kernel::checkpoint::build_trust_anchored_checkpoint_publication(&checkpoint, binding)

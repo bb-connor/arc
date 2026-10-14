@@ -243,13 +243,12 @@ fn validate_recovery_posture(
     .any(|status| status.as_str() != "none");
 
     match context.current_state.as_str() {
-        "disputed" => {
-            if payment.dispute_status == "none" {
-                return Err(CommerceOrderError::PaymentFailed(
-                    "disputed order missing dispute state".to_string(),
-                ));
-            }
+        "disputed" if payment.dispute_status == "none" => {
+            return Err(CommerceOrderError::PaymentFailed(
+                "disputed order missing dispute state".to_string(),
+            ));
         }
+        "disputed" => {}
         "refunded" => {
             if payment.refund_status != "succeeded" {
                 return Err(CommerceOrderError::PaymentFailed(

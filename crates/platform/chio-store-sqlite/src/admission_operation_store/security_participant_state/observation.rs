@@ -21,12 +21,9 @@ impl SqliteAdmissionOperationStore {
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
         let observed_at = observed_time(&tx, trusted_now_unix_ms)?;
-        verify_coverage(&tx).map_err(map_owner_error)?;
-        let initialized = records::load_metadata(&tx, binding.security_authority_id().as_str())?
-            .ok_or_else(|| invalid("selected native initialization is absent"))?;
-        if initialized.admission_binding()? != *binding
-            || binding.store_uuid().as_str() != fence.store_uuid
-        {
+        verify_current_catalogs(&tx)?;
+        records::load_current_metadata(&tx, binding)?;
+        if binding.store_uuid().as_str() != fence.store_uuid {
             return Err(invalid("selected native initialization binding differs"));
         }
         let (snapshot, stored_context_generation) =
@@ -44,4 +41,26 @@ impl SqliteAdmissionOperationStore {
             observed_at,
         )
     }
+}
+
+pub(in crate::admission_operation_store) fn verify_recovery_initialization(
+    tx: &Connection,
+    binding: &NativeSecurityAuthorityBindingV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    let initialized = records::load_metadata(tx, binding.security_authority_id().as_str())?
+        .ok_or_else(|| invalid("recovery native initialization is absent"))?;
+    if initialized.admission_binding()? != *binding {
+        return Err(invalid("recovery native initialization differs"));
+    }
+    records::verify_all(tx).map(|_| ())
+}
+
+/// Verify selected initialization custody after the serving owner and anchor
+/// have been checked in this transaction. Cold open authenticates full history;
+/// configuration retains `verify_recovery_initialization` and its full replay.
+pub(in crate::admission_operation_store) fn verify_current_recovery_initialization(
+    tx: &Connection,
+    binding: &NativeSecurityAuthorityBindingV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    records::load_current_metadata(tx, binding).map(|_| ())
 }

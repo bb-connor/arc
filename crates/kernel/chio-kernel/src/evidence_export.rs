@@ -749,7 +749,7 @@ mod tests {
             ),
             trust_anchor_ref: "witness-root".to_string(),
             signer_cert_ref: "cert-chain-1".to_string(),
-            publication_profile_version: "phase4-pilot".to_string(),
+            publication_profile_version: "evidence-pilot.v1".to_string(),
         };
         transparency.publications = vec![
             crate::checkpoint::build_trust_anchored_checkpoint_publication(&first, binding.clone())

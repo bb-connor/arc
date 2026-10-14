@@ -163,24 +163,30 @@ impl<'a> ScopedReader<'a> {
 /// commit, select another scope, or obtain the underlying SQLite connection.
 pub(super) struct ScopedMutation<'a> {
     reader: ScopedReader<'a>,
+    // Only the affine Output owner supplies an operation whose retained slot
+    // this transaction may spend. Other joins preserve every outstanding slot.
+    flow_owner: Option<&'a super::native_mutation::NativeFlowOwner<'a>>,
 }
 
 impl<'a> ScopedMutation<'a> {
     pub(super) fn native(owner: &'a super::native_mutation::NativeFlowOwner<'_>) -> Self {
         Self {
             reader: ScopedReader::native(owner.transaction(), owner.authority()),
+            flow_owner: Some(owner),
         }
     }
 
     pub(super) fn legacy(transaction: &'a Transaction<'_>) -> Self {
         Self {
             reader: ScopedReader::legacy(transaction),
+            flow_owner: None,
         }
     }
 
     pub(super) fn native_egress(owner: &'a super::native_mutation::NativeEgressOwner<'_>) -> Self {
         Self {
             reader: ScopedReader::native(owner.transaction(), owner.authority()),
+            flow_owner: None,
         }
     }
 
@@ -189,7 +195,29 @@ impl<'a> ScopedMutation<'a> {
     pub(super) fn native_for_test(transaction: &'a Transaction<'_>, authority: &'a str) -> Self {
         Self {
             reader: ScopedReader::native(transaction, authority),
+            flow_owner: None,
         }
+    }
+
+    pub(super) fn generation_preserving_owed_output(
+        &self,
+        tenant: &str,
+        proposed: u64,
+    ) -> PortResult<u64> {
+        if let Some(owner) = self.flow_owner {
+            return owner.generation(tenant, proposed);
+        }
+        let Some(authority) = self.reader.authority else {
+            return Ok(proposed);
+        };
+        crate::admission_operation_store::native_finishing_generation(
+            self.reader.connection,
+            authority,
+            tenant,
+            proposed,
+            None,
+        )
+        .map_err(|_| PortError::integrity_failure())
     }
 
     pub(super) fn reader(&self) -> ScopedReader<'a> {

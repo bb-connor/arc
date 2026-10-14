@@ -152,16 +152,32 @@ fn durable_nonce_issuance_rechecks_fences_and_original_provenance() -> TestResul
     ));
     assert!(load(&fixture)?.is_none());
     let current = command(&fixture)?;
-    fixture.fixture.store.connection()?.execute_batch(
-        "DROP TRIGGER admission_operation_tool_requests_no_delete;
-         DELETE FROM admission_operation_tool_requests;",
-    )?;
+    {
+        let connection = fixture.fixture.store.connection()?;
+        let restore: String = connection.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = 'admission_operation_tool_requests_no_delete'",
+            [],
+            |row| row.get(0),
+        )?;
+        connection.execute_batch(
+            "DROP TRIGGER admission_operation_tool_requests_no_delete;
+             DELETE FROM admission_operation_tool_requests;",
+        )?;
+        // Preserve the exact catalog shape so issuance must fail on the
+        // missing original provenance row, not a canonical schema refusal.
+        connection.execute_batch(&restore)?;
+    }
     let error = fixture
         .fixture
         .store
         .issue_execution_nonce_and_commit_admission(&current, &fixture.reservation, now_ms())
         .expect_err("issuance accepted missing original provenance");
-    assert!(error.to_string().contains("request"), "{error}");
+    assert!(
+        error
+            .to_string()
+            .contains("committed original tool request is missing"),
+        "{error}"
+    );
     let count: i64 = fixture.fixture.store.connection()?.query_row(
         "SELECT COUNT(*) FROM admission_execution_nonce_issuances",
         [],

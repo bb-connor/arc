@@ -96,7 +96,7 @@ authority after legacy invocations have been quiesced. The setter is not an
 activation operation; unsupported backends and fixed clock overrides reject.
 See [operation-owned replay custody](../chio-runtime-core/README.md#operation-owned-replay-custody)
 for the backend and lifecycle requirements. Broader launch qualification remains
-tracked in the security roadmap.
+incomplete.
 
 ```rust
 use chio_runtime::{

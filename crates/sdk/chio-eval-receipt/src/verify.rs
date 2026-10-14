@@ -73,15 +73,15 @@ const SIGNATURE_REQUIRED_FIELDS: &[&str] = &["kind", "key_id", "signature", "sig
 const LOCAL_TEST_RECEIPT_FIXTURE_HASHES: &[(&str, &str)] = &[
     (
         "capability-subset-001-read-exact",
-        "2667e32d83f8f7db47b316f7f188e4dcd0a7d0414767122c54a043d076acb704",
+        "80b986aebd384466cba632fe902850c5146fe3650182050799bcccb5c98b3b6d",
     ),
     (
         "revocation-propagation-001-active-read",
-        "f6db0dec41eb7b9873a4d0a14d26f7cb42c13dcfd22e04384bf1b20da67294c2",
+        "60f432fa83aec6944fbc2ed13e37f1e02cec89503ee2f581ccea802107c1a7b4",
     ),
     (
         "replay-verdict-001-fresh-read",
-        "6e52db09a03b762233c5bf01e440bd0b9009f2c38527c43654a5090e852509f2",
+        "6b5ce21135f03f97f7c6aabcf83ba23d5c15f65ff45704914e5ac52dfd435c2f",
     ),
 ];
 

@@ -102,6 +102,9 @@ struct Fixture {
     fence: StoreMutationFence,
 }
 
+/// An authority opened by the current binary: both mandatory startup
+/// baselines (handle index and import manifest) are published, and their
+/// recovery events carry the startup observation time.
 fn fixture() -> Fixture {
     let temp = tempfile::tempdir().expect("tempdir");
     secure_directory(temp.path());
@@ -121,6 +124,166 @@ fn fixture() -> Fixture {
         store,
         fence,
     }
+}
+
+/// A modeled supported pre-recovery predecessor, for explicit predecessor
+/// construction only. The current binary opens the authority with the
+/// prior-format startup guards armed, so neither the handle-index nor the
+/// import-manifest baseline is published and the store holds no recovery
+/// custody. The guards drop on return: the next plain `open_serving` is the
+/// current startup and publishes both baselines under its own owner.
+fn pre_recovery_fixture() -> Fixture {
+    let _prior_format = prior_format_startup();
+    fixture()
+}
+
+/// A later serving owner of the same modeled predecessor, opened before it is
+/// shaped and upgraded. Like `pre_recovery_fixture`, it publishes neither
+/// baseline.
+fn pre_recovery_open_serving(
+    database: &std::path::Path,
+    lock_root: &std::path::Path,
+) -> Result<SqliteAuthorityStore, SqliteServingOwnerError> {
+    let _prior_format = prior_format_startup();
+    SqliteAuthorityStore::open_serving(database, lock_root)
+}
+
+fn prior_format_startup() -> (
+    crate::admission_operation_store::PriorFormatHandleStartupGuard,
+    crate::admission_operation_store::PriorFormatImportStartupGuard,
+) {
+    (
+        crate::admission_operation_store::PriorFormatHandleStartupGuard::arm(),
+        crate::admission_operation_store::PriorFormatImportStartupGuard::arm(),
+    )
+}
+
+/// The first whole second no earlier than the authority's trusted time: the
+/// commit-chain high water and the last recovery event, which the current
+/// startup stamps with its own observation. A second-granular fixed clock
+/// started here is never behind the history it is meant to extend.
+fn clock_origin_ms(fixture: &Fixture) -> AnchoredTestResult<u64> {
+    let high_water: i64 = fixture.store.connection()?.query_row(
+        "SELECT max(
+            (SELECT trusted_time_high_water_unix_ms FROM admission_operation_commit_meta
+             WHERE singleton = 1),
+            coalesce((SELECT observed_at FROM admission_operation_recovery_events
+                      ORDER BY sequence DESC LIMIT 1), 0))",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(u64::try_from(high_water)?
+        .div_ceil(1_000)
+        .saturating_mul(1_000)
+        .max(now_ms() / 1_000 * 1_000))
+}
+
+/// Every global commit, every column, in chain order.
+fn global_commit_rows(connection: &Connection) -> AnchoredTestResult<Vec<Vec<Value>>> {
+    let mut statement =
+        connection.prepare("SELECT * FROM authority_global_commits ORDER BY commit_sequence")?;
+    let columns = statement.column_count();
+    let rows = statement
+        .query_map([], |row| {
+            (0..columns)
+                .map(|index| row.get(index))
+                .collect::<rusqlite::Result<Vec<Value>>>()
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
+}
+
+/// The upgrade contract of a modeled pre-recovery predecessor once the current
+/// binary serves it: every predecessor global commit is retained row for row,
+/// the whole chain authenticates, and the serving owner's startup appends
+/// exactly the handle-index baseline and then the import-manifest baseline.
+/// Each appended commit names the first version of its retained recovery
+/// record and that record's only event, and nothing else enters recovery
+/// custody.
+fn assert_predecessor_history_then_startup_baselines(
+    connection: &Connection,
+    predecessor: &[Vec<Value>],
+    fence: &StoreMutationFence,
+) -> AnchoredTestResult {
+    assert_eq!(
+        global_commit_rows(connection)?.get(..predecessor.len()),
+        Some(predecessor),
+        "predecessor global history is retained exactly"
+    );
+    crate::serving_owner::verify_authenticated_recovery_history(connection)?;
+    let authority = sha256_hex(fence.store_uuid.as_bytes());
+    let baselines = [
+        format!("knowledge-handle-baseline:{authority}"),
+        format!("knowledge-import-baseline:{authority}"),
+    ];
+    let expected = baselines
+        .iter()
+        .map(|key| {
+            let event: String = connection.query_row(
+                "SELECT event_digest FROM admission_operation_recovery_events
+                 WHERE record_key = ?1 AND record_version = 1",
+                [key],
+                |row| row.get(0),
+            )?;
+            Ok((
+                "recovery_transition".to_owned(),
+                "recovery".to_owned(),
+                key.clone(),
+                1,
+                event,
+                fence.store_uuid.clone(),
+                Some(fence.lease_id.clone()),
+                i64::try_from(fence.owner_epoch)?,
+            ))
+        })
+        .collect::<AnchoredTestResult<Vec<_>>>()?;
+    let mut statement = connection.prepare(
+        "SELECT mutation_kind, projection_kind, projection_key, projection_sequence,
+                projection_reference_digest, store_uuid, store_lease_id, store_owner_epoch
+         FROM authority_global_commits WHERE commit_sequence > ?1 ORDER BY commit_sequence",
+    )?;
+    let appended = statement
+        .query_map([i64::try_from(predecessor.len())?], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, i64>(7)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    assert_eq!(
+        appended, expected,
+        "the current startup appends exactly its two baselines under the serving owner"
+    );
+    let mut statement = connection.prepare(
+        "SELECT record_key, version FROM admission_operation_recovery_records
+         ORDER BY record_key",
+    )?;
+    let records = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    assert_eq!(
+        records,
+        baselines
+            .iter()
+            .map(|key| (key.clone(), 1))
+            .collect::<Vec<_>>(),
+        "recovery custody holds only the two baselines"
+    );
+    let mut statement = connection
+        .prepare("SELECT record_key FROM admission_operation_recovery_events ORDER BY sequence")?;
+    let events = statement
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    assert_eq!(events, baselines, "each baseline has exactly one event");
+    Ok(())
 }
 
 /// Tightens a fixture directory to owner-only access. Both `tempfile::tempdir` and

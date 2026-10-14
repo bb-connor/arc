@@ -2,8 +2,9 @@ use super::*;
 
 #[cfg(unix)]
 #[test]
-fn v28_initialization_and_anchor_survive_v29_without_rewriting_history() -> AnchoredTestResult {
-    let fixture = fixture();
+fn pre_recovery_initialization_survives_index_publication_without_rewriting_history(
+) -> AnchoredTestResult {
+    let fixture = pre_recovery_fixture();
     let source = imported(&fixture, "source")?;
     {
         let connection = fixture.store.connection()?;
@@ -41,6 +42,7 @@ fn v28_initialization_and_anchor_survive_v29_without_rewriting_history() -> Anch
         before
     );
     assert_eq!(native::verify_all(&connection)?, vec![initialized.clone()]);
+    assert!(initialized.requires_imported_influence_upgrade()?);
     drop(statement);
     drop(connection);
     let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
@@ -54,6 +56,44 @@ fn v28_initialization_and_anchor_survive_v29_without_rewriting_history() -> Anch
             )?,
         Some(initialized.clone())
     );
+    let imported_root = |connection: &Connection| -> rusqlite::Result<Vec<(String, i64, String)>> {
+        let mut statement = connection.prepare(
+            "SELECT projection_reference_digest, store_owner_epoch, store_lease_id
+             FROM authority_global_commits WHERE projection_kind='recovery'
+               AND projection_key GLOB 'knowledge-imported-influence-root:*'
+             ORDER BY commit_sequence",
+        )?;
+        let rows = statement
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+            .collect();
+        rows
+    };
+    let root = {
+        let connection = Connection::open(&database)?;
+        let mut statement = connection.prepare(
+            "SELECT commit_sequence, chain_digest FROM authority_global_commits
+             WHERE commit_sequence <= ?1 ORDER BY commit_sequence",
+        )?;
+        let old_head = before.last().ok_or("pre-recovery history is absent")?.0;
+        let retained = statement
+            .query_map([old_head], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        assert_eq!(retained, before);
+        let root = imported_root(&connection)?;
+        assert_eq!(root.len(), 1);
+        assert_eq!(
+            u64::try_from(root[0].1)?,
+            authority.mutation_fence().owner_epoch
+        );
+        assert_eq!(root[0].2, authority.mutation_fence().lease_id);
+        crate::admission_operation_store::verify_initialized_scope_projections(&connection)?;
+        root
+    };
+    drop(authority);
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    assert_eq!(imported_root(&Connection::open(&database)?)?, root);
     let fixture = Fixture {
         _temp,
         database,
@@ -62,6 +102,28 @@ fn v28_initialization_and_anchor_survive_v29_without_rewriting_history() -> Anch
         fence: authority.mutation_fence(),
         authority,
     };
+    // Index publication preserves the exact observation of the retained source,
+    // including after a second normal serving reopen.
+    let key = chio_security_types::ports::FlowStateKey {
+        tenant_id: chio_security_types::ports::TenantId::new("tenant")?,
+        principal_id: chio_security_types::PrincipalId::new("principal")?,
+        lineage_id: chio_security_types::ports::LineageId::new("lineage")?,
+        isolation_epoch_id: chio_security_types::ports::IsolationEpochId::new("epoch")?,
+        session_id: chio_security_types::ports::SessionId::new("session")?,
+    };
+    {
+        let connection = fixture.store.connection()?;
+        let expected = native::knowledge::full_scan_commitment(&connection, &initialized, &key)?;
+        assert!(expected.is_some());
+        let mut budget = chio_semantic_contracts::VerificationBudget::new(4096)?;
+        let observed = native::knowledge::budgeted_observed_influence(
+            &connection,
+            &initialized.admission_binding()?,
+            &key,
+            &mut budget,
+        )?;
+        assert_eq!(observed.map(|influence| influence.commitment), expected);
+    }
     let (context, request) = super::mutations::request("post-migration-join")?;
     let (operation, lease) =
         super::mutations::setup(&fixture, "post-migration-operation", &context)?;
@@ -94,7 +156,7 @@ fn v27_upgrade_adds_empty_native_tables_but_rejects_partial_future_and_aliases(
         Some("CREATE TABLE SECURITY_PARTICIPANT_STATE_alias(value TEXT)"),
         Some("DROP TRIGGER security_participant_migration_rows_no_replace"),
     ] {
-        let fixture = fixture();
+        let fixture = pre_recovery_fixture();
         let Fixture {
             _temp,
             database,
@@ -154,7 +216,7 @@ fn missing_current_native_barrier_is_never_repaired() -> AnchoredTestResult {
 #[cfg(unix)]
 #[test]
 fn v27_import_history_and_global_digests_survive_empty_v28_upgrade() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let source = imported(&fixture, "source")?;
     let Fixture {
         _temp,

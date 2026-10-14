@@ -7,7 +7,7 @@ fn fixed_clock(milliseconds: u64) -> chio_kernel::FixedRuntimeScope {
 #[test]
 fn authority_clock_rollback_is_rejected_without_mutating_history() -> AnchoredTestResult {
     let fixture = fixture();
-    let now = now_ms() / 1_000 * 1_000;
+    let now = clock_origin_ms(&fixture)?;
     let _clock = fixed_clock(now);
     let first = prepared_operation(
         &fixture.fence,
@@ -42,7 +42,7 @@ fn authority_clock_rollback_is_rejected_without_mutating_history() -> AnchoredTe
 #[test]
 fn decision_order_is_local_but_observation_order_is_global() -> AnchoredTestResult {
     let fixture = fixture();
-    let now = now_ms() / 1_000 * 1_000;
+    let now = clock_origin_ms(&fixture)?;
     let _clock = fixed_clock(now);
     let first = prepared_operation(
         &fixture.fence,
@@ -116,7 +116,7 @@ fn decision_order_is_local_but_observation_order_is_global() -> AnchoredTestResu
 #[test]
 fn delayed_time_cannot_create_revalidate_or_use_an_expired_lease() -> AnchoredTestResult {
     let fixture = fixture();
-    let now = now_ms() / 1_000 * 1_000;
+    let now = clock_origin_ms(&fixture)?;
     let _clock = fixed_clock(now);
     let operation = prepared_operation(
         &fixture.fence,

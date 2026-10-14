@@ -1,6 +1,43 @@
 //! Classified input is resolved by the physical writer under its actual lease.
 use super::*;
-use crate::admission_operation::NativeSecurityInputJoinRequestV1;
+use crate::admission_operation::{
+    NativeSecurityInputClassificationAuthority, NativeSecurityInputFateV1,
+    NativeSecurityInputJoinRecordV1, NativeSecurityInputJoinRequestV1,
+};
+
+impl NativeSecurityFlowJoinAuthority<'_> {
+    /// The only original classified Input custody a resumed caller may confirm.
+    /// The retained record must be exactly the operation, intent and selected
+    /// authority this start was admitted under, and its retained fate must be
+    /// Eligible. A Refused or Unproved Input (including one a prior binary
+    /// re-admitted) is denied here, before any confirmation or effect, and is
+    /// never relabeled or re-admitted.
+    pub(in crate::kernel) fn verify_resumed_input(
+        operation: &AdmissionOperationV1,
+        binding: &NativeSecurityAuthorityBindingV1,
+        input: &NativeSecurityInputJoinRequestV1,
+        current: &AdmissionOperationV1,
+        history: &NativeSecurityInputJoinRecordV1,
+    ) -> Result<(), KernelError> {
+        if current != operation
+            || history.input != *input
+            || history.join.binding != *binding
+            || history.join.operation_id != *operation.binding().operation_id()
+        {
+            return Err(invalid(
+                "native caller start changed its original classified input custody",
+            ));
+        }
+        history.validate().map_err(durable_store_error)?;
+        if history.fate != NativeSecurityInputFateV1::Eligible {
+            return Err(KernelError::GuardDenied(
+                "native caller start refused: its original classified input is not retained Eligible"
+                    .into(),
+            ));
+        }
+        Ok(())
+    }
+}
 
 impl NativeSecurityFlowJoinAuthority<'_> {
     /// Join classified input plus all inherited native labels into each of the
@@ -31,31 +68,32 @@ impl NativeSecurityFlowJoinAuthority<'_> {
                     .ok_or_else(|| invalid("native caller input operation is absent"))?;
                     let history =
                         history.ok_or_else(|| invalid("native caller input custody is absent"))?;
-                    if current != *operation
-                        || history.input != input
-                        || history.join.binding != self.binding
-                        || history.join.operation_id != *operation.binding().operation_id()
-                    {
-                        return Err(invalid(
-                            "native caller start changed its original classified input custody",
-                        ));
-                    }
-                    history.validate().map_err(durable_store_error)?;
+                    Self::verify_resumed_input(
+                        operation,
+                        &self.binding,
+                        &input,
+                        &current,
+                        &history,
+                    )?;
                     let snapshot = history.join.snapshot.clone();
                     self.confirm(history.join)?;
                     // Original input custody precedes the reserved hold. A
                     // caller start may verify it, never create another join.
                     return Ok(snapshot);
                 }
+                let classification = NativeSecurityInputClassificationAuthority::new(
+                    operation,
+                    lease,
+                    &self.binding,
+                    self.context,
+                    &input,
+                    self.request,
+                    now,
+                );
                 let acknowledged = store_call(|| {
-                    runtime.store.join_native_security_input(
-                        operation,
-                        lease,
-                        &self.binding,
-                        self.context,
-                        &input,
-                        now,
-                    )
+                    runtime
+                        .store
+                        .join_native_security_input_classified(&classification)
                 });
                 // Inspect independently even after failure or panic. A durable
                 // write does not turn a lost acknowledgement into success.
@@ -71,8 +109,9 @@ impl NativeSecurityFlowJoinAuthority<'_> {
                     history?.ok_or_else(|| invalid("native input operation readback is absent"))?;
                 let history = history
                     .ok_or_else(|| invalid("native input preparation has no recorded join"))?;
-                if current != *operation
-                    || history != acknowledged
+                if !acknowledged.belongs_to(&classification)
+                    || current != *operation
+                    || &history != acknowledged.record()
                     || history.input != input
                     || history.join.binding != self.binding
                     || history.join.operation_id != *operation.binding().operation_id()
@@ -82,6 +121,13 @@ impl NativeSecurityFlowJoinAuthority<'_> {
                     ));
                 }
                 history.validate().map_err(durable_store_error)?;
+                if acknowledged.is_refused() {
+                    // The truthful monotone join is durable. Preserve explicit
+                    // callback failure before any capture or external effect.
+                    return Err(KernelError::GuardDenied(
+                        "native semantic input authorization refused".into(),
+                    ));
+                }
                 let snapshot = history.join.snapshot.clone();
                 self.confirm(history.join)?;
                 Ok(snapshot)

@@ -10,7 +10,7 @@ use chio_control_plane::{
 };
 use chio_control_plane::{prepare_private_directory, PreparedPrivateDirectory};
 use chio_core_types::capability::attenuation::scope_hash;
-use chio_kernel::admission_operation::DurableAdmissionMode;
+use chio_kernel::admission_operation::{DurableAdmissionMode, NativeOutputRetentionProfileV1};
 use chio_kernel::execution_nonce::{ExecutionNonceConfig, ExecutionNonceStore};
 use chio_kernel::ChioKernel;
 use chio_manifest::ToolManifest;
@@ -43,6 +43,9 @@ pub(super) struct Config {
     /// Require the original operation-owned nonce before every tool dispatch.
     #[serde(default, skip_serializing_if = "is_false")]
     pub execution_nonces: bool,
+    /// Operator-selected envelope bounds retained by each original native admission.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_output_retention: Option<NativeOutputRetentionProfileV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_broker: Option<super::native_broker::Config>,
 }
@@ -420,6 +423,7 @@ pub(super) fn kernel(
     loaded: policy::LoadedPolicy,
     initializing: bool,
     execution_nonces: bool,
+    native_output_retention: Option<&NativeOutputRetentionProfileV1>,
     keyring_config: Option<&super::keyring::Config>,
 ) -> Result<KernelAssembly, CliError> {
     if loaded.default_capabilities.len() != 1 {
@@ -443,6 +447,11 @@ pub(super) fn kernel(
         .map(|config| super::keyring::HostKeyring::open(config, directory, initializing))
         .transpose()?;
     let mut kernel = build_kernel(loaded, &key);
+    if let Some(profile) = native_output_retention {
+        kernel
+            .select_native_output_retention(profile.clone())
+            .map_err(error)?;
+    }
     if execution_nonces {
         kernel.set_execution_nonce_store(
             ExecutionNonceConfig {
@@ -453,16 +462,27 @@ pub(super) fn kernel(
         );
     }
     kernel.set_capability_trust_root(key.public_key(), scope_hash(&root_scope).map_err(error)?);
+    // The sink preserves the authority's native finishing debt from its
+    // first write, including initialization, migration and backfill.
+    let native_bank = authority.native_receipt_bank()?;
     let receipts = Arc::new(match keyring_config {
-        Some(config) => chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool(
+        Some(config) => {
+            chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool_with_native_bank(
+                directory.join("receipts.db"),
+                &config.receipt_anchor_directory,
+                &native_bank,
+            )?
+        }
+        None => chio_store_sqlite::SqliteReceiptStore::open_with_native_bank(
             directory.join("receipts.db"),
-            &config.receipt_anchor_directory,
+            &native_bank,
         )?,
-        None => chio_store_sqlite::SqliteReceiptStore::open(directory.join("receipts.db"))?,
     });
     receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
     kernel
-        .set_receipt_store_handle(receipts.clone())
+        .set_native_receipt_store(
+            chio_kernel::receipt_store::NativeReceiptStoreRegistration::new(receipts.clone()),
+        )
         .map_err(error)?;
     kernel
         .validate_web3_evidence_prerequisites()
@@ -519,7 +539,11 @@ pub(super) struct Host {
     pub record: Record,
     pub runtime: ProcessRuntime,
     pub kernel: Arc<ChioKernel>,
+    #[cfg(target_os = "linux")]
     pub keyring: Option<super::keyring::HostKeyring>,
+    // Retain signer custody and the same drop order on other platforms.
+    #[cfg(not(target_os = "linux"))]
+    _keyring: Option<super::keyring::HostKeyring>,
     #[cfg(target_os = "linux")]
     pub receipts: Arc<chio_store_sqlite::SqliteReceiptStore>,
     #[cfg(target_os = "linux")]
@@ -562,6 +586,7 @@ impl Host {
             policy,
             false,
             record.config.execution_nonces,
+            record.config.native_output_retention.as_ref(),
             record
                 .config
                 .native_broker
@@ -657,7 +682,10 @@ impl Host {
             record,
             runtime,
             kernel,
+            #[cfg(target_os = "linux")]
             keyring,
+            #[cfg(not(target_os = "linux"))]
+            _keyring: keyring,
             _broker_service: broker_service,
             #[cfg(target_os = "linux")]
             receipts: _receipts,
@@ -758,6 +786,50 @@ mod tests {
                 "unexpected validation error: {failure}"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn native_output_retention_preserves_explicit_selection_and_refuses_invalid_bounds(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut value = json!({
+            "schema": SCHEMA,
+            "policy": "/policies/host.yaml",
+            "servers": [server_fixture()],
+            "limits": {"max_calls": 1, "max_processes": 1, "max_depth": 0},
+        });
+        let absent: Config = serde_json::from_value(value.clone())?;
+        assert!(absent.native_output_retention.is_none());
+        assert!(serde_json::to_value(absent)?
+            .get("native_output_retention")
+            .is_none());
+
+        let selected = json!({
+            "schema": "chio.native-output-retention.v1",
+            "overflow": "output_withheld_after_invocation",
+            "envelopes": {
+                "raw": 16384,
+                "resolved": 32768,
+                "evaluation": 65536,
+                "receipt": 131072,
+                "post_return_steps": 1,
+            },
+        });
+        value["native_output_retention"] = selected.clone();
+        let configured: Config = serde_json::from_value(value.clone())?;
+        configured.validate()?;
+        let restored: Config = serde_json::from_value(serde_json::to_value(&configured)?)?;
+        assert_eq!(
+            restored.native_output_retention,
+            configured.native_output_retention
+        );
+        assert_eq!(
+            serde_json::to_value(restored)?["native_output_retention"],
+            selected
+        );
+
+        value["native_output_retention"]["envelopes"]["raw"] = json!(0);
+        assert!(serde_json::from_value::<Config>(value).is_err());
         Ok(())
     }
 }

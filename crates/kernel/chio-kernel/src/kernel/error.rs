@@ -135,6 +135,12 @@ pub enum KernelError {
     #[error("capability issuer is not a trusted CA")]
     UntrustedIssuer,
 
+    #[error("recovery authority refused")]
+    RecoveryAuthorityDenied,
+
+    #[error("recovery mediation is required")]
+    RecoveryMediationRequired,
+
     #[error("capability issuance failed: {0}")]
     CapabilityIssuanceFailed(String),
 
@@ -426,6 +432,16 @@ impl KernelError {
                 "CHIO-KERNEL-UNTRUSTED-ISSUER",
                 serde_json::json!({}),
                 "Configure the issuing CA public key in the kernel trust set or use a capability issued by a trusted authority.",
+            ),
+            Self::RecoveryAuthorityDenied => self.report_with_context(
+                "CHIO-KERNEL-RECOVERY-AUTHORITY-DENIED",
+                serde_json::json!({}),
+                "Present a current recovery control capability for the selected scope and permission.",
+            ),
+            Self::RecoveryMediationRequired => self.report_with_context(
+                "CHIO-KERNEL-RECOVERY-MEDIATION-REQUIRED",
+                serde_json::json!({}),
+                "Complete the required native recovery setup before admitting new work.",
             ),
             Self::CapabilityIssuanceFailed(reason) => self.report_with_context(
                 "CHIO-KERNEL-CAPABILITY-ISSUANCE-FAILED",

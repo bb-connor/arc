@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn v23_upgrade_preserves_active_approval_authority_and_owned_claims() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let source = Source::new(&fixture, true)?;
     let binding = activate(&fixture, &source)?;
     let (operation, lease, credential) = setup(&fixture, "v23-owned-approval")?;
@@ -20,7 +20,7 @@ fn v23_upgrade_preserves_active_approval_authority_and_owned_claims() -> Anchore
         fixture
             .store
             .load_governed_approval_activation(&binding, &fixture.fence, now_ms())?;
-    let before = global_count(&fixture);
+    let predecessor = global_commit_rows(&*fixture.store.connection()?)?;
     drop(source);
     let Fixture {
         _temp,
@@ -52,13 +52,6 @@ fn v23_upgrade_preserves_active_approval_authority_and_owned_claims() -> Anchore
         )?,
         retained
     );
-    assert_eq!(
-        store.connection()?.query_row(
-            "SELECT COUNT(*) FROM authority_global_commits",
-            [],
-            |row| row.get::<_, i64>(0)
-        )?,
-        before
-    );
+    assert_predecessor_history_then_startup_baselines(&*store.connection()?, &predecessor, &fence)?;
     Ok(())
 }

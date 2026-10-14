@@ -2,6 +2,36 @@
 //! marker or imported fence. Historical retry results are not fresh permission.
 use super::*;
 
+enum InitializationSelection<'a> {
+    Original(&'a SecurityParticipantStateInitialization),
+    Binding(&'a chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1),
+}
+
+impl InitializationSelection<'_> {
+    fn authority(&self) -> &AdmissionIdentifier {
+        match self {
+            Self::Original(initialized) => &initialized.authority,
+            Self::Binding(binding) => binding.security_authority_id(),
+        }
+    }
+
+    fn validate(
+        &self,
+        actual: &SecurityParticipantStateInitialization,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let exact = match self {
+            Self::Original(initialized) => *initialized == actual,
+            Self::Binding(binding) => actual.admission_binding()? == **binding,
+        };
+        if !exact {
+            return Err(invalid(
+                "native egress initialization differs from selected destination",
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl SqliteAdmissionOperationStore {
     #[allow(clippy::too_many_arguments)]
     pub fn acquire_security_participant_egress(
@@ -17,7 +47,7 @@ impl SqliteAdmissionOperationStore {
         match self.mutate_security_participant_egress(
             operation,
             lease,
-            initialized,
+            InitializationSelection::Original(initialized),
             context,
             request,
             NativeEgressCommand::Acquire(plan.clone()),
@@ -44,7 +74,7 @@ impl SqliteAdmissionOperationStore {
         match self.mutate_security_participant_egress(
             operation,
             lease,
-            initialized,
+            InitializationSelection::Original(initialized),
             context,
             request,
             NativeEgressCommand::Commit(commitment.clone()),
@@ -63,16 +93,6 @@ impl SqliteAdmissionOperationStore {
         commitment: &EgressFenceCommit,
         consumption: &chio_security_types::ports::DeclassificationConsumptionEvidenceCommit,
     ) -> Result<CommittedEgressFence, AdmissionOperationStoreError> {
-        let initialized = self
-            .load_security_participant_state(
-                context.binding.security_authority_id(),
-                context.lease.store_fence(),
-                context.trusted_now_unix_ms,
-            )?
-            .ok_or_else(|| invalid("native declassification initialization is absent"))?;
-        if initialized.admission_binding()? != *context.binding {
-            return Err(invalid("native declassification initialization differs"));
-        }
         let signed = context
             .request
             .declassification_grant
@@ -84,7 +104,7 @@ impl SqliteAdmissionOperationStore {
         match self.mutate_security_participant_egress(
             context.operation,
             context.lease,
-            &initialized,
+            InitializationSelection::Binding(context.binding),
             context.security_context,
             context.request,
             command,
@@ -97,12 +117,33 @@ impl SqliteAdmissionOperationStore {
         }
     }
 
+    pub(in crate::admission_operation_store) fn commit_selected_native_egress(
+        &self,
+        context: &chio_kernel::admission_operation::NativeSecurityEgressContext<'_>,
+        commitment: &EgressFenceCommit,
+    ) -> Result<CommittedEgressFence, AdmissionOperationStoreError> {
+        match self.mutate_security_participant_egress(
+            context.operation,
+            context.lease,
+            InitializationSelection::Binding(context.binding),
+            context.security_context,
+            context.request,
+            NativeEgressCommand::Commit(commitment.clone()),
+            context.trusted_now_unix_ms,
+        )? {
+            NativeEgressResult::Committed(result) => Ok(result),
+            NativeEgressResult::Acquired(_) => {
+                Err(invalid("native commitment returned acquisition"))
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn mutate_security_participant_egress(
         &self,
         operation: &AdmissionOperationV1,
         lease: &AdmissionRecoveryLease,
-        initialized: &SecurityParticipantStateInitialization,
+        selection: InitializationSelection<'_>,
         context: &SecurityInvocationContext,
         request: &ToolCallRequest,
         command: NativeEgressCommand,
@@ -111,13 +152,21 @@ impl SqliteAdmissionOperationStore {
         let fence = command.fence().map_err(invalid)?;
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(lease.store_fence()))?;
+        // A first commitment constructs its event in this writer. Preparation
+        // is a lower bound, never a renewal of its original expiring authority.
+        let decision_at = if matches!(command, NativeEgressCommand::Acquire(_)) {
+            decision_at
+        } else {
+            physical_commit_time(&tx, decision_at)?
+        };
         super::super::observed_time(&tx, decision_at)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
         ensure_no_reserved_terminal_stage(&tx, operation.binding().operation_id())?;
         verify_catalog(&tx)?;
-        let actual = super::super::records::load_metadata(&tx, initialized.authority.as_str())?
+        let actual = super::super::records::load_metadata(&tx, selection.authority().as_str())?
             .ok_or_else(|| invalid("native egress initialization is absent"))?;
-        if &actual != initialized || actual.fence.store_uuid != lease.store_fence().store_uuid {
+        selection.validate(&actual)?;
+        if actual.fence.store_uuid != lease.store_fence().store_uuid {
             return Err(invalid(
                 "native egress initialization differs from selected destination",
             ));
@@ -144,7 +193,10 @@ impl SqliteAdmissionOperationStore {
         {
             if existing.authority != actual.authority
                 || existing.initialization != actual.digest
-                || existing.command != command
+                || !existing
+                    .command
+                    .matches_preparation(&command)
+                    .map_err(invalid)?
                 || existing.live_request_hash != live_request_hash
             {
                 return Err(invalid("native egress retry replaced its original command"));
@@ -180,7 +232,8 @@ impl SqliteAdmissionOperationStore {
                 )?)
             }
         };
-        let egress_head = head(&tx, actual.authority.as_str())?;
+        let mut segment = super::super::history::segments::SegmentSnapshot::capture(&tx, &actual)?;
+        let egress_head = segment.head(&tx, super::super::history::segments::Family::Egress)?;
         let previous = if egress_head == 0 {
             actual.digest.clone()
         } else {
@@ -189,10 +242,16 @@ impl SqliteAdmissionOperationStore {
                 .digest()?
         };
         let (mut current_rows, mut current_bytes) =
-            super::super::history::ordered::latest_totals(&tx, &actual)?;
-        let before = footprint(&tx)?;
+            super::super::history::ordered::latest_totals(&tx, &segment)?;
+        let (command, decision_at) = if matches!(command, NativeEgressCommand::Acquire(_)) {
+            (command, decision_at)
+        } else {
+            let event_at = physical_commit_time(&tx, decision_at)?;
+            (command.at_event_time(event_at).map_err(invalid)?, event_at)
+        };
         let observed_at = super::super::observed_time(&tx, decision_at)?;
         if let NativeEgressCommand::CommitDeclassified { grant, .. } = &command {
+            super::super::finishing_account::require_priced_declassification(&tx, operation)?;
             let (snapshot, generation) = crate::security_state::observe_native_flow_state(
                 &tx,
                 actual.authority.as_str(),
@@ -228,7 +287,7 @@ impl SqliteAdmissionOperationStore {
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
         super::super::cutpoint(12)?;
         // Domain callbacks cannot append initialization or journal records.
-        if footprint(&tx)? != before {
+        if !segment.unchanged(&tx)? {
             return Err(invalid(
                 "native egress domain mutation escaped its journal boundary",
             ));
@@ -273,21 +332,16 @@ impl SqliteAdmissionOperationStore {
             current_bytes,
         };
         record.validate(&tx)?;
+        super::super::storage::require_tenant_live(
+            &tx,
+            actual.authority.as_str(),
+            fence.key.tenant_id.as_str(),
+        )?;
+        crate::admission_operation_store::recovery::resources::check_intake_committing(&tx)?;
+        let append = super::super::history::segments::Append::egress(&record)?;
+        segment.prepare_pre_effect_append(&tx, &self.serving_owner, &append)?;
         record.insert(&tx)?;
-        let expected = (
-            before.0,
-            before.1,
-            before
-                .2
-                .checked_add(1)
-                .ok_or_else(|| invalid("native journal count overflow"))?,
-            before.3,
-        );
-        if head(&tx, actual.authority.as_str())? != record.sequence || footprint(&tx)? != expected {
-            return Err(invalid("native egress append introduced other history"));
-        }
-        super::super::history::ordered::validate_history_bounds(&tx, actual.authority.as_str())?;
-        super::super::storage::verify_no_orphans(&tx)?;
+        segment.appended(&tx, append.entry())?;
         super::super::cutpoint(13)?;
         self.serving_owner
             .append_global_commit(
@@ -298,26 +352,16 @@ impl SqliteAdmissionOperationStore {
                 record.sequence,
             )
             .map_err(map_owner_error)?;
-        if footprint(&tx)?
-            != (
-                expected.0,
-                expected.1,
-                expected.2,
-                expected
-                    .3
-                    .checked_add(1)
-                    .ok_or_else(|| invalid("native global count overflow"))?,
-            )
-        {
-            return Err(invalid(
-                "native egress global append introduced other history",
-            ));
-        }
+        segment.committed(&tx, append.entry())?;
         super::super::cutpoint(14)?;
-        let commit_at = super::super::observed_time(&tx, observed_at.max(decision_at))?;
+        #[cfg(test)]
+        let _commit_clock =
+            super::super::super::tests::security_participant_state::egress_commit_clock();
+        let commit_at = physical_commit_time(&tx, observed_at.max(decision_at))?;
+        let commit_at = super::super::observed_time(&tx, commit_at)?;
         record
             .command
-            .validate_observation(commit_at)
+            .validate_commit_authority(commit_at)
             .map_err(invalid)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, commit_at)?;
         self.commit_write(tx)?;
@@ -332,10 +376,15 @@ impl SqliteAdmissionOperationStore {
     }
 }
 
-fn footprint(
-    connection: &Connection,
-) -> Result<(i64, i64, i64, i64), AdmissionOperationStoreError> {
-    connection.query_row("SELECT (SELECT COUNT(*) FROM security_participant_state_initializations),
-        (SELECT COUNT(*) FROM security_participant_state_mutations), (SELECT COUNT(*) FROM security_participant_egress_events),
-        (SELECT COUNT(*) FROM authority_global_commits)", [], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))).map_err(sqlite_error)
+fn physical_commit_time(
+    tx: &Transaction<'_>,
+    prepared_at: u64,
+) -> Result<u64, AdmissionOperationStoreError> {
+    let observed = super::super::super::schema::observe_authority_time(tx)?;
+    if prepared_at > observed {
+        // Preserve the existing future-clock bound. Only time spent waiting
+        // before a new physical event is excluded from evidence skew.
+        super::super::super::schema::authority_validation_time(tx, prepared_at)?;
+    }
+    Ok(observed.max(prepared_at))
 }

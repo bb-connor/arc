@@ -393,7 +393,7 @@ fn retained_request_v9_migration_preserves_legacy_commits_without_inventing_cont
         authority,
         store,
         fence,
-    } = fixture();
+    } = pre_recovery_fixture();
     let (operation, request) = original(&fence)?;
     store.begin(&operation, &fence, now_ms())?;
     drop(store);
@@ -526,7 +526,7 @@ fn retained_request_v10_migration_adds_bounded_lookup_and_preserves_original_byt
         authority,
         store,
         fence,
-    } = fixture();
+    } = pre_recovery_fixture();
     let (operation, request) = original(&fence)?;
     store.begin_with_retained_tool_request(&operation, &request, &fence, now_ms())?;
     drop(store);

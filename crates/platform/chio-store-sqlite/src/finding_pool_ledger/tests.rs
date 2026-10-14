@@ -3,25 +3,22 @@ use chio_core::crypto::{Ed25519Backend, Keypair};
 use chio_test_support::prelude::*;
 
 fn rollback_anchor_root() -> &'static Path {
-    static ROOT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
-    ROOT.get_or_init(|| {
-        let root = Path::new("/dev/shm").join(format!(
+    static ROOT: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
+    let anchor = ROOT.get_or_init(|| {
+        let anchor = crate::store_connection::test_support::rollback_anchor_tempdir(&format!(
             "chio-finding-pool-unit-anchors-{}",
             std::process::id()
-        ));
-        let mut builder = std::fs::DirBuilder::new();
+        ))
+        .test_expect("create test rollback anchor root");
         #[cfg(unix)]
         {
-            use std::os::unix::fs::DirBuilderExt as _;
-            builder.mode(0o700);
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(anchor.path(), std::fs::Permissions::from_mode(0o700))
+                .test_expect("secure test rollback anchor root");
         }
-        if let Err(error) = builder.create(&root) {
-            if error.kind() != std::io::ErrorKind::AlreadyExists {
-                panic!("create test rollback anchor root: {error}");
-            }
-        }
-        root
-    })
+        anchor
+    });
+    anchor.path()
 }
 
 #[cfg(unix)]

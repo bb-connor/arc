@@ -69,8 +69,55 @@ fn native_reader_cannot_fill_missing_principal_from_colliding_authority() -> Tes
         FlowMutation::native_for_test(&tx, B).join(&join)?;
         tx.execute("DELETE FROM security_participant_state_principal_flow_state WHERE security_authority_id = ?1", [A])?;
         assert!(load_scoped_flow_snapshot(FlowReader::native(&tx, A), &join.key).is_err());
+        assert!(load_observed_flow_snapshot(FlowReader::native(&tx, A), &join.key).is_err());
         assert!(verify_native_flow_state(&tx, A).is_err());
         verify_native_flow_state(&tx, B)?;
+        tx.rollback()?;
+        Ok(())
+    })
+}
+
+#[test]
+fn native_inherited_observation_requires_its_own_epoch_and_never_creates_context() -> TestResult {
+    with_flow_sql_fixture(false, |connection| {
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut first = request("first-inherited-source")?;
+        first.principal_join = label("principal")?;
+        let original = FlowMutation::native_for_test(&tx, A).join(&first)?;
+        let mut second = first.key.clone();
+        second.lineage_id = LineageId::new("new-authenticated-lineage")?;
+        let before = tx.total_changes();
+        assert!(!isolation_epoch_exists(
+            FlowReader::native(&tx, A),
+            &second
+        )?);
+        assert_eq!(
+            load_context_generation(FlowReader::native(&tx, A), &second)?,
+            None
+        );
+        let inherited = load_observed_flow_snapshot(FlowReader::native(&tx, A), &second)?
+            .ok_or("inherited source absent")?;
+        assert_eq!(inherited.principal_label, original.principal_label);
+        assert_eq!(inherited.lineage_label, InformationLabel::bottom());
+        assert_eq!(inherited.session_label, original.session_label);
+        assert_eq!(inherited.context_generation, original.context_generation);
+        assert_eq!(
+            load_observed_flow_snapshot(FlowReader::native(&tx, B), &second)?,
+            None
+        );
+        assert_eq!(
+            load_context_generation(FlowReader::native(&tx, A), &second)?,
+            None
+        );
+        assert!(!isolation_epoch_exists(
+            FlowReader::native(&tx, A),
+            &second
+        )?);
+        assert_eq!(tx.total_changes(), before);
+        // The strict custody reader still refuses an unjoined lineage. A
+        // conservative observation cannot authorize egress or create a fence.
+        assert!(load_scoped_flow_snapshot(FlowReader::native(&tx, A), &second).is_err());
+        verify_native_flow_state(&tx, A)?;
         tx.rollback()?;
         Ok(())
     })

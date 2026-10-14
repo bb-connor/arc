@@ -8,13 +8,16 @@ trap 'rm -rf "${fixture_root}"' EXIT
 
 copy_fixture() {
   rm -rf "${fixture_root}/deploy"
-  mkdir -p "${fixture_root}/deploy/docker/chio-workspace" "${fixture_root}/deploy/sidecar"
+  mkdir -p "${fixture_root}/deploy/docker/chio-workspace" \
+    "${fixture_root}/deploy/sidecar" "${fixture_root}/deploy/cognition-market"
   cp "${repo_root}/Cargo.toml" "${fixture_root}/Cargo.toml"
   cp "${repo_root}/rust-toolchain.toml" "${fixture_root}/rust-toolchain.toml"
   cp "${repo_root}/deploy/docker/Dockerfile" "${fixture_root}/deploy/docker/Dockerfile"
   cp "${repo_root}/deploy/docker/Dockerfile.sidecar" "${fixture_root}/deploy/docker/Dockerfile.sidecar"
   cp "${repo_root}/deploy/docker/Dockerfile.tee" "${fixture_root}/deploy/docker/Dockerfile.tee"
   cp "${repo_root}/deploy/sidecar/Dockerfile" "${fixture_root}/deploy/sidecar/Dockerfile"
+  cp "${repo_root}/deploy/cognition-market/Dockerfile" \
+    "${fixture_root}/deploy/cognition-market/Dockerfile"
   cp "${repo_root}/deploy/docker/chio-workspace/Cargo.toml" \
     "${fixture_root}/deploy/docker/chio-workspace/Cargo.toml"
 }
@@ -31,22 +34,27 @@ python3 "${checker}"
 copy_fixture
 python3 "${checker}" --repo-root "${fixture_root}"
 
-sed -i 's/ARG RUST_VERSION=1\.94\.1/ARG RUST_VERSION=1.93/' \
+sed -i 's/ARG RUST_VERSION=1\.95\.0/ARG RUST_VERSION=1.93/' \
   "${fixture_root}/deploy/docker/Dockerfile.sidecar"
 expect_rejection "a stale production Rust version"
 
 copy_fixture
-sed -i '0,/rust-version = "1\.94"/s//rust-version = "1.93"/' \
+sed -i 's/ARG RUST_VERSION=1\.95\.0/ARG RUST_VERSION=1.94.1/' \
+  "${fixture_root}/deploy/cognition-market/Dockerfile"
+expect_rejection "a stale cognition-market Rust version"
+
+copy_fixture
+sed -i '0,/rust-version = "1\.95"/s//rust-version = "1.93"/' \
   "${fixture_root}/deploy/docker/chio-workspace/Cargo.toml"
 expect_rejection "a stale generated workspace MSRV"
 
 copy_fixture
-sed -i '0,/sha256:797631f9/s//sha256:897631f9/' \
+sed -i '0,/sha256:064dfc92/s//sha256:164dfc92/' \
   "${fixture_root}/deploy/docker/Dockerfile.sidecar"
 expect_rejection "a divergent Alpine builder digest"
 
 copy_fixture
-sed -i 's/@sha256:cf9dd0ec73e75f827fe59123fff9dc65af1a1c8363c3c31ee8d7f8ad0b6a5fb2//' \
+sed -i 's/@sha256:d7482085ff5b415f84dba5647ae71606650bdef00db7aeb69f4b3d170c3e4082//' \
   "${fixture_root}/deploy/sidecar/Dockerfile"
 expect_rejection "an unpinned production Rust builder"
 

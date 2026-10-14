@@ -229,7 +229,11 @@ fn handle_action(
         AdmissionAuthorityAction::ListRecoverable => {
             let request: ListRecoverableWire = decode(payload)?;
             let operations = operations
-                .list_recoverable(request.not_after_unix_ms, request.limit)
+                .list_recoverable(
+                    request.not_after_unix_ms,
+                    request.after_operation_id.as_ref(),
+                    request.limit,
+                )
                 .map_err(operation_store_error)?
                 .into_iter()
                 .map(|operation| operation.to_persisted())
@@ -803,9 +807,10 @@ fn operation_store_error(error: AdmissionOperationStoreError) -> AdmissionAuthor
         AdmissionOperationStoreError::Unavailable(_) => AdmissionAuthorityErrorCode::Unavailable,
         AdmissionOperationStoreError::Fenced => AdmissionAuthorityErrorCode::Fenced,
         AdmissionOperationStoreError::NotFound => AdmissionAuthorityErrorCode::NotFound,
-        AdmissionOperationStoreError::Invariant(_) | AdmissionOperationStoreError::Operation(_) => {
-            AdmissionAuthorityErrorCode::Invariant
-        }
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired
+        | AdmissionOperationStoreError::Invariant(_)
+        | AdmissionOperationStoreError::Operation(_) => AdmissionAuthorityErrorCode::Invariant,
         AdmissionOperationStoreError::OutcomeUnknown(_) => {
             AdmissionAuthorityErrorCode::OutcomeUnknown
         }

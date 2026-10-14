@@ -193,6 +193,7 @@ RUST_VERIFICATION_STATIC_INPUTS = [
     "scripts/check-creusot-body-sync.sh",
     "scripts/check-creusot-smoke.sh",
     "scripts/check-kani-smoke.sh",
+    "scripts/check-kani-toolchain.sh",
     "scripts/check-creusot-core.sh",
     "scripts/check-kani-core.sh",
     "scripts/check-kani-public-core.sh",

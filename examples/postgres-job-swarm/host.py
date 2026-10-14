@@ -6,7 +6,7 @@ import os
 import select
 import subprocess
 
-from chio_process.launch import provision_native_demo
+from chio_process.launch import NativeDemoProvisionError, provision_native_demo
 
 ROLES = ("superseded", "replacement")
 
@@ -34,6 +34,50 @@ def command(arguments, directory, *, env=None, input=None):
     return result.stdout
 
 
+def review_tool_surface(arguments, directory, environment, mode):
+    """Review metadata with the fixture's explicit database environment only."""
+    requests = (
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {},
+                "clientInfo": {"name": "chio-postgres-job-review", "version": "1"},
+            },
+        },
+        {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+    )
+    output = command(
+        arguments,
+        directory,
+        env=environment,
+        input="".join(json.dumps(request) + "\n" for request in requests).encode(),
+    )
+    if len(output) > 4 * 1024 * 1024:
+        raise ValueError("gateway metadata exceeded its review bound")
+    replies = {}
+    for line in output.splitlines():
+        reply = json.loads(line)
+        if (
+            not isinstance(reply, dict)
+            or reply.get("jsonrpc") != "2.0"
+            or reply.get("id") not in (1, 2)
+            or reply["id"] in replies
+            or "error" in reply
+            or not isinstance(reply.get("result"), dict)
+        ):
+            raise ValueError("gateway metadata response was not an expected review reply")
+        replies[reply["id"]] = reply["result"]
+    if set(replies) != {1, 2} or not isinstance(replies[2].get("tools"), list):
+        raise ValueError("gateway did not supply its reviewed tool surface")
+    fixture = directory / ("reviewed-" + mode + "-tools.json")
+    write(fixture, {"tools": replies[2]["tools"]})
+    return fixture
+
+
 def prepare(chio, gateway, tenant, directory, environment, *, operator_command=None):
     chio = chio.resolve(strict=True)
     gateway = gateway.resolve(strict=True)
@@ -53,19 +97,47 @@ capabilities:
         operations: [invoke, delegate]
         ttl: 3600
 """)
-    servers = [
-        provision_native_demo(
-            chio,
-            server,
+    servers = []
+    for server, mode in (("jobs", "worker"), ("jobs-admin", "operator")):
+        native_command = (
             operator_command
             if mode == "operator" and operator_command is not None
-            else [str(gateway), mode, tenant],
-            directory / ("launch-" + mode),
-            directory,
-            environment=environment,
+            else [str(gateway), mode, tenant]
         )
-        for server, mode in (("jobs", "worker"), ("jobs-admin", "operator"))
-    ]
+        stage = "gateway_metadata_review"
+        try:
+            fixture = review_tool_surface(native_command, directory, environment, mode)
+            stage = "native_demo_provision"
+            servers.append(
+                provision_native_demo(
+                    chio,
+                    server,
+                    native_command,
+                    directory / ("launch-" + mode),
+                    directory,
+                    environment=environment,
+                    tools_fixture=fixture,
+                )
+            )
+        except Exception as error:
+            # Only fixed phrases and an exit status may leave the private fixture.
+            # Child stdout, argv, database URLs and environment stay private.
+            write(
+                directory / "launch-diagnostics.json",
+                {
+                    "schema": "chio.postgres-job-swarm.launch-diagnostic.v1",
+                    "stage": stage,
+                    "exit_status": (
+                        error.returncode if isinstance(error, NativeDemoProvisionError) else None
+                    ),
+                    "diagnostic": (
+                        error.diagnostic
+                        if isinstance(error, NativeDemoProvisionError)
+                        else "gateway metadata review failed"
+                    ),
+                },
+            )
+            raise
     write(
         directory / "host-config.json",
         {

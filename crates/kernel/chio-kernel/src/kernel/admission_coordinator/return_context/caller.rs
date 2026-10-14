@@ -464,6 +464,11 @@ impl ChioKernel {
             request_material_digest: wire.request_material_digest,
             matched_grant_index: wire.matched_grant_index,
             stream_limits,
+            native_output_retention: admission
+                .original_retained_request()
+                .and_then(|original| original.native_output_retention())
+                .cloned()
+                .map(Box::new),
             admitted_metadata: wire.admitted_metadata,
             purchase_replay_metadata: wire.purchase_replay_metadata,
             recovery_replay_metadata: wire.recovery_replay_metadata,

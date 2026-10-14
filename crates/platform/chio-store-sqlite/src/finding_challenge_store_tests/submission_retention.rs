@@ -294,7 +294,8 @@ fn current_schema_rejects_a_challenge_missing_its_submission() {
 
 #[test]
 fn offline_repair_atomically_restores_v13_exact_submission_bytes() {
-    let temp = tempfile::tempdir().expect("create repair directory");
+    let temp = tempfile::tempdir_in(std::env::temp_dir().canonicalize().expect("temp root"))
+        .expect("create repair directory");
     secure_temp_directory(temp.path());
     let database = temp.path().join("challenge-repair.sqlite3");
     let envelope = br#"{"challenge":"legacy"}"#;
@@ -405,7 +406,8 @@ fn offline_repair_atomically_restores_v13_exact_submission_bytes() {
 
 #[test]
 fn offline_repair_upgrades_earliest_accepted_legacy_submission_schema() {
-    let temp = tempfile::tempdir().expect("create legacy repair directory");
+    let temp = tempfile::tempdir_in(std::env::temp_dir().canonicalize().expect("temp root"))
+        .expect("create legacy repair directory");
     secure_temp_directory(temp.path());
     let database = temp.path().join("challenge-repair-v7.sqlite3");
     let envelope = br#"{"challenge":"legacy-v7"}"#;

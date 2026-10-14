@@ -495,6 +495,14 @@ fn sealed_launch_preparation_is_secret_free_and_owns_descriptors_without_launchi
 
     assert_eq!(evidence.manifest_digest(), manifest_digest.as_str());
     assert_eq!(
+        evidence.base_profile_digest(),
+        compiler_receipt_bindings.profile_digest.as_str()
+    );
+    assert_eq!(
+        evidence.base_plan_digest(),
+        compiler_receipt_bindings.plan_digest.as_str()
+    );
+    assert_eq!(
         evidence.helper_binding_digest(),
         helper_binding_digest.as_str()
     );
@@ -524,6 +532,8 @@ fn sealed_launch_preparation_is_secret_free_and_owns_descriptors_without_launchi
             .map(String::as_str)
             .collect::<BTreeSet<_>>(),
         [
+            "base_plan_digest",
+            "base_profile_digest",
             "exact_requirements_match",
             "fd_table_digest",
             "helper_binding_digest",

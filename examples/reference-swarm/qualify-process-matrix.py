@@ -268,7 +268,7 @@ def main():
                 "bundle_sha256": digest(artifact),
                 "local_matrix_verified": True,
                 "rejected_substitutions": len(negative["checks"]),
-                "m5_acceptance_complete": False,
+                "qualification_complete": False,
             }
         )
     )

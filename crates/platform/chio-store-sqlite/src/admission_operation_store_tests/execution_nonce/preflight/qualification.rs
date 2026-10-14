@@ -136,8 +136,10 @@ fn durable_nonce_preflight_rolls_back_physical_and_operation_sql_cutpoints() -> 
     ] {
         let mut fixture = unowned_prepared_nonce_fixture(None)?;
         let lease = lease(&fixture)?;
+        // A temporary trigger reaches the exact SQL cutpoint without mutating
+        // the canonical catalog the production owner validates on entry.
         fixture.fixture.store.connection()?.execute_batch(&format!(
-            "CREATE TRIGGER preflight_cutpoint BEFORE {mutation} ON {table}
+            "CREATE TEMP TRIGGER preflight_cutpoint BEFORE {mutation} ON main.{table}
              BEGIN SELECT RAISE(ABORT, 'injected preflight cutpoint'); END;"
         ))?;
         let error = fixture
@@ -394,10 +396,21 @@ fn durable_nonce_preflight_requires_original_provenance_and_cannot_start_after_i
 ) -> TestResult {
     let fixture = unowned_prepared_nonce_fixture(None)?;
     let lease = lease(&fixture)?;
-    fixture.fixture.store.connection()?.execute_batch(
-        "DROP TRIGGER admission_operation_tool_requests_no_delete;
-         DELETE FROM admission_operation_tool_requests;",
-    )?;
+    {
+        let connection = fixture.fixture.store.connection()?;
+        let restore: String = connection.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = 'admission_operation_tool_requests_no_delete'",
+            [],
+            |row| row.get(0),
+        )?;
+        connection.execute_batch(
+            "DROP TRIGGER admission_operation_tool_requests_no_delete;
+             DELETE FROM admission_operation_tool_requests;",
+        )?;
+        // Preserve the exact catalog shape so preflight must fail on the
+        // missing original provenance row, not a canonical schema refusal.
+        connection.execute_batch(&restore)?;
+    }
     let error = fixture
         .fixture
         .store

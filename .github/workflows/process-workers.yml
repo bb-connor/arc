@@ -330,7 +330,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
-      RUSTUP_TOOLCHAIN: "1.94.1"
+      RUSTUP_TOOLCHAIN: "1.95.0"
       CARGO_BUILD_JOBS: "2"
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_RELEASE_OPT_LEVEL: "3"
@@ -358,7 +358,7 @@ jobs:
           test -z "$(git status --porcelain)"
           test "$(git config --get core.sparseCheckout || true)" != true
       - name: Install the pinned Rust toolchain
-        run: rustup toolchain install 1.94.1 --profile minimal
+        run: rustup toolchain install 1.95.0 --profile minimal
       - uses: ./.github/actions/apt-install
         with:
           packages: protobuf-compiler

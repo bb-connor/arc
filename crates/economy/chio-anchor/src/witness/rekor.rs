@@ -1008,7 +1008,7 @@ mod tests {
             envelope.get("payload_type").is_none(),
             "snake_case payload_type leaked into wire shape: {envelope}"
         );
-        // P1: intoto v0.0.2 requires at least one publicKey/sig entry.
+        // in-toto v0.0.2 requires at least one publicKey/sig entry.
         assert!(
             envelope["signatures"].is_array(),
             "DSSE envelope must carry a signatures array: {envelope}"

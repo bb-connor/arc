@@ -156,6 +156,7 @@ impl ChioKernel {
                 admission,
                 binding,
                 context,
+                request,
                 requested_now: now,
                 attempted: Cell::new(false),
                 failed: Cell::new(false),

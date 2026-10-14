@@ -726,7 +726,7 @@ fn record_checkpoint_publication_trust_anchor_binding_is_idempotent_and_visible_
         ),
         trust_anchor_ref: "anchor-root-1".to_string(),
         signer_cert_ref: "cert-chain-1".to_string(),
-        publication_profile_version: "phase4-pilot".to_string(),
+        publication_profile_version: "evidence-pilot.v1".to_string(),
     };
 
     store

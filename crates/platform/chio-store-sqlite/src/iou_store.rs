@@ -101,7 +101,7 @@ impl SqliteIouEnvelopeStore {
 
     fn connection(
         &self,
-    ) -> Result<r2d2::PooledConnection<SqliteConnectionManager>, IouEnvelopeStoreError> {
+    ) -> Result<crate::receipt_store::SqliteStoreConnection, IouEnvelopeStoreError> {
         let connection =
             receipt_pool_connection(&self.pool, self.receipt_sink_qualification.as_deref())
                 .map_err(|error| IouEnvelopeStoreError::Backend(error.to_string()))?;
@@ -461,10 +461,9 @@ mod tests {
     #[test]
     fn qualified_alongside_store_rejects_iou_rollback() {
         let dir = tempdir().unwrap();
-        let anchor_dir = tempfile::Builder::new()
-            .prefix("chio-iou-anchor")
-            .tempdir_in("/dev/shm")
-            .unwrap();
+        let anchor_dir =
+            crate::store_connection::test_support::rollback_anchor_tempdir("chio-iou-anchor")
+                .unwrap();
         #[cfg(unix)]
         for root in [dir.path(), anchor_dir.path()] {
             use std::os::unix::fs::PermissionsExt as _;

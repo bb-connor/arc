@@ -298,6 +298,8 @@ if [[ "$args" == *" --all-targets "* ]] ||
     )
     print_target "Running unittests src/lib.rs (/tmp/chio_cage-lib)" "${lib_tests[@]}"
     print_target "Running unittests src/bin/chio-cage-init.rs (/tmp/chio_cage_init-bin)"
+    print_target "Running unittests src/bin/chio-confined-reader.rs (/tmp/chio_confined_reader)"
+    print_target "Running unittests examples/confined-return-canary.rs (/tmp/confined_return_canary)"
     print_target "Running tests/enforcement_evidence.rs (/tmp/enforcement_evidence)" "${evidence_tests[@]}"
     print_target "Running tests/linux_compile.rs (/tmp/linux_compile)" "${compile_tests[@]}"
     printf '     Running tests/linux_enforcement.rs (/tmp/linux_enforcement)\n'

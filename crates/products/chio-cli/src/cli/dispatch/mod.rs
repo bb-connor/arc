@@ -285,6 +285,7 @@ pub(crate) fn run() {
         Commands::Passport { command } => dispatch_passport(command, json_output, receipt_db, budget_db, control_url, control_token),
         Commands::Proof { command } => dispatch_proof(command, json_output),
         Commands::Commerce { command } => dispatch_commerce(command, json_output),
+        Commands::Recovery { command } => crate::recovery::run(command),
         Commands::Workflow { command } => dispatch_workflow(command, json_output),
         Commands::Cert { command } => dispatch_cert(command, json_output, authority_seed_file),
         Commands::Reputation { command } => dispatch_reputation(command, json_output, receipt_db, budget_db, authority_seed_file, control_url, control_token),

@@ -19,7 +19,7 @@ env:
   # Nightly-tier proptest case count; the PR-tier (256) lives in ci.yml.
   PROPTEST_CASES: "4096"
   # These pins must agree with formal-pr-smoke.yml.
-  CHIO_KANI_VERSION: 0.67.0
+  CHIO_KANI_VERSION: 0.68.0
   CHIO_ELAN_VERSION: v4.2.1
   CHIO_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
   CHIO_AENEAS_RELEASE_TAG: build-2026.04.22.215158-38d10a22642d75d051e14006cc6e45055381f10e
@@ -189,7 +189,7 @@ jobs:
   kani-public-nightly:
     name: kani-public-nightly (lanes.pr + lanes.nightly_only)
     # owner: Chio maintainers
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     concurrency:
       group: ${{ github.event_name == 'pull_request' && format('pr-{0}-kani-public-nightly', github.ref) || format('main-{0}-kani-public-nightly', github.sha) }}
@@ -213,14 +213,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
 
-      - name: Install cargo-kani
-        env:
-          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-kani-tool-target
-        run: |
-          set -euo pipefail
-          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
-          cargo kani setup
-          cargo kani --version
+      - name: Install Kani (patched source build)
+        uses: ./.github/actions/setup-kani
+
+      - name: Verify Kani version
+        run: bash scripts/check-kani-toolchain.sh
 
       - name: Run chio-kernel-core lanes.pr + lanes.nightly_only Kani harnesses
         shell: bash
@@ -264,7 +261,7 @@ jobs:
   formal-qualification:
     name: formal-qualification (proof report + portable + SDK parity)
     # owner: Chio maintainers
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -369,6 +366,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
 
+      - name: Install Kani (patched source build)
+        uses: ./.github/actions/setup-kani
+
       - name: Install Rust verification tools
         shell: bash
         env:
@@ -377,8 +377,6 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-verification-tool-target
         run: |
           set -euo pipefail
-          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
-          cargo kani setup
           sudo apt-get update
           sudo apt-get install -y opam
           opam init --disable-sandboxing --bare -y
@@ -389,7 +387,7 @@ jobs:
             ./INSTALL
           )
           cargo creusot version
-          cargo kani --version
+          bash scripts/check-kani-toolchain.sh
 
       - name: Install portable qualification dependencies
         run: |

@@ -580,16 +580,52 @@ fn credit_authorization_rollback_restores_budget_reservation_and_account(
     let fixture = fixture();
     let authorities = CreditAuthorityFixture::new()?;
     let now = now_ms();
-    let operation = broker_registered_credit_operation(&fixture, "request-credit-rollback", now)?;
+    // A provisioned account without reservation history is not a servable
+    // state, so the rollback scenario starts from one exact authorized
+    // reservation and verifies the failed authorization restores it.
+    let seeded = broker_registered_credit_operation(&fixture, "request-credit-rollback-seed", now)?;
+    let seeded_request = authorities.reservation_request(
+        seeded.binding().operation_id().as_str(),
+        seeded.binding().request_id().as_str(),
+        "nonce-credit-rollback-seed",
+        SOURCE_VERSION,
+        now + 3,
+    )?;
+    provision_account(&fixture, &seeded_request, now + 3)?;
+    let seeded_lease = claim(&fixture, &seeded, "sqlite-credit-authorizer", now + 4);
+    let (decision, seeded_operation) = fixture.store.authorize_budget_and_commit_admission(
+        &seeded,
+        &seeded_lease,
+        budget_authorization_request(&fixture, &seeded, "credit-rollback-seed"),
+        None,
+        Some(seeded_request),
+        &fixture.fence,
+        now + 5,
+    )?;
+    assert!(matches!(
+        decision,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    let seeded_reservation = fixture
+        .store
+        .load_credit_exposure_reservation(seeded.binding().operation_id().as_str())?
+        .ok_or("seeded credit reservation was not persisted")?;
+    assert_eq!(
+        seeded_reservation.state(),
+        CreditExposureReservationStateV1::Reserved
+    );
+    assert_eq!(account_state(&fixture)?, (1, 0, 1_000, 8, 8));
+
+    let operation =
+        broker_registered_credit_operation(&fixture, "request-credit-rollback", now + 10)?;
     let credit_request = authorities.reservation_request(
         operation.binding().operation_id().as_str(),
         operation.binding().request_id().as_str(),
         "nonce-credit-rollback",
-        SOURCE_VERSION,
-        now + 3,
+        SOURCE_VERSION + 1,
+        now + 13,
     )?;
-    provision_account(&fixture, &credit_request, now + 3)?;
-    let lease = claim(&fixture, &operation, "sqlite-credit-authorizer", now + 4);
+    let lease = claim(&fixture, &operation, "sqlite-credit-authorizer", now + 14);
     {
         let connection = fixture.store.connection()?;
         connection.execute_batch(
@@ -611,14 +647,21 @@ fn credit_authorization_rollback_restores_budget_reservation_and_account(
         None,
         Some(credit_request),
         &fixture.fence,
-        now + 5,
+        now + 15,
     );
-    assert!(result.is_err());
+    assert!(
+        matches!(
+            &result,
+            Err(AdmissionCaptureError::Invariant(detail))
+                if detail.contains("injected credit authorization rollback")
+        ),
+        "authorization did not reach the injected rollback: {result:?}"
+    );
     fixture
         .store
         .connection()?
         .execute_batch("DROP TRIGGER fail_credit_authorization_admission_commit")?;
-    assert_eq!(account_state(&fixture)?, (1, 0, 0, 7, 7));
+    assert_eq!(account_state(&fixture)?, (1, 0, 1_000, 8, 8));
     assert_eq!(
         authorization_mutation_counts(&fixture, &operation, "credit-rollback")?,
         (0, 0, 0, 0)
@@ -630,10 +673,24 @@ fn credit_authorization_rollback_restores_budget_reservation_and_account(
     assert_eq!(
         fixture
             .store
+            .load_credit_exposure_reservation(seeded.binding().operation_id().as_str())?
+            .ok_or("rollback lost the original signed reservation history")?,
+        seeded_reservation
+    );
+    assert_eq!(
+        fixture
+            .store
             .load_by_operation_id(operation.binding().operation_id())?
             .ok_or("credit rollback operation was lost")?
             .state(),
         AdmissionOperationState::BrokerAttemptRegistered
+    );
+    assert_eq!(
+        fixture
+            .store
+            .load_by_operation_id(seeded.binding().operation_id())?
+            .ok_or("seeded credit operation was lost")?,
+        seeded_operation
     );
     Ok(())
 }

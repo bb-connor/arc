@@ -1622,7 +1622,7 @@ fn policy_deny_is_not_recorded_as_a_dispatch_failure() {
     // A normal policy/capability deny is an expected fail-closed decision. It is
     // tracked by the guard-verdict metrics and must NOT increment
     // chio_dispatch_failure_total, or one ordinary rejected request would page
-    // the P0 fail-open/dispatch-failure alert.
+    // the highest-priority fail-open/dispatch-failure alert.
     let query = HashMap::new();
     let denied = authority()
         .evaluate(HttpAuthorityInput {

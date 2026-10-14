@@ -7,6 +7,7 @@ mod cumulative_model;
 mod event_projection;
 mod model;
 mod native_capture;
+pub(crate) use native_capture::authenticate_native_budget_capture;
 mod nonce;
 mod preflight;
 pub(crate) use nonce::{
@@ -18,7 +19,9 @@ pub(crate) use preflight::{
 };
 mod transitions;
 
-pub(crate) use transitions::AdmissionCaptureBinding;
+pub(crate) use transitions::{
+    composite_budget_text_bounds, AdmissionCaptureBinding, CompositeBudgetTextBounds,
+};
 mod validation;
 
 use cumulative_model::*;

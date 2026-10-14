@@ -1,6 +1,69 @@
 // Original consumption survives failed capture; output and use-outcome roll back together.
 use super::*;
 
+#[test]
+fn native_egress_event_is_stamped_after_queued_valid_declassification() -> TestResult {
+    let (fixture, _) = profile(false, 300)?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let prepared_at = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let _observer = fixture
+        .kernel
+        .observe_native_egress_commit_for_test(Arc::new({
+            let calls = calls.clone();
+            let prepared_at = prepared_at.clone();
+            move |time| {
+                if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                    prepared_at.store(time, Ordering::SeqCst);
+                    // The signed grant, native lease and fence remain valid for
+                    // much longer than this real scheduling delay. Only the old
+                    // pre-writer event clock is stale at the physical writer.
+                    std::thread::sleep(std::time::Duration::from_millis(6_050));
+                }
+            }
+        }))?;
+    let response = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
+    assert!(
+        calls.load(Ordering::SeqCst) > 0,
+        "the prepared event was not observed"
+    );
+    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    let store = fixture.authority.admission_operation_store();
+    let fence = fixture.authority.mutation_fence();
+    let (operation, _) = store
+        .load_unambiguous_retained_tool_request(
+            &AdmissionIdentifier::try_new("request", &fixture.request.request_id)?,
+            &fence,
+            now_ms()?,
+        )?
+        .ok_or("queued original absent")?;
+    let (_, history) = store
+        .load_native_security_egress(operation.binding().operation_id(), &fence, now_ms()?)?
+        .ok_or("queued original egress absent")?;
+    let commitment = history
+        .ok_or("queued original history absent")?
+        .commitment
+        .ok_or("queued original commitment absent")?;
+    let consumption = commitment
+        .declassification
+        .ok_or("queued original consumption absent")?;
+    assert!(
+        commitment.commitment.committed_at_unix_ms > prepared_at.load(Ordering::SeqCst) + 5_000,
+    );
+    assert_eq!(
+        consumption.consumption.consumed_at_unix_ms,
+        commitment.commitment.committed_at_unix_ms,
+    );
+    assert_eq!(
+        consumption.receipt.occurred_at_unix_ms,
+        commitment.commitment.committed_at_unix_ms,
+    );
+    assert!(operation.dispatch_commit().is_some());
+    Ok(())
+}
+
 fn pending_use(fixture: &Fixture) -> TestResult {
     let connection = rusqlite::Connection::open_with_flags(
         fixture._directory.path().join("admission.db"),
@@ -127,5 +190,49 @@ fn native_declassification_output_fault_rolls_back_outcome_without_refunding_use
         .get_invocation_quota_usage(&BudgetQuotaKey::grant(&fixture.request.capability.id, 0))?
         .ok_or("captured quota")?;
     assert_eq!(usage.captured_invocations, 1);
+    Ok(())
+}
+
+#[test]
+fn missing_disclosure_grant_attests_native_policy_before_dispatch() -> TestResult {
+    let (mut fixture, _) = profile(false, 300)?;
+    let original_capability = fixture.request.capability.clone();
+    fixture.request.declassification_grant = None;
+    fixture.request.execution_nonce = None;
+    let response = fixture
+        .kernel
+        .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.output.is_none());
+    assert!(response.receipt.verify_signature()?);
+    assert_eq!(response.receipt.capability_id, original_capability.id);
+    let (operation, retained) = fixture
+        .authority
+        .admission_operation_store()
+        .load_unambiguous_retained_tool_request(
+            &AdmissionIdentifier::try_new("request_id", &fixture.request.request_id)?,
+            &fixture.authority.mutation_fence(),
+            now_ms()?,
+        )?
+        .ok_or("native missing-grant original custody absent")?;
+    assert_eq!(
+        operation.state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert!(operation.dispatch_commit().is_none());
+    retained.validate_request_material(&fixture.request)?;
+    retained.validate_native_security_context(&fixture.context)?;
+    retained.validate_native_security_authority(&fixture.binding)?;
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    assert!(
+        response
+            .receipt
+            .evidence
+            .iter()
+            .any(|guard| guard.guard_name == "native-flow-resolver"
+                && !guard.verdict
+                && guard.details.as_deref() == Some("policy_flow_violation")),
+        "native policy refusal lacks a fixed signed owner witness"
+    );
     Ok(())
 }

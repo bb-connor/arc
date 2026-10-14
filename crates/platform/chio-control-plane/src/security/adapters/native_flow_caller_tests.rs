@@ -12,6 +12,13 @@ mod denial {
     ));
 }
 
+mod wait {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_caller_wait_tests.rs"
+    ));
+}
+
 #[cfg(unix)]
 mod restart {
     include!(concat!(
@@ -71,7 +78,12 @@ fn start_credentials(fixture: &Fixture) -> CallerStartCredentials {
         approval_token: fixture.request.approval_token.clone(),
         approval_tokens: fixture.request.approval_tokens.clone(),
         threshold_approval_proposal: fixture.request.threshold_approval_proposal.clone(),
-        declassification_grant: fixture.request.declassification_grant.clone(),
+        declassification_grant: fixture
+            .request
+            .declassification_grant
+            .as_ref()
+            .and_then(|grant| grant.legacy_v1())
+            .cloned(),
     }
 }
 

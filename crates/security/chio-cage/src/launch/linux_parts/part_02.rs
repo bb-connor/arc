@@ -887,14 +887,9 @@ fn send_descriptors(socket: RawFd, descriptors: &[RawFd]) -> Result<(), CageLaun
     unsafe {
         (*header).cmsg_level = libc::SOL_SOCKET;
         (*header).cmsg_type = libc::SCM_RIGHTS;
-        (*header).cmsg_len = libc::CMSG_LEN(descriptor_bytes as libc::c_uint)
-            .try_into()
-            .map_err(|_| {
-                CageLaunchError::bootstrap_failed(
-                    CageEnforcementFailureCode::DescriptorCountMismatch,
-                    "descriptor_send_size",
-                )
-            })?;
+        // CMSG_LEN is u32; cmsg_len is u32 on musl and usize on glibc.
+        // The checked finite descriptor table fits either Linux x86_64 type.
+        (*header).cmsg_len = libc::CMSG_LEN(descriptor_bytes as libc::c_uint) as _;
         std::ptr::copy_nonoverlapping(
             descriptors.as_ptr().cast::<u8>(),
             libc::CMSG_DATA(header),

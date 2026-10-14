@@ -138,15 +138,14 @@ impl ChioKernel {
         };
         let trusted_now_unix_ms = runtime.refresh_trusted_time(current_unix_timestamp_ms());
         let mut reconciled = 0_usize;
-        // An operation that cannot be reconciled is recorded and skipped rather
-        // than abandoning the sweep, so one wedged operation cannot hold up every
-        // other recoverable operation. The first failure is still returned once
-        // the sweep finishes, so callers keep failing closed on it.
-        let mut deferred_failure: Option<KernelError> = None;
+        let mut after_operation_id = None;
+        // Retain the first operation failure while giving every later operation
+        // its turn. The sweep still fails closed, including at startup.
+        let mut deferred_failure = None;
         loop {
             let recoverable = runtime
                 .store
-                .list_recoverable(trusted_now_unix_ms, PAGE_LIMIT)
+                .list_recoverable(trusted_now_unix_ms, after_operation_id.as_ref(), PAGE_LIMIT)
                 .map_err(durable_store_error)?;
             if recoverable.len() > PAGE_LIMIT {
                 return Err(KernelError::DurableAdmission(
@@ -156,209 +155,151 @@ impl ChioKernel {
             if recoverable.is_empty() {
                 break;
             }
-            let reconciled_before_page = reconciled;
+            // Validate the entire page before mutating any returned operation.
+            // An invalid store must not repeat a row or prevent cursor progress.
+            let mut previous = after_operation_id.as_ref();
+            for operation in &recoverable {
+                let operation_id = operation.binding().operation_id();
+                if previous.is_some_and(|previous| previous >= operation_id) {
+                    return Err(KernelError::DurableAdmission(
+                        "admission recovery store returned a non-increasing page".to_owned(),
+                    ));
+                }
+                previous = Some(operation_id);
+            }
+            after_operation_id = previous.cloned();
             for operation in recoverable {
-                // A live evaluation owns its cleanup and connector handoff.
+                let operation_id = operation.binding().operation_id().clone();
+                // The live evaluation owns its cleanup and connector handoff.
                 // Background recovery must not borrow that coordinator's lease.
                 let Some(_live_owner) = runtime
                     .mutation_sequencer
-                    .try_own_operation(operation.binding().operation_id())?
+                    .try_own_operation(&operation_id)?
                 else {
                     continue;
                 };
-                match operation.state() {
-                    AdmissionOperationState::DispatchCommitted => {
-                        match self.retain_authenticated_caller_wait(&operation, trusted_now_unix_ms)
-                        {
-                            Ok(true) => {
-                                reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                                    KernelError::DurableAdmission(
-                                        "admission recovery count overflow".into(),
-                                    )
-                                })?;
-                                continue;
-                            }
-                            Ok(false) => {}
-                            Err(error) => {
-                                deferred_failure.get_or_insert(error);
-                                continue;
-                            }
-                        }
-                        if let Err(error) = self.terminalize_dispatch_committed_admission(
-                            &operation,
-                            trusted_now_unix_ms,
-                        ) {
-                            warn!(
-                                operation_id = %operation.binding().operation_id().as_str(),
-                                reason = %redacted!(&error),
-                                audit_fault = "admission_recovery_terminalization_unresolved",
-                                "failed to terminalize a dispatch-committed admission"
-                            );
-                            deferred_failure.get_or_insert(error);
-                            continue;
-                        }
+                match self.reconcile_recoverable_admission(operation, trusted_now_unix_ms) {
+                    Ok(true) => {
                         reconciled = reconciled.checked_add(1).ok_or_else(|| {
                             KernelError::DurableAdmission(
                                 "admission recovery count overflow".to_owned(),
                             )
                         })?;
                     }
-                    AdmissionOperationState::Prepared
-                        if self
-                            .durable_nonce_issuance_is_live(&operation, trusted_now_unix_ms)? =>
-                    {
-                        // A live issued nonce waits for its execution request.
-                        // Compensation follows only once that nonce has expired.
-                    }
-                    AdmissionOperationState::ReadyToDispatch
-                        if self.durable_caller_reservation_is_live(
-                            &operation,
-                            trusted_now_unix_ms,
-                        )? =>
-                    {
-                        // A caller holds this reservation until its report
-                        // arrives or the reserved nonce expires.
-                    }
-                    AdmissionOperationState::Prepared
-                    | AdmissionOperationState::BrokerAttemptRegistered
-                    | AdmissionOperationState::BudgetAuthorized
-                    | AdmissionOperationState::ApprovalReserved
-                    | AdmissionOperationState::ReadyToDispatch
-                    | AdmissionOperationState::CapturePending => {
-                        // One operation that cannot be compensated must not abandon
-                        // the rest of the page: it stays recoverable for a later
-                        // sweep, and the remaining operations still reconcile.
-                        if let Err(error) = self.compensate_durable_admission_before_dispatch(
-                            &operation,
-                            serde_json::json!({
-                                "authority": "startup-recovery",
-                                "cause": "no-authoritative-budget-participant"
-                            }),
-                            trusted_now_unix_ms,
-                            None,
-                        ) {
-                            warn!(
-                                operation_id = %operation.binding().operation_id().as_str(),
-                                reason = %redacted!(&error),
-                                audit_fault = "admission_recovery_compensation_unresolved",
-                                "failed to compensate a recoverable admission"
-                            );
-                            deferred_failure.get_or_insert(error);
-                            continue;
-                        }
-                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "admission recovery count overflow".to_owned(),
-                            )
-                        })?;
-                    }
-                    AdmissionOperationState::ApprovalRequired => {
-                        let deadline_unix_ms = operation
-                            .parked_approval_deadline_unix_ms()
-                            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-                        let Some(deadline_unix_ms) =
-                            deadline_unix_ms.filter(|deadline| *deadline <= trusted_now_unix_ms)
-                        else {
-                            deferred_failure.get_or_insert_with(|| {
-                                KernelError::DurableAdmission(
-                                    "admission recovery store returned a quiescent approval-required operation"
-                                        .to_owned(),
-                                )
-                            });
-                            continue;
-                        };
-                        if let Err(error) = self.compensate_durable_admission_before_dispatch(
-                            &operation,
-                            serde_json::json!({
-                                "authority": "startup-recovery",
-                                "cause": "approval-deadline-elapsed",
-                                "proposal_deadline_unix_ms": deadline_unix_ms
-                            }),
-                            trusted_now_unix_ms,
-                            None,
-                        ) {
-                            warn!(
-                                operation_id = %operation.binding().operation_id().as_str(),
-                                reason = %redacted!(&error),
-                                audit_fault = "admission_recovery_retirement_unresolved",
-                                "failed to retire an expired approval-required admission"
-                            );
-                            deferred_failure.get_or_insert(error);
-                            continue;
-                        }
-                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "admission recovery count overflow".to_owned(),
-                            )
-                        })?;
-                    }
-                    AdmissionOperationState::Finalizing => {
-                        let retained_request = self.load_original_request_for_finalization(
-                            &operation,
-                            trusted_now_unix_ms,
-                        )?;
-                        let mut admission = DurableToolAdmission {
-                            _live_owner: None,
-                            operation,
-                            aggregate_quota: None,
-                            supplemental_quota: None,
-                            retained_request,
-                            issued_nonce: None,
-                            nonce_preflight: None,
-                        };
-                        let tool_return = self.load_durable_tool_return(&admission)?;
-                        let Some(request) =
-                            tool_return.recovery_request().map_err(tool_outcome_error)?
-                        else {
-                            self.claim_admission_recovery(
-                                &admission.operation,
-                                trusted_now_unix_ms,
-                            )?;
-                            continue;
-                        };
-                        // Recovery may run without the public evaluation scope.
-                        // Give every attempt its own scope, including concurrent
-                        // operations that share a caller-supplied request ID.
-                        // The task-local guard restores any outer scope on exit.
-                        let finalized = RECEIPT_EVALUATION_SCOPE_KEY.sync_scope(
-                            uuid::Uuid::now_v7().to_string(),
-                            || {
-                                self.finalize_durable_tool_return(
-                                    &mut admission,
-                                    &request,
-                                    &tool_return,
-                                )
-                            },
+                    Ok(false) => {}
+                    Err(error) => {
+                        warn!(
+                            operation_id = %operation_id.as_str(),
+                            reason = %redacted!(&error),
+                            audit_fault = "admission_recovery_operation_unresolved",
+                            "failed to reconcile a recoverable admission"
                         );
-                        if let Err(error) = finalized {
-                            warn!(
-                                operation_id = %admission.operation.binding().operation_id().as_str(),
-                                reason = %redacted!(&error),
-                                audit_fault = "admission_recovery_finalization_unresolved",
-                                "failed to finalize a recoverable admission"
-                            );
-                            deferred_failure.get_or_insert(error);
-                            continue;
-                        }
-                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                            KernelError::DurableAdmission(
-                                "admission recovery count overflow".to_owned(),
-                            )
-                        })?;
-                    }
-                    _ => {
-                        self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
+                        deferred_failure.get_or_insert(error);
                     }
                 }
             }
-            if reconciled == reconciled_before_page {
-                break;
+        }
+        match deferred_failure {
+            Some(error) => Err(error),
+            None => Ok(reconciled),
+        }
+    }
+
+    /// Reconcile one owned operation without dispatching another effect. True
+    /// means it advanced; false leaves a live wait, historical hold or claim.
+    fn reconcile_recoverable_admission(
+        &self,
+        operation: AdmissionOperationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<bool, KernelError> {
+        match operation.state() {
+            AdmissionOperationState::DispatchCommitted => {
+                if !self.retain_authenticated_caller_wait(&operation, trusted_now_unix_ms)? {
+                    self.terminalize_dispatch_committed_admission(&operation, trusted_now_unix_ms)?;
+                }
+            }
+            AdmissionOperationState::Prepared
+                if self.durable_nonce_issuance_is_live(&operation, trusted_now_unix_ms)? =>
+            {
+                return Ok(false);
+            }
+            AdmissionOperationState::ReadyToDispatch
+                if self.durable_caller_reservation_is_live(&operation, trusted_now_unix_ms)? =>
+            {
+                return Ok(false);
+            }
+            AdmissionOperationState::Prepared
+            | AdmissionOperationState::BrokerAttemptRegistered
+            | AdmissionOperationState::BudgetAuthorized
+            | AdmissionOperationState::ApprovalReserved
+            | AdmissionOperationState::ReadyToDispatch
+            | AdmissionOperationState::CapturePending => {
+                self.compensate_durable_admission_before_dispatch(
+                    &operation,
+                    serde_json::json!({
+                        "authority": "startup-recovery",
+                        "cause": "no-authoritative-budget-participant"
+                    }),
+                    trusted_now_unix_ms,
+                    None,
+                )?;
+            }
+            AdmissionOperationState::ApprovalRequired => {
+                let deadline_unix_ms = operation
+                    .parked_approval_deadline_unix_ms()
+                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
+                    .filter(|deadline| *deadline <= trusted_now_unix_ms)
+                    .ok_or_else(|| {
+                        KernelError::DurableAdmission(
+                            "admission recovery store returned a quiescent approval-required operation"
+                                .to_owned(),
+                        )
+                    })?;
+                self.compensate_durable_admission_before_dispatch(
+                    &operation,
+                    serde_json::json!({
+                        "authority": "startup-recovery",
+                        "cause": "approval-deadline-elapsed",
+                        "proposal_deadline_unix_ms": deadline_unix_ms
+                    }),
+                    trusted_now_unix_ms,
+                    None,
+                )?;
+            }
+            AdmissionOperationState::Finalizing => {
+                if self.quarantine_unavailable_recovery(&operation, trusted_now_unix_ms)? {
+                    return Ok(false);
+                }
+                let retained_request =
+                    self.load_original_request_for_finalization(&operation, trusted_now_unix_ms)?;
+                let mut admission = DurableToolAdmission {
+                    _live_owner: None,
+                    operation,
+                    aggregate_quota: None,
+                    supplemental_quota: None,
+                    retained_request,
+                    issued_nonce: None,
+                    nonce_preflight: None,
+                };
+                let tool_return = self.load_durable_tool_return(&admission)?;
+                let Some(request) = tool_return.recovery_request().map_err(tool_outcome_error)?
+                else {
+                    self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
+                    return Ok(false);
+                };
+                // Each recovery attempt owns its receipt scope, even without
+                // a public evaluation or with a shared caller request id.
+                RECEIPT_EVALUATION_SCOPE_KEY
+                    .sync_scope(uuid::Uuid::now_v7().to_string(), || {
+                        self.finalize_durable_tool_return(&mut admission, &request, &tool_return)
+                    })?;
+            }
+            _ => {
+                self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
+                return Ok(false);
             }
         }
-        if let Some(error) = deferred_failure {
-            return Err(error);
-        }
-        Ok(reconciled)
+        Ok(true)
     }
 
     /// Retire a parked operation whose proposal deadline has elapsed. No token
@@ -401,7 +342,7 @@ impl ChioKernel {
         &self,
         operation: &AdmissionOperationV1,
         trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
+    ) -> Result<AdmissionReceiptMetadataV1, KernelError> {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         // Dispatch may have advanced durable time since evaluation began.
@@ -417,14 +358,25 @@ impl ChioKernel {
                 "dispatch-committed admission already has a durable tool outcome".to_owned(),
             ));
         }
-        let lease = self.claim_admission_recovery(operation, trusted_now_unix_ms)?;
+        // A prepaid native original persists its claim inside the funded
+        // terminal write; the preview names the lease that write will create.
+        let request = Self::recovery_claim_request(runtime, operation, trusted_now_unix_ms)?;
+        let mut recovery = if self.prepaid_native_original(operation)? {
+            DeferredRecoveryClaim::deferred(runtime, request, trusted_now_unix_ms)?
+        } else {
+            DeferredRecoveryClaim::claimed(
+                request,
+                trusted_now_unix_ms,
+                self.claim_admission_recovery(operation, trusted_now_unix_ms)?,
+            )
+        };
         let context = AdmissionProjectionContext {
             operation_id: operation.binding().operation_id().clone(),
             request_id: operation.binding().request_id().clone(),
             expected_operation_version: operation.version(),
             trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            coordinator_lease_id: recovery.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: recovery.coordinator_lease_epoch(),
             store_fence: runtime.fence.clone(),
         };
         let projection = verified_outcome_unknown_after_dispatch_projection(operation, context)?;
@@ -437,10 +389,7 @@ impl ChioKernel {
                 "outcome-unknown finding pool finalization failed: {error}"
             ))
         })?;
-        let terminal = runtime
-            .store
-            .commit_admission_projection(&projection)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        let terminal = recovery.commit_admission_projection(runtime, &projection)?;
         if terminal.operation_id != *operation.binding().operation_id()
             || terminal.state != AdmissionOperationState::OutcomeUnknownAfterDispatch
         {
@@ -448,6 +397,249 @@ impl ChioKernel {
                 "admission recovery committed a different terminal operation".to_owned(),
             ));
         }
-        Ok(())
+        let retained = runtime
+            .store
+            .load_by_operation_id(operation.binding().operation_id())
+            .map_err(durable_store_error)?
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("unknown outcome readback is absent".into())
+            })?;
+        if retained.binding() != operation.binding() || retained.state() != terminal.state {
+            return Err(KernelError::DurableAdmission(
+                "unknown outcome readback changed its original".into(),
+            ));
+        }
+        AdmissionReceiptMetadataV1::retained_unknown_dispatch(&retained, trusted_now_unix_ms)
+            .map_err(Into::into)
+    }
+}
+
+/// The recovery authority a sequence of durable steps applies under: the
+/// lease already persisted, or the claim the first changing funded write
+/// persists with it. A prepaid native original never commits its claim alone.
+pub(super) struct DeferredRecoveryClaim<'a> {
+    request: RecoveryClaimRequest<'a>,
+    trusted_now_unix_ms: u64,
+    /// The one deterministic lease identity of this epoch, persisted or not.
+    coordinator_lease_id: AdmissionIdentifier,
+    coordinator_lease_epoch: u64,
+    lease: Option<crate::admission_operation::AdmissionRecoveryLease>,
+}
+
+impl<'a> DeferredRecoveryClaim<'a> {
+    pub(super) fn claimed(
+        request: RecoveryClaimRequest<'a>,
+        trusted_now_unix_ms: u64,
+        lease: crate::admission_operation::AdmissionRecoveryLease,
+    ) -> Self {
+        Self {
+            request,
+            trusted_now_unix_ms,
+            coordinator_lease_id: lease.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            lease: Some(lease),
+        }
+    }
+
+    /// Previews the claim without persisting it.
+    pub(super) fn deferred(
+        runtime: &DurableAdmissionRuntime,
+        request: RecoveryClaimRequest<'a>,
+        trusted_now_unix_ms: u64,
+    ) -> Result<Self, KernelError> {
+        let preview = native_acquisition::store_call(|| {
+            runtime
+                .store
+                .preview_recovery_claim(request, trusted_now_unix_ms)
+        })?;
+        Ok(Self {
+            request,
+            trusted_now_unix_ms,
+            coordinator_lease_id: preview.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: preview.coordinator_lease_epoch(),
+            lease: None,
+        })
+    }
+
+    pub(super) fn coordinator_lease_id(&self) -> &AdmissionIdentifier {
+        &self.coordinator_lease_id
+    }
+
+    pub(super) fn coordinator_lease_epoch(&self) -> u64 {
+        self.coordinator_lease_epoch
+    }
+
+    pub(super) fn advance_payment_journal(
+        &mut self,
+        runtime: &DurableAdmissionRuntime,
+        operation: &AdmissionOperationV1,
+        expected: &crate::payment::PaymentJournalRecord,
+        transition: &crate::payment::PaymentJournalTransition,
+        release_evidence: Option<&crate::tool_outcome::MonetaryReleaseEvidenceV1>,
+    ) -> Result<crate::payment::PaymentJournalRecord, KernelError> {
+        let trusted_now_unix_ms = self.trusted_now_unix_ms;
+        let advanced = match &self.lease {
+            Some(recovery_lease) => runtime
+                .store
+                .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
+                    operation,
+                    recovery_lease,
+                    expected,
+                    transition,
+                    release_evidence,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                })
+                .map(|journal| (journal, None)),
+            None => runtime.store.claim_and_advance_payment_journal(
+                crate::receipt_store::AdmissionPaymentJournalClaim {
+                    claim: self.request,
+                    operation,
+                    expected,
+                    transition,
+                    release_evidence,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                },
+                &mut qualified_lease(self.request, trusted_now_unix_ms),
+            ),
+        };
+        let (journal, lease) =
+            advanced.map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        self.retain(lease);
+        Ok(journal)
+    }
+
+    pub(super) fn begin_payment_settlement(
+        &mut self,
+        runtime: &DurableAdmissionRuntime,
+        operation: &AdmissionOperationV1,
+        expected: &crate::payment::PaymentJournalRecord,
+        transition: Option<&crate::payment::PaymentJournalTransition>,
+        release_evidence: Option<&crate::tool_outcome::MonetaryReleaseEvidenceV1>,
+        budget_reconcile: BudgetReconcileHoldRequest,
+    ) -> Result<crate::receipt_store::AdmissionPaymentSettlement, KernelError> {
+        let trusted_now_unix_ms = self.trusted_now_unix_ms;
+        let begun = match &self.lease {
+            Some(recovery_lease) => runtime
+                .store
+                .begin_payment_settlement(crate::receipt_store::AdmissionPaymentSettlementBegin {
+                    operation,
+                    recovery_lease,
+                    expected,
+                    transition,
+                    release_evidence,
+                    budget_reconcile,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                })
+                .map(|settlement| (settlement, None)),
+            None => runtime.store.claim_and_begin_payment_settlement(
+                crate::receipt_store::AdmissionPaymentSettlementClaim {
+                    claim: self.request,
+                    operation,
+                    expected,
+                    transition,
+                    release_evidence,
+                    budget_reconcile,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                },
+                &mut qualified_lease(self.request, trusted_now_unix_ms),
+            ),
+        };
+        let (settlement, lease) =
+            begun.map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        self.retain(lease);
+        Ok(settlement)
+    }
+
+    pub(super) fn reverse_funded_payment_holds(
+        &mut self,
+        runtime: &DurableAdmissionRuntime,
+        operation: &AdmissionOperationV1,
+        expected: &crate::payment::PaymentJournalRecord,
+    ) -> Result<Option<crate::receipt_store::AdmissionPaymentHoldReversed>, KernelError> {
+        let trusted_now_unix_ms = self.trusted_now_unix_ms;
+        let reversed = match &self.lease {
+            Some(recovery_lease) => runtime
+                .store
+                .reverse_funded_payment_holds(crate::receipt_store::AdmissionPaymentHoldReversal {
+                    operation,
+                    recovery_lease,
+                    expected,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                })
+                .map(|reversed| (reversed, None)),
+            None => runtime.store.claim_and_reverse_funded_payment_holds(
+                crate::receipt_store::AdmissionPaymentHoldReversalClaim {
+                    claim: self.request,
+                    operation,
+                    expected,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                },
+                &mut qualified_lease(self.request, trusted_now_unix_ms),
+            ),
+        };
+        let (reversed, lease) =
+            reversed.map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        self.retain(lease);
+        Ok(reversed)
+    }
+
+    pub(super) fn commit_admission_projection(
+        &mut self,
+        runtime: &DurableAdmissionRuntime,
+        projection: &AdmissionTerminalProjection,
+    ) -> Result<crate::admission_operation::AdmissionTerminal, KernelError> {
+        let committed = match &self.lease {
+            Some(_) => runtime
+                .store
+                .commit_admission_projection(projection)
+                .map(|terminal| (terminal, None)),
+            None => runtime.store.claim_and_commit_admission_projection(
+                self.request,
+                &mut qualified_lease(self.request, self.trusted_now_unix_ms),
+                projection,
+            ),
+        };
+        let (terminal, lease) =
+            committed.map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        self.retain(lease);
+        Ok(terminal)
+    }
+
+    pub(super) fn persisted(
+        &self,
+    ) -> Result<&crate::admission_operation::AdmissionRecoveryLease, KernelError> {
+        self.lease.as_ref().ok_or_else(|| {
+            KernelError::DurableAdmission("recovery claim is not yet persisted".to_owned())
+        })
+    }
+
+    /// The persisted lease, claiming it alone when no funded write carried
+    /// the claim. That standalone claim is ordinary intake.
+    pub(super) fn into_persisted_lease(
+        self,
+        runtime: &DurableAdmissionRuntime,
+    ) -> Result<crate::admission_operation::AdmissionRecoveryLease, KernelError> {
+        match self.lease {
+            Some(lease) => Ok(lease),
+            None => crate::admission_operation::claim_qualified_lease(
+                runtime.store.as_ref(),
+                self.request,
+                self.trusted_now_unix_ms,
+                &mut qualified_lease(self.request, self.trusted_now_unix_ms),
+            )
+            .map_err(durable_store_error),
+        }
+    }
+
+    fn retain(&mut self, lease: Option<crate::admission_operation::AdmissionRecoveryLease>) {
+        if self.lease.is_none() {
+            self.lease = lease;
+        }
     }
 }

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/dependency-graph.schema.json",
+  "title": "Recovery dependency graph V1",
+  "description": "Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "nodes"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.recovery.dependency-graph.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step_id",
+          "template_id",
+          "dependencies",
+          "estimated_cost_units"
+        ],
+        "properties": {
+          "step_id": {
+            "$ref": "observation.schema.json#/$defs/opaqueId"
+          },
+          "template_id": {
+            "$ref": "observation.schema.json#/$defs/opaqueId"
+          },
+          "dependencies": {
+            "type": "array",
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "observation.schema.json#/$defs/opaqueId"
+            }
+          },
+          "estimated_cost_units": {
+            "$ref": "observation.schema.json#/$defs/safeInteger"
+          }
+        }
+      }
+    }
+  }
+}

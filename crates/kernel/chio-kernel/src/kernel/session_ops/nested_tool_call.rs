@@ -203,6 +203,6 @@ fn nested_tool_request(
         supplemental_authorization: operation.supplemental_authorization.clone(),
         model_metadata: operation.model_metadata.clone(),
         federated_origin_kernel_id: None,
-        declassification_grant: proofs.declassification_grant,
+        declassification_grant: proofs.declassification_grant.map(Into::into),
     }
 }

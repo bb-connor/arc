@@ -51,12 +51,9 @@ impl ProcessStateReader {
                 | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )?;
         connection.busy_timeout(Duration::from_secs(5))?;
-        let version: u32 = connection.query_row(
-            "SELECT version FROM process_runtime WHERE singleton=1",
-            [],
-            |row| row.get(0),
-        )?;
-        if version != 1 {
+        // The raw reader serves only raw Knowledge journals, including one
+        // whose native return activation retained a raw feature level.
+        if !matches!(crate::store::feature_level(&connection)?, 1 | 2) {
             return Err(ProcessError::Configuration(
                 "unsupported process journal version",
             ));
@@ -64,8 +61,18 @@ impl ProcessStateReader {
         Ok(Self { connection })
     }
 
+    fn require_raw_knowledge(&self) -> Result<(), ProcessError> {
+        if crate::store::feature_level(&self.connection)? >= 3 {
+            return Err(ProcessError::Configuration(
+                "durable knowledge requires mediated release",
+            ));
+        }
+        Ok(())
+    }
+
     /// Read a bounded checkpoint. No capability token is decoded or returned.
     pub fn checkpoint(&self, process: &str) -> Result<Checkpoint, ProcessError> {
+        self.require_raw_knowledge()?;
         let row: Option<(i64, Option<String>)> = self
             .connection
             .query_row(
@@ -88,6 +95,7 @@ impl ProcessStateReader {
 
     /// Read one process's immutable blob, verifying its bounds and digest.
     pub fn blob(&self, process: &str, sha256: &str) -> Result<Vec<u8>, ProcessError> {
+        self.require_raw_knowledge()?;
         if sha256.len() != 64
             || !sha256
                 .bytes()

@@ -483,6 +483,9 @@ mod cli_env_tests {
 
 #[derive(Subcommand)]
 pub(crate) enum Commands {
+    /// Execute the bounded Rust-owned recovery protocol through its host.
+    Recovery { #[command(subcommand)] command: crate::recovery::RecoveryCommands },
+
     /// Host durable agent processes backed by existing MCP tool servers.
     Process {
         #[command(subcommand)]

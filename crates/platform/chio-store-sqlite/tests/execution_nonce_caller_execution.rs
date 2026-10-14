@@ -205,7 +205,7 @@ fn restart_keeps_a_live_caller_reservation() -> TestResult {
         runtime
             .authority
             .admission_operation_store()
-            .list_recoverable(now, 1)?
+            .list_recoverable(now, None, 1)?
             .is_empty(),
         "live caller reservations must not occupy the bounded recovery page"
     );

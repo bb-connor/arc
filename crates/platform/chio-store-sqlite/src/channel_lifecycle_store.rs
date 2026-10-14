@@ -981,6 +981,10 @@ fn admission_error(error: AdmissionOperationStoreError) -> ChannelLifecycleStore
         AdmissionOperationStoreError::OutcomeUnknown(detail) => {
             ChannelLifecycleStoreError::OutcomeUnknown(detail)
         }
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired => {
+            invalid("recovery preview refusal is outside this store")
+        }
         AdmissionOperationStoreError::Operation(error) => invalid(error.to_string()),
     }
 }
@@ -1005,6 +1009,7 @@ fn economic_error(error: EconomicStateCacheError) -> ChannelLifecycleStoreError 
 
 fn owner_error(error: SqliteServingOwnerError) -> ChannelLifecycleStoreError {
     match error {
+        SqliteServingOwnerError::Invalid(detail) => invalid(detail),
         SqliteServingOwnerError::OutcomeUnknown(detail) => {
             ChannelLifecycleStoreError::OutcomeUnknown(detail)
         }

@@ -194,7 +194,10 @@ fn invoke(
 fn proofs(request: &ToolCallRequest) -> NestedToolCallProofs {
     NestedToolCallProofs {
         dpop_proof: request.dpop_proof.clone(),
-        declassification_grant: request.declassification_grant.clone(),
+        declassification_grant: request
+            .declassification_grant
+            .as_ref()
+            .and_then(|grant| grant.legacy_v1().cloned()),
     }
 }
 

@@ -34,6 +34,7 @@ mod passport;
 mod policies;
 mod scaffold;
 mod settle;
+mod recovery;
 
 // Shared imports for the CLI module tree. These live at the crate root so the
 // `cli/*` submodules (which each begin with `use super::*;`) inherit them,

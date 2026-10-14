@@ -56,34 +56,9 @@ pub(crate) fn ensure_receipt_retention_watermark_table(
     Ok(())
 }
 
-/// Tombstones for receipt ids removed from the live store by a retention
-/// rotation, plus the DB triggers that keep an archived id from being reused.
-///
-/// A rotation deletes the live receipt rows (and their `UNIQUE(receipt_id)`
-/// sentinel) once they are co-archived. Without a record of what left, the
-/// append path's `ON CONFLICT(receipt_id) DO NOTHING` sees an archived id as
-/// brand new and inserts a second live receipt/claim-log entry for it, so a
-/// retry or a forged append overlaps the archived and live histories and makes a
-/// point lookup by receipt id ambiguous. The tombstone table preserves the
-/// uniqueness sentinel across archival (one small row per archived id, not the
-/// full receipt), and the two `BEFORE INSERT` triggers RAISE(ABORT) any source
-/// insert whose id is tombstoned, DB-enforced like the immutability guards so a
-/// writer that bypasses the Rust append path still cannot resurrect an archived
-/// id. Created on every writable open (new and existing).
-///
-/// The tombstone rows are themselves append-only. Once a rotation deletes the
-/// live receipt (and its `UNIQUE(receipt_id)` sentinel), the tombstone is the
-/// only DB-level record that the id was archived, so it carries the same
-/// immutability guarantee as the append-only projection tables: two
-/// `BEFORE UPDATE`/`BEFORE DELETE` triggers RAISE(ABORT) so a writer that
-/// bypasses the Rust path cannot delete or rewrite a tombstone and then
-/// re-insert the archived id, recreating the archived/live ambiguity these
-/// triggers exist to prevent.
-pub(crate) fn ensure_receipt_retention_tombstones(
-    connection: &rusqlite::Connection,
-) -> Result<(), ReceiptStoreError> {
-    connection.execute_batch(
-        r#"
+/// Tombstones and the archived-reuse guards. Shared with the native
+/// finishing reference catalog of the receipt append write.
+pub(in crate::receipt_store) const RECEIPT_RETENTION_TOMBSTONES_SQL: &str = r#"
         CREATE TABLE IF NOT EXISTS receipt_retention_tombstones (
             receipt_id                 TEXT PRIMARY KEY,
             receipt_kind               TEXT NOT NULL,
@@ -116,8 +91,35 @@ pub(crate) fn ensure_receipt_retention_tombstones(
         BEGIN
             SELECT RAISE(ABORT, 'receipt_id was archived by retention and cannot be re-appended');
         END;
-        "#,
-    )?;
+        "#;
+
+/// Tombstones for receipt ids removed from the live store by a retention
+/// rotation, plus the DB triggers that keep an archived id from being reused.
+///
+/// A rotation deletes the live receipt rows (and their `UNIQUE(receipt_id)`
+/// sentinel) once they are co-archived. Without a record of what left, the
+/// append path's `ON CONFLICT(receipt_id) DO NOTHING` sees an archived id as
+/// brand new and inserts a second live receipt/claim-log entry for it, so a
+/// retry or a forged append overlaps the archived and live histories and makes a
+/// point lookup by receipt id ambiguous. The tombstone table preserves the
+/// uniqueness sentinel across archival (one small row per archived id, not the
+/// full receipt), and the two `BEFORE INSERT` triggers RAISE(ABORT) any source
+/// insert whose id is tombstoned, DB-enforced like the immutability guards so a
+/// writer that bypasses the Rust append path still cannot resurrect an archived
+/// id. Created on every writable open (new and existing).
+///
+/// The tombstone rows are themselves append-only. Once a rotation deletes the
+/// live receipt (and its `UNIQUE(receipt_id)` sentinel), the tombstone is the
+/// only DB-level record that the id was archived, so it carries the same
+/// immutability guarantee as the append-only projection tables: two
+/// `BEFORE UPDATE`/`BEFORE DELETE` triggers RAISE(ABORT) so a writer that
+/// bypasses the Rust path cannot delete or rewrite a tombstone and then
+/// re-insert the archived id, recreating the archived/live ambiguity these
+/// triggers exist to prevent.
+pub(crate) fn ensure_receipt_retention_tombstones(
+    connection: &rusqlite::Connection,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute_batch(RECEIPT_RETENTION_TOMBSTONES_SQL)?;
     Ok(())
 }
 

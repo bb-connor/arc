@@ -822,6 +822,11 @@ pub(crate) fn persist_receipt_lineage_statement_tx(
         )));
     }
 
+    crate::receipt_store::native_finishing::require_lineage_names_no_owed_receipt(
+        tx,
+        &child_receipt_id,
+        parent_receipt_id.as_deref(),
+    )?;
     let verification = build_receipt_lineage_verification_tx(
         tx,
         &child_receipt_id,

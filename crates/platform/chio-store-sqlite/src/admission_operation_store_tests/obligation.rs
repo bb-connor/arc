@@ -836,7 +836,7 @@ fn empty_v5_migration_adds_lifecycle_state_without_backfill() -> AnchoredTestRes
         authority,
         store,
         ..
-    } = fixture();
+    } = pre_recovery_fixture();
     drop(store);
     drop(authority);
     let connection = Connection::open(&database)?;
@@ -869,7 +869,7 @@ fn empty_v5_migration_adds_lifecycle_state_without_backfill() -> AnchoredTestRes
 
 #[test]
 fn populated_v5_migration_requires_authoritative_settlement_reconciliation() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let at = now_ms();
     let operation = operation(&fixture, "v5-migration", at)?;
     let artifact = per_call_artifact(at + 1, "v5-migration")?;
@@ -1141,6 +1141,7 @@ fn conflicting_obligation_source_and_digest_are_rejected() -> AnchoredTestResult
     let at = now_ms();
     let source_receipt_digest = economic_digest("receipt-conflict");
     let first_operation = operation(&fixture, "conflict-first", at)?;
+    let second_operation = operation(&fixture, "conflict-second", at + 2)?;
     let first = obligation_artifact(
         at + 1,
         "conflict-first",
@@ -1149,9 +1150,6 @@ fn conflicting_obligation_source_and_digest_are_rejected() -> AnchoredTestResult
         &source_receipt_digest,
         29,
     )?;
-    commit_projection_with_obligation(&fixture, &first_operation, &first, at + 1)?;
-
-    let second_operation = operation(&fixture, "conflict-second", at + 2)?;
     let second = obligation_artifact(
         at + 3,
         "conflict-second",
@@ -1160,10 +1158,36 @@ fn conflicting_obligation_source_and_digest_are_rejected() -> AnchoredTestResult
         &source_receipt_digest,
         29,
     )?;
+
+    // The artificial projection and obligation rows never commit: they live
+    // only inside this one store-owned transaction, which is rolled back
+    // after every contract assertion, so no invalid state is ever rebased
+    // into the trusted change watermark.
     let mut connection = fixture.store.connection()?;
     let transaction = fixture
         .store
         .begin_write(&mut connection, Some(&fixture.fence))?;
+    insert_local_projection(&transaction, &first_operation, &fixture.fence, at + 1)?;
+    super::super::obligation::insert_obligation_projection(
+        &transaction,
+        first_operation.binding().operation_id(),
+        Some(&first.obligation_json),
+        Some(&first.channel_json),
+        at + 1,
+        at + 1,
+        &fixture.fence,
+    )?;
+    super::super::obligation::verify_obligation_projection(
+        &transaction,
+        first_operation.binding().operation_id(),
+        Some(&first.obligation_json),
+        Some(&first.channel_json),
+        at + 1,
+        at + 1,
+        &fixture.fence,
+    )?;
+
+    transaction.execute_batch("SAVEPOINT conflicting_second_source;")?;
     insert_local_projection(&transaction, &second_operation, &fixture.fence, at + 3)?;
     assert!(super::super::obligation::insert_obligation_projection(
         &transaction,
@@ -1175,15 +1199,15 @@ fn conflicting_obligation_source_and_digest_are_rejected() -> AnchoredTestResult
         &fixture.fence,
     )
     .is_err());
-    transaction.rollback()?;
+    transaction.execute_batch(
+        "ROLLBACK TO conflicting_second_source; RELEASE conflicting_second_source;",
+    )?;
 
     let mut substituted: serde_json::Value = serde_json::from_slice(&first.obligation_json)?;
     substituted["source"]["source_record_digest"] =
         serde_json::json!(economic_digest("substituted-atom-digest"));
     let substituted = canonical_json_bytes(&substituted)?;
-    let transaction = fixture
-        .store
-        .begin_write(&mut connection, Some(&fixture.fence))?;
+    transaction.execute_batch("SAVEPOINT substituted_atom_digest;")?;
     assert!(super::super::obligation::insert_obligation_projection(
         &transaction,
         first_operation.binding().operation_id(),
@@ -1194,6 +1218,26 @@ fn conflicting_obligation_source_and_digest_are_rejected() -> AnchoredTestResult
         &fixture.fence,
     )
     .is_err());
+    transaction
+        .execute_batch("ROLLBACK TO substituted_atom_digest; RELEASE substituted_atom_digest;")?;
+
+    let rejected_path_rows: i64 = transaction.query_row(
+        r#"
+        SELECT (SELECT COUNT(*) FROM admission_operation_terminal_projections
+                WHERE operation_id = ?1)
+             + (SELECT COUNT(*) FROM obligation_atoms WHERE operation_id = ?1)
+             + (SELECT COUNT(*) FROM obligation_disposition_records WHERE operation_id = ?1)
+             + (SELECT COUNT(*) FROM obligation_settlement_lifecycle_records
+                WHERE operation_id = ?1)
+             + (SELECT COUNT(*) FROM obligation_head_commits WHERE source_operation_id = ?1)
+        "#,
+        [second_operation.binding().operation_id().as_str()],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        rejected_path_rows, 0,
+        "rejected conflicting and substituted inserts must leave no artificial rows"
+    );
     transaction.rollback()?;
     Ok(())
 }

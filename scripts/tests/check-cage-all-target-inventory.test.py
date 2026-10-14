@@ -24,6 +24,8 @@ HEADERS = {
     "bin_chio_cage_init": (
         "Running unittests src/bin/chio-cage-init.rs (/tmp/chio_cage_init-bin)"
     ),
+    "bin_chio_confined_reader": "Running unittests src/bin/chio-confined-reader.rs (/tmp/reader)",
+    "example_confined_return_canary": "Running unittests examples/confined-return-canary.rs (/tmp/canary)",
     "enforcement_evidence": (
         "Running tests/enforcement_evidence.rs (/tmp/enforcement_evidence)"
     ),
@@ -69,6 +71,7 @@ def main() -> int:
         crate = root / "crates/security/chio-cage"
         shutil.copytree(ROOT / "crates/security/chio-cage/src", crate / "src")
         shutil.copytree(ROOT / "crates/security/chio-cage/tests", crate / "tests")
+        shutil.copytree(ROOT / "crates/security/chio-cage/examples", crate / "examples")
         shutil.copy2(
             ROOT / "crates/security/chio-cage/Cargo.toml", crate / "Cargo.toml"
         )
@@ -109,6 +112,16 @@ def main() -> int:
             + "0 filtered out; finished in 0.01s\n",
             "an extra all-target harness",
         )
+
+        for target in ["bin_chio_confined_reader", "example_confined_return_canary"]:
+            start = valid.index(HEADERS[target])
+            end = valid.index("finished in 0.01s\n", start) + len("finished in 0.01s\n")
+            require_rejected(root, valid[:start] + valid[end:], "missing confined-return " + target)
+        extra_example = crate / "examples/unregistered.rs"
+        extra_example.write_text("fn main() {}\n", encoding="utf-8")
+        if invoke(root, None) == 0:
+            raise SystemExit("cage inventory checker accepted an unregistered example")
+        extra_example.unlink()
 
         evidence = crate / "tests/enforcement_evidence.rs"
         original = evidence.read_text(encoding="utf-8")

@@ -3,18 +3,16 @@
 # regen-types.sh - regenerate sdks/go/chio-go-http/types.go from
 # spec/schemas/chio-wire/v1/**/*.schema.json via oapi-codegen v2.4.1.
 #
-# Go uses a committed
-# generated file rather than a live `cargo xtask codegen --lang go` pipeline.
-# `cargo xtask codegen --lang go` shells out to this script (see
-# xtask/src/main.rs::run_codegen). With `--check`, the xtask additionally
-# runs `git diff --exit-code sdks/go/chio-go-http/types.go` to surface drift.
+# `cargo xtask codegen --lang go` shells out to this script. Its `--check`
+# path uses `--output <temporary-path>` to compare bytes without changing the
+# maintained file. Direct regeneration uses the maintained path by default.
 #
 # Toolchain pin: oapi-codegen v2.4.1 (xtask/codegen-tools.lock.toml [go]).
 # Bumping the pin requires re-running this script, committing the regenerated
 # bytes, and updating the lock file in the same PR.
 #
 # Inputs:
-#   spec/schemas/chio-wire/v1/**/*.schema.json (35 schema files, JSON Schema
+#   spec/schemas/chio-wire/v1/**/*.schema.json (JSON Schema
 #   draft 2020-12). The script walks them deterministically (sorted by path)
 #   and bundles them into a single OpenAPI 3.0 document fed to oapi-codegen.
 #
@@ -25,13 +23,15 @@
 #   - go on PATH (any 1.21+).
 #   - python3 on PATH (stdlib only; used to translate JSON Schema 2020-12 ->
 #     OpenAPI 3.0 components.schemas, which oapi-codegen accepts).
-#   - git on PATH (used to embed the schema git SHA in the file header).
+#   - The generator modules in scripts/tools/go.sum must already be cached.
+#     Prepare that cache with `cd scripts/tools && go mod download` before
+#     running codegen. Generation itself is offline and module-readonly.
 #
 # House rules:
 #   - No em dashes (U+2014) in this script or in the emitted file.
 #   - Fail closed on any error (`set -euo pipefail`).
 #   - Deterministic: sorted file walk, no timestamps in the body, schema git
-#     SHA pinned to HEAD of the schema subtree at script-run time.
+#     SHA derived from the schema subtree bytes at script-run time.
 
 set -euo pipefail
 
@@ -41,8 +41,31 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 SCHEMAS_DIR="${WORKSPACE_ROOT}/spec/schemas/chio-wire/v1"
 OUTPUT_FILE="${WORKSPACE_ROOT}/sdks/go/chio-go-http/types.go"
+TOOLS_DIR="${SCRIPT_DIR}/tools"
 PACKAGE_NAME="chio"
 OAPI_CODEGEN_VERSION="v2.4.1"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --output)
+      if [[ $# -lt 2 || -z "$2" ]]; then
+        echo "regen-types.sh: --output requires a destination path" >&2
+        exit 2
+      fi
+      OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    *)
+      echo "regen-types.sh: unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+# Interpret explicit relative destinations against the caller's directory,
+# before changing directories for schema collection or pinned tool execution.
+if [[ "${OUTPUT_FILE}" != /* ]]; then
+  OUTPUT_FILE="${PWD}/${OUTPUT_FILE}"
+fi
 
 # --- preflight --------------------------------------------------------------
 if ! command -v go >/dev/null 2>&1; then
@@ -55,8 +78,8 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
-if ! command -v git >/dev/null 2>&1; then
-  echo "regen-types.sh: 'git' is required on PATH" >&2
+if [[ ! -f "${TOOLS_DIR}/go.mod" || ! -f "${TOOLS_DIR}/go.sum" ]]; then
+  echo "regen-types.sh: pinned generator module and checksums are required" >&2
   exit 2
 fi
 
@@ -107,6 +130,7 @@ trap 'rm -rf "${WORK_DIR}"' EXIT
 
 OPENAPI_PATH="${WORK_DIR}/chio-wire-v1.openapi.json"
 RAW_OUTPUT_PATH="${WORK_DIR}/types.raw.go"
+FINAL_OUTPUT_PATH="${WORK_DIR}/types.go"
 
 # --- preprocess JSON Schema 2020-12 -> OpenAPI 3.0 -------------------------
 # JSON Schema features that need translation for oapi-codegen v2.4.1:
@@ -127,7 +151,8 @@ RAW_OUTPUT_PATH="${WORK_DIR}/types.raw.go"
 #      sibling property). The canonical JSON Schema still enforces them.
 #   8. Cross-file `$ref`s (e.g. "../receipt/record.schema.json") are
 #      rewritten to the local component the target file lifts to (e.g.
-#      "#/components/schemas/ReceiptRecord").
+#      "#/components/schemas/ReceiptRecord"). Referenced property schemas
+#      are lifted with their original document's reference context.
 #
 # Component naming: `<DirPascal><FilePascal>` for top-level schemas (so
 # `agent/heartbeat.schema.json` -> `AgentHeartbeat`,
@@ -140,8 +165,10 @@ python3 - "${SCHEMAS_DIR}" "${OPENAPI_PATH}" <<'PY'
 import json
 import copy
 import os
+import re
 import sys
 from pathlib import Path
+from urllib.parse import unquote
 
 schemas_dir = Path(sys.argv[1])
 output_path = Path(sys.argv[2])
@@ -472,72 +499,157 @@ def component_name_for(rel_path: Path) -> str:
     return name_prefix + pascalize(file_stem)
 
 
-# Rewrite cross-file `$ref` strings (e.g. "../receipt/record.schema.json" and
-# "tool-manifest-v2.schema.json#/$defs/networkDestination") into local
-# component refs. JSON
-# Schema 2020-12 resolves a relative ref against the referencing file's own
-# location; oapi-codegen has no notion of the original directory layout
-# once every schema is flattened into components.schemas, so it would 404
-# trying to open the on-disk path. Local "#/..." refs and remote URLs are
-# left untouched.
-def _rewrite_cross_file_refs(node, base_dir: Path):
+# Resolve pointers against immutable source documents before any `$defs` or
+# nullable rewrites alter their structure. Preserve existing top-level and
+# direct `$defs` component names; queue other referenced schemas for lifting.
+schema_root = schemas_dir.resolve()
+schema_files = collect_schema_files()
+documents: dict[Path, object] = {}
+document_names: dict[Path, str] = {}
+document_ids: dict[str, Path] = {}
+component_owners: dict[str, tuple[Path, tuple[str, ...]]] = {}
+pointer_names: dict[tuple[Path, tuple[str, ...]], str] = {}
+pending_pointers: list[tuple[Path, tuple[str, ...]]] = []
+
+
+def claim_component(name: str, target: Path, pointer: tuple[str, ...]):
+    owner = (target, pointer)
+    existing = component_owners.setdefault(name, owner)
+    if existing != owner:
+        raise SystemExit(f"regen-types.sh: ambiguous schema component name: {name}")
+    pointer_names[owner] = name
+
+
+for path in schema_files:
+    target = path.resolve()
+    if not target.is_relative_to(schema_root):
+        raise SystemExit(f"regen-types.sh: schema file escapes the schema root: {path}")
+    if target in documents:
+        raise SystemExit(f"regen-types.sh: duplicate schema file identity: {path}")
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, (dict, bool)):
+        raise SystemExit(f"regen-types.sh: schema document is not a schema: {path}")
+    documents[target] = document
+    name = component_name_for(path.relative_to(schemas_dir))
+    document_names[target] = name
+    claim_component(name, target, ())
+    if isinstance(document, dict):
+        identifier = document.get("$id")
+        if isinstance(identifier, str):
+            previous = document_ids.setdefault(identifier, target)
+            if previous != target:
+                raise SystemExit(f"regen-types.sh: ambiguous schema document ID: {identifier}")
+        for definition in document.get("$defs", {}):
+            claim_component(name + pascalize(definition), target, ("$defs", definition))
+
+
+def pointer_tokens(fragment: str) -> tuple[str, ...]:
+    if re.search(r"%(?![0-9A-Fa-f]{2})", fragment):
+        raise SystemExit("regen-types.sh: invalid percent escape in schema pointer")
+    try:
+        pointer = unquote(fragment, encoding="utf-8", errors="strict")
+    except UnicodeError as error:
+        raise SystemExit("regen-types.sh: invalid UTF-8 in schema pointer") from error
+    if not pointer:
+        return ()
+    if not pointer.startswith("/"):
+        raise SystemExit(f"regen-types.sh: unsupported schema pointer fragment: {fragment}")
+    tokens = []
+    for token in pointer[1:].split("/"):
+        if re.search(r"~(?![01])", token):
+            raise SystemExit("regen-types.sh: invalid JSON pointer escape")
+        tokens.append(token.replace("~1", "/").replace("~0", "~"))
+    return tuple(tokens)
+
+
+def source_schema(target: Path, pointer: tuple[str, ...]):
+    if target not in documents:
+        raise SystemExit(f"regen-types.sh: referenced schema file is absent: {target}")
+    node = documents[target]
+    for token in pointer:
+        if isinstance(node, dict) and token in node:
+            node = node[token]
+        elif (
+            isinstance(node, list)
+            and re.fullmatch(r"0|[1-9][0-9]*", token)
+            and int(token) < len(node)
+        ):
+            node = node[int(token)]
+        else:
+            raise SystemExit(f"regen-types.sh: schema pointer target is absent: {target} {pointer}")
+    if not isinstance(node, (dict, bool)):
+        raise SystemExit(f"regen-types.sh: pointer target is not a schema: {target} {pointer}")
+    return node
+
+
+def pointer_component(target: Path, pointer: tuple[str, ...]) -> str:
+    # Validate even known names: a missing foreign definition must never turn
+    # into a dangling OpenAPI component merely because its name was guessed.
+    source_schema(target, pointer)
+    owner = (target, pointer)
+    if owner not in pointer_names:
+        suffix = "".join(pascalize(re.sub(r"[^A-Za-z0-9_.-]", "_", token)) for token in pointer)
+        name = document_names[target] + "Pointer" + suffix
+        claim_component(name, target, pointer)
+        pending_pointers.append(owner)
+    return pointer_names[owner]
+
+
+def _rewrite_schema_refs(node, source_path: Path):
     if isinstance(node, dict):
         ref = node.get("$ref")
-        if isinstance(ref, str) and "://" not in ref:
-            path_part, separator, fragment = ref.partition("#")
-            if not path_part.endswith(".schema.json"):
-                path_part = ""
-            if not path_part:
-                for value in node.values():
-                    _rewrite_cross_file_refs(value, base_dir)
-                return
-            target = (base_dir / path_part).resolve()
-            try:
-                rel_target = target.relative_to(schemas_dir.resolve())
-            except ValueError as exc:
-                raise SystemExit(
-                    "regen-types.sh: cross-file $ref escapes the schema root: "
-                    f"{ref}"
-                ) from exc
-            component = component_name_for(rel_target)
-            if separator:
-                fragment_parts = fragment.split("/")
-                if len(fragment_parts) != 3 or fragment_parts[:2] != ["", "$defs"]:
+        if (
+            isinstance(ref, str)
+            and not ref.startswith("#/components/schemas/")
+        ):
+            path_part, _, fragment = ref.partition("#")
+            target = document_ids.get(path_part)
+            # Only an exact locally declared schema ID may name a remote URI.
+            # Never pass an unresolved URI to codegen, which can fetch it.
+            if target is None and re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", path_part):
+                raise SystemExit("regen-types.sh: untrusted remote $ref: " + ref)
+            if target is None:
+                if not path_part or path_part.endswith(".schema.json"):
+                    target = (source_path.parent / path_part).resolve() if path_part else source_path
+            if target is not None:
+                if not target.is_relative_to(schema_root):
                     raise SystemExit(
-                        "regen-types.sh: unsupported cross-file $ref fragment: "
-                        f"{ref}"
+                        "regen-types.sh: cross-file $ref escapes the schema root: " + ref
                     )
-                component += pascalize(fragment_parts[2])
-            node["$ref"] = f"#/components/schemas/{component}"
+                component = pointer_component(target, pointer_tokens(fragment))
+                node["$ref"] = f"#/components/schemas/{component}"
         for value in node.values():
-            _rewrite_cross_file_refs(value, base_dir)
+            _rewrite_schema_refs(value, source_path)
     elif isinstance(node, list):
         for item in node:
-            _rewrite_cross_file_refs(item, base_dir)
+            _rewrite_schema_refs(item, source_path)
+
+
+def translated_schema(target: Path, pointer: tuple[str, ...], lifts: dict):
+    schema = copy.deepcopy(source_schema(target, pointer))
+    if schema is True:
+        return {}
+    if schema is False:
+        return {"not": {}}
+    schema.pop("$schema", None)
+    schema.pop("$id", None)
+    _rewrite_schema_refs(schema, target)
+    rewrite(schema, lifts, document_names[target])
+    return schema
 
 
 schemas: dict = {}
-for path in collect_schema_files():
-    rel = path.relative_to(schemas_dir)
-    # Component name = DirPascal + FilePascal. The schemas tree is two
-    # levels deep (subtree/file.schema.json), so we expect parts of length
-    # 2. Defensive fallback for deeper trees: join all dir segments.
-    component_name = component_name_for(rel)
+for path in schema_files:
+    target = path.resolve()
+    schemas[document_names[target]] = translated_schema(target, (), schemas)
 
-    raw = path.read_text(encoding="utf-8")
-    schema = json.loads(raw)
-
-    # Strip JSON Schema document keys; OpenAPI components.schemas is just
-    # the schema body.
-    schema.pop("$schema", None)
-    schema.pop("$id", None)
-
-    # Resolve cross-file refs against this file's directory before the
-    # local `$defs`/`const`/`oneOf` rewrites run.
-    _rewrite_cross_file_refs(schema, path.parent)
-
-    rewrite(schema, schemas, component_name)
-    schemas[component_name] = schema
+# A finite work queue supports recursive references without recursively
+# expanding schemas. Each source pointer owns exactly one component.
+index = 0
+while index < len(pending_pointers):
+    target, pointer = pending_pointers[index]
+    schemas[pointer_names[(target, pointer)]] = translated_schema(target, pointer, schemas)
+    index += 1
 
 # Build the final OpenAPI 3.0 document. paths is required by oapi-codegen,
 # even when empty. info.title carries the wire-version banner.
@@ -596,10 +708,13 @@ compatibility:
 CONFIG_EOF
 
 echo "regen-types.sh: invoking oapi-codegen ${OAPI_CODEGEN_VERSION}" >&2
-GOFLAGS="" GOTOOLCHAIN=auto go run \
-  "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@${OAPI_CODEGEN_VERSION}" \
-  -config "${CONFIG_PATH}" \
-  "${OPENAPI_PATH}"
+(
+  cd "${TOOLS_DIR}"
+  GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=readonly go run \
+    "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen" \
+    -config "${CONFIG_PATH}" \
+    "${OPENAPI_PATH}"
+)
 
 if [[ ! -s "${RAW_OUTPUT_PATH}" ]]; then
   echo "regen-types.sh: oapi-codegen produced an empty file" >&2
@@ -653,9 +768,9 @@ awk '
 ' "${RAW_OUTPUT_PATH}" > "${TAIL_FILE}"
 
 # Concatenate header + tail.
-cat "${HEADER_FILE}" "${TAIL_FILE}" > "${OUTPUT_FILE}"
+cat "${HEADER_FILE}" "${TAIL_FILE}" > "${FINAL_OUTPUT_PATH}"
 
-python3 - "${OUTPUT_FILE}" <<'PY'
+python3 - "${FINAL_OUTPUT_PATH}" <<'PY'
 import sys
 from pathlib import Path
 
@@ -1291,6 +1406,10 @@ PY
 # Final pass: gofmt the file in-place. oapi-codegen already runs gofmt on
 # its output, but our header prepend can shift line-numbering across
 # versions; gofmt is idempotent so this is safe.
-go fmt "${OUTPUT_FILE}" >/dev/null
+gofmt -w "${FINAL_OUTPUT_PATH}"
+
+# Complete all translation, hardening and formatting before replacing any
+# caller-selected output. An interrupted check only touches its temporary path.
+cp "${FINAL_OUTPUT_PATH}" "${OUTPUT_FILE}"
 
 echo "regen-types.sh: wrote ${OUTPUT_FILE}" >&2

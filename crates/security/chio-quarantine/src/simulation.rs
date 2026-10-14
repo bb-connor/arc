@@ -192,13 +192,11 @@ fn state_index(
 ) -> PortResult<usize> {
     let mut found = None;
     for (index, state) in states.iter().enumerate() {
-        if state.matches(plan, effect)? {
-            if found.replace(index).is_some() {
-                return Err(refused(
-                    "simulation.duplicate_snapshot",
-                    PortErrorKind::InvalidData,
-                ));
-            }
+        if state.matches(plan, effect)? && found.replace(index).is_some() {
+            return Err(refused(
+                "simulation.duplicate_snapshot",
+                PortErrorKind::InvalidData,
+            ));
         }
     }
     found.ok_or_else(|| refused("simulation.missing_snapshot", PortErrorKind::InvalidData))

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/disclosure-grant.schema.json",
+  "title": "Version selected disclosure grant",
+  "oneOf": [
+    {
+      "$ref": "../security/declassification-grant.schema.json"
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "grant"
+      ],
+      "properties": {
+        "kind": {
+          "const": "recovery_v2"
+        },
+        "grant": {
+          "$ref": "signed-grant-v2.schema.json"
+        }
+      }
+    }
+  ]
+}

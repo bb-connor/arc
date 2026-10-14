@@ -340,3 +340,10 @@ fn native_atomic_capture_faults_roll_back_budget_and_operation_together() -> Tes
     }
     Ok(())
 }
+
+mod ordinary_egress_event {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/security/adapters/native_flow_ordinary_egress_event_tests.rs"
+    ));
+}

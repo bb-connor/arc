@@ -7,7 +7,9 @@ use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-const MAX_IDENTIFIER_BYTES: usize = 256;
+/// UTF-8 byte ceiling shared by flow principals, compartments and purposes.
+pub const MAX_FLOW_IDENTIFIER_BYTES: usize = 256;
+const MAX_IDENTIFIER_BYTES: usize = MAX_FLOW_IDENTIFIER_BYTES;
 
 fn deserialize_present_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where

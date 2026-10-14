@@ -20,8 +20,8 @@ url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 url = "https://raw.githubusercontent.com/zcash/rust-ecosystem/main/supply-chain/audits.toml"
 
 [policy.aws-lc-rs]
-audit-as-crates-io = true
-notes = "Audit the published 1.18.1 base. Cargo Vet cannot authenticate the local path bytes; separately review CHIO-PATCH.patch and the restored-fixture manifest before accepting this fork."
+audit-as-crates-io = false
+notes = "Owned unpublished path fork with an independently reconstructed and reviewed DES parity repair. See supply-chain/reviews/aws-lc-rs-1.18.1.md, CHIO-PATCH.patch and CHIO-RESTORED-FIXTURES.sha256. This does not certify the original registry 1.18.1 bytes; native and registry dependencies retain their existing criteria."
 
 [policy.chio-a2a-adapter]
 audit-as-crates-io = true
@@ -403,6 +403,10 @@ audit-as-crates-io = true
 
 [policy.cmpv2]
 audit-as-crates-io = false
+
+[policy.cpp_demangle]
+audit-as-crates-io = false
+notes = "Owned unpublished path source with the actual upstream repr(transparent) backport, selected source review and retained full parser/demangler tests. See third_party/cpp-demangle-chio/CHIO-PATCH.md. No new registry certificate or exemption."
 
 [policy.crmf]
 audit-as-crates-io = false

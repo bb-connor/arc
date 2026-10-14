@@ -9,15 +9,35 @@ pub(super) fn callback<T>(
     stage: &'static str,
     action: impl FnOnce() -> Result<T, KernelError>,
 ) -> Result<T, KernelError> {
-    let failure = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(action)) {
+    callback_with_failure_kind(stage, action).map_err(|(error, _)| error)
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(in crate::kernel) enum SecurityCallbackFailureKind {
+    ReturnedError,
+    Panicked,
+}
+
+pub(in crate::kernel) fn callback_with_failure_kind<T>(
+    stage: &'static str,
+    action: impl FnOnce() -> Result<T, KernelError>,
+) -> Result<T, (KernelError, SecurityCallbackFailureKind)> {
+    let kind = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(action)) {
         Ok(Ok(value)) => return Ok(value),
-        Ok(Err(_)) => "failed",
-        Err(_) => "panicked",
+        Ok(Err(_)) => SecurityCallbackFailureKind::ReturnedError,
+        Err(_) => SecurityCallbackFailureKind::Panicked,
+    };
+    let failure = match kind {
+        SecurityCallbackFailureKind::ReturnedError => "failed",
+        SecurityCallbackFailureKind::Panicked => "panicked",
     };
     // Do not include extension-controlled errors or panic payloads. In
     // particular a post-effect fault must not advertise a retryable rejection.
-    Err(KernelError::SecurityDispatchOutcomeRecoveryRequired(
-        format!("security {stage} callback {failure}; authoritative recovery required"),
+    Err((
+        KernelError::SecurityDispatchOutcomeRecoveryRequired(format!(
+            "security {stage} callback {failure}; authoritative recovery required"
+        )),
+        kind,
     ))
 }
 

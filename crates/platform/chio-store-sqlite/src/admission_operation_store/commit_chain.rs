@@ -80,6 +80,80 @@ pub(super) fn append_operation_commit(
     )
 }
 
+/// A fresh actual admission append, not a historical row selector. It carries
+/// no dispatch, release, native output absence or finishing-spend permission.
+pub(super) struct AdmissionCommitAppendReceipt {
+    connection_identity: usize,
+    operation: AdmissionOperationV1,
+    operation_digest: String,
+    admission_sequence: u64,
+    admission_chain_digest: String,
+    mutation_kind: &'static str,
+    fence: chio_kernel::admission_operation::StoreMutationFence,
+    recorded_at_unix_ms: u64,
+    global: crate::serving_owner::GlobalCommitAppendReceipt,
+}
+impl AdmissionCommitAppendReceipt {
+    pub(super) fn operation(&self) -> &AdmissionOperationV1 {
+        &self.operation
+    }
+    pub(super) fn global_sequence(&self) -> u64 {
+        self.global.sequence()
+    }
+    pub(super) fn recorded_at_unix_ms(&self) -> u64 {
+        self.recorded_at_unix_ms
+    }
+    pub(super) fn verify(
+        &self,
+        tx: &Transaction<'_>,
+        owner: &SqliteServingOwner,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        if &**tx as *const Connection as usize != self.connection_identity
+            || owner.fence != self.fence
+            || sha256_hex(&super::encode_operation(&self.operation)?) != self.operation_digest
+        {
+            return Err(invariant(
+                "admission append receipt changed its owning identity",
+            ));
+        }
+        let exact: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM admission_operation_commits WHERE commit_sequence=?1
+             AND operation_id=?2 AND operation_version=?3 AND mutation_kind=?4
+             AND operation_digest=?5 AND chain_digest=?6 AND store_uuid=?7
+             AND store_lease_id=?8 AND store_owner_epoch=?9 AND recorded_at_unix_ms=?10)",
+                params![
+                    sqlite_i64(self.admission_sequence, "admission append sequence")?,
+                    self.operation.binding().operation_id().as_str(),
+                    sqlite_i64(self.operation.version(), "admission append version")?,
+                    self.mutation_kind,
+                    &self.operation_digest,
+                    &self.admission_chain_digest,
+                    &self.fence.store_uuid,
+                    &self.fence.lease_id,
+                    sqlite_i64(self.fence.owner_epoch, "admission append owner epoch")?,
+                    sqlite_i64(self.recorded_at_unix_ms, "admission append time")?
+                ],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        if !exact {
+            return Err(invariant("admission append receipt lost its exact source"));
+        }
+        self.global
+            .verify(
+                tx,
+                &self.fence,
+                self.mutation_kind,
+                "admission",
+                self.operation.binding().operation_id().as_str(),
+                self.admission_sequence,
+                &self.admission_chain_digest,
+            )
+            .map_err(super::map_owner_error)
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn append_operation_commit_with_participant(
     transaction: &Transaction<'_>,
@@ -91,6 +165,52 @@ pub(crate) fn append_operation_commit_with_participant(
     owner: &SqliteServingOwner,
     recorded_at_unix_ms: u64,
 ) -> Result<(), AdmissionOperationStoreError> {
+    append_operation_commit_with_participant_receipt(
+        transaction,
+        operation,
+        encoded,
+        recovery_claim,
+        mutation_kind,
+        participant_digest,
+        owner,
+        recorded_at_unix_ms,
+    )
+    .map(|_| ())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn append_operation_commit_with_receipt(
+    transaction: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    encoded: &[u8],
+    recovery_claim: Option<&UntrustedAdmissionRecoveryClaim>,
+    mutation_kind: &'static str,
+    owner: &SqliteServingOwner,
+    recorded_at_unix_ms: u64,
+) -> Result<AdmissionCommitAppendReceipt, AdmissionOperationStoreError> {
+    append_operation_commit_with_participant_receipt(
+        transaction,
+        operation,
+        encoded,
+        recovery_claim,
+        mutation_kind,
+        None,
+        owner,
+        recorded_at_unix_ms,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_operation_commit_with_participant_receipt(
+    transaction: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    encoded: &[u8],
+    recovery_claim: Option<&UntrustedAdmissionRecoveryClaim>,
+    mutation_kind: &'static str,
+    participant_digest: Option<&str>,
+    owner: &SqliteServingOwner,
+    recorded_at_unix_ms: u64,
+) -> Result<AdmissionCommitAppendReceipt, AdmissionOperationStoreError> {
     if participant_digest.is_some_and(|digest| !is_digest(digest)) {
         return Err(invariant("admission participant digest is malformed"));
     }
@@ -186,8 +306,8 @@ pub(crate) fn append_operation_commit_with_participant(
             "admission operation commit chain did not advance exactly once",
         ));
     }
-    owner
-        .append_global_commit(
+    let global = owner
+        .append_global_commit_with_receipt(
             transaction,
             mutation_kind,
             "admission",
@@ -195,7 +315,17 @@ pub(crate) fn append_operation_commit_with_participant(
             next,
         )
         .map_err(|error| invariant(error.to_string()))?;
-    Ok(())
+    Ok(AdmissionCommitAppendReceipt {
+        connection_identity: &**transaction as *const Connection as usize,
+        operation: operation.clone(),
+        operation_digest,
+        admission_sequence: next,
+        admission_chain_digest: chain_digest,
+        mutation_kind,
+        fence: owner.fence.clone(),
+        recorded_at_unix_ms,
+        global,
+    })
 }
 
 pub(crate) fn load_admission_commit_head(

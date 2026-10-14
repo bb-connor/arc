@@ -33,6 +33,8 @@ const TOOL_OUTCOME_SCHEMA_ANCHORS: &[&str] = &[
 ];
 const TOOL_OUTCOME_SCHEMA: &str = include_str!("tool_outcome_store.sql");
 const SECURITY_RELEASE_SCHEMA: &str = include_str!("tool_outcome_security_release.sql");
+#[cfg(feature = "admission-test-support")]
+pub(crate) mod cold_read_test_support;
 #[path = "tool_outcome_native_output.rs"]
 mod native_output;
 #[path = "tool_outcome_security_release.rs"]
@@ -213,9 +215,20 @@ impl SqliteToolOutcomeStore {
             load_operation_for_participant_tx(&transaction, operation.binding().operation_id())
                 .map_err(admission_error)?
                 .ok_or(ToolOutcomeStoreError::NotFound)?;
+        crate::admission_operation_store::authorize_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &stored_operation,
+            crate::admission_operation_store::NativeFinishingWrite::RawCustody,
+        )
+        .map_err(admission_error)?;
         if let Some(existing) = load_outcome_tx(&transaction, operation.binding().operation_id())? {
-            let stored_blob = load_blob_state_tx(&transaction, existing.raw_output_digest())?
-                .ok_or_else(|| invariant("tool outcome lost its canonical blob"))?;
+            let stored_blob = load_blob_state_tx(
+                &transaction,
+                existing.raw_output_digest(),
+                operation.binding().operation_id().as_str(),
+            )?
+            .ok_or_else(|| invariant("tool outcome lost its canonical blob"))?;
             let blob_matches = match &stored_blob {
                 StoredInvocationBlob::Present(existing_blob) => {
                     existing_blob.bytes() == blob.bytes()
@@ -285,6 +298,13 @@ impl SqliteToolOutcomeStore {
             trusted_now_unix_ms,
         )
         .map_err(admission_error)?;
+        crate::admission_operation_store::spend_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            operation,
+            crate::admission_operation_store::NativeFinishingWrite::RawCustody,
+        )
+        .map_err(admission_error)?;
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)?;
         Ok(ToolOutcomeInsertResultV1::Inserted {
@@ -305,6 +325,13 @@ impl SqliteToolOutcomeStore {
         let operation = load_operation_for_participant_tx(&transaction, record.operation_id())
             .map_err(admission_error)?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
+        crate::admission_operation_store::authorize_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &operation,
+            crate::admission_operation_store::NativeFinishingWrite::EvaluationBegin,
+        )
+        .map_err(admission_error)?;
         let outcome = load_outcome_tx(&transaction, record.operation_id())?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
         require_finalizing_operation(&operation, &outcome)?;
@@ -347,6 +374,13 @@ impl SqliteToolOutcomeStore {
             &recovery_lease,
             &participant_digest,
             trusted_now_unix_ms,
+        )
+        .map_err(admission_error)?;
+        crate::admission_operation_store::spend_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &operation,
+            crate::admission_operation_store::NativeFinishingWrite::EvaluationBegin,
         )
         .map_err(admission_error)?;
         self.commit_write(transaction)?;
@@ -472,10 +506,14 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
         let raw = match load_outcome_tx(&transaction, operation_id)? {
-            Some(outcome) => load_blob_tx(&transaction, outcome.raw_output_digest())?
-                .map(|blob| RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes()))
-                .transpose()
-                .map_err(|error| invariant(error.to_string()))?,
+            Some(outcome) => load_blob_tx(
+                &transaction,
+                outcome.raw_output_digest(),
+                operation_id.as_str(),
+            )?
+            .map(|blob| RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes()))
+            .transpose()
+            .map_err(|error| invariant(error.to_string()))?,
             None => None,
         };
         transaction.commit().map_err(sqlite_error)?;
@@ -575,6 +613,17 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, active_fence, trusted_now_unix_ms)?;
+        // The pure prefix and the terminal result are the one priced finalization.
+        let finalizing = load_operation_for_participant_tx(&transaction, operation_id)
+            .map_err(admission_error)?
+            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        crate::admission_operation_store::authorize_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &finalizing,
+            crate::admission_operation_store::NativeFinishingWrite::Finalization,
+        )
+        .map_err(admission_error)?;
         let mut version = expected_evaluation_version;
         if !pure_result_digests.is_empty() {
             let mut current = load_evaluation_tx(&transaction, operation_id)?
@@ -768,11 +817,41 @@ impl SqliteToolOutcomeStore {
             trusted_now_unix_ms,
         )
         .map_err(admission_error)?;
+        crate::admission_operation_store::spend_native_finishing_write(
+            transaction,
+            &self.serving_owner,
+            &operation,
+            crate::admission_operation_store::NativeFinishingWrite::Finalization,
+        )
+        .map_err(admission_error)?;
         Ok((terminal_evaluation.clone(), terminal_outcome.clone()))
     }
 }
 
 impl QualifiedToolOutcomeStore for SqliteToolOutcomeStore {}
+
+/// The producer's exact compiled schema, including its immutable and lease
+/// guards. Returned SQL is catalog DATA and grants no mutation or loan.
+pub(crate) fn compiled_tool_outcome_schema() -> &'static str {
+    TOOL_OUTCOME_SCHEMA
+}
+
+/// The security release producer's exact compiled schema. Catalog DATA only.
+pub(crate) fn compiled_security_release_schema() -> &'static str {
+    SECURITY_RELEASE_SCHEMA
+}
+
+/// The actual producer's enforced complete canonical outcome record bound.
+/// This describes cost and grants no claim, mutation or financing authority.
+pub(crate) fn outcome_record_maximum_bytes() -> usize {
+    MAX_OUTCOME_RECORD_BYTES
+}
+
+/// The actual producer's enforced complete canonical evaluation record bound.
+/// Original producing profiles can select a smaller bound without changing it.
+pub(crate) fn evaluation_record_maximum_bytes() -> usize {
+    MAX_EVALUATION_RECORD_BYTES
+}
 
 pub(crate) fn initialize_tool_outcome_schema(
     connection: &mut Connection,
@@ -900,7 +979,7 @@ fn verify_outcome_projection(
     outcome
         .validate_against(&operation)
         .map_err(|error| invariant(error.to_string()))?;
-    match load_blob_state_connection(connection, outcome.raw_output_digest())? {
+    match load_blob_state_connection(connection, outcome.raw_output_digest(), operation_id)? {
         None => return Err(invariant("tool outcome canonical blob is absent")),
         Some(StoredInvocationBlob::Present(blob)) => outcome
             .validate_canonical_blob(&operation, &blob)
@@ -1092,7 +1171,7 @@ fn insert_blob_bytes_tx(
     }
 }
 
-fn load_resolved_blob_connection(
+pub(crate) fn load_resolved_blob_connection(
     connection: &Connection,
     outcome: &ToolOutcomeRecordV1,
 ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError> {
@@ -1296,7 +1375,7 @@ fn load_outcome_tx(
     load_outcome_connection(transaction, operation_id.as_str())
 }
 
-fn load_outcome_connection(
+pub(crate) fn load_outcome_connection(
     connection: &Connection,
     operation_id: &str,
 ) -> Result<Option<ToolOutcomeRecordV1>, ToolOutcomeStoreError> {
@@ -1357,21 +1436,28 @@ fn load_evaluation_connection(
     connection: &Connection,
     operation_id: &str,
 ) -> Result<Option<PostReturnEvaluationRecordV1>, ToolOutcomeStoreError> {
+    let maximum =
+        crate::admission_operation_store::original_output_read_bounds(connection, operation_id)
+            .map_err(admission_error)?
+            .map(|(_, evaluation)| sqlite_u64(evaluation, "original evaluation bound"))
+            .transpose()?;
     let row = connection
         .query_row(
             r#"
             SELECT evaluation_id, outcome_id, evaluation_version,
-                   lifecycle_digest, evaluation_json
+                   lifecycle_digest,
+                   CASE WHEN ?2 IS NULL OR length(evaluation_json) BETWEEN 1 AND ?2
+                        THEN evaluation_json END
             FROM post_return_evaluations WHERE operation_id = ?1
             "#,
-            [operation_id],
+            params![operation_id, maximum],
             |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, i64>(2)?,
                     row.get::<_, String>(3)?,
-                    row.get::<_, Vec<u8>>(4)?,
+                    row.get::<_, Option<Vec<u8>>>(4)?,
                 ))
             },
         )
@@ -1380,6 +1466,10 @@ fn load_evaluation_connection(
     let Some((evaluation_id, outcome_id, version, lifecycle, encoded)) = row else {
         return Ok(None);
     };
+    let encoded =
+        encoded.ok_or_else(|| invariant("evaluation exceeds its original storage bound"))?;
+    #[cfg(feature = "admission-test-support")]
+    cold_read_test_support::observe_evaluation_allocation(encoded.len());
     let persisted: PersistedPostReturnEvaluationRecordV1 = serde_json::from_slice(&encoded)
         .map_err(|error| invariant(format!("post-return evaluation decode failed: {error}")))?;
     let record = PostReturnEvaluationRecordV1::from_persisted(persisted)
@@ -1402,15 +1492,17 @@ fn load_evaluation_connection(
 fn load_blob_tx(
     transaction: &Transaction<'_>,
     digest: &chio_kernel::admission_operation::AdmissionDigest,
+    operation_id: &str,
 ) -> Result<Option<CanonicalInvocationBlobV1>, ToolOutcomeStoreError> {
-    load_blob_connection(transaction, digest)
+    load_blob_connection(transaction, digest, operation_id)
 }
 
 fn load_blob_connection(
     connection: &Connection,
     digest: &chio_kernel::admission_operation::AdmissionDigest,
+    operation_id: &str,
 ) -> Result<Option<CanonicalInvocationBlobV1>, ToolOutcomeStoreError> {
-    match load_blob_state_connection(connection, digest)? {
+    match load_blob_state_connection(connection, digest, operation_id)? {
         None => Ok(None),
         Some(StoredInvocationBlob::Present(blob)) => Ok(Some(blob)),
         Some(StoredInvocationBlob::Compacted) => Err(compacted_blob_error(digest.as_str())),
@@ -1420,26 +1512,39 @@ fn load_blob_connection(
 fn load_blob_state_tx(
     transaction: &Transaction<'_>,
     digest: &chio_kernel::admission_operation::AdmissionDigest,
+    operation_id: &str,
 ) -> Result<Option<StoredInvocationBlob>, ToolOutcomeStoreError> {
-    load_blob_state_connection(transaction, digest)
+    load_blob_state_connection(transaction, digest, operation_id)
 }
 
 fn load_blob_state_connection(
     connection: &Connection,
     digest: &chio_kernel::admission_operation::AdmissionDigest,
+    operation_id: &str,
 ) -> Result<Option<StoredInvocationBlob>, ToolOutcomeStoreError> {
-    let stored: Option<Option<Vec<u8>>> = connection
+    let maximum =
+        crate::admission_operation_store::original_output_read_bounds(connection, operation_id)
+            .map_err(admission_error)?
+            .map(|(raw, _)| sqlite_u64(raw, "original Raw bound"))
+            .transpose()?;
+    let stored: Option<(Option<i64>, Option<Vec<u8>>)> = connection
         .query_row(
-            "SELECT canonical_bytes FROM tool_outcome_blobs WHERE digest = ?1",
-            [digest.as_str()],
-            |row| row.get::<_, Option<Vec<u8>>>(0),
+            "SELECT length(canonical_bytes),
+                    CASE WHEN ?2 IS NULL OR length(canonical_bytes) BETWEEN 1 AND ?2
+                         THEN canonical_bytes END
+             FROM tool_outcome_blobs WHERE digest = ?1",
+            params![digest.as_str(), maximum],
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()
         .map_err(sqlite_error)?;
     match stored {
         None => Ok(None),
-        Some(None) => Ok(Some(StoredInvocationBlob::Compacted)),
-        Some(Some(bytes)) => {
+        Some((None, None)) => Ok(Some(StoredInvocationBlob::Compacted)),
+        Some((_, None)) => Err(invariant("Raw outcome exceeds its original storage bound")),
+        Some((_, Some(bytes))) => {
+            #[cfg(feature = "admission-test-support")]
+            cold_read_test_support::observe_raw_allocation(bytes.len());
             let blob = RawInvocationOutcomeV1::from_canonical_bytes(&bytes)
                 .and_then(|raw| raw.canonical_blob())
                 .map_err(|error| invariant(error.to_string()))?;
@@ -1454,7 +1559,9 @@ fn compacted_blob_error(digest: &str) -> ToolOutcomeStoreError {
     ))
 }
 
-fn encode_outcome(record: &ToolOutcomeRecordV1) -> Result<Vec<u8>, ToolOutcomeStoreError> {
+pub(crate) fn encode_outcome(
+    record: &ToolOutcomeRecordV1,
+) -> Result<Vec<u8>, ToolOutcomeStoreError> {
     encode_bounded(
         "tool outcome",
         &record.to_persisted(),
@@ -1596,6 +1703,10 @@ fn admission_error(error: AdmissionOperationStoreError) -> ToolOutcomeStoreError
             ToolOutcomeStoreError::Unavailable(detail)
         }
         AdmissionOperationStoreError::Invariant(detail) => ToolOutcomeStoreError::Invariant(detail),
+        AdmissionOperationStoreError::RecoveryAuthorityDenied
+        | AdmissionOperationStoreError::RecoveryMediationRequired => {
+            invariant("recovery preview refusal is outside this store")
+        }
         AdmissionOperationStoreError::Operation(error) => invariant(error.to_string()),
     }
 }

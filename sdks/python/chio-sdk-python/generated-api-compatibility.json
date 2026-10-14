@@ -1,0 +1,1021 @@
+{
+  "approved_transitions": [
+    {
+      "after": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "19aad653f5fe9c16e6b48ac550a20bdf39af1eaca768e57986bbadef6ae75547",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "afbc9c1cf19c147f9c84eb1ba239e76758b4f5faed10f0e4cc697bdab9237cda",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "__init__.py:SecurityBody",
+      "reason": "Correct TargetLabel to inherit the known InformationLabel contract (owners and compartments) rather than a model containing only kind. Body and SignedDeclassificationGrant fingerprints include this exact dependent contract repair.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "e137bea5111ca71777204e05e7d328d77c833f0a2603f7efdec7adf65892f6dd",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "b970c86c031105706a02ca8ab9963e83d4b6ae05608403fe54194e18653daf5b",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "__init__.py:SignedDeclassificationGrant",
+      "reason": "Correct TargetLabel to inherit the known InformationLabel contract (owners and compartments) rather than a model containing only kind. Body and SignedDeclassificationGrant fingerprints include this exact dependent contract repair.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "f464d5189dd2ee6846f072a405b233e4e026f1fdc85e4f2fef2cafe0f3c50467",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "ca48786b1fa98afab9bd3a43981b2257a6e0d7dd64c3317e7e75e43c97b76d36",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "__init__.py:TargetLabel",
+      "reason": "Correct TargetLabel to inherit the known InformationLabel contract (owners and compartments) rather than a model containing only kind. Body and SignedDeclassificationGrant fingerprints include this exact dependent contract repair.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "19aad653f5fe9c16e6b48ac550a20bdf39af1eaca768e57986bbadef6ae75547",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "afbc9c1cf19c147f9c84eb1ba239e76758b4f5faed10f0e4cc697bdab9237cda",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/__init__.py:Body",
+      "reason": "Correct TargetLabel to inherit the known InformationLabel contract (owners and compartments) rather than a model containing only kind. Body and SignedDeclassificationGrant fingerprints include this exact dependent contract repair.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "e137bea5111ca71777204e05e7d328d77c833f0a2603f7efdec7adf65892f6dd",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "b970c86c031105706a02ca8ab9963e83d4b6ae05608403fe54194e18653daf5b",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/__init__.py:SignedDeclassificationGrant",
+      "reason": "Correct TargetLabel to inherit the known InformationLabel contract (owners and compartments) rather than a model containing only kind. Body and SignedDeclassificationGrant fingerprints include this exact dependent contract repair.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "f464d5189dd2ee6846f072a405b233e4e026f1fdc85e4f2fef2cafe0f3c50467",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "ca48786b1fa98afab9bd3a43981b2257a6e0d7dd64c3317e7e75e43c97b76d36",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/__init__.py:TargetLabel",
+      "reason": "Correct TargetLabel to inherit the known InformationLabel contract (owners and compartments) rather than a model containing only kind. Body and SignedDeclassificationGrant fingerprints include this exact dependent contract repair.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "19aad653f5fe9c16e6b48ac550a20bdf39af1eaca768e57986bbadef6ae75547",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "afbc9c1cf19c147f9c84eb1ba239e76758b4f5faed10f0e4cc697bdab9237cda",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/declassification_grant_schema.py:Body",
+      "reason": "Correct TargetLabel to inherit the known InformationLabel contract (owners and compartments) rather than a model containing only kind. Body and SignedDeclassificationGrant fingerprints include this exact dependent contract repair.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "e137bea5111ca71777204e05e7d328d77c833f0a2603f7efdec7adf65892f6dd",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "b970c86c031105706a02ca8ab9963e83d4b6ae05608403fe54194e18653daf5b",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+      "reason": "Correct TargetLabel to inherit the known InformationLabel contract (owners and compartments) rather than a model containing only kind. Body and SignedDeclassificationGrant fingerprints include this exact dependent contract repair.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "f464d5189dd2ee6846f072a405b233e4e026f1fdc85e4f2fef2cafe0f3c50467",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "ca48786b1fa98afab9bd3a43981b2257a6e0d7dd64c3317e7e75e43c97b76d36",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/declassification_grant_schema.py:TargetLabel",
+      "reason": "Correct TargetLabel to inherit the known InformationLabel contract (owners and compartments) rather than a model containing only kind. Body and SignedDeclassificationGrant fingerprints include this exact dependent contract repair.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "f5ab7a0daffd678e53d9fa625b20358410f5ab6f2f114f19b7fea421f31ac804",
+        "module": "security/information_label_schema.py"
+      },
+      "before": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "121ff34ed31621458a3dfe71285061aa04a684fdb3d74266ad104af62f12440c",
+        "module": "security/information_label_schema.py"
+      },
+      "export": "__init__.py:InformationLabel",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Apply the registered 256-byte UTF-8 flowIdentifier facets through the known-label union dependency, including owner propertyNames validation and reader/compartment references. Preserve this root constructor and nominal identity.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "c39f927b78ba0bc29a2954319a2395b63f0df8ff60c3c4a8aa4cd0fbcd4ad544",
+        "module": "security/information_label_schema.py"
+      },
+      "before": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "0ae8618d564d8e294e6610ac0a3345659837b5c727003ebf0b5e833bca8204a6",
+        "module": "security/information_label_schema.py"
+      },
+      "export": "__init__.py:InformationLabel1",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Enforce the existing flowIdentifier propertyNames contract on owner map keys, its registered 256-byte UTF-8 facet, and the same bound through reader/compartment FlowIdentifier references. Fields and nominal identity remain unchanged.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "c62ff460789b8014ee688050fedb73bdb6f5955265fcf8a5fff6708a24cd65aa",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "afbc9c1cf19c147f9c84eb1ba239e76758b4f5faed10f0e4cc697bdab9237cda",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "__init__.py:SecurityBody",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Retain the reviewed TargetLabel inheritance repair restoring required known-label owners/compartments, and add schema-driven 256-byte UTF-8 validation to the declared declassification flow roles and their label dependencies. Preserve the consumer-bound actual Body class.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "21fe3593d5545c59d7e8879aaa9c181d6d3bbabe74196e73779be368dc61f520",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "b970c86c031105706a02ca8ab9963e83d4b6ae05608403fe54194e18653daf5b",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "__init__.py:SignedDeclassificationGrant",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Retain the consumer-bound actual Body type while its exact dependency incorporates the reviewed known TargetLabel inheritance repair and declared 256-byte UTF-8 flow-role/owner validation. Signed envelope fields and nominal identities remain unchanged.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "3ba627ecb84603ce9577b432b4290e031b933ccfb177efb06192db7dad4ff882",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "ca48786b1fa98afab9bd3a43981b2257a6e0d7dd64c3317e7e75e43c97b76d36",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "__init__.py:TargetLabel",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Retain the reviewed correction making TargetLabel inherit the complete known InformationLabel owners/compartments contract; incorporate declared 256-byte UTF-8 scalar/reader/compartment and owner-key validation inherited through that contract.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "c62ff460789b8014ee688050fedb73bdb6f5955265fcf8a5fff6708a24cd65aa",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "afbc9c1cf19c147f9c84eb1ba239e76758b4f5faed10f0e4cc697bdab9237cda",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/__init__.py:Body",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Retain the reviewed TargetLabel inheritance repair restoring required known-label owners/compartments, and add schema-driven 256-byte UTF-8 validation to the declared declassification flow roles and their label dependencies. Preserve the consumer-bound actual Body class.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "f5ab7a0daffd678e53d9fa625b20358410f5ab6f2f114f19b7fea421f31ac804",
+        "module": "security/information_label_schema.py"
+      },
+      "before": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "121ff34ed31621458a3dfe71285061aa04a684fdb3d74266ad104af62f12440c",
+        "module": "security/information_label_schema.py"
+      },
+      "export": "security/__init__.py:InformationLabel",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Apply the registered 256-byte UTF-8 flowIdentifier facets through the known-label union dependency, including owner propertyNames validation and reader/compartment references. Preserve this root constructor and nominal identity.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "c39f927b78ba0bc29a2954319a2395b63f0df8ff60c3c4a8aa4cd0fbcd4ad544",
+        "module": "security/information_label_schema.py"
+      },
+      "before": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "0ae8618d564d8e294e6610ac0a3345659837b5c727003ebf0b5e833bca8204a6",
+        "module": "security/information_label_schema.py"
+      },
+      "export": "security/__init__.py:InformationLabel1",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Enforce the existing flowIdentifier propertyNames contract on owner map keys, its registered 256-byte UTF-8 facet, and the same bound through reader/compartment FlowIdentifier references. Fields and nominal identity remain unchanged.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "21fe3593d5545c59d7e8879aaa9c181d6d3bbabe74196e73779be368dc61f520",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "b970c86c031105706a02ca8ab9963e83d4b6ae05608403fe54194e18653daf5b",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/__init__.py:SignedDeclassificationGrant",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Retain the consumer-bound actual Body type while its exact dependency incorporates the reviewed known TargetLabel inheritance repair and declared 256-byte UTF-8 flow-role/owner validation. Signed envelope fields and nominal identities remain unchanged.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "3ba627ecb84603ce9577b432b4290e031b933ccfb177efb06192db7dad4ff882",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "ca48786b1fa98afab9bd3a43981b2257a6e0d7dd64c3317e7e75e43c97b76d36",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/__init__.py:TargetLabel",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Retain the reviewed correction making TargetLabel inherit the complete known InformationLabel owners/compartments contract; incorporate declared 256-byte UTF-8 scalar/reader/compartment and owner-key validation inherited through that contract.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "c62ff460789b8014ee688050fedb73bdb6f5955265fcf8a5fff6708a24cd65aa",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "afbc9c1cf19c147f9c84eb1ba239e76758b4f5faed10f0e4cc697bdab9237cda",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/declassification_grant_schema.py:Body",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Retain the reviewed TargetLabel inheritance repair restoring required known-label owners/compartments, and add schema-driven 256-byte UTF-8 validation to the declared declassification flow roles and their label dependencies. Preserve the consumer-bound actual Body class.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "FlowIdentifier",
+        "contract": "security/declassification_grant_schema.py:FlowIdentifier",
+        "fingerprint": "4f55b6c09f642b353b69420c2dd9c27fcb6e47576357dde105b31331c99a624e",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "FlowIdentifier",
+        "contract": "security/declassification_grant_schema.py:FlowIdentifier",
+        "fingerprint": "6b2e65389c2264bf817ee23685c39171a28f7b77d5d6a8d3a78f20be61f20fa8",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/declassification_grant_schema.py:FlowIdentifier",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Enforce the registered 256-byte UTF-8 facet on the existing declassification scalar RootModel. Preserve its annotation, Unicode-scalar pattern/length constraints and actual nominal identity.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "21fe3593d5545c59d7e8879aaa9c181d6d3bbabe74196e73779be368dc61f520",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "b970c86c031105706a02ca8ab9963e83d4b6ae05608403fe54194e18653daf5b",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Retain the consumer-bound actual Body type while its exact dependency incorporates the reviewed known TargetLabel inheritance repair and declared 256-byte UTF-8 flow-role/owner validation. Signed envelope fields and nominal identities remain unchanged.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "3ba627ecb84603ce9577b432b4290e031b933ccfb177efb06192db7dad4ff882",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "ca48786b1fa98afab9bd3a43981b2257a6e0d7dd64c3317e7e75e43c97b76d36",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "export": "security/declassification_grant_schema.py:TargetLabel",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Retain the reviewed correction making TargetLabel inherit the complete known InformationLabel owners/compartments contract; incorporate declared 256-byte UTF-8 scalar/reader/compartment and owner-key validation inherited through that contract.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "FlowIdentifier",
+        "contract": "security/information_label_schema.py:FlowIdentifier",
+        "fingerprint": "4f55b6c09f642b353b69420c2dd9c27fcb6e47576357dde105b31331c99a624e",
+        "module": "security/information_label_schema.py"
+      },
+      "before": {
+        "class": "FlowIdentifier",
+        "contract": "security/information_label_schema.py:FlowIdentifier",
+        "fingerprint": "6b2e65389c2264bf817ee23685c39171a28f7b77d5d6a8d3a78f20be61f20fa8",
+        "module": "security/information_label_schema.py"
+      },
+      "export": "security/information_label_schema.py:FlowIdentifier",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Enforce the registered 256-byte UTF-8 facet on the existing information-label scalar RootModel used by readers and compartments. Preserve its annotation, Unicode-scalar pattern/length constraints and actual nominal identity.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "f5ab7a0daffd678e53d9fa625b20358410f5ab6f2f114f19b7fea421f31ac804",
+        "module": "security/information_label_schema.py"
+      },
+      "before": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "121ff34ed31621458a3dfe71285061aa04a684fdb3d74266ad104af62f12440c",
+        "module": "security/information_label_schema.py"
+      },
+      "export": "security/information_label_schema.py:InformationLabel",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Apply the registered 256-byte UTF-8 flowIdentifier facets through the known-label union dependency, including owner propertyNames validation and reader/compartment references. Preserve this root constructor and nominal identity.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "c39f927b78ba0bc29a2954319a2395b63f0df8ff60c3c4a8aa4cd0fbcd4ad544",
+        "module": "security/information_label_schema.py"
+      },
+      "before": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "0ae8618d564d8e294e6610ac0a3345659837b5c727003ebf0b5e833bca8204a6",
+        "module": "security/information_label_schema.py"
+      },
+      "export": "security/information_label_schema.py:InformationLabel1",
+      "kind": "rebound_or_contract_changed",
+      "reason": "Enforce the existing flowIdentifier propertyNames contract on owner map keys, its registered 256-byte UTF-8 facet, and the same bound through reader/compartment FlowIdentifier references. Fields and nominal identity remain unchanged.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    }
+  ],
+  "format": "chio.sdk.python.generated-api-compatibility.v1",
+  "pending_review_transitions": [],
+  "enforcement_dependencies_transitions": [
+    {
+      "after": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "f5ab7a0daffd678e53d9fa625b20358410f5ab6f2f114f19b7fea421f31ac804",
+        "module": "security/information_label_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "85e394e718618ef3299fdb20b5153add88694a33af3cf58262fd7dd8a8f93323"
+      },
+      "before": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "121ff34ed31621458a3dfe71285061aa04a684fdb3d74266ad104af62f12440c",
+        "module": "security/information_label_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "ebe4e64b1faeafc537190cbb9e4ef246fdb7ada0d6f5b2c251aceaf234a1a91c"
+      },
+      "export": "__init__.py:InformationLabel",
+      "reason": "Apply the registered 256-byte UTF-8 flowIdentifier facets through the known-label union dependency, including owner propertyNames validation and reader/compartment references. Preserve this root constructor and nominal identity. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "c39f927b78ba0bc29a2954319a2395b63f0df8ff60c3c4a8aa4cd0fbcd4ad544",
+        "module": "security/information_label_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "ca0e88e51a5b59bb86e3a56c9a2542246edc251c767f66fa62f04fd47a11d26f"
+      },
+      "before": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "0ae8618d564d8e294e6610ac0a3345659837b5c727003ebf0b5e833bca8204a6",
+        "module": "security/information_label_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "d20b3b2aa657b00f9a3b76d9b8884dfc554f58096978714de6021535999c7bd8"
+      },
+      "export": "__init__.py:InformationLabel1",
+      "reason": "Enforce the existing flowIdentifier propertyNames contract on owner map keys, its registered 256-byte UTF-8 facet, and the same bound through reader/compartment FlowIdentifier references. Fields and nominal identity remain unchanged. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "c62ff460789b8014ee688050fedb73bdb6f5955265fcf8a5fff6708a24cd65aa",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "2b2e85192fe46ff6b3ac8c7eb55c16625c977b764ddb640d945cc0d39ae03cda"
+      },
+      "before": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "afbc9c1cf19c147f9c84eb1ba239e76758b4f5faed10f0e4cc697bdab9237cda",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "36f86b00295948d42c1086a9dc5e3dd234b4d0923fe5046cc90562e2a024bfbb"
+      },
+      "export": "__init__.py:SecurityBody",
+      "reason": "Retain the reviewed TargetLabel inheritance repair restoring required known-label owners/compartments, and add schema-driven 256-byte UTF-8 validation to the declared declassification flow roles and their label dependencies. Preserve the consumer-bound actual Body class. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "21fe3593d5545c59d7e8879aaa9c181d6d3bbabe74196e73779be368dc61f520",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "4c9f2b6233c7e6d1d07b7a08fe5ed80ee0acdc9ee4cf312f9cdb130a9110977d"
+      },
+      "before": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "b970c86c031105706a02ca8ab9963e83d4b6ae05608403fe54194e18653daf5b",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "33e7aa793269f23aacff4548bedaa81037eb2d83fa82161ebe683f2e48b07608"
+      },
+      "export": "__init__.py:SignedDeclassificationGrant",
+      "reason": "Retain the consumer-bound actual Body type while its exact dependency incorporates the reviewed known TargetLabel inheritance repair and declared 256-byte UTF-8 flow-role/owner validation. Signed envelope fields and nominal identities remain unchanged. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "3ba627ecb84603ce9577b432b4290e031b933ccfb177efb06192db7dad4ff882",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "c4fa5d934ba2b0f026af29c9d313a21942033a7375770b0360449f1c8f94c730"
+      },
+      "before": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "ca48786b1fa98afab9bd3a43981b2257a6e0d7dd64c3317e7e75e43c97b76d36",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "b23d4b922177ade786d2d4de58e61568619a53d54d0e04ac1b0b0772bf2aef0e"
+      },
+      "export": "__init__.py:TargetLabel",
+      "reason": "Retain the reviewed correction making TargetLabel inherit the complete known InformationLabel owners/compartments contract; incorporate declared 256-byte UTF-8 scalar/reader/compartment and owner-key validation inherited through that contract. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "c62ff460789b8014ee688050fedb73bdb6f5955265fcf8a5fff6708a24cd65aa",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "2b2e85192fe46ff6b3ac8c7eb55c16625c977b764ddb640d945cc0d39ae03cda"
+      },
+      "before": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "afbc9c1cf19c147f9c84eb1ba239e76758b4f5faed10f0e4cc697bdab9237cda",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "36f86b00295948d42c1086a9dc5e3dd234b4d0923fe5046cc90562e2a024bfbb"
+      },
+      "export": "security/__init__.py:Body",
+      "reason": "Retain the reviewed TargetLabel inheritance repair restoring required known-label owners/compartments, and add schema-driven 256-byte UTF-8 validation to the declared declassification flow roles and their label dependencies. Preserve the consumer-bound actual Body class. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "f5ab7a0daffd678e53d9fa625b20358410f5ab6f2f114f19b7fea421f31ac804",
+        "module": "security/information_label_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "85e394e718618ef3299fdb20b5153add88694a33af3cf58262fd7dd8a8f93323"
+      },
+      "before": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "121ff34ed31621458a3dfe71285061aa04a684fdb3d74266ad104af62f12440c",
+        "module": "security/information_label_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "ebe4e64b1faeafc537190cbb9e4ef246fdb7ada0d6f5b2c251aceaf234a1a91c"
+      },
+      "export": "security/__init__.py:InformationLabel",
+      "reason": "Apply the registered 256-byte UTF-8 flowIdentifier facets through the known-label union dependency, including owner propertyNames validation and reader/compartment references. Preserve this root constructor and nominal identity. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "c39f927b78ba0bc29a2954319a2395b63f0df8ff60c3c4a8aa4cd0fbcd4ad544",
+        "module": "security/information_label_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "ca0e88e51a5b59bb86e3a56c9a2542246edc251c767f66fa62f04fd47a11d26f"
+      },
+      "before": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "0ae8618d564d8e294e6610ac0a3345659837b5c727003ebf0b5e833bca8204a6",
+        "module": "security/information_label_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "d20b3b2aa657b00f9a3b76d9b8884dfc554f58096978714de6021535999c7bd8"
+      },
+      "export": "security/__init__.py:InformationLabel1",
+      "reason": "Enforce the existing flowIdentifier propertyNames contract on owner map keys, its registered 256-byte UTF-8 facet, and the same bound through reader/compartment FlowIdentifier references. Fields and nominal identity remain unchanged. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "21fe3593d5545c59d7e8879aaa9c181d6d3bbabe74196e73779be368dc61f520",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "4c9f2b6233c7e6d1d07b7a08fe5ed80ee0acdc9ee4cf312f9cdb130a9110977d"
+      },
+      "before": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "b970c86c031105706a02ca8ab9963e83d4b6ae05608403fe54194e18653daf5b",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "33e7aa793269f23aacff4548bedaa81037eb2d83fa82161ebe683f2e48b07608"
+      },
+      "export": "security/__init__.py:SignedDeclassificationGrant",
+      "reason": "Retain the consumer-bound actual Body type while its exact dependency incorporates the reviewed known TargetLabel inheritance repair and declared 256-byte UTF-8 flow-role/owner validation. Signed envelope fields and nominal identities remain unchanged. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "3ba627ecb84603ce9577b432b4290e031b933ccfb177efb06192db7dad4ff882",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "c4fa5d934ba2b0f026af29c9d313a21942033a7375770b0360449f1c8f94c730"
+      },
+      "before": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "ca48786b1fa98afab9bd3a43981b2257a6e0d7dd64c3317e7e75e43c97b76d36",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "b23d4b922177ade786d2d4de58e61568619a53d54d0e04ac1b0b0772bf2aef0e"
+      },
+      "export": "security/__init__.py:TargetLabel",
+      "reason": "Retain the reviewed correction making TargetLabel inherit the complete known InformationLabel owners/compartments contract; incorporate declared 256-byte UTF-8 scalar/reader/compartment and owner-key validation inherited through that contract. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "c62ff460789b8014ee688050fedb73bdb6f5955265fcf8a5fff6708a24cd65aa",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "2b2e85192fe46ff6b3ac8c7eb55c16625c977b764ddb640d945cc0d39ae03cda"
+      },
+      "before": {
+        "class": "SecurityDeclassificationGrantBody",
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "afbc9c1cf19c147f9c84eb1ba239e76758b4f5faed10f0e4cc697bdab9237cda",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SecurityDeclassificationGrantBody",
+        "fingerprint": "36f86b00295948d42c1086a9dc5e3dd234b4d0923fe5046cc90562e2a024bfbb"
+      },
+      "export": "security/declassification_grant_schema.py:Body",
+      "reason": "Retain the reviewed TargetLabel inheritance repair restoring required known-label owners/compartments, and add schema-driven 256-byte UTF-8 validation to the declared declassification flow roles and their label dependencies. Preserve the consumer-bound actual Body class. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "FlowIdentifier",
+        "contract": "security/declassification_grant_schema.py:FlowIdentifier",
+        "fingerprint": "4f55b6c09f642b353b69420c2dd9c27fcb6e47576357dde105b31331c99a624e",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:FlowIdentifier",
+        "fingerprint": "5c36770ab9b6176f16fb6878c5b487496b61f98ab924695314d66fccdf33d066"
+      },
+      "before": {
+        "class": "FlowIdentifier",
+        "contract": "security/declassification_grant_schema.py:FlowIdentifier",
+        "fingerprint": "6b2e65389c2264bf817ee23685c39171a28f7b77d5d6a8d3a78f20be61f20fa8",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:FlowIdentifier",
+        "fingerprint": "b23d4b922177ade786d2d4de58e61568619a53d54d0e04ac1b0b0772bf2aef0e"
+      },
+      "export": "security/declassification_grant_schema.py:FlowIdentifier",
+      "reason": "Enforce the registered 256-byte UTF-8 facet on the existing declassification scalar RootModel. Preserve its annotation, Unicode-scalar pattern/length constraints and actual nominal identity. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "21fe3593d5545c59d7e8879aaa9c181d6d3bbabe74196e73779be368dc61f520",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "4c9f2b6233c7e6d1d07b7a08fe5ed80ee0acdc9ee4cf312f9cdb130a9110977d"
+      },
+      "before": {
+        "class": "SignedDeclassificationGrant",
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "b970c86c031105706a02ca8ab9963e83d4b6ae05608403fe54194e18653daf5b",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+        "fingerprint": "33e7aa793269f23aacff4548bedaa81037eb2d83fa82161ebe683f2e48b07608"
+      },
+      "export": "security/declassification_grant_schema.py:SignedDeclassificationGrant",
+      "reason": "Retain the consumer-bound actual Body type while its exact dependency incorporates the reviewed known TargetLabel inheritance repair and declared 256-byte UTF-8 flow-role/owner validation. Signed envelope fields and nominal identities remain unchanged. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "3ba627ecb84603ce9577b432b4290e031b933ccfb177efb06192db7dad4ff882",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "c4fa5d934ba2b0f026af29c9d313a21942033a7375770b0360449f1c8f94c730"
+      },
+      "before": {
+        "class": "TargetLabel",
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "ca48786b1fa98afab9bd3a43981b2257a6e0d7dd64c3317e7e75e43c97b76d36",
+        "module": "security/declassification_grant_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/declassification_grant_schema.py:TargetLabel",
+        "fingerprint": "b23d4b922177ade786d2d4de58e61568619a53d54d0e04ac1b0b0772bf2aef0e"
+      },
+      "export": "security/declassification_grant_schema.py:TargetLabel",
+      "reason": "Retain the reviewed correction making TargetLabel inherit the complete known InformationLabel owners/compartments contract; incorporate declared 256-byte UTF-8 scalar/reader/compartment and owner-key validation inherited through that contract. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "FlowIdentifier",
+        "contract": "security/information_label_schema.py:FlowIdentifier",
+        "fingerprint": "4f55b6c09f642b353b69420c2dd9c27fcb6e47576357dde105b31331c99a624e",
+        "module": "security/information_label_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:FlowIdentifier",
+        "fingerprint": "5c36770ab9b6176f16fb6878c5b487496b61f98ab924695314d66fccdf33d066"
+      },
+      "before": {
+        "class": "FlowIdentifier",
+        "contract": "security/information_label_schema.py:FlowIdentifier",
+        "fingerprint": "6b2e65389c2264bf817ee23685c39171a28f7b77d5d6a8d3a78f20be61f20fa8",
+        "module": "security/information_label_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:FlowIdentifier",
+        "fingerprint": "b23d4b922177ade786d2d4de58e61568619a53d54d0e04ac1b0b0772bf2aef0e"
+      },
+      "export": "security/information_label_schema.py:FlowIdentifier",
+      "reason": "Enforce the registered 256-byte UTF-8 facet on the existing information-label scalar RootModel used by readers and compartments. Preserve its annotation, Unicode-scalar pattern/length constraints and actual nominal identity. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "f5ab7a0daffd678e53d9fa625b20358410f5ab6f2f114f19b7fea421f31ac804",
+        "module": "security/information_label_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "85e394e718618ef3299fdb20b5153add88694a33af3cf58262fd7dd8a8f93323"
+      },
+      "before": {
+        "class": "InformationLabel",
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "121ff34ed31621458a3dfe71285061aa04a684fdb3d74266ad104af62f12440c",
+        "module": "security/information_label_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:InformationLabel",
+        "fingerprint": "ebe4e64b1faeafc537190cbb9e4ef246fdb7ada0d6f5b2c251aceaf234a1a91c"
+      },
+      "export": "security/information_label_schema.py:InformationLabel",
+      "reason": "Apply the registered 256-byte UTF-8 flowIdentifier facets through the known-label union dependency, including owner propertyNames validation and reader/compartment references. Preserve this root constructor and nominal identity. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    },
+    {
+      "after": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "c39f927b78ba0bc29a2954319a2395b63f0df8ff60c3c4a8aa4cd0fbcd4ad544",
+        "module": "security/information_label_schema.py"
+      },
+      "after_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "ca0e88e51a5b59bb86e3a56c9a2542246edc251c767f66fa62f04fd47a11d26f"
+      },
+      "before": {
+        "class": "SecurityInformationLabelKnown",
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "0ae8618d564d8e294e6610ac0a3345659837b5c727003ebf0b5e833bca8204a6",
+        "module": "security/information_label_schema.py"
+      },
+      "before_enforcement_dependencies": {
+        "contract": "security/information_label_schema.py:SecurityInformationLabelKnown",
+        "fingerprint": "d20b3b2aa657b00f9a3b76d9b8884dfc554f58096978714de6021535999c7bd8"
+      },
+      "export": "security/information_label_schema.py:InformationLabel1",
+      "reason": "Enforce the existing flowIdentifier propertyNames contract on owner map keys, its registered 256-byte UTF-8 facet, and the same bound through reader/compartment FlowIdentifier references. Fields and nominal identity remain unchanged. Bind the actual owned chio_sdk.recovery_wire:require_utf8_bound source and exact transitive model dependency graph.",
+      "version_scope": {
+        "from": "0.1.1",
+        "to": "0.1.1"
+      }
+    }
+  ]
+}

@@ -7,16 +7,27 @@ use chio_kernel::receipt_store::AdmissionCallerDispatchCapture;
 const PAYLOAD: &[u8] =
     br#"{"schema":"chio.kernel-caller-context-test.v1","value":"private-context"}"#;
 
-fn ready() -> TestResult<NonceFixture> {
-    ready_with_transport("caller-report:test-server")
-}
+const LEGACY_TRANSPORT: &str = "caller-report:test-server";
 
 fn pending() -> TestResult<NonceFixture> {
-    pending_with_transport("caller-report:test-server")
+    pending_with_transport(LEGACY_TRANSPORT)
 }
 
 fn pending_with_transport(transport: &str) -> TestResult<NonceFixture> {
-    let mut fixture = ready_with_transport(transport)?;
+    pending_from(ready_with_transport(transport)?)
+}
+
+/// Modeled supported-predecessor construction for the v17 migration refusals:
+/// the caller reservations are written through a `pre_recovery_fixture` store.
+fn pre_recovery_ready() -> TestResult<NonceFixture> {
+    ready_from(pre_recovery_prepared_nonce_fixture(None)?, LEGACY_TRANSPORT)
+}
+
+fn pre_recovery_pending() -> TestResult<NonceFixture> {
+    pending_from(pre_recovery_ready()?)
+}
+
+fn pending_from(mut fixture: NonceFixture) -> TestResult<NonceFixture> {
     let command = nonce_command(
         &fixture.fixture.store,
         &fixture.fixture.fence,
@@ -34,13 +45,12 @@ fn pending_with_transport(transport: &str) -> TestResult<NonceFixture> {
 }
 
 fn ready_with_transport(transport: &str) -> TestResult<NonceFixture> {
-    let mut fixture = advance_nonce_fixture_with_transport(
-        prepared_nonce_fixture(None)?,
-        true,
-        None,
-        true,
-        Some(transport),
-    )?;
+    ready_from(prepared_nonce_fixture(None)?, transport)
+}
+
+fn ready_from(prepared: NonceFixture, transport: &str) -> TestResult<NonceFixture> {
+    let mut fixture =
+        advance_nonce_fixture_with_transport(prepared, true, None, true, Some(transport))?;
     fixture.operation = fixture
         .fixture
         .store
@@ -285,70 +295,113 @@ fn assert_context_insert_rollback(table: &str) -> TestResult {
     Ok(())
 }
 
-#[test]
-fn caller_context_missing_or_changed_physical_rows_fail_closed() -> TestResult {
-    for delete in [false, true] {
-        let mut fixture = pending()?;
-        let context = context(&fixture)?;
-        capture(&mut fixture, &context)?;
-        {
-            let connection = fixture.fixture.store.connection()?;
-            let trigger = if delete {
-                "admission_operation_caller_contexts_no_delete"
-            } else {
-                "admission_operation_caller_contexts_immutable"
-            };
-            let restore: String = connection.query_row(
-                "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = ?1",
-                [trigger],
-                |row| row.get(0),
+/// The precise public readers that must reject a corrupted physical context.
+enum CallerContextReader {
+    OperationId,
+    PhysicalContext,
+    ReplayKey,
+    RecoveryScan,
+    Startup,
+}
+
+/// Drop the immutable/no-delete guard, apply the physical corruption, then
+/// restore the exact captured catalog trigger so every reader must detect the
+/// physical context corruption itself, not a missing immutability guard.
+fn corrupt_caller_context_row(
+    fixture: &NonceFixture,
+    context: &AdmissionCallerDispatchContextV1,
+    delete: bool,
+) -> TestResult {
+    {
+        let connection = fixture.fixture.store.connection()?;
+        let trigger = if delete {
+            "admission_operation_caller_contexts_no_delete"
+        } else {
+            "admission_operation_caller_contexts_immutable"
+        };
+        let restore: String = connection.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = ?1",
+            [trigger],
+            |row| row.get(0),
+        )?;
+        if delete {
+            connection.execute_batch("DROP TRIGGER admission_operation_caller_contexts_no_delete; DELETE FROM admission_operation_caller_contexts;")?;
+        } else {
+            let mut wire: serde_json::Value = serde_json::from_slice(context.canonical_bytes())?;
+            wire["kernel_context_json"] = serde_json::json!("{\"value\":\"substituted\"}");
+            connection
+                .execute_batch("DROP TRIGGER admission_operation_caller_contexts_immutable;")?;
+            connection.execute(
+                "UPDATE admission_operation_caller_contexts SET context_json = ?1",
+                [canonical_json_bytes(&wire)?],
             )?;
-            if delete {
-                connection.execute_batch("DROP TRIGGER admission_operation_caller_contexts_no_delete; DELETE FROM admission_operation_caller_contexts;")?;
-            } else {
-                let mut wire: serde_json::Value =
-                    serde_json::from_slice(context.canonical_bytes())?;
-                wire["kernel_context_json"] = serde_json::json!("{\"value\":\"substituted\"}");
-                connection
-                    .execute_batch("DROP TRIGGER admission_operation_caller_contexts_immutable;")?;
-                connection.execute(
-                    "UPDATE admission_operation_caller_contexts SET context_json = ?1",
-                    [canonical_json_bytes(&wire)?],
-                )?;
-            }
-            // Preserve the exact schema so startup must detect the physical
-            // context corruption, not a missing immutability trigger.
-            connection.execute_batch(&restore)?;
         }
-        let error = fixture
+        // Preserve the exact schema so every reader must detect the physical
+        // context corruption, not a missing immutability trigger.
+        connection.execute_batch(&restore)?;
+    }
+    Ok(())
+}
+
+/// One detected corruption poisons the detecting owner, so each precise public
+/// read runs on an independent freshly corrupted fixture and must return its
+/// own exact integrity refusal rather than a generic poisoned-owner outcome.
+fn assert_caller_context_reader_fails_closed(
+    reader: CallerContextReader,
+    delete: bool,
+) -> TestResult {
+    let mut fixture = pending()?;
+    let context = context(&fixture)?;
+    capture(&mut fixture, &context)?;
+    corrupt_caller_context_row(&fixture, &context, delete)?;
+    let expected = if delete {
+        "lost its physical dispatch context"
+    } else {
+        "lost its immutable operation attachment"
+    };
+    let error = match reader {
+        CallerContextReader::OperationId => fixture
             .fixture
             .store
             .load_by_operation_id(fixture.operation.binding().operation_id())
-            .expect_err("physical context corruption must reject the operation read");
-        let expected = if delete {
-            "lost its physical dispatch context"
-        } else {
-            "lost its immutable operation attachment"
-        };
-        assert!(error.to_string().contains(expected), "{error}");
-        assert!(load(&fixture).is_err());
-        let error = fixture
+            .expect_err("physical context corruption must reject the operation read")
+            .to_string(),
+        CallerContextReader::PhysicalContext => load(&fixture)
+            .expect_err("physical context corruption must reject the context read")
+            .to_string(),
+        CallerContextReader::ReplayKey => fixture
             .fixture
             .store
             .load_by_replay_key(&fixture.operation.replay_key())
-            .expect_err("replay must validate the same physical context");
-        assert!(error.to_string().contains(expected), "{error}");
-        let error = fixture
+            .expect_err("replay must validate the same physical context")
+            .to_string(),
+        CallerContextReader::RecoveryScan => fixture
             .fixture
             .store
-            .list_recoverable(now_ms() + 120_000, 10)
-            .expect_err("recovery scan must validate the same physical context");
-        assert!(error.to_string().contains(expected), "{error}");
-        let error = match lifecycle::reopen(fixture) {
+            .list_recoverable(now_ms() + 120_000, None, 10)
+            .expect_err("recovery scan must validate the same physical context")
+            .to_string(),
+        CallerContextReader::Startup => match lifecycle::reopen(fixture) {
             Ok(_) => return Err("startup accepted corrupt caller context".into()),
-            Err(error) => error,
-        };
-        assert!(error.to_string().contains(expected), "{error}");
+            Err(error) => error.to_string(),
+        },
+    };
+    assert!(error.contains(expected), "{error}");
+    Ok(())
+}
+
+#[test]
+fn caller_context_missing_or_changed_physical_rows_fail_closed() -> TestResult {
+    for delete in [false, true] {
+        for reader in [
+            CallerContextReader::OperationId,
+            CallerContextReader::PhysicalContext,
+            CallerContextReader::ReplayKey,
+            CallerContextReader::RecoveryScan,
+            CallerContextReader::Startup,
+        ] {
+            assert_caller_context_reader_fails_closed(reader, delete)?;
+        }
     }
     Ok(())
 }
@@ -384,12 +437,20 @@ fn caller_context_oversized_physical_row_is_rejected_before_decode() -> TestResu
     capture(&mut fixture, &context)?;
     {
         let connection = fixture.fixture.store.connection()?;
+        let restore: String = connection.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = 'admission_operation_caller_contexts_immutable'",
+            [],
+            |row| row.get(0),
+        )?;
         connection.execute_batch(
             "DROP TRIGGER admission_operation_caller_contexts_immutable;
              PRAGMA ignore_check_constraints = ON;
              UPDATE admission_operation_caller_contexts SET context_json = zeroblob(1048577);
              PRAGMA ignore_check_constraints = OFF;",
         )?;
+        // Preserve the exact schema so the read must reject the oversized
+        // physical row before decode instead of failing a canonical schema check.
+        connection.execute_batch(&restore)?;
     }
     let error = load(&fixture).expect_err("oversized physical context must fail closed");
     assert!(
@@ -516,17 +577,17 @@ fn mark_v17(fixture: &NonceFixture) -> TestResult {
 
 #[test]
 fn caller_context_migration_refuses_ambiguous_legacy_caller_reservations() -> TestResult {
-    assert_ambiguous_migration_refused(ready()?, false)
+    assert_ambiguous_migration_refused(pre_recovery_ready()?, false)
 }
 
 #[test]
 fn caller_context_migration_refuses_unversioned_legacy_callers() -> TestResult {
-    assert_ambiguous_migration_refused(ready()?, true)
+    assert_ambiguous_migration_refused(pre_recovery_ready()?, true)
 }
 
 #[test]
 fn caller_context_migration_refuses_legacy_compensation_as_proof_of_nonexecution() -> TestResult {
-    let fixture = pending()?;
+    let fixture = pre_recovery_pending()?;
     lifecycle::release(&fixture)?;
     let terminal = fixture
         .fixture
@@ -575,7 +636,10 @@ fn assert_ambiguous_migration_refused(fixture: NonceFixture, unversioned: bool) 
 
 #[test]
 fn caller_context_migration_preserves_ordinary_nonce_history() -> TestResult {
-    let fixture = ready_with_transport("kernel-tool-server:test-server")?;
+    let fixture = ready_from(
+        pre_recovery_prepared_nonce_fixture(None)?,
+        "kernel-tool-server:test-server",
+    )?;
     let before = fixture.operation.clone();
     mark_v17(&fixture)?;
     let fixture = lifecycle::reopen(fixture)?;

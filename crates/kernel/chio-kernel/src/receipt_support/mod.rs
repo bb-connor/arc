@@ -29,8 +29,8 @@ pub(crate) use receipt_scopes::{
     GovernedCallChainReceiptEvidence,
 };
 pub use receipt_scopes::{
-    fixed_runtime_unix_secs_for_current_thread, scope_fixed_runtime_for_current_thread,
-    FixedRuntimeScope,
+    fixed_runtime_unix_secs_for_current_thread, scope_fixed_runtime_clock_for_current_thread,
+    scope_fixed_runtime_for_current_thread, FixedRuntimeClockScope, FixedRuntimeScope,
 };
 pub use signing::{
     kernel_signing_backend, sign_receipt_body_hybrid_canonical, sign_receipt_body_with_backend,

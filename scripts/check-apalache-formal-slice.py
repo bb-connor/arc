@@ -586,8 +586,9 @@ def check_safety_workflow_wiring() -> None:
         "apalache-safety must be reusable without a second direct pull-request trigger",
     )
     require(
-        "\n  pull_request:\n    branches: [main]\n" in ci,
-        "required CI must run for every pull request to main",
+        "\n  pull_request:\n"
+        "    branches: [main, research/openappa-recovery-20261001]\n" in ci,
+        "required CI must run for every pull request to main or the approved stacked base",
     )
     ci_job = workflow_job(
         ci,

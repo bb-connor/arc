@@ -404,7 +404,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 );
                 true
             }
-            // Skip any leftover valid frames still in flight from phase 1.
+            // Skip any leftover valid frames still in flight from the initial gossip exchange.
             _ => false,
         },
     )

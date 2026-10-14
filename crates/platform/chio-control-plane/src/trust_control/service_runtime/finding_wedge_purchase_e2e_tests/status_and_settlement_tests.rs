@@ -245,7 +245,7 @@ async fn finding_purchase_without_status_verifier_denies_before_effects() -> Tes
     })
     .await?;
     let denied =
-        lane.reveal_without_status("m6-missing-status-verifier", "m6-missing-status-nonce")?;
+        lane.reveal_without_status("status-missing-status-verifier", "status-missing-status-nonce")?;
     assert_denied_with(&denied, "configured kernel verifier");
     assert_eq!(lane.calls.authorizations.load(Ordering::SeqCst), 0);
     assert_eq!(lane.calls.captures.load(Ordering::SeqCst), 0);
@@ -309,7 +309,7 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
         publisher.publish_non_inclusion(&lane.deployment.web.finding_id, &[], now + 1)?;
     assert_eq!(duplicate_live.proof_sha256, live.proof_sha256);
     assert_eq!(duplicate_live.checked_at, live.checked_at);
-    let other_live_finding = sha256_hex(b"m6-independent-live-finding");
+    let other_live_finding = sha256_hex(b"status-independent-live-finding");
     let other_live = publisher.publish_non_inclusion(&other_live_finding, &[], now)?;
     assert_eq!(
         other_live.map_epoch, live.map_epoch,
@@ -335,8 +335,8 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
     let delivered = lane.reveal_with_status(
         &lane.purchase,
         &live_b64,
-        "m6-live-reveal-1",
-        "m6-live-nonce-1",
+        "status-live-reveal-1",
+        "status-live-nonce-1",
     )?;
     assert_eq!(delivered.verdict, Verdict::Allow, "{:?}", delivered.reason);
     let delivery = finding_delivery_block(&delivered)?;
@@ -425,7 +425,7 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
         declassification_grant: None,
     };
     let live_read =
-        holder_kernel.evaluate_tool_call_blocking(&memory_read_request("m6-holder-live-read"))?;
+        holder_kernel.evaluate_tool_call_blocking(&memory_read_request("status-holder-live-read"))?;
     assert_eq!(live_read.verdict, Verdict::Allow, "{:?}", live_read.reason);
 
     // A second independent venue instance supplies a fresh one-shot purchase
@@ -448,7 +448,7 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
         )?;
     let status_gate_now = unix_timestamp_now();
 
-    let intent_id = sha256_hex(b"m6-voluntary-retraction-intent");
+    let intent_id = sha256_hex(b"status-voluntary-retraction-intent");
     let intent_bytes = canonical_json_bytes(&serde_json::json!({
         "finding_id": lane.deployment.web.finding_id,
         "reason": "seller_voluntary_retraction",
@@ -518,8 +518,8 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
     let pending = status_lane.reveal_with_status(
         &status_lane.purchase,
         &status_gate_live_b64,
-        "m6-pending-reveal-2",
-        "m6-pending-nonce-2",
+        "status-pending-reveal-2",
+        "status-pending-nonce-2",
     )?;
     assert_denied_with(&pending, "pending");
     let pending_intent = status_gate_store
@@ -543,20 +543,20 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
     let retracted = status_lane.reveal_with_status(
         &status_lane.purchase,
         &included_b64,
-        "m6-retracted-reveal-2",
-        "m6-retracted-nonce-2",
+        "status-retracted-reveal-2",
+        "status-retracted-nonce-2",
     )?;
     assert_denied_with(&retracted, "retracted");
     let rollback = status_lane.reveal_with_status(
         &status_lane.purchase,
         &status_gate_live_b64,
-        "m6-rollback-reveal-2",
-        "m6-rollback-nonce-2",
+        "status-rollback-reveal-2",
+        "status-rollback-nonce-2",
     )?;
     assert_denied_with(&rollback, "rollback");
 
-    let second_finding_id = sha256_hex(b"m6-second-retracted-finding");
-    let second_intent_id = sha256_hex(b"m6-second-retraction-intent");
+    let second_finding_id = sha256_hex(b"status-second-retracted-finding");
+    let second_intent_id = sha256_hex(b"status-second-retraction-intent");
     let second_intent_bytes = canonical_json_bytes(&serde_json::json!({
         "finding_id": second_finding_id,
         "reason": "seller_voluntary_retraction",
@@ -670,7 +670,7 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
         .map_epoch;
     let rotation_now = unix_timestamp_now().max(anchor_refresh_at + 1);
     let rotated = rotated_publisher.publish_non_inclusion(
-        &sha256_hex(b"m6-live-after-operator-rotation"),
+        &sha256_hex(b"status-live-after-operator-rotation"),
         &[],
         rotation_now,
     )?;
@@ -717,7 +717,7 @@ async fn run_finding_status_retraction_scenario() -> TestResult {
         chio_guards::finding_retraction::FindingStatusValue::Retracted
     );
     let guarded = holder_kernel
-        .evaluate_tool_call_blocking(&memory_read_request("m6-holder-retracted-read"))?;
+        .evaluate_tool_call_blocking(&memory_read_request("status-holder-retracted-read"))?;
     assert_eq!(guarded.verdict, Verdict::Deny);
     Ok(())
 }
@@ -862,7 +862,7 @@ async fn finding_status_cache_rechecks_sticky_state_after_proof_verification() -
             feed_id: config.status_feed_operator_ref.clone(),
             operator_id: config.status_feed_operator.authority.authority_id.clone(),
             finding_id: lane.deployment.web.finding_id.clone(),
-            intent_id: sha256_hex(b"m6-cache-release-retraction-intent"),
+            intent_id: sha256_hex(b"status-cache-release-retraction-intent"),
             intent_bytes,
             inclusion_deadline: now + config.status_feed_service_bond.inclusion_sla_secs,
         }),
@@ -927,7 +927,7 @@ async fn finding_status_admission_rechecks_sticky_state_after_proof_verification
             feed_id: config.status_feed_operator_ref.clone(),
             operator_id: config.status_feed_operator.authority.authority_id.clone(),
             finding_id: lane.deployment.web.finding_id.clone(),
-            intent_id: sha256_hex(b"m6-concurrent-retraction-intent"),
+            intent_id: sha256_hex(b"status-concurrent-retraction-intent"),
             intent_bytes,
             inclusion_deadline: refresh_now + config.status_feed_service_bond.inclusion_sla_secs,
         }),
@@ -993,7 +993,7 @@ async fn finding_status_admission_makes_sticky_read_final_after_record_verificat
             feed_id: config.status_feed_operator_ref.clone(),
             operator_id: config.status_feed_operator.authority.authority_id.clone(),
             finding_id: lane.deployment.web.finding_id.clone(),
-            intent_id: sha256_hex(b"m6-post-verification-retraction-intent"),
+            intent_id: sha256_hex(b"status-post-verification-retraction-intent"),
             intent_bytes,
             inclusion_deadline: refresh_now + config.status_feed_service_bond.inclusion_sla_secs,
         }),

@@ -113,10 +113,7 @@ pub fn validate_issued_capability_response(
     requested_ttl_seconds: u64,
     current_issuer: &PublicKey,
 ) -> Result<(), KernelError> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?
-        .as_secs();
+    let now = capability_authority_now_unix_secs(&SystemCapabilityAuthorityClock)?;
     validate_issued_capability_response_at(
         capability,
         requested_subject,
@@ -128,7 +125,7 @@ pub fn validate_issued_capability_response(
     )
 }
 
-/// Validate a security-bound authority response against the current wall clock.
+/// Validate a security-bound authority response against the capability authority clock.
 pub fn validate_issued_capability_response_with_binding(
     capability: &CapabilityToken,
     requested_subject: &PublicKey,
@@ -137,10 +134,7 @@ pub fn validate_issued_capability_response_with_binding(
     current_issuer: &PublicKey,
     expected_security_binding: Option<&CapabilitySecurityBinding>,
 ) -> Result<(), KernelError> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?
-        .as_secs();
+    let now = capability_authority_now_unix_secs(&SystemCapabilityAuthorityClock)?;
     validate_issued_capability_response_with_binding_at(
         capability,
         requested_subject,
@@ -1099,6 +1093,105 @@ mod tests {
             Err(KernelError::CapabilityIssuanceFailed(message))
                 if message.contains("clock is unavailable")
         ));
+    }
+
+    #[test]
+    fn response_wrappers_agree_with_issuance_under_the_scoped_authority_clock(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        const SCOPED_NOW_UNIX_SECS: u64 = 1_700_000_000;
+        let keypair = Keypair::generate();
+        let issuer_public_key = keypair.public_key();
+        let subject = Keypair::generate().public_key();
+        let scope = tool_scope();
+        let workload_signer = Keypair::generate();
+        let issuance = CapabilityIssuanceContext::authoritative_session(
+            TenantId::new("tenant-scoped")?,
+            LineageId::new("lineage-scoped")?,
+            SessionId::new("session-scoped")?,
+            PrincipalId::new(subject.to_hex())?,
+            IsolationEpochId::new("epoch-scoped")?,
+            3,
+        );
+        let workload = CapabilityAuthorityWorkloadBinding {
+            tenant_id: "tenant-scoped".to_string(),
+            workload_id: "workload-scoped".to_string(),
+            server_id: "authority-scoped".to_string(),
+            signer_public_key: workload_signer.public_key(),
+        };
+        let binding = capability_security_binding(&issuance, &workload)?;
+        let bound_capability = CapabilityToken::sign_with_security_binding(
+            CapabilityTokenBody {
+                id: "cap-scoped-security-response".to_string(),
+                issuer: issuer_public_key.clone(),
+                subject: subject.clone(),
+                scope: scope.clone(),
+                issued_at: SCOPED_NOW_UNIX_SECS,
+                expires_at: SCOPED_NOW_UNIX_SECS + 60,
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
+            },
+            binding.clone(),
+            &keypair,
+        )?;
+        let authority = LocalCapabilityAuthority::new(keypair);
+
+        let clock_scope = crate::scope_fixed_runtime_clock_for_current_thread(SCOPED_NOW_UNIX_SECS);
+        let capability = authority.issue_capability(&subject, scope.clone(), 60)?;
+        assert_eq!(capability.issued_at, SCOPED_NOW_UNIX_SECS);
+        assert_eq!(capability.expires_at, SCOPED_NOW_UNIX_SECS + 60);
+
+        validate_issued_capability_response(&capability, &subject, &scope, 60, &issuer_public_key)?;
+        validate_issued_capability_response_with_binding(
+            &bound_capability,
+            &subject,
+            &scope,
+            60,
+            &issuer_public_key,
+            Some(&binding),
+        )?;
+
+        let mut incorrect_binding = binding.clone();
+        incorrect_binding.context_generation = 4;
+        assert!(matches!(
+            validate_issued_capability_response_with_binding(
+                &bound_capability,
+                &subject,
+                &scope,
+                60,
+                &issuer_public_key,
+                Some(&incorrect_binding),
+            ),
+            Err(KernelError::CapabilityIssuanceFailed(_))
+        ));
+        drop(clock_scope);
+
+        for refusal in [
+            validate_issued_capability_response(
+                &capability,
+                &subject,
+                &scope,
+                60,
+                &issuer_public_key,
+            ),
+            validate_issued_capability_response_with_binding(
+                &bound_capability,
+                &subject,
+                &scope,
+                60,
+                &issuer_public_key,
+                Some(&binding),
+            ),
+        ] {
+            match refusal {
+                Err(KernelError::CapabilityIssuanceFailed(message))
+                    if message.contains("already expired") => {}
+                Err(other) => {
+                    panic!("scoped capability must be refused as already expired, got: {other}")
+                }
+                Ok(()) => panic!("scoped capability must be refused after the clock scope drops"),
+            }
+        }
+        Ok(())
     }
 
     #[test]

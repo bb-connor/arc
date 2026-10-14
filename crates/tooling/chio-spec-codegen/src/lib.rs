@@ -70,6 +70,8 @@ use std::process::{Command, Stdio};
 use typify::{TypeSpace, TypeSpaceSettings};
 
 mod errors_pass;
+mod schema_catalog;
+pub use schema_catalog::LocalSchemaCatalog;
 pub mod statemachines_pass;
 pub mod threat_coverage_doc;
 pub mod threat_model;
@@ -214,9 +216,15 @@ pub fn codegen_rust(schemas_dir: &Path, out_dir: &Path) -> Result<()> {
     let mut schema_files: Vec<PathBuf> = Vec::new();
     walk_schema_files(schemas_dir, &mut schema_files)?;
     schema_files.sort();
-    let referenced_schema_roots = collect_local_schema_ref_roots(&schema_files, schemas_dir)?;
+    let catalog = LocalSchemaCatalog::load(schemas_dir)?;
+    let referenced_schema_roots = collect_local_schema_ref_roots(&schema_files, &catalog)?;
 
-    let pretty = render_schema_modules(&schema_files, schemas_dir, &referenced_schema_roots)?;
+    let pretty = render_schema_modules(
+        &schema_files,
+        schemas_dir,
+        &catalog,
+        &referenced_schema_roots,
+    )?;
 
     fs::create_dir_all(out_dir).map_err(|err| CodegenError::Io(out_dir.to_path_buf(), err))?;
 
@@ -256,9 +264,15 @@ pub fn render_chio_wire_v1(schemas_dir: &Path) -> Result<String> {
     let mut schema_files: Vec<PathBuf> = Vec::new();
     walk_schema_files(schemas_dir, &mut schema_files)?;
     schema_files.sort();
-    let referenced_schema_roots = collect_local_schema_ref_roots(&schema_files, schemas_dir)?;
+    let catalog = LocalSchemaCatalog::load(schemas_dir)?;
+    let referenced_schema_roots = collect_local_schema_ref_roots(&schema_files, &catalog)?;
 
-    let pretty = render_schema_modules(&schema_files, schemas_dir, &referenced_schema_roots)?;
+    let pretty = render_schema_modules(
+        &schema_files,
+        schemas_dir,
+        &catalog,
+        &referenced_schema_roots,
+    )?;
     let mut body = String::with_capacity(GENERATED_HEADER.len() + pretty.len() + 1);
     body.push_str(GENERATED_HEADER);
     body.push('\n');
@@ -302,6 +316,7 @@ pub(crate) fn rustfmt_generated(path: &Path, source: &str) -> Result<String> {
 fn render_schema_modules(
     schema_files: &[PathBuf],
     schemas_dir: &Path,
+    catalog: &LocalSchemaCatalog,
     referenced_schema_roots: &BTreeSet<PathBuf>,
 ) -> Result<String> {
     let settings = TypeSpaceSettings::default();
@@ -311,7 +326,7 @@ fn render_schema_modules(
         if should_skip_referenced_root(path, referenced_schema_roots)? {
             continue;
         }
-        let value = load_schema_value(path, schemas_dir)?;
+        let value = load_schema_value(path, catalog)?;
         let schema: schemars::schema::RootSchema = serde_json::from_value(value)
             .map_err(|err| CodegenError::SchemaShape(path.clone(), err))?;
         let mut type_space = TypeSpace::new(&settings);
@@ -385,20 +400,34 @@ fn is_schema_json(path: &Path) -> bool {
     name.ends_with(".schema.json")
 }
 
-fn load_schema_value(path: &Path, schemas_dir: &Path) -> Result<serde_json::Value> {
-    let raw = fs::read_to_string(path).map_err(|err| CodegenError::Io(path.to_path_buf(), err))?;
-    let mut value: serde_json::Value =
-        serde_json::from_str(&raw).map_err(|err| CodegenError::Json(path.to_path_buf(), err))?;
+fn load_schema_value(path: &Path, catalog: &LocalSchemaCatalog) -> Result<serde_json::Value> {
+    load_schema_value_recursive(path, catalog, &mut BTreeSet::new())
+}
+
+fn load_schema_value_recursive(
+    path: &Path,
+    catalog: &LocalSchemaCatalog,
+    active: &mut BTreeSet<PathBuf>,
+) -> Result<serde_json::Value> {
+    let canonical = fs::canonicalize(path).map_err(|err| CodegenError::Io(path.into(), err))?;
+    if !active.insert(canonical.clone()) {
+        return Err(CodegenError::SchemaRef(
+            path.into(),
+            "cyclic cross-file schema reference".into(),
+        ));
+    }
+    let mut value = catalog.resource(path)?;
     let mut extra_defs = serde_json::Map::new();
-    inline_local_schema_refs(&mut value, path, schemas_dir, &mut extra_defs)?;
+    inline_local_schema_refs(&mut value, path, catalog, &mut extra_defs, active)?;
     merge_extra_defs_into_root(&mut value, extra_defs, path)?;
     strip_typify_unsupported_conditionals(&mut value);
+    active.remove(&canonical);
     Ok(value)
 }
 
 fn collect_local_schema_ref_roots(
     schema_files: &[PathBuf],
-    schemas_dir: &Path,
+    catalog: &LocalSchemaCatalog,
 ) -> Result<BTreeSet<PathBuf>> {
     let mut referenced_roots = BTreeSet::new();
 
@@ -407,12 +436,7 @@ fn collect_local_schema_ref_roots(
             fs::read_to_string(path).map_err(|err| CodegenError::Io(path.to_path_buf(), err))?;
         let value: serde_json::Value = serde_json::from_str(&raw)
             .map_err(|err| CodegenError::Json(path.to_path_buf(), err))?;
-        collect_local_schema_ref_roots_from_value(
-            &value,
-            path,
-            schemas_dir,
-            &mut referenced_roots,
-        )?;
+        collect_local_schema_ref_roots_from_value(&value, path, catalog, &mut referenced_roots)?;
     }
 
     Ok(referenced_roots)
@@ -421,15 +445,13 @@ fn collect_local_schema_ref_roots(
 fn collect_local_schema_ref_roots_from_value(
     value: &serde_json::Value,
     base_path: &Path,
-    schemas_dir: &Path,
+    catalog: &LocalSchemaCatalog,
     referenced_roots: &mut BTreeSet<PathBuf>,
 ) -> Result<()> {
     match value {
         serde_json::Value::Object(map) => {
             if let Some(serde_json::Value::String(reference)) = map.get("$ref") {
-                if let Some((target_path, fragment)) =
-                    resolve_local_schema_ref(reference, base_path, schemas_dir)?
-                {
+                if let Some((target_path, fragment)) = catalog.resolve(reference, base_path)? {
                     let targets_root = match fragment.as_deref() {
                         None | Some("") => true,
                         Some(_) => false,
@@ -443,7 +465,7 @@ fn collect_local_schema_ref_roots_from_value(
                 collect_local_schema_ref_roots_from_value(
                     item,
                     base_path,
-                    schemas_dir,
+                    catalog,
                     referenced_roots,
                 )?;
             }
@@ -453,7 +475,7 @@ fn collect_local_schema_ref_roots_from_value(
                 collect_local_schema_ref_roots_from_value(
                     item,
                     base_path,
-                    schemas_dir,
+                    catalog,
                     referenced_roots,
                 )?;
             }
@@ -475,16 +497,15 @@ fn should_skip_referenced_root(
 fn inline_local_schema_refs(
     value: &mut serde_json::Value,
     base_path: &Path,
-    schemas_dir: &Path,
+    catalog: &LocalSchemaCatalog,
     extra_defs: &mut serde_json::Map<String, serde_json::Value>,
+    active: &mut BTreeSet<PathBuf>,
 ) -> Result<()> {
     match value {
         serde_json::Value::Object(map) => {
             if let Some(serde_json::Value::String(reference)) = map.get("$ref") {
-                if let Some((target_path, fragment)) =
-                    resolve_local_schema_ref(reference, base_path, schemas_dir)?
-                {
-                    let target = load_schema_value(&target_path, schemas_dir)?;
+                if let Some((target_path, fragment)) = catalog.resolve(reference, base_path)? {
+                    let target = load_schema_value_recursive(&target_path, catalog, active)?;
                     merge_referenced_defs(&target, extra_defs, base_path, reference)?;
                     let mut resolved = resolve_json_pointer(&target, fragment.as_deref())
                         .map_err(|msg| {
@@ -500,60 +521,17 @@ fn inline_local_schema_refs(
                 }
             }
             for item in map.values_mut() {
-                inline_local_schema_refs(item, base_path, schemas_dir, extra_defs)?;
+                inline_local_schema_refs(item, base_path, catalog, extra_defs, active)?;
             }
         }
         serde_json::Value::Array(items) => {
             for item in items {
-                inline_local_schema_refs(item, base_path, schemas_dir, extra_defs)?;
+                inline_local_schema_refs(item, base_path, catalog, extra_defs, active)?;
             }
         }
         _ => {}
     }
     Ok(())
-}
-
-fn resolve_local_schema_ref(
-    reference: &str,
-    base_path: &Path,
-    schemas_dir: &Path,
-) -> Result<Option<(PathBuf, Option<String>)>> {
-    let (path_part, fragment) = reference
-        .split_once('#')
-        .map_or((reference, None), |(path, fragment)| {
-            (path, Some(fragment.to_string()))
-        });
-
-    if path_part.is_empty() {
-        return Ok(None);
-    }
-    if has_uri_scheme(path_part) {
-        return Err(CodegenError::SchemaRef(
-            base_path.to_path_buf(),
-            format!("{reference} uses an external schema reference"),
-        ));
-    }
-
-    let base_dir = base_path.parent().ok_or_else(|| {
-        CodegenError::SchemaRef(
-            base_path.to_path_buf(),
-            "schema path has no parent directory".to_string(),
-        )
-    })?;
-    let target_path = base_dir.join(path_part);
-    let target_path =
-        fs::canonicalize(&target_path).map_err(|err| CodegenError::Io(target_path.clone(), err))?;
-    let schemas_dir =
-        fs::canonicalize(schemas_dir).map_err(|err| CodegenError::Io(schemas_dir.into(), err))?;
-
-    if !target_path.starts_with(&schemas_dir) {
-        return Err(CodegenError::SchemaRef(
-            base_path.to_path_buf(),
-            format!("{reference} resolves outside {}", schemas_dir.display()),
-        ));
-    }
-
-    Ok(Some((target_path, fragment)))
 }
 
 fn has_uri_scheme(value: &str) -> bool {
@@ -731,7 +709,7 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn unique_temp_dir(prefix: &str) -> Result<PathBuf> {
+    pub(super) fn unique_temp_dir(prefix: &str) -> Result<PathBuf> {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|err| CodegenError::Io(PathBuf::from(prefix), std::io::Error::other(err)))?
@@ -849,11 +827,30 @@ mod tests {
             !rendered.contains("External schema reference erased for Rust typify codegen"),
             "local cross-file refs must not be erased before typify"
         );
-        assert_eq!(
-            rendered.matches("pub struct ChioReceiptRecord {\n").count(),
-            1,
-            "the referenced receipt root schema must be emitted once"
-        );
+        let file = syn::parse_file(&rendered).map_err(CodegenError::SynParse)?;
+        let mut receipt_modules = BTreeSet::new();
+        for item in &file.items {
+            if let syn::Item::Mod(module) = item {
+                if let Some((_, items)) = &module.content {
+                    let count = items
+                        .iter()
+                        .filter(|item| {
+                            matches!(item,
+                                syn::Item::Struct(item) if item.ident == "ChioReceiptRecord"
+                            )
+                        })
+                        .count();
+                    assert!(count <= 1, "duplicate receipt type in {}", module.ident);
+                    if count == 1 {
+                        receipt_modules.insert(module.ident.to_string());
+                    }
+                }
+            }
+        }
+        assert_eq!(receipt_modules, BTreeSet::from([
+            "recovery_command_result".to_owned(),
+                "kernel_tool_call_response".to_owned(),
+        ]), "each response owns a typed receipt and the referenced receipt root is not emitted separately");
         assert_eq!(
             rustfmt_generated(Path::new(CHIO_WIRE_V1_OUTPUT), &rendered)?,
             rendered,

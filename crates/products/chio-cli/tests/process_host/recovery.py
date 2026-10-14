@@ -164,7 +164,7 @@ capabilities:
         assert descriptor["credential"] not in json.dumps(response)
         assert out.stat().st_mode & 0o777 == 0o600
         assert descriptor["schema"] == "chio.process.connection.v1"
-        assert descriptor["abi"] == "chio.process.abi.v2"
+        assert descriptor["abi"] == "chio.process.abi.v3"
         assert descriptor["runtime_id"]
         assert descriptor["capability_id"]
         assert descriptor["process_id"] == process
@@ -238,7 +238,7 @@ capabilities:
     host_record = state / "host.json"
     recorded = host_record.read_bytes()
     host_json = json.loads(recorded)
-    assert host_json["abi"] == "chio.process.abi.v2"
+    assert host_json["abi"] == "chio.process.abi.v3"
     assert host_json["written_by"].startswith("chio-cli ")
     host_record.write_bytes(
         json.dumps({**host_json, "abi": "chio.process.abi.v0"}).encode()
@@ -264,23 +264,24 @@ capabilities:
     assert (state / "authority.db").read_bytes() == before_export
     status = cli("status", "--state", state)
     assert status["abi"] == {
-        "serving": "chio.process.abi.v2",
+        "serving": "chio.process.abi.v3",
         "host": "chio.process.abi.v0",
         "written_by": host_json["written_by"],
     }
     # ABI is checked before decoding old manifest shapes, including hosts
     # created before the ABI field was recorded.
-    for legacy_abi in ("chio.process.abi.v1", None):
+    for legacy_abi in ("chio.process.abi.v1", "chio.process.abi.v2", None):
         legacy = {**host_json, "manifests": {"legacy": "incompatible shape"}}
         if legacy_abi is None:
             legacy.pop("abi")
         else:
             legacy["abi"] = legacy_abi
         host_record.write_text(json.dumps(legacy))
-        assert "process ABI chio.process.abi.v1" in cli(
+        expected_abi = legacy_abi or "chio.process.abi.v1"
+        assert f"process ABI {expected_abi}" in cli(
             "export", "--state", state, success=False
         )
-        assert cli("status", "--state", state)["abi"]["host"] == "chio.process.abi.v1"
+        assert cli("status", "--state", state)["abi"]["host"] == expected_abi
         assert (state / "authority.db").read_bytes() == before_export
     host_record.write_bytes(recorded)
     socket = sockets / "first.sock"

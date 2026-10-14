@@ -799,7 +799,7 @@ pub(crate) fn cmd_passport_create(
     // Load the authority key first so its public key can anchor the
     // reputation config's trusted kernel set. Without trusted kernel keys,
     // `compute_local_scorecard` filters every receipt as unsigned and the
-    // resulting score is silently unknown / zero (see chio-reputation P2).
+    // resulting score is silently unknown / zero (see chio-reputation scorecard validation).
     let signing_key = load_or_create_authority_keypair(signing_seed_file)?;
     let scoring_config =
         ReputationConfig::default().with_trusted_kernel_keys([signing_key.public_key().to_hex()]);

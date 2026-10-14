@@ -87,6 +87,7 @@ jobs:
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/qualification.json
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/receipts.ndjson
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/kernel.pub
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/launch-diagnostics.json
           if-no-files-found: warn
       - name: Preserve only nonsecret claim response loss evidence
         if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
@@ -97,6 +98,7 @@ jobs:
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/qualification.json
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/receipts.ndjson
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/kernel.pub
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/launch-diagnostics.json
           if-no-files-found: warn
       - name: Stop only this job's database container
         if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}

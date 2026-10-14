@@ -16,6 +16,8 @@ use std::sync::Mutex;
 
 #[path = "native_egress/backend.rs"]
 mod backend;
+#[path = "native_egress/declassification.rs"]
+mod declassification;
 pub(super) use backend::TestEgress;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -39,6 +41,10 @@ enum Fault {
     ChangedObservation,
     StaleObservationTime,
     FutureObservationTime,
+    PhysicalEventClock,
+    EarlyEventClock,
+    FutureEventClock,
+    StaleConsumptionClock,
 }
 
 struct Hook(NativeSecurityAuthorityBindingV1);
@@ -270,6 +276,132 @@ fn native_egress_commit_faults_preserve_acquisition_and_deny_success() -> TestRe
             &context,
         )?;
     }
+    Ok(())
+}
+
+#[test]
+fn native_egress_commit_accepts_the_physical_event_clock_after_preparation() -> TestResult {
+    let (kernel, request, context, store) = fixture("physical-event-clock")?;
+    let operation = store.operation();
+    let acquired = kernel
+        .prepare_native_security_egress(operation.binding().operation_id(), &request, &context)?
+        .acquire(current_unix_timestamp_ms() + 60_000)?;
+    let before_commit = current_unix_timestamp_ms();
+    store.native_egress.arm_commit(Fault::PhysicalEventClock)?;
+    let history = acquired.commit()?;
+    let committed = history.commitment.ok_or("commitment")?;
+    assert!(committed.commitment.committed_at_unix_ms > before_commit);
+    assert_eq!(store.operation(), operation);
+    Ok(())
+}
+
+#[test]
+fn native_egress_commit_event_clock_must_fall_inside_the_physical_interval() -> TestResult {
+    for fault in [Fault::EarlyEventClock, Fault::FutureEventClock] {
+        let (kernel, request, context, store) = fixture(&format!("event-clock-{fault:?}"))?;
+        let operation = store.operation();
+        let acquired = kernel
+            .prepare_native_security_egress(operation.binding().operation_id(), &request, &context)?
+            .acquire(current_unix_timestamp_ms() + 60_000)?;
+        let original = acquired.history().acquisition.clone();
+        store.native_egress.arm_commit(fault)?;
+        let error = acquired.commit().err().ok_or("event clock accepted")?;
+        assert!(
+            error.to_string().contains("event clock differs"),
+            "{fault:?}: {error}"
+        );
+        assert_eq!(store.native_egress.acquisition()?, original);
+        assert_eq!(store.operation(), operation);
+    }
+    Ok(())
+}
+
+#[cfg(feature = "admission-test-support")]
+#[test]
+fn native_egress_commit_after_a_writer_delay_keeps_the_original_expiry() -> TestResult {
+    for (lifetime_ms, delay_ms, commits) in [(60_000_u64, 5_100_u64, true), (1_000, 1_200, false)] {
+        let (kernel, request, context, store) = fixture(&format!("writer-delay-{delay_ms}"))?;
+        let operation = store.operation();
+        let acquired = kernel
+            .prepare_native_security_egress(operation.binding().operation_id(), &request, &context)?
+            .acquire(current_unix_timestamp_ms() + lifetime_ms)?;
+        let prepared_at = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let _observer = kernel.observe_native_egress_commit_for_test(Arc::new({
+            let prepared_at = prepared_at.clone();
+            let owner_thread = std::thread::current().id();
+            move |time| {
+                // Other parallel fixtures share this test store identity. Only
+                // this synchronous owner's commit may incur the injected wait.
+                if std::thread::current().id() != owner_thread {
+                    return;
+                }
+                prepared_at.store(time, std::sync::atomic::Ordering::SeqCst);
+                std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+            }
+        }))?;
+        store.native_egress.arm_commit(Fault::PhysicalEventClock)?;
+        let result = acquired.commit();
+        if commits {
+            let committed = result?.commitment.ok_or("commitment")?;
+            assert!(
+                committed.commitment.committed_at_unix_ms
+                    > prepared_at.load(std::sync::atomic::Ordering::SeqCst) + 5_000
+            );
+        } else {
+            let error = result.err().ok_or("expired fence accepted")?;
+            assert!(error.to_string().contains("expired or invalid"), "{error}");
+            assert!(!store.native_egress.committed()?);
+        }
+        assert_eq!(store.operation(), operation);
+    }
+    Ok(())
+}
+
+#[test]
+fn native_egress_slow_post_write_verification_refuses_at_the_final_deadline() -> TestResult {
+    // The first case keeps the fence alive through the same slow readback.
+    for (fence_lifetime_ms, readback_delay_ms, accepted) in
+        [(60_000_u64, 1_800_u64, true), (1_500, 1_800, false)]
+    {
+        let (kernel, request, context, store) =
+            fixture(&format!("slow-readback-{readback_delay_ms}"))?;
+        let operation = store.operation();
+        let acquired = kernel
+            .prepare_native_security_egress(operation.binding().operation_id(), &request, &context)?
+            .acquire(current_unix_timestamp_ms() + fence_lifetime_ms)?;
+        let original = acquired.history().acquisition.clone();
+        store
+            .native_egress
+            .delay_committed_readback(readback_delay_ms)?;
+        let result = acquired.commit();
+        if accepted {
+            assert!(result?.commitment.is_some());
+        } else {
+            let error = result
+                .err()
+                .ok_or("expired fence accepted after readback")?;
+            assert!(error.to_string().contains("expired or invalid"), "{error}");
+            // The write already happened; custody stays visible to recovery.
+            assert!(store.native_egress.committed()?);
+        }
+        assert_eq!(store.native_egress.acquisition()?, original);
+        assert_eq!(store.operation(), operation);
+    }
+    Ok(())
+}
+
+#[test]
+fn native_egress_expired_fence_refuses_commit_before_any_physical_write() -> TestResult {
+    let (kernel, request, context, store) = fixture("expired-before-commit")?;
+    let operation = store.operation();
+    let acquired = kernel
+        .prepare_native_security_egress(operation.binding().operation_id(), &request, &context)?
+        .acquire(current_unix_timestamp_ms() + 1_000)?;
+    std::thread::sleep(std::time::Duration::from_millis(1_100));
+    let error = acquired.commit().err().ok_or("expired fence accepted")?;
+    assert!(error.to_string().contains("expired or invalid"), "{error}");
+    assert!(!store.native_egress.committed()?);
+    assert_eq!(store.operation(), operation);
     Ok(())
 }
 

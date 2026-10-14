@@ -20,7 +20,7 @@ Vector files are stored in these directories. Auto-promoted cases must set
 `pending: true` until triaged; pending cases do not count as threat-model
 coverage.
 
-The security roadmap also bundles 28 mutation case definitions for flow,
+The corpus also includes 28 mutation case definitions for flow,
 tripwires, temporal correlation, containment, key rotation, the secret broker
 and native confinement. They retain the 35 campaign identities from archived
 source `cbbba8cf2178cbbdd7b6b38a121e59365eb452ac`. Restored definitions are

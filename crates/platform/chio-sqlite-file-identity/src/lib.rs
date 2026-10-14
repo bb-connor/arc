@@ -7,6 +7,21 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod write_capacity;
+pub use write_capacity::{
+    require_physical_write_capacity, write_capacity_policy_descriptor,
+    SqlitePhysicalDebtAmountData, SqliteWriteCapacityStageData,
+};
+
+mod write_liability;
+pub use write_liability::{
+    price_transaction_write_shape, write_price_algorithm_descriptor, SqliteFramePriceProfileData,
+    SqliteTransactionWritePriceData, SqliteTransactionWriteShapeData, SqliteTreeWriteShapeData,
+};
+
+mod write_geometry;
+pub use write_geometry::{main_database_write_geometry, SqliteWriteGeometryData};
+
 #[cfg(unix)]
 use std::ffi::{c_int, c_void, CStr};
 
@@ -19,6 +34,24 @@ pub struct SqliteFileIdentity {
     pub device: u64,
     pub inode: u64,
     pub link_count: u64,
+}
+
+/// Ephemeral identity of a live SQLite connection, distinct from its file.
+///
+/// The identity survives Rust moves through a connection pool. It must not be
+/// persisted or used after the connection closes, when SQLite may reuse the
+/// allocation. It conveys no authority over the connection or database.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SqliteConnectionIdentity(usize);
+
+impl SqliteConnectionIdentity {
+    /// Observe an identity without exposing or dereferencing SQLite's handle.
+    #[must_use]
+    pub fn of(connection: &rusqlite::Connection) -> Self {
+        // SAFETY: the borrowed connection is alive; only compare its handle's
+        // address. No SQLite operation or dereference uses the raw pointer.
+        Self(unsafe { connection.handle() as usize })
+    }
 }
 
 #[cfg(unix)]
@@ -39,6 +72,53 @@ struct BundledUnixFilePrefix {
 pub fn main_database_file_identity(
     connection: &rusqlite::Connection,
 ) -> Result<SqliteFileIdentity, String> {
+    let descriptor = main_database_descriptor(connection)?;
+    let mut metadata = std::mem::MaybeUninit::<libc::stat>::uninit();
+    // SAFETY: the borrowed connection owns this descriptor. fstat neither
+    // closes nor duplicates it, preserving SQLite's process-owned locks.
+    if unsafe { libc::fstat(descriptor, metadata.as_mut_ptr()) } != 0 {
+        return Err(format!(
+            "SQLite main database descriptor metadata failed: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    // SAFETY: fstat returned success and initialized metadata above.
+    let metadata = unsafe { metadata.assume_init() };
+    // The stat field widths differ between supported Unix targets.
+    #[allow(clippy::unnecessary_cast)]
+    let identity = SqliteFileIdentity {
+        device: metadata.st_dev as u64,
+        inode: metadata.st_ino as u64,
+        link_count: metadata.st_nlink as u64,
+    };
+    Ok(identity)
+}
+
+/// Available filesystem bytes observed through SQLite's actual held main file.
+/// This is capacity data, not a reservation or permission to spend owed debt.
+#[cfg(unix)]
+pub fn main_database_available_bytes(connection: &rusqlite::Connection) -> Result<u64, String> {
+    let descriptor = main_database_descriptor(connection)?;
+    let mut capacity = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    // SAFETY: the connection retains the descriptor for this synchronous call.
+    // fstatvfs initializes capacity on success and does not change file locks.
+    if unsafe { libc::fstatvfs(descriptor, capacity.as_mut_ptr()) } != 0 {
+        return Err(format!(
+            "SQLite main database filesystem capacity failed: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    // SAFETY: fstatvfs succeeded and initialized every field.
+    let capacity = unsafe { capacity.assume_init() };
+    if capacity.f_frsize == 0 {
+        return Err("SQLite main database filesystem fragment size is zero".to_owned());
+    }
+    u64::try_from(u128::from(capacity.f_bavail) * u128::from(capacity.f_frsize))
+        .map_err(|_| "SQLite main database filesystem capacity overflow".to_owned())
+}
+
+#[cfg(unix)]
+fn main_database_descriptor(connection: &rusqlite::Connection) -> Result<c_int, String> {
     let mut file = std::ptr::null_mut::<ffi::sqlite3_file>();
     let mut vfs = std::ptr::null_mut::<ffi::sqlite3_vfs>();
     // SAFETY: `connection` keeps its sqlite3 handle alive for this call. Both
@@ -105,27 +185,7 @@ pub fn main_database_file_identity(
         return Err("SQLite main database descriptor is unavailable".to_owned());
     }
 
-    let mut metadata = std::mem::MaybeUninit::<libc::stat>::uninit();
-    // SAFETY: the live connection owns the descriptor returned by its bundled
-    // Unix VFS. fstat writes a complete stat on success and neither closes nor
-    // duplicates the descriptor. Closing even a duplicate would release the
-    // process's POSIX locks on this inode, invalidating SQLite's lock state.
-    if unsafe { libc::fstat(prefix.descriptor, metadata.as_mut_ptr()) } != 0 {
-        return Err(format!(
-            "SQLite main database descriptor metadata failed: {}",
-            std::io::Error::last_os_error()
-        ));
-    }
-    // SAFETY: fstat returned success and initialized metadata above.
-    let metadata = unsafe { metadata.assume_init() };
-    // The stat field widths differ between supported Unix targets.
-    #[allow(clippy::unnecessary_cast)]
-    let identity = SqliteFileIdentity {
-        device: metadata.st_dev as u64,
-        inode: metadata.st_ino as u64,
-        link_count: metadata.st_nlink as u64,
-    };
-    Ok(identity)
+    Ok(prefix.descriptor)
 }
 
 #[cfg(not(unix))]
@@ -135,9 +195,51 @@ pub fn main_database_file_identity(
     Err("qualified SQLite file identity requires Unix".to_owned())
 }
 
+#[cfg(not(unix))]
+pub fn main_database_available_bytes(_connection: &rusqlite::Connection) -> Result<u64, String> {
+    Err("qualified SQLite filesystem capacity requires Unix".to_owned())
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn pooled_connection_identity_survives_a_move_and_distinguishes_the_same_file(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let file = tempfile::NamedTempFile::new()?;
+        let first = rusqlite::Connection::open(file.path())?;
+        let second = rusqlite::Connection::open(file.path())?;
+        let identity = super::SqliteConnectionIdentity::of(&first);
+        assert_ne!(identity, super::SqliteConnectionIdentity::of(&second));
+        let moved = Box::new(first);
+        assert_eq!(identity, super::SqliteConnectionIdentity::of(&moved));
+        Ok(())
+    }
     use super::*;
+
+    #[test]
+    fn filesystem_capacity_refuses_an_in_memory_database() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let connection = rusqlite::Connection::open_in_memory()?;
+        assert!(main_database_available_bytes(&connection).is_err());
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn filesystem_capacity_uses_the_held_file_after_rename(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let original = directory.path().join("capacity.sqlite3");
+        let retained = directory.path().join("retained.sqlite3");
+        let connection = rusqlite::Connection::open(&original)?;
+        connection.execute_batch("CREATE TABLE capacity_probe (value INTEGER NOT NULL);")?;
+        let before = main_database_file_identity(&connection)?;
+        std::fs::rename(&original, &retained)?;
+        assert!(!original.exists());
+        main_database_available_bytes(&connection)?;
+        assert_eq!(main_database_file_identity(&connection)?, before);
+        Ok(())
+    }
 
     #[cfg(not(unix))]
     #[test]
@@ -229,6 +331,7 @@ mod tests {
         for inspect in [false, true] {
             if inspect {
                 main_database_file_identity(&connection)?;
+                main_database_available_bytes(&connection)?;
             }
             let result = std::process::Command::new(std::env::current_exe()?)
                 .args([

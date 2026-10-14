@@ -29,8 +29,8 @@
       "scenario_id": "capability-subset-001-read-exact",
       "category": "capability_subset",
       "verdict": "allow",
-      "receipt_payload": "{\n  \"receipt_id\": \"receipt-capability-subset-001-read-exact\",\n  \"scenario_id\": \"capability-subset-001-read-exact\",\n  \"category\": \"capability_subset\",\n  \"verdict\": \"allow\",\n  \"reason_code\": \"urn:chio:error:none\",\n  \"kernel_key\": \"p2-fixture-kernel\",\n  \"signature\": \"p2-fixture-signature\"\n}\n",
-      "receipt_sha256": "2667e32d83f8f7db47b316f7f188e4dcd0a7d0414767122c54a043d076acb704",
+      "receipt_payload": "{\n  \"receipt_id\": \"receipt-capability-subset-001-read-exact\",\n  \"scenario_id\": \"capability-subset-001-read-exact\",\n  \"category\": \"capability_subset\",\n  \"verdict\": \"allow\",\n  \"reason_code\": \"urn:chio:error:none\",\n  \"kernel_key\": \"fixture-kernel\",\n  \"signature\": \"fixture-signature\"\n}\n",
+      "receipt_sha256": "80b986aebd384466cba632fe902850c5146fe3650182050799bcccb5c98b3b6d",
       "evidence": {
         "trace_id": "trace-capability-001",
         "sample_id": "sample-capability-001"
@@ -40,8 +40,8 @@
       "scenario_id": "revocation-propagation-001-active-read",
       "category": "revocation_propagation",
       "verdict": "allow",
-      "receipt_payload": "{\n  \"receipt_id\": \"receipt-revocation-propagation-001-active-read\",\n  \"scenario_id\": \"revocation-propagation-001-active-read\",\n  \"category\": \"revocation_propagation\",\n  \"verdict\": \"allow\",\n  \"reason_code\": \"urn:chio:error:none\",\n  \"kernel_key\": \"p2-fixture-kernel\",\n  \"signature\": \"p2-fixture-signature\"\n}\n",
-      "receipt_sha256": "f6db0dec41eb7b9873a4d0a14d26f7cb42c13dcfd22e04384bf1b20da67294c2",
+      "receipt_payload": "{\n  \"receipt_id\": \"receipt-revocation-propagation-001-active-read\",\n  \"scenario_id\": \"revocation-propagation-001-active-read\",\n  \"category\": \"revocation_propagation\",\n  \"verdict\": \"allow\",\n  \"reason_code\": \"urn:chio:error:none\",\n  \"kernel_key\": \"fixture-kernel\",\n  \"signature\": \"fixture-signature\"\n}\n",
+      "receipt_sha256": "60f432fa83aec6944fbc2ed13e37f1e02cec89503ee2f581ccea802107c1a7b4",
       "evidence": {
         "trace_id": "trace-revocation-001",
         "sample_id": "sample-revocation-001"
@@ -51,8 +51,8 @@
       "scenario_id": "replay-verdict-001-fresh-read",
       "category": "replay_verdict",
       "verdict": "allow",
-      "receipt_payload": "{\n  \"receipt_id\": \"receipt-replay-verdict-001-fresh-read\",\n  \"scenario_id\": \"replay-verdict-001-fresh-read\",\n  \"category\": \"replay_verdict\",\n  \"verdict\": \"allow\",\n  \"reason_code\": \"urn:chio:error:none\",\n  \"kernel_key\": \"p2-fixture-kernel\",\n  \"signature\": \"p2-fixture-signature\"\n}\n",
-      "receipt_sha256": "6e52db09a03b762233c5bf01e440bd0b9009f2c38527c43654a5090e852509f2",
+      "receipt_payload": "{\n  \"receipt_id\": \"receipt-replay-verdict-001-fresh-read\",\n  \"scenario_id\": \"replay-verdict-001-fresh-read\",\n  \"category\": \"replay_verdict\",\n  \"verdict\": \"allow\",\n  \"reason_code\": \"urn:chio:error:none\",\n  \"kernel_key\": \"fixture-kernel\",\n  \"signature\": \"fixture-signature\"\n}\n",
+      "receipt_sha256": "6b5ce21135f03f97f7c6aabcf83ba23d5c15f65ff45704914e5ac52dfd435c2f",
       "evidence": {
         "trace_id": "trace-replay-001",
         "sample_id": "sample-replay-001"
@@ -63,7 +63,7 @@
     {
       "kind": "test-sha256",
       "key_id": "local-test",
-      "signature": "5e30d00c4dba2bacb1b22dd10f725797603338a511571980a706f496c1711f03",
+      "signature": "25fc71fe13224a19b41a0c01d545cdac2f2453881024275e6c5d4f2d805e9988",
       "signed_payload": "bundle_without_signatures:rfc8785"
     }
   ]

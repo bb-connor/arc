@@ -32,8 +32,7 @@ impl<'connection> SqlMutationScope<'connection> {
     }
 
     fn clear(&self) -> rusqlite::Result<()> {
-        self.connection
-            .authorizer(None::<fn(AuthContext<'_>) -> Authorization>)
+        crate::native_authority_capacity::install_schema_guard(self.connection, true)
     }
 }
 

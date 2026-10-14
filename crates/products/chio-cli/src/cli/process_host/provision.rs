@@ -154,6 +154,7 @@ pub(super) fn init(
         policy,
         true,
         config.execution_nonces,
+        config.native_output_retention.as_ref(),
         config
             .native_broker
             .as_ref()

@@ -1,6 +1,6 @@
 use super::*;
 
-const TRANSPARENCY_PROJECTION_GUARDS_SQL: &str = r#"
+pub(in crate::receipt_store) const TRANSPARENCY_PROJECTION_GUARDS_SQL: &str = r#"
 CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_update
 BEFORE UPDATE ON chio_tool_receipts
 BEGIN

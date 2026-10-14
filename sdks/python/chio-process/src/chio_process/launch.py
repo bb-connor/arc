@@ -14,6 +14,43 @@ from collections.abc import Mapping
 from pathlib import Path
 
 
+class NativeDemoProvisionError(RuntimeError):
+    """A provisioning failure whose public diagnostic contains no target output."""
+
+    def __init__(self, returncode: int, stderr: str | None):
+        self.returncode = returncode
+        self.diagnostic = _safe_diagnostic(stderr)
+        super().__init__(
+            f"Native MCP demo provisioning failed with exit status {returncode}: {self.diagnostic}"
+        )
+
+
+def _safe_diagnostic(stderr: str | None) -> str:
+    # A tool's diagnostic can contain database URLs, credentials or file data.
+    # Copy only known failure phrases, never arbitrary target text or stdout.
+    allowed = (
+        "native MCP tool discovery failed",
+        "discovery failed",
+        "privileged discovery requires an Enforced cage",
+        "CHIO_JOB_DATABASE_URL is required",
+        "CHIO_JOB_DATABASE_CA is required",
+        "the target closed its output before answering tools/list",
+        "the target closed its input before the MCP handshake",
+        "the target did not answer tools/list",
+        "MCP response exceeds the size limit",
+        "out-of-order MCP discovery response",
+        "failed to launch MCP discovery",
+        "native MCP target advertised an invalid tools/list result",
+    )
+    bounded = (stderr or "")[:4096]
+    diagnostic = "; ".join(phrase for phrase in allowed if phrase in bounded)
+    if not diagnostic:
+        diagnostic = "unrecognized provisioner stderr withheld"
+    if len(stderr or "") > len(bounded):
+        diagnostic += "; stderr truncated"
+    return diagnostic
+
+
 def demo_python() -> str:
     """Find a Python executable for stdlib-only demo tools that others cannot write.
 
@@ -37,14 +74,17 @@ def provision_native_demo(
     working_directory: str | Path,
     *,
     environment: Mapping[str, str] | None = None,
+    tools_fixture: str | Path | None = None,
 ) -> dict:
     """Provision a fresh policy and return one process-host server configuration.
 
-    Provisioning starts the command for tool discovery. It does not invoke its
-    tools. Existing output is refused; rebuilding Chio requires a
+    Provisioning discovers metadata or uses an explicitly reviewed tools fixture.
+    It does not invoke tools. Existing output is refused; rebuilding Chio requires a
     fresh policy because the authorization binds that executable's digest.
-    An explicit environment replaces subprocess inheritance during discovery;
-    operators must separately supply it when starting the process host.
+    An explicit environment replaces inheritance for the provisioner. Native
+    discovery retains the CLI's cleared environment. A tool requiring secrets
+    for metadata must be reviewed separately and supplied as a tools fixture;
+    operators separately supply its environment when starting the process host.
     """
     if not command or not command[0]:
         raise ValueError("A native MCP command is required")
@@ -61,7 +101,6 @@ def provision_native_demo(
         "provision-native-mcp-demo",
         "--output-dir",
         str(output),
-        "--discover-tools",
         "--target",
         bound_command[0],
         "--working-directory",
@@ -77,16 +116,23 @@ def provision_native_demo(
         "--server-version",
         "1",
     ]
+    if tools_fixture is None:
+        arguments.append("--discover-tools")
+    else:
+        arguments.extend(["--tools-fixture", str(Path(tools_fixture).resolve(strict=True))])
     for argument in bound_command[1:]:
         arguments.extend(["--target-arg", argument])
-    subprocess.run(
-        arguments,
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=90,
-        env=environment,
-    )
+    try:
+        subprocess.run(
+            arguments,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=90,
+            env=environment,
+        )
+    except subprocess.CalledProcessError as error:
+        raise NativeDemoProvisionError(error.returncode, error.stderr) from None
     return {
         "id": server_id,
         "command": bound_command,

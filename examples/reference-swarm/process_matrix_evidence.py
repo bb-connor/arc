@@ -757,7 +757,7 @@ def verify_bundle(chio, artifact, trusted_pins):
         "scenarios": reports,
         "verifier_sha256": digest(chio),
         "local_matrix_verified": True,
-        "m5_acceptance_complete": False,
+        "qualification_complete": False,
         "external_observation_authority": "independently retained operator bundle digest",
         "checks": checked,
         "unchecked": [
@@ -906,5 +906,5 @@ def verify_negative_cases(chio, artifact, trusted_pins):
         "schema": SCHEMA + ".negative-verification",
         "checks": results,
         "all_rejected": True,
-        "m5_acceptance_complete": False,
+        "qualification_complete": False,
     }

@@ -322,6 +322,19 @@ pub(crate) mod test_support {
             .expect("read user_version")
     }
 
+    /// Test-only rollback anchor directory: a fresh directory under the root
+    /// named by `CHIO_TEST_ROLLBACK_ANCHOR_ROOT`, or the `/dev/shm` default
+    /// when that variable is absent. The root is used exactly as configured:
+    /// a missing or unusable root surfaces as the directory creation error,
+    /// with no fallback and no synthetic pass. The authoritative device and
+    /// directory validation for each actual database stays in the production
+    /// open paths (`open_for_finding_pool` / `open_qualified`).
+    pub(crate) fn rollback_anchor_tempdir(prefix: &str) -> std::io::Result<tempfile::TempDir> {
+        let root = std::env::var_os("CHIO_TEST_ROLLBACK_ANCHOR_ROOT")
+            .unwrap_or_else(|| std::ffi::OsString::from("/dev/shm"));
+        tempfile::Builder::new().prefix(prefix).tempdir_in(root)
+    }
+
     /// What recovery decided for one connection, as it was logged.
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub(crate) struct RecoveryEvent {

@@ -201,6 +201,7 @@ impl ChioKernel {
 
         self.guards = Arc::new(publication.guards.into_iter().map(Arc::from).collect());
         self.post_invocation_pipeline = publication.post_invocation_pipeline;
+        self.native_flow_policy_witness_registration = None;
         self.security_pre_dispatch_hook = Some(publication.pre_dispatch_hook);
         self.security_pre_dispatch_policy = SecurityPreDispatchPolicy::Enforce;
         self.budget_store = publication.budget_store;

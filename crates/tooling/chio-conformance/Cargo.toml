@@ -72,6 +72,7 @@ chio-bbs = [
 public_entrypoint = true
 
 [dependencies]
+chio-security-types = { workspace = true }
 chio-core = { package = "chio-core-types", version = "0.1.0", path = "../../core/chio-core-types" }
 chio-kernel = { workspace = true }
 chio-trace-validate = { workspace = true }

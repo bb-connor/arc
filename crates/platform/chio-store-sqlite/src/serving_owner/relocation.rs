@@ -92,7 +92,9 @@ pub(super) enum RelocationState {
 pub(super) fn initialize_serving_relocation_schema(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    connection.execute_batch(SERVING_RELOCATION_SCHEMA)?;
+    if relocation_schema_catalog(connection)?.is_empty() {
+        connection.execute_batch(SERVING_RELOCATION_SCHEMA)?;
+    }
     verify_serving_relocation_schema(connection)
 }
 

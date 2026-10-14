@@ -34,3 +34,4 @@ export type {
   ConformanceManifest,
 } from "./browser-subset.js";
 export * as Schemas from "./_generated/index.js";
+export { RecoveryClient } from "./recovery.js";

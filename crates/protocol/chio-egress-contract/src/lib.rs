@@ -287,6 +287,8 @@ impl HttpEgressContract {
                 "egress URL {url} has no explicit port or known default port"
             ))
         })?;
+        #[cfg(all(test, feature = "reqwest-egress"))]
+        reqwest_helper::dns_deadline_tests::before_synchronous_lookup(&normalized);
         let addrs = (normalized.as_str(), port)
             .to_socket_addrs()
             .map_err(|error| HttpEgressError::DnsResolutionFailed {
@@ -312,12 +314,8 @@ impl HttpEgressContract {
             return Ok(true);
         }
         let host_authority = normalized_url_host_authority(url)?;
-        if url.port().is_some()
-            && url.port() == url.port_or_known_default()
-            && self.allowed_authority_set.contains(&host_authority)
-        {
-            return Ok(true);
-        }
+        // URL parsing normalizes an explicit scheme-default port. Every
+        // remaining explicit port must match a declared authority exactly.
         if let Some(default_port) = url.port_or_known_default() {
             let default_port_authority = format!("{host_authority}:{default_port}");
             return Ok(self.allowed_authority_set.contains(&default_port_authority));

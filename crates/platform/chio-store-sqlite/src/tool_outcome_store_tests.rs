@@ -4,11 +4,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::scope::MonetaryAmount;
 use chio_kernel::admission_operation::{
-    qualified_lease, AdmissionAttachment, AdmissionDigest, AdmissionIdentifier,
+    qualified_lease, AdmissionAttachment, AdmissionDigest, AdmissionIdentifier, AdmissionIncident,
     AdmissionOperationBindingInputV1, AdmissionOperationBindingV1, AdmissionOperationCommand,
     AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore, AdmissionOperationV1,
-    AdmissionParticipantRequirements, AdmissionRecoveryLease, AdmissionRequestBindingV1,
-    AuthenticatedRequestNamespace, ProviderAttemptBindingV1, QualifiedAdmissionOperationStore,
+    AdmissionParticipantRequirements, AdmissionProjectionContext, AdmissionRecoveryLease,
+    AdmissionRequestBindingV1, AdmissionTerminalProjection, AuthenticatedRequestNamespace,
+    ProviderAttemptBindingV1, QualifiedAdmissionOperationStore,
     QualifiedAdmissionOperationStoreExt, RecoveryClaimRequest, SideEffectClass, StoreMutationFence,
 };
 use chio_kernel::tool_outcome::test_support::{
@@ -22,6 +23,9 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::{SqliteAdmissionOperationStore, SqliteAuthorityStore};
+
+#[path = "tool_outcome_store_tests/physical_liability.rs"]
+mod physical_liability;
 
 #[path = "tool_outcome_store_tests/pure_finalization.rs"]
 mod pure_finalization;
@@ -701,21 +705,36 @@ fn outcome_journal_survives_owner_rotation_and_detects_tampering() {
     drop(_temp);
 }
 
-fn mark_operation_terminal(fixture: &Fixture, operation_id: &AdmissionOperationId) {
-    // Reaching a terminal state through the real API requires the signed
-    // terminal-projection machinery; this isolates the compaction gate, which
-    // reads only `admission_operations.terminal`. The version bump keeps the
-    // `admission_operations_versioned_body` trigger satisfied.
-    let connection = fixture.outcomes.connection().expect("connection");
-    let changed = connection
-        .execute(
-            "UPDATE admission_operations
-             SET terminal = 1, version = version + 1
-             WHERE operation_id = ?1",
-            [operation_id.as_str()],
-        )
-        .expect("mark operation terminal");
-    assert_eq!(changed, 1);
+fn mark_operation_terminal(fixture: &Fixture, operation: &AdmissionOperationV1, at: u64) {
+    let lease = claim(fixture, operation, at);
+    let context = AdmissionProjectionContext {
+        operation_id: operation.binding().operation_id().clone(),
+        request_id: operation.replay_key().request_id,
+        expected_operation_version: operation.version(),
+        trusted_time_unix_ms: at + 1,
+        coordinator_lease_id: lease.coordinator_lease_id().clone(),
+        coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+        store_fence: lease.store_fence().clone(),
+    };
+    let incident = AdmissionIncident::from_verified(
+        operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        id("incident_id", "tool-outcome-compaction-incident"),
+        digest("incident_digest", 'e'),
+    )
+    .expect("bind durable incident");
+    let terminal = fixture
+        .operations
+        .commit_terminal_projection(&AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
+            context,
+            incident: Box::new(incident),
+        })
+        .expect("commit terminal projection");
+    assert_eq!(
+        terminal.state,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    );
 }
 
 fn blob_state(fixture: &Fixture, digest: &str) -> (i64, bool) {
@@ -742,7 +761,7 @@ fn compaction_clears_a_terminal_blob_and_reports_compacted_reads() {
     let (size_before, present_before) = blob_state(&fixture, &digest);
     assert!(present_before, "blob payload is present before compaction");
 
-    mark_operation_terminal(&fixture, &operation_id);
+    mark_operation_terminal(&fixture, &operation, begun_at + 50);
     let summary = fixture
         .outcomes
         .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 200)
@@ -804,7 +823,7 @@ fn reinserting_verified_bytes_rehydrates_a_compacted_blob() {
     let operation_id = finalizing.binding().operation_id().clone();
     let digest = outcome.raw_output_digest().as_str().to_owned();
 
-    mark_operation_terminal(&fixture, &operation_id);
+    mark_operation_terminal(&fixture, &finalizing, begun_at + 50);
     fixture
         .outcomes
         .compact_retained_invocation_blobs(begun_at + 100, &fixture.fence, begun_at + 200)
@@ -877,9 +896,8 @@ fn compaction_respects_the_retention_cutoff() {
     let begun_at = now_ms();
     let committed = committed(&fixture, "compaction-cutoff", begun_at);
     let (operation, outcome) = record_return(&fixture, &committed, begun_at + 20);
-    let operation_id = operation.binding().operation_id().clone();
     let digest = outcome.raw_output_digest().as_str().to_owned();
-    mark_operation_terminal(&fixture, &operation_id);
+    mark_operation_terminal(&fixture, &operation, begun_at + 50);
 
     // The blob is recorded at `begun_at + 21`; a cutoff before it retains it.
     let early = fixture
@@ -920,3 +938,9 @@ fn secure_temp_directory(path: &std::path::Path) {
 
 #[path = "tool_outcome_store_tests/connection_recovery.rs"]
 mod connection_recovery;
+
+#[path = "tool_outcome_store_tests/raw_source_controls.rs"]
+mod raw_source_controls;
+
+#[path = "tool_outcome_store_tests/native_receipt_open.rs"]
+mod native_receipt_open;

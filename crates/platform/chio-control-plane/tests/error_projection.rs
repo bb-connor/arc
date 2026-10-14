@@ -1,8 +1,8 @@
 //! Stable public error paths and diagnostic projection after module separation.
 
 use chio_control_plane::CliError;
-use chio_errors::ChioError;
 use chio_errors::_generated::error_codes::GUARD_DENIED;
+use chio_errors::ChioError;
 
 #[test]
 fn registry_error_preserves_the_normative_code_and_metadata() {

@@ -1221,7 +1221,7 @@
       "status": "proved",
       "proof_path": "formal/lean4/Chio/Chio/Proofs/DeliveryContract.lean",
       "mapsTo": ["P3"],
-      "notes": "Over finite requirement, evidence, and opaque digest domains, settlement admission implies Allow and proves every required finding purchase is verified and every required output digest matches. The M3 Rust linkage covers the digest comparison; the finding-purchase dimension is the explicit M4 composition boundary. This is not a Rust refinement proof and does not model SHA-256, canonical JSON, signatures, persistence, payment rails, or external settlement."
+      "notes": "Over finite requirement, evidence, and opaque digest domains, settlement admission implies Allow and proves every required finding purchase is verified and every required output digest matches. The Rust delivery-verification linkage covers the digest comparison; the finding-purchase dimension is the explicit finding-purchase composition boundary. This is not a Rust refinement proof and does not model SHA-256, canonical JSON, signatures, persistence, payment rails, or external settlement."
     },
     {
       "id": "proof.delivery_contract.allow_requires_evidence",
@@ -1245,7 +1245,7 @@
       "status": "proved",
       "proof_path": "formal/lean4/Chio/Chio/Proofs/DeliveryContract.lean",
       "mapsTo": ["P3"],
-      "notes": "Every reachable deniedAfterDelivery result in the bounded model carries a blocked settlement gate, matching the M3 DeniedAfterDelivery and ContractualZeroCharge boundary without modeling the external rail."
+      "notes": "Every reachable deniedAfterDelivery result in the bounded model carries a blocked settlement gate, matching the DeniedAfterDelivery and ContractualZeroCharge boundary without modeling the external rail."
     },
     {
       "id": "proof.treaty_admission_iff_predicate_intersection",

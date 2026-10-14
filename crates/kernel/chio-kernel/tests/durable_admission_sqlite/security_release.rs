@@ -152,7 +152,7 @@ fn run(zero_charge: bool, allowed: bool) -> TestResult {
         let future = now_unix_ms()?.checked_add(120_000).ok_or("recovery time")?;
         let pending = authority
             .admission_operation_store()
-            .list_recoverable(future, 10)?;
+            .list_recoverable(future, None, 10)?;
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].state(), AdmissionOperationState::Finalizing);
         let journal = authority

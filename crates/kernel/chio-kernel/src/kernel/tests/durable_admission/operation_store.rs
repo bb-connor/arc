@@ -139,6 +139,25 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         self.native_egress.commit(command)
     }
 
+    fn commit_native_security_declassified_egress(
+        &self,
+        input: &crate::admission_operation::NativeSecurityEgressContext<'_>,
+        command: &chio_security_types::ports::EgressFenceCommit,
+        consumption: &chio_security_types::ports::DeclassificationConsumptionEvidenceCommit,
+    ) -> Result<chio_security_types::ports::CommittedEgressFence, AdmissionOperationStoreError>
+    {
+        self.native_egress
+            .require_enabled("declassified commitment")?;
+        self.revalidate_recovery_claim(
+            input.operation,
+            input.lease.untrusted_claim(),
+            input.trusted_now_unix_ms,
+            input.lease.store_fence(),
+        )?;
+        self.native_egress
+            .commit_declassified(input.request, command, consumption)
+    }
+
     fn load_native_security_egress(
         &self,
         id: &AdmissionOperationId,
@@ -211,6 +230,41 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         retained.validate_native_security_context(context)?;
         retained.validate_native_security_authority(binding)?;
         self.native_recovery.join_input(operation, binding, input)
+    }
+
+    fn join_native_security_input_classified<'call>(
+        &self,
+        classification: &'call crate::admission_operation::NativeSecurityInputClassificationAuthority<'call>,
+    ) -> Result<
+        crate::admission_operation::NativeSecurityInputJoinOutcome<'call>,
+        AdmissionOperationStoreError,
+    > {
+        self.revalidate_recovery_claim(
+            classification.operation(),
+            classification.lease().untrusted_claim(),
+            classification.trusted_now_unix_ms(),
+            classification.lease().store_fence(),
+        )?;
+        let retained = self
+            .state
+            .lock()
+            .map_err(|_| {
+                AdmissionOperationStoreError::Unavailable("input fixture state is fenced".into())
+            })?
+            .retained_request
+            .clone()
+            .ok_or_else(|| {
+                AdmissionOperationStoreError::Invariant("input fixture original is absent".into())
+            })?;
+        retained.validate_request_material(classification.request())?;
+        retained.validate_native_security_context(classification.context())?;
+        retained.validate_native_security_authority(classification.binding())?;
+        let record = self.native_recovery.join_input(
+            classification.operation(),
+            classification.binding(),
+            classification.input(),
+        )?;
+        classification.eligible(record)
     }
 
     fn load_native_security_input_join(
@@ -582,10 +636,13 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         operation_id: &AdmissionOperationId,
         expected_version: u64,
         claimant_id: &AdmissionIdentifier,
-        _trusted_now_unix_ms: u64,
+        trusted_now_unix_ms: u64,
         expires_at_unix_ms: u64,
         fence: &StoreMutationFence,
     ) -> Result<UntrustedAdmissionRecoveryClaim, AdmissionOperationStoreError> {
+        let expires_at_unix_ms = self
+            .native_egress
+            .capped_lease_expiry(trusted_now_unix_ms, expires_at_unix_ms)?;
         self.recovery_lease_faults
             .trip(recovery_lease::Stage::ClaimBefore);
         self.require_fence(fence)?;
@@ -641,6 +698,7 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
     fn list_recoverable(
         &self,
         not_after_unix_ms: u64,
+        after_operation_id: Option<&AdmissionOperationId>,
         limit: usize,
     ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
         let store_fence = self
@@ -657,6 +715,9 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
             .operation
             .iter()
             .filter(|operation| !operation.state().is_terminal())
+            .filter(|operation| {
+                after_operation_id.is_none_or(|after| operation.binding().operation_id() > after)
+            })
             .filter(|operation| {
                 operation
                     .parked_approval_deadline_unix_ms()

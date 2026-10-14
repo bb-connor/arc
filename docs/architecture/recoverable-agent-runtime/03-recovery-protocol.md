@@ -58,6 +58,23 @@ A plan can request exact disclosure, select a registered destination, run an aut
 
 Only one selected effectful continuation may own a workflow at a time. Selection uses expected workflow revision and an idempotent command ID; same command/same body returns the same retained result, changed body conflicts. Multiple offers may remain viewable but cannot each acquire ownership. A plan's prerequisite DAG allocates calls deterministically and records each dependency's authoritative result. Its default execution is sequential; parallel read-only prerequisites require a separately qualified profile and cannot use effectful grants.
 
+### Command capacity and replay lifetime
+
+Logical command custody is bounded per workflow and command kind while that
+workflow occupies its authenticated active-workflow allocation. The maintained
+slot ceilings are Create 8, Select 8, Approval 8, Resume 24, Cancel 8 and Report 8.
+Authenticated retirement releases active-workflow capacity. It preserves the
+workflow's command history and every accepted replay identity.
+
+Inspect creates no command record or event. A fresh same-value command identity
+retains a control-only alias of at most 4 KiB, admitted against physical intake
+capacity without spending a mutation slot. Every accepted identity remains
+principal-stable: subject to current command authorization, the same identity
+and body return the retained result, and a changed body conflicts, including
+after workflow retirement or grant refresh.
+No expiry, alias deletion or capability-bound identity is introduced. These
+source rules do not discharge C2-02 until its original owning acceptance passes.
+
 ## Disclosure grant v2
 
 Keep existing v1 verification for explicitly selected legacy profiles. Introduce a closed v2 signed body for recovery, retaining every v1 claim and adding a mandatory binding:

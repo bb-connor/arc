@@ -33,6 +33,15 @@ impl<'a> FlowPolicyView<'a> {
         input: &FlowPreInvocationInput<'_>,
         state: FlowStateSnapshot,
     ) -> Result<ResolvedFlowPolicy<'a>, FlowDenial> {
+        self.resolve_recovery_with_evidence(input, state, None)
+    }
+
+    pub(super) fn resolve_recovery_with_evidence(
+        &self,
+        input: &FlowPreInvocationInput<'_>,
+        state: FlowStateSnapshot,
+        recovery: Option<&chio_kernel::recovery::RecoveryVerificationContextV1>,
+    ) -> Result<ResolvedFlowPolicy<'a>, FlowDenial> {
         let key = flow_key(input.security_context);
         if state.key != key {
             return Err(FlowDenial::StateChanged);
@@ -81,31 +90,84 @@ impl<'a> FlowPolicyView<'a> {
             .declassification_grant
             .as_ref()
             .map(|grant| {
-                verify_declassification(
-                    grant,
-                    &DeclassificationVerificationRequest {
-                        capability_id: capability_id.clone(),
-                        tenant_id: key.tenant_id.clone(),
-                        subject_id: key.principal_id.clone(),
-                        agent_id: agent_id.clone(),
-                        session_id: key.session_id.clone(),
-                        source_label: complete_source,
-                        destination_id: destination_id.clone(),
-                        tool_name: tool_name.clone(),
-                        purpose: purpose.clone(),
-                        policy_purposes: security.declassification_purposes().clone(),
-                        manifest_purposes: manifest.declassification_purposes.clone(),
-                        canonical_request: canonical_request.clone(),
-                        now_unix_ms,
-                        trusted_authorities: self
-                            .config
-                            .trusted_declassification_authorities
-                            .clone(),
-                    },
-                )
-                .map_err(map_declassification_error)
+                let verification = DeclassificationVerificationRequest {
+                    capability_id: capability_id.clone(),
+                    tenant_id: key.tenant_id.clone(),
+                    subject_id: key.principal_id.clone(),
+                    agent_id: agent_id.clone(),
+                    session_id: key.session_id.clone(),
+                    source_label: complete_source,
+                    destination_id: destination_id.clone(),
+                    tool_name: tool_name.clone(),
+                    purpose: purpose.clone(),
+                    policy_purposes: security.declassification_purposes().clone(),
+                    manifest_purposes: manifest.declassification_purposes.clone(),
+                    canonical_request: canonical_request.clone(),
+                    now_unix_ms,
+                    trusted_authorities: self.config.trusted_declassification_authorities.clone(),
+                };
+                match grant {
+                    chio_core_types::recovery::SignedDisclosureGrant::LegacyV1(legacy)
+                        if recovery.is_none() =>
+                    {
+                        verify_declassification(legacy, &verification)
+                            .map_err(map_declassification_error)
+                    }
+                    chio_core_types::recovery::SignedDisclosureGrant::RecoveryV2(signed) => {
+                        let context =
+                            recovery.ok_or(FlowDenial::DeclassificationBindingMismatch)?;
+                        if signed.as_ref() != &context.grant
+                            || context.action.authorization_requirements.source_label
+                                != verification.source_label
+                            || context.action.request_id.as_str() != input.request.request_id
+                        {
+                            return Err(FlowDenial::DeclassificationBindingMismatch);
+                        }
+                        let assignments = context
+                            .deployment
+                            .coverage
+                            .as_slice()
+                            .iter()
+                            .map(|assignment| {
+                                (
+                                    assignment.issuer_id.clone(),
+                                    chio_flow::RecoveryAuthorityAssignment {
+                                        principal: assignment.principal.clone(),
+                                        key: assignment.key.clone(),
+                                        obligations: assignment
+                                            .obligations
+                                            .as_slice()
+                                            .iter()
+                                            .cloned()
+                                            .collect(),
+                                    },
+                                )
+                            })
+                            .collect();
+                        let coverage = chio_flow::verify_recovery_coverage(
+                            &context.approval.intent,
+                            &context.action.authorization_requirements,
+                            context.action.basis,
+                            &context.approval.coverage,
+                            &assignments,
+                            now_unix_ms,
+                        )
+                        .map_err(map_declassification_error)?;
+                        chio_flow::verify_recovery_declassification(
+                            signed,
+                            &verification,
+                            &context.grant.body().recovery,
+                            &coverage,
+                        )
+                        .map_err(map_declassification_error)
+                    }
+                    _ => Err(FlowDenial::DeclassificationBindingMismatch),
+                }
             })
             .transpose()?;
+        if recovery.is_some() && declassification.is_none() {
+            return Err(FlowDenial::DeclassificationBindingMismatch);
+        }
         let fence_expires_at_unix_ms = now_unix_ms
             .checked_add(self.config.fence_ttl_ms)
             .ok_or(FlowDenial::StateOverflow)?;

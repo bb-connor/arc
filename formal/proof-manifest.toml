@@ -272,8 +272,8 @@ discharged_assumptions = []
 # distributed-time model. The broad transport assumption remains required
 # alongside the narrower named fairness and partition assumption. In
 # particular, weak fairness does not prove a finite evaluation-count bound.
-m04_p5_t5_assumptions_decision = "ASSUME-NETWORK-TRANSPORT-scoped-not-retired"
-m04_p5_t5_rationale_anchor = "formal/tla/DistributedRevocation.tla::StaleEvaluationDenied"
+network_transport_assumptions_decision = "ASSUME-NETWORK-TRANSPORT-scoped-not-retired"
+network_transport_rationale_anchor = "formal/tla/DistributedRevocation.tla::StaleEvaluationDenied"
 
 # Ordered symbol-level hashes for manual Rust-to-model review seams.
 # The rollup uses length-prefixed normalized token streams in rust_symbols order.
@@ -2670,12 +2670,15 @@ symbol_sha256 = [
 # This reference does not certify classification, credential verification,
 # SQLite isolation, Rust lifetimes or complete native dispatch activation.
 [[mirror]]
+# Unblessed source correction: empty digests require the current formal-mirrors
+# tool after independent review. They are not computed hashes or acceptance.
+
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress.rs"
-rust_symbols = ["PreparedNativeSecurityEgress","AcquiredNativeSecurityEgress","PreparedNativeSecurityEgress::fmt","AcquiredNativeSecurityEgress::fmt","ChioKernel::prepare_native_security_egress","ChioKernel::validate_native_egress_original","PreparedNativeSecurityEgress::observation","PreparedNativeSecurityEgress::security_context","PreparedNativeSecurityEgress::acquire","PreparedNativeSecurityEgress::revalidate","PreparedNativeSecurityEgress::command_context","PreparedNativeSecurityEgress::read_history","AcquiredNativeSecurityEgress::history","AcquiredNativeSecurityEgress::commit","read_join","observe","canonical_live_request","require_deadline","PreparedNativeSecurityEgress::request","PreparedNativeSecurityEgress::operation_id","PreparedNativeSecurityEgress::validate_current","PreparedNativeSecurityEgress::operation_version","PreparedNativeSecurityEgress::retained_request_digest","PreparedNativeSecurityEgress::kernel_policy_hash","AcquiredNativeSecurityEgress::commit_current","AcquiredNativeSecurityEgress::commit_current_with_declassification"]
-normalized_sha256 = "6154ad885dde25819b459f3e123da6e6caca175ca967ed868f3b2d0990f5be10"
+rust_symbols = ["PreparedNativeSecurityEgress","AcquiredNativeSecurityEgress","PreparedNativeSecurityEgress::fmt","AcquiredNativeSecurityEgress::fmt","ChioKernel::prepare_native_security_egress","ChioKernel::validate_native_egress_original","PreparedNativeSecurityEgress::observation","PreparedNativeSecurityEgress::security_context","PreparedNativeSecurityEgress::acquire","PreparedNativeSecurityEgress::revalidate","PreparedNativeSecurityEgress::command_context","PreparedNativeSecurityEgress::read_history","AcquiredNativeSecurityEgress::history","AcquiredNativeSecurityEgress::commit","read_join","observe","canonical_live_request","require_deadline","PreparedNativeSecurityEgress::request","PreparedNativeSecurityEgress::operation_id","PreparedNativeSecurityEgress::validate_current","PreparedNativeSecurityEgress::operation_version","PreparedNativeSecurityEgress::retained_request_digest","PreparedNativeSecurityEgress::kernel_policy_hash","AcquiredNativeSecurityEgress::commit_current","AcquiredNativeSecurityEgress::prepare_commit_context","AcquiredNativeSecurityEgress::commit_prepared"]
+normalized_sha256 = ""
 symbol_sha256 = [
   { symbol = "PreparedNativeSecurityEgress", sha256 = "d5eed0ff5ae2dc004264926cf80b362572388b6c2d9d897ac68edcbd4da7a050" },
   { symbol = "AcquiredNativeSecurityEgress", sha256 = "d5efb9c1f50d7da7bb7c212d2de7a50ccfdad197955fe9891808df1727c9334c" },
@@ -2701,8 +2704,9 @@ symbol_sha256 = [
   { symbol = "PreparedNativeSecurityEgress::operation_version", sha256 = "1961009a80d7d78a17cc094b1dc19899f870cdf8f689e123427939e62152e81f" },
   { symbol = "PreparedNativeSecurityEgress::retained_request_digest", sha256 = "aa3154b12fe7115284a42f800e03aa80f9f0a9f2dcbff409c53403f5d34d6c95" },
   { symbol = "PreparedNativeSecurityEgress::kernel_policy_hash", sha256 = "64d2ad5ba42db599c0e26236031787030460047853544a84ecdb6c8e751b8663" },
-  { symbol = "AcquiredNativeSecurityEgress::commit_current", sha256 = "5b198d09100087ab1d39d7ed5c4c653c5a76a363f9a03f84e3c8319ca7b3be3d" },
-  { symbol = "AcquiredNativeSecurityEgress::commit_current_with_declassification", sha256 = "e8067172ff9ede63c532749bbc3bef6bc755fbfbf373f77f874fcc25c07c8f98" },
+  { symbol = "AcquiredNativeSecurityEgress::commit_current", sha256 = "" },
+  { symbol = "AcquiredNativeSecurityEgress::prepare_commit_context", sha256 = "" },
+  { symbol = "AcquiredNativeSecurityEgress::commit_prepared", sha256 = "" },
 ]
 
 # Policy-evidence serialization and exact classification are drift anchors,
@@ -2995,8 +2999,8 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/ledger.rs"
-rust_symbols = ["PreparedNativeSecurityEgress::acquire_and_commit_with_dispatch_ledger","PreparedNativeSecurityEgress::validate_ledger_input","PreparedNativeSecurityEgress::retain_dispatch_ledger","PreparedNativeSecurityEgress::retain_dispatch_ledger_current","PreparedNativeSecurityEgress::validate_ledger","AcquiredNativeSecurityEgress::commit_with_dispatch_ledger","PreparedNativeSecurityEgress::retain_for_capture","PreparedNativeSecurityEgress::retain_for_declassified_capture","PreparedNativeSecurityEgress::retain_for_capture_inner"]
-normalized_sha256 = "62bbabf173e86cdfa54ac59638a977d9c85d14c1074390343ab6f4562688f158"
+rust_symbols = ["PreparedNativeSecurityEgress::acquire_and_commit_with_dispatch_ledger","PreparedNativeSecurityEgress::validate_ledger_input","PreparedNativeSecurityEgress::retain_dispatch_ledger","PreparedNativeSecurityEgress::retain_dispatch_ledger_current","PreparedNativeSecurityEgress::validate_ledger","AcquiredNativeSecurityEgress::commit_with_dispatch_ledger","PreparedNativeSecurityEgress::retain_for_capture"]
+normalized_sha256 = ""
 symbol_sha256 = [
   { symbol = "PreparedNativeSecurityEgress::acquire_and_commit_with_dispatch_ledger", sha256 = "10d3dfe7f570383702ec9c686580a3d43e4c3485bf5a5139b09d753fd808aa6b" },
   { symbol = "PreparedNativeSecurityEgress::validate_ledger_input", sha256 = "83f6a7d2a97c0ce1eb222156b11de1d0a26a323cae9bb7d9409563624377f79e" },
@@ -3004,9 +3008,7 @@ symbol_sha256 = [
   { symbol = "PreparedNativeSecurityEgress::retain_dispatch_ledger_current", sha256 = "7d3770b341b046dbbfbea6aec6aa93d1a79bbd99dc79fb2adafa1b8f21d6977f" },
   { symbol = "PreparedNativeSecurityEgress::validate_ledger", sha256 = "dd12e277c51041a64f29be52549ef6d3dfed7351bbdd5cbc9ea20b1f23ba921c" },
   { symbol = "AcquiredNativeSecurityEgress::commit_with_dispatch_ledger", sha256 = "fa98e02fb5bd7e7949290f1ac31f73fafbcc2249e91f743ab615344fe935a84e" },
-  { symbol = "PreparedNativeSecurityEgress::retain_for_capture", sha256 = "93fd90ef3b3b27c93eb1171554642086b76a088fa9a9606d5f95535bb3a6a293" },
-  { symbol = "PreparedNativeSecurityEgress::retain_for_declassified_capture", sha256 = "92835f739c9840d07fe79545470f61cc1883c19d0aaf9421d1e0e6ef8258fae1" },
-  { symbol = "PreparedNativeSecurityEgress::retain_for_capture_inner", sha256 = "181341e9cfe456107753c0d0a2d1c64bdb2c8a7eb680b98d92ed448cdf7a2053" },
+  { symbol = "PreparedNativeSecurityEgress::retain_for_capture", sha256 = "" },
 ]
 
 [[mirror]]
@@ -3862,4 +3864,23 @@ rust_symbols = ["ChioKernel::reconcile_recoverable_admissions"]
 normalized_sha256 = "e22d6d0fbd2d609e72236ffb964ed885514cfa5535e15ba00ead96dda4984848"
 symbol_sha256 = [
   { symbol = "ChioKernel::reconcile_recoverable_admissions", sha256 = "e483ea2ff112713963d9b0fc5010d50113dcfdce826ae3a8a806bb5e3edf853b" },
+]
+
+# Explicit event preparation owns declassified use. Empty digests deliberately
+# fail the current-source gate until reviewed tooling computes the real values.
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_egress/prepared_commit.rs"
+rust_symbols = ["PreparedNativeSecurityEgressCommit","PreparedNativeSecurityEgressCommit::fmt","AcquiredNativeSecurityEgress::prepare_commit","PreparedNativeSecurityEgressCommit::request","PreparedNativeSecurityEgressCommit::trusted_now_unix_ms","PreparedNativeSecurityEgressCommit::retain_for_declassified_capture","consumption_at"]
+normalized_sha256 = ""
+symbol_sha256 = [
+  { symbol = "PreparedNativeSecurityEgressCommit", sha256 = "" },
+  { symbol = "PreparedNativeSecurityEgressCommit::fmt", sha256 = "" },
+  { symbol = "AcquiredNativeSecurityEgress::prepare_commit", sha256 = "" },
+  { symbol = "PreparedNativeSecurityEgressCommit::request", sha256 = "" },
+  { symbol = "PreparedNativeSecurityEgressCommit::trusted_now_unix_ms", sha256 = "" },
+  { symbol = "PreparedNativeSecurityEgressCommit::retain_for_declassified_capture", sha256 = "" },
+  { symbol = "consumption_at", sha256 = "" },
 ]

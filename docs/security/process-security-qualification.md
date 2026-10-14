@@ -1,5 +1,27 @@
 # Combined process and M4 qualification
 
+## Machine interface compatibility
+
+Versioned JSON reports retain deprecated machine-readable keys while exposing
+behavioral names. Process evidence and reference-swarm run reports emit both
+`qualification_complete: false` and `m5_acceptance_complete: false`. Neither key
+claims complete qualification. The cognition-market `formatVersion: 1` report
+emits `bilateral_deployment` and the retained `m7` alias with identical contents;
+their `triggered` member remains false.
+
+The corpus metadata checker accepts the retained `schema_version: 1` source
+values `m03_counterexample` and `m02_verdict_divergence` as aliases of
+`policy_counterexample` and `sdk_verdict_divergence`. Validation leaves retained
+metadata bytes unchanged and continues to refuse unknown source values.
+
+Internal qualification commands use behavioral names. Replace the removed
+`qualify-cognition-market-m11` Make target with
+`qualify-cognition-market-hosted`, and replace
+`qualify-cognition-market-m11-kvm` with
+`qualify-cognition-market-hosted-kvm`. These development gate targets do not
+constitute a versioned external protocol. Their replacement does not change the
+hosted qualification script or its `--kvm-boundary` argument.
+
 ## Review remediation (2026-09-25)
 
 The review of `24b995af66dbd3661f74ccea0a5192ddcfd763b3` produced corrections

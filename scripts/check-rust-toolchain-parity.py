@@ -15,6 +15,7 @@ PRODUCTION_DOCKERFILES = (
     Path("deploy/docker/Dockerfile.sidecar"),
     Path("deploy/docker/Dockerfile.tee"),
     Path("deploy/sidecar/Dockerfile"),
+    Path("deploy/cognition-market/Dockerfile"),
 )
 ALPINE_DOCKERFILES = PRODUCTION_DOCKERFILES[:3]
 GENERATED_MANIFEST = Path("deploy/docker/chio-workspace/Cargo.toml")

@@ -126,7 +126,7 @@ fn activation_sql_cutpoints_leave_import_inactive_and_retry_exactly_once() -> An
 
 #[test]
 fn v21_upgrade_preserves_active_runtime_source_history() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let source = Source::new(&fixture, false);
     let expected = pin(&fixture, &source)?;
     import(&fixture, &source, &expected)?;

@@ -127,6 +127,10 @@ pub struct AuthenticatedRequestNamespace {
 }
 
 impl AuthenticatedRequestNamespace {
+    /// Content identity only. Observing a namespace grants no admission rights.
+    pub fn digest(&self) -> &RequestNamespaceDigest {
+        &self.digest
+    }
     pub fn for_local_system(
         coordinator_authority_id: AdmissionIdentifier,
     ) -> Result<Self, AdmissionOperationError> {
@@ -563,6 +567,11 @@ impl AdmissionOperationBindingV1 {
     #[must_use]
     pub fn capability_id(&self) -> &AdmissionIdentifier {
         &self.capability_id
+    }
+    /// Hash of the exact original signed capability, independent of action and
+    /// process digest domains.
+    pub fn authorization_capability_hash(&self) -> &AdmissionDigest {
+        &self.authorization_capability_hash
     }
 
     #[must_use]

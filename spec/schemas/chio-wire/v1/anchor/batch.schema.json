@@ -111,7 +111,7 @@
       }
     },
     "witnessState": {
-      "description": "W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.",
+      "description": "Lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.",
       "oneOf": [
         {
           "type": "object",
