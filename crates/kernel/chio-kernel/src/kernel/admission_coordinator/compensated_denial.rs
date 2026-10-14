@@ -23,6 +23,28 @@ impl ConfirmedPreDispatchCompensation {
 }
 
 impl ChioKernel {
+    /// Whether this durable operation is a native original whose account
+    /// prepaid its post-authorization writes. Without a selected native
+    /// authority every store keeps its established cleanup path.
+    pub(in crate::kernel) fn prepaid_native_original(
+        &self,
+        operation: &AdmissionOperationV1,
+    ) -> Result<bool, KernelError> {
+        if self.native_security_authority_binding()?.is_none() {
+            return Ok(false);
+        }
+        let runtime = self.durable_runtime()?;
+        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let retained = native_acquisition::store_call(|| {
+            runtime.store.load_retained_tool_request(
+                operation.binding().operation_id(),
+                &runtime.fence,
+                now,
+            )
+        })?;
+        Ok(retained.is_some_and(|(_, original)| original.native_output_retention().is_some()))
+    }
+
     pub(in crate::kernel) fn compensated_native_denial_metadata(
         &self,
         request: &ToolCallRequest,

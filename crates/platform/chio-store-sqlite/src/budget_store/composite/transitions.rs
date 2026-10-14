@@ -28,6 +28,121 @@ pub(super) fn cumulative_state_text(state: BudgetCumulativeApprovalState) -> &'s
     }
 }
 
+/// The longest text each composite budget enum column can persist, taken from
+/// the writers' own text functions over every variant. Pricing reads these;
+/// it never assumes a literal length.
+pub(crate) struct CompositeBudgetTextBounds {
+    pub(crate) disposition: u64,
+    pub(crate) invocation_state: u64,
+    pub(crate) monetary_state: u64,
+    pub(crate) authorization_outcome: u64,
+    pub(crate) projection_kind: u64,
+    pub(crate) mutation_kind: u64,
+    pub(crate) cumulative_state: u64,
+    pub(crate) guarantee_level: u64,
+    pub(crate) quota_profile: u64,
+}
+
+pub(crate) fn composite_budget_text_bounds() -> CompositeBudgetTextBounds {
+    fn longest<'a>(values: impl IntoIterator<Item = &'a str>) -> u64 {
+        values
+            .into_iter()
+            .map(|value| u64::try_from(value.len()).unwrap_or(u64::MAX))
+            .max()
+            .unwrap_or(0)
+    }
+    CompositeBudgetTextBounds {
+        disposition: longest(
+            [
+                HoldDisposition::Open,
+                HoldDisposition::Released,
+                HoldDisposition::Reversed,
+                HoldDisposition::Reconciled,
+            ]
+            .iter()
+            .map(HoldDisposition::as_str),
+        ),
+        invocation_state: longest(
+            [
+                BudgetInvocationState::Absent,
+                BudgetInvocationState::Authorized,
+                BudgetInvocationState::Captured,
+                BudgetInvocationState::Reversed,
+                BudgetInvocationState::Denied,
+            ]
+            .into_iter()
+            .map(budget_invocation_state_text),
+        ),
+        monetary_state: longest(
+            [
+                BudgetMonetaryState::None,
+                BudgetMonetaryState::Exposed,
+                BudgetMonetaryState::Released,
+                BudgetMonetaryState::Reconciled,
+                BudgetMonetaryState::Captured,
+                BudgetMonetaryState::Reversed,
+            ]
+            .into_iter()
+            .map(budget_monetary_state_text),
+        ),
+        authorization_outcome: longest(
+            [
+                BudgetAuthorizationOutcome::Authorized,
+                BudgetAuthorizationOutcome::ApprovalRequired,
+                BudgetAuthorizationOutcome::Denied,
+            ]
+            .into_iter()
+            .map(budget_authorization_outcome_text),
+        ),
+        projection_kind: longest(["legacy", "composite_v1"]),
+        mutation_kind: longest(
+            [
+                BudgetMutationKind::IncrementInvocation,
+                BudgetMutationKind::ReserveInvocation,
+                BudgetMutationKind::AuthorizeExposure,
+                BudgetMutationKind::CaptureInvocation,
+                BudgetMutationKind::AuthorizeCumulativeApproval,
+                BudgetMutationKind::ReverseInvocation,
+                BudgetMutationKind::CancelCapturedBeforeDispatch,
+                BudgetMutationKind::ReverseExposure,
+                BudgetMutationKind::ReleaseExposure,
+                BudgetMutationKind::ReconcileSpend,
+                BudgetMutationKind::CaptureSpend,
+            ]
+            .into_iter()
+            .map(BudgetMutationKind::as_str),
+        ),
+        cumulative_state: longest(
+            [
+                BudgetCumulativeApprovalState::PendingApproval,
+                BudgetCumulativeApprovalState::Authorized,
+                BudgetCumulativeApprovalState::Captured,
+                BudgetCumulativeApprovalState::ReversedBeforeDispatch,
+            ]
+            .into_iter()
+            .map(cumulative_state_text),
+        ),
+        guarantee_level: longest(
+            [
+                BudgetGuaranteeLevel::SingleNodeAtomic,
+                BudgetGuaranteeLevel::HaLinearizable,
+            ]
+            .into_iter()
+            .map(BudgetGuaranteeLevel::as_str),
+        ),
+        quota_profile: longest(
+            [
+                BudgetQuotaProfile::GrantInvocation,
+                BudgetQuotaProfile::AggregateCapabilityInvocation,
+                BudgetQuotaProfile::AggregateFamilyInvocation,
+                BudgetQuotaProfile::SupplementalBrokerCapabilityExecution,
+            ]
+            .into_iter()
+            .map(BudgetQuotaProfile::as_str),
+        ),
+    }
+}
+
 pub(super) fn cumulative_state(
     value: &str,
 ) -> Result<BudgetCumulativeApprovalState, BudgetStoreError> {

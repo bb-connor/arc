@@ -19,7 +19,9 @@ pub(crate) use preflight::{
 };
 mod transitions;
 
-pub(crate) use transitions::AdmissionCaptureBinding;
+pub(crate) use transitions::{
+    composite_budget_text_bounds, AdmissionCaptureBinding, CompositeBudgetTextBounds,
+};
 mod validation;
 
 use cumulative_model::*;

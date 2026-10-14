@@ -177,6 +177,9 @@ fn supported_table(table: &str) -> bool {
             | "budget_event_revocation_commits"
             | "budget_event_cumulative_approval"
             | "budget_replication_meta"
+            | "budget_invocation_quotas"
+            | "budget_cumulative_approval_accounts"
+            | "budget_cumulative_approval_operations"
     )
 }
 

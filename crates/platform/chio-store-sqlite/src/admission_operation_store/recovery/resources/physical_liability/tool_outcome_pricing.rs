@@ -78,7 +78,7 @@ pub(in crate::admission_operation_store) fn price_native_tool_outcome_phases(
     // This exact full native profile must already authenticate UTF-8, FULL WAL,
     // auto-vacuum=0, current and pending reserved bytes=0, actual supported VFS,
     // whole source/index/trigger catalog and the original producing program.
-    let transactions = describe_native_tool_outcome_transactions(tx, source)?;
+    let transactions = describe_native_tool_outcome_transactions(source)?;
     transactions
         .iter()
         .map(|transaction| {
@@ -167,7 +167,9 @@ fn transaction_shape(
             .ok_or_else(|| invariant("original custody tree lacks its retained row ceiling"))?;
         let shape = if matches!(
             row.table(),
-            ToolOutcomeWriteTableData::AdmissionMeta | ToolOutcomeWriteTableData::GlobalMeta
+            ToolOutcomeWriteTableData::AdmissionMeta
+                | ToolOutcomeWriteTableData::GlobalMeta
+                | ToolOutcomeWriteTableData::BudgetReplicationMeta
         ) {
             SqliteTreeWriteShapeData::singleton_root(
                 row.maximum_after_record_bytes(),
@@ -191,14 +193,14 @@ fn transaction_shape(
         .map_err(invariant)?;
         trees.push(shape.within_retained_rows(ceiling).map_err(invariant)?);
         for &bytes in row.index_record_bytes() {
-            let index = if matches!(
-                row.table(),
-                ToolOutcomeWriteTableData::Operations | ToolOutcomeWriteTableData::PaymentJournal
-            ) {
-                // The recovery index changes when the operation's timestamp
-                // or state changes; the payment journal's state index changes
-                // when its state or updated_at changes. Retain deletion and
-                // reinsertion walks for both.
+            let index = if row.possible_before_record_bytes().is_some()
+                && !matches!(row.table(), ToolOutcomeWriteTableData::Blobs)
+            {
+                // A rewritten row lists exactly the indexes whose key its
+                // writer changes (the operation recovery index, the journal
+                // state index, the usage time and sequence indexes and the
+                // hold disposition index). Retain deletion and reinsertion
+                // walks for each.
                 SqliteTreeWriteShapeData::record(Some(bytes), bytes, row.mutations())
             } else {
                 // The content-addressed blob's PK index is inserted only for a

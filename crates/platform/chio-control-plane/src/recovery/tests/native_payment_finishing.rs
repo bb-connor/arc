@@ -220,7 +220,7 @@ fn purpose_disposition(account: &serde_json::Value, kind: &str) -> TestResult<St
             return liability["disposition"]
                 .as_str()
                 .map(str::to_owned)
-                .ok_or("native payment account purpose lost its disposition");
+                .ok_or_else(|| "native payment account purpose lost its disposition".into());
         }
     }
     Err(format!("native payment account purpose {kind} absent").into())
@@ -429,7 +429,8 @@ async fn native_payment_decline_compensates_before_dispatch_without_charge() -> 
 }
 
 #[tokio::test]
-async fn native_payment_settlement_survives_restart_and_never_charges_twice() -> TestResult {
+async fn native_payment_settled_operation_replays_after_restart_without_second_charge() -> TestResult
+{
     let calls = PaymentRailCalls::default();
     let directory = tempfile::tempdir()?;
     let adapter = Box::new(HoldingPaymentAdapter {
@@ -822,7 +823,8 @@ async fn native_payment_crash_after_effect_drains_settlement_once_across_restart
         log.contains("recovery crash cutpoint: return-recorded"),
         "payment child missed its cutpoint: {log}"
     );
-    let path = directory.path();
+    let retained_path = directory.path().to_path_buf();
+    let path = retained_path.as_path();
     // One external effect happened before the abort; the payment settlement
     // was interrupted before its terminal completion.
     assert_eq!(external_count(path)?, 1);
@@ -859,12 +861,16 @@ async fn native_payment_crash_after_effect_drains_settlement_once_across_restart
         "outstanding"
     );
     // A real cold restart reopens the same authority and drains the funded
-    // settlement to completion.
+    // settlement to completion. The restarted rail counts every call: the
+    // child's single authorization is never repeated.
+    let calls = PaymentRailCalls::default();
     let f = RecoveryFixture::open_with_payment_adapter(
         path.to_path_buf(),
         Some(directory),
         false,
-        reversible_hold_payment_adapter(),
+        Box::new(HoldingPaymentAdapter {
+            calls: calls.clone(),
+        }),
     )?;
     let settled = f
         .runtime
@@ -876,6 +882,9 @@ async fn native_payment_crash_after_effect_drains_settlement_once_across_restart
         settled.effect
     );
     assert_eq!(external_count(path)?, 1);
+    assert_eq!(calls.authorizations.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.captures.load(Ordering::SeqCst), 1);
+    assert_eq!(calls.releases.load(Ordering::SeqCst), 0);
     let drained = retained_payment_journal(path, &operation_id)?;
     assert_eq!(drained.state, "settled");
     assert_eq!(drained.settle_action.as_deref(), Some("capture"));
@@ -917,10 +926,209 @@ async fn native_payment_crash_after_effect_drains_settlement_once_across_restart
         "settled payment replay returned a different receipt"
     );
     assert_eq!(external_count(path)?, 1);
+    assert_eq!(calls.authorizations.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.captures.load(Ordering::SeqCst), 1);
+    assert_eq!(calls.releases.load(Ordering::SeqCst), 0);
     assert_eq!(
         retained_payment_journal(path, &operation_id)?.journal_version,
         drained.journal_version,
         "replay wrote the settled payment journal again"
     );
+    Ok(())
+}
+
+/// Disposition of one retained budget hold, read from the real store.
+fn budget_hold_state(path: &std::path::Path, hold_id: &str) -> TestResult<(String, String)> {
+    let database = rusqlite::Connection::open_with_flags(
+        path.join("admission.db"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    Ok(database.query_row(
+        "SELECT disposition, invocation_state FROM budget_authorization_holds WHERE hold_id=?1",
+        [hold_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?)
+}
+
+fn payment_hold_id(path: &std::path::Path, operation: &str) -> TestResult<String> {
+    let database = rusqlite::Connection::open_with_flags(
+        path.join("admission.db"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    Ok(database.query_row(
+        "SELECT hold_id FROM payment_journal WHERE operation_id=?1",
+        [operation],
+        |row| row.get(0),
+    )?)
+}
+
+/// The external authorization is held and the process aborts inside the
+/// native capture transaction, before any dispatch commit or effect. The
+/// cold restart compensates before dispatch: the rail hold is released once,
+/// every live budget hold is reversed in the transaction funded by the
+/// account's own PaymentSettlement purpose, and the terminal spends
+/// TerminalProjection instead of ordinary intake. A second restart replays
+/// nothing: no rail call, journal write or account transition repeats.
+#[cfg(unix)]
+#[tokio::test]
+async fn native_payment_crash_after_authorization_reverses_holds_on_prepaid_purposes() -> TestResult
+{
+    use std::os::unix::process::ExitStatusExt;
+    use std::time::{Duration, Instant};
+    let directory = tempfile::tempdir()?;
+    std::fs::write(directory.path().join("payment-effect"), b"1")?;
+    let original = RecoveryFixture::open_with_payment_adapter(
+        directory.path().to_path_buf(),
+        None,
+        false,
+        reversible_hold_payment_adapter(),
+    )?;
+    Box::pin(original.denied_seed_named("ticket-1")).await?;
+    drop(original);
+    let log = std::fs::File::create(directory.path().join("payment-cancel-child.log"))?;
+    let mut child = std::process::Command::new(std::env::current_exe()?)
+        .args([
+            "--exact",
+            "recovery::tests::recovery_crash_child",
+            "--ignored",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env("CHIO_RECOVERY_CRASH_CHILD", "1")
+        .env("CHIO_RECOVERY_CRASH_ROOT", directory.path())
+        .env("CHIO_RECOVERY_CRASH_POINT", "capture-before-commit")
+        .env("CHIO_RECOVERY_CRASH_PAYMENT", "1")
+        .stdout(log.try_clone()?)
+        .stderr(log)
+        .spawn()?;
+    let started = Instant::now();
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if started.elapsed() > Duration::from_secs(90) {
+            child.kill()?;
+            child.wait()?;
+            return Err("payment cancellation child timed out".into());
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    let log = std::fs::read_to_string(directory.path().join("payment-cancel-child.log"))?;
+    assert_eq!(status.signal(), Some(6), "capture-before-commit: {log}");
+    assert!(
+        log.contains("native capture transaction cutpoint: BeforeCommit"),
+        "payment child missed its capture cutpoint: {log}"
+    );
+    let retained_path = directory.path().to_path_buf();
+    let path = retained_path.as_path();
+    assert_eq!(
+        external_count(path)?,
+        0,
+        "no effect precedes the dispatch commit"
+    );
+    let interrupted = authority_history::retained_workflow(path)?;
+    assert!(!interrupted.captured);
+    let intent = interrupted
+        .admission
+        .as_ref()
+        .ok_or("interrupted payment native intent absent")?;
+    let operation_id = intent.native_operation_id.as_str().to_owned();
+    let held = retained_payment_journal(path, &operation_id)?;
+    assert_eq!(held.state, "authorized", "the rail hold must be retained");
+    assert!(held.authorization_id.is_some());
+    let hold_id = payment_hold_id(path, &operation_id)?;
+    assert_eq!(budget_hold_state(path, &hold_id)?.1, "authorized");
+    let account = super::native_lifecycle::native_account(path, &operation_id)?;
+    assert_eq!(account["state"], "confirmed");
+    assert_eq!(
+        purpose_disposition(&account, "payment_authorization")?,
+        "consumed"
+    );
+    for purpose in [
+        "payment_compensation",
+        "payment_settlement",
+        "payment_completion",
+        "terminal_projection",
+    ] {
+        assert_eq!(purpose_disposition(&account, purpose)?, "outstanding");
+    }
+    // The cold restart compensates the authorized operation before dispatch.
+    let calls = PaymentRailCalls::default();
+    let mut f = RecoveryFixture::open_with_payment_adapter(
+        path.to_path_buf(),
+        Some(directory),
+        false,
+        Box::new(HoldingPaymentAdapter {
+            calls: calls.clone(),
+        }),
+    )?;
+    let settled = f
+        .runtime
+        .settle(&f.control, &interrupted.workflow_id)
+        .map_err(|error| format!("payment cancellation drain failed: {error}"))?;
+    assert!(
+        !matches!(settled.effect, EffectObservationV1::Complete { .. }),
+        "a compensated operation reported an effect: {:?}",
+        settled.effect
+    );
+    assert_eq!(external_count(path)?, 0);
+    assert_eq!(calls.authorizations.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.captures.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.releases.load(Ordering::SeqCst), 1);
+    let released = retained_payment_journal(path, &operation_id)?;
+    assert_eq!(released.state, "settled");
+    assert_eq!(released.settle_action.as_deref(), Some("release"));
+    assert!(released.transaction_id.is_some());
+    assert_eq!(released.journal_version, held.journal_version + 2);
+    assert_eq!(
+        budget_hold_state(path, &hold_id)?,
+        ("reversed".to_owned(), "reversed".to_owned())
+    );
+    // Each post-authorization write spent its own prepaid purpose: the
+    // release intent, its completion, the funded hold reversal and the
+    // terminal. Nothing after the external authorization was ordinary intake.
+    let account = super::native_lifecycle::native_account(path, &operation_id)?;
+    assert_eq!(account["state"], "settled");
+    for purpose in [
+        "payment_authorization",
+        "payment_compensation",
+        "payment_completion",
+        "payment_settlement",
+        "terminal_projection",
+    ] {
+        assert_eq!(
+            purpose_disposition(&account, purpose)?,
+            "consumed",
+            "{purpose}"
+        );
+    }
+    // A second cold restart replays the compensated operation without any
+    // rail call, journal write, hold mutation or account transition.
+    let directory = f._directory.take();
+    drop(f);
+    let replay_calls = PaymentRailCalls::default();
+    let f = RecoveryFixture::open_with_payment_adapter(
+        path.to_path_buf(),
+        directory,
+        false,
+        Box::new(HoldingPaymentAdapter {
+            calls: replay_calls.clone(),
+        }),
+    )?;
+    f.runtime
+        .settle(&f.control, &interrupted.workflow_id)
+        .map_err(|error| format!("compensated payment replay failed: {error}"))?;
+    assert_eq!(replay_calls.authorizations.load(Ordering::SeqCst), 0);
+    assert_eq!(replay_calls.captures.load(Ordering::SeqCst), 0);
+    assert_eq!(replay_calls.releases.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        retained_payment_journal(path, &operation_id)?.journal_version,
+        released.journal_version
+    );
+    assert_eq!(
+        super::native_lifecycle::native_account(path, &operation_id)?,
+        account
+    );
+    assert_eq!(external_count(path)?, 0);
     Ok(())
 }

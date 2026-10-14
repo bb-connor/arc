@@ -73,9 +73,8 @@ struct ToolOutcomeEnvelopeData {
 /// Only the authenticated pre-effect original supplies these row envelopes.
 /// Source verification must precede both the row description and pricing.
 /// A payment participant additionally carries its four journal transactions,
-/// priced from the actual budget hold this original already placed.
+/// priced at the typed bounds of the budget hold it will place.
 pub(super) fn describe_native_tool_outcome_transactions(
-    tx: &Transaction<'_>,
     source: &VerifiedNativeInitialFinishingPlan<'_, '_>,
 ) -> Result<Vec<ToolOutcomeTransactionEnvelopeData>, AdmissionOperationStoreError> {
     let original = source.original();
@@ -152,14 +151,21 @@ pub(super) fn describe_native_tool_outcome_transactions(
         transactions.push(transaction(&envelope, purpose)?);
     }
     if requirements.payment {
-        let hold = rows::PaymentHoldShape::load(tx, source)?;
+        // The account is priced before any budget hold exists. A nonce
+        // original may still own its preflight hold when a pre-dispatch
+        // reversal runs, so its reversal shape covers two holds.
+        let reversal_holds = 1 + u64::from(requirements.execution_nonce);
         for purpose in [
             ToolOutcomeTransactionPurposeData::PaymentAuthorization,
             ToolOutcomeTransactionPurposeData::PaymentCompensation,
             ToolOutcomeTransactionPurposeData::PaymentSettlement,
             ToolOutcomeTransactionPurposeData::PaymentCompletion,
         ] {
-            transactions.push(rows::payment_transaction(&envelope, purpose, &hold)?);
+            transactions.push(rows::payment_transaction(
+                &envelope,
+                purpose,
+                reversal_holds,
+            )?);
         }
     }
     Ok(transactions)

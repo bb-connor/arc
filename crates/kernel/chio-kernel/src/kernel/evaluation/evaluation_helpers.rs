@@ -632,6 +632,11 @@ impl ChioKernel {
         let runtime_admission_metadata =
             merge_metadata_objects(runtime_admission_metadata, native_compensation_metadata);
 
+        let reverse = reverse.or_else(|| {
+            compensation
+                .as_ref()
+                .and_then(|confirmed| confirmed.funded_reversal().cloned())
+        });
         if let (Some(charge), Some(reverse)) =
             (denial.budget_mutation.charge_result(), reverse.as_ref())
         {

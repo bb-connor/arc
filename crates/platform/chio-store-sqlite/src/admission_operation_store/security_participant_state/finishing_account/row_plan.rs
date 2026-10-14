@@ -45,7 +45,7 @@ impl NativeRowPlan {
                 .ok_or_else(|| invalid("native row plan exhausted"))?;
             Ok(())
         };
-        let transactions = describe_native_tool_outcome_transactions(tx, source)?;
+        let transactions = describe_native_tool_outcome_transactions(source)?;
         for transaction in &transactions {
             for row in transaction.rows() {
                 add(row.table().table_name(), row.maximum_insertions())?;
