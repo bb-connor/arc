@@ -226,8 +226,11 @@ pub(super) fn describe_transaction_rows(
                     ],
                 });
             }
-            rows.push(operation_shape(operation, 1)?);
-            1
+            // The terminal rewrite and, for a restarted coordinator, the
+            // recovery claim this same funded transaction persists: two
+            // operation row rewrites and two admission and global commits.
+            rows.push(operation_shape(operation, 2)?);
+            2
         }
         ToolOutcomeTransactionPurposeData::PaymentAuthorization
         | ToolOutcomeTransactionPurposeData::PaymentCompensation
@@ -949,11 +952,30 @@ pub(super) fn payment_transaction(
         // family is described only through this path.
         _ => return Err(invariant("payment journal purpose is outside its family")),
     };
+    // A restarted coordinator persists its recovery claim inside this funded
+    // write: the operation row rewrite with its recovery index, one admission
+    // commit and its meta head, and one more global commit.
+    rows.push(operation_shape(operation_bytes(envelope)?, 1)?);
+    rows.push(ToolOutcomeRowEnvelopeData {
+        table: ToolOutcomeWriteTableData::AdmissionCommits,
+        possible_before_bytes: None,
+        maximum_after_bytes: record_bytes(&[8, 64, 8, 18, 64, 64, 64, 64, 64, 36, 36, 8, 8, 8])?,
+        mutations: 1,
+        index_bytes: vec![record_bytes(&[64, 8, 8])?],
+    });
+    rows.push(existing(
+        ToolOutcomeWriteTableData::AdmissionMeta,
+        record_bytes(&[8, 8, 64, 8])?,
+        1,
+    ));
+    let global_appends = global_appends
+        .checked_add(1)
+        .ok_or_else(|| invariant("payment claim global append exhausted"))?;
     payment_append_histories(&mut rows, envelope, global_appends)?;
     Ok(ToolOutcomeTransactionEnvelopeData {
         purpose,
         rows,
-        admission_appends: 0,
+        admission_appends: 1,
         global_appends,
     })
 }

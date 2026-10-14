@@ -577,8 +577,9 @@ pub use receipt_query::{
 #[cfg(not(loom))]
 pub use receipt_store::{
     AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError, AdmissionBudgetCapture,
-    AdmissionPaymentHoldReversal, AdmissionPaymentHoldReversed, AdmissionPaymentJournalAdvance,
-    AdmissionPaymentJournalError, AdmissionPaymentSettlement, AdmissionPaymentSettlementBegin,
+    AdmissionPaymentHoldReversal, AdmissionPaymentHoldReversalClaim, AdmissionPaymentHoldReversed,
+    AdmissionPaymentJournalAdvance, AdmissionPaymentJournalClaim, AdmissionPaymentJournalError,
+    AdmissionPaymentSettlement, AdmissionPaymentSettlementBegin, AdmissionPaymentSettlementClaim,
     AtomicReceiptProjection, AuthorizationReceiptConsumption, FederatedEvidenceShareImport,
     FederatedEvidenceShareSummary, IndexedSecurityEvidenceStore, PendingSettlementObservation,
     QualifiedAdmissionProjectionStore, ReceiptCheckpointCreateReport, ReceiptCheckpointRange,

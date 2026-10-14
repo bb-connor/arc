@@ -218,7 +218,8 @@ fn transaction(
         ToolOutcomeTransactionPurposeData::RawCustody
         | ToolOutcomeTransactionPurposeData::EvaluationBegin => 2,
         ToolOutcomeTransactionPurposeData::SecurityRelease => 1,
-        ToolOutcomeTransactionPurposeData::TerminalProjection { .. } => 1,
+        // The terminal append plus the restarted coordinator's claim commit.
+        ToolOutcomeTransactionPurposeData::TerminalProjection { .. } => 2,
         // The payment journal advance appends one global commit; the
         // settlement begin also carries the budget joint commit.
         ToolOutcomeTransactionPurposeData::PaymentAuthorization

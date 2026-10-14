@@ -1038,6 +1038,60 @@ pub struct AdmissionPaymentSettlement {
     pub budget_already_reconciled: bool,
 }
 
+/// A payment journal advance whose recovery claim the store persists in the
+/// advance's own transaction, so a restarted coordinator's claim commits only
+/// with the funded journal write it authorizes.
+#[derive(Debug, Clone)]
+pub struct AdmissionPaymentJournalClaim<'a> {
+    pub claim: crate::admission_operation::RecoveryClaimRequest<'a>,
+    pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+    pub expected: &'a crate::payment::PaymentJournalRecord,
+    pub transition: &'a crate::payment::PaymentJournalTransition,
+    pub release_evidence: Option<&'a crate::tool_outcome::MonetaryReleaseEvidenceV1>,
+    pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+    pub trusted_now_unix_ms: u64,
+}
+
+/// A payment settlement begin whose recovery claim commits with it.
+#[derive(Debug, Clone)]
+pub struct AdmissionPaymentSettlementClaim<'a> {
+    pub claim: crate::admission_operation::RecoveryClaimRequest<'a>,
+    pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+    pub expected: &'a crate::payment::PaymentJournalRecord,
+    pub transition: Option<&'a crate::payment::PaymentJournalTransition>,
+    pub release_evidence: Option<&'a crate::tool_outcome::MonetaryReleaseEvidenceV1>,
+    pub budget_reconcile: crate::budget_store::BudgetReconcileHoldRequest,
+    pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+    pub trusted_now_unix_ms: u64,
+}
+
+/// A funded pre-dispatch hold reversal whose recovery claim commits with it.
+#[derive(Debug, Clone)]
+pub struct AdmissionPaymentHoldReversalClaim<'a> {
+    pub claim: crate::admission_operation::RecoveryClaimRequest<'a>,
+    pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+    pub expected: &'a crate::payment::PaymentJournalRecord,
+    pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+    pub trusted_now_unix_ms: u64,
+}
+
+fn payment_claim_error(
+    error: crate::admission_operation::AdmissionOperationStoreError,
+) -> AdmissionPaymentJournalError {
+    match error {
+        crate::admission_operation::AdmissionOperationStoreError::Fenced => {
+            AdmissionPaymentJournalError::Fenced
+        }
+        crate::admission_operation::AdmissionOperationStoreError::Unavailable(detail) => {
+            AdmissionPaymentJournalError::Unavailable(detail)
+        }
+        crate::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(detail) => {
+            AdmissionPaymentJournalError::OutcomeUnknown(detail)
+        }
+        error => AdmissionPaymentJournalError::Invariant(error.to_string()),
+    }
+}
+
 /// The pre-dispatch reversal of every live budget hold of one payment
 /// operation after its external authorization was released.
 #[derive(Debug, Clone)]
@@ -1244,6 +1298,151 @@ pub trait QualifiedAdmissionProjectionStore:
         &self,
         begin: AdmissionPaymentSettlementBegin<'_>,
     ) -> Result<AdmissionPaymentSettlement, AdmissionPaymentJournalError>;
+
+    /// The recovery claim `request` would persist, read without writing. Only
+    /// a store that fuses claims with its funded writes provides it.
+    fn preview_recovery_claim(
+        &self,
+        _request: crate::admission_operation::RecoveryClaimRequest<'_>,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        crate::admission_operation::UntrustedAdmissionRecoveryClaim,
+        crate::admission_operation::AdmissionOperationStoreError,
+    > {
+        Err(
+            crate::admission_operation::AdmissionOperationStoreError::Unavailable(
+                "recovery claim preview is unsupported".to_owned(),
+            ),
+        )
+    }
+
+    /// Commit the terminal projection under a claim persisted with it. A store
+    /// that cannot fuse them persists the claim first, as before.
+    fn claim_and_commit_admission_projection(
+        &self,
+        claim: crate::admission_operation::RecoveryClaimRequest<'_>,
+        lease: &mut crate::admission_operation::ClaimedLease<'_>,
+        projection: &crate::admission_operation::AdmissionTerminalProjection,
+    ) -> Result<
+        (
+            crate::admission_operation::AdmissionTerminal,
+            Option<crate::admission_operation::AdmissionRecoveryLease>,
+        ),
+        ReceiptStoreError,
+    > {
+        let recovery_lease = crate::admission_operation::claim_qualified_lease(
+            self,
+            claim,
+            projection.context().trusted_time_unix_ms,
+            lease,
+        )
+        .map_err(|error| match error {
+            crate::admission_operation::AdmissionOperationStoreError::Fenced => {
+                ReceiptStoreError::Fenced
+            }
+            crate::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(detail) => {
+                ReceiptStoreError::OutcomeUnknown(detail)
+            }
+            error => ReceiptStoreError::Conflict(error.to_string()),
+        })?;
+        let terminal = self.commit_admission_projection(projection)?;
+        Ok((terminal, Some(recovery_lease)))
+    }
+
+    /// Advance the journal under a claim persisted with the advance. A store
+    /// that cannot fuse them persists the claim first, as before. `None`
+    /// means nothing changed and no claim was persisted: the caller carries
+    /// the same claim to its next write.
+    fn claim_and_advance_payment_journal(
+        &self,
+        advance: AdmissionPaymentJournalClaim<'_>,
+        lease: &mut crate::admission_operation::ClaimedLease<'_>,
+    ) -> Result<
+        (
+            crate::payment::PaymentJournalRecord,
+            Option<crate::admission_operation::AdmissionRecoveryLease>,
+        ),
+        AdmissionPaymentJournalError,
+    > {
+        let recovery_lease = crate::admission_operation::claim_qualified_lease(
+            self,
+            advance.claim,
+            advance.trusted_now_unix_ms,
+            lease,
+        )
+        .map_err(payment_claim_error)?;
+        let journal = self.advance_payment_journal(AdmissionPaymentJournalAdvance {
+            operation: advance.operation,
+            recovery_lease: &recovery_lease,
+            expected: advance.expected,
+            transition: advance.transition,
+            release_evidence: advance.release_evidence,
+            active_fence: advance.active_fence,
+            trusted_now_unix_ms: advance.trusted_now_unix_ms,
+        })?;
+        Ok((journal, Some(recovery_lease)))
+    }
+
+    /// Begin the settlement under a claim persisted with it.
+    fn claim_and_begin_payment_settlement(
+        &self,
+        begin: AdmissionPaymentSettlementClaim<'_>,
+        lease: &mut crate::admission_operation::ClaimedLease<'_>,
+    ) -> Result<
+        (
+            AdmissionPaymentSettlement,
+            Option<crate::admission_operation::AdmissionRecoveryLease>,
+        ),
+        AdmissionPaymentJournalError,
+    > {
+        let recovery_lease = crate::admission_operation::claim_qualified_lease(
+            self,
+            begin.claim,
+            begin.trusted_now_unix_ms,
+            lease,
+        )
+        .map_err(payment_claim_error)?;
+        let settlement = self.begin_payment_settlement(AdmissionPaymentSettlementBegin {
+            operation: begin.operation,
+            recovery_lease: &recovery_lease,
+            expected: begin.expected,
+            transition: begin.transition,
+            release_evidence: begin.release_evidence,
+            budget_reconcile: begin.budget_reconcile,
+            active_fence: begin.active_fence,
+            trusted_now_unix_ms: begin.trusted_now_unix_ms,
+        })?;
+        Ok((settlement, Some(recovery_lease)))
+    }
+
+    /// The funded pre-dispatch hold reversal under a claim persisted with it.
+    fn claim_and_reverse_funded_payment_holds(
+        &self,
+        reversal: AdmissionPaymentHoldReversalClaim<'_>,
+        lease: &mut crate::admission_operation::ClaimedLease<'_>,
+    ) -> Result<
+        (
+            Option<AdmissionPaymentHoldReversed>,
+            Option<crate::admission_operation::AdmissionRecoveryLease>,
+        ),
+        AdmissionPaymentJournalError,
+    > {
+        let recovery_lease = crate::admission_operation::claim_qualified_lease(
+            self,
+            reversal.claim,
+            reversal.trusted_now_unix_ms,
+            lease,
+        )
+        .map_err(payment_claim_error)?;
+        let reversed = self.reverse_funded_payment_holds(AdmissionPaymentHoldReversal {
+            operation: reversal.operation,
+            recovery_lease: &recovery_lease,
+            expected: reversal.expected,
+            active_fence: reversal.active_fence,
+            trusted_now_unix_ms: reversal.trusted_now_unix_ms,
+        })?;
+        Ok((reversed, Some(recovery_lease)))
+    }
 
     /// Reverse every live budget hold of a pre-dispatch payment operation in
     /// the store transaction that funds it from the operation's own prepaid

@@ -7,12 +7,13 @@ const MIB: u64 = 1024 * 1024;
 
 mod physical_liability;
 #[cfg(test)]
+pub(in crate::admission_operation_store) use physical_liability::price_protected_command_liability;
+#[cfg(test)]
 pub(in crate::admission_operation_store) use physical_liability::price_raw_custody_liability;
 pub(in crate::admission_operation_store) use physical_liability::{
     physical_command_write_profile, price_native_tool_outcome_phases,
-    price_protected_command_liability, price_protected_command_with_row_limits,
-    raw_custody_price_algorithm_fingerprint, tool_outcome_price_algorithm_fingerprint,
-    PhysicalLiabilityData, ProtectedCommandLiabilityPlan,
+    price_protected_command_with_row_limits, raw_custody_price_algorithm_fingerprint,
+    tool_outcome_price_algorithm_fingerprint, PhysicalLiabilityData, ProtectedCommandLiabilityPlan,
 };
 
 #[cfg(test)]

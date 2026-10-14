@@ -246,7 +246,9 @@ impl SqliteAdmissionOperationStore {
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
         schema::authority_validation_time(&tx, now)?;
         let deployment = protected::deployment_tx(&tx, scope)?;
-        super::super::security_participant_state::verify_recovery_initialization(
+        // begin_read and the fenced owner check above pinned the history open
+        // authenticated; check the selected initialization binding.
+        super::super::security_participant_state::verify_current_recovery_initialization(
             &tx,
             &deployment.native_authority,
         )?;

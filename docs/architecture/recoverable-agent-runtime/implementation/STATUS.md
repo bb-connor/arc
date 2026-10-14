@@ -1,14 +1,15 @@
 # Recovery runtime execution status
 
-The implementation is **not qualified and not ready to merge**. The current
-uncommitted candidate is based on `75bb56bb96f1e53795bafc577bdcaa1c6557e4ef`.
-The branch has not been committed or pushed in this continuation. Unpublished
-local checkpoints preserve the complete candidate and original index state;
-hosted CI does not cover these working-tree changes.
+The implementation is **not qualified and not ready to merge**. PR #1179 is open
+at published head `f0c85061d01443268023746eabca74ed627d6931`. Newer local commits
+are undergoing owning acceptance. The 2026-10-14 hosted snapshot has 74 queued
+checks and four skipped checks, with no passing qualification implied. Current
+source, actual process ownership and execution results are recorded in
+`target/recovery-execution-status.json`. No merge is authorized.
 
 The [review register](review-register.json) is the authoritative inventory and
-working queue: **11 P1, 74 P2 and 89 P3 remain open**. It separately records
-141 currently applicable scoped closures, 38 historical scopes requiring
+working queue: **8 P1, 74 P2 and 89 P3 remain open**. It separately records
+144 currently applicable scoped closures, 38 historical scopes requiring
 revalidation, two superseded support obligations and 44 candidate-only records.
 Original findings and historical dispositions remain preserved.
 
@@ -27,13 +28,32 @@ Planners, logical capacity counters and setup records cannot provide that author
 
 ## Current integration stage
 
+The real SQLite/Process capture, abort, restart, settlement and replay lifecycle
+has scoped passing evidence. `C1-01` is scoped closed at `c2b6cc7a` with 16 owning
+Control Plane cases and source continuity for the complete 11-case Process
+binding target. The original 8193-poll control also passed there. These results
+remain tied to their recorded source; affected dependencies require revalidation.
+
+The unchanged 512-alias flood at `9072aef7` completed every alias but failed at
+victim resume when the original seed capability expired after 602.9 seconds.
+The failed result is preserved. A separately reviewed same-transaction quota
+reuse repair is installed at `8b59417cb3`; neither patch has whole-finding
+acceptance. The payment batch adds funded claim/write composition, authentic
+unavailable-verifier quarantine, warm setup verification and an additive restart
+pressure regression. Its initial review found an ordinary-intake availability
+regression; the corrected snapshot restores the established 64-row allowance
+for every reserved table. Payment reservation capacity, remaining post-effect
+claim coverage, complete verifier acceptance and settlement overload remain open.
+
+The following earlier integration results retain their original source scopes.
+
 `C1-02` is accepted at `55dcab8c` after its original four-action stale-owner
 control passed 1/1 and its setup/output fresh-owner progress complements passed
 2/2, on the same current binary and source pins. Independent review confirms
 the original scope; completed-native-output delivery is not claimed. This brings
 the continuation to one P1 and 36 P2 scoped closures.
 
-The current production source checkpoint is `a4443a0b`. Current owning
+An earlier production source checkpoint is `a4443a0b`. Its owning
 compilation passed, followed by Kernel authority 13/13, Process custody 3/3,
 checkpoint/audience 3/3 and the actual-clock checkpoint observer 1/1. The repaired
 Store compaction controls passed 4/4 on their freshly compiled `fe160500` source.
@@ -51,10 +71,10 @@ it does not restore missing historical stdin or argv capture. The recorder repai
 subsequently passed its focused actual compiler control. A later original
 producer stopped at automatic disk protection before Cargo, inspector and export
 completion. Required downstream acceptance remains open. Broad qualification is
-suspended until the central production lifecycle works. C1-01's private
-diagnostic established missing original output retention; selecting a genuine
-profile then requires the unimplemented SQLite preparation. Neither P1 closes
-from generic passing controls.
+suspended until the central production lifecycle works. The earlier C1-01
+diagnostic exposed missing original output retention and SQLite preparation.
+Those prerequisites now have installed successors and the scoped acceptance
+above. The broader compiler and funding obligations remain open.
 
 The native lifecycle owner is implementing SQLite account preparation,
 enrollment, confirmation, restoration and funded writes together with the real
@@ -179,17 +199,15 @@ broader runtime runs into passes or qualify changed source.
 
 ## Concrete blockers
 
-- An earlier diagnostic exposed the actual inner refusal:
-  `native capture requires an original output retention profile`. An explicit
-  profile additionally requires genuine original finishing preparation. SQLite
-  still inherits the unsupported default; completing the required producer roster
-  depends on the parked Capture workflow-identity/cumulative-roster work.
-  Current tests observe the sanitized capture-callback reconciliation failure;
-  they do not expose the inner string. No fabricated account, partial roster or
-  permissive default replaces the producer.
-- Original-operation capture, historical settlement, retained output/receipts,
-  capacity guarantees and terminal retirement therefore remain unaccepted.
-  Polling, helper tests and earlier-prerequisite refusals do not discharge them.
+- Payment finishing still exceeds the unchanged WAL reservation ceiling in its
+  last executed positive. The reviewed funded-write batch retains additional
+  unfunded restart paths. Complete original payment, pressure and retained
+  guarantee acceptance is required; no limit increase or silent repricing
+  substitutes for it. This is ordinary permitted runtime work, without an
+  established blanket dependency on parked Capture work.
+- Quota flood victim completion, complete historical rotation and verifier
+  controls, and settlement under four provider-waiting commands remain open.
+  Earlier lifecycle and polling passes do not discharge these distinct scopes.
 - The former 16/21 GiB starting estimates were superseded by measured stage costs,
   authorized inactive-cache reclamation and automatic resource monitoring. They
   are not acceptance requirements or prohibitions. The protected floor remains

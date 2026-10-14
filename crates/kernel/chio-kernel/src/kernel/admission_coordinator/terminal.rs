@@ -1277,10 +1277,30 @@ impl ChioKernel {
             )
             .max(1);
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let (mut evaluation, lease) = match existing_evaluation {
+        let claim_request =
+            Self::recovery_claim_request(runtime, &admission.operation, trusted_now_unix_ms)?;
+        let (mut evaluation, mut recovery_claim) = match existing_evaluation {
+            // A resolved prepaid native original persists its claim with its
+            // first changing funded payment write; the preview names that lease.
+            Some(existing)
+                if matches!(
+                    existing.state(),
+                    PostReturnEvaluationStateV1::Resolved { .. }
+                ) && admission.requires_payment()
+                    && self.prepaid_native_original(&admission.operation)? =>
+            {
+                (
+                    existing,
+                    DeferredRecoveryClaim::deferred(runtime, claim_request, trusted_now_unix_ms)?,
+                )
+            }
             Some(existing) => (
                 existing,
-                self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?,
+                DeferredRecoveryClaim::claimed(
+                    claim_request,
+                    trusted_now_unix_ms,
+                    self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?,
+                ),
             ),
             None => {
                 if !matches!(
@@ -1299,18 +1319,13 @@ impl ChioKernel {
                     normalized_context.clone(),
                 )
                 .map_err(tool_outcome_error)?;
-                let claim = Self::recovery_claim_request(
-                    runtime,
-                    &admission.operation,
-                    trusted_now_unix_ms,
-                )?;
                 let admission_store: &dyn QualifiedAdmissionOperationStore = runtime.store.as_ref();
-                let begun = runtime
+                let (begun, lease) = runtime
                     .outcome_store
                     .claim_and_begin_post_return_evaluation(
                         admission_store,
-                        claim,
-                        &mut qualified_lease(claim, trusted_now_unix_ms),
+                        claim_request,
+                        &mut qualified_lease(claim_request, trusted_now_unix_ms),
                         &prepared,
                         &runtime.fence,
                         trusted_now_unix_ms,
@@ -1319,7 +1334,10 @@ impl ChioKernel {
                 self.reach_durable_finalization_cutpoint(
                     DurableFinalizationCutpoint::PostReturnEvaluationBegun,
                 );
-                begun
+                (
+                    begun,
+                    DeferredRecoveryClaim::claimed(claim_request, trusted_now_unix_ms, lease),
+                )
             }
         };
         evaluation
@@ -1471,7 +1489,7 @@ impl ChioKernel {
                         admission.operation.binding().operation_id(),
                         expected_evaluation_version,
                         &pending_results,
-                        &lease,
+                        recovery_claim.persisted()?,
                         &terminal_evaluation,
                         stored_outcome.version(),
                         &terminal_outcome,
@@ -1540,8 +1558,8 @@ impl ChioKernel {
             request_id: admission.operation.binding().request_id().clone(),
             expected_operation_version: admission.operation.version(),
             trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            coordinator_lease_id: recovery_claim.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: recovery_claim.coordinator_lease_epoch(),
             store_fence: runtime.fence.clone(),
         };
         let payment_terminal = payment_plan
@@ -1549,7 +1567,7 @@ impl ChioKernel {
                 self.settle_durable_payment(DurablePaymentSettlementInput {
                     admission,
                     runtime,
-                    lease: &lease,
+                    recovery: &mut recovery_claim,
                     journal,
                     disposition: &settlement_disposition,
                     context: &context,
@@ -1565,6 +1583,8 @@ impl ChioKernel {
                 &settlement_disposition,
             )?;
         }
+        // Without a changing funded payment write the claim persists alone.
+        let lease = recovery_claim.into_persisted_lease(runtime)?;
         // A release owner may need the same fenced authority to inspect or
         // mutate current security state. Never invoke or dispose of that owner
         // under the kernel sequencer. The checkpoint transaction revalidates

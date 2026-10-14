@@ -222,8 +222,13 @@ impl ChioKernel {
         original: &RetainedToolAdmissionRequestV1,
     ) -> Result<bool, KernelError> {
         if original.native_output_retention().is_some() {
-            let plan = self.durable_post_return_plan_for_original(Some(original))?;
-            return Ok(original.post_return_steps() == plan.frozen_steps.as_slice());
+            // A corrupt original materializer is an integrity fault, not an
+            // unavailable verifier.
+            self.durable_post_return_plan_for_original(Some(original))?;
+            // The frozen native program evaluates no post-invocation hook. A
+            // current hook, with or without a durable identity, cannot
+            // reproduce it.
+            return Ok(self.post_invocation_pipeline.is_empty());
         }
         let plan = super::super::security_dispatch::callback(
             "historical output verifier selection",

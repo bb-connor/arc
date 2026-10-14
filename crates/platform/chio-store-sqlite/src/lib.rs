@@ -525,6 +525,87 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
         )
     }
 
+    fn preview_recovery_claim(
+        &self,
+        request: chio_kernel::admission_operation::RecoveryClaimRequest<'_>,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::UntrustedAdmissionRecoveryClaim,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::preview_recovery_claim(
+            self,
+            request,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn claim_and_commit_admission_projection(
+        &self,
+        claim: chio_kernel::admission_operation::RecoveryClaimRequest<'_>,
+        lease: &mut chio_kernel::admission_operation::ClaimedLease<'_>,
+        projection: &chio_kernel::admission_operation::AdmissionTerminalProjection,
+    ) -> Result<
+        (
+            chio_kernel::admission_operation::AdmissionTerminal,
+            Option<chio_kernel::admission_operation::AdmissionRecoveryLease>,
+        ),
+        chio_kernel::ReceiptStoreError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::claim_and_commit_terminal_projection(
+            self, claim, lease, projection,
+        )
+        .map_err(admission_operation_store::receipt_projection_error)
+    }
+
+    fn claim_and_advance_payment_journal(
+        &self,
+        advance: chio_kernel::AdmissionPaymentJournalClaim<'_>,
+        lease: &mut chio_kernel::admission_operation::ClaimedLease<'_>,
+    ) -> Result<
+        (
+            chio_kernel::payment::PaymentJournalRecord,
+            Option<chio_kernel::admission_operation::AdmissionRecoveryLease>,
+        ),
+        chio_kernel::AdmissionPaymentJournalError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::claim_and_advance_payment_journal(
+            self, advance, lease,
+        )
+    }
+
+    fn claim_and_begin_payment_settlement(
+        &self,
+        begin: chio_kernel::AdmissionPaymentSettlementClaim<'_>,
+        lease: &mut chio_kernel::admission_operation::ClaimedLease<'_>,
+    ) -> Result<
+        (
+            chio_kernel::AdmissionPaymentSettlement,
+            Option<chio_kernel::admission_operation::AdmissionRecoveryLease>,
+        ),
+        chio_kernel::AdmissionPaymentJournalError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::claim_and_begin_payment_settlement(
+            self, begin, lease,
+        )
+    }
+
+    fn claim_and_reverse_funded_payment_holds(
+        &self,
+        reversal: chio_kernel::AdmissionPaymentHoldReversalClaim<'_>,
+        lease: &mut chio_kernel::admission_operation::ClaimedLease<'_>,
+    ) -> Result<
+        (
+            Option<chio_kernel::AdmissionPaymentHoldReversed>,
+            Option<chio_kernel::admission_operation::AdmissionRecoveryLease>,
+        ),
+        chio_kernel::AdmissionPaymentJournalError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::claim_and_reverse_funded_payment_holds(
+            self, reversal, lease,
+        )
+    }
+
     fn reverse_funded_payment_holds(
         &self,
         reversal: chio_kernel::AdmissionPaymentHoldReversal<'_>,

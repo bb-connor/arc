@@ -30,6 +30,33 @@ pub(in crate::admission_operation_store) fn spend_native_finishing_purpose(
     Ok(NativeFinishingSpend::Spent)
 }
 
+/// Consume the Output join, and its journal seal when this same transaction
+/// seals the journal, as one account transition inside the Output writer's
+/// transaction. An ordinary original owes nothing.
+pub(in crate::admission_operation_store) fn spend_native_output_join(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    operation: &AdmissionOperationV1,
+    sealed: bool,
+) -> Result<NativeFinishingSpend, AdmissionOperationStoreError> {
+    if !sealed {
+        return spend_native_finishing_purpose(
+            tx,
+            owner,
+            operation,
+            NativeFinishingPurposeV1::OutputJoin,
+        );
+    }
+    if !native_original(tx, operation)? {
+        return Ok(NativeFinishingSpend::Ordinary);
+    }
+    let retained = load_native_finishing_account(tx, operation.binding().operation_id().as_str())?
+        .ok_or_else(|| invalid("native original writer has no finishing account"))?;
+    let next = retained.account.consuming_output_seal_pair()?;
+    persist_native_finishing_transition(tx, owner, &retained, &next)?;
+    Ok(NativeFinishingSpend::Spent)
+}
+
 /// Before a funded writer's first write, raise this transaction's page cap
 /// by exactly the growth its outstanding purposes on the operation's own
 /// Confirmed account allow. The file's pages plus every owed growth must lie
@@ -416,6 +443,44 @@ pub(in crate::admission_operation_store) fn require_outstanding_native_payment_p
         }
     }
     Ok(())
+}
+
+/// Whether one write of `purpose` may persist the coordinator's recovery claim
+/// inside its own transaction. A native original's Confirmed account funds it
+/// only when the retained, still outstanding purpose's own row loans reserve
+/// more admission commits than the purpose itself appends: the claim's
+/// operation rewrite and commits are then part of that exact priced envelope.
+/// Without a Confirmed account the write is ordinary intake either way, and a
+/// consumed purpose replays without persisting any claim.
+pub(in crate::admission_operation_store) fn atomic_claim_is_funded(
+    tx: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    purpose: NativeFinishingPurposeV1,
+    own_admission_commits: u64,
+) -> Result<bool, AdmissionOperationStoreError> {
+    if !native_original(tx, operation)? {
+        return Ok(true);
+    }
+    let Some(retained) =
+        load_native_finishing_account(tx, operation.binding().operation_id().as_str())?
+    else {
+        return Ok(true);
+    };
+    if retained.account.state != NativeFinishingStateV1::Confirmed {
+        return Ok(true);
+    }
+    let Some(liability) = retained.account.outstanding_in_slot(purpose) else {
+        return Ok(true);
+    };
+    let commits = crate::admission_operation_store::tool_outcome_liability::ToolOutcomeWriteTableData::AdmissionCommits
+        .table_name();
+    Ok(liability
+        .row_loans
+        .iter()
+        .filter(|loan| loan.table == commits)
+        .map(|loan| loan.insertions)
+        .sum::<u64>()
+        > own_admission_commits)
 }
 
 /// The retained original selected the bounded native output program.

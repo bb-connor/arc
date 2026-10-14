@@ -41,11 +41,12 @@ mod roster;
 mod row_plan;
 mod spend;
 pub(in crate::admission_operation_store) use spend::{
-    authorize_native_finishing_growth, native_finishing_at_terminal,
+    atomic_claim_is_funded, authorize_native_finishing_growth, native_finishing_at_terminal,
     native_finishing_seal_allowance, native_original, native_payment_journal_write,
     refuse_unpriced_native_payment_write, require_confirmed_native_finishing,
     require_outstanding_native_payment_purposes, spend_native_finishing_purpose,
-    spend_native_payment_purpose, NativeFinishingSpend, NativePaymentJournalWrite,
+    spend_native_output_join, spend_native_payment_purpose, NativeFinishingSpend,
+    NativePaymentJournalWrite,
 };
 
 /// A declassified egress of a native original requires the Output join its

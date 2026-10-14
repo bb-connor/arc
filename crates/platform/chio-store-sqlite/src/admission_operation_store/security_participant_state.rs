@@ -18,7 +18,7 @@ pub(super) mod knowledge;
 pub(crate) use knowledge::NativeKnowledgeJoinAuthority;
 mod finishing_account;
 pub(in crate::admission_operation_store) use finishing_account::{
-    authorize_native_finishing_growth, native_finishing_at_terminal,
+    atomic_claim_is_funded, authorize_native_finishing_growth, native_finishing_at_terminal,
     native_original as native_finishing_original, native_payment_journal_write,
     refuse_unpriced_native_payment_write, spend_native_finishing_purpose,
     spend_native_payment_purpose, NativePaymentJournalWrite,

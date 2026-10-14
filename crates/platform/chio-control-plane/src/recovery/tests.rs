@@ -468,7 +468,11 @@ impl RecoveryFixture {
         if path.join("revoke-initiating").exists() {
             kernel.revoke_capability(&seed.capability.id)?;
         }
-        kernel.reconcile_durable_admission_startup()?;
+        // A pressure regression applies real store pressure first and then
+        // drives the same startup reconciliation itself.
+        if !path.join("defer-startup-reconcile").exists() {
+            kernel.reconcile_durable_admission_startup()?;
+        }
         let scope = RecoveryScopeV1 {
             authority_domain: AuthorityDomainId::new(&fence.store_uuid)?,
             tenant_id: RecoveryTenantId::new("native-tenant")?,

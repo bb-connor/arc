@@ -256,11 +256,13 @@ impl SqliteAdmissionOperationStore {
                 // Consume the exact owed purposes in this same transaction, after
                 // the producer has verified its uninterrupted journal append. Cache
                 // spill is disabled: neither rows nor spends publish before COMMIT.
-                let funded = super::super::finishing_account::spend_native_finishing_purpose(
+                let sealed =
+                    seal.is_some() && boundary == super::super::history::segments::Boundary::Sealed;
+                let funded = super::super::finishing_account::spend_native_output_join(
                     &tx,
                     &self.serving_owner,
                     operation,
-                    crate::admission_operation_store::recovery::storage::NativeFinishingPurposeV1::OutputJoin,
+                    sealed,
                 )?;
                 if seal.is_some()
                     != (funded == super::super::finishing_account::NativeFinishingSpend::Spent)
@@ -268,14 +270,6 @@ impl SqliteAdmissionOperationStore {
                     return Err(invalid(
                         "native Output funding changed within its transaction",
                     ));
-                }
-                if seal.is_some() && boundary == super::super::history::segments::Boundary::Sealed {
-                    super::super::finishing_account::spend_native_finishing_purpose(
-                        &tx,
-                        &self.serving_owner,
-                        operation,
-                        crate::admission_operation_store::recovery::storage::NativeFinishingPurposeV1::NativeJournalSeal,
-                    )?;
                 }
                 // Expiry is checked again at the physical commit boundary, not renewed
                 // merely because policy evaluation or the monotone join succeeded.

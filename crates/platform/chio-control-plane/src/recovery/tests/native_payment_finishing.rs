@@ -1132,3 +1132,199 @@ async fn native_payment_crash_after_authorization_reverses_holds_on_prepaid_purp
     assert_eq!(external_count(path)?, 0);
     Ok(())
 }
+
+/// Abort a payment original inside its native capture transaction, after the
+/// external authorization and before any dispatch commit or effect.
+#[cfg(unix)]
+async fn crash_after_payment_authorization() -> TestResult<tempfile::TempDir> {
+    use std::os::unix::process::ExitStatusExt;
+    use std::time::{Duration, Instant};
+    let directory = tempfile::tempdir()?;
+    std::fs::write(directory.path().join("payment-effect"), b"1")?;
+    let original = RecoveryFixture::open_with_payment_adapter(
+        directory.path().to_path_buf(),
+        None,
+        false,
+        reversible_hold_payment_adapter(),
+    )?;
+    Box::pin(original.denied_seed_named("ticket-1")).await?;
+    drop(original);
+    let log = std::fs::File::create(directory.path().join("payment-pressure-child.log"))?;
+    let mut child = std::process::Command::new(std::env::current_exe()?)
+        .args([
+            "--exact",
+            "recovery::tests::recovery_crash_child",
+            "--ignored",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env("CHIO_RECOVERY_CRASH_CHILD", "1")
+        .env("CHIO_RECOVERY_CRASH_ROOT", directory.path())
+        .env("CHIO_RECOVERY_CRASH_POINT", "capture-before-commit")
+        .env("CHIO_RECOVERY_CRASH_PAYMENT", "1")
+        .stdout(log.try_clone()?)
+        .stderr(log)
+        .spawn()?;
+    let started = Instant::now();
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if started.elapsed() > Duration::from_secs(90) {
+            child.kill()?;
+            child.wait()?;
+            return Err("payment pressure child timed out".into());
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    let log = std::fs::read_to_string(directory.path().join("payment-pressure-child.log"))?;
+    assert_eq!(status.signal(), Some(6), "capture-before-commit: {log}");
+    assert!(
+        log.contains("native capture transaction cutpoint: BeforeCommit"),
+        "payment child missed its capture cutpoint: {log}"
+    );
+    Ok(directory)
+}
+
+/// Retain one ordinary protected record batch through the real fenced writer.
+fn retain_ordinary_records(
+    f: &RecoveryFixture,
+    first: usize,
+    count: usize,
+) -> TestResult<Result<(), String>> {
+    use chio_store_sqlite::admission_operation_store::{
+        retain_recovery_quota_fixture_records, RecoveryQuotaFixtureRecord,
+    };
+    let records = (first..first + count)
+        .map(|index| {
+            Ok(RecoveryQuotaFixtureRecord {
+                scope: f.runtime.scope().clone(),
+                key: format!("protected-setup:payment-restart-pressure:{index}"),
+                payload: chio_core::canonical_json_bytes(
+                    &serde_json::json!({"fixture": "ordinary shared-history pressure"}),
+                )?,
+            })
+        })
+        .collect::<TestResult<Vec<_>>>()?;
+    Ok(retain_recovery_quota_fixture_records(
+        &f.authority.admission_operation_store(),
+        &f.authority.mutation_fence(),
+        &records,
+    )
+    .map_err(|error| error.to_string()))
+}
+
+/// The restart after an authorized hold runs with no ordinary shared-history
+/// row left: real ordinary protected writes exhaust it, and the established
+/// standalone recovery claim refuses there. Startup still compensates before
+/// dispatch, because each restart claim commits inside the funded payment or
+/// terminal transaction that spends its own prepaid purpose.
+#[cfg(unix)]
+#[tokio::test]
+async fn native_payment_restart_claims_commit_inside_funded_purposes_under_row_pressure(
+) -> TestResult {
+    const OWED_ROW: &str = "owed native table row";
+    let directory = Box::pin(crash_after_payment_authorization()).await?;
+    let retained_path = directory.path().to_path_buf();
+    let path = retained_path.as_path();
+    assert_eq!(external_count(path)?, 0);
+    let interrupted = authority_history::retained_workflow(path)?;
+    let operation_id = interrupted
+        .admission
+        .as_ref()
+        .ok_or("interrupted payment native intent absent")?
+        .native_operation_id
+        .clone();
+    let held = retained_payment_journal(path, operation_id.as_str())?;
+    assert_eq!(held.state, "authorized");
+    let hold_id = payment_hold_id(path, operation_id.as_str())?;
+    std::fs::write(path.join("defer-startup-reconcile"), b"1")?;
+    let calls = PaymentRailCalls::default();
+    let f = RecoveryFixture::open_with_payment_adapter(
+        path.to_path_buf(),
+        Some(directory),
+        false,
+        Box::new(HoldingPaymentAdapter {
+            calls: calls.clone(),
+        }),
+    )?;
+    assert_eq!(
+        retained_payment_journal(path, operation_id.as_str())?.journal_version,
+        held.journal_version,
+        "startup ran before the pressure was applied"
+    );
+    // Exhaust every ordinary row of the shared histories with real writes.
+    let mut next = 0;
+    for batch in [16, 1] {
+        loop {
+            match retain_ordinary_records(&f, next, batch)? {
+                Ok(()) => next += batch,
+                Err(refusal) => {
+                    assert!(refusal.contains(OWED_ROW), "{refusal}");
+                    break;
+                }
+            }
+            if next > 16_384 {
+                return Err("ordinary shared-history intake never reached its owed rows".into());
+            }
+        }
+    }
+    let store = f.authority.admission_operation_store();
+    let fence = f.authority.mutation_fence();
+    let original = store
+        .load_by_operation_id(&operation_id)?
+        .ok_or("authorized payment original absent")?;
+    let now = now_ms()?;
+    let probe = store
+        .claim_recovery(
+            &operation_id,
+            original.version(),
+            &AdmissionIdentifier::try_new("claimant_id", "payment-restart-pressure-probe")?,
+            now,
+            now + 60_000,
+            &fence,
+        )
+        .err()
+        .ok_or("a standalone restart claim consumed an owed row")?
+        .to_string();
+    assert!(probe.contains(OWED_ROW), "{probe}");
+    assert_eq!(store.load_by_operation_id(&operation_id)?, Some(original));
+    f.kernel
+        .reconcile_durable_admission_startup()
+        .map_err(|error| format!("funded restart under row pressure failed: {error}"))?;
+    assert_eq!(external_count(path)?, 0);
+    assert_eq!(calls.authorizations.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.captures.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.releases.load(Ordering::SeqCst), 1);
+    let released = retained_payment_journal(path, operation_id.as_str())?;
+    assert_eq!(released.state, "settled");
+    assert_eq!(released.settle_action.as_deref(), Some("release"));
+    assert_eq!(released.journal_version, held.journal_version + 2);
+    assert_eq!(
+        budget_hold_state(path, &hold_id)?,
+        ("reversed".to_owned(), "reversed".to_owned())
+    );
+    let account = super::native_lifecycle::native_account(path, operation_id.as_str())?;
+    assert_eq!(account["state"], "settled");
+    for purpose in [
+        "payment_authorization",
+        "payment_compensation",
+        "payment_completion",
+        "payment_settlement",
+        "terminal_projection",
+    ] {
+        assert_eq!(
+            purpose_disposition(&account, purpose)?,
+            "consumed",
+            "{purpose}"
+        );
+    }
+    assert_eq!(
+        store
+            .load_by_operation_id(&operation_id)?
+            .ok_or("compensated payment original absent")?
+            .state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    Ok(())
+}

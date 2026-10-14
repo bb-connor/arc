@@ -65,6 +65,7 @@ mod process_return_participant;
 pub use native_output::NativeSecurityOutputJoinAuthority;
 #[path = "admission_coordinator/recovery.rs"]
 mod recovery;
+use recovery::DeferredRecoveryClaim;
 #[path = "admission_coordinator/recovery_runtime.rs"]
 mod recovery_runtime;
 #[path = "admission_coordinator/runtime_acquisition.rs"]
@@ -1671,19 +1672,31 @@ impl ChioKernel {
                 "pre-dispatch compensation operation changed".to_owned(),
             ));
         }
-        let lease = self.claim_admission_recovery(&current, trusted_now_unix_ms)?;
-        // Runtime replay custody must be physically released before any
-        // compensation can assert no effect or unwind a monetary participant.
-        self.release_retained_runtime_participants(&current, &lease, trusted_now_unix_ms)?;
-        self.release_retained_governed_approval(&current, &lease, trusted_now_unix_ms)?;
-        self.release_retained_dpop(&current, &lease, trusted_now_unix_ms)?;
+        let request = Self::recovery_claim_request(runtime, &current, trusted_now_unix_ms)?;
+        // A prepaid native original with no participant to release first
+        // persists its claim with its first changing funded write.
+        let defer_claim = current.runtime_participant_ledger_digest().is_none()
+            && current.governed_approval_ledger_digest().is_none()
+            && current.dpop_replay_ledger_digest().is_none()
+            && self.prepaid_native_original(&current)?;
+        let mut recovery = if defer_claim {
+            DeferredRecoveryClaim::deferred(runtime, request, trusted_now_unix_ms)?
+        } else {
+            let lease = self.claim_admission_recovery(&current, trusted_now_unix_ms)?;
+            // Runtime replay custody must be physically released before any
+            // compensation can assert no effect or unwind a monetary participant.
+            self.release_retained_runtime_participants(&current, &lease, trusted_now_unix_ms)?;
+            self.release_retained_governed_approval(&current, &lease, trusted_now_unix_ms)?;
+            self.release_retained_dpop(&current, &lease, trusted_now_unix_ms)?;
+            DeferredRecoveryClaim::claimed(request, trusted_now_unix_ms, lease)
+        };
         let context = AdmissionProjectionContext {
             operation_id: current.binding().operation_id().clone(),
             request_id: current.binding().request_id().clone(),
             expected_operation_version: current.version(),
             trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            coordinator_lease_id: recovery.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: recovery.coordinator_lease_epoch(),
             store_fence: runtime.fence.clone(),
         };
         let mut released_payment = None;
@@ -1701,19 +1714,13 @@ impl ChioKernel {
                     )
                 })?;
             if journal.state == crate::payment::PaymentJournalState::HoldPlaced {
-                journal = runtime
-                    .store
-                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                        operation: &current,
-                        recovery_lease: &lease,
-                        expected: &journal,
-                        transition:
-                            &crate::payment::PaymentJournalTransition::CancelBeforeAuthorization,
-                        release_evidence: None,
-                        active_fence: &runtime.fence,
-                        trusted_now_unix_ms,
-                    })
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                journal = recovery.advance_payment_journal(
+                    runtime,
+                    &current,
+                    &journal,
+                    &crate::payment::PaymentJournalTransition::CancelBeforeAuthorization,
+                    None,
+                )?;
             }
             if journal.state == crate::payment::PaymentJournalState::Authorized {
                 // The rail hold was authorized before dispatch, so the tool never
@@ -1745,20 +1752,13 @@ impl ChioKernel {
                     evidence_id: persisted.evidence_id.as_str().to_owned(),
                     evidence_digest: persisted.bundle_digest.as_str().to_owned(),
                 };
-                journal = runtime
-                    .store
-                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                        operation: &current,
-                        recovery_lease: &lease,
-                        expected: &journal,
-                        transition: &crate::payment::PaymentJournalTransition::BeginRelease {
-                            authority,
-                        },
-                        release_evidence: Some(&evidence),
-                        active_fence: &runtime.fence,
-                        trusted_now_unix_ms,
-                    })
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                journal = recovery.advance_payment_journal(
+                    runtime,
+                    &current,
+                    &journal,
+                    &crate::payment::PaymentJournalTransition::BeginRelease { authority },
+                    Some(&evidence),
+                )?;
             }
             if journal.state == crate::payment::PaymentJournalState::Settling
                 && journal.settle_action == Some(crate::payment::PaymentSettleAction::Release)
@@ -1808,21 +1808,15 @@ impl ChioKernel {
                     }
                     result.transaction_id
                 };
-                journal = runtime
-                    .store
-                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                        operation: &current,
-                        recovery_lease: &lease,
-                        expected: &journal,
-                        transition:
-                            &crate::payment::PaymentJournalTransition::SettlementCompleted {
-                                transaction_id,
-                            },
-                        release_evidence: None,
-                        active_fence: &runtime.fence,
-                        trusted_now_unix_ms,
-                    })
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                journal = recovery.advance_payment_journal(
+                    runtime,
+                    &current,
+                    &journal,
+                    &crate::payment::PaymentJournalTransition::SettlementCompleted {
+                        transaction_id,
+                    },
+                    None,
+                )?;
             }
             let released = journal.state == crate::payment::PaymentJournalState::Settled
                 && journal.settle_action == Some(crate::payment::PaymentSettleAction::Release);
@@ -1854,16 +1848,7 @@ impl ChioKernel {
         // funds that reversal in one store transaction; every other operation
         // keeps the budget authority reversal.
         let funded = match released_payment.as_ref() {
-            Some(journal) => runtime
-                .store
-                .reverse_funded_payment_holds(crate::receipt_store::AdmissionPaymentHoldReversal {
-                    operation: &current,
-                    recovery_lease: &lease,
-                    expected: journal,
-                    active_fence: &runtime.fence,
-                    trusted_now_unix_ms,
-                })
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
+            Some(journal) => recovery.reverse_funded_payment_holds(runtime, &current, journal)?,
             None => None,
         };
         let funded_reversal = match funded {
@@ -1883,10 +1868,7 @@ impl ChioKernel {
             context,
             verifier_policy,
         )?;
-        let terminal = runtime
-            .store
-            .commit_admission_projection(&projection)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        let terminal = recovery.commit_admission_projection(runtime, &projection)?;
         if terminal.operation_id != *current.binding().operation_id()
             || terminal.state != AdmissionOperationState::CompensatedBeforeDispatch
         {

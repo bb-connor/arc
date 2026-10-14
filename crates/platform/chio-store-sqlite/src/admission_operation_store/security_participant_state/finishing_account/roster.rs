@@ -28,7 +28,7 @@ const MAX_LABEL_JSON_BYTES: u64 = 1_048_576;
 const MAX_RECORD_HEADER_BYTES: u64 = 64;
 /// The most pre-effect generation allocations this original can still make
 /// before its external effect: the Input join and the Nonce preflight join.
-const PRE_EFFECT_JOIN_SLOTS: u64 = 2;
+pub(super) const PRE_EFFECT_JOIN_SLOTS: u64 = 2;
 
 pub(super) struct PricedRoster {
     pub(super) liabilities: Vec<NativeFinishingLiabilityV1>,

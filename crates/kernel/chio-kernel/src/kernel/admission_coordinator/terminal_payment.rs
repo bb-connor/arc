@@ -9,10 +9,10 @@ pub(super) struct DurablePaymentTerminal {
     pub(super) amount_units: u64,
 }
 
-pub(super) struct DurablePaymentSettlementInput<'a> {
+pub(super) struct DurablePaymentSettlementInput<'a, 'r> {
     pub(super) admission: &'a DurableToolAdmission,
     pub(super) runtime: &'a DurableAdmissionRuntime,
-    pub(super) lease: &'a crate::admission_operation::AdmissionRecoveryLease,
+    pub(super) recovery: &'a mut DeferredRecoveryClaim<'r>,
     pub(super) journal: crate::payment::PaymentJournalRecord,
     pub(super) disposition: &'a SettlementDispositionV1,
     pub(super) context: &'a AdmissionProjectionContext,
@@ -137,9 +137,8 @@ impl ChioKernel {
         &self,
         operation: &AdmissionOperationV1,
         runtime: &DurableAdmissionRuntime,
-        lease: &crate::admission_operation::AdmissionRecoveryLease,
+        recovery: &mut DeferredRecoveryClaim<'_>,
         mut journal: crate::payment::PaymentJournalRecord,
-        trusted_now_unix_ms: u64,
     ) -> Result<Option<crate::payment::PaymentJournalRecord>, KernelError> {
         journal
             .validate()
@@ -215,18 +214,13 @@ impl ChioKernel {
             let transition = crate::payment::PaymentJournalTransition::SettlementCompleted {
                 transaction_id: result.transaction_id,
             };
-            journal = runtime
-                .store
-                .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                    operation,
-                    recovery_lease: lease,
-                    expected: &journal,
-                    transition: &transition,
-                    release_evidence: None,
-                    active_fence: &runtime.fence,
-                    trusted_now_unix_ms,
-                })
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            journal = recovery.advance_payment_journal(
+                runtime,
+                operation,
+                &journal,
+                &transition,
+                None,
+            )?;
             return Ok(Some(journal));
         }
         if result.settlement_status == crate::payment::RailSettlementStatus::Pending {
@@ -234,18 +228,7 @@ impl ChioKernel {
         }
         if journal.state != crate::payment::PaymentJournalState::ReconcileFailed {
             let transition = crate::payment::PaymentJournalTransition::ReconcileFailed;
-            runtime
-                .store
-                .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                    operation,
-                    recovery_lease: lease,
-                    expected: &journal,
-                    transition: &transition,
-                    release_evidence: None,
-                    active_fence: &runtime.fence,
-                    trusted_now_unix_ms,
-                })
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            recovery.advance_payment_journal(runtime, operation, &journal, &transition, None)?;
         }
         Err(KernelError::DurableAdmission(
             "payment rail returned an incompatible settlement status".to_owned(),
@@ -254,12 +237,12 @@ impl ChioKernel {
 
     pub(super) fn settle_durable_payment(
         &self,
-        input: DurablePaymentSettlementInput<'_>,
+        input: DurablePaymentSettlementInput<'_, '_>,
     ) -> Result<DurablePaymentTerminal, KernelError> {
         let DurablePaymentSettlementInput {
             admission,
             runtime,
-            lease,
+            recovery,
             mut journal,
             disposition,
             context,
@@ -358,31 +341,26 @@ impl ChioKernel {
                 ));
             }
         };
-        let settlement = runtime
-            .store
-            .begin_payment_settlement(crate::receipt_store::AdmissionPaymentSettlementBegin {
-                operation: &admission.operation,
-                recovery_lease: lease,
-                expected: &journal,
-                transition: transition.as_ref(),
-                release_evidence: release_evidence.as_ref(),
-                budget_reconcile: BudgetReconcileHoldRequest {
-                    capability_id: journal.capability_id.clone(),
-                    grant_index: usize::try_from(journal.grant_index).map_err(|_| {
-                        KernelError::DurableAdmission(
-                            "payment journal grant index overflowed".to_owned(),
-                        )
-                    })?,
-                    exposed_cost_units: journal.amount_units,
-                    realized_spend_units: amount_units,
-                    hold_id: Some(hold_id.clone()),
-                    event_id: Some(format!("{hold_id}:reconcile")),
-                    authority: Some(runtime.authority()),
-                },
-                active_fence: &runtime.fence,
-                trusted_now_unix_ms,
-            })
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        let settlement = recovery.begin_payment_settlement(
+            runtime,
+            &admission.operation,
+            &journal,
+            transition.as_ref(),
+            release_evidence.as_ref(),
+            BudgetReconcileHoldRequest {
+                capability_id: journal.capability_id.clone(),
+                grant_index: usize::try_from(journal.grant_index).map_err(|_| {
+                    KernelError::DurableAdmission(
+                        "payment journal grant index overflowed".to_owned(),
+                    )
+                })?,
+                exposed_cost_units: journal.amount_units,
+                realized_spend_units: amount_units,
+                hold_id: Some(hold_id.clone()),
+                event_id: Some(format!("{hold_id}:reconcile")),
+                authority: Some(runtime.authority()),
+            },
+        )?;
         journal = settlement.journal;
         let reconcile = settlement.budget;
         if !payment_journal_matches_settlement(&journal, settle_action, amount_units) {
@@ -407,13 +385,7 @@ impl ChioKernel {
             }
         }
         journal = self
-            .continue_durable_payment_settlement(
-                &admission.operation,
-                runtime,
-                lease,
-                journal,
-                trusted_now_unix_ms,
-            )?
+            .continue_durable_payment_settlement(&admission.operation, runtime, recovery, journal)?
             .ok_or_else(|| {
                 KernelError::DurableAdmission("payment settlement remains pending".to_owned())
             })?;

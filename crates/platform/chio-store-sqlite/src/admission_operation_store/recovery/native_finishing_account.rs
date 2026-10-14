@@ -854,7 +854,11 @@ impl NativeFinishingAccountV1 {
                     && next.process_enrollment.is_some() == self.identity.process.is_some()
             }
             (NativeFinishingStateV1::Confirmed, NativeFinishingStateV1::Confirmed) => {
-                consumed == 1 && released == 0 && enrollment_unchanged
+                released == 0
+                    && enrollment_unchanged
+                    && (consumed == 1
+                        || (consumed == 2
+                            && consumes_output_seal_pair(&self.liabilities, &next.liabilities)))
             }
             (
                 NativeFinishingStateV1::Prepared | NativeFinishingStateV1::Confirmed,
@@ -911,6 +915,25 @@ impl NativeFinishingAccountV1 {
             return Err(invariant("native finishing purpose was already spent"));
         }
         liability.disposition = NativeFinishingDispositionV1::Consumed;
+        Ok(next)
+    }
+
+    /// The Confirmed successor of the Output join that also seals its journal:
+    /// both purposes are spent by their one transaction, so one revision and
+    /// one transition consume the exact pair.
+    pub(in crate::admission_operation_store) fn consuming_output_seal_pair(
+        &self,
+    ) -> Result<Self, AdmissionOperationStoreError> {
+        let mut next = self.consuming(NativeFinishingPurposeV1::OutputJoin)?;
+        let seal = next
+            .liabilities
+            .iter_mut()
+            .find(|liability| liability.purpose == NativeFinishingPurposeV1::NativeJournalSeal)
+            .ok_or_else(|| invariant("native finishing purpose was not prepaid"))?;
+        if seal.disposition != NativeFinishingDispositionV1::Outstanding {
+            return Err(invariant("native finishing purpose was already spent"));
+        }
+        seal.disposition = NativeFinishingDispositionV1::Consumed;
         Ok(next)
     }
 
@@ -1084,6 +1107,34 @@ fn account_row_ceilings(
             .or_insert(loan.ceiling);
     }
     ceilings
+}
+
+/// Whether `next` consumes exactly the Output join and its journal seal of
+/// `previous`, the only two purposes one transaction may spend together.
+fn consumes_output_seal_pair(
+    previous: &[NativeFinishingLiabilityV1],
+    next: &[NativeFinishingLiabilityV1],
+) -> bool {
+    let mut newly = previous
+        .iter()
+        .zip(next)
+        .filter(|(before, after)| {
+            before.disposition == NativeFinishingDispositionV1::Outstanding
+                && after.disposition == NativeFinishingDispositionV1::Consumed
+        })
+        .map(|(_, after)| after.purpose);
+    matches!(
+        (newly.next(), newly.next(), newly.next()),
+        (
+            Some(NativeFinishingPurposeV1::OutputJoin),
+            Some(NativeFinishingPurposeV1::NativeJournalSeal),
+            None
+        ) | (
+            Some(NativeFinishingPurposeV1::NativeJournalSeal),
+            Some(NativeFinishingPurposeV1::OutputJoin),
+            None
+        )
+    )
 }
 
 /// Exact current account with its protected record version.
@@ -2439,4 +2490,80 @@ pub(in crate::admission_operation_store) fn verify_native_finishing_inventory(
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod output_seal_pair_tests {
+    use super::*;
+
+    fn liability(purpose: NativeFinishingPurposeV1) -> NativeFinishingLiabilityV1 {
+        NativeFinishingLiabilityV1 {
+            purpose,
+            profile_digest: "a".repeat(64),
+            liability: PhysicalLiabilityData::zero(),
+            disposition: NativeFinishingDispositionV1::Outstanding,
+            page_recipe: None,
+            width_recipe: None,
+            wal_frames: None,
+            row_loans: Vec::new(),
+        }
+    }
+
+    fn roster() -> Vec<NativeFinishingLiabilityV1> {
+        [
+            NativeFinishingPurposeV1::RawCustody,
+            NativeFinishingPurposeV1::OutputJoin,
+            NativeFinishingPurposeV1::NativeJournalSeal,
+            NativeFinishingPurposeV1::TerminalProjection,
+        ]
+        .into_iter()
+        .map(liability)
+        .collect()
+    }
+
+    fn consumed(purposes: &[NativeFinishingPurposeV1]) -> Vec<NativeFinishingLiabilityV1> {
+        roster()
+            .into_iter()
+            .map(|mut liability| {
+                if purposes.contains(&liability.purpose) {
+                    liability.disposition = NativeFinishingDispositionV1::Consumed;
+                }
+                liability
+            })
+            .collect()
+    }
+
+    #[test]
+    fn only_the_output_join_and_its_seal_are_one_transition() {
+        use NativeFinishingPurposeV1::{
+            NativeJournalSeal, OutputJoin, RawCustody, TerminalProjection,
+        };
+        let before = roster();
+        assert!(consumes_output_seal_pair(
+            &before,
+            &consumed(&[OutputJoin, NativeJournalSeal])
+        ));
+        assert!(!consumes_output_seal_pair(
+            &before,
+            &consumed(&[OutputJoin])
+        ));
+        assert!(!consumes_output_seal_pair(
+            &before,
+            &consumed(&[OutputJoin, TerminalProjection])
+        ));
+        assert!(!consumes_output_seal_pair(
+            &before,
+            &consumed(&[RawCustody, NativeJournalSeal])
+        ));
+        assert!(!consumes_output_seal_pair(
+            &before,
+            &consumed(&[OutputJoin, NativeJournalSeal, TerminalProjection])
+        ));
+        // A seal spent by an earlier version cannot pair again.
+        let sealed = consumed(&[NativeJournalSeal]);
+        assert!(!consumes_output_seal_pair(
+            &sealed,
+            &consumed(&[OutputJoin, NativeJournalSeal])
+        ));
+    }
 }

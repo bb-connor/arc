@@ -421,6 +421,29 @@ impl DurableObligationV1 {
     }
 }
 
+/// One payment settlement begin, applied under a lease or a claim its
+/// transaction persists.
+struct PaymentSettlementWrite<'a> {
+    operation: &'a AdmissionOperationV1,
+    expected: &'a PaymentJournalRecord,
+    transition: Option<&'a chio_kernel::payment::PaymentJournalTransition>,
+    release_evidence: Option<&'a chio_kernel::tool_outcome::MonetaryReleaseEvidenceV1>,
+    budget_reconcile: chio_kernel::budget_store::BudgetReconcileHoldRequest,
+    active_fence: &'a StoreMutationFence,
+    trusted_now_unix_ms: u64,
+}
+
+/// One payment journal transition of one operation, applied under a lease or
+/// a claim its transaction persists.
+struct PaymentJournalWrite<'a> {
+    operation: &'a AdmissionOperationV1,
+    expected: &'a PaymentJournalRecord,
+    transition: &'a chio_kernel::payment::PaymentJournalTransition,
+    release_evidence: Option<&'a chio_kernel::tool_outcome::MonetaryReleaseEvidenceV1>,
+    active_fence: &'a StoreMutationFence,
+    trusted_now_unix_ms: u64,
+}
+
 impl SqliteAdmissionOperationStore {
     pub(crate) fn open_alongside(
         connection: Arc<StoreConnection>,
@@ -864,8 +887,127 @@ impl SqliteAdmissionOperationStore {
             active_fence,
             trusted_now_unix_ms,
         } = advance;
+        self.advance_payment_journal_under(
+            RecoveryAuthority::Lease(recovery_lease),
+            PaymentJournalWrite {
+                operation,
+                expected,
+                transition,
+                release_evidence,
+                active_fence,
+                trusted_now_unix_ms,
+            },
+        )
+        .map(|(journal, _)| journal)
+    }
+
+    /// Advance the journal and persist the coordinator's recovery claim in
+    /// the same funded transaction.
+    pub fn claim_and_advance_payment_journal(
+        &self,
+        advance: chio_kernel::AdmissionPaymentJournalClaim<'_>,
+        lease: &mut ClaimedLease<'_>,
+    ) -> Result<(PaymentJournalRecord, Option<AdmissionRecoveryLease>), AdmissionPaymentJournalError>
+    {
+        let purpose = security_participant_state::native_payment_journal_write(advance.transition)
+            .funded_purpose();
+        if !self.claim_is_funded(advance.operation, purpose, 0)? {
+            let recovery_lease =
+                self.standalone_claim(advance.claim, advance.trusted_now_unix_ms, lease)?;
+            return self
+                .advance_payment_journal_under(
+                    RecoveryAuthority::Lease(&recovery_lease),
+                    PaymentJournalWrite {
+                        operation: advance.operation,
+                        expected: advance.expected,
+                        transition: advance.transition,
+                        release_evidence: advance.release_evidence,
+                        active_fence: advance.active_fence,
+                        trusted_now_unix_ms: advance.trusted_now_unix_ms,
+                    },
+                )
+                .map(|(journal, _)| (journal, Some(recovery_lease)));
+        }
+        self.advance_payment_journal_under(
+            RecoveryAuthority::Claim {
+                request: advance.claim,
+                lease,
+            },
+            PaymentJournalWrite {
+                operation: advance.operation,
+                expected: advance.expected,
+                transition: advance.transition,
+                release_evidence: advance.release_evidence,
+                active_fence: advance.active_fence,
+                trusted_now_unix_ms: advance.trusted_now_unix_ms,
+            },
+        )
+    }
+
+    /// Whether `purpose` of `operation` may carry the coordinator's claim in
+    /// its own transaction (see `atomic_claim_is_funded`).
+    fn claim_is_funded(
+        &self,
+        operation: &AdmissionOperationV1,
+        purpose: Option<recovery::storage::NativeFinishingPurposeV1>,
+        own_admission_commits: u64,
+    ) -> Result<bool, AdmissionPaymentJournalError> {
+        let Some(purpose) = purpose else {
+            return Ok(false);
+        };
+        let mut connection = self.connection().map_err(map_payment_operation_error)?;
+        let transaction = self
+            .begin_read(&mut connection)
+            .map_err(map_payment_operation_error)?;
+        let funded = security_participant_state::atomic_claim_is_funded(
+            &transaction,
+            operation,
+            purpose,
+            own_admission_commits,
+        )
+        .map_err(map_payment_operation_error)?;
+        transaction
+            .commit()
+            .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+        Ok(funded)
+    }
+
+    /// The established standalone claim, for a retained purpose priced before
+    /// it reserved one: the claim commits first, then the write runs under it.
+    fn standalone_claim(
+        &self,
+        request: RecoveryClaimRequest<'_>,
+        trusted_now_unix_ms: u64,
+        lease: &mut ClaimedLease<'_>,
+    ) -> Result<AdmissionRecoveryLease, AdmissionPaymentJournalError> {
+        chio_kernel::admission_operation::claim_qualified_lease(
+            self,
+            request,
+            trusted_now_unix_ms,
+            lease,
+        )
+        .map_err(map_payment_operation_error)
+    }
+
+    /// A claimed write that changes nothing (an exact replay) persists no
+    /// claim: its unfunded claim would otherwise commit alone. The coordinator
+    /// then carries the same claim to its next funded write.
+    fn advance_payment_journal_under(
+        &self,
+        recovery: RecoveryAuthority<'_, '_>,
+        write: PaymentJournalWrite<'_>,
+    ) -> Result<(PaymentJournalRecord, Option<AdmissionRecoveryLease>), AdmissionPaymentJournalError>
+    {
+        let PaymentJournalWrite {
+            operation,
+            expected,
+            transition,
+            release_evidence,
+            active_fence,
+            trusted_now_unix_ms,
+        } = write;
         if active_fence != &self.serving_owner.fence
-            || recovery_lease.store_fence() != active_fence
+            || recovery.store_fence() != active_fence
             || expected.operation_id != operation.binding().operation_id().as_str()
         {
             return Err(AdmissionPaymentJournalError::Fenced);
@@ -874,16 +1016,8 @@ impl SqliteAdmissionOperationStore {
         let transaction = self
             .begin_write(&mut connection, Some(active_fence))
             .map_err(map_payment_operation_error)?;
-        verify_payment_write_context(
-            &transaction,
-            &self.serving_owner,
-            operation,
-            recovery_lease,
-            active_fence,
-            trusted_now_unix_ms,
-        )?;
-        // This journal advance is a post-effect payment write of a native
-        // original: admit only the growth its own prepaid purpose funded.
+        // The claim, when the coordinator asked for one, is this transaction's
+        // first write: it commits only with the funded journal write below.
         let write = security_participant_state::native_payment_journal_write(transition);
         if let Some(purpose) = write.funded_purpose() {
             security_participant_state::authorize_native_finishing_growth(
@@ -894,6 +1028,23 @@ impl SqliteAdmissionOperationStore {
             )
             .map_err(map_payment_operation_error)?;
         }
+        let claimed = matches!(recovery, RecoveryAuthority::Claim { .. });
+        let recovery_lease = resolve_recovery_authority(
+            &transaction,
+            &self.serving_owner,
+            recovery,
+            trusted_now_unix_ms,
+        )
+        .map_err(map_payment_operation_error)?
+        .into_owned();
+        verify_payment_write_context(
+            &transaction,
+            &self.serving_owner,
+            operation,
+            &recovery_lease,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
         let (updated, changed) = crate::budget_store::advance_payment_journal(
             &transaction,
             expected,
@@ -928,13 +1079,19 @@ impl SqliteAdmissionOperationStore {
                 )
                 .map_err(map_payment_owner_error)?;
         }
+        if claimed && !changed {
+            transaction
+                .rollback()
+                .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+            return Ok((updated, None));
+        }
         self.commit_write(transaction)
             .map_err(map_payment_operation_error)?;
         if changed {
             self.sync_after_write(&connection)
                 .map_err(map_payment_operation_error)?;
         }
-        Ok(updated)
+        Ok((updated, Some(recovery_lease)))
     }
 
     pub fn begin_payment_settlement(
@@ -951,8 +1108,89 @@ impl SqliteAdmissionOperationStore {
             active_fence,
             trusted_now_unix_ms,
         } = begin;
+        self.begin_payment_settlement_under(
+            RecoveryAuthority::Lease(recovery_lease),
+            PaymentSettlementWrite {
+                operation,
+                expected,
+                transition,
+                release_evidence,
+                budget_reconcile,
+                active_fence,
+                trusted_now_unix_ms,
+            },
+        )
+        .map(|(settlement, _)| settlement)
+    }
+
+    /// Begin the settlement and persist the coordinator's recovery claim in
+    /// the same funded transaction.
+    pub fn claim_and_begin_payment_settlement(
+        &self,
+        begin: chio_kernel::AdmissionPaymentSettlementClaim<'_>,
+        lease: &mut ClaimedLease<'_>,
+    ) -> Result<
+        (AdmissionPaymentSettlement, Option<AdmissionRecoveryLease>),
+        AdmissionPaymentJournalError,
+    > {
+        if !self.claim_is_funded(
+            begin.operation,
+            Some(recovery::storage::NativeFinishingPurposeV1::PaymentSettlement),
+            0,
+        )? {
+            let recovery_lease =
+                self.standalone_claim(begin.claim, begin.trusted_now_unix_ms, lease)?;
+            return self
+                .begin_payment_settlement_under(
+                    RecoveryAuthority::Lease(&recovery_lease),
+                    PaymentSettlementWrite {
+                        operation: begin.operation,
+                        expected: begin.expected,
+                        transition: begin.transition,
+                        release_evidence: begin.release_evidence,
+                        budget_reconcile: begin.budget_reconcile,
+                        active_fence: begin.active_fence,
+                        trusted_now_unix_ms: begin.trusted_now_unix_ms,
+                    },
+                )
+                .map(|(settlement, _)| (settlement, Some(recovery_lease)));
+        }
+        self.begin_payment_settlement_under(
+            RecoveryAuthority::Claim {
+                request: begin.claim,
+                lease,
+            },
+            PaymentSettlementWrite {
+                operation: begin.operation,
+                expected: begin.expected,
+                transition: begin.transition,
+                release_evidence: begin.release_evidence,
+                budget_reconcile: begin.budget_reconcile,
+                active_fence: begin.active_fence,
+                trusted_now_unix_ms: begin.trusted_now_unix_ms,
+            },
+        )
+    }
+
+    fn begin_payment_settlement_under(
+        &self,
+        recovery: RecoveryAuthority<'_, '_>,
+        begin: PaymentSettlementWrite<'_>,
+    ) -> Result<
+        (AdmissionPaymentSettlement, Option<AdmissionRecoveryLease>),
+        AdmissionPaymentJournalError,
+    > {
+        let PaymentSettlementWrite {
+            operation,
+            expected,
+            transition,
+            release_evidence,
+            budget_reconcile,
+            active_fence,
+            trusted_now_unix_ms,
+        } = begin;
         if active_fence != &self.serving_owner.fence
-            || recovery_lease.store_fence() != active_fence
+            || recovery.store_fence() != active_fence
             || expected.operation_id != operation.binding().operation_id().as_str()
         {
             return Err(AdmissionPaymentJournalError::Fenced);
@@ -962,17 +1200,9 @@ impl SqliteAdmissionOperationStore {
         let transaction = self
             .begin_write(&mut connection, Some(active_fence))
             .map_err(map_payment_operation_error)?;
-        verify_payment_write_context(
-            &transaction,
-            &self.serving_owner,
-            operation,
-            recovery_lease,
-            active_fence,
-            trusted_now_unix_ms,
-        )?;
-        // The settlement begin writes the composite budget reconcile and the
-        // journal's settlement intent: one prepaid purpose owns this whole
-        // transaction on a native original's funded account.
+        // The settlement begin writes the composite budget reconcile, the
+        // journal's settlement intent and, when asked, the coordinator's claim:
+        // one prepaid purpose owns this whole transaction on a native original.
         security_participant_state::authorize_native_finishing_growth(
             &transaction,
             &self.serving_owner,
@@ -980,6 +1210,23 @@ impl SqliteAdmissionOperationStore {
             &[recovery::storage::NativeFinishingPurposeV1::PaymentSettlement],
         )
         .map_err(map_payment_operation_error)?;
+        let claimed = matches!(recovery, RecoveryAuthority::Claim { .. });
+        let recovery_lease = resolve_recovery_authority(
+            &transaction,
+            &self.serving_owner,
+            recovery,
+            trusted_now_unix_ms,
+        )
+        .map_err(map_payment_operation_error)?
+        .into_owned();
+        verify_payment_write_context(
+            &transaction,
+            &self.serving_owner,
+            operation,
+            &recovery_lease,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
         let budget = crate::budget_store::SqliteBudgetStore::open_alongside(
             self.connection.clone(),
             self.serving_owner.clone(),
@@ -1042,17 +1289,24 @@ impl SqliteAdmissionOperationStore {
             )
             .map_err(map_payment_operation_error)?;
         }
+        let settlement = AdmissionPaymentSettlement {
+            journal,
+            budget,
+            budget_already_reconciled: !budget_changed,
+        };
+        if claimed && !budget_changed && !payment_changed {
+            transaction
+                .rollback()
+                .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+            return Ok((settlement, None));
+        }
         self.commit_write(transaction)
             .map_err(map_payment_operation_error)?;
         if budget_changed || payment_changed {
             self.sync_after_write(&connection)
                 .map_err(map_payment_operation_error)?;
         }
-        Ok(AdmissionPaymentSettlement {
-            journal,
-            budget,
-            budget_already_reconciled: !budget_changed,
-        })
+        Ok((settlement, Some(recovery_lease)))
     }
 
     /// Reverse every live budget hold of a pre-dispatch native payment original
@@ -1076,8 +1330,75 @@ impl SqliteAdmissionOperationStore {
             active_fence,
             trusted_now_unix_ms,
         } = reversal;
+        self.reverse_funded_payment_holds_under(
+            RecoveryAuthority::Lease(recovery_lease),
+            operation,
+            expected,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map(|(reversed, _)| reversed)
+    }
+
+    /// The funded reversal with the coordinator's recovery claim persisted in
+    /// the same transaction. An ordinary original still persists the claim and
+    /// returns `None` with its lease.
+    pub fn claim_and_reverse_funded_payment_holds(
+        &self,
+        reversal: chio_kernel::AdmissionPaymentHoldReversalClaim<'_>,
+        lease: &mut ClaimedLease<'_>,
+    ) -> Result<
+        (
+            Option<chio_kernel::receipt_store::AdmissionPaymentHoldReversed>,
+            Option<AdmissionRecoveryLease>,
+        ),
+        AdmissionPaymentJournalError,
+    > {
+        if !self.claim_is_funded(
+            reversal.operation,
+            Some(recovery::storage::NativeFinishingPurposeV1::PaymentSettlement),
+            0,
+        )? {
+            let recovery_lease =
+                self.standalone_claim(reversal.claim, reversal.trusted_now_unix_ms, lease)?;
+            return self
+                .reverse_funded_payment_holds_under(
+                    RecoveryAuthority::Lease(&recovery_lease),
+                    reversal.operation,
+                    reversal.expected,
+                    reversal.active_fence,
+                    reversal.trusted_now_unix_ms,
+                )
+                .map(|(reversed, _)| (reversed, Some(recovery_lease)));
+        }
+        self.reverse_funded_payment_holds_under(
+            RecoveryAuthority::Claim {
+                request: reversal.claim,
+                lease,
+            },
+            reversal.operation,
+            reversal.expected,
+            reversal.active_fence,
+            reversal.trusted_now_unix_ms,
+        )
+    }
+
+    fn reverse_funded_payment_holds_under(
+        &self,
+        recovery: RecoveryAuthority<'_, '_>,
+        operation: &AdmissionOperationV1,
+        expected: &PaymentJournalRecord,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        (
+            Option<chio_kernel::receipt_store::AdmissionPaymentHoldReversed>,
+            Option<AdmissionRecoveryLease>,
+        ),
+        AdmissionPaymentJournalError,
+    > {
         if active_fence != &self.serving_owner.fence
-            || recovery_lease.store_fence() != active_fence
+            || recovery.store_fence() != active_fence
             || expected.operation_id != operation.binding().operation_id().as_str()
         {
             return Err(AdmissionPaymentJournalError::Fenced);
@@ -1091,50 +1412,64 @@ impl SqliteAdmissionOperationStore {
         let transaction = self
             .begin_write(&mut connection, Some(active_fence))
             .map_err(map_payment_operation_error)?;
+        let claimed = matches!(recovery, RecoveryAuthority::Claim { .. });
+        let native = security_participant_state::native_finishing_original(&transaction, operation)
+            .map_err(map_payment_operation_error)?;
+        if native {
+            let journal = crate::budget_store::load_payment_journal(
+                &transaction,
+                operation.binding().operation_id().as_str(),
+            )
+            .map_err(map_payment_budget_error)?
+            .ok_or_else(|| {
+                AdmissionPaymentJournalError::Invariant(
+                    "funded payment hold reversal lost its journal".to_owned(),
+                )
+            })?;
+            // Only a released external authorization reaches this writer: the
+            // rail released the hold and the journal retained that completion.
+            if journal != *expected
+                || journal.state != chio_kernel::payment::PaymentJournalState::Settled
+                || journal.settle_action != Some(chio_kernel::payment::PaymentSettleAction::Release)
+                || journal.authorization_id.is_none()
+            {
+                return Err(AdmissionPaymentJournalError::Conflict(
+                    "funded payment hold reversal requires the released authorization".to_owned(),
+                ));
+            }
+            // The claim, the reversals and the spend are one funded transaction.
+            security_participant_state::authorize_native_finishing_growth(
+                &transaction,
+                &self.serving_owner,
+                operation,
+                &[recovery::storage::NativeFinishingPurposeV1::PaymentSettlement],
+            )
+            .map_err(map_payment_operation_error)?;
+        }
+        let recovery_lease = resolve_recovery_authority(
+            &transaction,
+            &self.serving_owner,
+            recovery,
+            trusted_now_unix_ms,
+        )
+        .map_err(map_payment_operation_error)?
+        .into_owned();
         verify_payment_write_context(
             &transaction,
             &self.serving_owner,
             operation,
-            recovery_lease,
+            &recovery_lease,
             active_fence,
             trusted_now_unix_ms,
         )?;
-        if !security_participant_state::native_finishing_original(&transaction, operation)
-            .map_err(map_payment_operation_error)?
-        {
+        if !native {
+            // An ordinary original owes no funded claim: it keeps the
+            // established standalone claim and budget authority reversal.
             transaction
                 .rollback()
                 .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
-            return Ok(None);
+            return Ok((None, (!claimed).then_some(recovery_lease)));
         }
-        let journal = crate::budget_store::load_payment_journal(
-            &transaction,
-            operation.binding().operation_id().as_str(),
-        )
-        .map_err(map_payment_budget_error)?
-        .ok_or_else(|| {
-            AdmissionPaymentJournalError::Invariant(
-                "funded payment hold reversal lost its journal".to_owned(),
-            )
-        })?;
-        // Only a released external authorization reaches this writer: the
-        // rail released the hold and the journal retained that completion.
-        if journal != *expected
-            || journal.state != chio_kernel::payment::PaymentJournalState::Settled
-            || journal.settle_action != Some(chio_kernel::payment::PaymentSettleAction::Release)
-            || journal.authorization_id.is_none()
-        {
-            return Err(AdmissionPaymentJournalError::Conflict(
-                "funded payment hold reversal requires the released authorization".to_owned(),
-            ));
-        }
-        security_participant_state::authorize_native_finishing_growth(
-            &transaction,
-            &self.serving_owner,
-            operation,
-            &[recovery::storage::NativeFinishingPurposeV1::PaymentSettlement],
-        )
-        .map_err(map_payment_operation_error)?;
         let budget = crate::budget_store::SqliteBudgetStore::open_alongside(
             self.connection.clone(),
             self.serving_owner.clone(),
@@ -1191,15 +1526,21 @@ impl SqliteAdmissionOperationStore {
             )
             .map_err(map_payment_operation_error)?;
         }
+        let reversed =
+            Some(chio_kernel::receipt_store::AdmissionPaymentHoldReversed { executable });
+        if claimed && !changed {
+            transaction
+                .rollback()
+                .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+            return Ok((reversed, None));
+        }
         self.commit_write(transaction)
             .map_err(map_payment_operation_error)?;
         if changed {
             self.sync_after_write(&connection)
                 .map_err(map_payment_operation_error)?;
         }
-        Ok(Some(
-            chio_kernel::receipt_store::AdmissionPaymentHoldReversed { executable },
-        ))
+        Ok((reversed, Some(recovery_lease)))
     }
 
     pub fn commit_terminal_projection(
@@ -1229,6 +1570,113 @@ impl SqliteAdmissionOperationStore {
             self.sync_after_write(&connection)?;
         }
         Ok(terminal)
+    }
+
+    /// The claim `request` would persist, read without writing: the lease
+    /// identity a deferred claim's projection context binds before the funded
+    /// write that persists the same claim.
+    pub fn preview_recovery_claim(
+        &self,
+        request: RecoveryClaimRequest<'_>,
+        trusted_now_unix_ms: u64,
+    ) -> Result<UntrustedAdmissionRecoveryClaim, AdmissionOperationStoreError> {
+        store::validate_claim_request(&request, trusted_now_unix_ms)?;
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let stored = load_by_operation_id_tx(&transaction, request.operation_id)?
+            .ok_or(AdmissionOperationStoreError::NotFound)?;
+        let claim = match store::prepare_recovery_claim_tx(
+            &transaction,
+            &self.serving_owner,
+            &stored,
+            request,
+            trusted_now_unix_ms,
+        )? {
+            store::PreparedRecoveryClaimData::Active(claim)
+            | store::PreparedRecoveryClaimData::Write(claim) => claim,
+        };
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(claim)
+    }
+
+    /// Commit the terminal projection and persist the coordinator's recovery
+    /// claim in the same transaction, funded by the native original's
+    /// TerminalProjection purpose when its retained loans reserve the claim.
+    /// A retained purpose that does not keeps the established standalone
+    /// claim. An exact terminal replay persists no claim.
+    pub fn claim_and_commit_terminal_projection(
+        &self,
+        request: RecoveryClaimRequest<'_>,
+        lease: &mut ClaimedLease<'_>,
+        projection: &AdmissionTerminalProjection,
+    ) -> Result<(AdmissionTerminal, Option<AdmissionRecoveryLease>), AdmissionOperationStoreError>
+    {
+        let now = projection.context().trusted_time_unix_ms;
+        let (terminal_already, funded) = {
+            let mut connection = self.connection()?;
+            let transaction = self.begin_read(&mut connection)?;
+            let stored = load_by_operation_id_tx(&transaction, &projection.context().operation_id)?
+                .ok_or(AdmissionOperationStoreError::NotFound)?;
+            let funded = security_participant_state::atomic_claim_is_funded(
+                &transaction,
+                &stored.operation,
+                recovery::storage::NativeFinishingPurposeV1::TerminalProjection,
+                1,
+            )?;
+            let terminal = stored.operation.state().is_terminal();
+            transaction.commit().map_err(sqlite_error)?;
+            (terminal, funded)
+        };
+        if terminal_already {
+            return self
+                .commit_terminal_projection(projection)
+                .map(|terminal| (terminal, None));
+        }
+        if !funded {
+            let recovery_lease =
+                chio_kernel::admission_operation::claim_qualified_lease(self, request, now, lease)?;
+            return self
+                .commit_terminal_projection(projection)
+                .map(|terminal| (terminal, Some(recovery_lease)));
+        }
+        if projection.requires_anchored_economic_commit() {
+            return Err(invariant(
+                "terminal projection requires an advanced economic anchor",
+            ));
+        }
+        projection.context().validate()?;
+        let mut connection = self.connection()?;
+        let transaction =
+            self.begin_write(&mut connection, Some(&projection.context().store_fence))?;
+        let origin = self
+            .serving_owner
+            .prepare_native_source_transaction(&transaction)
+            .map_err(map_owner_error)?;
+        let stored = load_by_operation_id_tx(&transaction, &projection.context().operation_id)?
+            .ok_or(AdmissionOperationStoreError::NotFound)?;
+        // The claim is this transaction's first write, inside the growth the
+        // TerminalProjection purpose priced for it.
+        security_participant_state::authorize_native_finishing_growth(
+            &transaction,
+            &self.serving_owner,
+            &stored.operation,
+            &[recovery::storage::NativeFinishingPurposeV1::TerminalProjection],
+        )?;
+        let recovery_lease = resolve_recovery_authority(
+            &transaction,
+            &self.serving_owner,
+            RecoveryAuthority::Claim { request, lease },
+            now,
+        )?
+        .into_owned();
+        let (terminal, _) = self.commit_terminal_projection_with_origin_in_transaction(
+            &transaction,
+            projection,
+            Some(&origin),
+        )?;
+        self.commit_write(transaction)?;
+        self.sync_after_write(&connection)?;
+        Ok((terminal, Some(recovery_lease)))
     }
 
     fn commit_terminal_projection_with_origin_in_transaction(

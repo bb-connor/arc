@@ -17,6 +17,7 @@ mod pricing;
 #[cfg(test)]
 use preservation::require_progress_preserving_liability;
 pub(in crate::admission_operation_store) use pricing::physical_command_write_profile;
+#[cfg(test)]
 pub(in crate::admission_operation_store) use pricing::price_protected_command_liability;
 pub(in crate::admission_operation_store) use pricing::price_protected_command_with_row_limits;
 

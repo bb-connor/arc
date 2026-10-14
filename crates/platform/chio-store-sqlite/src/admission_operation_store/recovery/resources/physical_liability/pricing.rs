@@ -83,6 +83,7 @@ pub(in crate::admission_operation_store) fn physical_command_write_profile(
 
 /// Describe a bounded command write. This DATA grants no authority to append
 /// native source, publish a migration, or consume an owed purpose.
+#[cfg(test)]
 pub(in crate::admission_operation_store) fn price_protected_command_liability(
     tx: &Connection,
     plan: &ProtectedCommandLiabilityPlan,

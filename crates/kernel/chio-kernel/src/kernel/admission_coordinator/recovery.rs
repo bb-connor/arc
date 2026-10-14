@@ -358,14 +358,25 @@ impl ChioKernel {
                 "dispatch-committed admission already has a durable tool outcome".to_owned(),
             ));
         }
-        let lease = self.claim_admission_recovery(operation, trusted_now_unix_ms)?;
+        // A prepaid native original persists its claim inside the funded
+        // terminal write; the preview names the lease that write will create.
+        let request = Self::recovery_claim_request(runtime, operation, trusted_now_unix_ms)?;
+        let mut recovery = if self.prepaid_native_original(operation)? {
+            DeferredRecoveryClaim::deferred(runtime, request, trusted_now_unix_ms)?
+        } else {
+            DeferredRecoveryClaim::claimed(
+                request,
+                trusted_now_unix_ms,
+                self.claim_admission_recovery(operation, trusted_now_unix_ms)?,
+            )
+        };
         let context = AdmissionProjectionContext {
             operation_id: operation.binding().operation_id().clone(),
             request_id: operation.binding().request_id().clone(),
             expected_operation_version: operation.version(),
             trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            coordinator_lease_id: recovery.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: recovery.coordinator_lease_epoch(),
             store_fence: runtime.fence.clone(),
         };
         let projection = verified_outcome_unknown_after_dispatch_projection(operation, context)?;
@@ -378,10 +389,7 @@ impl ChioKernel {
                 "outcome-unknown finding pool finalization failed: {error}"
             ))
         })?;
-        let terminal = runtime
-            .store
-            .commit_admission_projection(&projection)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        let terminal = recovery.commit_admission_projection(runtime, &projection)?;
         if terminal.operation_id != *operation.binding().operation_id()
             || terminal.state != AdmissionOperationState::OutcomeUnknownAfterDispatch
         {
@@ -403,5 +411,235 @@ impl ChioKernel {
         }
         AdmissionReceiptMetadataV1::retained_unknown_dispatch(&retained, trusted_now_unix_ms)
             .map_err(Into::into)
+    }
+}
+
+/// The recovery authority a sequence of durable steps applies under: the
+/// lease already persisted, or the claim the first changing funded write
+/// persists with it. A prepaid native original never commits its claim alone.
+pub(super) struct DeferredRecoveryClaim<'a> {
+    request: RecoveryClaimRequest<'a>,
+    trusted_now_unix_ms: u64,
+    /// The one deterministic lease identity of this epoch, persisted or not.
+    coordinator_lease_id: AdmissionIdentifier,
+    coordinator_lease_epoch: u64,
+    lease: Option<crate::admission_operation::AdmissionRecoveryLease>,
+}
+
+impl<'a> DeferredRecoveryClaim<'a> {
+    pub(super) fn claimed(
+        request: RecoveryClaimRequest<'a>,
+        trusted_now_unix_ms: u64,
+        lease: crate::admission_operation::AdmissionRecoveryLease,
+    ) -> Self {
+        Self {
+            request,
+            trusted_now_unix_ms,
+            coordinator_lease_id: lease.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            lease: Some(lease),
+        }
+    }
+
+    /// Previews the claim without persisting it.
+    pub(super) fn deferred(
+        runtime: &DurableAdmissionRuntime,
+        request: RecoveryClaimRequest<'a>,
+        trusted_now_unix_ms: u64,
+    ) -> Result<Self, KernelError> {
+        let preview = native_acquisition::store_call(|| {
+            runtime
+                .store
+                .preview_recovery_claim(request, trusted_now_unix_ms)
+        })?;
+        Ok(Self {
+            request,
+            trusted_now_unix_ms,
+            coordinator_lease_id: preview.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: preview.coordinator_lease_epoch(),
+            lease: None,
+        })
+    }
+
+    pub(super) fn coordinator_lease_id(&self) -> &AdmissionIdentifier {
+        &self.coordinator_lease_id
+    }
+
+    pub(super) fn coordinator_lease_epoch(&self) -> u64 {
+        self.coordinator_lease_epoch
+    }
+
+    pub(super) fn advance_payment_journal(
+        &mut self,
+        runtime: &DurableAdmissionRuntime,
+        operation: &AdmissionOperationV1,
+        expected: &crate::payment::PaymentJournalRecord,
+        transition: &crate::payment::PaymentJournalTransition,
+        release_evidence: Option<&crate::tool_outcome::MonetaryReleaseEvidenceV1>,
+    ) -> Result<crate::payment::PaymentJournalRecord, KernelError> {
+        let trusted_now_unix_ms = self.trusted_now_unix_ms;
+        let advanced = match &self.lease {
+            Some(recovery_lease) => runtime
+                .store
+                .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
+                    operation,
+                    recovery_lease,
+                    expected,
+                    transition,
+                    release_evidence,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                })
+                .map(|journal| (journal, None)),
+            None => runtime.store.claim_and_advance_payment_journal(
+                crate::receipt_store::AdmissionPaymentJournalClaim {
+                    claim: self.request,
+                    operation,
+                    expected,
+                    transition,
+                    release_evidence,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                },
+                &mut qualified_lease(self.request, trusted_now_unix_ms),
+            ),
+        };
+        let (journal, lease) =
+            advanced.map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        self.retain(lease);
+        Ok(journal)
+    }
+
+    pub(super) fn begin_payment_settlement(
+        &mut self,
+        runtime: &DurableAdmissionRuntime,
+        operation: &AdmissionOperationV1,
+        expected: &crate::payment::PaymentJournalRecord,
+        transition: Option<&crate::payment::PaymentJournalTransition>,
+        release_evidence: Option<&crate::tool_outcome::MonetaryReleaseEvidenceV1>,
+        budget_reconcile: BudgetReconcileHoldRequest,
+    ) -> Result<crate::receipt_store::AdmissionPaymentSettlement, KernelError> {
+        let trusted_now_unix_ms = self.trusted_now_unix_ms;
+        let begun = match &self.lease {
+            Some(recovery_lease) => runtime
+                .store
+                .begin_payment_settlement(crate::receipt_store::AdmissionPaymentSettlementBegin {
+                    operation,
+                    recovery_lease,
+                    expected,
+                    transition,
+                    release_evidence,
+                    budget_reconcile,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                })
+                .map(|settlement| (settlement, None)),
+            None => runtime.store.claim_and_begin_payment_settlement(
+                crate::receipt_store::AdmissionPaymentSettlementClaim {
+                    claim: self.request,
+                    operation,
+                    expected,
+                    transition,
+                    release_evidence,
+                    budget_reconcile,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                },
+                &mut qualified_lease(self.request, trusted_now_unix_ms),
+            ),
+        };
+        let (settlement, lease) =
+            begun.map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        self.retain(lease);
+        Ok(settlement)
+    }
+
+    pub(super) fn reverse_funded_payment_holds(
+        &mut self,
+        runtime: &DurableAdmissionRuntime,
+        operation: &AdmissionOperationV1,
+        expected: &crate::payment::PaymentJournalRecord,
+    ) -> Result<Option<crate::receipt_store::AdmissionPaymentHoldReversed>, KernelError> {
+        let trusted_now_unix_ms = self.trusted_now_unix_ms;
+        let reversed = match &self.lease {
+            Some(recovery_lease) => runtime
+                .store
+                .reverse_funded_payment_holds(crate::receipt_store::AdmissionPaymentHoldReversal {
+                    operation,
+                    recovery_lease,
+                    expected,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                })
+                .map(|reversed| (reversed, None)),
+            None => runtime.store.claim_and_reverse_funded_payment_holds(
+                crate::receipt_store::AdmissionPaymentHoldReversalClaim {
+                    claim: self.request,
+                    operation,
+                    expected,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                },
+                &mut qualified_lease(self.request, trusted_now_unix_ms),
+            ),
+        };
+        let (reversed, lease) =
+            reversed.map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        self.retain(lease);
+        Ok(reversed)
+    }
+
+    pub(super) fn commit_admission_projection(
+        &mut self,
+        runtime: &DurableAdmissionRuntime,
+        projection: &AdmissionTerminalProjection,
+    ) -> Result<crate::admission_operation::AdmissionTerminal, KernelError> {
+        let committed = match &self.lease {
+            Some(_) => runtime
+                .store
+                .commit_admission_projection(projection)
+                .map(|terminal| (terminal, None)),
+            None => runtime.store.claim_and_commit_admission_projection(
+                self.request,
+                &mut qualified_lease(self.request, self.trusted_now_unix_ms),
+                projection,
+            ),
+        };
+        let (terminal, lease) =
+            committed.map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        self.retain(lease);
+        Ok(terminal)
+    }
+
+    pub(super) fn persisted(
+        &self,
+    ) -> Result<&crate::admission_operation::AdmissionRecoveryLease, KernelError> {
+        self.lease.as_ref().ok_or_else(|| {
+            KernelError::DurableAdmission("recovery claim is not yet persisted".to_owned())
+        })
+    }
+
+    /// The persisted lease, claiming it alone when no funded write carried
+    /// the claim. That standalone claim is ordinary intake.
+    pub(super) fn into_persisted_lease(
+        self,
+        runtime: &DurableAdmissionRuntime,
+    ) -> Result<crate::admission_operation::AdmissionRecoveryLease, KernelError> {
+        match self.lease {
+            Some(lease) => Ok(lease),
+            None => crate::admission_operation::claim_qualified_lease(
+                runtime.store.as_ref(),
+                self.request,
+                self.trusted_now_unix_ms,
+                &mut qualified_lease(self.request, self.trusted_now_unix_ms),
+            )
+            .map_err(durable_store_error),
+        }
+    }
+
+    fn retain(&mut self, lease: Option<crate::admission_operation::AdmissionRecoveryLease>) {
+        if self.lease.is_none() {
+            self.lease = lease;
+        }
     }
 }
