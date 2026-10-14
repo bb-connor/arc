@@ -1,4 +1,4 @@
-//! Integration tests for the OCSF 1.3.0 Authorization mapping.
+//! Integration tests for the OCSF 1.3.0 API Activity mapping.
 //!
 //! These tests exercise `chio_siem::ocsf::receipt_to_ocsf` and
 //! `chio_siem::OcsfExporter::format_events` against fully-signed
@@ -120,10 +120,53 @@ fn trusted_allow_receipt_maps_to_success_event() {
     assert_eq!(ev["status"], "Success");
     assert_eq!(ev["severity_id"], 1, "Allow -> Informational");
     assert_eq!(ev["severity"], "Informational");
-    assert_eq!(ev["activity_id"], 1);
-    assert_eq!(ev["activity_name"], "Grant");
-    assert_eq!(ev["type_uid"], 300_201);
+    assert_eq!(ev["activity_id"], 99);
+    assert_eq!(ev["activity_name"], "Tool Call");
+    assert_eq!(ev["type_uid"], 600_399);
     assert_eq!(ev["metadata"]["version"], OCSF_SCHEMA_VERSION);
+    assert_eq!(ev["actor"]["authorizations"][0]["decision"], "Authorized");
+}
+
+#[test]
+fn every_decision_maps_to_the_api_activity_class_and_never_to_authentication() {
+    let cancelled = receipt_with(
+        "rc-cancel-class",
+        Decision::Cancelled {
+            reason: "user cancelled".to_string(),
+        },
+        TrustLevel::Mediated,
+        vec![],
+        None,
+    );
+    let events = [
+        siem_event_to_ocsf(&trusted_event(allow_receipt())),
+        receipt_to_ocsf(&allow_receipt()),
+        receipt_to_ocsf(&deny_receipt()),
+        receipt_to_ocsf(&cancelled),
+    ];
+    for ev in events {
+        assert_eq!(ev["class_uid"], 6003);
+        assert_eq!(ev["class_name"], "API Activity");
+        assert_eq!(ev["category_uid"], 6);
+        assert_eq!(ev["category_name"], "Application Activity");
+        assert_eq!(ev["activity_id"], 99);
+        assert_eq!(ev["activity_name"], "Tool Call");
+        assert_eq!(ev["type_uid"], 600_399);
+        assert_eq!(ev["type_name"], "API Activity: Other");
+        assert_eq!(ev["metadata"]["version"], "1.3.0");
+        assert!(ev["api"]["operation"]
+            .as_str()
+            .is_some_and(|op| op.starts_with("sha256:")));
+        assert!(ev["src_endpoint"]["uid"]
+            .as_str()
+            .is_some_and(|uid| uid.starts_with("sha256:")));
+        assert!(ev["actor"]["invoked_by"].is_string());
+        assert!(ev["severity_id"].is_u64());
+        assert!(ev["time"].is_u64());
+        assert_ne!(ev["class_uid"], 3002);
+    }
+    assert_eq!(OCSF_CLASS_UID, 6003);
+    assert_eq!(OCSF_CATEGORY_UID, 6);
 }
 
 #[test]
@@ -132,7 +175,8 @@ fn invalid_receipt_id_never_exports_as_authorized() {
     receipt.id = "0000000000000000000000000000000000000000000000000000000000000000".to_string();
     let ev = receipt_to_ocsf(&receipt);
 
-    assert_eq!(ev["activity_name"], "Other");
+    assert_eq!(ev["activity_id"], 99);
+    assert_eq!(ev["status_id"], 99);
     assert_eq!(ev["status"], "Other");
     assert_eq!(ev["actor"]["authorizations"][0]["decision"], "Unverified");
     assert_eq!(ev["unmapped"]["chio"]["authorized"], false);
@@ -157,7 +201,7 @@ fn deny_receipt_maps_to_failure_event() {
 }
 
 #[test]
-fn cancelled_receipt_uses_other_activity_and_low_severity() {
+fn cancelled_receipt_fails_with_low_severity() {
     let receipt = receipt_with(
         "rc-cancel-1",
         Decision::Cancelled {
@@ -170,8 +214,9 @@ fn cancelled_receipt_uses_other_activity_and_low_severity() {
     let ev = receipt_to_ocsf(&receipt);
 
     assert_eq!(ev["activity_id"], 99);
-    assert_eq!(ev["activity_name"], "Other");
+    assert_eq!(ev["type_uid"], 600_399);
     assert_eq!(ev["status_id"], 2);
+    assert_eq!(ev["status"], "Failure");
     assert_eq!(ev["severity_id"], 2);
     assert_eq!(ev["severity"], "Low");
 }

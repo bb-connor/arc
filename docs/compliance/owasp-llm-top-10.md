@@ -51,7 +51,7 @@ The table below maps each 2025 risk to Chio controls with a coverage level and e
 | **LLM07** | System Prompt Leakage | Where system prompts flow through tool calls (e.g., LLM gateway wrapped as a tool), `response_sanitization.rs` and `secret_leak.rs` can match on known prompt content. Capability scoping prevents agents from calling introspection tools that would reveal prompts. | partial | System prompt is not typically visible to Chio because it lives inside the model-invocation layer. | Prompt hygiene; use of dedicated prompt stores |
 | **LLM08** | Vector and Embedding Weaknesses | Vector-DB data-layer guard (see `crates/guards/chio-guards/src/` data guards) restricts which embeddings an agent may read or write; `egress_allowlist.rs` limits retrieval endpoints; column constraints can deny sensitive fields before vectorization tools see them. Receipts log every retrieval. | partial | Chio does not validate embedding provenance or detect poisoned retrieval corpora. | Embedding-corpus curation |
 | **LLM09** | Misinformation | Chio records what was returned (post-invocation guard evidence) and who it went to (DPoP attribution), producing audit evidence that supports correction workflows. | partial | Chio does not evaluate factuality. Hallucination detection is a model-layer concern. | Factuality evaluation |
-| **LLM10** | Unbounded Consumption | Budget enforcement (`crates/kernel/chio-kernel/src/budget_store.rs`, `crates/economy/chio-metering/src/budget.rs`) caps monetary spend atomically per invocation and per grant; velocity guard (`crates/guards/chio-guards/src/velocity.rs`) caps invocation rate and spend rate; revocation is immediate (`crates/kernel/chio-kernel/src/revocation_runtime.rs`); grant expiry bounds time. | strong | Inference compute DoS (driving a model to exhaustion without paid tool calls) requires model-infra-layer defenses. | Inference-layer rate limits |
+| **LLM10** | Unbounded Consumption | Budget enforcement (`crates/kernel/chio-kernel/src/budget_store.rs`) caps monetary spend atomically per invocation and per grant; velocity guard (`crates/guards/chio-guards/src/velocity.rs`) caps invocation rate and spend rate; revocation is immediate (`crates/kernel/chio-kernel/src/revocation_runtime.rs`); grant expiry bounds time. | strong | Inference compute DoS (driving a model to exhaustion without paid tool calls) requires model-infra-layer defenses. | Inference-layer rate limits |
 
 ---
 
@@ -100,7 +100,7 @@ Customer-responsibility items that implementers must not assume Chio provides:
 - Patch integrity: `crates/guards/chio-guards/src/patch_integrity.rs`
 - Behavioral sequence and data-flow guards: `crates/guards/chio-guards/src/behavioral_sequence.rs`, `crates/guards/chio-guards/src/data_flow.rs`
 - Post-invocation pipeline: `crates/guards/chio-guards/src/post_invocation.rs`
-- Budget and metering: `crates/kernel/chio-kernel/src/budget_store.rs`, `crates/economy/chio-metering/src/budget.rs`
+- Budget and metering: `crates/kernel/chio-kernel/src/budget_store.rs`
 - Revocation: `crates/kernel/chio-kernel/src/revocation_runtime.rs`, `crates/kernel/chio-kernel/src/revocation_store.rs`
 - DPoP proof-of-possession: `crates/kernel/chio-kernel/src/dpop.rs`
 - Manifest signing: `crates/platform/chio-manifest/src/lib.rs`

@@ -27,7 +27,7 @@ appropriate disclosure contract themselves.
 | `ratelimit` | Token buckets keyed by exporter name, one token per attempt |
 | `exporter` | Dyn-compatible `Exporter` and `ExportError` contracts |
 | `exporters` | Splunk, Elastic, Datadog, Sumo, webhook, OCSF, and CEF adapters |
-| `ocsf` | OCSF 1.3.0 Authorization-class mapping from the closed view |
+| `ocsf` | OCSF 1.3.0 API Activity (class 6003) mapping from the closed view |
 | `alerting` | Severity/filter rules, private notification projection, paging |
 | `metrics_sink` | Host-installed instrumentation seam with a no-op default |
 | `redaction` | Operator error formatting through `chio-log-redact` |

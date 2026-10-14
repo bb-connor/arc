@@ -7,6 +7,11 @@
 //! requires them to agree when both are present, rejects unknown events and any
 //! tool-call payload outside the tool-call frames, and evaluates every call
 //! before any byte is released.
+//!
+//! A stream is complete only when it is structurally terminated: the first
+//! event is `message-start`, every `tool-call-start` is closed by its
+//! `tool-call-end`, a `message-end` arrives outside any tool call, and no frame
+//! follows it.
 
 use chio_provider_adapter_core::{
     ensure_streaming_allow_no_redactions, parse_sse_frames, GatedStream, SseParseOptions,
@@ -36,6 +41,14 @@ const KNOWN_EVENTS: &[&str] = &[
     "message-end",
 ];
 
+/// Position of the gate within the single message a stream carries.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MessageState {
+    NotStarted,
+    Open,
+    Ended,
+}
+
 /// A tool call opened by `tool-call-start` and not yet ended.
 struct OpenCall {
     index: Option<u64>,
@@ -60,9 +73,12 @@ impl CohereAdapter {
         let mut invocations = Vec::new();
         let mut verdicts = Vec::new();
         let mut open: Option<OpenCall> = None;
-        let mut message_open = false;
+        let mut message = MessageState::NotStarted;
 
         for frame in frames {
+            if message == MessageState::Ended {
+                return Err(malformed("Cohere SSE frame arrived after message-end"));
+            }
             let Some(event) = frame.event.as_deref() else {
                 if frame.data.is_some() {
                     return Err(malformed("Cohere SSE data frame carried no event name"));
@@ -85,13 +101,24 @@ impl CohereAdapter {
                     "Cohere {event} frame carried a tool call outside the tool-call frames"
                 )));
             }
+            match (message, event) {
+                (MessageState::NotStarted, "message-start") => message = MessageState::Open,
+                (MessageState::NotStarted, _) => {
+                    return Err(malformed("Cohere stream must begin with message-start"));
+                }
+                (_, "message-start") => {
+                    return Err(malformed(
+                        "Cohere message-start arrived inside an open message",
+                    ));
+                }
+                _ => {}
+            }
             match event {
-                "message-start" => message_open = true,
                 "message-end" => {
                     if open.is_some() {
                         return Err(malformed("Cohere message-end arrived inside a tool call"));
                     }
-                    message_open = false;
+                    message = MessageState::Ended;
                 }
                 "tool-call-start" => {
                     if open.is_some() {
@@ -177,7 +204,7 @@ impl CohereAdapter {
         if open.is_some() {
             return Err(malformed("Cohere stream ended before the tool call ended"));
         }
-        if message_open {
+        if message != MessageState::Ended {
             return Err(malformed("Cohere stream ended before message-end"));
         }
 
@@ -348,7 +375,7 @@ mod tests {
         let evaluated = Cell::new(false);
         let err = adapter
             .gate_sse_stream(
-                b"event: tool-call-end\ndata: {\"delta\":{}}\n\n",
+                b"event: message-start\ndata: {\"type\":\"message-start\"}\n\nevent: tool-call-end\ndata: {\"delta\":{}}\n\nevent: message-end\ndata: {\"type\":\"message-end\"}\n\n",
                 |_invocation| {
                     evaluated.set(true);
                     Ok(VerdictResult::Allow {
@@ -360,7 +387,10 @@ mod tests {
             .expect_err("terminal Cohere tool-call frame without a tool_call must fail closed");
 
         assert!(!evaluated.get(), "malformed frame must not reach evaluator");
-        assert!(matches!(err, ProviderError::Malformed(_)));
-        assert!(err.to_string().contains("missing tool_call"));
+        assert!(matches!(
+            err,
+            ProviderError::Malformed(ref message)
+                if message == "Cohere tool-call-end frame was missing tool_call"
+        ));
     }
 }

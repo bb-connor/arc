@@ -7,7 +7,12 @@ fn call(id: &str, name: &str, arguments: &str) -> Value {
 }
 
 fn assembled(end: Value) -> Vec<u8> {
-    format!("{}{}", start_frame("{}"), frame(Some("tool-call-end"), end)).into_bytes()
+    message(&format!(
+        "{}{}",
+        start_frame("{}"),
+        frame(Some("tool-call-end"), end)
+    ))
+    .into_bytes()
 }
 
 fn preserves(raw: Vec<u8>, arguments: Value) {
@@ -73,7 +78,7 @@ fn terminal_stream_style_or_extra_tool_payload_cannot_bypass_assembled_call() {
 
 #[test]
 fn index_only_terminal_keeps_exact_bytes_and_signed_registry_flow() {
-    let raw = format!(
+    let raw = message(&format!(
         "{}{}{}{}",
         start_frame(""),
         delta_frame("{\"city\":"),
@@ -82,7 +87,7 @@ fn index_only_terminal_keeps_exact_bytes_and_signed_registry_flow() {
             Some("tool-call-end"),
             json!({"type":"tool-call-end","index":0})
         )
-    )
+    ))
     .into_bytes();
     preserves(raw, json!({"city":"Paris"}));
 }
@@ -95,7 +100,7 @@ fn singular_end_only_and_agreeing_assembled_terminal_keep_exact_bytes() {
         json!({"type":"tool-call-end","delta":{"tool_call":accepted}}),
     ] {
         preserves(
-            frame(Some("tool-call-end"), end.clone()).into_bytes(),
+            message(&frame(Some("tool-call-end"), end.clone())).into_bytes(),
             json!({}),
         );
         preserves(assembled(end), json!({}));

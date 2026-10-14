@@ -89,12 +89,14 @@ impl ChioMcpEdge {
                     EdgeState::WaitingForInitialized { session_id } => session_id.clone(),
                     _ => return None,
                 };
+                // A notification never receives a response. A failed
+                // activation leaves the session out of `Ready`, so every later
+                // request is refused as uninitialized.
                 if let Err(error) = self.kernel.activate_session(&session_id) {
-                    return Some(jsonrpc_error(
-                        Value::Null,
-                        JSONRPC_INTERNAL_ERROR,
-                        &format!("failed to activate session: {error}"),
-                    ));
+                    eprintln!(
+                        "MCP session activation failed on notifications/initialized: {error}"
+                    );
+                    return None;
                 }
                 self.state = EdgeState::Ready {
                     session_id: session_id.clone(),

@@ -1,5 +1,8 @@
-//! OCSF 1.3.0 Authorization mapping from the closed unsigned sink projection.
-//! Original payloads and signatures require separate authorized evidence reads.
+//! OCSF 1.3.0 API Activity (class 6003) mapping from the closed unsigned sink
+//! projection. Each evaluated tool call is one API Activity event with activity
+//! `Other` named `Tool Call`; the decision is carried by `status_id` and
+//! `actor.authorizations`. Original payloads and signatures require separate
+//! authorized evidence reads.
 
 use chio_core::receipt::body::ChioReceipt;
 use serde_json::{json, Value};
@@ -8,10 +11,15 @@ use crate::event::SiemEvent;
 use crate::sink_projection::{SiemSinkProjection, SinkDecision};
 
 pub const OCSF_SCHEMA_VERSION: &str = "1.3.0";
-pub const OCSF_CLASS_UID: u32 = 3002;
-pub const OCSF_CLASS_NAME: &str = "Authorization";
-pub const OCSF_CATEGORY_UID: u32 = 3;
-pub const OCSF_CATEGORY_NAME: &str = "Identity & Access Management";
+pub const OCSF_CLASS_UID: u32 = 6003;
+pub const OCSF_CLASS_NAME: &str = "API Activity";
+pub const OCSF_CATEGORY_UID: u32 = 6;
+pub const OCSF_CATEGORY_NAME: &str = "Application Activity";
+/// OCSF activity `Other`: a tool call is not one of the CRUD activities.
+pub const OCSF_ACTIVITY_ID: u32 = 99;
+pub const OCSF_ACTIVITY_NAME: &str = "Tool Call";
+pub const OCSF_TYPE_UID: u32 = OCSF_CLASS_UID * 100 + OCSF_ACTIVITY_ID;
+pub const OCSF_TYPE_NAME: &str = "API Activity: Other";
 pub const OCSF_PRODUCT_NAME: &str = "Chio";
 pub const OCSF_PRODUCT_VENDOR: &str = "Backbay Labs";
 
@@ -32,18 +40,18 @@ pub fn siem_event_to_ocsf(event: &SiemEvent) -> Value {
 fn projection_to_ocsf(projection: &SiemSinkProjection) -> Value {
     let Ok(mut source) = serde_json::to_value(projection) else {
         return json!({
-            "class_uid": OCSF_CLASS_UID, "status_id": 0, "status": "Unknown",
+            "category_uid": OCSF_CATEGORY_UID, "class_uid": OCSF_CLASS_UID,
+            "activity_id": OCSF_ACTIVITY_ID, "type_uid": OCSF_TYPE_UID,
+            "status_id": 0, "status": "Unknown",
             "payload_included": false, "original_retrieval_required": true,
             "projection_signed": false,
         });
     };
-    // Compatibility classification derived exclusively from the closed owner.
     source["decision.verdict"] = json!(projection.decision_label());
-    let (activity_id, activity_name, status_id, status) = match projection.decision {
-        SinkDecision::Authorized => (1, "Grant", 1, "Success"),
-        SinkDecision::Denied => (1, "Grant", 2, "Failure"),
-        SinkDecision::Cancelled => (99, "Other", 2, "Failure"),
-        _ => (99, "Other", 99, "Other"),
+    let (status_id, status) = match projection.decision {
+        SinkDecision::Authorized => (1, "Success"),
+        SinkDecision::Denied | SinkDecision::Cancelled => (2, "Failure"),
+        _ => (99, "Other"),
     };
     let severity = match projection.severity_id {
         1 => "Informational",
@@ -78,14 +86,14 @@ fn projection_to_ocsf(projection: &SiemSinkProjection) -> Value {
     let mut event = json!({
         "category_uid":OCSF_CATEGORY_UID, "category_name":OCSF_CATEGORY_NAME,
         "class_uid":OCSF_CLASS_UID, "class_name":OCSF_CLASS_NAME,
-        "type_uid":OCSF_CLASS_UID * 100 + activity_id,
-        "type_name":format!("{OCSF_CLASS_NAME}: {activity_name}"),
-        "activity_id":activity_id, "activity_name":activity_name,
+        "type_uid":OCSF_TYPE_UID, "type_name":OCSF_TYPE_NAME,
+        "activity_id":OCSF_ACTIVITY_ID, "activity_name":OCSF_ACTIVITY_NAME,
         "status_id":status_id, "status":status,
         "severity_id":projection.severity_id, "severity":severity,
         "time":projection.timestamp.saturating_mul(1000),
         "metadata":{"version":OCSF_SCHEMA_VERSION,"uid":projection.event_reference(),"product":{"name":OCSF_PRODUCT_NAME,"vendor_name":OCSF_PRODUCT_VENDOR}},
         "api":{"operation":format!("sha256:{}",projection.tool_name_sha256.as_str()),"service":{"name":format!("sha256:{}",projection.tool_server_sha256.as_str())},"request":{"uid":projection.event_reference()}},
+        "src_endpoint":{"uid":format!("sha256:{}",projection.capability_id_sha256.as_str())},
         "dst_endpoint":{"name":format!("sha256:{}",projection.tool_server_sha256.as_str()),"svc_name":format!("sha256:{}",projection.tool_server_sha256.as_str())},
         "actor":{"invoked_by":"chio-agent","authorizations":[{"decision":projection.result_label()}]},
         "observables":observables, "enrichments":enrichments,
@@ -162,9 +170,11 @@ mod tests {
     #[test]
     fn raw_receipt_allow_without_trusted_signer_is_unverified() {
         let ev = receipt_to_ocsf(&test_receipt("r-1", Decision::Allow));
-        assert_eq!(ev["class_uid"], 3002);
-        assert_eq!(ev["category_uid"], 3);
-        assert_ne!(ev["activity_name"], "Grant");
+        assert_eq!(ev["class_uid"], 6003);
+        assert_eq!(ev["category_uid"], 6);
+        assert_eq!(ev["activity_id"], 99);
+        assert_eq!(ev["type_uid"], 600_399);
+        assert_eq!(ev["status_id"], 99);
         assert_ne!(ev["status"], "Success");
         assert_eq!(ev["unmapped"]["chio"]["signer_trusted"], false);
         assert_eq!(ev["unmapped"]["chio"]["authorized"], false);
@@ -180,8 +190,8 @@ mod tests {
         );
         let ev = receipt_to_ocsf(&receipt);
 
-        assert_ne!(ev["activity_name"], "Grant");
         assert_ne!(ev["status"], "Success");
+        assert_ne!(ev["actor"]["authorizations"][0]["decision"], "Authorized");
         assert_eq!(ev["unmapped"]["chio"]["receipt_kind"], "trace_observation");
         assert_eq!(ev["unmapped"]["chio"]["boundary_class"], "detect_only");
         assert_eq!(ev["unmapped"]["chio"]["authorized"], false);

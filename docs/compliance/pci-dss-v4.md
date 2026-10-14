@@ -52,16 +52,16 @@ This mapping covers all 12 requirement groups with coverage level, gaps, and cus
 | 2.2 | System components are configured securely | `KernelConfig` defaults (deny unless allowed); guard pipeline defaults | partial | No hardening benchmark shipped | Secure baseline doc |
 | 2.2.7 | Non-console admin access uses strong crypto | HTTP endpoints support TLS; mTLS documented for tool-server transport | partial | `min_tls_version` config option is planned, not yet enforced | TLS configuration |
 | 2.3 | Wireless environments secured | N/A | out-of-scope | N/A | Wireless policy |
-| **Req 3** | Protect stored account data | Chio does not store CHD. Receipt content hashes are SHA-256 of arguments (not raw CHD) | partial | Guard evidence (e.g., `response_sanitization` output snippets) may contain sensitive substrings before redaction | Encryption at rest for data stores |
-| 3.2 | Account data storage minimized | Receipts store hashes, not raw arguments; see `crates/core/chio-core-types` | strong | None in receipt payload | PAN minimization in tool servers |
+| **Req 3** | Protect stored account data | Tool-call receipts store the call arguments (`action.parameters`) and their SHA-256 hash (`action.parameter_hash`); CHD passed as a tool argument is stored in the receipt | partial | Guard evidence (e.g., `response_sanitization` output snippets) may contain sensitive substrings before redaction | Encryption at rest for data stores |
+| 3.2 | Account data storage minimized | Receipts store the tool arguments (`action.parameters`) and their SHA-256 hash; see `crates/core/chio-core-types/src/receipt/decision.rs` | strong | Kernel tool-call receipts carry the arguments with `redaction_mode` `none` | PAN minimization in tool servers |
 | 3.3 | SAD is not stored after authorization | N/A | out-of-scope | N/A | SAD handling in tool servers |
 | 3.4 | PAN is rendered unreadable | PAN redaction in guard outputs is configurable via `secret_leak.rs` / `response_sanitization.rs` patterns | partial | No shipped PAN-specific pattern library | PAN pattern set for `response_sanitization` |
-| 3.5 | Cryptographic keys used to protect PAN are secured | Chio signing keys are not PAN-encryption keys; FIPS/HSM path planned (`docs/protocols/COMPLIANCE-ROADMAP.md` section 2) | partial | HSM backends (Vault/KMS) not yet shipped | Key management for PAN |
+| 3.5 | Cryptographic keys used to protect PAN are secured | Chio signing keys are not PAN-encryption keys; remote Ed25519 signing through HashiCorp Vault Transit is available in `crates/trust/chio-signing-remote`; no FIPS 140-validated module is used (see 4.2.1) | partial | No AWS KMS signing backend | Key management for PAN |
 | 3.6 | Cryptographic keys are managed | Kernel signing key rotation documented at `docs/protocols/TRUST-MODEL-AND-KEY-MANAGEMENT.md` | partial | Automated rotation tooling incomplete | Key rotation SOPs |
 | 3.7 | Key-management policies and procedures | Documented in trust-model draft | partial | No formal signed SOP artifact | Customer policy docs |
 | **Req 4** | Protect cardholder data with strong cryptography during transmission | TLS on HTTP endpoints; mTLS documented | partial | No enforced `min_tls_version` yet (planned) | TLS termination config |
 | 4.2 | PAN is secured in transit over open/public networks | TLS between kernel and tool server | partial | Minimum version not enforced | Deployment TLS config |
-| 4.2.1 | Strong cryptography and security protocols are used | Ed25519 signing for Chio artifacts; TLS configured by deployer | partial | FIPS signing path behind feature flag (planned) | FIPS crypto selection |
+| 4.2.1 | Strong cryptography and security protocols are used | Ed25519 signing for Chio artifacts; TLS configured by deployer | partial | The `chio-core-types` `fips` feature adds P-256/P-384 signing through aws-lc-rs built on `aws-lc-sys`, not the FIPS-validated `aws-lc-fips-sys`; no build uses a FIPS 140-validated module | FIPS crypto selection |
 | **Req 5** | Protect all systems and networks from malicious software | Not endpoint protection | out-of-scope | N/A | AV/EDR on hosts |
 | 5.2 | Anti-malware solutions are deployed | N/A | out-of-scope | N/A | Endpoint security |
 | 5.3 | Anti-malware mechanisms are active | N/A | out-of-scope | N/A | Endpoint security |
@@ -69,7 +69,7 @@ This mapping covers all 12 requirement groups with coverage level, gaps, and cus
 | **Req 6** | Develop and maintain secure systems and software | `unwrap_used = "deny"`, `expect_used = "deny"`, `clippy -D warnings` in workspace | partial | No formal SDLC document | Customer SDLC |
 | 6.2 | Bespoke and custom software is developed securely | `cargo test --workspace`, `cargo fmt --check`, canonical JSON (RFC 8785) for all signed payloads | strong | None at protocol layer | SDLC evidence |
 | 6.3 | Security vulnerabilities are identified and addressed | GitHub issue tracker; dependency review | partial | No formal vuln disclosure policy | Vuln disclosure policy |
-| 6.4 | Public-facing web applications are protected | Chio is not public-facing by default; `chio trust serve` requires Bearer auth (`docs/RECEIPT_QUERY_API.md`) | partial | No WAF integration | WAF for public endpoints |
+| 6.4 | Public-facing web applications are protected | Chio is not public-facing by default; `chio trust serve` requires Bearer auth (`docs/reference/RECEIPT_QUERY_API.md`) | partial | No WAF integration | WAF for public endpoints |
 | 6.5 | Changes to systems and software are managed | Policy hash in every receipt (`crates/core/chio-core-types`) ties call to policy version | strong | No change-management workflow shipped | Change-management process |
 | **Req 7** | Restrict access to system components and cardholder data by business need to know | Capability tokens (`crates/core/chio-core-types/src/capability`) scope access to specific tools and servers | strong | None at tool-access layer | Role/permission design |
 | 7.2 | Access is defined and assigned appropriately | `ToolGrant` with `scope`, `constraints`, expiry; delegation attenuation in `capability.rs` | strong | None | Role definitions |
@@ -84,7 +84,7 @@ This mapping covers all 12 requirement groups with coverage level, gaps, and cus
 | **Req 9** | Restrict physical access to cardholder data | Physical controls | out-of-scope | N/A | Data center, clean desk |
 | 9.2-9.5 | Physical access controls | N/A | out-of-scope | N/A | Physical security |
 | **Req 10** | Log and monitor all access to system components and cardholder data | Every tool invocation produces a signed `ChioReceipt`; batches Merkle-committed via `KernelCheckpoint` | strong | None at tool-call layer | Log aggregation |
-| 10.2 | Audit logs are implemented | Receipt store (`crates/kernel/chio-kernel/src/receipt_store.rs`); append-only, sequential | strong | None | Log destination |
+| 10.2 | Audit logs are implemented | Receipt store (`crates/kernel/chio-kernel/src/receipt_store.rs`); receipts are written in sequence order, and retention archival moves aged receipts from the live database to an archive database | strong | None | Log destination |
 | 10.3 | Audit logs are protected from destruction and unauthorized modification | Merkle commitments in `crates/kernel/chio-kernel/src/checkpoint.rs`; inclusion proofs via `build_inclusion_proof` | strong | None | Archive storage |
 | 10.4 | Audit logs are reviewed | `chio trust serve` dashboard; receipt query API (`crates/kernel/chio-kernel/src/receipt_query.rs`) | partial | No alerting engine in Chio itself (SIEM export covers this) | Review rota |
 | 10.5 | Audit-log history is retained | `RetentionConfig.retention_days` and `max_size_bytes`; archival preserves checkpoint rows | strong | 1-year minimum (PCI) must be set explicitly | Retention configuration |
@@ -110,7 +110,7 @@ This mapping covers all 12 requirement groups with coverage level, gaps, and cus
 Items that require additional Chio work or customer effort:
 
 1. **Req 3.4 PAN redaction patterns.** `response_sanitization.rs` supports pattern rules but ships no PAN-specific library. Customer must load a PAN regex set.
-2. **Req 3.5 / 3.6 / 4.2.1 FIPS and key management.** The FIPS signing path and HSM backends (Vault Transit, AWS KMS) are tracked in `docs/protocols/COMPLIANCE-ROADMAP.md` section 2 but not yet shipped.
+2. **Req 3.5 / 3.6 / 4.2.1 FIPS and key management.** The `chio-core-types` `fips` feature selects P-256/P-384 algorithms through aws-lc-rs built on `aws-lc-sys`; no Chio build links the FIPS-validated `aws-lc-fips-sys` module. A HashiCorp Vault Transit Ed25519 signing backend ships in `crates/trust/chio-signing-remote`; there is no AWS KMS backend. Remaining work is tracked in `docs/protocols/COMPLIANCE-ROADMAP.md` section 2.
 3. **Req 4.2 `min_tls_version`.** The option is planned but not currently enforced inside `KernelConfig`. HTTP termination layer must enforce TLS 1.2 minimum.
 4. **Req 6.3 Vulnerability disclosure policy.** Not published in-tree.
 5. **Req 10.6 NTP.** Host-level concern; kernel relies on system clock.
@@ -131,10 +131,10 @@ Customer-responsibility items that implementers must not assume Chio provides:
 - Checkpoints: `crates/kernel/chio-kernel/src/checkpoint.rs`
 - DPoP: `crates/kernel/chio-kernel/src/dpop.rs`
 - Revocation: `crates/kernel/chio-kernel/src/revocation_runtime.rs`, `crates/kernel/chio-kernel/src/revocation_store.rs`
-- Budgets: `crates/kernel/chio-kernel/src/budget_store.rs`, `crates/economy/chio-metering/src/budget.rs`
+- Budgets: `crates/kernel/chio-kernel/src/budget_store.rs`
 - Guards (egress/path/secret-leak/response-sanitization): `crates/guards/chio-guards/src/`
 - SIEM export: `crates/observability/chio-siem/src/exporter.rs`
 - Compliance certificate: `crates/products/chio-cli/src/cert.rs`
-- Receipt query API: `crates/kernel/chio-kernel/src/receipt_query.rs` and `docs/RECEIPT_QUERY_API.md`
+- Receipt query API: `crates/kernel/chio-kernel/src/receipt_query.rs` and `docs/reference/RECEIPT_QUERY_API.md`
 - Trust model and key management: `docs/protocols/TRUST-MODEL-AND-KEY-MANAGEMENT.md`
 - Unified configuration: `docs/protocols/UNIFIED-CONFIGURATION.md`
