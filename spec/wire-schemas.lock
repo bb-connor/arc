@@ -260,19 +260,9 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/economy/c
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.anchor-inclusion-proof.v2"
-files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/economy/chio-web3/src/anchors.rs"]
-first_seen = "8dd3f6d81e"
-
-[[schema]]
 value = "chio.anchor-proof-bundle.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/economy/chio-anchor/src/bundle.rs", "crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs"]
 first_seen = "11e573d2d7"
-
-[[schema]]
-value = "chio.anchor-proof-bundle.v2"
-files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/economy/chio-anchor/src/bundle.rs"]
-first_seen = "417bd17981"
 
 [[schema]]
 value = "chio.anchor-runtime-report.v1"
@@ -910,11 +900,6 @@ files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.checkpoint_consistency_proof.v2"
-files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
-first_seen = "57789d0d50"
-
-[[schema]]
 value = "chio.checkpoint_equivocation.v1"
 files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
 first_seen = "11e573d2d7"
@@ -922,11 +907,6 @@ first_seen = "11e573d2d7"
 [[schema]]
 value = "chio.checkpoint_publication.v1"
 files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
-first_seen = "11e573d2d7"
-
-[[schema]]
-value = "chio.checkpoint_statement.v1"
-files = ["crates/economy/chio-web3/src/anchors.rs", "crates/kernel/chio-kernel/src/checkpoint.rs", "crates/platform/chio-transaction-passport/src/minimal.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]

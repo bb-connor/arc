@@ -918,10 +918,8 @@ fn extend_frontier_with_adopted_checkpoint(
 /// Extend the verified checkpoint-chain frontier by one peer checkpoint.
 ///
 /// A cache miss rebuilds only the prefix represented by `predecessor`; startup
-/// normally retains the frontier returned by full verification. Signed v2
-/// roots must match before the caller advances its verified head. Legacy v1
-/// checkpoints carry no root, but their leaves still extend the frontier so a
-/// later v2 checkpoint commits the complete history.
+/// normally retains the frontier returned by full verification. Signed chain
+/// roots must match before the caller advances its verified head.
 pub(crate) fn advance_verified_checkpoint_chain_frontier(
     connection: &Connection,
     cached: Option<&CheckpointChainFrontier>,

@@ -1036,10 +1036,9 @@ fn frontier_rebuild_adopts_concurrent_checkpoint_winner() -> Result<(), Box<dyn 
 
 /// A failed build must preserve the live cached chain frontier. After forcing a
 /// cache miss, the retry must fully verify predecessor continuity, not merely
-/// hash individually valid rows, before a v2 successor commits a legacy v1
-/// prefix.
+/// hash individually valid rows, before a successor commits the prefix.
 #[test]
-fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
+fn frontier_cache_miss_rejects_disconnected_prefix_after_failed_build(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (temp_dir, path) = temp_db("chio-bg-frontier-cache-loss")?;
     let keypair = receipt_test_keypair();
@@ -1053,21 +1052,18 @@ fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
     }
     store.flush_receipt_writes()?;
 
-    let mut checkpoint_one = build_checkpoint(
+    let checkpoint_one = build_checkpoint(
         1,
         1,
         max_batch,
         &canonical_receipt_bytes(&store, 1, max_batch),
         &keypair,
     )?;
-    checkpoint_one.body.schema = chio_kernel::checkpoint::CHECKPOINT_SCHEMA_V1.to_string();
-    checkpoint_one.body.chain_root = None;
-    checkpoint_one.signature = keypair.sign(&canonical_json_bytes(&checkpoint_one.body)?);
     insert_checkpoint_row(&store, &checkpoint_one, checkpoint_one.body.batch_end_seq);
 
     let checkpoint_one_leaf =
         chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint_one.body)?;
-    let mut checkpoint_two = build_checkpoint_with_previous(
+    let checkpoint_two = build_checkpoint_with_previous(
         2,
         max_batch + 1,
         max_batch * 2,
@@ -1076,9 +1072,6 @@ fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
         Some(&checkpoint_one),
         &[checkpoint_one_leaf],
     )?;
-    checkpoint_two.body.schema = chio_kernel::checkpoint::CHECKPOINT_SCHEMA_V1.to_string();
-    checkpoint_two.body.chain_root = None;
-    checkpoint_two.signature = keypair.sign(&canonical_json_bytes(&checkpoint_two.body)?);
     insert_checkpoint_row(&store, &checkpoint_two, checkpoint_two.body.batch_end_seq);
 
     let mut connection = store.connection()?;
@@ -1089,7 +1082,7 @@ fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
             .as_ref()
             .map(CheckpointChainFrontier::leaf_count),
         Some(2),
-        "seeding must retain the fully verified legacy frontier"
+        "seeding must retain the fully verified frontier"
     );
 
     let error = maybe_build_checkpoint(
@@ -1121,7 +1114,7 @@ fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
     );
     head.chain_frontier = None;
 
-    // Replace checkpoint 1 out of band with a separately valid v1 statement.
+    // Replace checkpoint 1 out of band with a separately valid statement.
     // Its earlier timestamp changes its signed body digest without changing
     // the covered receipts. Checkpoint 2 remains byte-for-byte unchanged and
     // therefore still points at the original checkpoint 1.
@@ -1192,7 +1185,7 @@ fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
         &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
     )
     .err()
-    .ok_or("a cache-miss retry must reject the disconnected legacy prefix")?;
+    .ok_or("a cache-miss retry must reject the disconnected prefix")?;
     assert!(
         matches!(error, ReceiptStoreError::Conflict(_))
             && error
@@ -1202,7 +1195,7 @@ fn frontier_cache_miss_rejects_disconnected_legacy_prefix_after_failed_build(
     );
     assert!(
         load_persisted_checkpoint_row(&connection, 3)?.is_none(),
-        "a disconnected legacy prefix must not gain a v2 successor"
+        "a disconnected prefix must not gain a successor"
     );
 
     // Now make the replacement prefix internally coherent by re-linking and
@@ -1326,19 +1319,16 @@ fn checkpoint_insert_rejects_prefix_replaced_after_frontier_audit(
     }
     store.flush_receipt_writes()?;
 
-    // Persist a valid one-checkpoint legacy prefix. A legacy checkpoint carries
-    // no chain_root, so changing and re-signing its timestamp produces a
-    // distinct but independently valid replacement prefix.
-    let mut checkpoint_one = build_checkpoint(
+    // Persist a valid one-checkpoint prefix. The chain leaf excludes
+    // issued_at, so changing and re-signing the timestamp produces a distinct
+    // but independently valid replacement prefix.
+    let checkpoint_one = build_checkpoint(
         1,
         1,
         max_batch,
         &canonical_receipt_bytes(&store, 1, max_batch),
         &keypair,
     )?;
-    checkpoint_one.body.schema = chio_kernel::checkpoint::CHECKPOINT_SCHEMA_V1.to_string();
-    checkpoint_one.body.chain_root = None;
-    checkpoint_one.signature = keypair.sign(&canonical_json_bytes(&checkpoint_one.body)?);
     insert_checkpoint_row(&store, &checkpoint_one, checkpoint_one.body.batch_end_seq);
 
     // This is the builder's verified snapshot and the candidate derived from

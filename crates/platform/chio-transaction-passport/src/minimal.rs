@@ -798,8 +798,7 @@ fn issuer_key_part(issuer: &str) -> &str {
 
 const TRANSPARENCY_INCLUSION_PROOF_SCHEMA_ID: &str = "chio.transparency.inclusion-proof.v1";
 const RECEIPT_INCLUSION_PROOF_SCHEMA_ID: &str = "chio.transparency.receipt-inclusion-proof.v1";
-const CHECKPOINT_STATEMENT_SCHEMA_V1_ID: &str = "chio.checkpoint_statement.v1";
-const CHECKPOINT_STATEMENT_SCHEMA_V2_ID: &str = "chio.checkpoint_statement.v2";
+const CHECKPOINT_STATEMENT_SCHEMA_ID: &str = "chio.checkpoint_statement.v2";
 const RECEIPT_EVIDENCE_ROLE: &str = "receipt";
 
 /// Payload of a `chio.transparency.receipt-inclusion-proof.v1` artifact as
@@ -864,10 +863,7 @@ struct CheckpointStatementChainLeaf {
 
 impl CheckpointStatementBody {
     fn validate(&self) -> Result<(), String> {
-        if !matches!(
-            self.schema.as_str(),
-            CHECKPOINT_STATEMENT_SCHEMA_V1_ID | CHECKPOINT_STATEMENT_SCHEMA_V2_ID
-        ) {
+        if self.schema != CHECKPOINT_STATEMENT_SCHEMA_ID {
             return Err(format!(
                 "checkpoint statement carries unsupported schema {}",
                 self.schema
@@ -894,12 +890,9 @@ impl CheckpointStatementBody {
                 self.tree_size, covered_entries
             ));
         }
-        if self.schema == CHECKPOINT_STATEMENT_SCHEMA_V1_ID && self.chain_root.is_some() {
-            return Err("v1 checkpoint statements cannot carry chain_root".to_string());
-        }
-        if self.schema == CHECKPOINT_STATEMENT_SCHEMA_V2_ID && self.checkpoint_seq == 1 {
+        if self.checkpoint_seq == 1 {
             let Some(chain_root) = self.chain_root else {
-                return Err("v2 checkpoint 1 must carry chain_root".to_string());
+                return Err("checkpoint 1 must carry chain_root".to_string());
             };
             let chain_leaf = CheckpointStatementChainLeaf {
                 checkpoint_seq: self.checkpoint_seq,

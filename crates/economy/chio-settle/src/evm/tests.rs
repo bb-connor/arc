@@ -210,13 +210,13 @@ fn batched_primary_proof() -> AnchorInclusionProof {
     let mut proof = sample_primary_proof();
     let receipt_bytes =
         canonical_json_bytes(&proof.receipt.body()).test_expect("proof receipt serializes");
-    let peer_receipt = b"peer receipt";
-    let leaves: Vec<&[u8]> = vec![receipt_bytes.as_slice(), peer_receipt.as_slice()];
+    let leaves: Vec<&[u8]> = vec![receipt_bytes.as_slice(), b"peer receipt"];
     let tree = MerkleTree::from_leaves(&leaves).test_expect("batched tree builds");
     let merkle_root = tree.root();
     proof.receipt_inclusion.merkle_root = merkle_root;
     proof.receipt_inclusion.proof = tree.inclusion_proof(0).test_expect("proof builds");
     proof.checkpoint_statement.tree_size = tree.leaf_count() as u64;
+    proof.checkpoint_statement.batch_end_seq = proof.checkpoint_statement.batch_start_seq + 1;
     proof.checkpoint_statement.merkle_root = merkle_root;
     if let Some(chain_anchor) = proof.chain_anchor.as_mut() {
         chain_anchor.anchored_merkle_root = merkle_root;

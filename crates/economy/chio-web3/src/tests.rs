@@ -3,9 +3,8 @@ use crate::anchors::{
     validate_anchor_inclusion_proof, validate_oracle_conversion_evidence,
     verify_anchor_inclusion_proof, AnchorInclusionProof, OracleConversionEvidence,
     Web3ChainAnchorRecord, Web3CheckpointStatement, Web3ReceiptInclusion,
-    CHIO_ANCHOR_INCLUSION_PROOF_SCHEMA, CHIO_ANCHOR_INCLUSION_PROOF_SCHEMA_V1,
-    CHIO_CHECKPOINT_STATEMENT_SCHEMA, CHIO_LINK_ORACLE_AUTHORITY,
-    CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA,
+    CHIO_ANCHOR_INCLUSION_PROOF_SCHEMA, CHIO_CHECKPOINT_STATEMENT_SCHEMA,
+    CHIO_LINK_ORACLE_AUTHORITY, CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA,
 };
 use crate::canonical::canonical_json_bytes;
 use crate::capability::scope::MonetaryAmount;

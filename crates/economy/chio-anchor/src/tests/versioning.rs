@@ -1,6 +1,6 @@
 use super::*;
 
-fn sample_v2_primary_proof() -> AnchorInclusionProof {
+fn sample_primary_proof_with_chain_anchor() -> AnchorInclusionProof {
     let sample = sample_primary_proof();
     let checkpoint_key = chio_core::Keypair::generate();
     let mut receipt_body = sample.receipt.body().clone();
@@ -16,7 +16,7 @@ fn sample_v2_primary_proof() -> AnchorInclusionProof {
         settlement_address: "0x1000000000000000000000000000000000000002".to_string(),
         issued_at: 1_743_600_000,
         expires_at: 1_774_828_800,
-        nonce: "v2-bundle-binding".to_string(),
+        nonce: "anchored-bundle-binding".to_string(),
     };
     let binding = chio_core::web3::identity::SignedWeb3IdentityBinding {
         signature: checkpoint_key.sign_canonical(&certificate).test_unwrap().0,
@@ -88,8 +88,8 @@ fn kernel_signed_checkpoint_survives_the_web3_statement_bridge() {
 }
 
 #[test]
-fn proof_bundle_schema_tracks_the_primary_proof_version() {
-    let proof = sample_v2_primary_proof();
+fn proof_bundle_refuses_retired_bundle_and_primary_proof_schemas() {
+    let proof = sample_primary_proof_with_chain_anchor();
     let checkpoint = kernel_checkpoint_from_statement(&proof.checkpoint_statement);
     let prepared = prepare_solana_memo_publication(
         &checkpoint,
@@ -104,7 +104,7 @@ fn proof_bundle_schema_tracks_the_primary_proof_version() {
         1_743_600_000,
     );
     let mut bundle = AnchorProofBundle {
-        schema: CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA_V2.to_string(),
+        schema: CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA.to_string(),
         primary_proof: proof,
         secondary_lanes: vec![AnchorLaneKind::SolanaMemo],
         solana_anchor: Some(solana),
@@ -112,7 +112,7 @@ fn proof_bundle_schema_tracks_the_primary_proof_version() {
     };
 
     let mut schema_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    schema_path.push("../../../spec/schemas/chio-web3/v2/anchor-proof-bundle.schema.json");
+    schema_path.push("../../../spec/schemas/chio-web3/v1/anchor-proof-bundle.schema.json");
     let schema_path = std::fs::canonicalize(&schema_path).test_unwrap();
     let schema = chio_spec_validate::load_json(&schema_path).test_unwrap();
     let serialized = serde_json::to_value(&bundle).test_unwrap();
@@ -122,22 +122,38 @@ fn proof_bundle_schema_tracks_the_primary_proof_version() {
         std::path::Path::new("<sample-anchor-proof-bundle>"),
         &serialized,
     )
-    .test_expect("serialized v2 proof bundle satisfies its published schema");
+    .test_expect("serialized proof bundle satisfies its published schema");
 
     assert!(verify_proof_bundle(&bundle).test_unwrap().verified);
 
-    bundle.schema = CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA_V1.to_string();
+    let mut retired_primary = bundle.clone();
+    retired_primary.primary_proof.schema = "chio.anchor-inclusion-proof.v2".to_string();
+    let error = verify_proof_bundle(&retired_primary).test_unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        crate::AnchorError::Verification(
+            "bundle schema chio.anchor-proof-bundle.v1 requires primary proof schema chio.anchor-inclusion-proof.v1"
+                .to_string()
+        )
+        .to_string()
+    );
+
+    bundle.schema = "chio.anchor-proof-bundle.v2".to_string();
     let error = verify_proof_bundle(&bundle).test_unwrap_err();
-    assert!(error.to_string().contains(
-        "bundle schema chio.anchor-proof-bundle.v1 requires primary proof schema chio.anchor-inclusion-proof.v1"
-    ));
+    assert_eq!(
+        error.to_string(),
+        crate::AnchorError::Verification(
+            "unsupported bundle schema chio.anchor-proof-bundle.v2".to_string()
+        )
+        .to_string()
+    );
 }
 
 /// The report states the EVM primary lane is verified, so the on-chain anchor
 /// record that claim rests on has to be there and has to check out.
 #[test]
-fn v2_proof_bundle_requires_evm_anchor_evidence_for_the_primary_lane() {
-    let proof = sample_v2_primary_proof();
+fn proof_bundle_requires_evm_anchor_evidence_for_the_primary_lane() {
+    let proof = sample_primary_proof_with_chain_anchor();
     let checkpoint = kernel_checkpoint_from_statement(&proof.checkpoint_statement);
     let prepared = prepare_solana_memo_publication(
         &checkpoint,
@@ -152,7 +168,7 @@ fn v2_proof_bundle_requires_evm_anchor_evidence_for_the_primary_lane() {
         1_743_600_000,
     );
     let mut bundle = AnchorProofBundle {
-        schema: CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA_V2.to_string(),
+        schema: CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA.to_string(),
         primary_proof: proof,
         secondary_lanes: vec![AnchorLaneKind::SolanaMemo],
         solana_anchor: Some(solana),
@@ -168,7 +184,7 @@ fn v2_proof_bundle_requires_evm_anchor_evidence_for_the_primary_lane() {
     let mut anchored = bundle.primary_proof.clone();
     bundle.primary_proof.chain_anchor = None;
     let mut schema_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    schema_path.push("../../../spec/schemas/chio-web3/v2/anchor-proof-bundle.schema.json");
+    schema_path.push("../../../spec/schemas/chio-web3/v1/anchor-proof-bundle.schema.json");
     let schema_path = std::fs::canonicalize(&schema_path).test_unwrap();
     let schema = chio_spec_validate::load_json(&schema_path).test_unwrap();
     let serialized = serde_json::to_value(&bundle).test_unwrap();
@@ -176,16 +192,16 @@ fn v2_proof_bundle_requires_evm_anchor_evidence_for_the_primary_lane() {
         chio_spec_validate::validate_value(
             &schema_path,
             &schema,
-            std::path::Path::new("<unanchored-v2-proof-bundle>"),
+            std::path::Path::new("<unanchored-proof-bundle>"),
             &serialized,
         )
         .is_err(),
-        "published v2 bundle schema accepted a missing primary chain anchor"
+        "published bundle schema accepted a missing primary chain anchor"
     );
     let error = verify_proof_bundle(&bundle).test_unwrap_err();
     assert!(
         error.to_string().contains(
-            "v2 proof bundle must carry primary_proof.chain_anchor for the EVM primary lane"
+            "proof bundle must carry primary_proof.chain_anchor for the EVM primary lane"
         ),
         "{error}"
     );
@@ -204,13 +220,5 @@ fn v2_proof_bundle_requires_evm_anchor_evidence_for_the_primary_lane() {
             .to_string()
             .contains("chain anchor checkpoint seq must match checkpoint statement"),
         "{error}"
-    );
-}
-
-#[test]
-fn unsuffixed_proof_bundle_schema_tracks_current_v2_issuance() {
-    assert_eq!(
-        crate::CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA,
-        CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA_V2
     );
 }

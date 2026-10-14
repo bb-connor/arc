@@ -1,19 +1,26 @@
 use super::*;
 
 #[test]
-fn anchor_inclusion_proof_versions_match_the_embedded_checkpoint_version() {
+fn anchor_inclusion_proof_refuses_retired_schemas() {
     let mut proof = sample_anchor_inclusion_proof();
-    proof.schema = CHIO_ANCHOR_INCLUSION_PROOF_SCHEMA_V1.to_string();
-
+    proof.schema = "chio.anchor-inclusion-proof.v2".to_string();
     assert!(matches!(
         validate_anchor_inclusion_proof(&proof),
-        Err(Web3ContractError::InvalidProof(message))
-            if message.contains("v1 anchor inclusion proofs must embed a v1 checkpoint statement")
+        Err(Web3ContractError::UnsupportedSchema(schema))
+            if schema == "chio.anchor-inclusion-proof.v2"
+    ));
+
+    let mut proof = sample_anchor_inclusion_proof();
+    proof.checkpoint_statement.schema = "chio.checkpoint_statement.v1".to_string();
+    assert!(matches!(
+        validate_anchor_inclusion_proof(&proof),
+        Err(Web3ContractError::UnsupportedSchema(schema))
+            if schema == "chio.checkpoint_statement.v1"
     ));
 }
 
 #[test]
-fn web3_checkpoint_verification_requires_valid_first_v2_chain_root() {
+fn web3_checkpoint_verification_requires_valid_first_chain_root() {
     let mut missing = sample_anchor_inclusion_proof();
     missing.receipt_inclusion.checkpoint_seq = 1;
     missing.checkpoint_statement.checkpoint_seq = 1;
@@ -28,7 +35,7 @@ fn web3_checkpoint_verification_requires_valid_first_v2_chain_root() {
     assert!(matches!(
         verify_anchor_inclusion_proof(&missing),
         Err(Web3ContractError::InvalidProof(message))
-            if message.contains("v2 checkpoint 1 must carry chain_root")
+            if message == "checkpoint 1 must carry chain_root"
     ));
 
     let mut incorrect = missing;

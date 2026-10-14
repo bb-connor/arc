@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-161 of 524 identifier constants in the security crates are unpinned.
+161 of 520 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (25)
 
@@ -45,9 +45,9 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs:9` `SCHEMA` = `chio.admission-caller-dispatch-context.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs:12` `SCHEMA` = `chio.governed-approval-replay-source-seal.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/native_security_binding.rs:6` `SCHEMA` = `chio.native-security-authority-binding.v1`
-- `crates/kernel/chio-kernel/src/checkpoint.rs:43` `CHECKPOINT_PUBLICATION_SCHEMA` = `chio.checkpoint_publication.v1`
-- `crates/kernel/chio-kernel/src/checkpoint.rs:44` `CHECKPOINT_WITNESS_SCHEMA` = `chio.checkpoint_witness.v1`
-- `crates/kernel/chio-kernel/src/checkpoint.rs:51` `CHECKPOINT_EQUIVOCATION_SCHEMA` = `chio.checkpoint_equivocation.v1`
+- `crates/kernel/chio-kernel/src/checkpoint.rs:39` `CHECKPOINT_PUBLICATION_SCHEMA` = `chio.checkpoint_publication.v1`
+- `crates/kernel/chio-kernel/src/checkpoint.rs:40` `CHECKPOINT_WITNESS_SCHEMA` = `chio.checkpoint_witness.v1`
+- `crates/kernel/chio-kernel/src/checkpoint.rs:43` `CHECKPOINT_EQUIVOCATION_SCHEMA` = `chio.checkpoint_equivocation.v1`
 - `crates/kernel/chio-kernel/src/dpop/replay_source/snapshot.rs:24` `SCHEMA` = `chio.dpop-replay-source-seal.v1`
 - `crates/kernel/chio-kernel/src/evidence_export.rs:13` `EVIDENCE_TRANSPARENCY_CLAIMS_SCHEMA` = `chio.evidence_transparency_claims.v1`
 - `crates/kernel/chio-kernel/src/finding_pool.rs:27` `FINDING_POOL_MUTATION_SCHEMA_V1` = `chio.finding.pool-mutation.v1`

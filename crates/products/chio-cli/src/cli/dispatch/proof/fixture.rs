@@ -260,6 +260,8 @@ struct ProofFixtureCheckpointStatementBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     previous_checkpoint_sha256: Option<String>,
     kernel_key: chio_core_types::PublicKey,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chain_root: Option<chio_web3::hashing::Hash>,
 }
 
 pub(super) fn dispatch_proof_fixture(
@@ -2999,6 +3001,8 @@ fn reseal_public_settlement_anchor_receipt(
             })?
             .clone(),
     )?;
+    statement.schema = chio_web3::anchors::CHIO_CHECKPOINT_STATEMENT_SCHEMA.to_string();
+    statement.batch_end_seq = statement.batch_start_seq;
     statement.tree_size = 1;
     statement.merkle_root = merkle_root;
     statement.kernel_key = anchor_keypair.public_key();
@@ -3012,6 +3016,7 @@ fn reseal_public_settlement_anchor_receipt(
         issued_at: statement.issued_at,
         previous_checkpoint_sha256: statement.previous_checkpoint_sha256.clone(),
         kernel_key: statement.kernel_key.clone(),
+        chain_root: statement.chain_root,
     };
     let (signature, _) = anchor_keypair
         .sign_canonical(&statement_body)

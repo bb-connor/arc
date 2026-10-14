@@ -64,15 +64,15 @@
       }
     },
     "checkpoint_statement": {
-      "schema": "chio.checkpoint_statement.v1",
+      "schema": "chio.checkpoint_statement.v2",
       "checkpoint_seq": 1042,
       "batch_start_seq": 104101,
-      "batch_end_seq": 104200,
+      "batch_end_seq": 104101,
       "tree_size": 1,
       "merkle_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
       "issued_at": 1743292800,
       "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-      "signature": "91ef6c1f7e1789491d77fec62448d70a1b2c850ff5e29f9db7b1d8cf29034328483448ebc747826bfecbe8293c2fc74bbadd66cc61d1339a6c52ae2282b7c40a"
+      "signature": "d7c02fd5fc6c47678320c909ef1586b9a48749e38a2ef89a12c25fe61c0ffe98b9100f4e24a06952ec739e72aab5a2b65ed706d514c95691b85316dec9e98a01"
     },
     "chain_anchor": {
       "chain_id": "eip155:8453",

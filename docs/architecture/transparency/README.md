@@ -143,12 +143,11 @@ true. The pair primitive constrains nothing below its earlier endpoint, so a
 pair that starts after checkpoint 1 must also name what anchors that prefix
 (a previously verified chain root or the prefix leaves themselves) through
 `verify_checkpoint_consistency_proof_with_anchor`; the set-level derivation
-builds its chain from sequence 1 and is anchored by construction. New statements use `chio.checkpoint_statement.v2`, and real
-cryptographic proofs use `chio.checkpoint_consistency_proof.v2`. Explicit v1
-parsers and legacy verification remain for old statements and metadata-only
-records, while v2 fields cannot be smuggled under a v1 schema. This version
-boundary is required for rolling verifiers because both records are signed or
-security-interpreted wire formats. The store cross-checks every commitment
+builds its chain from sequence 1 and is anchored by construction. Statements
+use `chio.checkpoint_statement.v2` and consistency proofs use
+`chio.checkpoint_consistency_proof.v1`; every other statement or proof schema is
+refused, and a consistency proof missing either chain root or either endpoint
+leaf inclusion does not deserialize. The store cross-checks every commitment
 against the persisted chain on the operator path and rejects divergent
 clock-skew siblings. Issuance stays batch-bounded: the writer keeps an
 append-only Merkle frontier of the chain on its verified head, so a checkpoint
@@ -212,12 +211,11 @@ hashing are not RFC 6962 receipt-tree semantics. It remains preview-only.
 Checkpoint-anchored receipt proofs use
 `chio.transparency.receipt-inclusion-proof.v1`, whose schema requires the signed
 checkpoint statement and whose leaf is the RFC 6962 hash of the receipt bytes.
-Web3 projections preserve the same rolling-reader boundary:
-`chio.anchor-inclusion-proof.v1` embeds only v1 checkpoint statements, while
-`chio.anchor-inclusion-proof.v2` embeds v2 statements and preserves their
-optional chain commitment. Sequence 1 statements must carry `chain_root`, and
-later v2 statements carry a signature-bound chain commitment only when
-`chain_root` is present. Cross-checkpoint consistency requires the checkpoint
+Web3 projections use `chio.anchor-inclusion-proof.v1`, which embeds a
+`chio.checkpoint_statement.v2` statement and preserves its optional chain
+commitment. Sequence 1 statements must carry `chain_root`, and later
+statements carry a signature-bound chain commitment only when `chain_root` is
+present. Cross-checkpoint consistency requires the checkpoint
 transparency verifier or a consistency proof.
 
 ### F3 (medium): the signed checkpoint body accepts unknown fields
@@ -245,9 +243,8 @@ field-smuggling ambiguity between producers and verifiers.
 wrapper both deny unknown fields, with rejection tests in the kernel and a
 conformance negative
 (`crates/tooling/chio-conformance/tests/checkpoint_statement_unknown_field_rejected.rs`).
-Legacy v1 bodies without `chain_root` still parse and re-serialize
-byte-identically, so stored signatures survive. New bodies carrying the field
-use v2.
+A detached body without `chain_root` re-serializes byte-identically, so its
+signature survives a round trip.
 
 ### F4: retention deletes checkpointed log entries
 

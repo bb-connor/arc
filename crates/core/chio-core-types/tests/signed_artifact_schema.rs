@@ -1133,22 +1133,12 @@ fn public_settlement_anchor_evidence_schemas_are_registered() {
         (
             "chio.anchor-inclusion-proof.v1",
             "anchor_inclusion_proof",
-            "public-settlement-v1",
-        ),
-        (
-            "chio.anchor-inclusion-proof.v2",
-            "anchor_inclusion_proof",
-            "checkpoint-transparency-v2",
+            "checkpoint-transparency-v1",
         ),
         (
             "chio.anchor-proof-bundle.v1",
             "anchor_proof_bundle",
-            "public-settlement-v1",
-        ),
-        (
-            "chio.anchor-proof-bundle.v2",
-            "anchor_proof_bundle",
-            "checkpoint-transparency-v2",
+            "checkpoint-transparency-v1",
         ),
     ] {
         assert!(

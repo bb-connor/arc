@@ -230,11 +230,8 @@ while IFS= read -r line; do
     continue
   fi
 
-  # Checkpoint statements, consistency proofs, anchor inclusion
-  # proofs, and bundles containing those proofs are security-interpreted
-  # formats. Their v2 schemas prevent rolling readers from applying legacy v1
-  # semantics to new commitments, paths, and hash constructions.
-  if [[ "$text" =~ chio\.checkpoint_(statement|consistency_proof)\.v2|chio\.(anchor-inclusion-proof|anchor-proof-bundle)\.v2|CHECKPOINT_(CONSISTENCY_PROOF_)?SCHEMA_V2|CHIO_CHECKPOINT_STATEMENT_SCHEMA_V2|CHIO_ANCHOR_PROOF_BUNDLE_(SCHEMA_)?V2|ANCHOR_INCLUSION_PROOF_(SCHEMA_V2|V2_SCHEMA) ]]; then
+  # Kernel checkpoint statements carry the chio.checkpoint_statement.v2 id.
+  if [[ "$text" =~ chio\.checkpoint_statement\.v2 ]]; then
     continue
   fi
 

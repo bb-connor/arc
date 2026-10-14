@@ -679,14 +679,14 @@ rust_symbols = [
   "build_checkpoint_with_chain_frontier",
   "build_checkpoint_with_chain_frontier_at",
 ]
-normalized_sha256 = "d3e9699be69b4ddc5d8b9ee4653b7816bc217c4cbd87e3e6f610a50761e1a1d8"
+normalized_sha256 = "df1c41993dde322592c497bba39aa0616dd5e582a86d591248b1a01863d06f71"
 symbol_sha256 = [
   { symbol = "CheckpointSigningContext", sha256 = "470cd3aec02d4f9589c096df83d8678e824104840d05ea3c3e7cd7612b07a197" },
   { symbol = "build_checkpoint", sha256 = "43f68cff56db2effbf22622b756c4c14160b55a7f9a5229b914feb28c2c66e3e" },
   { symbol = "build_checkpoint_with_previous", sha256 = "e853f8494246e1b2d30f9bf74d84bc89786b6737bc387ee72ff9f57e79075ae1" },
   { symbol = "build_checkpoint_with_previous_at", sha256 = "d5c9e15d7bad17f335e225fd207691be8a60f4b673fee3aff023c73c12214936" },
   { symbol = "build_checkpoint_with_chain_frontier", sha256 = "645d086c4522657c579d18574ba6930fcd6f2719869ea8d4a694d32f1692e468" },
-  { symbol = "build_checkpoint_with_chain_frontier_at", sha256 = "81506eb7ba6b59223748f4a682a31131bbb4c4850aae334fb603679765f7c826" },
+  { symbol = "build_checkpoint_with_chain_frontier_at", sha256 = "142018cec6b882a4193d304437790e421fc755845905ee05d0b2f12d94460edd" },
 ]
 
 # TLA records are abstraction anchors. Their hashes force model review when the
