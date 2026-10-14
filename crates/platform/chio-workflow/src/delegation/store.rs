@@ -305,8 +305,7 @@ impl DelegationStore {
             )
             .optional()?;
         let permit = if let Some(body) = existing {
-            serde_json::from_str::<Signed<DispatchPermit>>(&body)
-                .map_err(|e| Error::Invalid(e.to_string()))?
+            decode::<Signed<DispatchPermit>>(&body)?
         } else {
             let permit = Signed::sign(
                 DispatchPermit {
@@ -342,6 +341,11 @@ impl DelegationStore {
 fn encode(value: &impl serde::Serialize) -> Result<String> {
     String::from_utf8(canonical(value)?).map_err(|e| Error::Invalid(e.to_string()))
 }
+fn decode<T: serde::de::DeserializeOwned>(text: &str) -> Result<T> {
+    chio_core::canonical::UntrustedJsonText::from_wire(text.as_bytes(), MAX_ENVELOPE_BYTES)
+        .and_then(|text| text.decode_signed())
+        .map_err(|error| Error::Invalid(error.to_string()))
+}
 fn insert(
     connection: &Connection,
     slot: &WorkSlot,
@@ -359,8 +363,7 @@ fn read(connection: &Connection, id: &str) -> Result<Option<Row>> {
     }).optional()?;
     raw.map(
         |(body, parent, root, allocated, selection, revision, dispatched)| {
-            let slot: WorkSlot =
-                serde_json::from_str(&body).map_err(|e| Error::Invalid(e.to_string()))?;
+            let slot: WorkSlot = decode(&body)?;
             slot.validate()?;
             if slot.id != id || dispatched > 1 {
                 return invalid("stored slot identity/state");
@@ -372,9 +375,7 @@ fn read(connection: &Connection, id: &str) -> Result<Option<Row>> {
             if allocated > slot.contract.max_units {
                 return invalid("stored allocation");
             }
-            let selection = selection
-                .map(|s| serde_json::from_str(&s).map_err(|e| Error::Invalid(e.to_string())))
-                .transpose()?;
+            let selection = selection.map(|s| decode(&s)).transpose()?;
             Ok(Row {
                 slot,
                 parent,

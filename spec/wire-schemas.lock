@@ -5490,6 +5490,26 @@ files = ["crates/trust/chio-weights/src/lineage.rs"]
 first_seen = "15d154f6c9"
 
 [[schema]]
+value = "chio.work-dispatch-permit.v1"
+files = ["crates/platform/chio-workflow/src/delegation/types.rs"]
+first_seen = "160e8efd81"
+
+[[schema]]
+value = "chio.work-offer.v1"
+files = ["crates/platform/chio-workflow/src/delegation/types.rs"]
+first_seen = "160e8efd81"
+
+[[schema]]
+value = "chio.work-selection.v1"
+files = ["crates/platform/chio-workflow/src/delegation/types.rs"]
+first_seen = "160e8efd81"
+
+[[schema]]
+value = "chio.work-subdivision.v1"
+files = ["crates/platform/chio-workflow/src/delegation/types.rs"]
+first_seen = "160e8efd81"
+
+[[schema]]
 value = "chio.workflow-receipt.v1"
 files = ["crates/platform/chio-workflow/src/receipt.rs"]
 first_seen = "11e573d2d7"
