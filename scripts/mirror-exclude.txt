@@ -16,6 +16,10 @@ docs/papers/**
 docs/market/open-agent-work/**
 # Workflow that validates the withheld paper artifact.
 .github/workflows/paper-artifact-check.yml
+# Research workspaces that read withheld research fixtures, and their workflow.
+labs/kernel-work-composition/**
+labs/kernel-work-families/**
+.github/workflows/research-workspaces.yml
 docs/reference/COMPETITIVE_LANDSCAPE.md
 docs/guards/02-WASM-RUNTIME-LANDSCAPE.md
 formal/experiments/**
