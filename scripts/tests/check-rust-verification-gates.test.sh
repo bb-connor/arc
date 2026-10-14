@@ -31,7 +31,6 @@ for script in \
   check-kani-smoke.sh \
   check-creusot-core.sh \
   check-kani-core.sh \
-  check-kani-public-core.sh \
   run-kani-manifest.sh
 do
   cat >"${fixture}/scripts/${script}" <<'SH'
@@ -73,13 +72,8 @@ if [[ "$(grep -v '^[[:space:]]*$' "${tmp_dir}/strict.out" | tail -n 2)" != "${ex
   cat "${tmp_dir}/strict.out" >&2
   exit 1
 fi
-if [[ "$(grep -c '^run-kani-manifest.sh --lane pr --exclude-crate chio-kernel-core$' "${log}")" -ne 1 ]]; then
-  echo "strict Rust verification did not execute the non-core manifest runner exactly once" >&2
-  cat "${log}" >&2
-  exit 1
-fi
-if [[ "$(grep -c '^check-kani-public-core.sh ' "${log}")" -ne 1 ]]; then
-  echo "strict Rust verification did not own exactly one public-core invocation" >&2
+if [[ "$(grep -c '^run-kani-manifest.sh --lane pr$' "${log}")" -ne 1 ]]; then
+  echo "strict Rust verification did not execute the manifest runner exactly once" >&2
   cat "${log}" >&2
   exit 1
 fi

@@ -18,16 +18,14 @@ schema = "chio.kani.multi-crate.v1"
 #   * lane = "pr"      Runs on scoped PR changes and in the nightly sweep.
 #   * lane = "nightly" Runs only in the nightly Kani sweep.
 #
-# This file is the source of truth for the multi-crate sweep. The public-core
-# runner reads `formal/rust-verification/kani-public-harnesses.toml`; the
-# chio-kernel-core entries below mirror its PR lane for multi-crate consumers.
-# `scripts/tests/check-kani-public-core.test.sh` fails if the two lists drift.
+# This file is the only Kani harness registry. Every lane, unwind bound and
+# reachability posture is declared here and run by
+# `scripts/run-kani-manifest.sh`.
 #
 # Adding a harness:
 #   1. Land the `#[kani::proof]` in `crates/<crate>/src/<file>.rs`,
 #      gated by `#[cfg(kani)]`.
-#   2. Append a `[[harness]]` block here. For chio-kernel-core, also update the
-#      public-core registry.
+#   2. Append a `[[harness]]` block here.
 #   3. The manifest runner auto-iterates; no workflow edit required.
 #
 # Schema:
@@ -44,11 +42,9 @@ schema = "chio.kani.multi-crate.v1"
 # ---------------------------------------------------------------------
 # chio-kernel-core baseline floor
 # ---------------------------------------------------------------------
-# Mirrors `[lanes.pr]` of formal/rust-verification/kani-public-harnesses.toml.
-# Per-harness wall-clock figures (Apple M-series, hot cargo cache,
-# kani 0.67.0): see that file's comment block. CI runner overhead is
-# typically 2-3x; the heaviest harness (`public_verify_capability...`)
-# is ~31s locally and stays well under the 1800s cap.
+# The heaviest harness (`public_verify_capability...`) takes ~31s locally
+# (Apple M-series, hot cargo cache, kani 0.67.0); CI runner overhead is
+# typically 2-3x, well under the 1800s cap.
 
 [[harness]]
 crate = "chio-kernel-core"

@@ -777,7 +777,7 @@ Source file: `crates/economy/chio-web3/src/kani_public_harnesses.rs`.
 
 Source file:
 `crates/economy/chio-open-market/src/kani_public_harnesses.rs`. The
-multi-crate runner reads `.kani/harnesses.toml`; this harness is also named in
+multi-crate runner reads `.kani/harnesses.toml`; its covered symbol is listed in
 `formal/rust-verification/kani-public-harnesses.toml` and the proof manifest.
 
 | Property | Source | Rust path constrained | Assumption discharge | One-line description |

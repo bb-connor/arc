@@ -45,8 +45,6 @@ def result() -> dict:
 
 
 class ReachabilityTests(unittest.TestCase):
-    runner_kind = "multi"
-
     def run_proof(
         self,
         document: dict | str | None,
@@ -82,34 +80,6 @@ require_cover = {require_cover}
             if key_hex is not None:
                 with manifest.open("a") as stream:
                     stream.write(f"public_key_hex_unwind = {key_hex}\n")
-            source = work / "source.rs"
-            source.write_text("#[kani::proof]\npub fn proof_target() {}\n")
-            if self.runner_kind == "core":
-                covers = (
-                    '["proof_target"]'
-                    if require_cover == "true"
-                    else "[]"
-                    if require_cover == "false"
-                    else require_cover
-                )
-                checks = '["proof_target"]' if unwinding == "true" else "[]"
-                manifest.write_text(f"""schema = "chio.kani-public-harnesses.v1"
-crate = "chio-kernel-core"
-script = "scripts/check-kani-public-core.sh"
-unwinding_checks = {checks}
-cover_required = {covers}
-memcmp_unwind = {"{}" if memcmp is None else '{ "proof_target" = ' + memcmp + " }"}
-public_key_eq_unwind = {"{}" if key_eq is None else '{ "proof_target" = ' + key_eq + " }"}
-{config_extra}
-harness_groups = []
-covered_symbols = []
-[lanes.pr]
-description = "test"
-harnesses = ["proof_target"]
-[lanes.nightly_only]
-description = "reserved"
-harnesses = []
-""")
             fixture = work / "result.json"
             if document is not None:
                 fixture.write_text(
@@ -155,16 +125,9 @@ sys.exit(int(os.environ["KANI_TEST_EXIT"]))
                 "KANI_TEST_EXIT": str(cargo_exit),
                 "KANI_TEST_KEY_EQ": key_eq or "",
                 "KANI_TEST_KEY_HEX": key_hex or "",
-                "KANI_PUBLIC_HARNESSES_MANIFEST": str(manifest),
-                "KANI_PUBLIC_HARNESSES_SOURCE": str(source),
             }
-            runner = (
-                "scripts/run-kani-manifest.sh"
-                if self.runner_kind == "multi"
-                else "scripts/check-kani-public-core.sh"
-            )
             return subprocess.run(
-                ["bash", str(ROOT / runner), "--lane", "pr"],
+                ["bash", str(ROOT / "scripts/run-kani-manifest.sh"), "--lane", "pr"],
                 check=False,
                 env=env,
                 cwd=ROOT,
@@ -302,10 +265,6 @@ sys.exit(int(os.environ["KANI_TEST_EXIT"]))
 
     def test_underlying_kani_failure_is_preserved(self) -> None:
         self.assertEqual(self.run_proof(result(), cargo_exit=17).returncode, 17)
-
-
-class CoreReachabilityTests(ReachabilityTests):
-    runner_kind = "core"
 
 
 class HexProfileTests(unittest.TestCase):

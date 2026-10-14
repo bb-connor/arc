@@ -59,7 +59,7 @@ gate_commands = [
   "./scripts/tests/aeneas-equivalence.test.sh",
   "./scripts/check-rust-verification-gates.sh",
   "cargo xtask check formal-mirrors",
-  "./scripts/check-kani-public-core.sh",
+  "./scripts/run-kani-manifest.sh --lane pr --crate chio-kernel-core",
   "./scripts/run-kani-manifest.sh --lane pr --crate chio-open-market",
   "./scripts/check-adapter-no-bypass.sh",
   "cargo test -p chio-formal-diff-tests",

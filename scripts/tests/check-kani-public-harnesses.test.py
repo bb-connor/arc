@@ -175,17 +175,9 @@ def test_freshness_is_checked_reachable() -> None:
     ]
     if len(enrolled) != 1:
         raise AssertionError("production snapshot freshness is not enrolled exactly once")
-    for field, public_field, message in (
-        (
-            "unwinding_checks",
-            "unwinding_checks",
-            "proof must enable unwinding checks",
-        ),
-        (
-            "require_cover",
-            "cover_required",
-            "proof must require a reachable witness",
-        ),
+    for field, message in (
+        ("unwinding_checks", "proof must enable unwinding checks"),
+        ("require_cover", "proof must require a reachable witness"),
     ):
         with tempfile.TemporaryDirectory(prefix="chio-kani-freshness-") as raw:
             source, multi, public, trusts = copied_fixture(Path(raw))
@@ -193,12 +185,9 @@ def test_freshness_is_checked_reachable() -> None:
             row = next(row for row in document["harness"] if row["harness"] == name)
             row[field] = False
             write_toml(multi, document)
-            public_document = tomllib.loads(public.read_text())
-            public_document[public_field].remove(name)
-            write_toml(public, public_document)
             require_failure(
                 invoke(source, multi, public, trust_sources=trusts),
-                f"coordinated freshness {field} downgrade",
+                f"freshness {field} downgrade",
                 message,
             )
 
@@ -231,7 +220,10 @@ def main() -> int:
                 shutil.copyfile(original, work / f"{crate}.rs")
 
         test_trust_bound_drift()
-        for surface in ("multi", "public"):
+        for surface, message in (
+            ("multi", "unknown keys"),
+            ("public", "must hold exactly the keys"),
+        ):
             reset()
             path = multi_manifest if surface == "multi" else public_manifest
             document = tomllib.loads(path.read_text())
@@ -243,8 +235,19 @@ def main() -> int:
             require_failure(
                 invoke(source, multi_manifest, public_manifest),
                 "unknown enrollment key",
-                "unknown keys",
+                message,
             )
+        reset()
+        with public_manifest.open("a") as handle:
+            handle.write(
+                '\n[lanes.pr]\ndescription = "pr"\n'
+                'harnesses = ["verify_receipt_roundtrip"]\n'
+            )
+        require_failure(
+            invoke(source, multi_manifest, public_manifest),
+            "public manifest declaring harness lanes",
+            "must hold exactly the keys",
+        )
         reset()
         for mappings in ({}, {"chio-weights": work / "chio-weights.rs"}):
             require_failure(
@@ -406,7 +409,9 @@ def main() -> int:
         )
 
         reset()
-        replace_once(public_manifest, f"{receipt} = 66", f"{receipt} = 8")
+        head, tail = multi_manifest.read_text().split(f'harness = "{receipt}"', 1)
+        tail = tail.replace("memcmp_unwind = 66", "memcmp_unwind = 8", 1)
+        multi_manifest.write_text(head + f'harness = "{receipt}"' + tail)
         require_failure(
             invoke(source, multi_manifest, public_manifest),
             "truncated key comparison",
@@ -415,7 +420,11 @@ def main() -> int:
 
         reset()
         hash_receipt = "public_sign_receipt_accepts_matching_content_hash"
-        replace_once(public_manifest, f"{hash_receipt} = 8", f"{hash_receipt} = 7")
+        head, tail = multi_manifest.read_text().split(
+            f'harness = "{hash_receipt}"', 1
+        )
+        tail = tail.replace("public_key_eq_unwind = 8", "public_key_eq_unwind = 7", 1)
+        multi_manifest.write_text(head + f'harness = "{hash_receipt}"' + tail)
         require_failure(
             invoke(source, multi_manifest, public_manifest),
             "key recursion profile drift",
@@ -432,14 +441,6 @@ def main() -> int:
             invoke(source, multi_manifest, public_manifest),
             "hash loop bound drift",
             "loop bound 66",
-        )
-
-        reset()
-        replace_once(public_manifest, "cover_required = [", "obsolete_covers = [")
-        require_failure(
-            invoke(source, multi_manifest, public_manifest),
-            "removed public-core cover requirement",
-            "required cover posture differs",
         )
 
         reset()
@@ -467,18 +468,6 @@ def main() -> int:
         )
 
         reset()
-        replace_once(
-            public_manifest,
-            '  "verify_replay_fingerprint_uniqueness",\n  "verify_family_binding_preservation",',
-            '  "verify_replay_fingerprint_uniqueness",',
-        )
-        require_failure(
-            invoke(source, multi_manifest, public_manifest),
-            "formal PR-lane deletion mutation",
-            "formal lanes.pr set",
-        )
-
-        reset()
         old_name = "verify_threshold_distinct_signers"
         new_name = "verify_threshold_unique_signers"
         replace_once(source, f"pub fn {old_name}()", f"pub fn {new_name}()")
@@ -486,11 +475,6 @@ def main() -> int:
             multi_manifest,
             f'harness = "{old_name}"',
             f'harness = "{new_name}"',
-        )
-        replace_once(
-            public_manifest,
-            f'  "{old_name}",',
-            f'  "{new_name}",',
         )
         require_failure(
             invoke(source, multi_manifest, public_manifest),

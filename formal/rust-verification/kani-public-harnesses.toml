@@ -1,30 +1,8 @@
 schema = "chio.kani-public-harnesses.v1"
 crate = "chio-kernel-core"
-script = "scripts/check-kani-public-core.sh"
-# Named harnesses omit the legacy `--no-unwinding-checks` runner flag.
-unwinding_checks = [
-  "public_sign_receipt_rejects_kernel_key_mismatch_before_signing",
-  "public_sign_receipt_accepts_matching_kernel_key",
-  "public_sign_receipt_refuses_content_hash_mismatch",
-  "public_sign_receipt_accepts_matching_content_hash",
-  "verify_family_binding_preservation",
-  "verify_oracle_inclusion_walk_parity",
-  "verify_revocation_snapshot_timestamp_freshness",
-]
-cover_required = [
-  "public_sign_receipt_rejects_kernel_key_mismatch_before_signing",
-  "public_sign_receipt_accepts_matching_kernel_key",
-  "public_sign_receipt_refuses_content_hash_mismatch",
-  "public_sign_receipt_accepts_matching_content_hash",
-  "verify_family_binding_preservation",
-  "verify_revocation_snapshot_timestamp_freshness",
-]
 
-# Bound the full key comparison while retaining the harness recursion bound.
-memcmp_unwind = { public_sign_receipt_rejects_kernel_key_mismatch_before_signing = 66, public_sign_receipt_accepts_matching_kernel_key = 66 }
-
-# Discover the compiler symbol from fresh diagnostics; retain all unwind checks.
-public_key_eq_unwind = { public_sign_receipt_refuses_content_hash_mismatch = 8, public_sign_receipt_accepts_matching_content_hash = 8 }
+# Proof-coverage metadata for the chio-kernel-core harnesses registered in
+# `.kani/harnesses.toml`.
 
 # `harness_groups` is the flat-array catalog (one entry per logical edge or
 # algebraic property the harnesses exercise). Entries cover scope intersection
@@ -88,54 +66,3 @@ covered_symbols = [
   "chio_kernel_core::formal_core::delivery_denies_settlement",
   "chio_open_market::finding_slash_amount::compute_slash_allocation",
 ]
-
-# Lane assignment.
-#
-# Concrete receipt/hash fixtures require complete loop bounds and reachable
-# witnesses. Their cost is measured separately from the algebraic harnesses;
-# a legacy success with disabled unwinding checks is not reachability evidence.
-# Every registered harness remains in the PR lane with its existing time cap.
-#
-# The nightly Kani job runs the union of `lanes.pr` and
-# `lanes.nightly_only`; the pull-request workflow runs only `lanes.pr`.
-[lanes.pr]
-description = "Kani harnesses run on pull requests touching the scoped paths (full sweep)"
-harnesses = [
-  "public_verify_capability_rejects_untrusted_issuer_before_signature",
-  "public_normalized_scope_subset_rejects_widened_child",
-  "public_normalized_scope_subset_rejects_value_widened_child",
-  "public_normalized_scope_subset_rejects_identity_mismatch",
-  "public_resolve_matching_grants_rejects_out_of_scope_request",
-  "public_resolve_matching_grants_preserves_wildcard_matching",
-  "public_evaluate_rejects_untrusted_issuer_before_dispatch",
-  "public_sign_receipt_rejects_kernel_key_mismatch_before_signing",
-  "public_sign_receipt_accepts_matching_kernel_key",
-  "public_sign_receipt_refuses_content_hash_mismatch",
-  "public_sign_receipt_accepts_matching_content_hash",
-  "verify_scope_intersection_associative",
-  "verify_revocation_predicate_idempotent",
-  "verify_revocation_admission_projection",
-  "verify_delegation_chain_step",
-  "verify_receipt_roundtrip",
-  "verify_budget_checked_add_no_overflow",
-  "verify_budget_admission_projection",
-  "verify_reservation_ledger_terminal_classification",
-  "verify_reservation_ledger_conservation",
-  "verify_composite_quota_all_or_nothing",
-  "verify_quota_maximum_immutable",
-  "verify_captured_invocation_count_monotonic",
-  "verify_replay_fingerprint_uniqueness",
-  "verify_family_binding_preservation",
-  "verify_threshold_distinct_signers",
-  "verify_delegate_no_widen",
-  "verify_delegation_receipt_canonical",
-  "verify_revocation_view_freshness",
-  "verify_revocation_snapshot_timestamp_freshness",
-  "verify_inclusion_step_equivalence",
-  "verify_oracle_inclusion_walk_parity",
-  "public_delivery_contract_allow_implies_digest_match",
-]
-
-[lanes.nightly_only]
-description = "Slow Kani harnesses gated to the nightly lane (currently empty; reserved for future slow harnesses)"
-harnesses = []
