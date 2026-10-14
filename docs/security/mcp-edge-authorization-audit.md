@@ -58,7 +58,7 @@ package's unit-test target.
 | RS-05 | `401` responses MUST carry `WWW-Authenticate` with `resource_metadata`. | `oauth/bearer_auth.rs` `unauthorized_bearer_response`, `ProtectedResourceMetadata::bearer_challenge` | `chio-cli mcp_serve_http mcp_serve_http_rejects_jwt_with_wrong_audience` asserts `resource_metadata=` | PASS |
 | RS-06 | A request with no `Authorization` header receives the same `401` challenge. | `extract_bearer_token` | none in an OAuth mode; static bearer covered by `chio-cli mcp_serve_http mcp_serve_http_requires_auth_reuses_sessions_and_supports_delete` | GAP |
 | RS-07 | The challenge SHOULD carry `scope`. | `bearer_challenge` appends `scope` when `--auth-scope` is set | `chio-cli mcp_serve_http mcp_serve_http_rejects_jwt_with_wrong_audience` asserts `scope="mcp:invoke"` | PASS |
-| RS-08 | Protected resource metadata and `401` challenges SHOULD NOT name `offline_access`. | `--auth-scope` values are published unchanged | none | GAP |
+| RS-08 | Protected resource metadata and `401` challenges SHOULD NOT name `offline_access`. | `http_service_auth.rs` `build_remote_auth_mode` refuses `--auth-scope offline_access` at startup | `chio-mcp-remote lib hosted_tests::auth_config::remote_auth_config_rejects_offline_access_scope` | PASS |
 | RS-09 | Published authorization-server metadata agrees with the protected resource metadata (profile and issuer). | `http_service_auth.rs` `validate_chio_oauth_discovery_metadata_pair` | `chio-mcp-remote lib tests::chio_oauth_discovery_validation_rejects_profile_mismatch` covers the profile; the issuer-not-advertised refusal has no test | GAP |
 
 ### Token validation
@@ -72,14 +72,14 @@ package's unit-test target.
 | RS-14 | A token without `exp` is refused. | `JwtBearerVerifier::authenticate_token` and `IntrospectionBearerVerifier::session_auth_context_from_introspection` refuse a missing `exp` with `401`; local token exchange refuses a subject token without `exp` | `chio-mcp-remote lib tests::bearer_verifier::jwt_bearer_verifier_rejects_token_without_exp`; `chio-mcp-remote lib tests::bearer_verifier::introspection_bearer_verifier_rejects_token_without_exp`; `chio-mcp-remote lib tests::bearer_verifier::local_authorization_server_rejects_subject_token_without_exp` | PASS |
 | RS-15 | Invalid or inactive tokens MUST receive `401`. | `unauthorized_bearer_response` on every verifier refusal | `chio-mcp-remote lib hosted_tests::auth_flows::hosted_mcp_accepts_static_bearer_and_rejects_invalid_token`; `chio-mcp-remote lib tests::bearer_verifier::introspection_bearer_verifier_rejects_inactive_token`; `chio-mcp-remote lib tests::bearer_verifier::inbound_authority_jwt_unknown_empty_or_null_confirmation_never_becomes_bearer` | PASS |
 | RS-16 | Issuer mismatch is refused. | `http_service_auth.rs` `expected_bearer_issuer` resolves the issuer when the edge starts; both verifiers refuse a token whose `iss` is absent or differs from it | `chio-mcp-remote lib tests::bearer_verifier::jwt_bearer_verifier_rejects_issuer_mismatch`; `chio-mcp-remote lib tests::bearer_verifier::introspection_bearer_verifier_rejects_missing_or_mismatched_issuer` | PASS |
-| RS-17 | `401` challenges for a rejected token carry `error="invalid_token"` (OAuth 2.1 section 5.3, RFC 6750 section 3.1). | `bearer_challenge` emits `resource_metadata` and `scope` only | none; the parameter is not emitted | GAP |
+| RS-17 | `401` challenges for a rejected token carry `error="invalid_token"` (OAuth 2.1 section 5.3, RFC 6750 section 3.1). | `bearer_auth.rs` `unauthorized_bearer_response` emits `error="invalid_token"` in OAuth modes; a request without a token gets the challenge without `error` | `chio-mcp-remote lib tests::bearer_verifier::invalid_token_challenge_carries_error_invalid_token` | PASS |
 | RS-18 | Tokens MUST be sent in the `Authorization` header and never in the URI query. | `extract_bearer_token` reads only `Authorization: Bearer`; metadata publishes `bearer_methods_supported: ["header"]` | none | GAP |
 
 ### Scope
 
 | ID | Requirement | Implementation | Test | Status |
 | --- | --- | --- | --- | --- |
-| RS-19 | A token lacking a required scope is refused. Runtime insufficient scope SHOULD be `403` with `error="insufficient_scope"`, `scope` and `resource_metadata`. | Both verifiers require every `--auth-scope`; refusal is `401` without `error` | none; the status and challenge do not match the requirement | GAP |
+| RS-19 | A token lacking a required scope is refused. Runtime insufficient scope SHOULD be `403` with `error="insufficient_scope"`, `scope` and `resource_metadata`. | `bearer_auth.rs` `insufficient_scope_response` answers `403` with `error="insufficient_scope"`, the required `scope` and `resource_metadata` in both verifiers | `chio-mcp-remote lib tests::bearer_verifier::missing_required_scope_answers_403_insufficient_scope_challenge` | PASS |
 | RS-20 | Servers MUST account for scope hierarchies. | `--auth-scope` values are flat and matched exactly; Chio defines no scope that implies another | not applicable | N/A |
 
 ### No token passthrough and token handling
@@ -99,7 +99,7 @@ package's unit-test target.
 | ID | Requirement | Implementation | Test | Status |
 | --- | --- | --- | --- | --- |
 | RS-28 | Endpoints are served over HTTPS (OAuth 2.1 section 1.5). | The shared listener refuses a non-loopback plaintext bind unless `--allow-plaintext` names a protected proxy network | `chio-mcp-remote lib tests::revocation_transport::mcp_transport_denies_public_plaintext_before_policy_or_store_work` | PASS |
-| RS-29 | Advertised URLs (`resource`, `resource_metadata`, issuer, endpoints) use `https` unless the host is loopback. | `normalize_public_base_url` accepts any scheme | none | GAP |
+| RS-29 | Advertised URLs (`resource`, `resource_metadata`, issuer, endpoints) use `https` unless the host is loopback. | `normalize_public_base_url` refuses a base URL that is not `https` unless its host is `localhost` or a loopback address | `chio-mcp-remote lib hosted_tests::auth_config::public_base_url_rejects_non_https_non_loopback_scheme` | PASS |
 
 ## Local authorization server controls
 
@@ -145,14 +145,10 @@ change before it can pass.
 | RS-02 | `chio-mcp-remote lib oauth_edge_without_authorization_server_refuses_to_start` | |
 | RS-04 | `chio-cli mcp_serve_http mcp_serve_http_serves_protected_resource_metadata_at_root_well_known_uri` | |
 | RS-06 | `chio-mcp-remote lib hosted_mcp_oauth_edge_challenges_missing_token_with_resource_metadata` | |
-| RS-08 | `chio-mcp-remote lib remote_auth_config_rejects_offline_access_scope` | code |
 | RS-09 | `chio-mcp-remote lib chio_oauth_discovery_validation_rejects_unadvertised_issuer` | |
 | RS-11 | `chio-mcp-remote lib introspection_bearer_verifier_rejects_audience_mismatch` | |
-| RS-17 | `chio-mcp-remote lib invalid_token_challenge_carries_error_invalid_token` | code |
 | RS-18 | `chio-mcp-remote lib hosted_mcp_rejects_access_token_in_query_string` | |
-| RS-19 | `chio-mcp-remote lib missing_required_scope_answers_403_insufficient_scope_challenge` | code |
 | RS-21 | `chio-cli mcp_serve_http mcp_serve_http_wrapped_server_never_observes_inbound_bearer` (the mock server records its environment and every received message; the test asserts the token and its fingerprint appear in neither) | |
-| RS-29 | `chio-mcp-remote lib public_base_url_rejects_non_https_non_loopback_scheme` | code |
 | AS-01 | `chio-mcp-remote lib local_authorization_server_rejects_missing_or_plain_code_challenge`, plus `code_challenge_methods_supported == ["S256"]` in `mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange` | |
 | AS-03 | `chio-mcp-remote lib local_authorization_server_rejects_missing_resource` | |
 | AS-04 | `chio-mcp-remote lib local_authorization_server_rejects_token_resource_mismatch` | |
