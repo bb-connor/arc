@@ -26,7 +26,7 @@ impl LoadedSpec {
         guard_profile_identity: &str,
     ) -> Result<String, ProtectError> {
         let bytes = chio_core_types::canonical::canonical_json_bytes(&(
-            "chio-api-protect-local-policy-v2",
+            "chio-api-protect-local-policy-v1",
             chio_core_types::sha256_hex(self.content.as_bytes()),
             self.pinned,
             allow_anonymous_reads,
@@ -126,6 +126,20 @@ mod product_guard_tests {
             pinned: true,
         };
         assert_ne!(spec.policy_hash(false)?, other_spec.policy_hash(false)?);
+        Ok(())
+    }
+
+    #[test]
+    fn local_policy_hash_has_an_exact_v1_golden_vector() -> Result<(), ProtectError> {
+        let spec = LoadedSpec {
+            content: "openapi: 3.0.3".into(),
+            pinned: true,
+        };
+        let profile = chio_core_types::sha256_hex(b"changed-default-profile");
+        assert_eq!(
+            spec.policy_hash_with_guard_profile(false, &profile)?,
+            "8c3f7accbd566999ef0f431eab15fcb555f211fd05897b31670771c417a1d9ac"
+        );
         Ok(())
     }
 }

@@ -1,8 +1,11 @@
 use super::*;
 
+/// Every refusal here answers the client directly and never redirects: the
+/// redirect URI is trusted only once it matches a registration exactly.
 pub(super) fn validate_authorization_request(
     clock: &RemoteClock,
     request: &AuthorizationRequest,
+    clients: &HashMap<String, HashSet<String>>,
     supported_scopes: &[String],
     expected_resource: &str,
 ) -> Result<String, Response> {
@@ -13,14 +16,20 @@ pub(super) fn validate_authorization_request(
             "response_type must be code",
         ));
     }
-    if request.client_id.trim().is_empty() {
+    let redirect_uris = clients.get(&request.client_id).ok_or_else(|| {
+        oauth_token_error(
+            StatusCode::BAD_REQUEST,
+            OAuthError::InvalidRequest,
+            "unknown client_id",
+        )
+    })?;
+    if !redirect_uris.contains(&request.redirect_uri) {
         return Err(oauth_token_error(
             StatusCode::BAD_REQUEST,
             OAuthError::InvalidRequest,
-            "client_id must not be empty",
+            "redirect_uri is not registered for client_id",
         ));
     }
-    validate_redirect_uri(&request.redirect_uri)?;
     let resource = request.resource.clone().ok_or_else(|| {
         oauth_token_error(
             StatusCode::BAD_REQUEST,
@@ -61,36 +70,6 @@ pub(super) fn validate_authorization_request(
         parse_request_time_transaction_context(clock, request.chio_transaction_context.as_deref())?;
     let _ = resolve_requested_scopes(request.scope.as_deref(), supported_scopes)?;
     Ok(resource)
-}
-
-pub(super) fn validate_redirect_uri(redirect_uri: &str) -> Result<(), Response> {
-    let redirect = Url::parse(redirect_uri).map_err(|source| {
-        crate::input::with_source(
-            oauth_token_error(
-                StatusCode::BAD_REQUEST,
-                OAuthError::InvalidRequest,
-                "invalid redirect_uri",
-            ),
-            source,
-        )
-    })?;
-    let Some(host) = redirect.host_str() else {
-        return Err(oauth_token_error(
-            StatusCode::BAD_REQUEST,
-            OAuthError::InvalidRequest,
-            "invalid redirect_uri",
-        ));
-    };
-    let is_localhost = matches!(host, "localhost" | "127.0.0.1" | "::1");
-    if redirect.scheme() == "https" || (redirect.scheme() == "http" && is_localhost) {
-        Ok(())
-    } else {
-        Err(oauth_token_error(
-            StatusCode::BAD_REQUEST,
-            OAuthError::InvalidRequest,
-            "redirect_uri must use https or localhost",
-        ))
-    }
 }
 
 pub(super) fn resolve_requested_scopes(

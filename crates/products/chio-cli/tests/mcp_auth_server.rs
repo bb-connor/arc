@@ -227,6 +227,8 @@ fn spawn_http_server_with_local_auth_and_proxy(
         &audience,
         "--auth-scope",
         "mcp:invoke",
+        "--auth-client",
+        "https://client.example/app=http://localhost:7777/callback",
         "--admin-token",
         admin_token,
         "--signed-manifest",

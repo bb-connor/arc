@@ -174,6 +174,10 @@ pub enum RunnerError {
     NoResults { path: String },
 }
 
+/// The OAuth client every conformance peer and SDK flow authorizes as, with
+/// its one redirect URI, registered with the embedded authorization server.
+const CONFORMANCE_OAUTH_CLIENT: &str = "https://client.example/app=http://localhost:7777/callback";
+
 fn conformance_fixture_root_from_manifest_dir(manifest_dir: &Path) -> PathBuf {
     let workspace_root = manifest_dir
         .ancestors()
@@ -757,9 +761,11 @@ fn spawn_remote_edge(
                 .arg("--auth-jwt-audience")
                 .arg(format!("{public_base_url}/mcp"))
                 .arg("--auth-scope")
-                .arg(&options.auth_scope);
+                .arg(&options.auth_scope)
+                .arg("--auth-client")
+                .arg(CONFORMANCE_OAUTH_CLIENT);
             command_description.push_str(&format!(
-                " --public-base-url {} --auth-server-seed-file {} --auth-jwt-audience {}/mcp --auth-scope {} (admin via CHIO_ADMIN_TOKEN env)",
+                " --public-base-url {} --auth-server-seed-file {} --auth-jwt-audience {}/mcp --auth-scope {} --auth-client {CONFORMANCE_OAUTH_CLIENT} (admin via CHIO_ADMIN_TOKEN env)",
                 public_base_url,
                 runtime_state.auth_server_seed_path.display(),
                 public_base_url,

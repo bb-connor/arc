@@ -124,6 +124,7 @@ impl LocalAuthorizationServer {
         let resource = validate_authorization_request(
             &self.clock,
             request,
+            &self.clients,
             &self.supported_scopes,
             &self.default_audience,
         )?;
@@ -214,6 +215,7 @@ impl LocalAuthorizationServer {
         let resource = validate_authorization_request(
             &self.clock,
             &request,
+            &self.clients,
             &self.supported_scopes,
             &self.default_audience,
         )?;

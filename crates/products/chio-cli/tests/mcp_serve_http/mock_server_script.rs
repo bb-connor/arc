@@ -10,11 +10,22 @@ import sys
 import time
 
 CLIENT_CAPABILITIES = {}
-STARTUP_MARKER_PATH = sys.argv[2] if len(sys.argv) == 3 and sys.argv[1] == "--startup-marker" else None
+OPTIONS = dict(zip(sys.argv[1::2], sys.argv[2::2]))
+STARTUP_MARKER_PATH = OPTIONS.get("--startup-marker")
+OBSERVATION_LOG_PATH = OPTIONS.get("--observation-log")
 
 if STARTUP_MARKER_PATH:
     with open(STARTUP_MARKER_PATH, "a", encoding="utf-8") as handle:
         handle.write(f"{os.getpid()}\n")
+
+
+def observe(record):
+    if OBSERVATION_LOG_PATH:
+        with open(OBSERVATION_LOG_PATH, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record) + "\n")
+
+
+observe({"environ": dict(os.environ), "argv": sys.argv})
 
 TOOLS = [
     {
@@ -124,6 +135,7 @@ def respond(payload):
 for line in native_io:
     if not line.strip():
         continue
+    observe({"received": line})
 
     message = json.loads(line)
     method = message.get("method")

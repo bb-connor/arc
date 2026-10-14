@@ -472,7 +472,7 @@ def _validate_structured_surface(root: Path) -> None:
 def _validate_ci_gate(root: Path) -> None:
     body = _read(root / ".github/workflows/ci.yml")
     for command in CI_GATE_COMMANDS:
-        if body.count(command) != 1:
+        if body.count(f"run_gate {command}\n") != 1:
             raise ContractError(f"CI must run exactly once: {command}")
 
 

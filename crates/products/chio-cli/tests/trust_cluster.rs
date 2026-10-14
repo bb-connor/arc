@@ -34,6 +34,9 @@ use authority_fixture::provision_cluster_authorities;
 
 #[path = "trust_cluster/health.rs"]
 mod health;
+#[allow(dead_code)]
+#[path = "support/trust_health.rs"]
+mod trust_health;
 use health::wait_for_node_health;
 
 #[path = "trust_cluster/revocation_proof.rs"]

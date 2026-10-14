@@ -68,7 +68,7 @@ impl fmt::Display for CageMigrationPostureDigestError {
 
 impl core::error::Error for CageMigrationPostureDigestError {}
 
-/// Compute the canonical v2 posture for one exact native cage contract.
+/// Compute the canonical posture digest for one exact native cage contract.
 #[cfg(feature = "std")]
 pub fn cage_migration_posture_digest(
     deployment_id: &RecordId,

@@ -1,5 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+#[path = "support/trust_health.rs"]
+mod trust_health;
+
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -119,21 +122,7 @@ fn wait_for_trust_service(
                 read_child_stderr(&mut service.child)
             ));
         }
-        // Receipt reads refuse with 503 until the query snapshot publishes
-        // its first version, so readiness includes the snapshot.
-        let ready = client
-            .get(format!("{base_url}/health"))
-            .send()
-            .ok()
-            .filter(|response| response.status() == reqwest::StatusCode::OK)
-            .and_then(|response| response.json::<Value>().ok())
-            .is_some_and(|health| {
-                matches!(
-                    health["receiptQuerySnapshot"]["state"].as_str(),
-                    Some("ready" | "unconfigured")
-                )
-            });
-        if ready {
+        if trust_health::trust_service_ready(client, base_url) {
             return Ok(());
         }
         std::thread::sleep(std::time::Duration::from_millis(100));

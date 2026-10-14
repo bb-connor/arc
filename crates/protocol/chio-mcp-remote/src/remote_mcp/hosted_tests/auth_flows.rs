@@ -372,3 +372,159 @@ fn local_authorization_server_rejects_approval_without_consent_nonce() {
         );
     }
 }
+
+#[test]
+fn local_authorization_server_rejects_unregistered_redirect_uri() {
+    let server = start_local_oauth_http_server("admin-token");
+    let metadata: Value = server
+        .get_protected_resource_metadata()
+        .json()
+        .expect("protected resource metadata");
+    let resource = metadata["resource"].as_str().expect("resource").to_string();
+    let challenge = pkce_challenge("chio-auth-verifier");
+    for (client_id, redirect_uri) in [
+        (
+            "https://unknown.example/app",
+            "http://localhost:7777/callback",
+        ),
+        ("https://client.example/app", "http://localhost:7777/other"),
+        (
+            "https://client.example/app",
+            "http://localhost:7777/callback/",
+        ),
+        (
+            "https://client.example/app",
+            "http://127.0.0.1:7777/callback",
+        ),
+    ] {
+        let refused = server
+            .client
+            .get(format!("{}/oauth/authorize", server.base_url))
+            .query(&[
+                ("response_type", "code"),
+                ("client_id", client_id),
+                ("redirect_uri", redirect_uri),
+                ("state", "state-123"),
+                ("resource", resource.as_str()),
+                ("scope", "mcp:invoke"),
+                ("code_challenge", challenge.as_str()),
+                ("code_challenge_method", "S256"),
+            ])
+            .send()
+            .expect("send authorize request");
+        assert_eq!(
+            refused.status(),
+            reqwest::StatusCode::BAD_REQUEST,
+            "{client_id} {redirect_uri}"
+        );
+        assert!(refused.headers().get(LOCATION).is_none());
+        let body: Value = refused.json().expect("refusal json");
+        assert_eq!(
+            body,
+            json!({
+                "error": "invalid_request",
+                "error_description": "urn:chio:error:transport:invalid-request-shape",
+            })
+        );
+    }
+}
+
+#[test]
+fn hosted_mcp_serves_protected_resource_metadata_at_root_well_known_uri() {
+    let server = start_local_oauth_http_server("admin-token");
+    let path_suffixed: Value = server
+        .get_protected_resource_metadata()
+        .json()
+        .expect("path-suffixed metadata");
+    let root = server
+        .client
+        .get(format!(
+            "{}/.well-known/oauth-protected-resource",
+            server.base_url
+        ))
+        .send()
+        .expect("fetch root metadata");
+    assert_eq!(root.status(), reqwest::StatusCode::OK);
+    let root: Value = root.json().expect("root metadata");
+    assert_eq!(root, path_suffixed);
+    assert_eq!(
+        root["authorization_servers"],
+        json!([format!("{}/oauth", server.base_url)])
+    );
+}
+
+#[test]
+fn hosted_mcp_oauth_edge_challenges_missing_token_with_resource_metadata() {
+    let server = start_local_oauth_http_server("admin-token");
+    let response = server.post_raw(
+        None,
+        None,
+        "application/json, text/event-stream",
+        "application/json",
+        &initialize_request(1),
+    );
+    assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        response
+            .headers()
+            .get("WWW-Authenticate")
+            .expect("www-authenticate header")
+            .to_str()
+            .expect("challenge string"),
+        format!(
+            "Bearer resource_metadata=\"{}/.well-known/oauth-protected-resource/mcp\", scope=\"mcp:invoke\"",
+            server.base_url
+        )
+    );
+}
+
+#[test]
+fn hosted_mcp_rejects_access_token_in_query_string() {
+    let server = start_local_oauth_http_server("admin-token");
+    let metadata: Value = server
+        .get_protected_resource_metadata()
+        .json()
+        .expect("protected resource metadata");
+    assert_eq!(metadata["bearer_methods_supported"], json!(["header"]));
+    let resource = metadata["resource"].as_str().expect("resource").to_string();
+    let redirect_uri = "http://localhost:7777/callback";
+    let code = authorize_code(&server, redirect_uri, &resource, "chio-auth-verifier");
+    let token_response: Value = exchange_code(
+        &server,
+        &code,
+        redirect_uri,
+        "chio-auth-verifier",
+        &resource,
+    )
+    .json()
+    .expect("token response");
+    let access_token = token_response["access_token"]
+        .as_str()
+        .expect("access token");
+    let response = server
+        .client
+        .post(format!("{}/mcp", server.base_url))
+        .query(&[("access_token", access_token)])
+        .header("Accept", "application/json, text/event-stream")
+        .header("Content-Type", "application/json")
+        .body(serde_json::to_vec(&initialize_request(2)).expect("serialize request"))
+        .send()
+        .expect("send query-token request");
+    assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        response
+            .headers()
+            .get("WWW-Authenticate")
+            .expect("www-authenticate header")
+            .to_str()
+            .expect("challenge string"),
+        format!(
+            "Bearer resource_metadata=\"{}/.well-known/oauth-protected-resource/mcp\", scope=\"mcp:invoke\"",
+            server.base_url
+        )
+    );
+    assert!(!server
+        .initialize_session_with_token(access_token)
+        .id
+        .is_empty());
+}

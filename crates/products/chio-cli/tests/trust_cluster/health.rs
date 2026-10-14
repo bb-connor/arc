@@ -9,7 +9,10 @@ pub(super) fn wait_for_node_health(client: &Client, base_url: &str, token: &str,
     wait_until_with_diagnostics(
         label,
         Duration::from_secs(30),
-        || try_get_json(client, &format!("{base_url}/health"), token).is_some(),
+        || {
+            try_get_json(client, &format!("{base_url}/health"), token)
+                .is_some_and(|health| super::trust_health::receipt_reads_ready(&health))
+        },
         || {
             json!({
                 "baseUrl": base_url,
