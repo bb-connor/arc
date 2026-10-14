@@ -89,8 +89,9 @@ class EntrypointTests(unittest.TestCase):
                     with mock.patch.object(module.urllib.request, "urlopen", trust_service):
                         with mock.patch.object(module.os, "getuid", lambda: 10001):
                             with mock.patch.object(module.os, "getgid", lambda: 10001):
-                                with mock.patch.object(module.os, "execve", lambda *args: calls.append(args)):
-                                    module.main()
+                                with mock.patch.object(module.os, "getgroups", lambda: [10003, 10001, 10002]):
+                                    with mock.patch.object(module.os, "execve", lambda *args: calls.append(args)):
+                                        module.main()
             self.keyrings = {}
             self.keyring_modes = {}
             keyring = os.path.join(provision_dir, "resume-hmac-keyring.json")
@@ -145,6 +146,8 @@ class EntrypointTests(unittest.TestCase):
         self.assertEqual(command[command.index("--target") + 1], target)
         self.assertEqual(command[command.index("--target-arg") + 1], module.MOCK_SERVER)
         self.assertEqual(command[command.index("--execution-uid") + 1], "10001")
+        self.assertEqual(command[command.index("--execution-gid") + 1], "10001")
+        self.assertEqual([command[i + 1] for i, value in enumerate(command) if value == "--execution-supplementary-gid"], ["10002", "10003"])
         self.assertEqual(command[command.index("--server-id") + 1], "wrapped-http-mock")
         for credential in DISTINCT:
             self.assertNotIn(credential, environment)
@@ -194,6 +197,12 @@ class EntrypointTests(unittest.TestCase):
                 second = module.provision_launch("test", "Test", "1")
                 self.assertEqual(marker.read_bytes(), b"retained")
                 self.assertEqual(pathlib.Path(second["resume_hmac_keyring"]).read_bytes(), keyring)
+
+    def test_the_root_supplementary_group_refuses_before_provisioning(self):
+        module = load_entrypoint()
+        with mock.patch.object(module.os, "getgid", lambda: 10001), mock.patch.object(module.os, "getgroups", lambda: [10001, 0]):
+            with self.assertRaisesRegex(SystemExit, "the demo edge must not hold the root supplementary group"):
+                module.supplementary_gid_arguments()
 
     def test_relative_read_grants_are_refused(self):
         module = load_entrypoint()
