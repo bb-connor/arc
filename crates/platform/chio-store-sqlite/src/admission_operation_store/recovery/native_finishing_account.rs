@@ -977,15 +977,14 @@ impl NativeFinishingAccountV1 {
     }
 }
 
-/// The largest record any version of an account with this immutable identity,
+/// The widest record any version of an account with this immutable identity,
 /// roster and transition loans can encode to. Between versions only the
 /// revision, state, dispositions, transition price, count and page recipe,
 /// the purposes' page recipes and the Process enrollment change; each is taken
 /// at its widest encoding (every integer at `u64::MAX`, the longest state and
-/// disposition, every recipe and the selected enrollment present). The
-/// account writer refuses any version above it, so a transition priced at this
-/// bound covers every account rewrite the original can make.
-pub(in crate::admission_operation_store) fn native_finishing_account_bound(
+/// disposition, every recipe and the selected enrollment present). It is not
+/// capped: an older account's hypothetical widest encoding may exceed the cap.
+fn native_finishing_account_encoded_maximum(
     identity: &NativeFinishingIdentityV1,
     liabilities: &[NativeFinishingLiabilityV1],
     transition_row_loans: &[NativeTableRowLoan],
@@ -1029,14 +1028,41 @@ pub(in crate::admission_operation_store) fn native_finishing_account_bound(
                 event_digest: widest_digest.clone(),
             }),
     };
-    let bytes = u64::try_from(encode(&widest)?.len())
-        .map_err(|_| invariant("native finishing account bound exhausted"))?;
+    u64::try_from(encode(&widest)?.len())
+        .map_err(|_| invariant("native finishing account bound exhausted"))
+}
+
+/// The bound a new account's transitions are priced at: its widest version
+/// must fit the record cap, or the original cannot be prepared at all.
+pub(in crate::admission_operation_store) fn native_finishing_account_bound(
+    identity: &NativeFinishingIdentityV1,
+    liabilities: &[NativeFinishingLiabilityV1],
+    transition_row_loans: &[NativeTableRowLoan],
+) -> Result<u64, AdmissionOperationStoreError> {
+    let bytes =
+        native_finishing_account_encoded_maximum(identity, liabilities, transition_row_loans)?;
     if bytes > NATIVE_FINISHING_ACCOUNT_MAX_BYTES {
         return Err(invariant(
             "native finishing account exceeds its record bound",
         ));
     }
     Ok(bytes)
+}
+
+/// The bound every later version of a retained account is written within.
+/// An account priced at its widest encoding keeps that bound; one retained
+/// from before that sizing was priced at the record cap and keeps the cap.
+/// The smaller of the two covers both, so no supported successor gains a
+/// refusal its retained price already funds.
+fn native_finishing_successor_bound(
+    account: &NativeFinishingAccountV1,
+) -> Result<u64, AdmissionOperationStoreError> {
+    Ok(native_finishing_account_encoded_maximum(
+        &account.identity,
+        &account.liabilities,
+        &account.transitions.row_loans,
+    )?
+    .min(NATIVE_FINISHING_ACCOUNT_MAX_BYTES))
 }
 
 /// Exact current account with its protected record version.
@@ -1348,14 +1374,7 @@ pub(in crate::admission_operation_store) fn persist_native_finishing_transition(
         &native_finishing_account_key(&next.identity.operation_id),
         &next.identity.flow_scope_digest,
         "command",
-        &bounded(
-            next,
-            native_finishing_account_bound(
-                &next.identity,
-                &next.liabilities,
-                &next.transitions.row_loans,
-            )?,
-        )?,
+        &bounded(next, native_finishing_successor_bound(next)?)?,
         None,
     )?;
     persist_bank(tx, owner, &bank)?;
