@@ -2,7 +2,7 @@
 
 use std::fs;
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -121,7 +121,11 @@ fn native_conformance_suite_runs_against_fixture() {
 
 #[test]
 fn native_standards_artifacts_cover_required_categories_and_references() {
-    let repo_root = default_repo_root();
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(3)
+        .expect("workspace root")
+        .to_path_buf();
     let scenarios =
         load_native_scenarios_from_dir(repo_root.join("tests/conformance/native/scenarios"))
             .expect("load scenarios");
