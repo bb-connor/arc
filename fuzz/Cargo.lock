@@ -2912,6 +2912,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core",
  "chio-workflow-preflight",
+ "rusqlite",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
