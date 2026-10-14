@@ -78,7 +78,7 @@ impl SqliteReceiptStore {
                     grants_json TEXT NOT NULL,
                     delegation_depth INTEGER NOT NULL DEFAULT 0,
                     parent_capability_id TEXT,
-                    signed_capability_json TEXT
+                    signed_capability_json TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS credit_bonds (
@@ -329,11 +329,7 @@ impl SqliteReceiptStore {
                 delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
                 parent_capability_id: row.get::<_, Option<String>>(7)?,
                 federated_parent_capability_id: None,
-                provenance: if signed_capability.is_some() {
-                    crate::CapabilitySnapshotProvenance::SignedToken
-                } else {
-                    crate::CapabilitySnapshotProvenance::LegacyProjection
-                },
+                provenance: crate::CapabilitySnapshotProvenance::SignedToken,
                 signed_capability,
             })
         }
@@ -407,11 +403,7 @@ impl SqliteReceiptStore {
                         delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
                         parent_capability_id: row.get::<_, Option<String>>(7)?,
                         federated_parent_capability_id: None,
-                        provenance: if signed_capability.is_some() {
-                            crate::CapabilitySnapshotProvenance::SignedToken
-                        } else {
-                            crate::CapabilitySnapshotProvenance::LegacyProjection
-                        },
+                        provenance: crate::CapabilitySnapshotProvenance::SignedToken,
                         signed_capability,
                     })
                 },

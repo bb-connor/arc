@@ -1392,8 +1392,8 @@ impl SqliteReceiptStore {
                 delegation_depth     INTEGER NOT NULL DEFAULT 0,
                 parent_capability_id TEXT REFERENCES capability_lineage(capability_id),
                 federated_parent_capability_id TEXT,
-                provenance TEXT NOT NULL DEFAULT 'legacy_projection'
-                    CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+                provenance TEXT NOT NULL
+                    CHECK (provenance IN ('signed_token', 'synthetic_anchor')),
                 signed_capability_json TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_capability_lineage_subject
@@ -1456,8 +1456,8 @@ impl SqliteReceiptStore {
                 delegation_depth INTEGER NOT NULL DEFAULT 0,
                 parent_capability_id TEXT,
                 federated_parent_capability_id TEXT,
-                provenance TEXT NOT NULL DEFAULT 'legacy_projection'
-                    CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+                provenance TEXT NOT NULL
+                    CHECK (provenance IN ('signed_token', 'synthetic_anchor')),
                 signed_capability_json TEXT,
                 PRIMARY KEY (share_id, capability_id)
             );

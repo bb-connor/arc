@@ -822,8 +822,8 @@ pub(super) fn create_archive_schema(
             expires_at INTEGER NOT NULL, grants_json TEXT NOT NULL,
             delegation_depth INTEGER NOT NULL DEFAULT 0, parent_capability_id TEXT,
             federated_parent_capability_id TEXT,
-            provenance TEXT NOT NULL DEFAULT 'legacy_projection'
-                CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+            provenance TEXT NOT NULL
+                CHECK (provenance IN ('signed_token', 'synthetic_anchor')),
             signed_capability_json TEXT
         );
         CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries (

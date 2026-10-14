@@ -331,7 +331,7 @@ impl SqliteReceiptStore {
                 snapshot.live,
                 &record.receipt.capability_id,
             )? {
-                snapshot.validate_for_transport()?;
+                snapshot.validate()?;
                 snapshots
                     .entry(snapshot.capability_id.clone())
                     .or_insert(snapshot);
