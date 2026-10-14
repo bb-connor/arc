@@ -43,75 +43,49 @@ pub(crate) async fn handle_internal_revocations_delta(
         Ok(store) => store,
         Err(response) => return response,
     };
-    match query.cursor_version {
-        Some(REVOCATION_SEQUENCE_CURSOR_VERSION) => {
-            let stream_id = match store.revocation_stream_id() {
-                Ok(stream_id) => stream_id,
-                Err(error) => {
-                    return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-                }
-            };
-            if query.stream_id.as_deref() != Some(stream_id.as_str()) {
-                return plain_http_error(
-                    StatusCode::CONFLICT,
-                    "revocation delta cursor belongs to a different stream instance",
-                );
-            }
-            let (records, head_seq) = match store.list_revocations_after_seq_with_head(
-                list_limit(query.limit),
-                query.after_seq.unwrap_or(0),
-            ) {
-                Ok(page) => page,
-                Err(error) => {
-                    return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-                }
-            };
-            Json(RevocationDeltaResponse {
-                cursor_version: Some(REVOCATION_SEQUENCE_CURSOR_VERSION),
-                stream_id: Some(stream_id),
-                head_seq: Some(head_seq),
-                records: records
-                    .into_iter()
-                    .map(|stored| StoredRevocationView {
-                        seq: Some(stored.seq),
-                        capability_id: stored.record.capability_id,
-                        revoked_at: stored.record.revoked_at,
-                    })
-                    .collect(),
-            })
-            .into_response()
-        }
-        None => {
-            let records = match store.list_revocations_after(
-                list_limit(query.limit),
-                query.after_revoked_at,
-                query.after_capability_id.as_deref(),
-            ) {
-                Ok(records) => records,
-                Err(error) => {
-                    return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-                }
-            };
-            Json(RevocationDeltaResponse {
-                cursor_version: None,
-                stream_id: None,
-                head_seq: None,
-                records: records
-                    .into_iter()
-                    .map(|record| StoredRevocationView {
-                        seq: None,
-                        capability_id: record.capability_id,
-                        revoked_at: record.revoked_at,
-                    })
-                    .collect(),
-            })
-            .into_response()
-        }
-        Some(version) => plain_http_error(
+    if query.cursor_version != REVOCATION_CURSOR_VERSION {
+        return plain_http_error(
             StatusCode::BAD_REQUEST,
-            &format!("unsupported revocation cursor version {version}"),
-        ),
+            &format!(
+                "unsupported revocation cursor version {}",
+                query.cursor_version
+            ),
+        );
     }
+    let stream_id = match store.revocation_stream_id() {
+        Ok(stream_id) => stream_id,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
+    if query.stream_id != stream_id {
+        return plain_http_error(
+            StatusCode::CONFLICT,
+            "revocation delta cursor belongs to a different stream instance",
+        );
+    }
+    let (records, head_seq) = match store
+        .list_revocations_after_seq_with_head(list_limit(query.limit), query.after_seq)
+    {
+        Ok(page) => page,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
+    Json(RevocationDeltaResponse {
+        cursor_version: REVOCATION_CURSOR_VERSION,
+        stream_id,
+        head_seq,
+        records: records
+            .into_iter()
+            .map(|stored| StoredRevocationView {
+                seq: stored.seq,
+                capability_id: stored.record.capability_id,
+                revoked_at: stored.record.revoked_at,
+            })
+            .collect(),
+    })
+    .into_response()
 }
 
 pub(crate) async fn handle_internal_tool_receipts_delta(
@@ -458,7 +432,10 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
                 return Err(error);
             }
         };
-        if !revocation_snapshot_contract_is_compatible(&revocation_contract, &snapshot_contract) {
+        if !revocation_snapshot_contract_is_compatible(
+            revocation_contract.as_ref(),
+            snapshot_contract.as_ref(),
+        ) {
             let error = CliError::cli_other_error(
                 "peer changed or regressed its revocation stream contract between status and snapshot"
                     .to_string(),
@@ -514,7 +491,7 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
                 state,
                 &client,
                 peer_url,
-                &revocation_contract,
+                revocation_contract.as_ref(),
                 &mut revocation_round,
             ),
             &mut delta_records,
@@ -559,37 +536,22 @@ fn prepare_peer_revocation_sync(
     state: &TrustServiceState,
     peer_url: &str,
     replication: &ClusterReplicationHeadsView,
-) -> Result<RevocationPeerContract, CliError> {
+) -> Result<Option<RevocationPeerStream>, CliError> {
     let contract = revocation_peer_contract(replication)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    let cached = peer_revocation_cursor(state, peer_url);
-    match &contract {
-        RevocationPeerContract::Legacy => {
-            // A legacy tuple cursor is only meaningful within one projection
-            // pass. Never carry a sequence cursor across a peer downgrade or
-            // rolling-upgrade boundary.
-            if cached.as_ref().is_some_and(|cursor| {
-                cursor.cursor_version.is_some()
-                    || cursor.stream_id.is_some()
-                    || cursor.seq.is_some()
-            }) {
-                clear_peer_revocation_cursor(state, peer_url);
-            }
-        }
-        RevocationPeerContract::Current {
-            stream_id,
-            head_seq,
-        } => {
-            let requires_snapshot =
-                current_revocation_cursor_requires_snapshot(cached.as_ref(), stream_id, *head_seq);
-            if requires_snapshot {
-                request_peer_snapshot_recovery(
-                    state,
-                    peer_url,
-                    "revocation stream identity or advertised head changed; snapshot required"
-                        .to_string(),
-                );
-            }
+    if let Some(stream) = &contract {
+        let cached = peer_revocation_cursor(state, peer_url);
+        if current_revocation_cursor_requires_snapshot(
+            cached.as_ref(),
+            &stream.stream_id,
+            stream.head_seq,
+        ) {
+            request_peer_snapshot_recovery(
+                state,
+                peer_url,
+                "revocation stream identity or advertised head changed; snapshot required"
+                    .to_string(),
+            );
         }
     }
     Ok(contract)
@@ -693,11 +655,11 @@ pub(crate) fn sync_peer_authority(
     Ok(Some(snapshot.envelope_digest()?))
 }
 
-fn sync_peer_revocations(
+pub(crate) fn sync_peer_revocations(
     state: &TrustServiceState,
     client: &TrustControlClient,
     peer_url: &str,
-    contract: &RevocationPeerContract,
+    contract: Option<&RevocationPeerStream>,
     round: &mut PullRoundBudget,
 ) -> Result<u64, PullError> {
     let Some(store) = state
@@ -706,28 +668,12 @@ fn sync_peer_revocations(
     else {
         return Ok(0);
     };
-    match contract {
-        RevocationPeerContract::Legacy => {
-            sync_legacy_peer_revocations(state, client, peer_url, &store, round)
-        }
-        RevocationPeerContract::Current {
-            stream_id,
-            head_seq,
-        } => sync_current_peer_revocations(
-            state, client, peer_url, &store, stream_id, *head_seq, round,
-        ),
-    }
-}
-
-fn sync_current_peer_revocations(
-    state: &TrustServiceState,
-    client: &TrustControlClient,
-    peer_url: &str,
-    store: &SqliteRevocationStore,
-    stream_id: &str,
-    advertised_head_seq: u64,
-    round: &mut PullRoundBudget,
-) -> Result<u64, PullError> {
+    let Some(stream) = contract else {
+        return Err(PullError::Transient(CliError::cli_other_error(
+            "peer advertises no revocation stream; revocations are not replicated from it"
+                .to_string(),
+        )));
+    };
     let mut applied = 0u64;
     loop {
         // Check the shared round budget BEFORE the next blocking fetch so an
@@ -736,35 +682,30 @@ fn sync_current_peer_revocations(
             break;
         }
         let cursor = peer_revocation_cursor(state, peer_url);
-        ensure_current_revocation_cursor(cursor.as_ref(), stream_id).map_err(|error| {
+        ensure_current_revocation_cursor(cursor.as_ref(), &stream.stream_id).map_err(|error| {
             PullError::ForceSnapshot(CliError::cli_other_error(format!(
                 "revocation cursor stream epoch changed; snapshot required: {error}"
             )))
         })?;
-        let after_seq = cursor.as_ref().and_then(|value| value.seq).unwrap_or(0);
+        let after_seq = cursor.as_ref().map_or(0, |value| value.seq);
         let response = client.revocation_deltas(&RevocationDeltaQuery {
-            cursor_version: Some(REVOCATION_SEQUENCE_CURSOR_VERSION),
-            stream_id: Some(stream_id.to_string()),
-            after_seq: Some(after_seq),
-            after_revoked_at: cursor.as_ref().map(|value| value.revoked_at),
-            after_capability_id: cursor.as_ref().map(|value| value.capability_id.clone()),
+            cursor_version: REVOCATION_CURSOR_VERSION,
+            stream_id: stream.stream_id.clone(),
+            after_seq,
             limit: Some(MAX_LIST_LIMIT),
         })?;
         ensure_revocation_cursor_version(response.cursor_version)?;
-        if response.stream_id.as_deref() != Some(stream_id) {
+        if response.stream_id != stream.stream_id {
             return Err(PeerProtocolError::RevocationStreamIdentityMismatch.into());
         }
-        let response_head_seq = response
-            .head_seq
-            .ok_or(PeerProtocolError::MissingRevocationSequence)?;
-        if response_head_seq < after_seq {
+        if response.head_seq < after_seq {
             return Err(PullError::ForceSnapshot(CliError::cli_other_error(
                 "revocation stream head moved behind the local cursor; snapshot required"
                     .to_string(),
             )));
         }
         if response.records.is_empty() {
-            if after_seq < advertised_head_seq || after_seq < response_head_seq {
+            if after_seq < stream.head_seq || after_seq < response.head_seq {
                 return Err(PullError::ForceSnapshot(CliError::cli_other_error(
                     "revocation stream ended below its advertised head; snapshot required"
                         .to_string(),
@@ -780,70 +721,14 @@ fn sync_current_peer_revocations(
         {
             break;
         }
-        // Version 4 pages advance through a dense append-only revocation log
-        // bound to one durable stream identity.
-        // The validator rejects a missing cursor successor, an interior gap, or
-        // a legacy response before the local cursor can advance past omitted
-        // revocations.
-        let page_head = ensure_revocation_page_ascending(
-            cursor.as_ref(),
-            response.cursor_version,
-            response.stream_id.as_deref(),
-            stream_id,
-            &response.records,
-        )?;
-        if page_head.seq.unwrap_or(0) > response_head_seq {
-            return Err(PeerProtocolError::IncompleteRevocationStreamContract.into());
-        }
-        applied = applied.saturating_add(apply_revocation_page(store, &response.records)?);
-        update_peer_revocation_cursor(state, peer_url, page_head);
-    }
-    Ok(applied)
-}
-
-fn sync_legacy_peer_revocations(
-    state: &TrustServiceState,
-    client: &TrustControlClient,
-    peer_url: &str,
-    store: &SqliteRevocationStore,
-    round: &mut PullRoundBudget,
-) -> Result<u64, PullError> {
-    let mut applied = 0u64;
-    loop {
-        if round.is_exhausted() {
-            break;
-        }
-        let cursor = peer_revocation_cursor(state, peer_url);
-        let response = client.revocation_deltas(&RevocationDeltaQuery {
-            cursor_version: None,
-            stream_id: None,
-            after_seq: None,
-            after_revoked_at: cursor.as_ref().map(|value| value.revoked_at),
-            after_capability_id: cursor.as_ref().map(|value| value.capability_id.clone()),
-            limit: Some(MAX_LIST_LIMIT),
-        })?;
-        if response.cursor_version.is_some()
-            || response.stream_id.is_some()
-            || response.head_seq.is_some()
-        {
-            return Err(PeerProtocolError::IncompleteRevocationStreamContract.into());
-        }
-        if response.records.is_empty() {
-            // Completion resets the within-pass tuple. The next round replays the
-            // full current projection and therefore catches a same-second record
-            // inserted lexically before the prior pass head.
-            clear_peer_revocation_cursor(state, peer_url);
-            break;
-        }
-        if round
-            .charge_page(crate::integer::count(response.records.len()))
-            .is_err()
-        {
-            break;
-        }
+        // The validator rejects a missing cursor successor or an interior gap
+        // before the local cursor can advance past omitted revocations.
         let page_head =
-            ensure_legacy_revocation_page_ascending(cursor.as_ref(), &response.records)?;
-        applied = applied.saturating_add(apply_revocation_page(store, &response.records)?);
+            ensure_revocation_page_ascending(cursor.as_ref(), &response, &stream.stream_id)?;
+        if page_head.seq > response.head_seq {
+            return Err(PeerProtocolError::IncompleteRevocationStreamContract.into());
+        }
+        applied = applied.saturating_add(apply_revocation_page(&store, &response.records)?);
         update_peer_revocation_cursor(state, peer_url, page_head);
     }
     Ok(applied)

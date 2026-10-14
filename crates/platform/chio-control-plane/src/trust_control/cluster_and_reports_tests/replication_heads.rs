@@ -27,21 +27,18 @@ fn cluster_replication_heads_reports_heads_without_materializing() {
     let heads = cluster_replication_heads(&state).test_unwrap();
     assert_eq!(heads.budget_seq, 1);
     assert_eq!(heads.tool_seq, 0);
+    let stream = heads.revocation_stream.test_unwrap();
+    assert_eq!(stream.cursor_version, REVOCATION_CURSOR_VERSION);
     assert_eq!(
-        heads.revocation_cursor_version,
-        Some(REVOCATION_SEQUENCE_CURSOR_VERSION)
-    );
-    let stream_id = heads.revocation_stream_id.as_deref().test_unwrap();
-    assert_eq!(
-        uuid::Uuid::parse_str(stream_id)
+        uuid::Uuid::parse_str(&stream.stream_id)
             .test_unwrap()
             .get_version_num(),
         7
     );
-    let cursor = heads.revocation_cursor.test_unwrap();
-    assert_eq!(cursor.stream_id.as_deref(), Some(stream_id));
-    assert_eq!(cursor.revoked_at, 77);
-    assert_eq!(cursor.capability_id, "cap-heads");
+    let head = stream.head.test_unwrap();
+    assert_eq!(head.seq, 1);
+    assert_eq!(head.revoked_at, 77);
+    assert_eq!(head.capability_id, "cap-heads");
 }
 
 #[test]

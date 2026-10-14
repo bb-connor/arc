@@ -1,26 +1,6 @@
 use super::*;
 
-#[tokio::test]
-async fn revocation_delta_endpoint_negotiates_legacy_and_sequence_cursors() {
-    let revocation_db = unique_temp_path("revocation-delta-upgrade", "sqlite3");
-    let state = state_with_cluster(
-        "https://node-a",
-        &["https://node-b"],
-        None,
-        Some(revocation_db),
-        None,
-    );
-    let store = state.revocation_store().test_unwrap();
-    for capability_id in ["cap-b", "cap-a"] {
-        store
-            .upsert_revocation(&RevocationRecord {
-                capability_id: capability_id.to_string(),
-                revoked_at: 10,
-            })
-            .test_unwrap();
-    }
-    let stream_id = store.revocation_stream_id().test_unwrap();
-
+fn signed_peer_headers(state: &TrustServiceState) -> HeaderMap {
     let issued_at = unix_timestamp_now()
         .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
         as i64;
@@ -45,58 +25,56 @@ async fn revocation_delta_endpoint_negotiates_legacy_and_sequence_cursors() {
         CLUSTER_AUTH_SIGNATURE_HEADER,
         HeaderValue::from_str(&signature).test_unwrap(),
     );
+    headers
+}
 
-    // An old client sends only the tuple cursor. The upgraded server must
-    // preserve that pagination and omit every sequence-cursor field.
-    let legacy = handle_internal_revocations_delta(
-        State(state.clone()),
-        Query(RevocationDeltaQuery {
-            cursor_version: None,
-            stream_id: None,
-            after_seq: None,
-            after_revoked_at: Some(10),
-            after_capability_id: Some("cap-a".to_string()),
-            limit: Some(MAX_LIST_LIMIT),
-        }),
-        headers.clone(),
+async fn body_text(response: Response) -> String {
+    String::from_utf8(
+        to_bytes(response.into_body(), usize::MAX)
+            .await
+            .test_unwrap()
+            .to_vec(),
     )
-    .await;
-    assert_eq!(legacy.status(), StatusCode::OK);
-    let legacy: Value =
-        serde_json::from_slice(&to_bytes(legacy.into_body(), usize::MAX).await.test_unwrap())
-            .test_unwrap();
-    assert!(legacy.get("cursorVersion").is_none());
-    assert_eq!(
-        legacy["records"],
-        json!([{"capabilityId": "cap-b", "revokedAt": 10}])
-    );
+    .test_unwrap()
+}
 
-    // A new client explicitly negotiates version 4 with the durable stream
-    // identity and gets the insertion sequence, including same-second backfills.
+#[tokio::test]
+async fn revocation_delta_endpoint_serves_only_the_v1_sequence_cursor() {
+    let revocation_db = unique_temp_path("revocation-delta-v1", "sqlite3");
+    let state = state_with_cluster(
+        "https://node-a",
+        &["https://node-b"],
+        None,
+        Some(revocation_db.clone()),
+        None,
+    );
+    let store = state.revocation_store().test_unwrap();
+    for capability_id in ["cap-b", "cap-a"] {
+        store
+            .upsert_revocation(&RevocationRecord {
+                capability_id: capability_id.to_string(),
+                revoked_at: 10,
+            })
+            .test_unwrap();
+    }
+    let stream_id = store.revocation_stream_id().test_unwrap();
+    let headers = signed_peer_headers(&state);
+    let query = |cursor_version: u8, stream_id: &str| RevocationDeltaQuery {
+        cursor_version,
+        stream_id: stream_id.to_string(),
+        after_seq: 0,
+        limit: Some(MAX_LIST_LIMIT),
+    };
+
     let sequence = handle_internal_revocations_delta(
         State(state.clone()),
-        Query(RevocationDeltaQuery {
-            cursor_version: Some(REVOCATION_SEQUENCE_CURSOR_VERSION),
-            stream_id: Some(stream_id.clone()),
-            after_seq: Some(0),
-            after_revoked_at: Some(10),
-            after_capability_id: Some("cap-z".to_string()),
-            limit: Some(MAX_LIST_LIMIT),
-        }),
+        Query(query(REVOCATION_CURSOR_VERSION, &stream_id)),
         headers.clone(),
     )
     .await;
     assert_eq!(sequence.status(), StatusCode::OK);
-    let sequence: Value = serde_json::from_slice(
-        &to_bytes(sequence.into_body(), usize::MAX)
-            .await
-            .test_unwrap(),
-    )
-    .test_unwrap();
-    assert_eq!(
-        sequence["cursorVersion"],
-        REVOCATION_SEQUENCE_CURSOR_VERSION
-    );
+    let sequence: Value = serde_json::from_str(&body_text(sequence).await).test_unwrap();
+    assert_eq!(sequence["cursorVersion"], REVOCATION_CURSOR_VERSION);
     assert_eq!(sequence["streamId"], stream_id);
     assert_eq!(sequence["headSeq"], 2);
     assert_eq!(sequence["records"][0]["seq"], 1);
@@ -106,37 +84,29 @@ async fn revocation_delta_endpoint_negotiates_legacy_and_sequence_cursors() {
 
     let wrong_stream = handle_internal_revocations_delta(
         State(state.clone()),
-        Query(RevocationDeltaQuery {
-            cursor_version: Some(REVOCATION_SEQUENCE_CURSOR_VERSION),
-            stream_id: Some("01991bb4-e2f7-7e21-b75d-a59be8fbc442".to_string()),
-            ..RevocationDeltaQuery::default()
-        }),
+        Query(query(
+            REVOCATION_CURSOR_VERSION,
+            "01991bb4-e2f7-7e21-b75d-a59be8fbc442",
+        )),
         headers.clone(),
     )
     .await;
     assert_eq!(wrong_stream.status(), StatusCode::CONFLICT);
 
-    let retired = handle_internal_revocations_delta(
-        State(state.clone()),
-        Query(RevocationDeltaQuery {
-            cursor_version: Some(2),
-            ..RevocationDeltaQuery::default()
-        }),
-        headers.clone(),
-    )
-    .await;
-    assert_eq!(retired.status(), StatusCode::BAD_REQUEST);
+    for version in [2, 4, 99] {
+        let refused = handle_internal_revocations_delta(
+            State(state.clone()),
+            Query(query(version, &stream_id)),
+            headers.clone(),
+        )
+        .await;
+        assert_eq!(refused.status(), StatusCode::BAD_REQUEST);
+        assert!(body_text(refused)
+            .await
+            .contains(&format!("unsupported revocation cursor version {version}")));
+    }
 
-    let unsupported = handle_internal_revocations_delta(
-        State(state),
-        Query(RevocationDeltaQuery {
-            cursor_version: Some(99),
-            ..RevocationDeltaQuery::default()
-        }),
-        headers,
-    )
-    .await;
-    assert_eq!(unsupported.status(), StatusCode::BAD_REQUEST);
+    let _ = std::fs::remove_file(revocation_db);
 }
 
 #[test]
@@ -170,28 +140,19 @@ fn revocation_snapshot_is_projection_bounded_and_epoch_bound() {
     let mut snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
     assert_eq!(snapshot.revocations.len(), 1);
     assert_eq!(snapshot.revocations[0].revoked_at, 32);
-    let cursor = snapshot
+    let stream = snapshot
         .replication
-        .revocation_cursor
-        .as_ref()
-        .test_unwrap();
-    assert_eq!(
-        cursor.cursor_version,
-        Some(REVOCATION_SEQUENCE_CURSOR_VERSION)
-    );
-    assert_eq!(cursor.seq, Some(32));
-
-    snapshot.replication.revocation_cursor_version = Some(2);
-    snapshot
-        .replication
-        .revocation_cursor
+        .revocation_stream
         .as_mut()
-        .test_unwrap()
-        .cursor_version = Some(2);
+        .test_unwrap();
+    assert_eq!(stream.cursor_version, REVOCATION_CURSOR_VERSION);
+    assert_eq!(stream.head.as_ref().test_unwrap().seq, 32);
+
+    stream.cursor_version = 4;
     let error = apply_cluster_snapshot(&target_state, "https://node-a", snapshot)
         .test_unwrap_err()
         .to_string();
-    assert!(error.contains("unsupported revocation cursor version 2"));
+    assert!(error.contains("unsupported revocation cursor version 4"));
     assert!(SqliteRevocationStore::open(&target_revocation_db)
         .test_unwrap()
         .list_revocations_after(MAX_LIST_LIMIT, None, None)
@@ -208,11 +169,9 @@ fn revocation_snapshot_is_projection_bounded_and_epoch_bound() {
 }
 
 #[test]
-fn legacy_revocation_snapshot_recovers_projection_without_reusing_tuple_cursor() {
-    let source_revocation_db =
-        unique_temp_path("cluster-source-legacy-revocation-snapshot", "sqlite3");
-    let target_revocation_db =
-        unique_temp_path("cluster-target-legacy-revocation-snapshot", "sqlite3");
+fn revocation_snapshot_refuses_tuple_shapes_and_streamless_projections() {
+    let source_revocation_db = unique_temp_path("cluster-source-streamless-snapshot", "sqlite3");
+    let target_revocation_db = unique_temp_path("cluster-target-streamless-snapshot", "sqlite3");
     let source_state = state_with_cluster(
         "https://node-a",
         &["https://node-b"],
@@ -230,30 +189,92 @@ fn legacy_revocation_snapshot_recovers_projection_without_reusing_tuple_cursor()
     SqliteRevocationStore::open(&source_revocation_db)
         .test_unwrap()
         .upsert_revocation(&RevocationRecord {
-            capability_id: "cap-legacy-origin".to_string(),
+            capability_id: "cap-origin".to_string(),
             revoked_at: 55,
         })
         .test_unwrap();
-
     let current = build_cluster_state_snapshot(&source_state).test_unwrap();
-    let mut legacy_json = serde_json::to_value(current).test_unwrap();
-    let replication = legacy_json["replication"].as_object_mut().test_unwrap();
-    replication.remove("revocationCursorVersion");
-    replication.remove("revocationStreamId");
-    let cursor = replication["revocationCursor"]
-        .as_object_mut()
-        .test_unwrap();
-    cursor.insert("cursorVersion".to_string(), serde_json::json!(3));
-    cursor.remove("streamId");
-    let legacy: ClusterStateSnapshotResponse = serde_json::from_value(legacy_json).test_unwrap();
 
-    apply_cluster_snapshot(&target_state, "https://node-a", legacy).test_unwrap();
-    assert!(SqliteRevocationStore::open(&target_revocation_db)
+    let mut tuple_json = serde_json::to_value(&current).test_unwrap();
+    let replication = tuple_json["replication"].as_object_mut().test_unwrap();
+    replication.remove("revocationStream");
+    replication.insert(
+        "revocationCursor".to_string(),
+        json!({"cursorVersion": 3, "revokedAt": 55, "capabilityId": "cap-origin"}),
+    );
+    let refused = serde_json::from_value::<ClusterStateSnapshotResponse>(tuple_json)
+        .err()
+        .unwrap_or_else(|| panic!("a tuple-cursor snapshot decoded"));
+    assert!(refused
+        .to_string()
+        .starts_with("unknown field `revocationCursor`"));
+
+    let mut streamless = current;
+    streamless.replication.revocation_stream = None;
+    let error = apply_cluster_snapshot(&target_state, "https://node-a", streamless)
+        .test_unwrap_err()
+        .to_string();
+    assert!(error
+        .contains("revocation snapshot carried projection records without a revocation stream"));
+    assert!(!SqliteRevocationStore::open(&target_revocation_db)
         .test_unwrap()
-        .is_revoked("cap-legacy-origin")
+        .is_revoked("cap-origin")
         .test_unwrap());
     assert!(peer_revocation_cursor(&target_state, "https://node-a").is_none());
 
     let _ = std::fs::remove_file(source_revocation_db);
     let _ = std::fs::remove_file(target_revocation_db);
+}
+
+#[test]
+fn streamless_peer_is_a_transient_revocation_pull_error_that_applies_nothing() {
+    let revocation_db = unique_temp_path("cluster-follower-streamless-peer", "sqlite3");
+    let state = state_with_cluster(
+        "https://node-b",
+        &["https://node-a"],
+        None,
+        Some(revocation_db.clone()),
+        None,
+    );
+    let cursor = RevocationCursor {
+        stream_id: "01991bb4-e2f7-7e21-b75d-a59be8fbc441".to_string(),
+        seq: 7,
+        revoked_at: 5,
+        capability_id: "cap-1".to_string(),
+    };
+    update_peer_revocation_cursor(&state, "https://node-a", cursor.clone());
+    let client = service_runtime::client::build_cluster_peer_client(
+        "https://node-a",
+        &state.config.service_token,
+        "https://node-b",
+    )
+    .test_unwrap();
+
+    let outcome = sync_peer_revocations(
+        &state,
+        &client,
+        "https://node-a",
+        None,
+        &mut PullRoundBudget::new(),
+    );
+    let error = match outcome {
+        Err(PullError::Transient(error)) => error,
+        other => panic!("a streamless peer must be a transient pull error: {other:?}"),
+    };
+    assert!(error
+        .to_string()
+        .ends_with("peer advertises no revocation stream; revocations are not replicated from it"));
+    assert!(state
+        .revocation_store()
+        .test_unwrap()
+        .list_revocations_after(MAX_LIST_LIMIT, None, None)
+        .test_unwrap()
+        .is_empty());
+    let retained = peer_revocation_cursor(&state, "https://node-a").test_unwrap();
+    assert_eq!(retained.stream_id, cursor.stream_id);
+    assert_eq!(retained.seq, cursor.seq);
+    assert_eq!(retained.revoked_at, cursor.revoked_at);
+    assert_eq!(retained.capability_id, cursor.capability_id);
+
+    let _ = std::fs::remove_file(revocation_db);
 }

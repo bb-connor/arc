@@ -168,13 +168,13 @@ mod deltas_tests {
     }
 
     #[test]
-    fn legacy_projection_replay_does_not_count_as_fresh_delta_records() {
-        let db = temp_budget_db("legacy-revocation-replay");
+    fn revocation_page_replay_does_not_count_as_fresh_delta_records() {
+        let db = temp_budget_db("revocation-page-replay");
         let store = SqliteRevocationStore::open(&db).test_unwrap();
         let records = (0..CLUSTER_SNAPSHOT_RECORD_THRESHOLD)
             .map(|index| StoredRevocationView {
-                seq: None,
-                capability_id: format!("cap-legacy-{index}"),
+                seq: index.saturating_add(1),
+                capability_id: format!("cap-replay-{index}"),
                 revoked_at: 10,
             })
             .collect::<Vec<_>>();
@@ -182,23 +182,23 @@ mod deltas_tests {
         assert_eq!(
             apply_revocation_page(&store, &records).test_unwrap(),
             CLUSTER_SNAPSHOT_RECORD_THRESHOLD,
-            "the first legacy projection pass applies every fresh revocation"
+            "the first page applies every fresh revocation"
         );
         assert_eq!(
             apply_revocation_page(&store, &records).test_unwrap(),
             0,
-            "a completed legacy pass replay must not count idempotent rows toward forced snapshot"
+            "a replayed page must not count idempotent rows toward forced snapshot"
         );
 
         let advanced = StoredRevocationView {
-            seq: None,
+            seq: CLUSTER_SNAPSHOT_RECORD_THRESHOLD.saturating_add(1),
             capability_id: records[0].capability_id.clone(),
             revoked_at: 11,
         };
         assert_eq!(
             apply_revocation_page(&store, &[advanced]).test_unwrap(),
             1,
-            "a genuinely newer legacy projection row remains a fresh delta"
+            "a genuinely newer revocation remains a fresh delta"
         );
 
         let _ = std::fs::remove_file(&db);
