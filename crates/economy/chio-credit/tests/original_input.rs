@@ -1,5 +1,5 @@
 use chio_credit::obligation::{SignedCreditFacilityBindV1, SignedObligationStatusProofV1};
-use chio_credit::SignedIouEnvelopeV2;
+use chio_credit::SignedReceivableIou;
 use std::error::Error;
 
 fn require_error<T, E: Error + 'static>(result: Result<T, E>) -> E {
@@ -20,7 +20,7 @@ fn assert_native_cause(error: &(dyn Error + 'static)) {
 #[test]
 fn original_credit_readers_preserve_native_causes() {
     let bytes = br#"{"private-marker":1,"private-marker":2}"#;
-    assert_native_cause(&require_error(SignedIouEnvelopeV2::from_canonical_bytes(
+    assert_native_cause(&require_error(SignedReceivableIou::from_canonical_bytes(
         bytes,
     )));
     assert_native_cause(&require_error(
@@ -34,7 +34,7 @@ fn original_credit_readers_preserve_native_causes() {
 #[test]
 fn original_credit_input_is_bounded_before_typed_projection() {
     let bytes = vec![b' '; 4 * 1024 * 1024 + 1];
-    let error = require_error(SignedIouEnvelopeV2::from_canonical_bytes(&bytes));
+    let error = require_error(SignedReceivableIou::from_canonical_bytes(&bytes));
     let mut source: &(dyn Error + 'static) = &error;
     loop {
         if let Some(input) = source.downcast_ref::<chio_core_types::canonical::UntrustedJsonError>()

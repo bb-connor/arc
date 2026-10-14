@@ -25,9 +25,9 @@
     "crates/economy/chio-credit/src/factor/mod.rs",
     "crates/economy/chio-credit/src/financial_credentials.rs",
     "crates/economy/chio-credit/src/input.rs",
-    "crates/economy/chio-credit/src/iou_v2.rs",
     "crates/economy/chio-credit/src/obligation/credit_facility_bind.rs",
     "crates/economy/chio-credit/src/obligation/status.rs",
+    "crates/economy/chio-credit/src/receivable_iou.rs",
     "crates/economy/chio-finding/src/purchase_context.rs",
     "crates/economy/chio-finding/src/recovery_context.rs",
     "crates/economy/chio-finding/src/status.rs",
@@ -15282,7 +15282,7 @@
       "kind": "parser-internal-or-typed",
       "contract": "Shared bounded native typed canonical original-byte reader; source error is retained through the existing shared redacted owner."
     },
-    "crates/economy/chio-credit/src/iou_v2.rs": {
+    "crates/economy/chio-credit/src/receivable_iou.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Native IOU canonical imports have a 4 MiB cap and exact typed original-byte equality with preserved body validation and native causes. Issuer, receipt and committed credit admission verification still determine authority."
     },
@@ -17147,7 +17147,7 @@
     "crates/economy/chio-credit/src/input.rs": [
       "canonical::original-json-reader::UntrustedJsonText"
     ],
-    "crates/economy/chio-credit/src/iou_v2.rs": [
+    "crates/economy/chio-credit/src/receivable_iou.rs": [
       "from_canonical_bytes::shared-reader::crates/economy/chio-credit/src/input.rs::canonical"
     ],
     "crates/economy/chio-credit/src/obligation/credit_facility_bind.rs": [

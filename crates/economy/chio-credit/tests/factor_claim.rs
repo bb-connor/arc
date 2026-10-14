@@ -11,7 +11,7 @@ use chio_credit::obligation::{
     CreditFacilityBindTrustInputV1, CreditFacilityBindTrustV1, ObligationSettlementTransitionV1,
     ObligationStatusProofTrustV1,
 };
-use chio_credit::{IouEnvelopeCryptoFloorV2, IouEnvelopeIssuerTrustV2, IouEnvelopeReceiptTrustV2};
+use chio_credit::{ReceivableIouCryptoFloor, ReceivableIouIssuerTrust, ReceivableIouReceiptTrust};
 use factor_claim_support::{
     build_claim_evidence, ClaimEvidence, SupportResult, ATOM_CREATED_AT, CREDITOR_KEY_EPOCH,
     CREDIT_AUTHORITY_EPOCH, CREDIT_AUTHORITY_ID, DEBTOR_ID, DEBTOR_KEY_EPOCH, IOU_ISSUER_EPOCH,
@@ -150,21 +150,21 @@ fn claim_trust_is_deterministic_and_role_separated() -> SupportResult<()> {
         RESULT_AUTHORITY_EPOCH,
         600,
     )?;
-    let receipt_trust = IouEnvelopeReceiptTrustV2::new(
+    let receipt_trust = ReceivableIouReceiptTrust::new(
         [evidence.kernel_key.clone()],
         ReceiptCryptoFloor::AllowClassical,
     );
-    let retained = IouEnvelopeIssuerTrustV2::new(
+    let retained = ReceivableIouIssuerTrust::new(
         IOU_ISSUER_ID.to_owned(),
         IOU_ISSUER_EPOCH,
         evidence.issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
-    let rotated = IouEnvelopeIssuerTrustV2::new(
+    let rotated = ReceivableIouIssuerTrust::new(
         IOU_ISSUER_ID.to_owned(),
         IOU_ISSUER_EPOCH + 1,
         Keypair::from_seed(&[113; 32]).public_key(),
-        IouEnvelopeCryptoFloorV2::PqRequired,
+        ReceivableIouCryptoFloor::PqRequired,
     )?;
     let retained_bind = evidence.credit_facility_bind_trust.clone();
     let rotated_bind = rotated_credit_facility_bind_trust(&evidence)?;
@@ -188,7 +188,7 @@ fn claim_trust_is_deterministic_and_role_separated() -> SupportResult<()> {
     assert_eq!(
         ReceivableClaimTrustV1::new(
             &status_trust,
-            IouEnvelopeReceiptTrustV2::new(
+            ReceivableIouReceiptTrust::new(
                 std::iter::empty::<chio_core_types::crypto::PublicKey>(),
                 ReceiptCryptoFloor::AllowClassical,
             ),
@@ -201,7 +201,7 @@ fn claim_trust_is_deterministic_and_role_separated() -> SupportResult<()> {
         ReceivableClaimTrustV1::new(
             &status_trust,
             receipt_trust.clone(),
-            std::iter::empty::<IouEnvelopeIssuerTrustV2>(),
+            std::iter::empty::<ReceivableIouIssuerTrust>(),
             [retained_bind.clone()],
         ),
         Err(FactorError::InvalidField("claim_iou_issuer_trust"))
@@ -215,11 +215,11 @@ fn claim_trust_is_deterministic_and_role_separated() -> SupportResult<()> {
         ),
         Err(FactorError::InvalidField("claim_iou_issuer_coordinate"))
     );
-    let conflicting = IouEnvelopeIssuerTrustV2::new(
+    let conflicting = ReceivableIouIssuerTrust::new(
         IOU_ISSUER_ID.to_owned(),
         IOU_ISSUER_EPOCH,
         Keypair::from_seed(&[114; 32]).public_key(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     assert_eq!(
         ReceivableClaimTrustV1::new(
@@ -230,11 +230,11 @@ fn claim_trust_is_deterministic_and_role_separated() -> SupportResult<()> {
         ),
         Err(FactorError::InvalidField("claim_iou_issuer_key"))
     );
-    let cross_role = IouEnvelopeIssuerTrustV2::new(
+    let cross_role = ReceivableIouIssuerTrust::new(
         IOU_ISSUER_ID.to_owned(),
         IOU_ISSUER_EPOCH,
         evidence.kernel_key,
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     assert_eq!(
         ReceivableClaimTrustV1::new(
@@ -318,15 +318,15 @@ fn sealed_claim_rejects_legacy_and_untrusted_evidence() -> SupportResult<()> {
         Err(FactorError::Input(source))
             if source.code() == "urn:chio:error:attest:signed-json-invalid-shape"
     ));
-    let wrong_issuer = IouEnvelopeIssuerTrustV2::new(
+    let wrong_issuer = ReceivableIouIssuerTrust::new(
         IOU_ISSUER_ID.to_owned(),
         IOU_ISSUER_EPOCH,
         Keypair::from_seed(&[115; 32]).public_key(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     let untrusted_issuer = ReceivableClaimTrustV1::new(
         &status_trust,
-        IouEnvelopeReceiptTrustV2::new(
+        ReceivableIouReceiptTrust::new(
             [evidence.kernel_key.clone()],
             ReceiptCryptoFloor::AllowClassical,
         ),
@@ -343,15 +343,15 @@ fn sealed_claim_rejects_legacy_and_untrusted_evidence() -> SupportResult<()> {
         )),
         FactorError::AuthorityVerification
     );
-    let retained_issuer = IouEnvelopeIssuerTrustV2::new(
+    let retained_issuer = ReceivableIouIssuerTrust::new(
         IOU_ISSUER_ID.to_owned(),
         IOU_ISSUER_EPOCH,
         evidence.issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     let untrusted_receipt = ReceivableClaimTrustV1::new(
         &status_trust,
-        IouEnvelopeReceiptTrustV2::new(
+        ReceivableIouReceiptTrust::new(
             [Keypair::from_seed(&[116; 32]).public_key()],
             ReceiptCryptoFloor::AllowClassical,
         ),
@@ -368,15 +368,15 @@ fn sealed_claim_rejects_legacy_and_untrusted_evidence() -> SupportResult<()> {
         )),
         FactorError::AuthorityVerification
     );
-    let retained_issuer = IouEnvelopeIssuerTrustV2::new(
+    let retained_issuer = ReceivableIouIssuerTrust::new(
         IOU_ISSUER_ID.to_owned(),
         IOU_ISSUER_EPOCH,
         evidence.issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     let untrusted_bind = ReceivableClaimTrustV1::new(
         &status_trust,
-        IouEnvelopeReceiptTrustV2::new(
+        ReceivableIouReceiptTrust::new(
             [evidence.kernel_key.clone()],
             ReceiptCryptoFloor::AllowClassical,
         ),
@@ -397,15 +397,15 @@ fn sealed_claim_rejects_legacy_and_untrusted_evidence() -> SupportResult<()> {
         )),
         FactorError::AuthorityVerification
     );
-    let retained_issuer = IouEnvelopeIssuerTrustV2::new(
+    let retained_issuer = ReceivableIouIssuerTrust::new(
         IOU_ISSUER_ID.to_owned(),
         IOU_ISSUER_EPOCH,
         evidence.issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     let ambiguous_bind = ReceivableClaimTrustV1::new(
         &status_trust,
-        IouEnvelopeReceiptTrustV2::new(
+        ReceivableIouReceiptTrust::new(
             [evidence.kernel_key.clone()],
             ReceiptCryptoFloor::AllowClassical,
         ),
@@ -437,15 +437,15 @@ fn sealed_claim_rejects_mixed_status_trust_and_premature_build() -> SupportResul
         RESULT_AUTHORITY_EPOCH,
         601,
     )?;
-    let issuer_trust = IouEnvelopeIssuerTrustV2::new(
+    let issuer_trust = ReceivableIouIssuerTrust::new(
         IOU_ISSUER_ID.to_owned(),
         IOU_ISSUER_EPOCH,
         evidence.issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     let mismatched_claim_trust = ReceivableClaimTrustV1::new(
         &mismatched_status_trust,
-        IouEnvelopeReceiptTrustV2::new(
+        ReceivableIouReceiptTrust::new(
             [evidence.kernel_key.clone()],
             ReceiptCryptoFloor::AllowClassical,
         ),

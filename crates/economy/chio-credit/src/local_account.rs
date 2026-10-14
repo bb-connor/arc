@@ -25,13 +25,13 @@ use crate::crypto::{sha256_hex, sign_canonical_with_backend, SigningBackend};
 use crate::hook::{
     CreditEvaluatorError, CreditEvaluatorHook, IouEnvelope, IouEnvelopeBody, IOU_ENVELOPE_SCHEMA,
 };
-use crate::iou_v2::{
-    mint_iou_envelope_v2, IouEnvelopeMintContextV2, IouEnvelopeReceiptTrustV2, IouEnvelopeV2Error,
-    SignedIouEnvelopeV2,
-};
 use crate::obligation::{CreditAdmissionStore, CreditAdmissionStoreAdapter};
 use crate::receipt::crypto_floor::ReceiptCryptoFloor;
 use crate::receipt::{body::chio_receipt_id, body::ChioReceipt};
+use crate::receivable_iou::{
+    mint_receivable_iou, ReceivableIouError, ReceivableIouMintContext, ReceivableIouReceiptTrust,
+    SignedReceivableIou,
+};
 
 /// Deterministic IOU id derivation from the originating receipt id.
 ///
@@ -49,7 +49,7 @@ fn derive_iou_id(receipt_id: &str) -> String {
 /// envelope.
 pub struct LocalCreditAccount<B: SigningBackend> {
     backend: B,
-    receipt_trust: IouEnvelopeReceiptTrustV2,
+    receipt_trust: ReceivableIouReceiptTrust,
 }
 
 impl<B: SigningBackend> LocalCreditAccount<B> {
@@ -60,7 +60,7 @@ impl<B: SigningBackend> LocalCreditAccount<B> {
     pub fn new(backend: B) -> Self {
         Self {
             backend,
-            receipt_trust: IouEnvelopeReceiptTrustV2::new(
+            receipt_trust: ReceivableIouReceiptTrust::new(
                 std::iter::empty::<crate::crypto::PublicKey>(),
                 ReceiptCryptoFloor::AllowClassical,
             ),
@@ -76,7 +76,7 @@ impl<B: SigningBackend> LocalCreditAccount<B> {
     {
         Self {
             backend,
-            receipt_trust: IouEnvelopeReceiptTrustV2::new(
+            receipt_trust: ReceivableIouReceiptTrust::new(
                 trusted_kernel_keys,
                 ReceiptCryptoFloor::AllowClassical,
             ),
@@ -84,7 +84,7 @@ impl<B: SigningBackend> LocalCreditAccount<B> {
     }
 
     #[must_use]
-    pub fn new_with_receipt_trust(backend: B, receipt_trust: IouEnvelopeReceiptTrustV2) -> Self {
+    pub fn new_with_receipt_trust(backend: B, receipt_trust: ReceivableIouReceiptTrust) -> Self {
         Self {
             backend,
             receipt_trust,
@@ -97,16 +97,16 @@ impl<B: SigningBackend> LocalCreditAccount<B> {
     }
 
     #[must_use]
-    pub const fn receipt_trust(&self) -> &IouEnvelopeReceiptTrustV2 {
+    pub const fn receipt_trust(&self) -> &ReceivableIouReceiptTrust {
         &self.receipt_trust
     }
 
-    pub fn mint_obligation_iou_v2<S: CreditAdmissionStore>(
+    pub fn mint_receivable_iou<S: CreditAdmissionStore>(
         &self,
         credit_admission_store: &CreditAdmissionStoreAdapter<S>,
-        context: &IouEnvelopeMintContextV2<'_>,
-    ) -> Result<SignedIouEnvelopeV2, IouEnvelopeV2Error> {
-        mint_iou_envelope_v2(
+        context: &ReceivableIouMintContext<'_>,
+    ) -> Result<SignedReceivableIou, ReceivableIouError> {
+        mint_receivable_iou(
             &self.backend,
             &self.receipt_trust,
             credit_admission_store,

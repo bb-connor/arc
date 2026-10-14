@@ -1,4 +1,4 @@
-ea0d36e64fdebec9f31800d3600aa3c8e711b2f08839cfe3df40c390f28d55e9  spec/schemas/MANIFEST.sha256
+734d57fe545a8ac8f87e61344a4af892d7627268418c8d125dcdf87ade2b3583  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -80,7 +80,7 @@ eebb21aedb0bcb945e1238852ea6f96647169d3fe78b368f82ffe96a3a485601  spec/schemas/c
 5f08aad75f8169929cf5c76349a9f31af3101e469fbd034f362829eac7a946aa  spec/schemas/chio-economy/obligation-disposition.v1.json
 06f02fd1b32f00b13db3f54e7a7226d44f5fb874c8f6550ab1a171744187b0af  spec/schemas/chio-economy/obligation-settlement-lifecycle.v1.json
 7598ab95c1e110ca6b8db2ef9d4ecaffec48e2a1664bbac69ab302926c821318  spec/schemas/chio-economy/obligation-status-proof.v1.json
-30163f9e5af20d681fe6b17a454d63e9f8f38a60fbba258e8121ab899383b6a0  spec/schemas/chio-economy/receivable-iou-envelope.v1.json
+addf3434fd7e9fee67faa532f1f0061f2a54eb56fc6ae3c6adcf17b4ae452432  spec/schemas/chio-economy/receivable-iou-envelope.v1.json
 d6cea9045b9ec7ce1b7d68081fd5159e1bce8b318e35236e47e6a60b6a7d8c73  spec/schemas/chio-economy/resource-head.v1.json
 fb10036259cce9ba1abd18a6b516d78d0c9f0460bcd5e042bbe0db6fdf892fed  spec/schemas/chio-economy/state-batch.v1.json
 408513b06b97fb575ccf4b1cf2fa03fc0df76c7c4eb018f213be2378f2f3646b  spec/schemas/chio-econsim/v1/qualification-matrix.schema.json

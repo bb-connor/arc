@@ -69,9 +69,9 @@ package's unit-test target.
 | RS-11 | Audience validation, introspection path. | `IntrospectionBearerVerifier::session_auth_context_from_introspection` | `chio-mcp-remote lib tests::bearer_verifier::introspection_bearer_verifier_accepts_active_token_with_resource_claim` covers acceptance only | GAP |
 | RS-12 | Token signature MUST verify. | `JwtVerificationKeySource::verify` | `chio-mcp-remote lib tests::bearer_verifier::inbound_authority_jwt_rejects_weak_key_forgery` | PASS |
 | RS-13 | Expired tokens MUST receive `401`. | `exp` check in both verifiers | `chio-mcp-remote lib hosted_tests::error_contract::hosted_mcp_rejects_expired_or_mismatched_auth_during_session_reuse_without_panicking` | PASS |
-| RS-14 | A token without `exp` is refused. | JWT and introspection verifiers check `exp` only when present | none; the code accepts a token with no `exp` | GAP |
+| RS-14 | A token without `exp` is refused. | `JwtBearerVerifier::authenticate_token` and `IntrospectionBearerVerifier::session_auth_context_from_introspection` refuse a missing `exp` with `401`; local token exchange refuses a subject token without `exp` | `chio-mcp-remote lib tests::bearer_verifier::jwt_bearer_verifier_rejects_token_without_exp`; `chio-mcp-remote lib tests::bearer_verifier::introspection_bearer_verifier_rejects_token_without_exp`; `chio-mcp-remote lib tests::bearer_verifier::local_authorization_server_rejects_subject_token_without_exp` | PASS |
 | RS-15 | Invalid or inactive tokens MUST receive `401`. | `unauthorized_bearer_response` on every verifier refusal | `chio-mcp-remote lib hosted_tests::auth_flows::hosted_mcp_accepts_static_bearer_and_rejects_invalid_token`; `chio-mcp-remote lib tests::bearer_verifier::introspection_bearer_verifier_rejects_inactive_token`; `chio-mcp-remote lib tests::bearer_verifier::inbound_authority_jwt_unknown_empty_or_null_confirmation_never_becomes_bearer` | PASS |
-| RS-16 | Issuer mismatch is refused. | `issuer` check in `JwtBearerVerifier`; the introspection verifier checks `iss` only when the response carries it | none | GAP |
+| RS-16 | Issuer mismatch is refused. | `http_service_auth.rs` `expected_bearer_issuer` resolves the issuer when the edge starts; both verifiers refuse a token whose `iss` is absent or differs from it | `chio-mcp-remote lib tests::bearer_verifier::jwt_bearer_verifier_rejects_issuer_mismatch`; `chio-mcp-remote lib tests::bearer_verifier::introspection_bearer_verifier_rejects_missing_or_mismatched_issuer` | PASS |
 | RS-17 | `401` challenges for a rejected token carry `error="invalid_token"` (OAuth 2.1 section 5.3, RFC 6750 section 3.1). | `bearer_challenge` emits `resource_metadata` and `scope` only | none; the parameter is not emitted | GAP |
 | RS-18 | Tokens MUST be sent in the `Authorization` header and never in the URI query. | `extract_bearer_token` reads only `Authorization: Bearer`; metadata publishes `bearer_methods_supported: ["header"]` | none | GAP |
 
@@ -148,8 +148,6 @@ change before it can pass.
 | RS-08 | `chio-mcp-remote lib remote_auth_config_rejects_offline_access_scope` | code |
 | RS-09 | `chio-mcp-remote lib chio_oauth_discovery_validation_rejects_unadvertised_issuer` | |
 | RS-11 | `chio-mcp-remote lib introspection_bearer_verifier_rejects_audience_mismatch` | |
-| RS-14 | `chio-mcp-remote lib jwt_bearer_verifier_rejects_token_without_exp` and `introspection_bearer_verifier_rejects_token_without_exp` | code |
-| RS-16 | `chio-mcp-remote lib jwt_bearer_verifier_rejects_issuer_mismatch` and `introspection_bearer_verifier_rejects_missing_or_mismatched_issuer` | code |
 | RS-17 | `chio-mcp-remote lib invalid_token_challenge_carries_error_invalid_token` | code |
 | RS-18 | `chio-mcp-remote lib hosted_mcp_rejects_access_token_in_query_string` | |
 | RS-19 | `chio-mcp-remote lib missing_required_scope_answers_403_insufficient_scope_challenge` | code |
@@ -179,6 +177,8 @@ cargo test --locked -p chio-cli --features real-linux-enforcement \
 ```
 
 - `chio-mcp-adapter` and `chio-mcp-remote` unit tests: 17 of 17 passed.
+- RS-14 and RS-16 ran with the full `chio-mcp-remote` and `chio-mcp-adapter`
+  suites on `05bb3ce0f3` with the fix applied: 230 and 137 passed.
 - `chio-cli` `mcp_serve_http` and `mcp_auth_server`: 11 of 11 passed. These
   tests launch the wrapped server inside the native cage and run only with
   the enforced native fixture (`CHIO_CAGE_INIT`, read grants, runtime files

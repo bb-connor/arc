@@ -1179,7 +1179,6 @@ fn runtime_attestation_claim_vocabulary_lists_portable_codes() {
     );
     assert!(vocabulary.entries.iter().any(|entry| {
         entry.code == RuntimeAttestationNormalizedClaimCode::SecureBootState
-            && entry.legacy_assertion_key == "secureBoot"
             && entry.category == RuntimeAttestationNormalizedClaimCategory::Configuration
             && entry
                 .supported_verifier_families
@@ -1191,6 +1190,42 @@ fn runtime_attestation_claim_vocabulary_lists_portable_codes() {
                 .supported_verifier_families
                 .contains(&AttestationVerifierFamily::EnterpriseVerifier)
     }));
+}
+
+#[test]
+fn runtime_attestation_normalized_claim_rejects_unknown_fields() {
+    let claim = RuntimeAttestationNormalizedClaim::new(
+        RuntimeAttestationNormalizedClaimCode::SecureBootState,
+        json!("enabled"),
+    );
+    let mut value = serde_json::to_value(&claim).test_unwrap();
+    value
+        .as_object_mut()
+        .test_expect("claim serializes as an object")
+        .insert("legacyAssertionKey".to_string(), json!("secureBoot"));
+
+    let error = serde_json::from_value::<RuntimeAttestationNormalizedClaim>(value)
+        .test_expect_err("unknown claim field");
+    assert!(error
+        .to_string()
+        .starts_with("unknown field `legacyAssertionKey`"));
+
+    let entry = runtime_attestation_normalized_claim_vocabulary()
+        .entries
+        .into_iter()
+        .next()
+        .test_expect("vocabulary has entries");
+    let mut value = serde_json::to_value(&entry).test_unwrap();
+    value
+        .as_object_mut()
+        .test_expect("vocabulary entry serializes as an object")
+        .insert("legacyAssertionKey".to_string(), json!("attestationType"));
+
+    let error = serde_json::from_value::<RuntimeAttestationNormalizedClaimVocabularyEntry>(value)
+        .test_expect_err("unknown vocabulary field");
+    assert!(error
+        .to_string()
+        .starts_with("unknown field `legacyAssertionKey`"));
 }
 
 #[test]

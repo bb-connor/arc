@@ -48,13 +48,21 @@ fn post_stateless(server: &TestServer, body: &Value) -> Response {
     post(server, &headers, body)
 }
 
+/// Decode a JSON body, reporting the body when the status is not `expected`.
+fn body_with_status(response: Response, expected: StatusCode) -> Value {
+    let status = response.status();
+    let body = response.text().unwrap();
+    assert_eq!(status, expected, "{body}");
+    serde_json::from_str(&body).unwrap()
+}
+
 fn json_body(response: Response) -> Value {
     assert_eq!(
         response.headers()[CONTENT_TYPE].to_str().unwrap(),
         "application/json"
     );
     assert!(response.headers().get("mcp-session-id").is_none());
-    response.json().unwrap()
+    body_with_status(response, StatusCode::OK)
 }
 
 #[test]
@@ -65,7 +73,6 @@ fn stateless_client_discovers_lists_and_calls_without_a_session() {
         &server,
         &stateless_body(1, "server/discover", json!({}), STATELESS),
     );
-    assert_eq!(discover.status(), StatusCode::OK);
     let discover = json_body(discover);
     assert_eq!(
         discover["result"]["supportedVersions"],
@@ -77,7 +84,6 @@ fn stateless_client_discovers_lists_and_calls_without_a_session() {
         &server,
         &stateless_body(2, "tools/list", json!({}), STATELESS),
     );
-    assert_eq!(tools.status(), StatusCode::OK);
     let tools = json_body(tools);
     assert_eq!(tools["result"]["tools"][0]["name"], "echo_json");
     assert_eq!(tools["result"]["cacheScope"], "private");
@@ -91,7 +97,6 @@ fn stateless_client_discovers_lists_and_calls_without_a_session() {
             STATELESS,
         ),
     );
-    assert_eq!(call.status(), StatusCode::OK);
     let call = json_body(call);
     assert_eq!(call["id"], 3);
     assert_eq!(call["result"]["structuredContent"]["echo"], "stateless");
@@ -149,7 +154,7 @@ fn mirrored_headers_must_match_the_body() {
         ],
         &call,
     );
-    assert_eq!(encoded.status(), StatusCode::OK);
+    body_with_status(encoded, StatusCode::OK);
 
     let with_session = post(
         &server,
@@ -172,8 +177,7 @@ fn unsupported_versions_and_removed_methods_are_refused() {
         &server,
         &stateless_body(1, "tools/list", json!({}), "1900-01-01"),
     );
-    assert_eq!(unsupported.status(), StatusCode::BAD_REQUEST);
-    let unsupported: Value = unsupported.json().unwrap();
+    let unsupported = body_with_status(unsupported, StatusCode::BAD_REQUEST);
     assert_eq!(unsupported["error"]["code"], -32022);
     assert_eq!(unsupported["error"]["data"]["requested"], "1900-01-01");
     assert_eq!(
@@ -182,8 +186,7 @@ fn unsupported_versions_and_removed_methods_are_refused() {
     );
 
     let removed = post_stateless(&server, &stateless_body(2, "ping", json!({}), STATELESS));
-    assert_eq!(removed.status(), StatusCode::NOT_FOUND);
-    let removed: Value = removed.json().unwrap();
+    let removed = body_with_status(removed, StatusCode::NOT_FOUND);
     assert_eq!(removed["error"]["code"], -32601);
 
     let initialize = post_stateless(
@@ -195,8 +198,7 @@ fn unsupported_versions_and_removed_methods_are_refused() {
             STATELESS,
         ),
     );
-    assert_eq!(initialize.status(), StatusCode::BAD_REQUEST);
-    let initialize: Value = initialize.json().unwrap();
+    let initialize = body_with_status(initialize, StatusCode::BAD_REQUEST);
     assert_eq!(initialize["error"]["code"], -32600);
 }
 
@@ -210,7 +212,7 @@ fn handshake_sessions_keep_working_beside_stateless_requests() {
         &server,
         &stateless_body(9, "tools/list", json!({}), STATELESS),
     );
-    assert_eq!(stateless.status(), StatusCode::OK);
+    body_with_status(stateless, StatusCode::OK);
 
     let tools = server.list_tools(&session);
     assert_eq!(tools["result"]["tools"][0]["name"], "echo_json");
@@ -281,7 +283,7 @@ fn ended_sessions_release_their_store_pool_threads() {
                 STATELESS,
             ),
         );
-        assert_eq!(response.status(), StatusCode::OK);
+        body_with_status(response, StatusCode::OK);
     }
     settled("stateless requests");
 

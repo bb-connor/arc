@@ -47,10 +47,10 @@ use chio_credit::{
     CreditFacilityArtifact, CreditFacilityCapitalSource, CreditFacilityDisposition,
     CreditFacilityLifecycleState, CreditFacilityPrerequisites, CreditFacilityReport,
     CreditFacilitySupportBoundary, CreditFacilityTerms, CreditScorecardBand,
-    CreditScorecardConfidence, CreditScorecardSummary, ExposureLedgerQuery,
-    IouEnvelopeCryptoFloorV2, IouEnvelopeIssuerTrustV2, IouEnvelopeMintContextV2,
-    IouEnvelopeReceiptTrustV2, LocalCreditAccount, SignedCreditFacility,
-    CREDIT_FACILITY_ARTIFACT_SCHEMA, CREDIT_FACILITY_REPORT_SCHEMA,
+    CreditScorecardConfidence, CreditScorecardSummary, ExposureLedgerQuery, LocalCreditAccount,
+    ReceivableIouCryptoFloor, ReceivableIouIssuerTrust, ReceivableIouMintContext,
+    ReceivableIouReceiptTrust, SignedCreditFacility, CREDIT_FACILITY_ARTIFACT_SCHEMA,
+    CREDIT_FACILITY_REPORT_SCHEMA,
 };
 use chio_kernel::admission_operation::{
     AdmissionCompensationStatus, AdmissionCompletedProjection, AdmissionDispatchState,
@@ -189,12 +189,12 @@ impl AuthoritySpec {
     }
 }
 
-fn claim_receipt_trust(alternate: bool) -> IouEnvelopeReceiptTrustV2 {
+fn claim_receipt_trust(alternate: bool) -> ReceivableIouReceiptTrust {
     let mut keys = vec![Keypair::from_seed(&[CLAIM_KERNEL_SEED; 32]).public_key()];
     if alternate {
         keys.push(Keypair::from_seed(&[113; 32]).public_key());
     }
-    IouEnvelopeReceiptTrustV2::new(keys, ReceiptCryptoFloor::AllowClassical)
+    ReceivableIouReceiptTrust::new(keys, ReceiptCryptoFloor::AllowClassical)
 }
 
 fn claim_credit_facility_bind_trust(
@@ -226,11 +226,11 @@ fn claim_trust(alternate: bool) -> Result<ReceivableClaimTrustV1, FactorError> {
     ReceivableClaimTrustV1::new(
         &status_trust,
         claim_receipt_trust(alternate),
-        [IouEnvelopeIssuerTrustV2::new(
+        [ReceivableIouIssuerTrust::new(
             CLAIM_IOU_ISSUER_ID.to_owned(),
             CLAIM_IOU_ISSUER_EPOCH,
             Keypair::from_seed(&[CLAIM_IOU_ISSUER_SEED; 32]).public_key(),
-            IouEnvelopeCryptoFloorV2::AllowClassical,
+            ReceivableIouCryptoFloor::AllowClassical,
         )
         .map_err(|error| FactorError::Canonicalization(error.to_string()))?],
         [
@@ -1048,9 +1048,9 @@ impl FactorCase {
             claim_receipt_trust(false),
         );
         let credit_admission = CreditAdmissionStoreAdapter::new(fixture.store.clone());
-        let signed_iou = account.mint_obligation_iou_v2(
+        let signed_iou = account.mint_receivable_iou(
             &credit_admission,
-            &IouEnvelopeMintContextV2 {
+            &ReceivableIouMintContext {
                 atom: &receivable.atom,
                 disposition: &receivable.disposition,
                 settlement_lifecycle: &receivable.settlement,
