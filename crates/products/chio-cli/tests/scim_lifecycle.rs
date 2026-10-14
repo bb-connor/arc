@@ -119,10 +119,24 @@ fn wait_for_trust_service(
                 read_child_stderr(&mut service.child)
             ));
         }
-        match client.get(format!("{base_url}/health")).send() {
-            Ok(response) if response.status() == reqwest::StatusCode::OK => return Ok(()),
-            Ok(_) | Err(_) => std::thread::sleep(std::time::Duration::from_millis(100)),
+        // Receipt reads refuse with 503 until the query snapshot publishes
+        // its first version, so readiness includes the snapshot.
+        let ready = client
+            .get(format!("{base_url}/health"))
+            .send()
+            .ok()
+            .filter(|response| response.status() == reqwest::StatusCode::OK)
+            .and_then(|response| response.json::<Value>().ok())
+            .is_some_and(|health| {
+                matches!(
+                    health["receiptQuerySnapshot"]["state"].as_str(),
+                    Some("ready" | "unconfigured")
+                )
+            });
+        if ready {
+            return Ok(());
         }
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
     Err("trust service did not become ready".to_string())
 }
@@ -439,7 +453,7 @@ fn trust_service_scim_delete_users_deactivates_identity_revokes_capabilities_and
         .expect("query receipts")
         .json()
         .expect("decode receipts");
-    assert_eq!(receipts["count"], 1);
+    assert_eq!(receipts["count"], 1, "{receipts}");
     assert_eq!(
         receipts["receipts"][0]["metadata"]["scimLifecycle"]["userId"],
         user_id
