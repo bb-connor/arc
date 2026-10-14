@@ -1,8 +1,7 @@
 impl FindingChallengeCoordinator {
-    /// Reconstruct the immutable anchor binding for a pre-upgrade intent.
-    /// Current intent digests bind the stable seller-impair intent. Legacy
-    /// digests bind the original enforcement ID. Both forms still commit to
-    /// this liability, penalty, and Merkle root.
+    /// Reconstruct the immutable anchor binding for a confirmed intent. The
+    /// durable intent digest must equal the commitment to this liability's
+    /// seller-impair intent, penalty, and Merkle root.
     fn recover_anchor_binding(
         &self,
         liability_key: &str,
@@ -10,21 +9,11 @@ impl FindingChallengeCoordinator {
         intent: &chio_settle::FindingImpairmentIntent,
         now: u64,
     ) -> Result<(), ChallengeCoordinatorError> {
-        let current_commitment = anchor_evidence_intent_commitment(
+        let commitment = anchor_evidence_intent_commitment(
             liability_key,
             &intent.intent_id,
             &verified.enforcement().penalty_envelope_sha256,
             &intent.merkle_root,
-        );
-        let enforcement = verified.enforcement();
-        let legacy_commitment = sha256_hex(
-            format!(
-                "{EFFECT_ANCHOR_EVIDENCE_DOMAIN}\0{liability_key}\0{enforcement_id}\0{penalty}\0{root}",
-                enforcement_id = enforcement.enforcement_id,
-                penalty = enforcement.penalty_envelope_sha256,
-                root = intent.merkle_root,
-            )
-            .as_bytes(),
         );
         let anchor_key = derive_anchor_evidence_intent_key(&intent.evidence_hash);
         let durable_intent = self
@@ -32,15 +21,11 @@ impl FindingChallengeCoordinator {
             .get_effect_intent(&anchor_key)
             .map_err(|error| ChallengeCoordinatorError::ChallengeStore(error.to_string()))?
             .ok_or(ChallengeCoordinatorError::EffectIntentUnfenced)?;
-        let commitment = if durable_intent.intent_digest == current_commitment {
-            current_commitment
-        } else if durable_intent.intent_digest == legacy_commitment {
-            legacy_commitment
-        } else {
+        if durable_intent.intent_digest != commitment {
             return Err(ChallengeCoordinatorError::ChallengeStore(
-                "anchor intent does not match a supported commitment".to_owned(),
+                "anchor intent does not match its commitment".to_owned(),
             ));
-        };
+        }
         self.challenges
             .reconcile_anchor_effect_root_binding(
                 &anchor_key,

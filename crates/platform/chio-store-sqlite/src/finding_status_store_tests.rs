@@ -1438,110 +1438,6 @@ fn dispatch_eligibility_rejects_commit_clock_rollback_inside_the_transaction() {
 }
 
 #[test]
-fn schema_v1_migration_moves_the_inclusion_window_to_finality() {
-    let fixture = DurableFixture::new();
-    let connection = Connection::open(&fixture.database).expect("open authority database");
-    connection
-        .execute_batch(
-            r#"
-            DROP TRIGGER finding_retraction_intents_lifecycle;
-            CREATE TRIGGER finding_retraction_intents_lifecycle
-            BEFORE UPDATE ON finding_retraction_intents
-            WHEN NEW.intent_id <> OLD.intent_id
-              OR NEW.source <> OLD.source
-              OR NEW.intent_sha256 <> OLD.intent_sha256
-              OR NEW.intent_bytes <> OLD.intent_bytes
-              OR NEW.issued_at <> OLD.issued_at
-              OR NEW.inclusion_deadline <> OLD.inclusion_deadline
-              OR NEW.created_at <> OLD.created_at
-              OR NOT (
-                  (OLD.state = 'waiting_finality' AND NEW.state = 'dispatch_eligible')
-                  OR (OLD.state = 'dispatch_eligible' AND NEW.state = 'published')
-              )
-            BEGIN
-                SELECT RAISE(ABORT, 'invalid finding retraction intent transition');
-            END;
-            "#,
-        )
-        .expect("restore revision one lifecycle trigger");
-    crate::stamp_schema_version(&connection, FINDING_STATUS_SCHEMA_KEY, 1)
-        .expect("stamp revision one");
-    drop(connection);
-
-    let authority = fixture.open();
-    let store = authority.finding_status_store();
-    let finding_id = hex64('6');
-    let intent_id = hex64('7');
-    store
-        .issue_retraction_intent(&FindingRetractionIntentInput {
-            intent_id: &intent_id,
-            feed_id: FEED,
-            operator_id: OPERATOR,
-            finding_id: &finding_id,
-            source: FindingRetractionIntentSource::Enforcement,
-            intent_bytes: b"signed-enforcement-intent",
-            issued_at: NOW + 1,
-            inclusion_deadline: NOW + 500,
-            created_at: NOW + 2,
-        })
-        .expect("persist intent after migration");
-    store
-        .mark_retraction_dispatch_eligible(
-            &intent_id,
-            b"finality",
-            500,
-            FindingRetractionIntentCommitLiveness {
-                valid_from: NOW,
-                valid_until: NOW + 1_000,
-            },
-            || Ok(NOW + 40),
-        )
-        .expect("start inclusion window at finality");
-
-    let retained = store
-        .get_retraction_intent(&intent_id)
-        .expect("load intent")
-        .expect("intent remains durable");
-    assert_eq!(retained.issued_at, NOW + 40);
-    assert_eq!(retained.inclusion_deadline, NOW + 540);
-}
-
-#[test]
-fn schema_v2_migration_recreates_bounded_current_proof_retention() {
-    let fixture = DurableFixture::new();
-    let connection = Connection::open(&fixture.database).expect("open authority database");
-    connection
-        .execute_batch(
-            r#"
-            DROP TRIGGER finding_status_proofs_no_delete;
-            CREATE TRIGGER finding_status_proofs_no_delete
-            BEFORE DELETE ON finding_status_proofs
-            BEGIN
-                SELECT RAISE(ABORT, 'finding status proof must be retained');
-            END;
-            "#,
-        )
-        .expect("restore revision two proof-retention trigger");
-    crate::stamp_schema_version(&connection, FINDING_STATUS_SCHEMA_KEY, 2)
-        .expect("stamp revision two");
-    drop(connection);
-
-    let authority = fixture.open();
-    drop(authority);
-    let connection = Connection::open(&fixture.database).expect("reopen authority database");
-    let trigger_sql: String = connection
-        .query_row(
-            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' \
-             AND name = 'finding_status_proofs_no_delete'",
-            [],
-            |row| row.get(0),
-        )
-        .expect("load migrated proof-retention trigger");
-    assert!(!trigger_sql.contains("proof_kind <> 'non_inclusion'"));
-    assert!(trigger_sql.contains("newer.map_epoch > OLD.map_epoch"));
-}
-
-#[test]
 fn rollback_and_same_epoch_equivocation_reject_without_moving_floor() {
     let fixture = DurableFixture::new();
     let authority = fixture.open();
@@ -1933,4 +1829,43 @@ fn commit_clock_errors_leave_no_retraction_and_survive_restart() {
             .unwrap(),
         FindingStatusWriteOutcome::Inserted
     );
+}
+
+#[test]
+fn finding_status_schema_other_than_current_is_refused() {
+    for version in [0, 5] {
+        let mut connection = rusqlite::Connection::open_in_memory().expect("open");
+        initialize_finding_status_schema(&mut connection).expect("initialize");
+        crate::stamp_schema_version(&connection, FINDING_STATUS_SCHEMA_KEY, version)
+            .expect("stage schema version");
+        let expected = format!(
+            "database schema version {version} is not the current schema version 1; refusing to open"
+        );
+        assert!(matches!(
+            initialize_finding_status_schema(&mut connection),
+            Err(FindingStatusStoreError::Invariant(message)) if message == expected
+        ));
+    }
+}
+
+#[test]
+fn current_stamp_over_a_retired_status_shape_is_refused() {
+    let mut connection = rusqlite::Connection::open_in_memory().expect("open");
+    initialize_finding_status_schema(&mut connection).expect("initialize");
+    connection
+        .execute_batch("DROP INDEX finding_status_epochs_by_operator;")
+        .expect("drop index");
+    assert!(matches!(
+        initialize_finding_status_schema(&mut connection),
+        Err(FindingStatusStoreError::Invariant(message))
+            if message == "finding status schema differs from the canonical definition"
+    ));
+    let restored: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_schema WHERE name = 'finding_status_epochs_by_operator'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count");
+    assert_eq!(restored, 0, "a refused store is not repaired");
 }

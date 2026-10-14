@@ -31,7 +31,7 @@ impl FindingChallengeCoordinator {
         }
 
         /// Read the exact signed filing envelope retained atomically with a
-        /// challenge. Legacy terminal rows may have no retained envelope.
+        /// challenge, or `None` when no envelope is retained for it.
         pub fn challenge_submission(
             &self,
             challenge_id: &str,

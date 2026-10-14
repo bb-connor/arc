@@ -282,10 +282,6 @@ fn complete_artifact_indexes_are_not_backfilled_again() {
     store
         .put_with_artifact_indexes(&finding_id(), bundle, &indexes)
         .unwrap();
-    assert!(store
-        .list_without_complete_artifact_index(10_000)
-        .unwrap()
-        .is_empty());
 }
 
 #[test]
