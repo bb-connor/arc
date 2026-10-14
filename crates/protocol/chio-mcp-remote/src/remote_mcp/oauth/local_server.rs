@@ -208,6 +208,7 @@ impl LocalAuthorizationServer {
                 OAuthError::AccessDenied,
                 "authorization request denied",
                 request.state.as_deref(),
+                &self.issuer,
             ));
         }
         let resource = validate_authorization_request(
@@ -290,6 +291,7 @@ impl LocalAuthorizationServer {
             if let Some(state) = request.state.as_deref() {
                 pairs.append_pair("state", state);
             }
+            pairs.append_pair("iss", &self.issuer);
         }
         Ok(Redirect::to(redirect_uri.as_str()))
     }
