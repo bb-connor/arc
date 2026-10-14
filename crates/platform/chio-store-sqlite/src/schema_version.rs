@@ -67,11 +67,8 @@ pub enum SchemaState {
 
 /// Validate the stamp of a store that has exactly one schema.
 ///
-/// An unstamped (`application_id == 0`) database is accepted only when it has no
-/// user tables; populated, it is refused as
-/// [`SchemaVersionError::ForeignDatabase`]. The remaining identity checks match
-/// [`check_schema_version`]. A database stamped at any version other than
-/// `current_version`, lower or higher, is refused as
+/// The identity checks match [`check_schema_version`]. A database stamped at any
+/// version other than `current_version`, lower or higher, is refused as
 /// [`SchemaVersionError::StaleSchema`].
 pub fn check_current_schema(
     conn: &Connection,
@@ -79,13 +76,6 @@ pub fn check_current_schema(
     current_version: i32,
     anchor_tables: &[&str],
 ) -> Result<SchemaState, SchemaVersionError> {
-    let app_id: i32 = conn.query_row("PRAGMA application_id", [], |row| row.get(0))?;
-    if app_id == 0 && user_table_count(conn)? != 0 {
-        return Err(SchemaVersionError::ForeignDatabase {
-            found: app_id,
-            expected: CHIO_SQLITE_APPLICATION_ID,
-        });
-    }
     check_store_identity(conn, anchor_tables)?;
     match read_store_schema_version(conn, store_key)? {
         None => Ok(SchemaState::Unstamped),
@@ -102,17 +92,14 @@ pub fn check_current_schema(
 /// identifies this store's revision within the keyed metadata table, so
 /// co-located stores in one shared file each track their own revision.
 ///
-/// An unstamped database (`application_id == 0`) is ambiguous: it is shared by a
-/// freshly created file, a legacy Chio store written before stamping existed,
-/// and countless unrelated SQLite files. It is adopted and stamped only when the
-/// contents prove provenance (the database is empty or carries one of this
-/// store's `legacy_tables`); otherwise it is refused as
+/// An unstamped database (`application_id == 0`) is stamped only when it has no
+/// user tables; a populated one is refused as
 /// [`SchemaVersionError::ForeignDatabase`] rather than commingling Chio tables
 /// into a foreign file.
 ///
 /// A database already stamped with the shared Chio `application_id` proves it is
 /// a Chio store, but not that it is *this* store's. A populated stamped database
-/// must therefore also carry one of `legacy_tables`, or it is refused as
+/// must therefore also carry one of `anchor_tables`, or it is refused as
 /// [`SchemaVersionError::MismatchedStore`] so a path aimed at a sibling store's
 /// database (a budget or authority file) never gets this store's tables written
 /// into it. An empty stamped database (freshly stamped, tables not yet created)
@@ -121,9 +108,9 @@ pub fn check_schema_version(
     conn: &Connection,
     store_key: &str,
     supported_version: i32,
-    legacy_tables: &[&str],
+    anchor_tables: &[&str],
 ) -> Result<i32, SchemaVersionError> {
-    check_store_identity(conn, legacy_tables)?;
+    check_store_identity(conn, anchor_tables)?;
     let on_disk_version = read_store_schema_version(conn, store_key)?.unwrap_or(0);
     if on_disk_version > supported_version {
         return Err(SchemaVersionError::FutureSchema {
@@ -136,12 +123,12 @@ pub fn check_schema_version(
 
 fn check_store_identity(
     conn: &Connection,
-    legacy_tables: &[&str],
+    anchor_tables: &[&str],
 ) -> Result<(), SchemaVersionError> {
     let app_id: i32 = conn.query_row("PRAGMA application_id", [], |row| row.get(0))?;
 
     if app_id == 0 {
-        if !database_belongs_to_store(conn, legacy_tables)? {
+        if user_table_count(conn)? != 0 {
             return Err(SchemaVersionError::ForeignDatabase {
                 found: app_id,
                 expected: CHIO_SQLITE_APPLICATION_ID,
@@ -158,9 +145,9 @@ fn check_store_identity(
             expected: CHIO_SQLITE_APPLICATION_ID,
         });
     }
-    if !database_belongs_to_store(conn, legacy_tables)? {
+    if !database_belongs_to_store(conn, anchor_tables)? {
         return Err(SchemaVersionError::MismatchedStore {
-            expected_anchors: legacy_tables
+            expected_anchors: anchor_tables
                 .iter()
                 .map(|table| table.to_string())
                 .collect(),
@@ -192,20 +179,17 @@ pub(crate) fn read_store_schema_version(
         .optional()?)
 }
 
-/// Whether a database may be adopted as this store's. It qualifies when it has no
-/// user tables (a freshly created or freshly stamped file) or when it carries a
-/// known anchor table (a legacy pre-stamping store, or a reopened store of the
-/// same kind). This keeps an unrelated SQLite file from being written into and
-/// keeps a sibling Chio store's populated database from being mistaken for this
-/// one, without falsely rejecting an empty or same-kind database.
+/// Whether a stamped Chio database may be opened as this store's: it has no user
+/// tables yet or it carries one of this store's anchor tables, so a sibling Chio
+/// store's populated database is never mistaken for this one.
 fn database_belongs_to_store(
     conn: &Connection,
-    legacy_tables: &[&str],
+    anchor_tables: &[&str],
 ) -> Result<bool, SchemaVersionError> {
     if user_table_count(conn)? == 0 {
         return Ok(true);
     }
-    for table in legacy_tables {
+    for table in anchor_tables {
         let present: bool = conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
             [table],
@@ -276,13 +260,19 @@ mod tests {
     }
 
     #[test]
-    fn legacy_unstamped_db_with_anchor_table_adopts_v0() -> Result<(), Box<dyn std::error::Error>> {
+    fn unstamped_db_with_anchor_table_is_refused() -> Result<(), Box<dyn std::error::Error>> {
         let conn = Connection::open_in_memory()?;
         conn.execute_batch("CREATE TABLE chio_tool_receipts (id TEXT PRIMARY KEY);")?;
-        let version = check_schema_version(&conn, STORE_KEY, SUPPORTED, &["chio_tool_receipts"])?;
-        assert_eq!(version, 0);
+        let error = check_schema_version(&conn, STORE_KEY, SUPPORTED, &["chio_tool_receipts"]);
+        assert!(matches!(
+            error,
+            Err(SchemaVersionError::ForeignDatabase {
+                found: 0,
+                expected: CHIO_SQLITE_APPLICATION_ID
+            })
+        ));
         let app_id: i32 = conn.query_row("PRAGMA application_id", [], |r| r.get(0))?;
-        assert_eq!(app_id, CHIO_SQLITE_APPLICATION_ID);
+        assert_eq!(app_id, 0, "a refused database is not stamped");
         Ok(())
     }
 
