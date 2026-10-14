@@ -793,7 +793,7 @@ fn federation_emits_chio_federation_hop_total_and_latency() -> Result<(), Box<dy
         &tool_host,
         &receipt,
         &cosigner,
-        "file_read",
+        &receipt.tool_name,
         1_734_000_000_000,
     )?;
 
@@ -1486,7 +1486,7 @@ fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {
             &tool_host,
             &receipt,
             &cosigner,
-            "file_read",
+            &receipt.tool_name,
             1_734_000_000_000,
         )?;
         return Ok(Some(
