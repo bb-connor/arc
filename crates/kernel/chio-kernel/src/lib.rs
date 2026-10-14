@@ -76,6 +76,8 @@ pub mod cost_attribution;
 #[cfg(not(loom))]
 pub mod custody;
 #[cfg(not(loom))]
+pub mod delegated_work;
+#[cfg(not(loom))]
 pub mod dispatch_status;
 #[cfg(not(loom))]
 pub mod dpop;
