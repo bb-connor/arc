@@ -5,10 +5,10 @@
 | Field | Value |
 |-------|-------|
 | Regulation | Colorado Senate Bill 24-205, "Consumer Protections for Artificial Intelligence" |
-| Effective Date | February 1, 2026 |
+| Effective Date | June 30, 2026 (SB 24-205 requirements, as extended by SB 25B-004, 2025 Colo. Sess. Laws, 1st Extraordinary Sess., ch. 3) |
 | Chio Profile | Current v1-only pre-release profile |
 | Document Date | 2026-03-22 |
-| Filing Deadline | June 30, 2026 |
+| Superseded By | SB 26-189 (2026 Colo. Sess. Laws ch. 131), which repeals and reenacts C.R.S. title 6, article 1, part 17 effective January 1, 2027, for consequential decisions made on or after that date |
 | Maintained by | Chio Protocol Team |
 
 ---
@@ -98,6 +98,6 @@ Expected output: all referenced test functions exist and report `ok`.
 
 ## Regulatory Notes
 
-The clause numbers above (§6-1-1703) reference Colorado SB 24-205 as enacted, effective February 1, 2026. The Colorado AI Act imposes requirements on developers and deployers of high-risk AI systems. Chio operates as infrastructure for the Runtime Kernel layer of an AI agent system and directly satisfies the record-keeping, audit, tamper-evidence, and transparency obligations described above.
+The clause numbers above (§6-1-1703) reference Colorado SB 24-205 as enacted (2024 Colo. Sess. Laws ch. 198). SB 24-205 set its requirements to apply on and after February 1, 2026; SB 25B-004 (approved August 28, 2025) extended that date to June 30, 2026. SB 26-189 (signed May 14, 2026) repeals and reenacts C.R.S. title 6, article 1, part 17 as requirements for automated decision-making technology used in consequential decisions, effective January 1, 2027 and applying to consequential decisions made on or after that date; its section numbers and obligations differ from SB 24-205 (for example, C.R.S. 6-1-1703 becomes deployer record keeping for at least three years). The Colorado AI Act imposes requirements on developers and deployers of high-risk AI systems. Chio operates as infrastructure for the Runtime Kernel layer of an AI agent system and directly satisfies the record-keeping, audit, tamper-evidence, and transparency obligations described above.
 
 Legal review of this mapping against the final enrolled bill text is recommended before filing. Technical claims in the "Clause Mapping" table are verifiable by running `cargo test --workspace`.
