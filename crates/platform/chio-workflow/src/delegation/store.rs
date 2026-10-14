@@ -7,6 +7,23 @@ use std::{
     time::Duration,
 };
 
+const SCHEMA_VERSION: i32 = 1;
+const SCHEMA: &str = "
+    CREATE TABLE work_slots_v1 (
+        id TEXT PRIMARY KEY, parent TEXT REFERENCES work_slots_v1(id),
+        root TEXT NOT NULL, body TEXT NOT NULL, allocated TEXT NOT NULL,
+        selection TEXT, revision INTEGER NOT NULL, dispatched INTEGER NOT NULL
+    );
+    CREATE INDEX work_slots_parent_v1 ON work_slots_v1(parent);
+    CREATE INDEX work_slots_root_v1 ON work_slots_v1(root);
+    CREATE TABLE work_dispatch_permits_v1 (
+        slot_id TEXT PRIMARY KEY REFERENCES work_slots_v1(id), body TEXT NOT NULL
+    );
+    CREATE TABLE work_allocator_identity_v1 (
+        singleton INTEGER PRIMARY KEY CHECK(singleton=1), domain TEXT NOT NULL
+    );
+";
+
 /// Protected owner-local allocation service. Callers must not share or roll back
 /// its database independently of native operation custody. No allocation release
 /// API exists: ambiguous work retains its full ceiling.
@@ -29,47 +46,44 @@ impl DelegationStore {
         let mut connection = Connection::open(path)?;
         connection.busy_timeout(Duration::from_secs(5))?;
         connection.execute_batch(
-            "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;
-            PRAGMA synchronous=FULL;
-            CREATE TABLE IF NOT EXISTS work_slots_v1 (
-                id TEXT PRIMARY KEY, parent TEXT REFERENCES work_slots_v1(id),
-                root TEXT NOT NULL, body TEXT NOT NULL, allocated TEXT NOT NULL,
-                selection TEXT, revision INTEGER NOT NULL, dispatched INTEGER NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS work_slots_parent_v1 ON work_slots_v1(parent);
-            CREATE INDEX IF NOT EXISTS work_slots_root_v1 ON work_slots_v1(root);
-            CREATE TABLE IF NOT EXISTS work_dispatch_permits_v1 (
-                slot_id TEXT PRIMARY KEY REFERENCES work_slots_v1(id), body TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS work_allocator_identity_v1 (
-                singleton INTEGER PRIMARY KEY CHECK(singleton=1), domain TEXT NOT NULL
-            );",
+            "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;",
         )?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let domain: Option<String> = tx
-            .query_row(
-                "SELECT domain FROM work_allocator_identity_v1 WHERE singleton=1",
-                [],
-                |r| r.get(0),
-            )
-            .optional()?;
-        if let Some(domain) = domain {
-            hash(&domain)?;
-        } else {
-            let count: i64 =
-                tx.query_row("SELECT count(*) FROM work_slots_v1", [], |r| r.get(0))?;
-            if count != 0 {
-                return invalid(
-                    "existing allocation store has no namespace; explicit migration required",
-                );
+        let version: i32 = tx.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        match version {
+            SCHEMA_VERSION => {
+                let domain: String = tx
+                    .query_row(
+                        "SELECT domain FROM work_allocator_identity_v1 WHERE singleton=1",
+                        [],
+                        |r| r.get(0),
+                    )
+                    .optional()?
+                    .ok_or(Error::Invalid(
+                        "allocation store has no allocator identity".to_string(),
+                    ))?;
+                hash(&domain)?;
             }
-            // A random public identifier, not a signing authority. Its protected
-            // persistence prevents equal local names from sharing signed consent.
-            let domain = Keypair::generate().public_key().to_hex();
-            tx.execute(
-                "INSERT INTO work_allocator_identity_v1(singleton,domain) VALUES(1,?1)",
-                [&domain],
-            )?;
+            0 => {
+                let tables: i64 = tx.query_row(
+                    "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+                    [],
+                    |r| r.get(0),
+                )?;
+                if tables != 0 {
+                    return invalid("database is not an allocation store");
+                }
+                tx.execute_batch(SCHEMA)?;
+                // A random public identifier, not a signing authority. Its protected
+                // persistence prevents equal local names from sharing signed consent.
+                let domain = Keypair::generate().public_key().to_hex();
+                tx.execute(
+                    "INSERT INTO work_allocator_identity_v1(singleton,domain) VALUES(1,?1)",
+                    [&domain],
+                )?;
+                tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+            }
+            found => return Err(Error::StaleSchema { found }),
         }
         tx.commit()?;
         Ok(Self {
@@ -389,5 +403,5 @@ fn allocation_digest(connection: &Connection, row: &Row) -> Result<String> {
     if root.parent.is_some() || root.root != root.slot.id {
         return invalid("stored allocation root");
     }
-    binding_digest(&("chio.work-allocation.v2", domain, root.slot, &row.slot))
+    binding_digest(&("chio.work-allocation.v1", domain, root.slot, &row.slot))
 }

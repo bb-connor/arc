@@ -613,3 +613,28 @@ fn allocator_namespace_survives_reopen_and_is_not_silently_recreated() -> Result
     );
     Ok(())
 }
+
+#[test]
+fn store_refuses_a_stale_schema_stamp() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("allocation.db");
+    drop(DelegationStore::open(&path)?);
+    rusqlite::Connection::open(&path)?.pragma_update(None, "user_version", 2)?;
+    assert!(matches!(
+        DelegationStore::open(&path),
+        Err(DelegationError::StaleSchema { found: 2 })
+    ));
+    Ok(())
+}
+
+#[test]
+fn store_refuses_a_foreign_database() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("foreign.db");
+    rusqlite::Connection::open(&path)?.execute_batch("CREATE TABLE other(id INTEGER);")?;
+    assert!(matches!(
+        DelegationStore::open(&path),
+        Err(DelegationError::Invalid(message)) if message == "database is not an allocation store"
+    ));
+    Ok(())
+}

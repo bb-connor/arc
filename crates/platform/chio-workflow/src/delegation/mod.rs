@@ -31,6 +31,8 @@ pub enum DelegationError {
     Rejected,
     #[error("delegation store is unavailable")]
     Unavailable,
+    #[error("delegation store schema version {found} is not the current version")]
+    StaleSchema { found: i32 },
     #[error(transparent)]
     Database(#[from] rusqlite::Error),
 }

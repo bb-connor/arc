@@ -164,8 +164,8 @@ pub struct Subdivision {
     pub child: WorkSlot,
 }
 
-/// Receiver-signed v2 offer with accepted-output pricing: a result rejected by
-/// the bound predicate earns zero charge in the qualified native payment profile.
+/// Receiver-signed offer priced on accepted output: a result rejected by the
+/// bound predicate earns no charge.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorkOffer {
@@ -196,13 +196,13 @@ mod sealed {
     }
 }
 impl sealed::Body for Subdivision {
-    const DOMAIN: &'static str = "chio.work-subdivision.v2";
+    const DOMAIN: &'static str = "chio.work-subdivision.v1";
 }
 impl sealed::Body for WorkOffer {
-    const DOMAIN: &'static str = "chio.work-offer.v2";
+    const DOMAIN: &'static str = "chio.work-offer.v1";
 }
 impl sealed::Body for Selection {
-    const DOMAIN: &'static str = "chio.work-selection.v2";
+    const DOMAIN: &'static str = "chio.work-selection.v1";
 }
 
 /// Portable evidence from an explicitly trusted resource allocator. It does
@@ -217,7 +217,7 @@ pub struct DispatchPermit {
     pub issued_at: u64,
 }
 impl sealed::Body for DispatchPermit {
-    const DOMAIN: &'static str = "chio.work-dispatch-permit.v2";
+    const DOMAIN: &'static str = "chio.work-dispatch-permit.v1";
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
