@@ -25,7 +25,7 @@ async fn failed_restoration_preserves_authenticated_session_bytes() {
         .expect("persist session");
     let sessions = RemoteSessionLedger::new(
         RemoteClock::new(Arc::new(RecoveryClock(StdMutex::new(reading(11))))),
-        SessionLifecyclePolicy::from_env(),
+        SessionLifecyclePolicy::default(),
         None,
         None,
     )
@@ -76,7 +76,7 @@ async fn expired_ready_recovery_is_durable_before_any_upstream_launch(
     persist_active_session_record(&path, &record, &keyring, 12)?;
     let sessions = RemoteSessionLedger::new(
         RemoteClock::new(Arc::new(RecoveryClock(StdMutex::new(reading(12))))),
-        SessionLifecyclePolicy::from_env(),
+        SessionLifecyclePolicy::default(),
         None,
         None,
     )?;
@@ -119,7 +119,7 @@ async fn recovery_clock_fault_or_future_record_preserves_active_authority(
     for time in [Err(ClockError::Unavailable), reading(10)] {
         let sessions = RemoteSessionLedger::new(
             RemoteClock::new(Arc::new(RecoveryClock(StdMutex::new(time)))),
-            SessionLifecyclePolicy::from_env(),
+            SessionLifecyclePolicy::default(),
             None,
             None,
         )?;
@@ -157,7 +157,7 @@ async fn expiry_during_recovery_is_terminal_but_unrelated_expiry_is_retained(
         let source = Arc::new(RecoveryClock(StdMutex::new(reading(11))));
         let sessions = RemoteSessionLedger::new(
             RemoteClock::new(source.clone()),
-            SessionLifecyclePolicy::from_env(),
+            SessionLifecyclePolicy::default(),
             None,
             None,
         )?;
@@ -202,7 +202,7 @@ async fn failed_expiry_fence_preserves_recovery_material() -> Result<(), Box<dyn
     connection.execute_batch("CREATE TRIGGER refuse_expiry BEFORE INSERT ON remote_session_terminal_fences BEGIN SELECT RAISE(ABORT, 'injected fence outage'); END;")?;
     let sessions = RemoteSessionLedger::new(
         RemoteClock::new(Arc::new(RecoveryClock(StdMutex::new(reading(12))))),
-        SessionLifecyclePolicy::from_env(),
+        SessionLifecyclePolicy::default(),
         None,
         None,
     )?;
@@ -262,12 +262,8 @@ async fn restored_transport_obeys_original_deadline_and_stops_even_if_fencing_fa
         }
         let source = Arc::new(RecoveryClock(StdMutex::new(reading(11))));
         let clock = RemoteClock::new(source.clone());
-        let sessions = RemoteSessionLedger::new(
-            clock.clone(),
-            SessionLifecyclePolicy::from_env(),
-            None,
-            None,
-        )?;
+        let sessions =
+            RemoteSessionLedger::new(clock.clone(), SessionLifecyclePolicy::default(), None, None)?;
         let transport = Arc::new(RecoveryTransport::default());
         let result = restore_persisted_sessions(&path, &keyring, &sessions, |record| {
             *source.0.lock().unwrap() = Ok(ClockReading::new(
@@ -289,7 +285,7 @@ async fn restored_transport_obeys_original_deadline_and_stops_even_if_fencing_fa
                 policy_fingerprint: record.policy_fingerprint.clone().unwrap_or_default(),
                 runtime_contract_fingerprint: record.runtime_contract_fingerprint.clone(),
                 hosted_isolation: record.hosted_isolation,
-                lifecycle_policy: SessionLifecyclePolicy::from_env(),
+                lifecycle_policy: SessionLifecyclePolicy::default(),
                 protocol_version: record.protocol_version.clone(),
                 peer_capabilities: Some(record.peer_capabilities.clone()),
                 initialize_params: Some(record.initialize_params.clone()),
@@ -367,7 +363,7 @@ async fn committed_expiry_fence_survives_failed_tombstone_finalization_and_resta
     let clock = RemoteClock::new(Arc::new(RecoveryClock(StdMutex::new(reading(12)))));
     let sessions = RemoteSessionLedger::new(
         clock.clone(),
-        SessionLifecyclePolicy::from_env(),
+        SessionLifecyclePolicy::default(),
         Some(path.clone()),
         Some(keyring.clone()),
     )?;
@@ -393,7 +389,7 @@ async fn committed_expiry_fence_survives_failed_tombstone_finalization_and_resta
     drop(sessions);
     let restarted = RemoteSessionLedger::new(
         clock,
-        SessionLifecyclePolicy::from_env(),
+        SessionLifecyclePolicy::default(),
         Some(path.clone()),
         Some(keyring.clone()),
     )?;
@@ -441,7 +437,7 @@ async fn tampered_pending_tombstone_keeps_the_store_unserved(
     let clock = RemoteClock::new(Arc::new(RecoveryClock(StdMutex::new(reading(12)))));
     let sessions = RemoteSessionLedger::new(
         clock.clone(),
-        SessionLifecyclePolicy::from_env(),
+        SessionLifecyclePolicy::default(),
         Some(path.clone()),
         Some(keyring.clone()),
     )?;
@@ -465,7 +461,7 @@ async fn tampered_pending_tombstone_keeps_the_store_unserved(
     )?;
     assert!(RemoteSessionLedger::new(
         clock,
-        SessionLifecyclePolicy::from_env(),
+        SessionLifecyclePolicy::default(),
         Some(path.clone()),
         Some(keyring.clone()),
     )

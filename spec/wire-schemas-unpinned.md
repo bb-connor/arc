@@ -190,7 +190,7 @@ since been pinned is removed by the next `--update`.
 - `crates/security/chio-secret-broker/src/audit.rs:40` `BROKER_AUDIT_GOVERNED_INTENT_SCHEMA` = `chio.broker-audit-intent.v1`
 - `crates/security/chio-secret-broker/src/daemon.rs:33` `DAEMON_ADMIN_INTENT_SCHEMA` = `chio.broker-daemon-admin-intent.v1`
 - `crates/security/chio-secret-broker/src/daemon.rs:34` `ISSUE_CAPABILITY_SCHEMA` = `chio.broker-issue-capability.v1`
-- `crates/security/chio-secret-broker/src/daemon_runtime.rs:62` `BROKER_DAEMON_CONFIG_SCHEMA` = `chio.secret-brokerd.runtime-config.v6`
+- `crates/security/chio-secret-broker/src/daemon_runtime.rs:62` `BROKER_DAEMON_CONFIG_SCHEMA` = `chio.secret-brokerd.runtime-config.v1`
 - `crates/security/chio-secret-broker/src/kernel_admission.rs:25` `VERIFIER_ID` = `chio.secret-broker.kernel-quota-verifier.v1`
 - `crates/security/chio-secret-broker/src/kernel_admission/registration.rs:23` `PARTICIPANT_ID` = `chio.secret-broker.kernel-registration.v1`
 - `crates/security/chio-secret-broker/src/kernel_admission/routes.rs:24` `VERIFIER_ID` = `chio.secret-broker.route-quota-verifier.v1`

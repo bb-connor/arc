@@ -103,39 +103,6 @@ pub(super) fn session_now_millis() -> u64 {
     RemoteClock::default().millis().test_unwrap("test clock")
 }
 
-pub(super) fn read_session_lifecycle_policy() -> SessionLifecyclePolicy {
-    SessionLifecyclePolicy {
-        idle_expiry_millis: read_env_u64(
-            SESSION_IDLE_EXPIRY_ENV,
-            DEFAULT_SESSION_IDLE_EXPIRY_MILLIS,
-        ),
-        drain_grace_millis: read_env_u64(
-            SESSION_DRAIN_GRACE_ENV,
-            DEFAULT_SESSION_DRAIN_GRACE_MILLIS,
-        ),
-        reaper_interval_millis: read_env_u64(
-            SESSION_REAPER_INTERVAL_ENV,
-            DEFAULT_SESSION_REAPER_INTERVAL_MILLIS,
-        ),
-        tombstone_retention_millis: read_env_u64(
-            SESSION_TOMBSTONE_RETENTION_ENV,
-            DEFAULT_SESSION_TOMBSTONE_RETENTION_MILLIS,
-        ),
-        request_response_timeout_millis: read_env_u64(
-            REQUEST_RESPONSE_TIMEOUT_ENV,
-            DEFAULT_REQUEST_RESPONSE_TIMEOUT_MILLIS,
-        ),
-    }
-}
-
-pub(super) fn read_env_u64(name: &str, default: u64) -> u64 {
-    std::env::var(name)
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .filter(|value| *value > 0)
-        .unwrap_or(default)
-}
-
 pub(super) fn terminal_session_response(state: RemoteSessionState) -> Response {
     match state {
         RemoteSessionState::Initializing => {

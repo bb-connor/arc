@@ -135,7 +135,7 @@ capabilities:
     .unwrap();
     config.test_session_line_bytes = Some(SESSION_LINE_BYTES);
     if let Some(millis) = request_response_timeout_millis {
-        let mut policy = config.lifecycle_policy();
+        let mut policy = config.lifecycle_policy().expect("lifecycle policy");
         policy.request_response_timeout_millis = millis;
         config.test_lifecycle_policy = Some(policy);
     }
@@ -147,8 +147,13 @@ capabilities:
     }));
     configure_signed_manifest(&mut config, directory.path());
     let sessions = Arc::new(
-        RemoteSessionLedger::new(config.clock.clone(), config.lifecycle_policy(), None, None)
-            .unwrap(),
+        RemoteSessionLedger::new(
+            config.clock.clone(),
+            config.lifecycle_policy().expect("lifecycle policy"),
+            None,
+            None,
+        )
+        .unwrap(),
     );
     let factory = Arc::new(RemoteSessionFactory::new(config).unwrap());
     Fixture {
@@ -510,7 +515,12 @@ async fn controlled_session(
     session_id: &str,
     event_capacity: usize,
 ) -> (Arc<RemoteSession>, McpInboxReceiver) {
-    let lifecycle_policy = fixture.state.factory.config.lifecycle_policy();
+    let lifecycle_policy = fixture
+        .state
+        .factory
+        .config
+        .lifecycle_policy()
+        .expect("lifecycle policy");
     controlled_session_with_policy(fixture, session_id, event_capacity, lifecycle_policy).await
 }
 
@@ -614,7 +624,12 @@ async fn lagged_post_response_fails_closed_without_reinvocation() {
 #[tokio::test]
 async fn unanswered_request_ends_at_its_deadline_and_releases_waiting_posts() {
     let fixture = fixture(0, None);
-    let mut policy = fixture.state.factory.config.lifecycle_policy();
+    let mut policy = fixture
+        .state
+        .factory
+        .config
+        .lifecycle_policy()
+        .expect("lifecycle policy");
     policy.request_response_timeout_millis = 200;
     let (session, input_rx) =
         controlled_session_with_policy(&fixture, "unanswered-session", 8, policy).await;

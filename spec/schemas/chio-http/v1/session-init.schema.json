@@ -30,7 +30,7 @@
     },
     "hosted_isolation": {
       "type": "string",
-      "enum": ["dedicated_per_session", "shared_hosted_owner_compatibility"],
+      "enum": ["dedicated_per_session", "shared_hosted_owner"],
       "default": "dedicated_per_session",
       "description": "Hosted-isolation mode for the session. Mirrors the snake_case enum `RemoteHostedIsolationMode` in `crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs`."
     },

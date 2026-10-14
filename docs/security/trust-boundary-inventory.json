@@ -1511,6 +1511,7 @@
     "crates/products/chio-cli/src/cli/dispatch/finding/hosted.rs::read_canonical_private_json::from_wire",
     "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs::load_profile::from_wire",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::read_private_client_profile::from_wire",
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata::from_wire",
     "crates/products/chio-cli/src/cli/input.rs::canonical_ijson::from_wire",
     "crates/products/chio-cli/src/cli/input.rs::decode::from_wire",
     "crates/products/chio-cli/src/cli/input/config.rs::load_document::from_wire",
@@ -1653,20 +1654,6 @@
     "crates/trust/chio-weights/src/card.rs::from_canonical_json::from_wire"
   ],
   "raw_decoders": [
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
@@ -5615,20 +5602,6 @@
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
       "try_from::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/canonical/signed_json.rs": [
@@ -5960,6 +5933,9 @@
     ],
     "crates/platform/chio-control-plane/src/enterprise_federation.rs": [
       "serialize::custom_deserialize"
+    ],
+    "crates/platform/chio-control-plane/src/evidence_export/verification.rs": [
+      "verify_http_receipt_evidence::from_value"
     ],
     "crates/platform/chio-control-plane/src/fiscal_state_anchor.rs": [
       "compare_and_swap::from_slice"
@@ -6694,7 +6670,7 @@
             "serde::Deserializer"
           ],
           "checked": true,
-          "instances": 573
+          "instances": 559
         }
       ]
     },
@@ -8143,6 +8119,22 @@
           ],
           "apis": [
             "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/platform/chio-control-plane/src/evidence_export/verification.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "The embedded HTTP receipt is decoded from the signed evidence package JSON value. Decoding does not establish authority. Verification requires the HTTP content ID, both signatures, equal signer keys, and the complete canonical core receipt projection; evidence policy establishes signer trust.",
+      "readers": [
+        {
+          "reader": "verify_http_receipt_evidence",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
           ],
           "checked": true
         }
@@ -16880,6 +16872,7 @@
     "crates/products/chio-cli/src/cli/dispatch/finding/hosted.rs::read_canonical_private_json::from_wire#1::decode_canonical",
     "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs::load_profile::from_wire#1::decode_canonical",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::read_private_client_profile::from_wire#1::decode_canonical",
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata::from_wire#1::decode_document",
     "crates/products/chio-cli/src/cli/input.rs::canonical_ijson::from_wire#1::canonicalize+decode_canonical",
     "crates/products/chio-cli/src/cli/input.rs::decode::from_wire#1::decode_signed",
     "crates/products/chio-cli/src/cli/input/config.rs::load_document::from_wire#1::decode_document",
@@ -22449,6 +22442,11 @@
     "crates/platform/chio-store-sqlite/src/security_state/flow_state.rs": [
       "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label",
       "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label"
+    ],
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs": [
+      "add_npm_runtime::shared-reader::crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata",
+      "add_npm_runtime::shared-reader::crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata",
+      "read_package_metadata::original-json-reader::UntrustedJsonText"
     ],
     "crates/tooling/chio-conformance/src/runner/restart_probe.rs": [
       "open_subscribed_session::shared-reader::crates/tooling/chio-conformance/src/runner/restart_probe.rs::validate_initialize",

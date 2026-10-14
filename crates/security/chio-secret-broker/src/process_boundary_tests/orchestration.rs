@@ -486,7 +486,7 @@ pub(super) fn run_boundary_test() {
         report_from_output(&upstream_output.stdout, UPSTREAM_REPORT_PREFIX);
     assert_eq!(
         upstream_report.schema,
-        "chio.process-boundary-upstream-report.v2"
+        "chio.process-boundary-upstream-report.v1"
     );
     assert_eq!(upstream_report.method, request.request.destination.method);
     assert_eq!(

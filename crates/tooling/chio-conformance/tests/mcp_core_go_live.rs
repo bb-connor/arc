@@ -4,9 +4,9 @@ use std::process::{Command, Stdio};
 
 use chio_conformance::{default_run_options, run_conformance_harness, unique_run_dir, PeerTarget};
 
-fn command_available(program: &str) -> bool {
-    Command::new(program)
-        .arg("--version")
+fn go_available() -> bool {
+    Command::new("go")
+        .arg("version")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
@@ -40,7 +40,7 @@ fn python3_supports_chio_sdk() -> bool {
 
 #[test]
 fn mcp_core_remote_http_harness_runs_against_live_go_peer() {
-    if !command_available("go") || !python3_supports_chio_sdk() {
+    if !go_available() || !python3_supports_chio_sdk() {
         return;
     }
 

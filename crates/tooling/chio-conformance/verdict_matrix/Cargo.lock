@@ -1160,6 +1160,7 @@ dependencies = [
  "chio-core-types",
  "chio-kernel",
  "chio-kernel-browser",
+ "chio-test-support",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1582,6 +1583,14 @@ version = "0.1.0"
 dependencies = [
  "loom",
  "serde",
+]
+
+[[package]]
+name = "chio-test-support"
+version = "0.1.0"
+dependencies = [
+ "chio-security-types",
+ "tempfile",
 ]
 
 [[package]]

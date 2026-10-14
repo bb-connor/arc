@@ -43,7 +43,7 @@ Completion evidence and receipts use v2. The signed evidence includes
 exact sanitized header vector. Names, values, ordering, additions and omissions
 are covered. Live clients, the MCP wrapper, durable replay and receipt-store
 readback reject a header vector that differs from this commitment. The receipt
-signature domain is `chio.broker-execution-receipt-signature.v2\0`.
+signature domain is `chio.broker-execution-receipt-signature.v1\0`.
 
 The v1 schemas and fixtures remain available for historical decoding. Current
 completion verification requires v2 and does not infer header authentication

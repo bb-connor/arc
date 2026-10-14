@@ -89,23 +89,6 @@ while IFS= read -r line; do
   rest="${line#*:}"
   text="${rest#*:}"
 
-  # Broker execution receipts have their own versioned evidence envelope.
-  # Remove only those generated type names before rechecking the line, so an
-  # adjacent future core receipt or capability still fails this gate.
-  broker_text="${text//ChioSignedBrokerExecutionReceiptV2/}"
-  broker_text="${broker_text//ChioBrokerExecutionReceiptV2/}"
-  if [[ "$broker_text" != "$text" ]]; then
-    broker_scan_status=0
-    rg -q "$pattern|$normative_claim_pattern" <<<"$broker_text" || broker_scan_status=$?
-    if ((broker_scan_status > 1)); then
-      echo "ripgrep failed while rechecking the broker receipt schema line" >&2
-      exit "$broker_scan_status"
-    fi
-    if ((broker_scan_status == 1)); then
-      continue
-    fi
-  fi
-
   # The trusted qualification auditor consumes internal App metadata v3.
   # Exempt only this exact quoted identifier in reviewed producer, validator
   # and regression paths, and its backtick-quoted form only in the reviewed

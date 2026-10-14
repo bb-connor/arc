@@ -117,9 +117,7 @@ pub(super) fn verify_tool_receipts(
                 record.seq
             )));
         }
-        // Evidence package verification has no policy.crypto_floor input.
-        // Keep the compatibility floor explicit here: accept classical and hybrid receipts, while policy-bearing callers enforce
-        // their configured floor before export.
+        // Offline evidence accepts classical and hybrid receipt signatures.
         if !record
             .receipt
             .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
@@ -141,8 +139,48 @@ pub(super) fn verify_tool_receipts(
                 record.receipt.id
             )));
         }
+        verify_http_receipt_evidence(&record.receipt)?;
     }
     Ok(by_seq)
+}
+
+fn verify_http_receipt_evidence(receipt: &ChioReceipt) -> Result<(), CliError> {
+    let embedded = receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("chio_http_receipt_v1"));
+    let Some(embedded) = embedded else {
+        return if receipt.tool_server == "http" {
+            Err(CliError::attest_error(format!(
+                "HTTP receipt evidence missing: {}",
+                receipt.id
+            )))
+        } else {
+            Ok(())
+        };
+    };
+    let http: chio_http_core::HttpReceipt =
+        serde_json::from_value(embedded.clone()).map_err(|error| {
+            CliError::attest_error(format!(
+                "HTTP receipt evidence decoding failed: {}: {error}",
+                receipt.id
+            ))
+        })?;
+    if !http
+        .verify_chio_receipt_projection(receipt)
+        .map_err(|error| {
+            CliError::attest_error(format!(
+                "HTTP receipt projection verification failed: {}: {error}",
+                receipt.id
+            ))
+        })?
+    {
+        return Err(CliError::attest_error(format!(
+            "HTTP receipt projection verification failed: {}",
+            receipt.id
+        )));
+    }
+    Ok(())
 }
 
 pub(super) fn verify_child_receipts(

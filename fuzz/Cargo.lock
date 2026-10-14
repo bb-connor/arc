@@ -1611,6 +1611,7 @@ dependencies = [
  "chio-fiscal",
  "chio-flow",
  "chio-guards",
+ "chio-http-core",
  "chio-http-serve",
  "chio-kernel",
  "chio-keyring",

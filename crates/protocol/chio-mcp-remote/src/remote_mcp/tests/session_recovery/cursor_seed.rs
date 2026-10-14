@@ -89,7 +89,7 @@ pub(super) async fn restore_with_factory(
         .ok_or("resume keyring")?;
     let sessions = RemoteSessionLedger::new(
         factory.config.clock.clone(),
-        factory.config.lifecycle_policy(),
+        factory.config.lifecycle_policy()?,
         None,
         None,
     )?;

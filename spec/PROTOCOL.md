@@ -2790,9 +2790,8 @@ The negative tests live as standalone files at
 
 The HTTP substrate (see [HTTP-SUBSTRATE.md](HTTP-SUBSTRATE.md)) introduces
 `HttpReceipt`, a domain-specific receipt type for HTTP-layer policy evaluations.
-`HttpReceipt` captures HTTP-specific context that `ChioReceipt` does not natively
-model, including the evaluated HTTP method, path, query parameters, request
-headers, caller identity, authentication method, and the sidecar verdict.
+`HttpReceipt` binds the HTTP request identity, matched route, method, caller
+identity hash, session, response status, verdict, and guard evidence.
 
 `HttpReceipt` is the receipt format returned by the sidecar evaluation endpoint.
 `ChioReceipt` remains the unified storage and verification format for all Chio
@@ -2801,17 +2800,23 @@ receipt workflows, including checkpoints, evidence export, and federation.
 The deterministic mapping from `HttpReceipt` to `ChioReceipt` is defined in
 [HTTP-SUBSTRATE.md Section 5](HTTP-SUBSTRATE.md). That mapping preserves:
 
-- `receipt_id` as the stable identifier across both formats
-- `tool_server` derived from the OpenAPI server identity or sidecar
-  configuration
-- `tool_name` derived from the matched `operationId`
-- `decision` mapped from the sidecar verdict
-- HTTP-specific evaluation context projected into `ChioReceipt.metadata`
-- `policy_hash` and `content_hash` carried through unchanged
+- the HTTP receipt ID as the outer signing nonce, with a distinct
+  content-addressed core receipt ID;
+- `tool_server: "http"` and `tool_name: "{method} {route_pattern}"`;
+- the canonical method, route, and request ID in the action and its hash;
+- the verdict as a decision for mediated receipts, with no decision for
+  advisory observations;
+- the complete signed HTTP receipt under `metadata.chio_http_receipt_v1`;
+- the policy hash, authority semantics, actor attribution, and guard evidence;
+- a content hash over the projection and an independent core signature from
+  the same kernel key.
 
 This mapping is deterministic: the same `HttpReceipt` always produces the same
 `ChioReceipt`. Operators may store either or both formats, but checkpoint
 signing and evidence export always operate on the `ChioReceipt` representation.
+Evidence verification requires a trusted outer signer, authentic inner and
+outer signatures, and exact equality with the canonical HTTP projection.
+HTTP projections without their complete embedded proof are rejected.
 
 ## 7. Manifest Contract
 

@@ -526,13 +526,13 @@ ordering; matching anchors do not establish Rust/model equivalence.
 
 The completion repair reproduced two accepted substitutions: altered response
 headers under the original signature, and a correctly signed native receipt
-claiming completion one hour in the future. V2 evidence commits to the exact
-canonical sanitized header vector under a separate digest domain; v2 receipts
-use a new signature domain. Shared live and durable response verification checks
-that commitment. Native completion also binds original parent issuance and
-broker activation to the trusted receiver's observation time, while historical
-verification remains valid after capability expiry. Historical v1 schemas and
-positive vectors remain unchanged; they cannot authorize a v2 completion.
+claiming completion one hour in the future. Execution evidence commits to the
+exact canonical sanitized header vector under a separate digest domain, and
+execution receipts use their own signature domain. Shared live and durable
+response verification checks that commitment. Native completion also binds
+original parent issuance and broker activation to the trusted receiver's
+observation time, while historical verification remains valid after capability
+expiry.
 
 The qualified Rust, protocol and binding patch on `3dd65e1fba` has full-index
 SHA-256 `469eea553c2a14a0b04761bfca1722f5153a34dfd9d3a54ebae1de0fc0ed611f`.

@@ -153,6 +153,13 @@ pub enum GenCommand {
         #[arg(long)]
         check: bool,
     },
+    /// Re-sign the broker execution receipt vectors with the fixed test signer.
+    #[command(name = "broker-receipt-vectors")]
+    BrokerReceiptVectors {
+        /// Compare the generated vectors with the committed vectors.
+        #[arg(long)]
+        check: bool,
+    },
     /// Generate the declared verification evidence matrix.
     #[command(name = "proof-coverage")]
     ProofCoverage {

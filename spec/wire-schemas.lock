@@ -590,9 +590,9 @@ files = ["crates/security/chio-secret-broker/src/protocol.rs"]
 first_seen = "38d8cd4341"
 
 [[schema]]
-value = "chio.broker-execution-evidence.v2"
+value = "chio.broker-execution-evidence.v1"
 files = ["crates/security/chio-secret-broker/src/protocol.rs"]
-first_seen = "5d643420b1"
+first_seen = "fb76fac55a"
 
 [[schema]]
 value = "chio.broker-execution-failure-receipt.v1"
@@ -600,9 +600,9 @@ files = ["crates/security/chio-secret-broker/src/receipt.rs"]
 first_seen = "38d8cd4341"
 
 [[schema]]
-value = "chio.broker-execution-receipt.v2"
+value = "chio.broker-execution-receipt.v1"
 files = ["crates/security/chio-secret-broker/src/receipt.rs"]
-first_seen = "5d643420b1"
+first_seen = "fb76fac55a"
 
 [[schema]]
 value = "chio.broker-issue-capability.v1"
@@ -5050,9 +5050,9 @@ files = ["crates/security/chio-secret-broker/src/kernel_admission/routes.rs"]
 first_seen = "95f04d5d74"
 
 [[schema]]
-value = "chio.secret-brokerd.runtime-config.v6"
+value = "chio.secret-brokerd.runtime-config.v1"
 files = ["crates/security/chio-secret-broker/src/daemon_runtime.rs"]
-first_seen = "95f04d5d74"
+first_seen = "fb76fac55a"
 
 [[schema]]
 value = "chio.security-admission-operation.v1"

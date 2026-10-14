@@ -105,7 +105,7 @@ impl RemoteSessionFactory {
                 open_durable_admission_runtime(mode, local_admission_database.as_deref())?
             }
         };
-        let lifecycle_policy = config.lifecycle_policy();
+        let lifecycle_policy = config.lifecycle_policy()?;
         let factory = Self {
             config,
             manifest_registry,
@@ -341,7 +341,7 @@ impl RemoteSessionFactory {
 
     pub(super) fn configured_hosted_isolation(&self) -> RemoteHostedIsolationMode {
         if self.config.shared_hosted_owner {
-            RemoteHostedIsolationMode::SharedHostedOwnerCompatibility
+            RemoteHostedIsolationMode::SharedHostedOwner
         } else {
             RemoteHostedIsolationMode::DedicatedPerSession
         }
