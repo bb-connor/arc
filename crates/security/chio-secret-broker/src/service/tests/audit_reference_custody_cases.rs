@@ -24,8 +24,8 @@ fn open_fixture(
     }
     let commitment = crate::audit::BrokerAuditReferencePrecommitment::generate(&head, &body)?;
     let open = BrokerPrivilegedAuditOpenRequest::new(
-        "f053-legacy-owned".to_owned(),
-        "legacy-provider-observation".to_owned(),
+        "audit-reference-owned".to_owned(),
+        "pre-broker-provider-observation".to_owned(),
         "combined-authority".to_owned(),
         request,
         head,
@@ -42,7 +42,7 @@ fn wire(
 }
 
 #[test]
-fn f053_legacy_open_long_credential_uses_bounded_custody_before_copy() -> TestResult {
+fn audit_reference_open_long_credential_uses_bounded_custody_before_copy() -> TestResult {
     let (_, open) = open_fixture(true)?;
     let bytes = wire(&open)?;
     let decoded = decode_open_wire(&bytes)?;
@@ -57,7 +57,7 @@ fn f053_legacy_open_long_credential_uses_bounded_custody_before_copy() -> TestRe
 }
 
 #[test]
-fn f053_legacy_open_accepts_exact_head_and_body_byte_bounds() -> TestResult {
+fn audit_reference_open_accepts_exact_head_and_body_byte_bounds() -> TestResult {
     let (_, mut open) = open_fixture(false)?;
     open.reference_request_head = vec![b'h'; HEAD_BYTES - 4];
     open.reference_request_head.extend_from_slice(b"\r\n\r\n");
@@ -77,7 +77,7 @@ fn f053_legacy_open_accepts_exact_head_and_body_byte_bounds() -> TestResult {
 }
 
 #[test]
-fn f053_legacy_open_refuses_one_byte_over_head_or_body_before_secret_copy() -> TestResult {
+fn audit_reference_open_refuses_one_byte_over_head_or_body_before_secret_copy() -> TestResult {
     let mut accepted_fields = Vec::new();
     for head_over in [true, false] {
         let (_, mut open) = open_fixture(false)?;
@@ -102,7 +102,7 @@ fn f053_legacy_open_refuses_one_byte_over_head_or_body_before_secret_copy() -> T
 }
 
 #[test]
-fn f053_legacy_open_late_decode_error_drops_both_private_arrays() -> TestResult {
+fn audit_reference_open_late_decode_error_drops_both_private_arrays() -> TestResult {
     let (_, mut open) = open_fixture(true)?;
     open.request.request.body.clear();
     open.request.request.headers.clear();
@@ -123,7 +123,7 @@ fn f053_legacy_open_late_decode_error_drops_both_private_arrays() -> TestResult 
 }
 
 #[test]
-fn f053_legacy_open_partial_array_error_cleans_live_private_prefix() -> TestResult {
+fn audit_reference_open_partial_array_error_cleans_live_private_prefix() -> TestResult {
     let (_, mut open) = open_fixture(true)?;
     open.reference_request_body.clear();
     let mut bytes = wire(&open)?;
@@ -163,7 +163,7 @@ fn f053_legacy_open_partial_array_error_cleans_live_private_prefix() -> TestResu
 }
 
 #[test]
-fn f053_legacy_open_exact_canonical_fields_preserve_native_bytes_and_order() -> TestResult {
+fn audit_reference_open_exact_canonical_fields_preserve_native_bytes_and_order() -> TestResult {
     let (_, open) = open_fixture(false)?;
     let expected = wire(&open)?;
     let encoded = encode_open_wire(&open)?;
@@ -194,7 +194,7 @@ fn f053_legacy_open_exact_canonical_fields_preserve_native_bytes_and_order() -> 
 }
 
 #[test]
-fn f053_legacy_open_rejects_duplicate_unknown_and_alternate_json() -> TestResult {
+fn audit_reference_open_rejects_duplicate_unknown_and_alternate_json() -> TestResult {
     let (_, open) = open_fixture(false)?;
     let canonical = wire(&open)?;
     for tail in [
@@ -240,7 +240,7 @@ fn f053_legacy_open_rejects_duplicate_unknown_and_alternate_json() -> TestResult
 }
 
 #[test]
-fn f053_legacy_open_sensitive_export_uses_direct_borrowed_arrays() -> TestResult {
+fn audit_reference_open_sensitive_export_uses_direct_borrowed_arrays() -> TestResult {
     let (_, open) = open_fixture(true)?;
     reset_private_byte_serialization_observer();
     let encoded = encode_open_wire(&open)?;
@@ -256,7 +256,7 @@ fn f053_legacy_open_sensitive_export_uses_direct_borrowed_arrays() -> TestResult
 
 #[test]
 #[cfg(target_os = "linux")]
-fn f053_legacy_open_preserves_auth_phase_order_and_healthy_comparison() -> TestResult {
+fn audit_reference_open_preserves_auth_phase_order_and_healthy_comparison() -> TestResult {
     use crate::privileged_audit::{
         read_privileged_audit_challenge_frame, read_privileged_audit_evidence_frame,
         write_privileged_audit_commit_frame, write_privileged_audit_open_frame,
@@ -285,7 +285,7 @@ fn f053_legacy_open_preserves_auth_phase_order_and_healthy_comparison() -> TestR
     open.reference_commitment_salt = commitment.commitment_salt().to_owned();
     open.reference_commitment_sha256 = commitment.commitment_sha256().to_owned();
     let directory = crate::private_tempdir()?;
-    let path = directory.path().join("f053-custody").join("audit.sock");
+    let path = directory.path().join("audit-custody").join("audit.sock");
     let signer: Arc<dyn SigningBackend> =
         Arc::new(Ed25519Backend::new(Keypair::from_seed(&[3; 32])));
     let trusted = signer.public_key();

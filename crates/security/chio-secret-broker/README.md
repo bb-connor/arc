@@ -56,7 +56,6 @@ available without enabling kernel integration.
 
 | Feature | Default | Effect |
 | --- | --- | --- |
-| `conformance` | Off | Compatibility alias enabling `kernel-admission`. |
 | `kernel-admission` | Off | Adds kernel quota verification, registration, capture, and authority integration; enables `chio-kernel`, `async-trait`, and `tokio`. |
 | `native-mcp` | Off | Enables `kernel-admission` and MCP, manifest, and tracing dependencies; exposes native MCP launch integration on Linux. |
 | `real-linux-enforcement` | Off | Enables `native-mcp` and Linux enforcement paths in process boundary tests. |

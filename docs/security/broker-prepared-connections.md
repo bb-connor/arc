@@ -45,10 +45,9 @@ are covered. Live clients, the MCP wrapper, durable replay and receipt-store
 readback reject a header vector that differs from this commitment. The receipt
 signature domain is `chio.broker-execution-receipt-signature.v1\0`.
 
-The v1 schemas and fixtures remain available for historical decoding. Current
-completion verification requires v2 and does not infer header authentication
-from v1 signatures. Legacy stored evidence cannot authorize redispatch or a
-refund. New signatures are never fabricated for old stored completions.
+Completion verification requires this header commitment; evidence without it
+is refused and cannot authorize redispatch or a refund. Stored completions are
+never re-signed.
 
 Native completion time must be at or after the original parent issuance and
 broker capability activation, and no later than the trusted receiver's observed

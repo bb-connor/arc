@@ -5,13 +5,13 @@ type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct LegacyFrameFixture {
+struct ReferenceFrameFixture {
     reference_commitment_salt: String,
     reference_request_head: Vec<u8>,
     reference_request_body: Vec<u8>,
 }
 
-impl Drop for LegacyFrameFixture {
+impl Drop for ReferenceFrameFixture {
     fn drop(&mut self) {
         self.reference_commitment_salt.zeroize();
         self.reference_request_head.zeroize();
@@ -20,7 +20,7 @@ impl Drop for LegacyFrameFixture {
 }
 
 #[test]
-fn f053_audit_partial_body_is_wiped_before_body_error_returns() -> TestResult {
+fn audit_partial_body_is_wiped_before_body_error_returns() -> TestResult {
     let mut bytes = Zeroizing::new(vec![0xaa; 32]);
     let mut partial = b"fixture-audit-secret".as_slice();
     let error = read_audit_frame_body(&mut partial, &mut bytes)
@@ -36,11 +36,11 @@ fn f053_audit_partial_body_is_wiped_before_body_error_returns() -> TestResult {
 }
 
 #[test]
-fn f053_audit_secret_encoding_is_canonical_and_uses_counted_output() -> TestResult {
+fn audit_secret_encoding_is_canonical_and_uses_counted_output() -> TestResult {
     let mut head = b"POST /private HTTP/1.1\r\nAuthorization: Bearer ".to_vec();
     head.extend_from_slice(&vec![b'x'; 16_385]);
     head.extend_from_slice(b"\r\n\r\n");
-    let fixture = LegacyFrameFixture {
+    let fixture = ReferenceFrameFixture {
         reference_commitment_salt: "a".repeat(64),
         reference_request_head: head,
         reference_request_body: vec![b'y'; 4_099],
@@ -67,7 +67,7 @@ fn f053_audit_secret_encoding_is_canonical_and_uses_counted_output() -> TestResu
 }
 
 #[test]
-fn f053_audit_frame_preserves_prefix_length_and_complete_body() -> TestResult {
+fn audit_frame_preserves_prefix_length_and_complete_body() -> TestResult {
     let bytes = b"fixture-only";
     let mut frame = Vec::new();
     write_frame(&mut frame, bytes, 32)?;
@@ -82,7 +82,7 @@ fn f053_audit_frame_preserves_prefix_length_and_complete_body() -> TestResult {
 }
 
 #[test]
-fn f053_audit_frame_preserves_native_bounds_and_truncation_errors() -> TestResult {
+fn audit_frame_preserves_native_bounds_and_truncation_errors() -> TestResult {
     for length in [0, u32::try_from(MAX_AUDIT_CONTROL_FRAME_BYTES + 1)?] {
         let prefix = length.to_be_bytes();
         let mut input = prefix.as_slice();

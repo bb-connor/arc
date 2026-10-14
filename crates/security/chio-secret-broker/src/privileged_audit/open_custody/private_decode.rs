@@ -534,7 +534,7 @@ impl<'de> Visitor<'de> for ExecuteSeed<'_> {
 mod tests {
     use super::*;
     #[test]
-    fn f053_codec_seed_retains_actual_capacity_failure_as_fatal_storage() {
+    fn audit_codec_seed_retains_actual_capacity_failure_as_fatal_storage() {
         // Capacity overflow is the real fallible constructor failure, without
         // allocating a huge buffer or probing an allocator's freed storage.
         let mut fields = super::super::Fields {

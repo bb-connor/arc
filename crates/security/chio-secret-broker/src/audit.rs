@@ -104,8 +104,8 @@ impl fmt::Debug for BrokerAuditReferencePrecommitment {
     }
 }
 
-/// Exact legacy outbound bytes admitted only into the privileged in-process
-/// migration audit path. The buffers are zeroized on every return path and
+/// Exact pre-broker reference request bytes admitted only into the privileged
+/// in-process migration audit path. The buffers are zeroized on every return path and
 /// cannot be cloned, serialized, or inspected through `Debug`.
 pub struct BrokerAuditReferenceRequest {
     commitment_salt: SecretString,
