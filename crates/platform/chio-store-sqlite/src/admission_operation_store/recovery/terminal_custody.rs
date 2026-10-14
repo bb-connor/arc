@@ -222,10 +222,20 @@ pub(super) fn publish_release(
 /// Callers that persist a workflow must keep its unchanged physical record.
 pub(in crate::admission_operation_store) fn view(
     tx: &Connection,
-    mut physical: RecoveryWorkflowRecordV1,
+    physical: RecoveryWorkflowRecordV1,
 ) -> Result<RecoveryWorkflowRecordV1, AdmissionOperationStoreError> {
-    let terminal = auxiliary_captured_terminal(tx, &physical)?;
-    let release = auxiliary_captured_release(tx, &physical)?;
+    let quota = viewed_workflow_quota(tx, &physical)?;
+    view_with(tx, physical, &quota)
+}
+
+/// `view` over the caller's quota read of this same physical workflow.
+pub(super) fn view_with(
+    tx: &Connection,
+    mut physical: RecoveryWorkflowRecordV1,
+    quota: &ViewedWorkflowQuota<'_>,
+) -> Result<RecoveryWorkflowRecordV1, AdmissionOperationStoreError> {
+    let terminal = quota.terminal(&physical)?;
+    let release = quota.release(&physical)?;
     if let Some(terminal) = terminal {
         let complete = EffectObservationV1::Complete {
             operation: terminal.operation.clone(),
@@ -258,7 +268,9 @@ pub(in crate::admission_operation_store) fn view(
     } else if release.is_some() {
         return Err(invariant("captured release lacks its original terminal"));
     }
-    physical.reported_decision = commands::reported_feedback(tx, &physical)?;
+    physical.reported_decision = commands::reported_feedback_with(tx, &physical, |workflow| {
+        quota.report_requested(workflow)
+    })?;
     Ok(physical)
 }
 
@@ -366,6 +378,38 @@ pub(in crate::admission_operation_store) fn verify_release(
     workflow: &WorkflowId,
     release: &CapturedWorkflowReleaseV1,
 ) -> Result<(), AdmissionOperationStoreError> {
+    verify_release_with(tx, scope, workflow, release, |terminal| {
+        verify_terminal(tx, scope, workflow, terminal)
+    })
+}
+
+/// `verify_release` where `verified` is the terminal `verify_terminal` already
+/// accepted for this workflow in this transaction. The stored terminal row must
+/// still equal it; every release, profile and actor check is unchanged.
+pub(in crate::admission_operation_store) fn verify_release_for_terminal(
+    tx: &Connection,
+    scope: &RecoveryScopeV1,
+    workflow: &WorkflowId,
+    release: &CapturedWorkflowReleaseV1,
+    verified: &CapturedWorkflowTerminalV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    verify_release_with(tx, scope, workflow, release, |terminal| {
+        if terminal != verified {
+            return Err(invariant("captured release original terminal changed"));
+        }
+        Ok(())
+    })
+}
+
+fn verify_release_with(
+    tx: &Connection,
+    scope: &RecoveryScopeV1,
+    workflow: &WorkflowId,
+    release: &CapturedWorkflowReleaseV1,
+    accept_terminal: impl FnOnce(
+        &CapturedWorkflowTerminalV1,
+    ) -> Result<(), AdmissionOperationStoreError>,
+) -> Result<(), AdmissionOperationStoreError> {
     require_bounded(release)?;
     let terminal_key = terminal_key(scope, workflow)?;
     let row = raw_checked(tx, &terminal_key)?
@@ -374,7 +418,7 @@ pub(in crate::admission_operation_store) fn verify_release(
         return Err(invariant("captured release terminal header changed"));
     }
     let terminal: CapturedWorkflowTerminalV1 = decode(&row.payload)?;
-    verify_terminal(tx, scope, workflow, &terminal)?;
+    accept_terminal(&terminal)?;
     if release.workflow_id != *workflow
         || release.operation != terminal.operation
         || &release.terminal_digest != source_reference(tx, &terminal_key)?.digest()

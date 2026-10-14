@@ -1,8 +1,8 @@
 //! One auxiliary release slot preserves the exact captured physical workflow.
 use super::*;
 use crate::admission_operation_store::recovery::terminal_custody::{
-    release_key, require_current_terminal_format, verify_release, CapturedWorkflowReleaseV1,
-    MAX_TERMINAL_CUSTODY_BYTES,
+    release_key, require_current_terminal_format, verify_release, verify_release_for_terminal,
+    CapturedWorkflowReleaseV1, CapturedWorkflowTerminalV1, MAX_TERMINAL_CUSTODY_BYTES,
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -13,6 +13,30 @@ pub(super) struct WorkflowReleaseAllocation {
 
 impl WorkflowReleaseAllocation {
     fn load(
+        &self,
+        tx: &Connection,
+        scope: &RecoveryScopeV1,
+        workflow: &WorkflowId,
+    ) -> Result<CapturedWorkflowReleaseV1, AdmissionOperationStoreError> {
+        let release = self.read(tx, scope, workflow)?;
+        verify_release(tx, scope, workflow, &release)?;
+        Ok(release)
+    }
+
+    /// `load` for quota validation, which has just verified `terminal`.
+    pub(super) fn load_for_terminal(
+        &self,
+        tx: &Connection,
+        scope: &RecoveryScopeV1,
+        workflow: &WorkflowId,
+        terminal: &CapturedWorkflowTerminalV1,
+    ) -> Result<CapturedWorkflowReleaseV1, AdmissionOperationStoreError> {
+        let release = self.read(tx, scope, workflow)?;
+        verify_release_for_terminal(tx, scope, workflow, &release, terminal)?;
+        Ok(release)
+    }
+
+    fn read(
         &self,
         tx: &Connection,
         scope: &RecoveryScopeV1,
@@ -39,18 +63,7 @@ impl WorkflowReleaseAllocation {
         {
             return Err(invariant("captured release allocation changed"));
         }
-        let release = decode(&row.payload)?;
-        verify_release(tx, scope, workflow, &release)?;
-        Ok(release)
-    }
-
-    pub(super) fn verify(
-        &self,
-        tx: &Connection,
-        scope: &RecoveryScopeV1,
-        workflow: &WorkflowId,
-    ) -> Result<(), AdmissionOperationStoreError> {
-        self.load(tx, scope, workflow).map(|_| ())
+        decode(&row.payload)
     }
 }
 

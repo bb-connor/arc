@@ -127,7 +127,10 @@ async fn extended_validity_setup_with_options(
         )?;
     } else {
         // Without the checkpoint this setup keeps its original unselected.
-        std::fs::write(directory.path().join("no-output-retention-profile"), "absent")?;
+        std::fs::write(
+            directory.path().join("no-output-retention-profile"),
+            "absent",
+        )?;
     }
     std::fs::write(directory.path().join("semantic-kind"), "read")?;
     // Both the original capability and the native policy clock must remain

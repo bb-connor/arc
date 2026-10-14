@@ -26,6 +26,19 @@ pub(super) fn reported_feedback(
     tx: &Connection,
     record: &RecoveryWorkflowRecordV1,
 ) -> Result<Option<RecoveryReportedDecision>, AdmissionOperationStoreError> {
+    reported_feedback_with(tx, record, |physical| {
+        workflow_report_requested(tx, physical)
+    })
+}
+
+/// `report_requested` observes the charged Report purpose of the raw workflow.
+pub(super) fn reported_feedback_with(
+    tx: &Connection,
+    record: &RecoveryWorkflowRecordV1,
+    report_requested: impl FnOnce(
+        &RecoveryWorkflowRecordV1,
+    ) -> Result<bool, AdmissionOperationStoreError>,
+) -> Result<Option<RecoveryReportedDecision>, AdmissionOperationStoreError> {
     let mut statement = tx
         .prepare(
             "SELECT record_key FROM admission_operation_recovery_records
@@ -49,7 +62,7 @@ pub(super) fn reported_feedback(
         // Terminal and hold views are observation clones. Authenticate the raw
         // workflow before interpreting its original feedback or charged purpose.
         let physical = workflow_tx(tx, &record.scope, &record.workflow_id)?;
-        if physical.reported_decision.is_none() && workflow_report_requested(tx, &physical)? {
+        if physical.reported_decision.is_none() && report_requested(&physical)? {
             return Err(invariant(
                 "recovery report lost its original charged source",
             ));

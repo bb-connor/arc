@@ -12,16 +12,16 @@ The live inventory and effective scoped dispositions are:
 
 | Inventory | Records | Effective scoped dispositions | Superseded by support decision | Currently open |
 | --- | ---: | ---: | ---: | ---: |
-| Canonical original findings | 328 | 155 | 2 | 171 |
+| Canonical original findings | 328 | 156 | 2 | 170 |
 | Additional maintained or actually executed support findings | 26 | 26 | 0 | 0 |
 | Supplemental PR obligations | 1 | 0 | 0 | 1 |
-| Current or executed-support total | 355 | 181 | 2 | 172 |
+| Current or executed-support total | 355 | 182 | 2 | 171 |
 | Prevented candidate issues, counted separately | 31 | Not combined | Not combined | Not combined |
 | Follow-up findings first observed in uninstalled candidates | 13 | Not combined | Not combined | Not combined |
 | Provenance prerequisite, excluded from implementation findings | 1 | Not applicable | Not applicable | Not applicable |
 
-The 181 scoped dispositions include 38 historical closures whose current source
-applicability still needs review. They are not 181 current-source approvals.
+The 182 scoped dispositions include 38 historical closures whose current source
+applicability still needs review. They are not 182 current-source approvals.
 `counts.current_acceptance` separates these dispositions from current applicability.
 
 The explicitly historical **394-record baseline** retains 99 canonical closures
@@ -42,12 +42,21 @@ The current status counts are:
 
 | Status | Records | Meaning |
 | --- | ---: | --- |
-| `open` | 172 | No complete independent disposition is recorded. |
+| `open` | 171 | No complete independent disposition is recorded. |
 | `superseded_by_support_boundary` | 2 | The user removed intermediate-format migration support; these are not counted as verified fixes. |
 | `needs_revalidation` | 38 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
-| `recorded_scoped_closed` | 143 | Historical or additive accepted scoped disposition currently applies, with the limits stated per record. |
+| `recorded_scoped_closed` | 144 | Historical or additive accepted scoped disposition currently applies, with the limits stated per record. |
 | `candidate_only` | 44 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
+
+`C1-01` closes its original call-binding contract at `c2b6cc7a`: all 14
+original-denial controls and both namespace controls passed on the current
+compiled candidate. The entire Process original-binding target passed 11/11
+at independently verified continuous source. The creation namespace negative,
+not its capture sibling, counts toward C1. Independent review accepted every
+original obligation and the complete owning suites; exact source and execution
+pins are in its additive `current_review`. Payment finishing, quota, rotations
+and the broader release gates remain open.
 
 `C1-02` now closes its original stale-owner scope at `55dcab8c`: the actual
 four-action takeover control passed 1/1 and the setup/output fresh-owner progress
@@ -71,7 +80,7 @@ strict Clippy and release gates stay open; readiness remains false.
 The preceding accepted batch closed 23 original P2 scopes: `NS-01` through
 `NS-05`, `CR-04`, `CR-R1-01`, `SO01` through `SO08`, `QF-01`, `QF-08`,
 `V3-I01`, `V3-I05`, `V3-I09`, and `SPI-01` through `SPI-03`. The current open
-inventory is **9 P1, 74 P2 and 89 P3**, with 143 currently applicable scoped
+inventory is **8 P1, 74 P2 and 89 P3**, with 144 currently applicable scoped
 closures. Earlier historical counts below retain their original stage boundaries.
 
 These dispositions bind actual owning execution and independent review to the

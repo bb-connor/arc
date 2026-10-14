@@ -1,5 +1,8 @@
 //! Fixed workflow progress, mutating identities and native archive allocations.
 use super::*;
+use crate::admission_operation_store::recovery::terminal_custody::{
+    CapturedWorkflowReleaseV1, CapturedWorkflowTerminalV1,
+};
 use chio_core::recovery::RecoveryDigestDomain;
 
 #[path = "historical_hold_allocation.rs"]
@@ -183,7 +186,7 @@ impl WorkflowQuota {
         revision: u64,
         commands: u64,
         version: u64,
-    ) -> Result<(), AdmissionOperationStoreError> {
+    ) -> Result<ValidatedNativeCustody, AdmissionOperationStoreError> {
         let workflow_counters = [self.planning, self.control, self.native];
         if self.scope != *scope
             || self.workflow_id != *workflow
@@ -208,16 +211,23 @@ impl WorkflowQuota {
         if let Some(hold) = &self.native_hold {
             hold.verify(tx, scope, workflow)?;
         }
-        if let Some(terminal) = &self.native_terminal {
-            terminal.verify(tx, scope, workflow)?;
-        } else {
-            terminal_allocation::require_absent_terminal(tx, scope, workflow)?;
-        }
-        if let Some(release) = &self.native_release {
-            release.verify(tx, scope, workflow)?;
-        } else {
-            release_allocation::require_absent_release(tx, scope, workflow)?;
-        }
+        let terminal = match &self.native_terminal {
+            Some(terminal) => Some(terminal.load(tx, scope, workflow)?),
+            None => {
+                terminal_allocation::require_absent_terminal(tx, scope, workflow)?;
+                None
+            }
+        };
+        let release = match (&self.native_release, &terminal) {
+            (Some(release), Some(terminal)) => {
+                Some(release.load_for_terminal(tx, scope, workflow, terminal)?)
+            }
+            (Some(_), None) => return Err(invariant("recovery workflow quota is corrupt")),
+            (None, _) => {
+                release_allocation::require_absent_release(tx, scope, workflow)?;
+                None
+            }
+        };
         if let Some(archive) = &self.native_archive {
             let expected = format!(
                 "deployment-history:{}:{}",
@@ -239,7 +249,7 @@ impl WorkflowQuota {
                 return Err(invariant("recovery native archive allocation changed"));
             }
         }
-        Ok(())
+        Ok(ValidatedNativeCustody { terminal, release })
     }
 
     fn verify_first_allocation(&self, tx: &Connection) -> Result<(), AdmissionOperationStoreError> {
@@ -328,6 +338,117 @@ fn workflow_quota(
     workflow: &WorkflowId,
 ) -> Result<WorkflowQuota, AdmissionOperationStoreError> {
     workflow_quota_with_count(tx, scope, workflow, None)
+}
+
+/// Terminal and release custody `WorkflowQuota::validate` loaded and verified.
+struct ValidatedNativeCustody {
+    terminal: Option<CapturedWorkflowTerminalV1>,
+    release: Option<CapturedWorkflowReleaseV1>,
+}
+
+/// One validated quota read for a single read-only workflow view. It borrows
+/// the reading connection and is dropped before that view returns, so it never
+/// spans a write. Every accessor still requires the unchanged physical workflow.
+pub(in crate::admission_operation_store) struct ViewedWorkflowQuota<'tx> {
+    tx: &'tx Connection,
+    quota: WorkflowQuota,
+    custody: ValidatedNativeCustody,
+}
+
+pub(in crate::admission_operation_store) fn viewed_workflow_quota<'tx>(
+    tx: &'tx Connection,
+    record: &RecoveryWorkflowRecordV1,
+) -> Result<ViewedWorkflowQuota<'tx>, AdmissionOperationStoreError> {
+    let (quota, custody) = validated_workflow_quota(tx, &record.scope, &record.workflow_id, None)?;
+    Ok(ViewedWorkflowQuota { tx, quota, custody })
+}
+
+impl ViewedWorkflowQuota<'_> {
+    fn require_owner(
+        &self,
+        record: &RecoveryWorkflowRecordV1,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        if self.quota.scope != record.scope || self.quota.workflow_id != record.workflow_id {
+            return Err(invariant("viewed workflow quota names another workflow"));
+        }
+        Ok(())
+    }
+
+    fn require_physical(
+        &self,
+        record: &RecoveryWorkflowRecordV1,
+        absent: &str,
+        changed: &str,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let key = workflow_key(&record.scope, &record.workflow_id)?;
+        let physical = raw_checked(self.tx, &key)?.ok_or_else(|| invariant(absent))?;
+        source_reference(self.tx, &key)?;
+        if physical.payload != encode(record)? {
+            return Err(invariant(changed));
+        }
+        Ok(())
+    }
+
+    /// `auxiliary_historical_hold` over this quota read.
+    pub(in crate::admission_operation_store) fn hold(
+        &self,
+        record: &RecoveryWorkflowRecordV1,
+    ) -> Result<Option<RecoveryHistoricalHoldV1>, AdmissionOperationStoreError> {
+        self.require_owner(record)?;
+        let Some(allocation) = &self.quota.native_hold else {
+            return Ok(None);
+        };
+        let physical = raw(self.tx, &workflow_key(&record.scope, &record.workflow_id)?)?
+            .ok_or_else(|| invariant("recovery historical hold workflow absent"))?;
+        if physical.payload != encode(record)? {
+            return Err(invariant("historical hold requires the physical workflow"));
+        }
+        Ok(Some(allocation.hold.clone()))
+    }
+
+    /// `auxiliary_captured_terminal` over this quota read.
+    pub(in crate::admission_operation_store) fn terminal(
+        &self,
+        record: &RecoveryWorkflowRecordV1,
+    ) -> Result<Option<CapturedWorkflowTerminalV1>, AdmissionOperationStoreError> {
+        self.require_owner(record)?;
+        let Some(terminal) = &self.custody.terminal else {
+            return Ok(None);
+        };
+        self.require_physical(
+            record,
+            "captured terminal workflow disappeared",
+            "captured terminal requires the physical workflow",
+        )?;
+        Ok(Some(terminal.clone()))
+    }
+
+    /// `auxiliary_captured_release` over this quota read.
+    pub(in crate::admission_operation_store) fn release(
+        &self,
+        record: &RecoveryWorkflowRecordV1,
+    ) -> Result<Option<CapturedWorkflowReleaseV1>, AdmissionOperationStoreError> {
+        self.require_owner(record)?;
+        let Some(release) = &self.custody.release else {
+            return Ok(None);
+        };
+        self.require_physical(
+            record,
+            "captured release workflow disappeared",
+            "captured release requires the physical workflow",
+        )?;
+        Ok(Some(release.clone()))
+    }
+
+    /// `workflow_report_requested` over this quota read.
+    pub(in crate::admission_operation_store) fn report_requested(
+        &self,
+        physical: &RecoveryWorkflowRecordV1,
+    ) -> Result<bool, AdmissionOperationStoreError> {
+        self.require_owner(physical)?;
+        require_report_physical(self.tx, physical)?;
+        Ok(self.quota.commands[5].get() != 0)
+    }
 }
 
 /// The authenticated purpose allocation of an unmaterialized setup, read
@@ -434,6 +555,17 @@ pub(in crate::admission_operation_store) fn workflow_report_requested(
     tx: &Connection,
     physical: &RecoveryWorkflowRecordV1,
 ) -> Result<bool, AdmissionOperationStoreError> {
+    require_report_physical(tx, physical)?;
+    // The ordinary typed loader verifies current quota/global heads, the exact
+    // immutable FIRST preimage, fixed purpose ceilings and physical revision.
+    // Its pre-baseline total is not reinterpreted as a Report-purpose count.
+    Ok(workflow_quota(tx, &physical.scope, &physical.workflow_id)?.commands[5].get() != 0)
+}
+
+fn require_report_physical(
+    tx: &Connection,
+    physical: &RecoveryWorkflowRecordV1,
+) -> Result<(), AdmissionOperationStoreError> {
     let key = workflow_key(&physical.scope, &physical.workflow_id)?;
     let row = raw_checked(tx, &key)?
         .ok_or_else(|| invariant("original report charge lost its physical workflow"))?;
@@ -448,10 +580,7 @@ pub(in crate::admission_operation_store) fn workflow_report_requested(
             "original report charge requires the current physical workflow",
         ));
     }
-    // The ordinary typed loader verifies current quota/global heads, the exact
-    // immutable FIRST preimage, fixed purpose ceilings and physical revision.
-    // Its pre-baseline total is not reinterpreted as a Report-purpose count.
-    Ok(workflow_quota(tx, &physical.scope, &physical.workflow_id)?.commands[5].get() != 0)
+    Ok(())
 }
 
 fn workflow_quota_with_count(
@@ -460,6 +589,15 @@ fn workflow_quota_with_count(
     workflow: &WorkflowId,
     verified_commands: Option<u64>,
 ) -> Result<WorkflowQuota, AdmissionOperationStoreError> {
+    validated_workflow_quota(tx, scope, workflow, verified_commands).map(|(quota, _)| quota)
+}
+
+fn validated_workflow_quota(
+    tx: &Connection,
+    scope: &RecoveryScopeV1,
+    workflow: &WorkflowId,
+    verified_commands: Option<u64>,
+) -> Result<(WorkflowQuota, ValidatedNativeCustody), AdmissionOperationStoreError> {
     let key = quota_key(scope, workflow)?;
     let physical_key = workflow_key(scope, workflow)?;
     let workflow_row = raw_checked(tx, &physical_key)?;
@@ -500,7 +638,7 @@ fn workflow_quota_with_count(
                 .checked_add(quota.command_units()?)
                 .ok_or_else(|| invariant("recovery command count exhausted"))?,
         };
-        quota.validate(tx, scope, workflow, revision, commands, row.version)?;
+        let custody = quota.validate(tx, scope, workflow, revision, commands, row.version)?;
         if let Some(archive) = &quota.native_archive {
             let retained: RecoveryWorkflowRecordV1 = decode(
                 &workflow_row
@@ -521,7 +659,7 @@ fn workflow_quota_with_count(
                 return Err(invariant("recovery archive workflow reference changed"));
             }
         }
-        return Ok(quota);
+        return Ok((quota, custody));
     }
     if retained_history(tx, &key)? {
         return Err(invariant("recovery workflow quota projection disappeared"));
@@ -540,7 +678,7 @@ fn workflow_quota_with_count(
             0
         }
     };
-    Ok(WorkflowQuota {
+    let quota = WorkflowQuota {
         schema: WorkflowQuotaSchema::V1,
         scope: scope.clone(),
         workflow_id: workflow.clone(),
@@ -556,7 +694,14 @@ fn workflow_quota_with_count(
         native_hold: None,
         native_terminal: None,
         native_release: None,
-    })
+    };
+    Ok((
+        quota,
+        ValidatedNativeCustody {
+            terminal: None,
+            release: None,
+        },
+    ))
 }
 
 fn save_quota(

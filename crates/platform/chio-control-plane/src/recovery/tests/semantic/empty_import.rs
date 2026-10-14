@@ -139,7 +139,10 @@ async fn native_fixture_from_empty_import_with_optional_retention(
     std::fs::write(directory.path().join("semantic-kind"), kind)?;
     std::fs::write(directory.path().join("empty-native-import"), "selected")?;
     // The owned source Input is admitted before any profile is selected.
-    std::fs::write(directory.path().join("no-output-retention-profile"), "absent")?;
+    std::fs::write(
+        directory.path().join("no-output-retention-profile"),
+        "absent",
+    )?;
     let Some(profile) = retention else {
         let fixture = match payment_adapter {
             Some(adapter) => RecoveryFixture::open_with_payment_adapter(

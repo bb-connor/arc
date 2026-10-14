@@ -33,7 +33,14 @@ pub(super) fn effective(
     tx: &Connection,
     record: &RecoveryWorkflowRecordV1,
 ) -> Result<Option<RecoveryHistoricalHoldV1>, AdmissionOperationStoreError> {
-    let auxiliary = auxiliary_historical_hold(tx, record)?;
+    resolve(tx, record, auxiliary_historical_hold(tx, record)?)
+}
+
+fn resolve(
+    tx: &Connection,
+    record: &RecoveryWorkflowRecordV1,
+    auxiliary: Option<RecoveryHistoricalHoldV1>,
+) -> Result<Option<RecoveryHistoricalHoldV1>, AdmissionOperationStoreError> {
     require_exclusive(record.historical_hold.as_ref(), auxiliary.as_ref())?;
     match (&record.historical_hold, auxiliary) {
         (Some(_), Some(_)) => Err(invariant("historical hold has two physical owners")),
@@ -165,12 +172,13 @@ pub(super) fn view(
     tx: &Connection,
     record: RecoveryWorkflowRecordV1,
 ) -> Result<RecoveryWorkflowRecordV1, AdmissionOperationStoreError> {
-    let hold = effective(tx, &record)?;
+    let quota = viewed_workflow_quota(tx, &record)?;
+    let hold = resolve(tx, &record, quota.hold(&record)?)?;
     let signer_hold_discharged =
         hold.as_ref().is_some_and(|hold| {
             hold.reason == RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable
         }) && super::terminal_custody::private_settlement_committed(tx, &record)?;
-    let mut record = super::terminal_custody::view(tx, record)?;
+    let mut record = super::terminal_custody::view_with(tx, record, &quota)?;
     if let Some(hold) = hold {
         if signer_hold_discharged
             && record.admission_closed

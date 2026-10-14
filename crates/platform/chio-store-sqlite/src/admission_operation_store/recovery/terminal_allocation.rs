@@ -12,7 +12,7 @@ pub(super) struct WorkflowTerminalAllocation {
 }
 
 impl WorkflowTerminalAllocation {
-    fn load(
+    pub(super) fn load(
         &self,
         tx: &Connection,
         scope: &RecoveryScopeV1,
@@ -42,15 +42,6 @@ impl WorkflowTerminalAllocation {
         let terminal = decode(&row.payload)?;
         verify_terminal(tx, scope, workflow, &terminal)?;
         Ok(terminal)
-    }
-
-    pub(super) fn verify(
-        &self,
-        tx: &Connection,
-        scope: &RecoveryScopeV1,
-        workflow: &WorkflowId,
-    ) -> Result<(), AdmissionOperationStoreError> {
-        self.load(tx, scope, workflow).map(|_| ())
     }
 }
 

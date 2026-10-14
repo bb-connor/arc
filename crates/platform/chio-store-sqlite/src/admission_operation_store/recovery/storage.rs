@@ -104,7 +104,8 @@ pub(in crate::admission_operation_store) use workflow_reservations::{
     auxiliary_captured_release, auxiliary_captured_terminal, auxiliary_historical_hold,
     require_command_slot, save_auxiliary_captured_release, save_auxiliary_captured_terminal,
     save_auxiliary_historical_hold, save_captured_deployment_history, save_command, save_workflow,
-    workflow_report_requested, workflow_resume_requested, WorkflowWriteClass,
+    viewed_workflow_quota, workflow_report_requested, workflow_resume_requested,
+    ViewedWorkflowQuota, WorkflowWriteClass,
 };
 
 #[cfg(all(test, unix))]

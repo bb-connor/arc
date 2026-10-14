@@ -59,9 +59,9 @@
     "current_status": {
       "candidate_only": 44,
       "needs_revalidation": 38,
-      "open": 172,
+      "open": 171,
       "prerequisite_only": 1,
-      "recorded_scoped_closed": 143,
+      "recorded_scoped_closed": 144,
       "superseded_by_support_boundary": 2
     },
     "needs_revalidation_by_category": {
@@ -112,8 +112,8 @@
       "scope": "Effective scoped dispositions include historical closures requiring revalidation. Superseded support obligations are counted separately from fixes and verified closures. Current applicability is separately counted; no qualification follows.",
       "canonical": {
         "total": 328,
-        "scoped_dispositions": 155,
-        "open": 171,
+        "scoped_dispositions": 156,
+        "open": 170,
         "superseded_by_support_boundary": 2
       },
       "additional": {
@@ -127,10 +127,10 @@
         "open": 1
       },
       "maintained_or_executed_support": 355,
-      "scoped_dispositions": 181,
-      "currently_applicable_scoped_closed": 143,
+      "scoped_dispositions": 182,
+      "currently_applicable_scoped_closed": 144,
       "historical_scoped_needing_revalidation": 38,
-      "open": 172,
+      "open": 171,
       "qualified": 0,
       "superseded_by_support_boundary": 2
     }
@@ -3638,8 +3638,80 @@
       "remaining_obligation_refs": [
         "reviewed#/rows/14/expected_remaining_obligations"
       ],
-      "current_status": "open",
-      "current_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it."
+      "current_status": "recorded_scoped_closed",
+      "current_reason": "Original C1 contract satisfied by complete owning Process binding and public Kernel/Store original-denial/namespace suites, with current-source execution and independent acceptance review at c2b6cc7a. This scoped closure does not qualify native payment finishing or the runtime.",
+      "current_review": {
+        "at_utc": "2026-10-14T19:27:29.811680+00:00",
+        "previous_status": "open",
+        "previous_reason": "No complete independent disposition is recorded. Retain the original obligation and every referenced current or historical owner check; partial observations do not close it.",
+        "candidate": "c2b6cc7a54fa368a19aa9b12cf04fcff9abda565",
+        "candidate_tree": "a5164b6405c6b5bacdd6218d3cd8bc050feb1d51",
+        "scope": "Ordinary first-attempt originals pass process binding but unknown, delivered-denied, committed and in-flight parents refuse creation without new claim, process charge or effect; known no-effect parent succeeds once.",
+        "execution": {
+          "control_plane": {
+            "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/native-c2b6cc7a-original-binding-owning-result.json",
+            "sha256": "f5bd41d4f9c13e35b4142832f819af108edaefa181431bb75d938412c206d0cc"
+          },
+          "control_plane_stdout": {
+            "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/native-c2b6cc7a-original-binding-owning.stdout.log",
+            "sha256": "fa2d3a83a7ecf629fce04cd45ec7b6d5b037271695f1286f18073ce5294d07eb"
+          },
+          "control_plane_stderr": {
+            "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/native-c2b6cc7a-original-binding-owning.stderr.log",
+            "sha256": "0ff934ea84bce99aad12fd8b2b4c6b61add5bc3f9d761821f344cb2ab8a3dce9"
+          },
+          "process": {
+            "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/native-a99c761e-process-original-binding-result.json",
+            "sha256": "53c328d17679148b16c411da3fd9caaf47f453d272d53153048532aa4c87ba76"
+          },
+          "process_stdout": {
+            "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/native-a99c761e-process-original-binding.stdout.log",
+            "sha256": "f79df065ecb3cbc84ddd9468e30f67203b9fbec13425d0782f69b899dc9c9a5d"
+          }
+        },
+        "owning_suites": {
+          "control_plane": [
+            "recovery::tests::original_denials:: (14/14)",
+            "recovery::tests::original_namespaces:: (2/2; creation negative counts for C1, capture sibling belongs to R2-X-authority-02)"
+          ],
+          "process": "Entire chio-process original_process_origin target, 11/11 with zero filtered out",
+          "source_manifest": {
+            "candidate": "c2b6cc7a54fa368a19aa9b12cf04fcff9abda565",
+            "git_objects": {
+              "crates/kernel/chio-process": "6be226f3e301748be398a58190efefd17e0a232c",
+              "crates/kernel/chio-kernel": "6d6c9c76c4ad4753c7113fc988bc67099d6daeca",
+              "crates/platform/chio-store-sqlite": "616d4b37f852cfe26abd3496ddfea35072f5c37f",
+              "crates/platform/chio-control-plane/src/recovery": "c631f21ff52b0b14a43afc3e344b34c5c0e91a3e",
+              "crates/security/chio-security-types/src/recovery": "0096cb5a4c4c06638ab51354cf13e0530b8995a7",
+              "Cargo.toml": "9c4fd292bcd3275bfa77f11aab5047b573a326a8",
+              "Cargo.lock": "bd26b699721a1c7ee7ae1c039fa59d659be6461e",
+              "rust-toolchain.toml": "8770b1d875864c5356dc4abad904b69ec484817f"
+            },
+            "ownership": "Full declared original_denials and original_namespaces modules integrate actual Kernel/Store; whole Process original_process_origin target. Global release suites remain separate unless original owning review identifies another affected suite."
+          },
+          "full_affected_suites_resolution": "Complete original-call binding contract suites above exercise actual Process, Kernel original_scope/ports and SQLite origins/original_resolution/validation. Original owner wording named no additional suite; independent review confirms no named obligation omitted. Broader release gates remain separate and open."
+        },
+        "source_continuity": {
+          "process_candidate": "a99c761eb7d2980d5bf41ce39f808410f0be09dc",
+          "basis": "Independent review confirms chio-process, authority/receipt stores used by this target, Cargo.lock and toolchain unchanged from a99 to c2. Control-plane path rerun at c2 after finishing changes."
+        },
+        "independent_review": {
+          "reviewer": "Claude Code Opus 5.5, independent of implementation",
+          "session_id": "18cd833d-c830-49e2-970d-19957db0e1a0",
+          "verdict": "Original C1 contract satisfied; eligible for current-scoped closure",
+          "record": {
+            "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/c1-c2-actual-acceptance-review.events.jsonl",
+            "sha256": "9b9a2323b2303ce2136dc5b3413a1c80ff5e3bbafef464f0bfa752d25a62a63b"
+          },
+          "report": {
+            "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/c1-original-acceptance-review.md",
+            "sha256": "0798809421ff4bac39af52cb98c5214cbdeacafcd6024145d6d351329c440ba6"
+          }
+        },
+        "limits": "No payment-positive, quota, rotation, provenance, strict Clippy, full crate/release or hosted qualification follows. The payment-positive failure and all prior failed evidence remain preserved. Later changes to relied-on paths require appropriate revalidation.",
+        "historical_dispositions_preserved": true,
+        "qualified": false
+      }
     },
     {
       "key": "C1-02",
@@ -16740,6 +16812,45 @@
           "sha256": "321d6409099b2c5553e4e5a439dfe9e9e6952699262c023b19937fcbbe4fa999"
         }
       ],
+      "qualified": false
+    },
+    {
+      "at_utc": "2026-10-14T19:27:29.811680+00:00",
+      "finding": "C1-01",
+      "candidate": "c2b6cc7a54fa368a19aa9b12cf04fcff9abda565",
+      "transition": "open to recorded_scoped_closed",
+      "scope": "Ordinary first-attempt originals pass process binding but unknown, delivered-denied, committed and in-flight parents refuse creation without new claim, process charge or effect; known no-effect parent succeeds once.",
+      "execution": {
+        "control_plane": {
+          "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/native-c2b6cc7a-original-binding-owning-result.json",
+          "sha256": "f5bd41d4f9c13e35b4142832f819af108edaefa181431bb75d938412c206d0cc"
+        },
+        "control_plane_stdout": {
+          "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/native-c2b6cc7a-original-binding-owning.stdout.log",
+          "sha256": "fa2d3a83a7ecf629fce04cd45ec7b6d5b037271695f1286f18073ce5294d07eb"
+        },
+        "control_plane_stderr": {
+          "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/native-c2b6cc7a-original-binding-owning.stderr.log",
+          "sha256": "0ff934ea84bce99aad12fd8b2b4c6b61add5bc3f9d761821f344cb2ab8a3dce9"
+        },
+        "process": {
+          "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/native-a99c761e-process-original-binding-result.json",
+          "sha256": "53c328d17679148b16c411da3fd9caaf47f453d272d53153048532aa4c87ba76"
+        },
+        "process_stdout": {
+          "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/native-a99c761e-process-original-binding.stdout.log",
+          "sha256": "f79df065ecb3cbc84ddd9468e30f67203b9fbec13425d0782f69b899dc9c9a5d"
+        }
+      },
+      "independent_review": {
+        "path": "target/hermes-recovery-remediation/integration-swarm/integration-owner/c1-c2-actual-acceptance-review.events.jsonl",
+        "sha256": "9b9a2323b2303ce2136dc5b3413a1c80ff5e3bbafef464f0bfa752d25a62a63b"
+      },
+      "open_by_severity": {
+        "P3": 89,
+        "P2": 74,
+        "P1": 8
+      },
       "qualified": false
     }
   ],
