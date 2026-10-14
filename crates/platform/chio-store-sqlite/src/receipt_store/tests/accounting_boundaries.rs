@@ -97,7 +97,7 @@ fn cost_attribution_propagates_corrupt_lineage_instead_of_reporting_a_gap() -> T
         "INSERT INTO capability_lineage
          (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json,
           delegation_depth, parent_capability_id, provenance)
-         VALUES ('cap-cost', 'leaf', 'issuer', 1, 100, '{}', 0, 'cap-cost', 'legacy_projection')",
+         VALUES ('cap-cost', 'leaf', 'issuer', 1, 100, '{}', 0, 'cap-cost', 'signed_token')",
         [],
     )?;
     assert!(store.get_combined_delegation_chain("cap-cost").is_err());

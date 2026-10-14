@@ -242,15 +242,15 @@ fn report_count_totals_and_groups_share_the_production_snapshot(
 }
 
 #[test]
-fn selected_integrity_preserves_legacy_null_lineage_fallback(
+fn selected_integrity_preserves_null_attribution_lineage_fallback(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let fixture = bounded_fixture();
-    // The signed body has no attribution and the receipt preceded its legacy
+    // The signed body has no attribution and the receipt preceded its
     // capability row. Stored NULL must retain the local COALESCE diagnostic.
     let mut body = sign_fixture_receipt(
         50,
         &FixtureReceipt {
-            capability_id: "cap-legacy-null".into(),
+            capability_id: "cap-null-attribution".into(),
             subject_key: "removed-before-signing",
             tool_server: "shell",
             tool_name: "bash",
@@ -270,17 +270,43 @@ fn selected_integrity_preserves_legacy_null_lineage_fallback(
     fixture
         .store
         .append_chio_receipt(&ChioReceipt::sign(body, &keypair)?)?;
-    let external = Connection::open(&fixture.path)?;
-    external.execute("INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance)
-        VALUES ('cap-legacy-null', 'legacy-subject', 'legacy-issuer', 1, 100, '{}', 0, 'legacy_projection')", [])?;
+    let subject = Keypair::from_seed(&[64; 32]);
+    let issuer = Keypair::from_seed(&[65; 32]);
+    let token = chio_core::capability::token::CapabilityToken::sign(
+        chio_core::capability::token::CapabilityTokenBody {
+            id: "cap-null-attribution".into(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope: chio_core::capability::scope::ChioScope {
+                grants: vec![chio_core::capability::scope::ToolGrant {
+                    server_id: "shell".into(),
+                    tool_name: "bash".into(),
+                    operations: vec![chio_core::capability::scope::Operation::Invoke],
+                    constraints: vec![],
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..chio_core::capability::scope::ChioScope::default()
+            },
+            issued_at: 1,
+            expires_at: 4_000_000_000,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )?;
+    fixture.store.record_capability_snapshot(&token, None)?;
+    let subject_key = subject.public_key().to_hex();
     let report = fixture
         .store
         .query_receipt_analytics(&ReceiptAnalyticsQuery {
-            agent_subject: Some("legacy-subject".into()),
+            agent_subject: Some(subject_key.clone()),
             ..admin_query()
         })?;
     assert_eq!(report.summary.total_receipts, 1);
-    assert_eq!(report.by_agent[0].subject_key, "legacy-subject");
+    assert_eq!(report.by_agent[0].subject_key, subject_key);
     let limits = ReportReadLimits {
         lineage_lookups: 0,
         ..ReportReadLimits::default()
@@ -349,7 +375,7 @@ fn signed_subject_grouping_does_not_multiply_receipts_through_unsigned_lineage(
     )?;
     for _ in 0..2 {
         external.execute("INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance)
-            VALUES ('cap-bounded-0', 'unsigned-subject', 'unsigned-issuer', 1, 100, '{}', 0, 'legacy_projection')", [])?;
+            VALUES ('cap-bounded-0', 'unsigned-subject', 'unsigned-issuer', 1, 100, '{}', 0, 'signed_token')", [])?;
     }
     let report = fixture.store.query_receipt_analytics(&admin_query())?;
     assert_eq!(report.summary.total_cost_charged, 33);
