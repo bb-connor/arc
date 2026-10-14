@@ -457,39 +457,18 @@ impl RetainedToolAdmissionRequestV1 {
         &self,
         binding: &AdmissionOperationBindingV1,
     ) -> Result<(), AdmissionOperationStoreError> {
-        Self::validate_request_binding(
-            binding,
-            &self.wire.request,
+        let request = &self.wire.request;
+        let capability_hash =
+            sha256_hex(&canonical_json_bytes(&request.capability).map_err(invalid)?);
+        let action_hash = sha256_hex(&canonical_json_bytes(&request.arguments).map_err(invalid)?);
+        let request_hash = immutable_tool_request_hash(
+            request,
             &self.matching_grants()?,
             &self.wire.post_return_steps,
             self.wire.security_binding.as_ref(),
             &self.wire.authority_profile,
             &self.wire.frozen_receipt_signing_identity,
             self.wire.admitted_receipt_metadata.as_ref(),
-        )
-    }
-
-    pub(crate) fn validate_request_binding(
-        binding: &AdmissionOperationBindingV1,
-        request: &ToolCallRequest,
-        matching_grants: &[MatchingGrant<'_>],
-        post_return_steps: &[FrozenEvaluationStepV1],
-        security_binding: Option<&AdmissionSecurityBindingV1>,
-        authority_profile: &AdmissionAuthorityProfileV1,
-        frozen_receipt_signing_identity: &FrozenReceiptSigningIdentityV1,
-        admitted_receipt_metadata: Option<&AdmittedReceiptMetadata>,
-    ) -> Result<(), AdmissionOperationStoreError> {
-        let capability_hash =
-            sha256_hex(&canonical_json_bytes(&request.capability).map_err(invalid)?);
-        let action_hash = sha256_hex(&canonical_json_bytes(&request.arguments).map_err(invalid)?);
-        let request_hash = immutable_tool_request_hash(
-            request,
-            matching_grants,
-            post_return_steps,
-            security_binding,
-            authority_profile,
-            frozen_receipt_signing_identity,
-            admitted_receipt_metadata,
         )?;
         if binding.kind() != super::AdmissionOperationKind::ToolDispatch
             || binding.request_id().as_str() != request.request_id

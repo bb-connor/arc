@@ -407,11 +407,15 @@ def unknown(binary, directory):
         "uncertain effect was redispatched"
     )
 
-    for attempt in (2, 3):
-        response = json.loads((directory / f"publish-{attempt}.json").read_text())
+    responses = [
+        json.loads((directory / f"publish-{attempt}.json").read_text())
+        for attempt in (2, 3)
+    ]
+    for response in responses:
         assert response["verdict"] == "deny"
         assert response["output"] is None
-        assert "OutcomeUnknownAfterDispatch" in response["reason"]
+        assert response["reason"] == "dispatch outcome is unknown after recovery", response
+    assert responses[0]["receipt_json"] == responses[1]["receipt_json"]
 
 
 def limited(binary, directory):
