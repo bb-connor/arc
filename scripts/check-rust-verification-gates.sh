@@ -215,8 +215,7 @@ fi
 ./scripts/check-kani-smoke.sh
 ./scripts/check-creusot-core.sh
 ./scripts/check-kani-core.sh
-./scripts/check-kani-public-core.sh
-./scripts/run-kani-manifest.sh --lane pr --exclude-crate chio-kernel-core
+./scripts/run-kani-manifest.sh --lane pr
 
 # Last, so a truncated output tail still separates executed checks from each
 # registered proof that is open and was not run.

@@ -182,10 +182,9 @@ jobs:
   # separate scheduled workflow avoids duplicating the safety sweep here while
   # preserving the formal OWNERS nightly-liveness obligation.
 
-  # Nightly Kani lane: runs the union of `lanes.pr` and `lanes.nightly_only`
-  # from formal/rust-verification/kani-public-harnesses.toml. The PR job in
-  # formal-pr-smoke.yml runs only `lanes.pr`; nightly runs everything so
-  # harnesses in `lanes.nightly_only` still get daily coverage.
+  # Nightly Kani lane: runs every `.kani/harnesses.toml` entry in the `pr` and
+  # `nightly` lanes. The PR job in formal-pr-smoke.yml runs only `pr`; nightly
+  # runs both so `nightly` harnesses still get daily coverage.
   kani-public-nightly:
     name: kani-public-nightly (lanes.pr + lanes.nightly_only)
     # owner: Chio maintainers
@@ -221,13 +220,15 @@ jobs:
           bash scripts/install-kani-toolchain.sh
           cargo kani --version
 
-      - name: Run chio-kernel-core lanes.pr + lanes.nightly_only Kani harnesses
+      - name: Run chio-kernel-core Kani harnesses (lanes pr + nightly)
         shell: bash
         env:
           CARGO_BUILD_JOBS: "1"
         run: |
           set -euo pipefail
-          bash scripts/check-kani-public-core.sh --lane all
+          bash scripts/run-kani-manifest.sh --lane pr --crate chio-kernel-core
+          bash scripts/run-kani-manifest.sh --lane nightly \
+            --crate chio-kernel-core --allow-empty
 
       # Multi-crate manifest sweep (Kani multi-crate manifest). Picks up every
       # `[[harness]]` entry in `.kani/harnesses.toml` whose `lane = "pr"`

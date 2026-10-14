@@ -178,7 +178,6 @@ pub(super) fn build_coverage(root: &Path) -> Result<CoverageBuild, String> {
         root,
         &workspace,
         &manifest,
-        &kani.harness,
         &mut input_hashes,
         &mut rows,
         &mut artifacts,

@@ -13,12 +13,12 @@
 #   --lane <l>    Lane filter. Default `pr`. Matches the per-entry
 #                 `lane = "pr"` / `lane = "nightly"` field.
 #   --crate <c>   Optional crate filter; only entries with `crate = c`
-#                 run. Useful for local debugging of a single crate.
+#                 run.
 #   --exclude-crate <c>
 #                 Optional crate exclusion filter. Skip entries whose
-#                 crate matches `c`. Used by CI to delegate
-#                 chio-kernel-core to the narrowing script while still
-#                 running every other manifest crate via this runner.
+#                 crate matches `c`. Used by CI to run
+#                 chio-kernel-core in its own job and every other
+#                 manifest crate in another.
 #                 May be repeated.
 #   --list        Print one `<crate>::<harness>` line per matched entry
 #                 and exit 0. Does not invoke Kani.

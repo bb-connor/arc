@@ -217,10 +217,9 @@ the typed, `pub(crate)` facade that performs those kernel projections.
   - Where a harness is model-only (for example the anchor witness-policy
     harness), the module docs state the honesty boundary and name the runtime
     tests covering the gap.
-- Cadence: `formal-pr-smoke.yml` runs the 25 public kernel-core `lanes.pr`
-  harnesses and the 16 non-core manifest PR harnesses on scoped pull-request
-  changes. `kani-public-nightly` in `nightly.yml` runs the union of core PR and
-  nightly-only lanes plus every non-core PR and nightly manifest entry.
+- Cadence: `formal-pr-smoke.yml` runs the chio-kernel-core and non-core PR
+  entries of `.kani/harnesses.toml` on scoped pull-request changes.
+  `kani-public-nightly` in `nightly.yml` runs every PR and nightly entry.
 
 ## Lane 5: TLA+ and Apalache (`formal/tla`, `formal/apalache`)
 

@@ -183,34 +183,29 @@ def multi_manifest_core_pr(path: Path) -> list[str]:
     return unique_names(names, f"{path} chio-kernel-core lane=pr")
 
 
-def public_manifest_pr(path: Path) -> list[str]:
+PUBLIC_MANIFEST_KEYS = {"schema", "crate", "harness_groups", "covered_symbols"}
+
+
+def public_manifest_errors(path: Path) -> list[str]:
     data = load_toml(path)
+    errors = []
     if data.get("schema") != "chio.kani-public-harnesses.v1":
-        raise ContractError(f"{path} has an unexpected schema")
+        errors.append(f"{path} has an unexpected schema")
     if data.get("crate") != "chio-kernel-core":
-        raise ContractError(f"{path} must describe chio-kernel-core")
-    lanes = data.get("lanes")
-    if not isinstance(lanes, dict):
-        raise ContractError(f"{path} lanes must be a table")
-    pr_lane = lanes.get("pr")
-    if not isinstance(pr_lane, dict):
-        raise ContractError(f"{path} lanes.pr must be a table")
-    names = pr_lane.get("harnesses")
-    if not isinstance(names, list) or not names:
-        raise ContractError(f"{path} lanes.pr.harnesses must be a non-empty array")
-    if any(not isinstance(name, str) or not name for name in names):
-        raise ContractError(f"{path} lanes.pr.harnesses contains an invalid name")
-    return unique_names(names, f"{path} lanes.pr")
+        errors.append(f"{path} must describe chio-kernel-core")
+    if set(data) != PUBLIC_MANIFEST_KEYS:
+        errors.append(
+            f"{path} must hold exactly the keys {sorted(PUBLIC_MANIFEST_KEYS)!r}"
+        )
+    return errors
 
 
 def reachability_errors(
     source_path: Path,
     multi_path: Path,
-    public_path: Path,
     trust_sources: dict[str, Path],
 ) -> list[str]:
     multi = load_toml(multi_path)
-    public = load_toml(public_path)
     entries = {
         row["harness"]: row
         for row in multi["harness"]
@@ -238,20 +233,6 @@ def reachability_errors(
         "primary_rust_symbol",
         "notes",
     }
-    allowed_public_keys = {
-        "schema",
-        "crate",
-        "script",
-        "unwinding_checks",
-        "cover_required",
-        "memcmp_unwind",
-        "public_key_eq_unwind",
-        "harness_groups",
-        "covered_symbols",
-        "lanes",
-    }
-    if set(public) - allowed_public_keys:
-        errors.append("public-core manifest has unknown keys")
     for row in multi["harness"]:
         if set(row) - allowed_harness_keys:
             errors.append(f"multi-crate harness has unknown keys: {row.get('harness')}")
@@ -310,36 +291,13 @@ def reachability_errors(
             errors.append(
                 f"reachable proof must select the portable hash backend: {name}"
             )
-    mirrored = public.get("cover_required")
-    expected = {
-        name for name, row in entries.items() if row.get("require_cover") is True
-    }
-    if (
-        not isinstance(mirrored, list)
-        or any(not isinstance(name, str) for name in mirrored)
-        or len(set(mirrored)) != len(mirrored)
-        or set(mirrored) != expected
-    ):
-        errors.append(
-            "public-core required cover posture differs from multi-crate manifest"
-        )
-    checks = public.get("unwinding_checks")
-    if (
-        not isinstance(checks, list)
-        or any(not isinstance(name, str) for name in checks)
-        or not set(REACHABLE_HARNESSES) <= set(checks)
-    ):
-        errors.append("public-core reachable proofs must enable unwinding checks")
     expected_memcmp = {name: 66 for name in KEY_COMPARISON_HARNESSES}
     observed_memcmp = {
         name: row["memcmp_unwind"]
         for name, row in entries.items()
         if "memcmp_unwind" in row
     }
-    if (
-        observed_memcmp != expected_memcmp
-        or public.get("memcmp_unwind") != expected_memcmp
-    ):
+    if observed_memcmp != expected_memcmp:
         errors.append(
             "key comparison loop bounds differ from the complete 65-byte contract"
         )
@@ -353,10 +311,7 @@ def reachability_errors(
         for name, row in entries.items()
         if "public_key_eq_unwind" in row
     }
-    if (
-        observed_recursion != expected_recursion
-        or public.get("public_key_eq_unwind") != expected_recursion
-    ):
+    if observed_recursion != expected_recursion:
         errors.append(
             "receipt hash proofs must retain the checked key recursion bound 8"
         )
@@ -392,16 +347,15 @@ def check(
 ) -> int:
     proof_names = source_proofs(source)
     multi_names = multi_manifest_core_pr(multi_manifest)
-    public_names = public_manifest_pr(public_manifest)
 
     proof_set = set(proof_names)
     surfaces = {
         "source #[kani::proof] set": proof_set,
         ".kani chio-kernel-core lane=pr set": set(multi_names),
-        "formal lanes.pr set": set(public_names),
     }
     required = set(PROTOCOL_HARNESSES)
-    errors = reachability_errors(source, multi_manifest, public_manifest, trust_sources)
+    errors = public_manifest_errors(public_manifest)
+    errors.extend(reachability_errors(source, multi_manifest, trust_sources))
     for label, names in surfaces.items():
         missing_protocol = sorted(required - names)
         if missing_protocol:

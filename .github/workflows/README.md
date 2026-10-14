@@ -64,10 +64,9 @@ verification check names are:
 - "kani-manifest-pr (non-core lanes.pr sweep)"
 - "rust-verification-metadata (schema only, no proofs)"
 
-The core Kani job reads all 24 PR harnesses from
-`formal/rust-verification/kani-public-harnesses.toml`. The non-core job reads
-the 12 matching entries for chio-attest-verify, chio-anchor, and chio-weights
-from `.kani/harnesses.toml`. The metadata job validates registry structure only;
+Both Kani jobs read `.kani/harnesses.toml` through
+`scripts/run-kani-manifest.sh`: the core job runs the chio-kernel-core PR
+entries and the non-core job runs every other crate's PR entries. The metadata job validates registry structure only;
 strict Creusot checks remain in `nightly.yml` and release qualification. These
 checks are frozen in `releases.toml` and must not enter a ruleset until a
 run-always aggregator exists. Real proof work must upload the configured

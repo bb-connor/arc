@@ -115,8 +115,9 @@ machine-readably enumerated in `formal/assumptions.toml`.
   `formal/aeneas/negative-tests.toml` registers drift, proof, and tool-binding
   mutations. The older pilot remains as compatibility evidence for
   `formal/aeneas/pilot.toml`.
-- `scripts/check-kani-public-core.sh` requires bounded Kani harnesses over
-  the public kernel-core functions named in the proof manifest.
+- `scripts/run-kani-manifest.sh --lane pr --crate chio-kernel-core` requires
+  bounded Kani harnesses over the public kernel-core functions named in the
+  proof manifest.
 - `scripts/check-adapter-no-bypass.sh` is the static adapter gate for MCP,
   API protect, and OpenAPI sidecar mediation markers.
 - `scripts/generate-proof-report.sh` writes `target/formal/proof-report.json`

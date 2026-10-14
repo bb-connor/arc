@@ -1270,7 +1270,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `51ec51d52feb226943ce1003dd350151a7f819364eb48de796ecc9aa908d0f55`
+- Input digest: `13b91f739052bbdbc699e0375ab768a19e343d4b9893d94c00678fba73bfaa3f`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1279,7 +1279,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `.cargo/config.toml`: `3f78f70cbb060afdc3795cb19a49e8e187c47b3cc66e4614513fd3ea74200ae1`
 - `.cargo/mutants.toml`: `14feb40a4e4468ab17b8eb6fc8af6f12e6117c2ada73a2696009f7de8102b5b4`
 - `.dst/harnesses.toml`: `02c022579994294816ab40683c211766ef131b18a6cd13c2c5692f91fd62f1a1`
-- `.kani/harnesses.toml`: `8884d5096d74290cd924005dbc4000ea7897e65532cd35d845bcf2081a23b089`
+- `.kani/harnesses.toml`: `ca35873e230f172eb9d581c4b5fbbba9709aaa135181d332064a48afaee0aebf`
 - `.loom/harnesses.toml`: `07b7f087e6e7f484c16be0d7cd079def72dcc35e536e02bf241337fc915b562b`
 - `Cargo.lock`: `7c02e230eec8548b77f7e2362cb2ea713eab0c3b5de34ccfb135c660aba10b20`
 - `Cargo.toml`: `8ca68537318bf69310e4549b78c530d7e4947e985d9a9352ccba1db59908e637`
@@ -1447,7 +1447,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/trust/chio-revocation-oracle/src/api.rs`: `b1bfcf2fa979f132693ef895f40512b53a5797b8ca2dbe609c3524eac58d0375`
 - `crates/trust/chio-revocation-oracle/src/freshness.rs`: `d699d5c59f1c5a660d9c06f294bb2ac1ee2c0fcd00cd9eebbe043df74ba733b8`
 - `docs/fuzzing/trust-boundary-mutants-baseline.toml`: `7331fb69499474ca22b14b6fb5a6f9a966eae2e2a26d3433d9030a4c985efee9`
-- `formal/MAPPING.md`: `29fbdb956121b0dbd376b32849dbec05fa060113388c685268d66ba41b3e8bb8`
+- `formal/MAPPING.md`: `3b915480cf199a0216adf23c68c94c4af90b16bde6b9817c5ed6b809af9e7a57`
 - `formal/aeneas/pilot.toml`: `86627b363717b47ced94caeb826185d400cf70fe357a55fe34d02ea70670956c`
 - `formal/aeneas/production.toml`: `2a3e3189ae4d283ddd6392ca373da61452c55252247be8050e068239745ef93e`
 - `formal/aeneas/verified_core.rs`: `44ef85fbe6c537e8c65a483a67c167f502ca1a108a25293414b27ab2a85046b8`
@@ -1529,11 +1529,11 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/mutation/evidence/spec-mutants-7b24142e8523fe08e501063dbf3d4f6cea3397be.json`: `82878e03aaafa1ceeb1f791386cffd57f9f88453b24113bd51e43b67996a66c2`
 - `formal/mutation/evidence/spec-mutants-d292f14df1c493873199f4f9d969ade00472ff28.json`: `d7b7a63401bfb071af87743ec07191e380c29ee1e306cca1fe35859a8194e623`
 - `formal/mutation/registry.toml`: `48387345d00fe7c53e777326f73e31370f7bc3d362a09f1059cadc06c98b6bb6`
-- `formal/proof-manifest.toml`: `c566625062c37e4868f0ce4dd1684ece382cb355e4351a4507ebe6becaf57914`
+- `formal/proof-manifest.toml`: `20d257ac5764a1c6ae2b803430bcdb98ca4c8aaaad20f75f6c3df67a0570f6f0`
 - `formal/rust-verification/creusot-contracts.toml`: `83000c98743013d3d6d468976a163edaf16d0d621070410d741f146bf61a28a5`
 - `formal/rust-verification/formal-mutants.toml`: `5f15de2f3833b11db3d783d05ab6efcd2c49840ede010fe7ec54fc2846c48fc6`
 - `formal/rust-verification/kani-harnesses.toml`: `60b49af814071bb16f3e027749b26fb9c86d032a00bb022aa0719b6d15c7506f`
-- `formal/rust-verification/kani-public-harnesses.toml`: `3962d4813e2d5742359e1026660c3e2d5a0b972f67678fedd759de8d16ee0b51`
+- `formal/rust-verification/kani-public-harnesses.toml`: `e2be8015e08d174ea66efa4063fa6e6f1e07a7d1a6ce25b935f593fa622f60a5`
 - `formal/theorem-inventory.json`: `91cab8491707abd7a25114b1f4cfffefb9b40e5b1ef474054d298cad46310f59`
 - `formal/tla/DelegationDepthBound.tla`: `69c28ca6b16ef3b2174235347d8bb2aab40fce4cbb79123e4512f363b9717be9`
 - `formal/tla/DistributedRevocation.tla`: `59110faa37eeeaac45b9b206594ae5ef39f94404323a377967012431489b8aa7`
@@ -1565,13 +1565,13 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `scripts/spec-mutants.py`: `c88efd2538101fadf201214440b2500e692e842f10c613d07f4c2f49b3c37c88`
 - `tools/install-apalache.sh`: `3f50745f56521685d30d18669bddb64a4bff060b40c121b30cdbf61fe26f4cc5`
 - `xtask/src/proof_coverage.rs`: `46ec8fb2f05be6282417743f02e4d55a0f0e8b0345489330a4e6ac7be1517a38`
-- `xtask/src/proof_coverage/build.rs`: `d3c143795929b424c1eb71008378801d9c3ea3e9717de287223e1a04eb148054`
+- `xtask/src/proof_coverage/build.rs`: `32f54b8d5c02eba54a2037cc3d5352dd47faf089f48efecd8bd1143c74797045`
 - `xtask/src/proof_coverage/common.rs`: `19da9d7c01cfc80fbafe2acf83706c866fb15f960583e66f251c0d6e15621553`
 - `xtask/src/proof_coverage/evidence.rs`: `ec8751942935652675bb1f1d28521a9608ee03971d561675b6af56a6e33bb7f8`
 - `xtask/src/proof_coverage/mapping.rs`: `b3fe4efaf7b5780169ba1109946fbdf476eefb41a2ba90fc8cc566bfbc0af268`
 - `xtask/src/proof_coverage/mutation_inputs.rs`: `72d9da42443b427139d7f5e5e8ea5ed8eb5539eb47dd050da870fede40dad2cf`
 - `xtask/src/proof_coverage/mutation_reports.rs`: `92dc5724bd98f97ffca22e8db0d0df61ef02ad504df654b308ab18af8cab412b`
-- `xtask/src/proof_coverage/refinement.rs`: `1f6e35bdd0d49b1e6cbaada302d90417592578ef048825d7b24f743c408ef3c9`
+- `xtask/src/proof_coverage/refinement.rs`: `8b697fb04195e69b722d90598b6510a440d0da6b58f6a6fb3c3b609ba4b4d49d`
 - `xtask/src/proof_coverage/render.rs`: `000adc02c61e9f5d7a9ae9bf1d04f4d7873ad1cfc28bc69d6894e7c62fa5305f`
 - `xtask/src/proof_coverage/tests/aeneas.rs`: `9f3d115d348aabc61bc09e4b0babd4236fcd73d4668f7d6f2689e91fafeeafb8`
 - `xtask/src/proof_coverage/tests/mod.rs`: `1ee35ada969b0cfa96af9ad22faeee733b545f67a3e6305bfd39c414714cbace`

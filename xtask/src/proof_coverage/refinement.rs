@@ -108,7 +108,6 @@ pub(super) fn add_refinement_artifacts(
     root: &Path,
     workspace: &WorkspaceCatalog,
     manifest: &ProofManifest,
-    flat_harnesses: &[KaniHarness],
     inputs: &mut BTreeMap<String, String>,
     rows: &mut BTreeMap<String, CoverageRow>,
     artifacts: &mut BTreeMap<String, ArtifactRecord>,
@@ -134,9 +133,6 @@ pub(super) fn add_refinement_artifacts(
             return Err(format!(
                 "unsupported refinement manifest schema in {path}: expected={expected_schema} actual={schema}"
             ));
-        }
-        if path.ends_with("kani-public-harnesses.toml") {
-            validate_legacy_kani_alias(&value, flat_harnesses)?;
         }
         if lane == "kani" {
             for symbol in required_toml_string_array(&value, "covered_symbols", &path)? {
@@ -466,45 +462,6 @@ pub(super) fn expected_refinement_schema(
             "unsupported refinement registry declaration: {lane}|{posture}|{path}"
         )),
     }
-}
-
-pub(super) fn validate_legacy_kani_alias(
-    value: &TomlValue,
-    flat_harnesses: &[KaniHarness],
-) -> Result<(), String> {
-    let crate_name = value
-        .get("crate")
-        .and_then(TomlValue::as_str)
-        .ok_or_else(|| "legacy Kani manifest has no crate".to_string())?;
-    let lanes = value
-        .get("lanes")
-        .and_then(TomlValue::as_table)
-        .ok_or_else(|| "legacy Kani manifest has no lanes table".to_string())?;
-    let mut legacy = BTreeSet::new();
-    for lane in lanes.values() {
-        for harness in lane
-            .get("harnesses")
-            .and_then(TomlValue::as_array)
-            .into_iter()
-            .flatten()
-        {
-            let Some(name) = harness.as_str() else {
-                return Err("legacy Kani harness name is not a string".to_string());
-            };
-            legacy.insert(name.to_string());
-        }
-    }
-    let flat = flat_harnesses
-        .iter()
-        .filter(|harness| harness.crate_name == crate_name)
-        .map(|harness| harness.harness.clone())
-        .collect::<BTreeSet<_>>();
-    if legacy != flat {
-        return Err(format!(
-            "legacy Kani manifest disagrees with .kani/harnesses.toml for {crate_name}"
-        ));
-    }
-    Ok(())
 }
 
 pub(super) fn toml_string_array(value: &TomlValue, key: &str) -> Result<Vec<String>, String> {
