@@ -66,10 +66,10 @@ impl SqliteFiscalStore {
             )
             .optional()
             .map_err(sqlite_error)?;
-        if let Some((schedule_id, digest, envelope_digest)) = retained {
+        if let Some((schedule_id, digest, retained_envelope_digest)) = retained {
             if schedule_id != schedule.body().schedule_id
                 || digest != schedule_digest
-                || envelope_digest != envelope_digest
+                || retained_envelope_digest != envelope_digest
             {
                 return Err(FiscalStoreError::Conflict);
             }
