@@ -474,7 +474,7 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
     );
     let mut mutated_open = BrokerPrivilegedAuditOpenRequest::new(
         "audit-socket-mutation".to_string(),
-        "legacy-provider-observation".to_string(),
+        "pre-broker-provider-observation".to_string(),
         "combined-authority".to_string(),
         request.clone(),
         reference_head.clone(),
@@ -486,7 +486,7 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
     assert!(mutated_open.validate().is_err());
     let mut salt_rebound_open = BrokerPrivilegedAuditOpenRequest::new(
         "audit-socket-salt-mutation".to_string(),
-        "legacy-provider-observation".to_string(),
+        "pre-broker-provider-observation".to_string(),
         "combined-authority".to_string(),
         request.clone(),
         reference_head.clone(),
@@ -545,7 +545,7 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
         .test_expect("privileged audit client write timeout");
     let open = BrokerPrivilegedAuditOpenRequest::new(
         "audit-socket-144".to_string(),
-        "legacy-provider-observation".to_string(),
+        "pre-broker-provider-observation".to_string(),
         "combined-authority".to_string(),
         request.clone(),
         reference_head.clone(),
@@ -607,7 +607,7 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
         crate::audit::BrokerAuditExpectedContext {
             request: &request,
             audit_id: "audit-socket-144",
-            reference_source: "legacy-provider-observation",
+            reference_source: "pre-broker-provider-observation",
             reference_precommitment: &reference_precommitment,
             revocation_authority_domain: "combined-authority",
             trust: audit_trust(&fixture),
@@ -641,7 +641,7 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
         crate::audit::BrokerAuditExpectedContext {
             request: &request,
             audit_id: "audit-socket-144",
-            reference_source: "legacy-provider-observation",
+            reference_source: "pre-broker-provider-observation",
             reference_precommitment: &rebound_precommitment,
             revocation_authority_domain: "combined-authority",
             trust: audit_trust(&fixture),
@@ -704,7 +704,7 @@ fn privileged_audit_socket_propagates_terminal_persistence_failure() {
         .test_expect("privileged audit client read timeout");
     let open = BrokerPrivilegedAuditOpenRequest::new(
         "audit-socket-persistence-145".to_string(),
-        "legacy-provider-observation".to_string(),
+        "pre-broker-provider-observation".to_string(),
         "combined-authority".to_string(),
         request,
         reference_head,
@@ -816,7 +816,7 @@ fn an_authority_outage_fails_only_its_audit_session() {
         .test_expect("privileged audit client read timeout");
     let open = BrokerPrivilegedAuditOpenRequest::new(
         "audit-socket-authority-outage-146".to_string(),
-        "legacy-provider-observation".to_string(),
+        "pre-broker-provider-observation".to_string(),
         "combined-authority".to_string(),
         request,
         reference_head,
@@ -922,7 +922,7 @@ fn a_credential_store_fault_during_an_audit_ends_the_audit_endpoint() {
         .test_expect("privileged audit client read timeout");
     let open = BrokerPrivilegedAuditOpenRequest::new(
         "audit-socket-credential-store-147".to_string(),
-        "legacy-provider-observation".to_string(),
+        "pre-broker-provider-observation".to_string(),
         "combined-authority".to_string(),
         request,
         reference_head,
@@ -1059,7 +1059,7 @@ fn audit_comparison_is_exact_non_dispatching_non_accounting_and_secret_free() {
         crate::audit::BrokerAuditExpectedContext {
             request: &request,
             audit_id: "audit-exact-140",
-            reference_source: "legacy-provider-observation",
+            reference_source: "pre-broker-provider-observation",
             reference_precommitment: &matching_precommitment,
             revocation_authority_domain: "combined-authority",
             trust: audit_trust(&fixture),
@@ -1078,7 +1078,7 @@ fn audit_comparison_is_exact_non_dispatching_non_accounting_and_secret_free() {
         crate::audit::BrokerAuditExpectedContext {
             request: &request,
             audit_id: "audit-mismatch-140",
-            reference_source: "legacy-provider-observation",
+            reference_source: "pre-broker-provider-observation",
             reference_precommitment: &mismatching_precommitment,
             revocation_authority_domain: "combined-authority",
             trust: audit_trust(&fixture),
@@ -1177,7 +1177,7 @@ fn audit_evidence_verifier_recomputes_every_external_trust_binding() {
         completed_audit_context(
             &request,
             "audit-evidence-143",
-            "legacy-provider-observation",
+            "pre-broker-provider-observation",
             &reference_precommitment,
             audit_trust(&fixture),
         ),
@@ -1191,7 +1191,7 @@ fn audit_evidence_verifier_recomputes_every_external_trust_binding() {
         completed_audit_context(
             &request,
             "another-audit",
-            "legacy-provider-observation",
+            "pre-broker-provider-observation",
             &reference_precommitment,
             audit_trust(&fixture),
         ),
@@ -1221,7 +1221,7 @@ fn audit_evidence_verifier_recomputes_every_external_trust_binding() {
         completed_audit_context(
             &request,
             "audit-evidence-143",
-            "legacy-provider-observation",
+            "pre-broker-provider-observation",
             &reference_precommitment,
             wrong_authority_trust,
         ),
@@ -1238,7 +1238,7 @@ fn audit_evidence_verifier_recomputes_every_external_trust_binding() {
         completed_audit_context(
             &request,
             "audit-evidence-143",
-            "legacy-provider-observation",
+            "pre-broker-provider-observation",
             &reference_precommitment,
             wrong_runner_trust,
         ),
@@ -1255,7 +1255,7 @@ fn audit_evidence_verifier_recomputes_every_external_trust_binding() {
         completed_audit_context(
             &request,
             "audit-evidence-143",
-            "legacy-provider-observation",
+            "pre-broker-provider-observation",
             &reference_precommitment,
             wrong_receipt_trust,
         ),
@@ -1278,7 +1278,7 @@ fn audit_evidence_verifier_recomputes_every_external_trust_binding() {
         completed_audit_context(
             &request,
             "audit-evidence-143",
-            "legacy-provider-observation",
+            "pre-broker-provider-observation",
             &reference_precommitment,
             wrong_policy_trust,
         ),
@@ -1294,7 +1294,7 @@ fn audit_evidence_verifier_recomputes_every_external_trust_binding() {
         completed_audit_context(
             &request,
             "audit-evidence-143",
-            "legacy-provider-observation",
+            "pre-broker-provider-observation",
             &reference_precommitment,
             wrong_provider_trust,
         ),
@@ -1314,7 +1314,7 @@ fn audit_evidence_verifier_recomputes_every_external_trust_binding() {
         crate::audit::BrokerAuditExpectedContext {
             request: &request,
             audit_id: "audit-evidence-143",
-            reference_source: "legacy-provider-observation",
+            reference_source: "pre-broker-provider-observation",
             reference_precommitment: &reference_precommitment,
             revocation_authority_domain: "combined-authority",
             trust: audit_trust(&fixture),

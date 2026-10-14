@@ -1,4 +1,4 @@
-//! Finite compatibility and owner controls for the actual audit request path.
+//! Codec contract and owner controls for the actual audit request path.
 use super::*;
 use crate::private_request_wire::{
     caller_drop_observation, canonical_execute_bytes, canonical_header_bytes,
@@ -18,8 +18,8 @@ fn audit_open(
     let (head, body) = audit_reference_parts(&fixture, &request, true);
     let commitment = crate::audit::BrokerAuditReferencePrecommitment::generate(&head, &body)?;
     let open = BrokerPrivilegedAuditOpenRequest::new(
-        "f053-contract".to_owned(),
-        "legacy-provider-observation".to_owned(),
+        "audit-contract".to_owned(),
+        "pre-broker-provider-observation".to_owned(),
         "combined-authority".to_owned(),
         request,
         head,
@@ -45,7 +45,7 @@ fn native_eof(error: &(dyn std::error::Error + 'static)) -> bool {
 }
 
 #[test]
-fn f053_contract_legacy_outer_sequence_keeps_noncanonical_category() -> TestResult {
+fn audit_contract_outer_sequence_keeps_noncanonical_category() -> TestResult {
     let (_, open) = audit_open()?;
     let sequence = Zeroizing::new(chio_core_types::canonical_json_bytes(&(
         &open.schema,
@@ -76,7 +76,7 @@ fn f053_contract_legacy_outer_sequence_keeps_noncanonical_category() -> TestResu
 }
 
 #[test]
-fn f053_contract_nested_request_bytes_keep_bounded_owned_storage() -> TestResult {
+fn audit_contract_nested_request_bytes_keep_bounded_owned_storage() -> TestResult {
     let (_, mut open) = audit_open()?;
     open.request.request.headers = vec![crate::protocol::HeaderField::normalized(
         "content-type",
@@ -103,7 +103,7 @@ fn f053_contract_nested_request_bytes_keep_bounded_owned_storage() -> TestResult
 }
 
 #[test]
-fn f053_contract_late_unknown_error_drops_nested_body_and_headers() -> TestResult {
+fn audit_contract_late_unknown_error_drops_nested_body_and_headers() -> TestResult {
     let (_, mut open) = audit_open()?;
     open.reference_request_head.clear();
     open.reference_request_body.clear();
@@ -123,7 +123,7 @@ fn f053_contract_late_unknown_error_drops_nested_body_and_headers() -> TestResul
 }
 
 #[test]
-fn f053_contract_partial_header_keeps_native_eof_and_cleans_prefix() -> TestResult {
+fn audit_contract_partial_header_keeps_native_eof_and_cleans_prefix() -> TestResult {
     let (fixture, mut open) = audit_open()?;
     open.request.request.headers = vec![crate::protocol::HeaderField::normalized(
         "content-type",
@@ -159,7 +159,7 @@ fn f053_contract_partial_header_keeps_native_eof_and_cleans_prefix() -> TestResu
 }
 
 #[test]
-fn f053_contract_direct_private_bytes_preserve_digest_inputs_and_domains() -> TestResult {
+fn audit_contract_direct_private_bytes_preserve_digest_inputs_and_domains() -> TestResult {
     let (_, mut open) = audit_open()?;
     let raw = vec![crate::protocol::HeaderField {
         name: "x-private".to_owned(),
@@ -197,7 +197,7 @@ fn f053_contract_direct_private_bytes_preserve_digest_inputs_and_domains() -> Te
 }
 
 #[test]
-fn f053_contract_actual_prepared_and_audit_caller_owners_run_cleanup() -> TestResult {
+fn audit_contract_actual_prepared_and_audit_caller_owners_run_cleanup() -> TestResult {
     let (fixture, open) = audit_open()?;
     let credential = fixture
         .backend
@@ -235,7 +235,7 @@ fn f053_contract_actual_prepared_and_audit_caller_owners_run_cleanup() -> TestRe
 }
 
 #[test]
-fn f053_contract_borrowed_header_validation_preserves_error_order() -> TestResult {
+fn audit_contract_borrowed_header_validation_preserves_error_order() -> TestResult {
     let (_, mut open) = audit_open()?;
     open.request.request.headers = vec![crate::protocol::HeaderField::normalized(
         "content-type",
@@ -279,7 +279,7 @@ fn f053_contract_borrowed_header_validation_preserves_error_order() -> TestResul
 }
 
 #[test]
-fn f053_contract_nested_private_exact_and_one_over_limits() -> TestResult {
+fn audit_contract_nested_private_exact_and_one_over_limits() -> TestResult {
     let (_, mut open) = audit_open()?;
     open.request.request.body = vec![b'b'; 524_288];
     open.request.request.headers = (0..64)
@@ -358,7 +358,7 @@ fn salt_wire(
 }
 
 #[test]
-fn f053_contract_salt_lone_surrogates_keep_invalid_shape_without_string_rerun() -> TestResult {
+fn audit_contract_salt_lone_surrogates_keep_invalid_shape_without_string_rerun() -> TestResult {
     let (_, open) = audit_open()?;
     for token in [
         br#""\uD800""#.as_slice(),
@@ -388,7 +388,7 @@ fn f053_contract_salt_lone_surrogates_keep_invalid_shape_without_string_rerun() 
 }
 
 #[test]
-fn f053_contract_salt_valid_alternate_escapes_and_partial_eof_keep_categories() -> TestResult {
+fn audit_contract_salt_valid_alternate_escapes_and_partial_eof_keep_categories() -> TestResult {
     let (_, open) = audit_open()?;
     for token in [br#""\u006b""#.as_slice(), br#""\uD83D\uDE00""#, br#""\/""#] {
         let encoded = salt_wire(&open, token, true)?;
@@ -424,7 +424,7 @@ fn f053_contract_salt_valid_alternate_escapes_and_partial_eof_keep_categories() 
 }
 
 #[test]
-fn f053_contract_canonical_salt_unicode_and_control_bytes_match_native() -> TestResult {
+fn audit_contract_canonical_salt_unicode_and_control_bytes_match_native() -> TestResult {
     let (_, mut open) = audit_open()?;
     open.reference_commitment_salt = "salt\"\\\n\u{001f}é😀".to_owned();
     let encoded = encode_open_wire(&open)?;
