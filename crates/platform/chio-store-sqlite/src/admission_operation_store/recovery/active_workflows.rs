@@ -420,15 +420,19 @@ fn require_terminal_retirement(
     physical: &RecoveryWorkflowRecordV1,
     expected: &ProjectionDigest,
 ) -> Result<(), AdmissionOperationStoreError> {
-    if super::super::historical_holds::effective(tx, physical)?.is_some()
-        && (super::super::historical_holds::blocks_original_private_settlement(tx, physical)?
-            || !super::super::terminal_custody::private_settlement_committed(tx, physical)?)
-    {
-        return Err(invariant(
-            "captured terminal retirement retains its historical hold",
-        ));
+    // One quota validation supplies both the hold and the terminal custody.
+    let quota = viewed_workflow_quota(tx, physical)?;
+    if let Some(hold) = super::super::historical_holds::effective_with(tx, physical, &quota)? {
+        if super::super::historical_holds::blocks_private_settlement(&hold)
+            || !super::super::terminal_custody::private_settlement_committed(tx, physical)?
+        {
+            return Err(invariant(
+                "captured terminal retirement retains its historical hold",
+            ));
+        }
     }
-    auxiliary_captured_terminal(tx, physical)?
+    quota
+        .terminal(physical)?
         .ok_or_else(|| invariant("retired captured workflow lost terminal custody"))?;
     let key = super::super::terminal_custody::terminal_key(&physical.scope, &physical.workflow_id)?;
     if source_reference(tx, &key)?.digest() != expected {

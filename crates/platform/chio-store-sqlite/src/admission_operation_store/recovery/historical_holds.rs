@@ -36,6 +36,15 @@ pub(super) fn effective(
     resolve(tx, record, auxiliary_historical_hold(tx, record)?)
 }
 
+/// `effective` over the caller's quota read of this same physical workflow.
+pub(super) fn effective_with(
+    tx: &Connection,
+    record: &RecoveryWorkflowRecordV1,
+    quota: &ViewedWorkflowQuota<'_>,
+) -> Result<Option<RecoveryHistoricalHoldV1>, AdmissionOperationStoreError> {
+    resolve(tx, record, quota.hold(record)?)
+}
+
 fn resolve(
     tx: &Connection,
     record: &RecoveryWorkflowRecordV1,
@@ -90,9 +99,13 @@ pub(super) fn blocks_original_private_settlement(
     tx: &Connection,
     record: &RecoveryWorkflowRecordV1,
 ) -> Result<bool, AdmissionOperationStoreError> {
-    Ok(effective(tx, record)?.is_some_and(|hold| {
-        hold.reason != RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable
-    }))
+    Ok(effective(tx, record)?
+        .as_ref()
+        .is_some_and(blocks_private_settlement))
+}
+
+pub(super) fn blocks_private_settlement(hold: &RecoveryHistoricalHoldV1) -> bool {
+    hold.reason != RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable
 }
 
 /// Authenticate retained hold data without reading the quota's terminal pointer.
@@ -173,7 +186,7 @@ pub(super) fn view(
     record: RecoveryWorkflowRecordV1,
 ) -> Result<RecoveryWorkflowRecordV1, AdmissionOperationStoreError> {
     let quota = viewed_workflow_quota(tx, &record)?;
-    let hold = resolve(tx, &record, quota.hold(&record)?)?;
+    let hold = effective_with(tx, &record, &quota)?;
     let signer_hold_discharged =
         hold.as_ref().is_some_and(|hold| {
             hold.reason == RecoveryHistoricalHoldReasonV1::FrozenSigningCustodyUnavailable
