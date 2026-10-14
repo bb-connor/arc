@@ -2443,25 +2443,16 @@ async fn sidecar_validate_capability_rejects_relaxed_expected_scope_constraints(
         .test_unwrap();
     let token: CapabilityToken = serde_json::from_slice(&mint_bytes).test_unwrap();
 
-    let validate_body = serde_json::json!({
-        "id": token.id,
-        "issuer": token.issuer.to_hex(),
-        "subject": token.subject.to_hex(),
-        "scope": token.scope,
-        "issued_at": token.issued_at,
-        "expires_at": token.expires_at,
-        "delegation_chain": token.delegation_chain,
-        "signature": token.signature.to_hex(),
-        "expected_scope": {
-            "grants": [{
-                "server_id": "files",
-                "tool_name": "read",
-                "operations": ["invoke"],
-                "constraints": []
-            }],
-            "resource_grants": [],
-            "prompt_grants": []
-        }
+    let mut validate_body = serde_json::to_value(&token).test_unwrap();
+    validate_body["expected_scope"] = serde_json::json!({
+        "grants": [{
+            "server_id": "files",
+            "tool_name": "read",
+            "operations": ["invoke"],
+            "constraints": []
+        }],
+        "resource_grants": [],
+        "prompt_grants": []
     });
     let validate_response = build_app(Arc::clone(&state))
         .oneshot(loopback_post("/v1/capabilities/validate", validate_body))
@@ -2478,6 +2469,45 @@ async fn sidecar_validate_capability_rejects_relaxed_expected_scope_constraints(
         json["reason"].as_str(),
         Some("expected_scope is not a subset of capability scope")
     );
+}
+
+#[tokio::test]
+async fn sidecar_validate_capability_refuses_token_without_schema() {
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let mint_body = serde_json::json!({
+        "subject": Keypair::generate().public_key().to_hex(),
+        "scope": { "grants": [], "resource_grants": [], "prompt_grants": [] },
+        "ttl_seconds": 600,
+    });
+    let mint_response = build_app(Arc::clone(&state))
+        .oneshot(loopback_post("/v1/capabilities", mint_body))
+        .await
+        .test_unwrap();
+    let token: CapabilityToken = serde_json::from_slice(
+        &to_bytes(mint_response.into_body(), 1024 * 1024)
+            .await
+            .test_unwrap(),
+    )
+    .test_unwrap();
+
+    let mut validate_body = serde_json::to_value(&token).test_unwrap();
+    validate_body
+        .as_object_mut()
+        .test_unwrap()
+        .remove("schema")
+        .test_unwrap();
+    let validate_response = build_app(Arc::clone(&state))
+        .oneshot(loopback_post("/v1/capabilities/validate", validate_body))
+        .await
+        .test_unwrap();
+    assert_eq!(validate_response.status(), StatusCode::BAD_REQUEST);
+    let json: serde_json::Value = serde_json::from_slice(
+        &to_bytes(validate_response.into_body(), 1024 * 1024)
+            .await
+            .test_unwrap(),
+    )
+    .test_unwrap();
+    assert_eq!(json["error"], "chio_bad_request");
 }
 
 #[tokio::test]

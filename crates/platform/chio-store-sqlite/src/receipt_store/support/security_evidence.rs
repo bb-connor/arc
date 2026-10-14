@@ -138,34 +138,6 @@ pub(crate) fn ensure_archive_security_evidence_schema(
     validate_security_evidence_schema_in(connection, EvidenceDatabase::Archive)
 }
 
-pub(crate) fn migrate_indexed_security_evidence_schema(
-    connection: &Connection,
-) -> Result<(), ReceiptStoreError> {
-    let legacy = Connection::open_in_memory()?;
-    legacy.execute_batch(&SECURITY_EVIDENCE_INDEX_SCHEMA.replace(
-        "receipt_id TEXT NOT NULL UNIQUE",
-        "receipt_id TEXT NOT NULL UNIQUE REFERENCES chio_tool_receipts(receipt_id) ON DELETE RESTRICT",
-    ))?;
-    let catalog = indexed_security_evidence_schema_catalog(connection, EvidenceDatabase::Main)?;
-    if catalog == indexed_security_evidence_schema_catalog(&legacy, EvidenceDatabase::Main)? {
-        // The caller owns the schema migration transaction. Both identities
-        // and immutable guards survive a failed or interrupted migration.
-        connection.execute_batch(
-            "CREATE TABLE chio_security_evidence_index_v5 (
-                evidence_id TEXT NOT NULL PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE
-             );
-             INSERT INTO chio_security_evidence_index_v5 SELECT * FROM chio_security_evidence_index;
-             DROP TABLE chio_security_evidence_index;",
-        )?;
-        connection.execute_batch(SECURITY_EVIDENCE_INDEX_SCHEMA)?;
-        connection.execute_batch(
-            "INSERT INTO chio_security_evidence_index SELECT * FROM chio_security_evidence_index_v5;
-             DROP TABLE chio_security_evidence_index_v5;"
-        )?;
-    }
-    validate_indexed_security_evidence_schema(connection)
-}
-
 pub(crate) fn validate_indexed_security_evidence_schema(
     connection: &Connection,
 ) -> Result<(), ReceiptStoreError> {
@@ -214,46 +186,4 @@ fn indexed_security_evidence_schema_catalog(
         .collect::<Result<Vec<_>, _>>()
         .map_err(ReceiptStoreError::from)?;
     Ok(entries)
-}
-
-#[cfg(test)]
-mod migration_tests {
-    use super::*;
-
-    #[test]
-    fn legacy_index_migration_preserves_identity_and_allows_payload_retention(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut connection = Connection::open_in_memory()?;
-        connection.execute_batch(
-            "PRAGMA foreign_keys = ON;
-            CREATE TABLE chio_tool_receipts (receipt_id TEXT PRIMARY KEY);
-            INSERT INTO chio_tool_receipts VALUES ('receipt');",
-        )?;
-        connection.execute_batch(&SECURITY_EVIDENCE_INDEX_SCHEMA.replace(
-            "receipt_id TEXT NOT NULL UNIQUE",
-            "receipt_id TEXT NOT NULL UNIQUE REFERENCES chio_tool_receipts(receipt_id) ON DELETE RESTRICT",
-        ))?;
-        connection.execute(
-            "INSERT INTO chio_security_evidence_index VALUES ('evidence', 'receipt')",
-            [],
-        )?;
-        assert!(connection
-            .execute("DELETE FROM chio_tool_receipts", [])
-            .is_err());
-        let transaction = connection.transaction()?;
-        migrate_indexed_security_evidence_schema(&transaction)?;
-        transaction.commit()?;
-        connection.execute("DELETE FROM chio_tool_receipts", [])?;
-        let identity: String = connection.query_row(
-            "SELECT receipt_id FROM chio_security_evidence_index WHERE evidence_id = 'evidence'",
-            [],
-            |row| row.get(0),
-        )?;
-        assert_eq!(identity, "receipt");
-        assert!(connection
-            .execute("DELETE FROM chio_security_evidence_index", [])
-            .is_err());
-        validate_indexed_security_evidence_schema(&connection)?;
-        Ok(())
-    }
 }

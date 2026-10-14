@@ -225,8 +225,8 @@ impl BrokerService {
         })
     }
 
-    /// Compare the exact broker-prepared HTTP request with a privileged legacy
-    /// reference without registering an attempt, mutating quota state, or
+    /// Compare the exact broker-prepared HTTP request with a privileged
+    /// pre-broker reference request without registering an attempt, mutating quota state, or
     /// crossing the network boundary. The secret-bearing requests and random
     /// blinding salts are destroyed before the signed artifact is returned.
     pub(crate) fn audit_compare_outbound_request(

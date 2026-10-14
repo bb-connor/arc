@@ -22,6 +22,200 @@ async function renderIntoDocument(node: ReactNode): Promise<HTMLDivElement> {
   return container
 }
 
+describe('dashboard bearer access', () => {
+  it('keeps URL-only credentials out of dashboard access and displayed content', async () => {
+    sessionStorage.clear()
+    window.history.replaceState({}, '', '/?token=url-only-credential')
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401, statusText: 'Unauthorized' })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const container = await renderIntoDocument(<App />)
+
+    expect(container.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe('')
+    expect(window.location.search).toBe('')
+    expect(container.querySelector('.app-body')).toBeNull()
+    expect(sessionStorage.getItem('chio_token')).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(container.textContent).not.toContain('url-only-credential')
+  })
+
+  it('clears receipts and rejects late responses across logout and a new login', async () => {
+    sessionStorage.clear()
+    window.history.replaceState({}, '', '/')
+    const page = (toolName: string, nextCursor: number | null = null) => ({
+      ok: true,
+      json: async () => ({
+        totalCount: 2,
+        nextCursor,
+        receipts: [{
+          id: `receipt-${toolName}`,
+          timestamp: 1,
+          capability_id: 'cap-1',
+          tool_server: 'protected-server',
+          tool_name: toolName,
+          action: { parameters: {}, parameter_hash: 'hash' },
+          decision: 'allow',
+        }],
+      }),
+    })
+    let resolvePage: (value: ReturnType<typeof page>) => void = () => {
+      throw new Error('receipt request is not pending')
+    }
+    const pendingPage = new Promise<ReturnType<typeof page>>((resolve) => {
+      resolvePage = resolve
+    })
+    const fetchMock = vi.fn((input: string, init?: RequestInit) => {
+      if (input.startsWith('/v1/receipts/query')) {
+        if (new URL(input, window.location.origin).searchParams.has('cursor')) return pendingPage
+        const authorization = new Headers(init?.headers).get('Authorization')
+        return Promise.resolve(page(authorization === 'Bearer entered-token-b' ? 'session-b' : 'session-a', 1))
+      }
+      return Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const container = await renderIntoDocument(<App />)
+
+    async function login(token: string) {
+      const input = container.querySelector<HTMLInputElement>('input[type="password"]')
+      const form = container.querySelector('form')
+      if (!input || !form) throw new Error('login form is missing')
+      input.value = token
+      await act(async () => {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      })
+    }
+
+    await login('entered-token-a')
+    await waitForText(container, 'protected-server/session-a')
+    expect(sessionStorage.getItem('chio_token')).toBe('entered-token-a')
+    expect(fetchMock.mock.calls.some(([, init]) => new Headers(init?.headers).get('Authorization') === 'Bearer entered-token-a')).toBe(true)
+    expect(container.textContent).not.toContain('entered-token-a')
+    await act(async () => { buttonWithText(container, 'Next').click() })
+    expect(fetchMock.mock.calls.some(([input]) => input.includes('cursor=1'))).toBe(true)
+    await act(async () => { buttonWithText(container, 'Log out').click() })
+
+    expect(sessionStorage.getItem('chio_token')).toBeNull()
+    expect(container.querySelector('.app-body')).toBeNull()
+    expect(container.textContent).not.toContain('protected-server/session-a')
+    expect(container.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe('')
+    await login('entered-token-b')
+    await waitForText(container, 'protected-server/session-b')
+    expect(sessionStorage.getItem('chio_token')).toBe('entered-token-b')
+    expect(fetchMock.mock.calls.some(([, init]) => new Headers(init?.headers).get('Authorization') === 'Bearer entered-token-b')).toBe(true)
+    await act(async () => { resolvePage(page('session-a-late')) })
+    expect(container.textContent).toContain('protected-server/session-b')
+    expect(container.textContent).not.toContain('protected-server/session-a')
+    expect(container.textContent).not.toContain('entered-token-b')
+  })
+
+  it('removes query credentials before the public proof room makes requests', async () => {
+    window.history.replaceState({}, '', '/proof-room?token=proof-room-credential')
+    const searches: string[] = []
+    const fetchMock = vi.fn((_input: string, _init?: RequestInit) => {
+      searches.push(window.location.search)
+      return Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const container = await renderIntoDocument(<App />)
+
+    expect(searches.length).toBeGreaterThan(0)
+    expect(searches.every((search) => search === '')).toBe(true)
+    expect(fetchMock.mock.calls.every(([, init]) => !new Headers(init?.headers).has('Authorization'))).toBe(true)
+    expect(sessionStorage.getItem('chio_token')).toBeNull()
+    expect(container.textContent).not.toContain('proof-room-credential')
+  })
+
+  it('hides protected data when clearing token storage fails', async () => {
+    sessionStorage.setItem('chio_token', 'storage-failure-secret')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401, statusText: 'Unauthorized' }))
+    const container = await renderIntoDocument(<App />)
+    expect(container.querySelector('.app-body')).not.toBeNull()
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage-failure-secret')
+    })
+
+    await act(async () => { buttonWithText(container, 'Log out').click() })
+
+    expect(container.querySelector('.app-body')).toBeNull()
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Unable to clear token storage. Close this tab to finish logging out.')
+    expect(container.textContent).not.toContain('storage-failure-secret')
+  })
+
+  it('makes no requests when the browser refuses query credential removal', async () => {
+    window.history.replaceState({}, '', '/proof-room?token=history-secret')
+    vi.spyOn(window.history, 'replaceState').mockImplementation(() => {
+      throw new Error('history-secret')
+    })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const container = await renderIntoDocument(<App />)
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Unable to read token storage in this tab.')
+    expect(container.textContent).not.toContain('history-secret')
+  })
+
+  it('refuses access when token storage cannot be read', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage-read-secret')
+    })
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const container = await renderIntoDocument(<App />)
+
+    expect(container.querySelector('.app-body')).toBeNull()
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Unable to read token storage in this tab.')
+    expect(container.textContent).not.toContain('storage-read-secret')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['invalid token value', 'Enter a bearer token without spaces or control characters.', false],
+    ['storage-write-secret', 'Unable to store the bearer token in this tab.', true],
+  ])('refuses invalid input or unavailable storage without exposing %s', async (token, message, storageFailure) => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const container = await renderIntoDocument(<App />)
+    const input = container.querySelector<HTMLInputElement>('input[type="password"]')
+    const form = container.querySelector('form')
+    if (!input || !form) throw new Error('login form is missing')
+    if (storageFailure) {
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error(token) })
+    }
+    input.value = token
+
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    })
+
+    expect(sessionStorage.getItem('chio_token')).toBeNull()
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(message)
+    expect(container.textContent).not.toContain(token)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses an empty token without making authenticated requests', async () => {
+    sessionStorage.clear()
+    window.history.replaceState({}, '', '/')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const container = await renderIntoDocument(<App />)
+    const form = container.querySelector('form')
+    expect(form).not.toBeNull()
+    if (!form) throw new Error('login form is missing')
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    })
+
+    expect(sessionStorage.getItem('chio_token')).toBeNull()
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Enter a bearer token.')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
 function bytesToHex(bytes: ArrayBuffer): string {
   return Array.from(new Uint8Array(bytes))
     .map((byte) => byte.toString(16).padStart(2, '0'))
@@ -6928,7 +7122,7 @@ describe('App operator paths', () => {
     await waitForText(container, 'Bearer token required')
 
     expect(container.textContent).toContain('Bearer token required')
-    expect(container.textContent).toContain('Provide a trust-control bearer token via')
+    expect(container.textContent).toContain('Enter your trust-control bearer token.')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

@@ -1,5 +1,5 @@
 use chio_federation_authority::SealedFrostRound2Package;
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 use chio_core::StoreMutationFence;
 use chio_federation_authority::{FrostCeremonySecret, FrostRound1Package};
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::admission_operation_store::verify_active_owner;
 use crate::encrypted_blob::TenantKey;
 use crate::serving_owner::SqliteServingOwner;
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 
 mod ceremony;
 mod input;
@@ -430,7 +430,7 @@ impl SqliteFrostStore {
         }
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, FrostStoreError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, FrostStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| FrostStoreError::Unavailable(fenced.to_string()))

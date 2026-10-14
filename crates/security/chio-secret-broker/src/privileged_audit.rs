@@ -1,8 +1,8 @@
 //! Privileged, audit-only Unix transport for broker migration comparisons.
 //!
 //! This protocol is deliberately separate from normal tool IPC. A connection
-//! has exactly two request phases: the runner precommits to the legacy wire
-//! reference, submits that precommitment with the live broker request and exact
+//! has exactly two request phases: the runner precommits to the pre-broker
+//! reference request, submits that precommitment with the live broker request and exact
 //! reference bytes, then verifies the broker-signed challenge retained it. The
 //! runner signs the challenge-derived authorization body and returns it with a
 //! one-shot governed admin authorization. The connection closes after one
@@ -1554,7 +1554,7 @@ mod tests {
             broker_instance_id: "broker-production-1".to_string(),
             tenant_scope: "tenant-production".to_string(),
             runner_id: "runner-production-1".to_string(),
-            reference_source: "legacy-production".to_string(),
+            reference_source: "pre-broker-production".to_string(),
             reference_commitment_sha256: "1".repeat(64),
             capability_sha256: "2".repeat(64),
             proof_sha256: "3".repeat(64),

@@ -242,15 +242,24 @@ fn security_context(request: &ToolCallRequest) -> SecurityInvocationContext {
     ))
 }
 
-struct SharedGuard(Arc<SessionThrottleGuard>);
+struct SharedGuard {
+    guard: Arc<SessionThrottleGuard>,
+    attempts: Arc<Mutex<Vec<String>>>,
+}
 
 impl Guard for SharedGuard {
     fn name(&self) -> &str {
-        self.0.name()
+        self.guard.name()
     }
 
     fn evaluate(&self, context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
-        self.0.evaluate(context)
+        if let Some(attempt) = context.invocation_attempt_id() {
+            self.attempts
+                .lock()
+                .unwrap_or_else(|_| panic!("attempt mutex poisoned"))
+                .push(attempt.to_owned());
+        }
+        self.guard.evaluate(context)
     }
 }
 
@@ -285,6 +294,15 @@ fn evaluate(
     request: &ToolCallRequest,
     security: Option<&SecurityInvocationContext>,
 ) -> Verdict {
+    evaluate_recording_attempts(guard, request, security, &Arc::default())
+}
+
+fn evaluate_recording_attempts(
+    guard: &Arc<SessionThrottleGuard>,
+    request: &ToolCallRequest,
+    security: Option<&SecurityInvocationContext>,
+    attempts: &Arc<Mutex<Vec<String>>>,
+) -> Verdict {
     let mut kernel = ChioKernel::new_with_clock(
         KernelConfig {
             keypair: Keypair::generate(),
@@ -307,7 +325,10 @@ fn evaluate(
         Arc::new(chio_security_types::clock::FixedClock::from_millis(10_500)),
     );
     kernel.register_tool_server(Box::new(ReadServer));
-    kernel.add_guard(Box::new(SharedGuard(guard.clone())));
+    kernel.add_guard(Box::new(SharedGuard {
+        guard: guard.clone(),
+        attempts: attempts.clone(),
+    }));
     let result = if let Some(security) = security {
         kernel.evaluate_tool_call_blocking_with_security_context(request, security)
     } else {
@@ -339,6 +360,78 @@ fn exact_decisions_allow_with_distinct_kernel_attempts() {
         .invocation_id
         .as_str()
         .starts_with("session_throttle_invocation:"));
+}
+
+fn expected_invocation_id(
+    domain: &[u8],
+    schema_version: u8,
+    request: &ToolCallRequest,
+    attempt: &str,
+) -> String {
+    let commitment = serde_json::json!({
+        "schema_version": schema_version,
+        "tenant_id": "tenant-a",
+        "session_id": "session-a",
+        "request_id": request.request_id,
+        "invocation_attempt_id": attempt,
+        "capability_id": request.capability.id,
+        "server_id": request.server_id,
+        "tool_name": request.tool_name,
+        "arguments": request.arguments,
+    });
+    let canonical = chio_core::canonical_json_bytes(&commitment)
+        .unwrap_or_else(|error| panic!("canonical commitment: {error}"));
+    let mut preimage = domain.to_vec();
+    preimage.extend_from_slice(&canonical);
+    format!(
+        "session_throttle_invocation:{}",
+        chio_core::sha256(&preimage).to_hex()
+    )
+}
+
+#[test]
+fn invocation_id_commits_to_the_v1_domain_and_schema_only() {
+    let store = Arc::new(FakeThrottles::new(Behavior::Allow));
+    let throttle_store: Arc<dyn SessionThrottleStore> = store.clone();
+    let guard = Arc::new(SessionThrottleGuard::new(
+        throttle_store,
+        Arc::new(FixedClock(10_500)),
+        MissingContextPolicy::Deny,
+    ));
+    let request = request();
+    let security = security_context(&request);
+    let attempts = Arc::default();
+    assert_eq!(
+        evaluate_recording_attempts(&guard, &request, Some(&security), &attempts),
+        Verdict::Allow
+    );
+    let attempts = attempts
+        .lock()
+        .unwrap_or_else(|_| panic!("attempt mutex poisoned"))
+        .clone();
+    assert_eq!(attempts.len(), 1);
+    let invocations = store.invocations();
+    assert_eq!(invocations.len(), 1);
+    let produced = invocations[0].invocation_id.as_str();
+    assert_eq!(
+        produced,
+        expected_invocation_id(
+            b"chio.session-throttle-invocation.v1\0",
+            1,
+            &request,
+            &attempts[0]
+        )
+    );
+    for (domain, schema_version) in [
+        (&b"chio.session-throttle-invocation.v2\0"[..], 2),
+        (&b"chio.session-throttle-invocation.v1\0"[..], 2),
+        (&b"chio.session-throttle-invocation.v2\0"[..], 1),
+    ] {
+        assert_ne!(
+            produced,
+            expected_invocation_id(domain, schema_version, &request, &attempts[0])
+        );
+    }
 }
 
 #[test]

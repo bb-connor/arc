@@ -59,6 +59,7 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/native_capture_test_support.rs::native_capture_readback_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/native_capture_test_support.rs::native_capture_response_fault_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/native_capture_test_support.rs::native_capture_response_for_test": 1,
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/catalog_scan_test_support.rs::observe_native_catalog_scans_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture/expiry_test_support.rs::clear_native_capture_declassification_expiry_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture/expiry_test_support.rs::clear_native_capture_nonce_expiry_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture/expiry_test_support.rs::clear_native_capture_runtime_expiry_for_test": 1,

@@ -71,21 +71,10 @@ import {
 
 const TOKEN_KEY = 'chio_token'
 
-/**
- * Read Bearer token from sessionStorage or URL query param.
- * Stores in sessionStorage for subsequent calls.
- * Returns empty string if neither source provides a token.
- */
+/** URL credentials never authorize dashboard requests. */
 export function getToken(): string {
-  const stored = sessionStorage.getItem(TOKEN_KEY)
-  if (stored) return stored
-
-  const param = new URLSearchParams(window.location.search).get('token')
-  if (param) {
-    sessionStorage.setItem(TOKEN_KEY, param)
-    // Remove only the token from the URL bar and history so it is not leaked via
-    // the Referer header, browser history, or shoulder-surfing.
-    const url = new URL(window.location.href)
+  const url = new URL(window.location.href)
+  if (url.searchParams.has('token')) {
     url.searchParams.delete('token')
     const search = url.searchParams.toString()
     window.history.replaceState(
@@ -93,9 +82,16 @@ export function getToken(): string {
       document.title,
       `${url.pathname}${search ? `?${search}` : ''}${url.hash}`,
     )
-    return param
   }
-  return ''
+  return sessionStorage.getItem(TOKEN_KEY) ?? ''
+}
+
+export function setToken(token: string): void {
+  sessionStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearToken(): void {
+  sessionStorage.removeItem(TOKEN_KEY)
 }
 
 /**

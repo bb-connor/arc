@@ -155,27 +155,6 @@ fn logical_identity_survives_retention_restart_and_exact_retry() -> TestResult {
 }
 
 #[test]
-fn logical_identity_survives_version_five_migration_after_retention() -> TestResult {
-    let directory = tempfile::tempdir()?;
-    let path = directory.path().join("live.db");
-    let archive = directory.path().join("archive.db");
-    let store = SqliteReceiptStore::open(&path)?;
-    let (id, receipt) = archive_indexed_receipt(&store, &archive)?;
-    drop(store);
-    let connection = rusqlite::Connection::open(&path)?;
-    connection.execute_batch("ALTER TABLE chio_tool_receipts DROP COLUMN attempted_cost_be")?;
-    crate::stamp_schema_version(&connection, "receipt", 5)?;
-    drop(connection);
-    let migrated = SqliteReceiptStore::open(&path)?;
-    migrated.ensure_indexed_security_evidence_ready()?;
-    assert_exact(&migrated, &id, &receipt)?;
-    assert_eq!(migrated.tool_receipt_count()?, 0);
-    drop(migrated);
-    assert_exact(&SqliteReceiptStore::open_existing(&path)?, &id, &receipt)?;
-    Ok(())
-}
-
-#[test]
 fn indexed_retention_rejects_missing_corrupt_and_replaced_archive_payloads() -> TestResult {
     for fault in ["missing", "corrupt", "replacement"] {
         let directory = tempfile::tempdir()?;

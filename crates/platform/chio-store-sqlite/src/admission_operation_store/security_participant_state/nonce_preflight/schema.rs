@@ -9,11 +9,19 @@ pub(in crate::admission_operation_store) fn sql() -> &'static str {
 pub(in crate::admission_operation_store) fn exists(
     connection: &Connection,
 ) -> Result<bool, AdmissionOperationStoreError> {
-    connection.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE lower(name) GLOB 'security_participant_nonce_preflight*' OR lower(tbl_name) GLOB 'security_participant_nonce_preflight*')", [], |row| row.get(0)).map_err(sqlite_error)
+    crate::catalog_memo::read(connection, "nonce_preflight.exists", sqlite_error, || {
+        connection.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE lower(name) GLOB 'security_participant_nonce_preflight*' OR lower(tbl_name) GLOB 'security_participant_nonce_preflight*')", [], |row| row.get(0)).map_err(sqlite_error)
+    })
 }
 
 type Entry = (String, String, String, Option<String>);
 fn catalog(connection: &Connection) -> Result<Vec<Entry>, AdmissionOperationStoreError> {
+    crate::catalog_memo::read(connection, "nonce_preflight", sqlite_error, || {
+        scan_catalog(connection)
+    })
+}
+
+fn scan_catalog(connection: &Connection) -> Result<Vec<Entry>, AdmissionOperationStoreError> {
     let (count, bytes): (i64, i64) = connection.query_row("SELECT COUNT(*), COALESCE(SUM(length(CAST(type AS BLOB)) + length(CAST(name AS BLOB)) + length(CAST(tbl_name AS BLOB)) + COALESCE(length(CAST(sql AS BLOB)), 0)), 0) FROM sqlite_schema WHERE lower(name) GLOB 'security_participant_nonce_preflight*' OR lower(tbl_name) GLOB 'security_participant_nonce_preflight*'", [], |row| Ok((row.get(0)?, row.get(1)?))).map_err(sqlite_error)?;
     if !(0..=16).contains(&count) || !(0..=1_048_576).contains(&bytes) {
         return Err(invalid("native nonce preflight catalog exceeds bounds"));

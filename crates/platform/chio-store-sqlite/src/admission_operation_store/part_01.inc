@@ -1,8 +1,7 @@
 use std::fs;
 use std::path::Path;
-use std::sync::MutexGuard;
 
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 use chio_kernel::{
     AdmissionCleanupAction, AdmissionCleanupActionCasOutcome, AdmissionCleanupActionClaimOutcome,
     AdmissionCleanupActionCreateOutcome, AdmissionCleanupActionKind, AdmissionCleanupActionState,
@@ -156,7 +155,7 @@ impl SqliteAdmissionOperationStore {
         })
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, AdmissionOperationError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, AdmissionOperationError> {
         self.connection
             .lock()
             .map_err(|fenced| AdmissionOperationError::Unavailable(fenced.to_string()))

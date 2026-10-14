@@ -72,7 +72,7 @@ fn authority_rpc_completion_time_is_bound_into_independently_verified_audit() {
     let mut context = completed_audit_context(
         &request,
         "audit-delayed-authority",
-        "legacy-provider-observation",
+        "pre-broker-provider-observation",
         &precommitment,
         audit_trust(&fixture),
     );

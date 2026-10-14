@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 use chio_kernel::budget_store::{
     BudgetEventAuthority, BudgetGuaranteeLevel, RevocationCommitMetadata,
@@ -8,7 +8,7 @@ use chio_kernel::budget_store::{
 use chio_kernel::{RevocationObservation, RevocationRecord, RevocationStore, RevocationStoreError};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 
 #[derive(Clone)]
 pub struct SqliteRevocationStore {
@@ -169,7 +169,7 @@ impl SqliteRevocationStore {
         }
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, RevocationStoreError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, RevocationStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| RevocationStoreError::Sync(fenced.to_string()))

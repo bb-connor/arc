@@ -33,8 +33,7 @@ fn unique_archive_path() -> std::path::PathBuf {
 }
 
 #[test]
-fn archive_schema_is_stamped_and_rejects_older_binaries() -> Result<(), Box<dyn std::error::Error>>
-{
+fn archive_schema_is_stamped_with_the_current_version() -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::evidence_retention::create_archive_schema;
 
     let archive = unique_archive_path();
@@ -77,14 +76,8 @@ fn archive_schema_is_stamped_and_rejects_older_binaries() -> Result<(), Box<dyn 
     )?;
     assert_eq!(
         version,
-        crate::receipt_store::support::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+        crate::receipt_store::support::RECEIPT_STORE_SCHEMA_VERSION
     );
-    assert!(matches!(
-        crate::check_schema_version(&archived, "receipt", 0, &["chio_tool_receipts"]),
-        Err(crate::SchemaVersionError::FutureSchema { found, supported })
-            if found == crate::receipt_store::support::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
-                && supported == 0
-    ));
 
     drop(archived);
     let _ = std::fs::remove_file(archive);
@@ -92,47 +85,75 @@ fn archive_schema_is_stamped_and_rejects_older_binaries() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn archive_schema_migrates_and_verifies_cost_projection() -> Result<(), Box<dyn std::error::Error>>
-{
+fn archive_schema_refuses_an_archive_without_the_current_version(
+) -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::evidence_retention::create_archive_schema;
 
+    for (version, expected) in [
+        (
+            Some(0),
+            "retention archive schema version 0 is not the current receipt schema version 1",
+        ),
+        (
+            Some(7),
+            "retention archive schema version 7 is not the current receipt schema version 1",
+        ),
+        (None, "retention archive carries no receipt schema version"),
+    ] {
+        let archive = unique_archive_path();
+        drop(crate::SqliteReceiptStore::open(&archive)?);
+        let archived = rusqlite::Connection::open(&archive)?;
+        match version {
+            Some(version) => crate::stamp_schema_version(&archived, "receipt", version)?,
+            None => {
+                archived.execute("DELETE FROM chio_store_schema_versions", [])?;
+            }
+        }
+        drop(archived);
+
+        let escaped_archive = archive
+            .to_str()
+            .ok_or("archive path invalid")?
+            .replace('\'', "''");
+        let mut connection = rusqlite::Connection::open_in_memory()?;
+        connection.execute_batch(&format!("ATTACH DATABASE '{escaped_archive}' AS archive"))?;
+        let error = create_archive_schema(&mut connection)
+            .err()
+            .ok_or("a non-current archive must be refused")?;
+        assert!(
+            matches!(&error, chio_kernel::ReceiptStoreError::Conflict(message) if message == expected),
+            "unexpected error: {error}"
+        );
+        connection.execute_batch("DETACH DATABASE archive")?;
+        let _ = std::fs::remove_file(archive);
+    }
+
     let archive = unique_archive_path();
-    let store = crate::SqliteReceiptStore::open(&archive)?;
-    store.append_chio_receipt(&super::support::sample_financial_receipt(
-        "archive-cost-migration",
-        u64::MAX,
-    )?)?;
-    drop(store);
-
-    let archived = rusqlite::Connection::open(&archive)?;
-    crate::receipt_store::support::drop_transparency_projection_guards(&archived)?;
-    archived.execute_batch(
-        "DROP INDEX idx_chio_tool_receipts_cost;\
-         DROP INDEX idx_chio_tool_receipts_cost_global;\
-         ALTER TABLE chio_tool_receipts DROP COLUMN cost_charged_be;\
-         ALTER TABLE chio_tool_receipts DROP COLUMN cost_currency;",
-    )?;
-    crate::stamp_schema_version(&archived, "receipt", 2)?;
-    drop(archived);
-
+    {
+        let foreign = rusqlite::Connection::open(&archive)?;
+        foreign.execute_batch(&format!(
+            "PRAGMA application_id = {}; CREATE TABLE chio_tool_receipts (seq INTEGER);",
+            crate::CHIO_SQLITE_APPLICATION_ID
+        ))?;
+    }
     let escaped_archive = archive
         .to_str()
         .ok_or("archive path invalid")?
         .replace('\'', "''");
     let mut connection = rusqlite::Connection::open_in_memory()?;
     connection.execute_batch(&format!("ATTACH DATABASE '{escaped_archive}' AS archive"))?;
-    create_archive_schema(&mut connection)?;
-    let projection = connection.query_row(
-        "SELECT cost_currency, cost_charged_be FROM archive.chio_tool_receipts",
-        [],
-        |row| Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?)),
-    )?;
-    assert_eq!(
-        projection,
-        ("USD".to_string(), u64::MAX.to_be_bytes().to_vec())
+    let error = create_archive_schema(&mut connection)
+        .err()
+        .ok_or("an unversioned populated archive must be refused")?;
+    assert!(
+        matches!(
+            &error,
+            chio_kernel::ReceiptStoreError::Conflict(message)
+                if message == "retention archive carries tables but no receipt schema version"
+        ),
+        "unexpected error: {error}"
     );
     connection.execute_batch("DETACH DATABASE archive")?;
-
     let _ = std::fs::remove_file(archive);
     Ok(())
 }

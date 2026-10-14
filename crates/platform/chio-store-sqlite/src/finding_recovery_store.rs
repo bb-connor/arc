@@ -1,7 +1,7 @@
 //! Durable issuance, shared quota, and receipt lineage for no-charge finding
 //! recovery.
 
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 use chio_kernel::admission_operation::AdmissionOperationStoreError;
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::admission_operation_store::verify_active_owner;
 use crate::serving_owner::SqliteServingOwner;
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 
 const SCHEMA_KEY: &str = "finding_recovery";
 const SUPPORTED_SCHEMA_VERSION: i32 = 1;
@@ -102,7 +102,7 @@ impl SqliteFindingRecoveryStore {
         }
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingRecoveryStoreError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, FindingRecoveryStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| FindingRecoveryStoreError::Unavailable(fenced.to_string()))

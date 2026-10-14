@@ -1,4 +1,4 @@
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::sha256_hex;
@@ -22,7 +22,7 @@ use crate::admission_operation_store::{
     resolve_recovery_authority, verify_active_owner, verify_trusted_time, RecoveryAuthority,
 };
 use crate::serving_owner::SqliteServingOwner;
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 
 const TOOL_OUTCOME_SCHEMA_KEY: &str = "tool_outcome";
 pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 4;
@@ -93,7 +93,7 @@ impl SqliteToolOutcomeStore {
         }
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, ToolOutcomeStoreError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, ToolOutcomeStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| ToolOutcomeStoreError::Unavailable(fenced.to_string()))

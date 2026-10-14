@@ -58,7 +58,7 @@
 //! are not part of it, so a retry issued from a later clock replays rather
 //! than stranding the durable row it is retrying.
 
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_finding::validate_evm_payout_destination;
@@ -67,8 +67,8 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBe
 use thiserror::Error;
 
 use crate::finding_status_store::{status_for_purchase_tx, FindingStatusDecision};
-use crate::serving_owner::SqliteServingOwner;
-use crate::{admission_operation_store::verify_active_owner, store_connection::StoreConnection};
+use crate::store_connection::{StoreConnection, StoreGuard};
+use crate::{admission_operation_store::verify_active_owner, serving_owner::SqliteServingOwner};
 
 #[path = "finding_purchase_public_request.rs"]
 mod public_request;
@@ -393,7 +393,7 @@ impl SqliteFindingPurchaseStore {
         self.serving_owner.fence.clone()
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingPurchaseStoreError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, FindingPurchaseStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| FindingPurchaseStoreError::Unavailable(fenced.to_string()))

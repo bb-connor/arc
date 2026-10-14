@@ -869,7 +869,7 @@ fn authorized_audit(
                 broker_instance_id: "test-broker-instance",
                 tenant_scope: "tenant-a",
                 runner_id: "test-enterprise-runner",
-                reference_source: "legacy-provider-observation",
+                reference_source: "pre-broker-provider-observation",
                 revocation_authority_domain: "combined-authority",
             },
             now_unix_seconds.saturating_sub(1),
@@ -1582,8 +1582,8 @@ mod ipc_audit_cases;
 mod recovery_cases;
 
 #[cfg(unix)]
-#[path = "tests/f053_legacy_custody_cases.rs"]
-mod f053_legacy_custody_cases;
+#[path = "tests/audit_reference_custody_cases.rs"]
+mod audit_reference_custody_cases;
 
 #[cfg(unix)]
-mod f053_codec_contract_cases;
+mod audit_codec_contract_cases;

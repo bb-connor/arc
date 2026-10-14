@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { getToken } from './api'
+import { clearToken, getToken, setToken } from './api'
 import type { Filters } from './types'
+import { BearerLogin } from './components/BearerLogin'
 import { FilterSidebar } from './components/FilterSidebar'
 import { ProofRoomView } from './components/ProofRoomView'
 import { ReceiptTable } from './components/ReceiptTable'
@@ -16,39 +17,58 @@ const INITIAL_FILTERS: Filters = {
 
 export default function App() {
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS)
-  const [token, setToken] = useState<string | null>(null)
+  const [token, setActiveToken] = useState<string | null>(null)
+  const [storageError, setStorageError] = useState('')
   const isProofRoom =
     window.location.pathname === '/proof-room'
     || new URLSearchParams(window.location.search).get('view') === 'proof-room'
 
   useEffect(() => {
-    setToken(getToken())
+    try {
+      setActiveToken(getToken())
+    } catch {
+      setStorageError('Unable to read token storage in this tab.')
+    }
   }, [])
 
   const missingToken = token !== null && token.length === 0
+
+  function login(value: string) {
+    setToken(value)
+    setStorageError('')
+    setActiveToken(value)
+  }
+
+  function logout() {
+    try {
+      clearToken()
+    } catch {
+      setStorageError('Unable to clear token storage. Close this tab to finish logging out.')
+    } finally {
+      setActiveToken('')
+      setFilters(INITIAL_FILTERS)
+    }
+  }
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <h1>{isProofRoom ? 'Chio Proof Room' : 'Chio Receipt Dashboard'}</h1>
+        {!isProofRoom && token && (
+          <button className="btn-clear auth-logout" type="button" onClick={logout}>Log out</button>
+        )}
       </header>
-      {isProofRoom ? (
-        <ProofRoomView />
-      ) : token === null ? (
+      {token === null ? (
         <div className="main-content">
-          <div className="state-loading">Checking dashboard access...</div>
+          <div className={storageError ? 'state-error' : 'state-loading'} role={storageError ? 'alert' : undefined}>
+            {storageError || 'Checking dashboard access...'}
+          </div>
         </div>
+      ) : isProofRoom ? (
+        <ProofRoomView />
       ) : missingToken ? (
         <div className="main-content">
-          <section className="auth-notice">
-            <h2>Bearer token required</h2>
-            <p>
-              Provide a trust-control bearer token via <code>?token=&lt;value&gt;</code> on the
-              first load, or set <code>sessionStorage.chio_token</code> before opening the
-              dashboard.
-            </p>
-            <pre className="detail-json">http://localhost:7391/?token=my-service-token</pre>
-          </section>
+          <BearerLogin onLogin={login} storageError={storageError} />
         </div>
       ) : (
         <div className="app-body">

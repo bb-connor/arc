@@ -34,10 +34,8 @@ pub(crate) use self::query_matching::{
     unix_now,
 };
 pub(crate) use self::schema::{
-    audit_receipt_cost_projection, backfill_tool_receipt_attribution_columns,
-    ensure_receipt_lineage_statement_columns, ensure_tool_receipt_attribution_columns,
-    migrate_archive_receipt_cost_projection, migrate_receipt_cost_projection,
-    receipt_cost_projection, verify_archive_receipt_cost_projection,
+    audit_receipt_cost_projection, install_archive_receipt_cost_indexes,
+    install_receipt_cost_indexes, receipt_cost_projection, verify_archive_receipt_cost_projection,
     verify_receipt_cost_projection,
 };
 pub(crate) use self::state_converters::{
@@ -54,11 +52,5 @@ pub(crate) use self::state_converters::{
     underwriting_risk_class_label,
 };
 pub(crate) use self::validation::{
-    backfill_claim_receipt_log_entries, validate_claim_receipt_log_entries,
-    validate_or_backfill_claim_receipt_log_entries_in_transaction,
+    validate_claim_receipt_log_entries, validate_claim_receipt_log_entries_in_transaction,
 };
-// Reachable in the lib build only through `backfill_claim_receipt_log_entries`
-// / `validate_claim_receipt_log_entries` above; this re-export exists so
-// tests can drive the fail-closed guard directly.
-#[cfg_attr(not(test), allow(unused_imports))]
-pub(crate) use self::validation::validate_or_backfill_claim_receipt_log_entries;

@@ -2,9 +2,7 @@ use super::*;
 
 pub(crate) use super::reports::read_boundary::{decoded_json_text_bytes, SqlWorkBudget};
 
-pub(crate) const RECEIPT_COST_PROJECTION_SCHEMA_VERSION: i32 = 3;
-pub(crate) const RECEIPT_ATTEMPTED_COST_SCHEMA_VERSION: i32 = 6;
-pub(crate) const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 7;
+pub(crate) const RECEIPT_STORE_SCHEMA_VERSION: i32 = 1;
 pub(crate) const RECEIPT_STORE_SCHEMA_KEY: &str = "receipt";
 
 #[path = "support/checkpoint_schema.rs"]

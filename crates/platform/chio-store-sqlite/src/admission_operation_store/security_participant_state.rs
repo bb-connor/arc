@@ -3,6 +3,8 @@
 
 use super::*;
 
+#[cfg(feature = "admission-test-support")]
+mod catalog_scan_test_support;
 pub(in crate::admission_operation_store) mod checkpoint;
 #[cfg(test)]
 mod cold;

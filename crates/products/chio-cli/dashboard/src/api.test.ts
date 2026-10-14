@@ -109,12 +109,34 @@ describe('dashboard api helpers', () => {
     vi.restoreAllMocks()
   })
 
-  it('stores token from the URL and removes it from the visible location', () => {
+  it('rejects URL credentials without storing them and removes them from the location', () => {
     window.history.replaceState({}, '', '/?token=secret-token')
 
-    expect(getToken()).toBe('secret-token')
-    expect(sessionStorage.getItem('chio_token')).toBe('secret-token')
+    expect(getToken()).toBe('')
+    expect(sessionStorage.getItem('chio_token')).toBeNull()
     expect(window.location.pathname).toBe('/')
+    expect(window.location.search).toBe('')
+  })
+
+  it('never sends a URL credential in an API authorization header', async () => {
+    window.history.replaceState({}, '', '/?view=receipts&token=url-only-token#details')
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchReceiptAnalytics({})
+
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBeUndefined()
+    expect(sessionStorage.getItem('chio_token')).toBeNull()
+    expect(window.location.search).toBe('?view=receipts')
+    expect(window.location.hash).toBe('#details')
+  })
+
+  it('removes query credentials while retaining an independently entered token', () => {
+    sessionStorage.setItem('chio_token', 'entered-token')
+    window.history.replaceState({}, '', '/?token=url-token&token=second-token')
+
+    expect(getToken()).toBe('entered-token')
+    expect(sessionStorage.getItem('chio_token')).toBe('entered-token')
     expect(window.location.search).toBe('')
   })
 

@@ -487,7 +487,7 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
   - The trust-control dashboard is the one operator web client. It is read-only today and served only from a relative path.
   - It gains:
     - approval routes;
-    - authentication beyond `?token=`;
+    - per-operator authentication beyond the shared bearer token entered at login;
     - the issuance panel;
     - authority-tree and pool views.
   - Plus the onboarding kit and runbooks.
