@@ -1,0 +1,15 @@
+[package]
+name = "kernel-work-composition"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
