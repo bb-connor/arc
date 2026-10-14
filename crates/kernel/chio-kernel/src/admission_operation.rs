@@ -219,7 +219,6 @@ pub enum AdmissionOperationError {
     MissingParticipantAttachment { field: &'static str },
     #[error("{entry} dispatch launch evidence is malformed")]
     InvalidDispatchLaunch { entry: &'static str },
-
     #[error("admission participant requirements are inconsistent")]
     InvalidParticipantRequirements,
     #[error("request binding hash does not cover its immutable request and requirements")]

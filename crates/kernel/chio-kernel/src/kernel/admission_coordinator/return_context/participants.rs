@@ -36,6 +36,8 @@ impl FrozenDispatchParticipants {
                 AdmissionAttachment::ThresholdProposalHash(value) => {
                     snapshot.threshold_proposal_hash = Some(value.clone());
                 }
+                // The dispatch commitment carries the dispatching launch.
+                AdmissionAttachment::DispatchLaunch(_) => {}
                 AdmissionAttachment::ThresholdProposal(value) => {
                     // Retain a reference, not the signed proposal or its input.
                     snapshot.threshold_proposal_body_digest =
