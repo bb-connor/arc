@@ -274,8 +274,8 @@ mod tests {
         assert_eq!(report.len(), 4);
         assert_eq!(report["alice"]["terminal_verified"], false);
         assert_eq!(report["bob"]["terminal_verified"], true);
-        assert_eq!(report["carol"]["terminal_verified"], false);
-        assert_eq!(report["dave"]["terminal_verified"], true);
+        assert_eq!(report["carol"]["terminal_verified"], true);
+        assert_eq!(report["dave"]["terminal_verified"], false);
         assert!(verify(&run, &BTreeMap::new()).is_err());
         let mut extra_pin = pins.clone();
         extra_pin.insert("unused-server".into(), key.clone());
@@ -287,21 +287,21 @@ mod tests {
         // Test the native composition boundary after the original signatures
         // above passed. Substituted receipts retain their valid native signatures.
         let alice = report["alice"]["receipt_id"].as_str().ok_or("alice")?;
-        let dave = report["dave"]["receipt_id"].as_str().ok_or("dave")?;
+        let carol = report["carol"]["receipt_id"].as_str().ok_or("carol")?;
         let params = &signed.action.parameters;
         let cases = [
             ("/confinement".to_owned(), json!({})),
             (
                 format!("/confinement/{alice}/enforcement"),
-                params["confinement"][dave]["enforcement"].clone(),
+                params["confinement"][carol]["enforcement"].clone(),
             ),
             (
                 format!("/confinement/{alice}/terminal"),
-                params["confinement"][dave]["terminal"].clone(),
+                params["confinement"][carol]["terminal"].clone(),
             ),
             (
-                format!("/confinement/{dave}/terminal"),
-                params["confinement"][dave]["enforcement"].clone(),
+                format!("/confinement/{carol}/terminal"),
+                params["confinement"][carol]["enforcement"].clone(),
             ),
             (
                 format!("/confinement/{alice}/signed_policy"),
@@ -330,11 +330,11 @@ mod tests {
         let mut changed: Outcomes = serde_json::from_value(params.clone())?;
         changed
             .confinement
-            .get_mut(dave)
-            .ok_or("dave launch")?
+            .get_mut(carol)
+            .ok_or("carol launch")?
             .terminal = None;
         assert_eq!(
-            verify(&changed, &pins)?["dave"]["terminal_verified"],
+            verify(&changed, &pins)?["carol"]["terminal_verified"],
             false
         );
         Ok(())
