@@ -232,7 +232,7 @@ pub(crate) fn validate_set_with_report(
     let mut invocation_count = 0u64;
     let mut total_bytes = 0usize;
     let mut digest = Sha256::new();
-    digest.update(b"chio.acp.compliance-receipt-set.v2\0");
+    digest.update(b"chio.acp.compliance-receipt-set.v1\0");
     digest.update(receipt_count.to_be_bytes());
     for entry in entries {
         if entry.receipt.kernel_key != first.receipt.kernel_key {
