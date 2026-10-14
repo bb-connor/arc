@@ -1,0 +1,13 @@
+exercise,arm,order,operator_id,provider_source_sha,verifier_source_sha,task_corpus_sha,model_pin,trust_profile,budget_profile,initial_platform_hours,repeated_hands_on_hours,training_hours,assistance_hours,debugging_hours,manual_approvals,human_wait_seconds,blocked_seconds,model_tokens,model_cost,kernel_cpu_seconds,kernel_latency_ms,state_bytes,physical_effects,quality_adjudication,failed_attempts,recoverable_incidents,recovered_without_repair,database_edits,bespoke_repairs,adapter_diff_sha,event_log_sha,operator_attestation
+I1,Chio,1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+I1,B1,2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+I2,B1,1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+I2,Chio,2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+I3,Chio,1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+I3,B1,2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+I4,B1,1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+I4,Chio,2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+I5,Chio,1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+I5,B1,2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+I6,B1,1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+I6,Chio,2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,

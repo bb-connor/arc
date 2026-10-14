@@ -1,0 +1,236 @@
+{
+  "schema": "chio.kernel-work.recovery-baseline.v1",
+  "recorded_on": "2026-10-02",
+  "instruction": "Assume the recovery specifications are shipped for the paper and research planning.",
+  "assume_shipped": true,
+  "assumption_scope": "All revision-3 P0-P6 normative capabilities under their declared profiles and assumptions; no invented measurements or external trial results.",
+  "source": {
+    "pr": 1172,
+    "url": "https://github.com/bb-connor/arc/pull/1172",
+    "head": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+    "architecture_revision": 3,
+    "observed_source_status": "architecture_only",
+    "requirement_count": 111
+  },
+  "phases": [
+    "P0",
+    "P1",
+    "P2",
+    "P3",
+    "P4",
+    "P5",
+    "P6"
+  ],
+  "requirements_by_family": {
+    "ART": 12,
+    "CON": 13,
+    "ISO": 10,
+    "OPS": 13,
+    "REC": 24,
+    "RUST": 11,
+    "SEC": 12,
+    "SIM": 8,
+    "TEST": 8
+  },
+  "requirement_ids": [
+    "SEC-01",
+    "SEC-02",
+    "SEC-03",
+    "SEC-04",
+    "SEC-05",
+    "SEC-06",
+    "SEC-07",
+    "SEC-08",
+    "SEC-09",
+    "SEC-10",
+    "SEC-11",
+    "SEC-12",
+    "RUST-01",
+    "RUST-02",
+    "RUST-03",
+    "RUST-04",
+    "RUST-05",
+    "RUST-06",
+    "RUST-07",
+    "RUST-08",
+    "RUST-09",
+    "RUST-10",
+    "RUST-11",
+    "REC-01",
+    "REC-02",
+    "REC-03",
+    "REC-04",
+    "REC-05",
+    "REC-06",
+    "REC-07",
+    "REC-08",
+    "REC-09",
+    "REC-10",
+    "REC-11",
+    "REC-12",
+    "REC-13",
+    "REC-14",
+    "REC-15",
+    "REC-16",
+    "REC-17",
+    "REC-18",
+    "REC-19",
+    "REC-20",
+    "REC-21",
+    "REC-22",
+    "REC-23",
+    "REC-24",
+    "SIM-01",
+    "SIM-02",
+    "SIM-03",
+    "SIM-04",
+    "SIM-05",
+    "SIM-06",
+    "SIM-07",
+    "SIM-08",
+    "CON-01",
+    "CON-02",
+    "CON-03",
+    "CON-04",
+    "CON-05",
+    "CON-06",
+    "CON-07",
+    "CON-08",
+    "CON-09",
+    "CON-10",
+    "CON-11",
+    "CON-12",
+    "CON-13",
+    "ART-01",
+    "ART-02",
+    "ART-03",
+    "ART-04",
+    "ART-05",
+    "ART-06",
+    "ART-07",
+    "ART-08",
+    "ART-09",
+    "ART-10",
+    "ART-11",
+    "ART-12",
+    "ISO-01",
+    "ISO-02",
+    "ISO-03",
+    "ISO-04",
+    "ISO-05",
+    "ISO-06",
+    "ISO-07",
+    "ISO-08",
+    "ISO-09",
+    "ISO-10",
+    "OPS-01",
+    "OPS-02",
+    "OPS-03",
+    "OPS-04",
+    "OPS-05",
+    "OPS-06",
+    "OPS-07",
+    "OPS-08",
+    "OPS-09",
+    "OPS-10",
+    "OPS-11",
+    "OPS-12",
+    "OPS-13",
+    "TEST-01",
+    "TEST-02",
+    "TEST-03",
+    "TEST-04",
+    "TEST-05",
+    "TEST-06",
+    "TEST-07",
+    "TEST-08"
+  ],
+  "documents": [
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/README.md",
+      "sha256": "2b9e9fd7fd3550ff9426258781fa5f9e0dbc6f4b8f124d91561fb875dee2c3fa",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/README.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/requirements.json",
+      "sha256": "b3f56200499e037171c602fbbe815426620024073b73be4657fba785197cf125",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/requirements.json"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/01-security-model.md",
+      "sha256": "1fffc88f236d7c869c68c968df68b6e7ee58c8e3a3f09fc61a1dc45f317e5160",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/01-security-model.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/02-rust-design.md",
+      "sha256": "c64494196045229cc5fd8a6cd6c2cc3fc3ff12fc846c8653b3cb38b38d9bc8f0",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/02-rust-design.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/03-recovery-protocol.md",
+      "sha256": "c9abf0ffbb12d376e71472ad434d5489b4346aebcfefcb0059f7db5663f17678",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/03-recovery-protocol.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/04-counterfactuals.md",
+      "sha256": "1ff752ad13aabd4655e21db63a47f95b732fa15335c47dad7924651ff8d141b7",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/04-counterfactuals.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/05-semantic-contracts.md",
+      "sha256": "8d98f869225d67be41fcd3e5d953110f02a6ab045fc56bd2c77e289d4eedd4a8",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/05-semantic-contracts.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/06-artifacts-memory.md",
+      "sha256": "6547879a4893866d06335a561c4109713eb9ee71218ec301c21af68a4593cc2c",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/06-artifacts-memory.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/07-confined-returns.md",
+      "sha256": "e2e61718f141ced2fe36d5743a1893af9a36bafb7c64d4d81464dbbf41bbd29e",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/07-confined-returns.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/08-protocol-operations.md",
+      "sha256": "33e107ad6c2df9febd23f50a5c28931d7e8a35fb90dceed53e20a4dbe15656ce",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/08-protocol-operations.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/09-conformance.md",
+      "sha256": "72cee862c55eff78c3123f8ceae0b5a0c463b6752fa50c3c97f3414562816a23",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/09-conformance.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/10-delivery-decisions.md",
+      "sha256": "9e89cb757d5a1b14a6c9842c27bc9529434ff1b718fe32c0ac7055fc11bb9b1c",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/10-delivery-decisions.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/11-contract-catalog.md",
+      "sha256": "fab53560b298ae852dfb5cbdd2d5833aaa966d1031387af784791ae1eb371cc0",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/11-contract-catalog.md"
+    },
+    {
+      "path": "docs/architecture/recoverable-agent-runtime/review-third-pass-2026-10-02.md",
+      "sha256": "37efaab13698ae09f51aa83e9f5a876600f0138aa182c7293263251883c7d41d",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/architecture/recoverable-agent-runtime/review-third-pass-2026-10-02.md"
+    },
+    {
+      "path": "docs/research/openappa-2026-10-01/README.md",
+      "sha256": "688fefa6ac992fa0d9e98deec0a90396918303a4c36abf3be3642da067ab88ce",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/research/openappa-2026-10-01/README.md"
+    },
+    {
+      "path": "docs/research/openappa-2026-10-01/technical-review.md",
+      "sha256": "333ff49f3fed44dcb2d58f89a06b6e96e17684f0e1cd4d020a902df5197a2f7c",
+      "url": "https://github.com/bb-connor/arc/blob/de84fc306efbb4c8dd6de748d0ad2a8d695fd30e/docs/research/openappa-2026-10-01/technical-review.md"
+    }
+  ],
+  "prior_art_pin": {
+    "repository": "https://github.com/archestra-ai/OpenAPPA",
+    "commit": "a96f87d1fec900caf890f14342a089a32b3bfaff"
+  },
+  "research_use": "Evaluate the full kernel and recovery architecture as a candidate contribution; do not duplicate its implementation plan or assume cross-owner composition is already proved.",
+  "future_evidence_rule": "Record implementation and measurements against the eventual exact recovery source. An assumed shipped contract is not an observed benchmark result."
+}

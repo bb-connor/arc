@@ -1,0 +1,400 @@
+{
+  "schema": "chio.kernel-work.task1-sources.v1",
+  "recorded_on": "2026-10-02",
+  "scope": "Primary evidence used for G0; source inspection is not experiment reproduction. Cache paths are relative to the optional local source cache, not repository deliverables.",
+  "recovery_source_manifest": "recovery-baseline.json",
+  "documents": [
+    {
+      "id": "S07-pdf",
+      "source_id": "S07",
+      "url": "https://web.stanford.edu/~ouster/cgi-bin/papers/rifl.pdf",
+      "sha256": "f609f9508beaf936027f31428a8f06dc86d8201faadc5b340ffead7706863969",
+      "cache_path": "S07.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Sections 3, 4.1-4.4; figures 3-5; completion record atomicity, retention and migration"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S08-pdf",
+      "source_id": "S08",
+      "url": "https://www.usenix.org/system/files/osdi20-zhang_haoran.pdf",
+      "sha256": "3b08a01341f85c0e15deee5c9140dd55d99d565a385d27b67b93db6c6d919049",
+      "cache_path": "S08.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Sections 2.2-3.2, invocation/callback protocol in 4.3, 5, 6.1-6.2"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S11-pdf",
+      "source_id": "S11",
+      "url": "https://www.vldb.org/pvldb/vol8/p185-bailis.pdf",
+      "sha256": "5ec38019fe24187b985d1db2f36ba7717d191c46c2abb2b792d49f8df6f85cad",
+      "cache_path": "S11.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Sections 3-4; definitions 1-6 and theorem 1"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S12-pdf",
+      "source_id": "S12",
+      "url": "https://arxiv.org/pdf/1606.07525v1",
+      "sha256": "30b502aed6ba74a3d8e773c2e62f5645462c0781988e4db2a9a8d1d8fd15023c",
+      "cache_path": "S12.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Sections 2-3; definition 2.1 and theorem 3.1"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S13-pdf",
+      "source_id": "S13",
+      "url": "https://arxiv.org/pdf/1503.09052v1",
+      "sha256": "2fdd8739f5c9033ba0620c20b09f3248d60296b6814bb1fe727fac43e9a3f49a",
+      "cache_path": "S13.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "System model; II.D; III; figure 2 and correctness argument"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S17-pdf",
+      "source_id": "S17",
+      "url": "https://arxiv.org/pdf/2603.00991v2",
+      "sha256": "b546ae857241d720175440adfb3fee6ea266a5dc776cab129f46d2a3f17bf66a",
+      "cache_path": "S17.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Sections 3.2-3.6, classified values, safe subset, harness and multi-turn guarantees"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S18-pdf",
+      "source_id": "S18",
+      "url": "https://arxiv.org/pdf/2503.18813v2",
+      "sha256": "c3719f6ce73eecf45e3764debef8a3d8ff8c9233b37d128c558b694ec3790cc7",
+      "cache_path": "S18.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Sections 3-5.4; selected section 7 side-channel discussion"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S19-pdf",
+      "source_id": "S19",
+      "url": "https://arxiv.org/pdf/2601.08815v3",
+      "sha256": "c5b675bc61e09a1e5b6f9234e4a8f89f36d9050337367b05bc81a35b6a98748c",
+      "cache_path": "S19.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "4.1 contract definition; 6.1 conservation; 7.1-7.3 enforcement boundaries"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S20-pdf",
+      "source_id": "S20",
+      "url": "https://arxiv.org/pdf/2606.30970v2",
+      "sha256": "296edf0b32725fb125059f0b888e687929f19a9df42899c34a9f5ce411014adb",
+      "cache_path": "S20.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "3.2 assumptions; 4.1-4.3 composition; 6-7 receipt/delegation mechanisms"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S21-pdf",
+      "source_id": "S21",
+      "url": "https://arxiv.org/pdf/2609.29647v1",
+      "sha256": "6f445930d60f41bb0a4b8b4067c06222f5880f131df7e24c7adc838bab3ec42c",
+      "cache_path": "S21.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Sections 5.1 and 5.4-5.5 trust, properties 5.1-5.2 and limitations; cover metadata"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S22-pdf",
+      "source_id": "S22",
+      "url": "https://arxiv.org/pdf/2609.38248v1",
+      "sha256": "8876b7dc502abd1b4b261eff4e9a685a88899c42bca4aba7a9947522f795068b",
+      "cache_path": "S22.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "III.A-D; tables I-III; coverage and declassification boundary"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S25-pdf",
+      "source_id": "S25",
+      "url": "https://www.cs.cornell.edu/andru/papers/iflow-tosem.pdf",
+      "sha256": "7c417b8f0502cb237dc7dc3037c5feb11dd28e67e8c166763dfa20ec728411a8",
+      "cache_path": "S25.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "3.1-3.7 owner policies, relabeling, derived values and declassification"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S26-pdf",
+      "source_id": "S26",
+      "url": "https://www.scs.stanford.edu/~dm/home/papers/zeldovich:dstar.pdf",
+      "sha256": "47256262731c6ee01e3fd1f6a310547d77531010f7eee638dc9c81652143c8f3",
+      "cache_path": "S26.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "2-3; especially 3.2-3.5 exporter protocol and category-specific trust"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S27-pdf",
+      "source_id": "S27",
+      "url": "https://arxiv.org/pdf/0706.2619v1",
+      "sha256": "cd0def72bb5a3f8a94dd925ec21b9fd5298445207870cb7fa7bf69a6f825103e",
+      "cache_path": "S27.pdf",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "2 definitions and lemma 1; 3.1 subset construction, lemmas 2-4 and theorem 2"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S05-docs-contract-details",
+      "source_id": "S05",
+      "url": "https://raw.githubusercontent.com/Agoric/documentation/d89bd222164c61d0ff9f0b8d3116f0687ee2770f/main/guides/zoe/contract-details.md",
+      "revision": "d89bd222164c61d0ff9f0b8d3116f0687ee2770f",
+      "sha256": "e4ea63e19a0cf5608df25b5e7a169995f6bc9d2e8afd71ea5441fd90d665e010",
+      "cache_path": "agoric/main/guides/zoe/contract-details.md",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Durable objects and facets; first-pass reading revisited for source pin"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S04-docs-offer-safety",
+      "source_id": "S04",
+      "url": "https://raw.githubusercontent.com/Agoric/documentation/d89bd222164c61d0ff9f0b8d3116f0687ee2770f/main/guides/zoe/offer-safety.md",
+      "revision": "d89bd222164c61d0ff9f0b8d3116f0687ee2770f",
+      "sha256": "72fb20e3b44895b6ed08e7aaeeba6f38ae766031fff3d33f25ff42faee413d94",
+      "cache_path": "agoric/main/guides/zoe/offer-safety.md",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Complete offer-safety explanation"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S04-docs-offer-enforcement",
+      "source_id": "S04",
+      "url": "https://raw.githubusercontent.com/Agoric/documentation/d89bd222164c61d0ff9f0b8d3116f0687ee2770f/main/guides/zoe/offer-enforcement.md",
+      "revision": "d89bd222164c61d0ff9f0b8d3116f0687ee2770f",
+      "sha256": "5a00d599c21d0c0ce02fadf6409c95bf1bbd78dd922082424da0a53a54e0cd58",
+      "cache_path": "agoric/main/guides/zoe/offer-enforcement.md",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Escrow, offer safety and facet explanation"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S05-docs-contract-upgrade",
+      "source_id": "S05",
+      "url": "https://raw.githubusercontent.com/Agoric/documentation/d89bd222164c61d0ff9f0b8d3116f0687ee2770f/main/guides/zoe/contract-upgrade.md",
+      "revision": "d89bd222164c61d0ff9f0b8d3116f0687ee2770f",
+      "sha256": "b7bf3ae5720021c36f492d9268efe626a2aa076521e7ebf06c5dabae71466f1e",
+      "cache_path": "agoric/main/guides/zoe/contract-upgrade.md",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Durability, kinds, crank, zones and vow tools"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S05-docs-contract-access-control",
+      "source_id": "S05",
+      "url": "https://raw.githubusercontent.com/Agoric/documentation/d89bd222164c61d0ff9f0b8d3116f0687ee2770f/main/guides/zoe/contract-access-control.md",
+      "revision": "d89bd222164c61d0ff9f0b8d3116f0687ee2770f",
+      "sha256": "37d08b3d771a4bb992eca17fc1b37f5f61687146db0b859cbe45a111daa638af",
+      "cache_path": "agoric/main/guides/zoe/contract-access-control.md",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Creator/public facets and object access rules"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S04-sdk-offerSafety",
+      "source_id": "S04",
+      "url": "https://raw.githubusercontent.com/Agoric/agoric-sdk/3a9096a59d398d357e4e849f1abada7b41a82a9c/packages/zoe/src/contractFacet/offerSafety.js",
+      "revision": "3a9096a59d398d357e4e849f1abada7b41a82a9c",
+      "sha256": "dd3e2dd9b98b3f31aba4a91f9ba3bd85548bcb96dce808c85697b802042c2b62",
+      "cache_path": "agoric-sdk/packages/zoe/src/contractFacet/offerSafety.js",
+      "reading": "complete_functions",
+      "locations": [
+        "satisfiesInternal, satisfiesWant, satisfiesGive, isOfferSafe"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S04-sdk-rightsConservation",
+      "source_id": "S04",
+      "url": "https://raw.githubusercontent.com/Agoric/agoric-sdk/3a9096a59d398d357e4e849f1abada7b41a82a9c/packages/zoe/src/contractFacet/rightsConservation.js",
+      "revision": "3a9096a59d398d357e4e849f1abada7b41a82a9c",
+      "sha256": "9b08ad4318007b13c47a96e101940e194676a267126e358a208b4f08d89cf59d",
+      "cache_path": "agoric-sdk/packages/zoe/src/contractFacet/rightsConservation.js",
+      "reading": "complete_functions",
+      "locations": [
+        "sumByBrand, assertEqualPerBrand, assertRightsConserved"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S05-sdk-vat-upgrade",
+      "source_id": "S05",
+      "url": "https://raw.githubusercontent.com/Agoric/agoric-sdk/3a9096a59d398d357e4e849f1abada7b41a82a9c/packages/SwingSet/docs/vat-upgrade.md",
+      "revision": "3a9096a59d398d357e4e849f1abada7b41a82a9c",
+      "sha256": "f301c02d63b92213de17d33ea59aa061fea3792da44b8f8839a54555e9a292c8",
+      "cache_path": "agoric-sdk/packages/SwingSet/docs/vat-upgrade.md",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Upgrade Sequence; Exported Obligations; Durable State; Promises Are Broken"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S05-sdk-transcript",
+      "source_id": "S05",
+      "url": "https://raw.githubusercontent.com/Agoric/agoric-sdk/3a9096a59d398d357e4e849f1abada7b41a82a9c/packages/SwingSet/docs/transcript.md",
+      "revision": "3a9096a59d398d357e4e849f1abada7b41a82a9c",
+      "sha256": "a05a607f7bbc4f90425b0f09401797cf3ea0e34f3e02f2664fa4ffb275d0ee91",
+      "cache_path": "agoric-sdk/packages/SwingSet/docs/transcript.md",
+      "reading": "claim_relevant_sections",
+      "locations": [
+        "Vat/worker lifecycle and deterministic transcript replay"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S24-appa-engine-src-plan",
+      "source_id": "S24",
+      "url": "https://github.com/archestra-ai/OpenAPPA/blob/a96f87d1fec900caf890f14342a089a32b3bfaff/appa-engine/src/plan.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "dd9e881c884f91ed7c1e42621b40d91724ae600874f41704d89eb6932957f76b",
+      "cache_path": "openappa/OpenAPPA-a96f87d1fec900caf890f14342a089a32b3bfaff/appa-engine/src/plan.rs",
+      "reading": "claim_relevant_contracts_and_definitions",
+      "locations": [
+        "Module contract, lines 1-56; remedy subset and scope of enumeration"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S24-appa-engine-src-label",
+      "source_id": "S24",
+      "url": "https://github.com/archestra-ai/OpenAPPA/blob/a96f87d1fec900caf890f14342a089a32b3bfaff/appa-engine/src/label.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "1d19f17afbf25bf82421a9da4557037700fb7f7610ffbdd1eaadffcb59059b23",
+      "cache_path": "openappa/OpenAPPA-a96f87d1fec900caf890f14342a089a32b3bfaff/appa-engine/src/label.rs",
+      "reading": "claim_relevant_contracts_and_definitions",
+      "locations": [
+        "Audience/Label contracts; Label implementation, lines 938-985"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S24-appa-engine-src-basis",
+      "source_id": "S24",
+      "url": "https://github.com/archestra-ai/OpenAPPA/blob/a96f87d1fec900caf890f14342a089a32b3bfaff/appa-engine/src/basis.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "8edb3792597f4b081db13298da148a5d9f6944ec19cc8f6922ba2e84d9156cf2",
+      "cache_path": "openappa/OpenAPPA-a96f87d1fec900caf890f14342a089a32b3bfaff/appa-engine/src/basis.rs",
+      "reading": "claim_relevant_contracts_and_definitions",
+      "locations": [
+        "FamilyVersion, FlowVersion, SubjectGeneration, PolicyBasis and advance rules"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S24-appa-engine-src-projection",
+      "source_id": "S24",
+      "url": "https://github.com/archestra-ai/OpenAPPA/blob/a96f87d1fec900caf890f14342a089a32b3bfaff/appa-engine/src/projection.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "307dec0fd6b554ae6527fce700d08b108d8fdc53c7d2962cfee4041330f07272",
+      "cache_path": "openappa/OpenAPPA-a96f87d1fec900caf890f14342a089a32b3bfaff/appa-engine/src/projection.rs",
+      "reading": "claim_relevant_contracts_and_definitions",
+      "locations": [
+        "Reservation creation and close handling, lines 456-518; root-fork and reservation lookup locations"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S24-appa-eventlog-src-lib",
+      "source_id": "S24",
+      "url": "https://github.com/archestra-ai/OpenAPPA/blob/a96f87d1fec900caf890f14342a089a32b3bfaff/appa-eventlog/src/lib.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "563926a5d58661e9b004b65c44e3e4fb757786ceff7108e2d1bb000f1f2bc1b8",
+      "cache_path": "openappa/OpenAPPA-a96f87d1fec900caf890f14342a089a32b3bfaff/appa-eventlog/src/lib.rs",
+      "reading": "claim_relevant_contracts_and_definitions",
+      "locations": [
+        "Storage and conditional-append contract, lines 1-130"
+      ],
+      "experiment_reproduced": false
+    },
+    {
+      "id": "S24-appa-eventlog-src-receipts",
+      "source_id": "S24",
+      "url": "https://github.com/archestra-ai/OpenAPPA/blob/a96f87d1fec900caf890f14342a089a32b3bfaff/appa-eventlog/src/receipts.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "e3bd5f8babb54ba653632b0aa1055af03b8dd485772b50a373c80009b7c45e2e",
+      "cache_path": "openappa/OpenAPPA-a96f87d1fec900caf890f14342a089a32b3bfaff/appa-eventlog/src/receipts.rs",
+      "reading": "claim_relevant_contracts_and_definitions",
+      "locations": [
+        "SessionScope, ReceiptBinding, ReceiptError, OperationKey/Request and result claim definitions, lines 1-125"
+      ],
+      "experiment_reproduced": false
+    }
+  ],
+  "retrieval_notes": [
+    {
+      "source_id": "S13",
+      "url": "https://perso.lip6.fr/Marc.Shapiro/papers/numeric-invariants-SRDS-2015.pdf",
+      "result": "404; used pinned arXiv v1 PDF instead"
+    },
+    {
+      "source_id": "S26",
+      "url": "https://www.usenix.org/legacy/event/nsdi08/tech/full_papers/zeldovich/zeldovich.pdf",
+      "result": "403 on this singular event path; used author-hosted PDF and verified plural events publisher path with browser"
+    },
+    {
+      "source_id": "S21",
+      "result": "Pinned v1 PDF itself shows 29 Aug 2026 beside arXiv:2609.29647v1; bibliographic date unresolved, not used to establish priority."
+    }
+  ],
+  "background_source_ids": [
+    "S01",
+    "S02",
+    "S03",
+    "S06",
+    "S09",
+    "S10",
+    "S14",
+    "S15",
+    "S16",
+    "S23"
+  ],
+  "background_reading": "Retain first-pass limits and historical evidence; no new precise comparative deficiency attributed to these sources."
+}

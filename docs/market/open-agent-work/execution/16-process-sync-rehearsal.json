@@ -1,0 +1,42 @@
+{
+  "schema": "chio.local-process-sync-rehearsal.v1",
+  "capturedUtc": "2026-09-14T20:35:45.945959+00:00",
+  "fundedIntegrationHead": "ae05b4939f94d347eb916bac31d01a5a3afcec42",
+  "fundedIntegrationParents": [
+    "5d1a9ec0d900bd03ce55de903919d972be852d79",
+    "926e1aa8411e3b516fe737988dd1a0989c447d08"
+  ],
+  "processHead": "3b926837372f2a878169671911e613968455f553",
+  "mergeBase": "5d1a9ec0d900bd03ce55de903919d972be852d79",
+  "shallowRepository": false,
+  "mergeTreeExitCode": 1,
+  "mergedTree": "eb0189ea79022e76b0a3431d366c57617a230fb5",
+  "conflictPaths": [
+    "docs/formal/COVERAGE.md"
+  ],
+  "worktreeCleanBefore": true,
+  "worktreeCleanAfter": true,
+  "scope": "Read-only merge rehearsal of committed inputs. No checkout, merge, conflict resolution or import of the process branch. The process foundation is not qualified by this result.",
+  "mergeTreeOutput": {
+    "path": "integration-evidence/process-sync-merge-tree.txt",
+    "sha256": "058c61b686a76c4587dd5f120ff8a11796ec31c4e7a75dae3282f994cc13b24e",
+    "bytes": 1081
+  },
+  "inspection": {
+    "kind": "source_navigation_only",
+    "jointPortsPresent": [
+      "claim_and_authorize_budget_and_commit_admission",
+      "claim_and_capture_invocation_and_commit_dispatch",
+      "claim_and_record_tool_returned",
+      "claim_and_begin_post_return_evaluation",
+      "finalize_post_return_with_pure_results"
+    ],
+    "fundedModulesByteIdentical": [
+      "crates/kernel/chio-kernel/src/kernel/admission_coordinator/outcome_authority.rs",
+      "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/output_verdict.rs",
+      "crates/platform/chio-store-sqlite/src/admission_operation_unknown_release.sql"
+    ],
+    "requiredDpopGuardPresent": true,
+    "mergedSourceCompiledOrTested": false
+  }
+}

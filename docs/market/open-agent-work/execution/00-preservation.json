@@ -1,0 +1,10 @@
+{
+  "schema": "chio.funded-work.original-checkout-preservation.v1",
+  "captured_utc": "2026-09-14T07:06:09.035780+00:00",
+  "checked_file_count": 3688,
+  "changed_or_missing_files": [],
+  "head_unchanged": true,
+  "short_status_unchanged": true,
+  "report35_original_sha256": "87de3a065fe13af801997b60d8983672d41175112b26c4b873cfe5af59554b8b",
+  "report35_candidate_sha256": "87de3a065fe13af801997b60d8983672d41175112b26c4b873cfe5af59554b8b"
+}
