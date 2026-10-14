@@ -25,7 +25,14 @@ fn startup_refusal(config: RemoteServeHttpConfig) -> String {
         .enable_all()
         .build()
         .expect("HTTP test runtime")
-        .block_on(crate::serve_http_async(config))
+        .block_on(async {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(30),
+                crate::serve_http_async(config),
+            )
+            .await
+        })
+        .expect("edge must refuse to start instead of serving")
         .expect_err("edge must refuse to start")
         .to_string()
 }
