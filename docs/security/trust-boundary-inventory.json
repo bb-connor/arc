@@ -5876,6 +5876,10 @@
       "proof_package_contains_signed_receipt::from_value",
       "proof_package_receipt_subject::from_value"
     ],
+    "crates/kernel/chio-runtime-core/src/computer/branches/records.rs": [
+      "decode::from_slice",
+      "decode::from_slice"
+    ],
     "crates/kernel/chio-runtime-core/src/computer/mod.rs": [
       "decode::from_value"
     ],
@@ -7969,6 +7973,23 @@
             "serde_json::from_value"
           ],
           "checked": true
+        }
+      ]
+    },
+    "crates/kernel/chio-runtime-core/src/computer/branches/records.rs": {
+      "kind": "durable-internal-state",
+      "contract": "Decodes only branch and publication records the managed-branch owner wrote as canonical JSON into its private object store and named by its own refs. Each record must re-encode to the exact original bytes and carry its own schema and identity; any mismatch refuses as a corrupt record. Records carry no authority beyond the owner's ref transactions.",
+      "readers": [
+        {
+          "reader": "decode",
+          "decoders": [
+            "from_slice"
+          ],
+          "apis": [
+            "canonical_json_bytes+original_equality"
+          ],
+          "checked": true,
+          "instances": 2
         }
       ]
     },

@@ -1,5 +1,6 @@
 //! Bounded resource descriptions without session or execution authority.
 
+pub mod branches;
 mod types;
 pub(crate) mod validation;
 
