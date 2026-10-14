@@ -193,10 +193,10 @@ exercised by any PR gate**. No PR gate compiles or runs
 workflows build browser SDK artifacts, run conformance peers, or run benches
 via `cargo bench`, none of which invoke these integration targets). They are
 covered outside the PR gates instead: the manually dispatched
-`release-qualification.yml` workflow runs `cargo +1.95.0 test --workspace` with
-no `--exclude`, which does compile and run those `wasmtime-runtime` integration
-targets. So editing or adding a test under `crates/guards/chio-wasm-guards/tests/`
-will not be caught by any PR gate (only later, by a dispatched Release
+`release-qualification.yml` workflow runs `cargo +1.95.0 test -p chio-conformance
+-p chio-formal-diff-tests -p chio-wasm-guards`, which does compile and run those
+`wasmtime-runtime` integration targets. So editing or adding a test under
+`crates/guards/chio-wasm-guards/tests/` will not be caught by any PR gate (only later, by a dispatched Release
 Qualification run on `main`). Do not "fix" the PR-gate carveout by folding
 `chio-wasm-guards` back into the PR `--workspace` test step (it is excluded there
 on purpose), and do not assume a green PR `ci.yml` run covered the wasm-guards
@@ -224,7 +224,10 @@ So MSRV test coverage is uneven:
   its `tests/` integration targets do not.
 
 Do not describe the MSRV job as testing the full workspace; it builds the full
-workspace and tests it with the carveouts above.
+workspace and tests it with the carveouts above. Release Qualification runs the
+three carved-out crates' full test suites on 1.95.0, and release publication
+requires both the exact-source MSRV job and Release Qualification
+(`scripts/check-release-source-gates.py`).
 
 > Note (firmware/console): the Chio workspace is Rust-only; the firmware and
 > console build pipelines referenced by the PR build/lint/test gate live in their own repos and
