@@ -141,21 +141,22 @@ per-request consent at the local server is the consent control.
 
 ## Verification
 
-Every PASS row ran on Linux x86_64 against `main` at `0aa9ff0dbb`, one test
-per invocation:
+Every PASS row ran on Linux x86_64 with the full suites of the named
+packages, on `main` at `52e44d78b9` plus the tests added with this revision:
 
 ```sh
-cargo test -p <package> --lib -- --exact <test path>
+cargo test -p chio-mcp-remote -p chio-mcp-adapter
 cargo test --locked -p chio-cli --features real-linux-enforcement \
-  --test <target> -- --exact <test name>
+  --test mcp_serve_http --test mcp_auth_server
 ```
 
-- `chio-mcp-adapter` and `chio-mcp-remote` unit tests: 17 of 17 passed.
-- RS-14 and RS-16 ran with the full `chio-mcp-remote` and `chio-mcp-adapter`
-  suites on `05bb3ce0f3` with the fix applied: 230 and 137 passed.
-- `chio-cli` `mcp_serve_http` and `mcp_auth_server`: 11 of 11 passed. These
+- `chio-mcp-remote`: 257 passed. `chio-mcp-adapter`: 137 passed.
+- `chio-cli` `mcp_serve_http` and `mcp_auth_server`: 44 and 5 passed. These
   tests launch the wrapped server inside the native cage and run only with
   the enforced native fixture (`CHIO_CAGE_INIT`, read grants, runtime files
   and an independent receipt anchor) that
   `.github/actions/enforced-native-fixture` provisions. Without it they
   panic before the edge starts.
+- The conformance runner in `--auth-mode oauth-local` with the auth
+  scenarios passes 5 of 5 against the Python peer, which exercises client
+  registration, the consent nonce, PKCE and token exchange end to end.
