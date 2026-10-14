@@ -224,12 +224,12 @@ pub fn self_test_fiscal_tier_limits_adapter() -> Result<(), String> {
                 currency: MARKETPLACE_TIER_LIMIT_CURRENCY.to_owned(),
                 publisher_revoked,
             };
-            let legacy = compute_marketplace_credit_limit(&request);
+            let unconfigured = compute_marketplace_credit_limit(&request);
             let installed = compute_marketplace_credit_limit_with_units(
                 &request,
                 &MARKETPLACE_TIER_LIMIT_UNITS,
             );
-            if installed != legacy {
+            if installed != unconfigured {
                 return Err("tier-limit bootstrap parity failed".to_owned());
             }
         }
@@ -288,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_limits_deny_an_unconfigured_currency() {
+    fn unconfigured_limits_deny_an_unknown_currency() {
         let mut unsupported = request(MarketplaceLimitTier::Tier3, false);
         unsupported.currency = "EUR".to_owned();
         let decision = compute_marketplace_credit_limit(&unsupported);

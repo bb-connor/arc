@@ -421,7 +421,7 @@ impl FindingOperatorPurchaseExecutor {
             venue_id: &self.market.venue_id,
             now,
             fee_schedule: &bundle.fee_schedule,
-            fee_schedule_gate: FindingFeeScheduleGate::Legacy,
+            fee_schedule_gate: FindingFeeScheduleGate::Ungoverned,
             trusted_local_operator_signers: &trusted_fee_signers,
             seller_authorization: &bundle.seller_authorization,
             terms: &bundle.market_terms,

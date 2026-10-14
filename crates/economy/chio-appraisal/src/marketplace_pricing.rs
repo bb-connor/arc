@@ -291,7 +291,7 @@ pub fn self_test_fiscal_marketplace_discount_adapter() -> Result<(), String> {
         MarketplaceReputationTier::Tier3,
     ] {
         let context = MarketplacePricingContext::new("fiscal-readiness", tier);
-        let legacy = compute_checked_marketplace_invocation_price(&base, &context)
+        let unconfigured = compute_checked_marketplace_invocation_price(&base, &context)
             .map_err(|error| error.to_string())?;
         let installed = compute_marketplace_invocation_price_with_discounts(
             &base,
@@ -299,7 +299,7 @@ pub fn self_test_fiscal_marketplace_discount_adapter() -> Result<(), String> {
             &TIER_DISCOUNT_PER_HUNDRED,
         )
         .map_err(|error| error.to_string())?;
-        if installed != legacy {
+        if installed != unconfigured {
             return Err("marketplace-discount bootstrap parity failed".to_owned());
         }
     }

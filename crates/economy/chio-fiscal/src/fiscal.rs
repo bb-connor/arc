@@ -116,7 +116,7 @@ pub enum FiscalParams {
         behavioral_penalty_cap: u32,
     },
     OpenMarketFeeAndBondSchedule {
-        legacy_body: Box<OpenMarketFeeScheduleArtifact>,
+        fee_schedule: Box<OpenMarketFeeScheduleArtifact>,
     },
 }
 
@@ -183,9 +183,9 @@ impl FiscalParams {
                 }
                 Ok(())
             }
-            Self::OpenMarketFeeAndBondSchedule { legacy_body } => {
-                legacy_body.validate().map_err(FiscalError::InvalidArtifact)
-            }
+            Self::OpenMarketFeeAndBondSchedule { fee_schedule } => fee_schedule
+                .validate()
+                .map_err(FiscalError::InvalidArtifact),
         }
     }
 }
@@ -491,10 +491,10 @@ impl FiscalSchedule {
             (2.., Some(id)) if is_sha256_hex(id) => {}
             _ => return Err(FiscalError::InvalidLineage),
         }
-        if let FiscalParams::OpenMarketFeeAndBondSchedule { legacy_body } = &self.params {
-            if legacy_body.governing_operator_id != charter.body().governing_operator_id
-                || legacy_body.issued_at != self.valid_from
-                || legacy_body.expires_at != Some(self.valid_until)
+        if let FiscalParams::OpenMarketFeeAndBondSchedule { fee_schedule } = &self.params {
+            if fee_schedule.governing_operator_id != charter.body().governing_operator_id
+                || fee_schedule.issued_at != self.valid_from
+                || fee_schedule.expires_at != Some(self.valid_until)
             {
                 return Err(FiscalError::InvalidField("params.open_market_binding"));
             }

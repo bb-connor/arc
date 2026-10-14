@@ -11,7 +11,7 @@ use chio_fiscal::{
     VerifiedFiscalProposalAdmission, VerifiedFiscalSchedule,
 };
 use chio_kernel::admission_operation::StoreMutationFence;
-use chio_open_market::fiscal_adapter::FiscalLegacyFeeScheduleBinding;
+use chio_open_market::fiscal_adapter::FiscalFeeScheduleBinding;
 use chio_store_sqlite::fiscal_store::SqliteFiscalStore;
 
 use crate::fiscal_runtime_readiness::production_fiscal_runtime_assembler;
@@ -507,31 +507,28 @@ impl TrustFiscalRuntime {
         }))
     }
 
-    pub(crate) fn legacy_fee_schedule_binding(
+    pub(crate) fn fee_schedule_binding(
         &self,
         fiscal_schedule_id: &str,
-    ) -> Result<Option<FiscalLegacyFeeScheduleBinding>, TrustFiscalOperationError> {
-        match self
-            .store
-            .load_legacy_fee_schedule_binding(fiscal_schedule_id)
-        {
-            Ok(binding) => Ok(Some(FiscalLegacyFeeScheduleBinding {
+    ) -> Result<Option<FiscalFeeScheduleBinding>, TrustFiscalOperationError> {
+        match self.store.load_fee_schedule_binding(fiscal_schedule_id) {
+            Ok(binding) => Ok(Some(FiscalFeeScheduleBinding {
                 fiscal_schedule_id: binding.fiscal_schedule_id,
-                legacy_envelope_digest: binding.legacy_envelope_digest,
+                envelope_digest: binding.envelope_digest,
             })),
             Err(chio_store_sqlite::fiscal_store::FiscalStoreError::NotFound) => Ok(None),
             Err(error) => Err(TrustFiscalOperationError::Store(error)),
         }
     }
 
-    /// Binds `legacy` to its governed schedule only if `admit` accepts it
+    /// Binds the signed `envelope` to its governed schedule only if `admit` accepts it
     /// inside the binding write transaction, immediately before commit. A
     /// refusal returns `Ok(Err(_))` with nothing persisted; fiscal failures
     /// stay `Err(_)`.
-    pub(crate) fn bind_legacy_fee_schedule_admitted<E>(
+    pub(crate) fn bind_fee_schedule_admitted<E>(
         &self,
         fiscal_schedule_id: &str,
-        legacy: &chio_fiscal::fee_schedule::SignedOpenMarketFeeSchedule,
+        envelope: &chio_fiscal::fee_schedule::SignedOpenMarketFeeSchedule,
         admit: impl FnOnce() -> Result<(), E>,
     ) -> Result<Result<(), E>, TrustFiscalOperationError> {
         let startup = self
@@ -542,7 +539,7 @@ impl TrustFiscalRuntime {
             .load_verified_schedule(fiscal_schedule_id, &startup.charters)
             .map_err(TrustFiscalOperationError::Store)?;
         self.store
-            .bind_legacy_fee_schedule_admitted(legacy, &schedule, &self.fence, admit)
+            .bind_fee_schedule_admitted(envelope, &schedule, &self.fence, admit)
             .map_err(TrustFiscalOperationError::Store)
     }
 

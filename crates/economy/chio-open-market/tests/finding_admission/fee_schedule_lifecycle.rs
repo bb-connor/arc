@@ -39,7 +39,7 @@ fn fee_schedule_issued_after_the_verification_clock_rejects() {
         web.admission = signed_admission(&web.venue, &web.finding, &bindings);
 
         let mut context = web.context(resolver);
-        context.fee_schedule_gate = FindingFeeScheduleGate::Legacy;
+        context.fee_schedule_gate = FindingFeeScheduleGate::Ungoverned;
         context.allocation_snapshot.status = FindingAllocationStatus::Available;
         context.allocation_snapshot.active_admission_id = None;
         assert_eq!(

@@ -255,7 +255,7 @@ pub(crate) async fn handle_issue_open_market_fee_schedule(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    // Governed issuance binds the legacy schedule under the local fiscal fence, so
+    // Governed issuance binds the signed schedule under the local fiscal fence, so
     // it has to run on the leader. Ungoverned issuance stays local and keeps signing
     // with this node's authority key.
     if state.fiscal_runtime.is_some() {

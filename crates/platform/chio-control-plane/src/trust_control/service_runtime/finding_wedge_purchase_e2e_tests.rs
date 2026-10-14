@@ -1709,7 +1709,7 @@ fn admission_witness(
         venue_id: VENUE_ID,
         now: unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         fee_schedule: &web.schedule,
-        fee_schedule_gate: FindingFeeScheduleGate::Legacy,
+        fee_schedule_gate: FindingFeeScheduleGate::Ungoverned,
         trusted_local_operator_signers: &trusted_signers,
         seller_authorization: &web.authorization,
         terms: &web.terms,

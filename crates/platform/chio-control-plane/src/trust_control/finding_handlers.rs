@@ -1710,7 +1710,7 @@ pub(crate) async fn handle_activate_finding(
                 "fiscal-governed finding activation is unavailable: no fee-schedule resolver is wired for this venue",
             );
         }
-        None => FindingFeeScheduleGate::Legacy,
+        None => FindingFeeScheduleGate::Ungoverned,
     };
     if let Err(error) = verify_report_authority_lifecycle(
         &request.verifier_report,

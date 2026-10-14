@@ -134,7 +134,7 @@ fn key_policy(seed: u8, label: &str) -> FindingAuthorityKeyPolicy {
 /// Fallback-mode fiscal resolver built from the checked-in chio-fiscal
 /// fixtures (`chio-market/tests/insurance_flow.rs` precedent). The
 /// open-market domain has never been activated there, so
-/// `authorize_fiscal_open_market_fee_schedule` verifies the legacy
+/// `authorize_fiscal_open_market_fee_schedule` verifies the signed
 /// schedule against the trusted local operator signers.
 fn with_fiscal<T>(run: impl FnOnce(&FiscalResolver<'_>) -> T) -> T {
     let fixture = |name: &str| {

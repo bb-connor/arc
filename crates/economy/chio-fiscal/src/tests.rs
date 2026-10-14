@@ -105,7 +105,7 @@ fn open_market_params(issued_at: u64, expires_at: Option<u64>) -> FiscalParams {
         note: None,
     };
     FiscalParams::OpenMarketFeeAndBondSchedule {
-        legacy_body: Box::new(
+        fee_schedule: Box::new(
             build_open_market_fee_schedule_artifact("operator.example", None, &request, issued_at)
                 .test_unwrap(),
         ),
@@ -426,8 +426,8 @@ fn open_market_schedule_requires_exact_operator_and_time_binding() {
     .is_err());
 
     let mut wrong_operator = open_market_params(20, Some(90));
-    if let FiscalParams::OpenMarketFeeAndBondSchedule { legacy_body } = &mut wrong_operator {
-        legacy_body.governing_operator_id = "attacker.example".to_string();
+    if let FiscalParams::OpenMarketFeeAndBondSchedule { fee_schedule } = &mut wrong_operator {
+        fee_schedule.governing_operator_id = "attacker.example".to_string();
     }
     assert!(
         schedule_builder(FiscalDomain::OpenMarketFeeAndBondSchedule, wrong_operator,)
@@ -479,4 +479,23 @@ fn unknown_schema_self_id_and_signature_tamper_fail_closed() {
         VerifiedFiscalSchedule::verify(signed, &charter, None),
         Err(FiscalError::InvalidSelfId)
     ));
+}
+
+#[test]
+fn open_market_params_refuse_the_renamed_body_field() {
+    let params = open_market_params(10, Some(20));
+    let mut value = serde_json::to_value(&params).test_unwrap();
+    let object = value.as_object_mut().test_unwrap();
+    let body = object.remove("feeSchedule").test_unwrap();
+    object.insert("legacyBody".to_string(), body);
+    let error = serde_json::from_value::<FiscalParams>(value).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .starts_with("unknown field `legacyBody`, expected `feeSchedule`"),
+        "{error}"
+    );
+    let restored: FiscalParams =
+        serde_json::from_value(serde_json::to_value(&params).test_unwrap()).test_unwrap();
+    assert_eq!(restored, params);
 }

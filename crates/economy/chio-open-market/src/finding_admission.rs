@@ -28,20 +28,21 @@ use crate::crypto::{sha256_hex, PublicKey};
 use crate::evaluation::OpenMarketPenaltyEvaluation;
 use crate::fee_schedule::{OpenMarketBondClass, SignedOpenMarketFeeSchedule};
 use crate::fiscal_adapter::{
-    authorize_fiscal_open_market_fee_schedule, signed_fee_schedule_digest, verify_legacy_schedule,
-    FiscalLegacyFeeScheduleBinding, FiscalOpenMarketError,
+    authorize_fiscal_open_market_fee_schedule, signed_fee_schedule_digest,
+    verify_trusted_fee_schedule, FiscalFeeScheduleBinding, FiscalOpenMarketError,
 };
 
 /// Fee-schedule authorization mode for admission verification.
 #[derive(Clone, Copy)]
 pub enum FindingFeeScheduleGate<'a> {
-    /// No fiscal runtime configured: legacy signer verification only.
-    Legacy,
+    /// No fiscal runtime configured: the schedule must verify under a
+    /// trusted operator signer.
+    Ungoverned,
     /// Fiscal governance live: authorize through the resolver, with the
     /// governed-mode binding when applicable.
     Fiscal {
         resolver: &'a FiscalResolver<'a>,
-        binding: Option<&'a FiscalLegacyFeeScheduleBinding>,
+        binding: Option<&'a FiscalFeeScheduleBinding>,
     },
 }
 
@@ -235,7 +236,7 @@ pub struct FindingAdmissionContext<'a> {
     /// digest.
     pub fee_schedule: &'a SignedOpenMarketFeeSchedule,
     /// Fee-schedule authorization gate. With no fiscal runtime the
-    /// schedule verifies as a legacy artifact against the trusted
+    /// schedule verifies against the trusted
     /// operator signers (the issuance precedent); with fiscal governance
     /// live it authorizes through the resolver.
     pub fee_schedule_gate: FindingFeeScheduleGate<'a>,
@@ -540,9 +541,12 @@ fn verify_finding_admission_inner(
         return Err(FindingAdmissionError::FeeScheduleDigestMismatch);
     }
     match context.fee_schedule_gate {
-        FindingFeeScheduleGate::Legacy => {
-            verify_legacy_schedule(context.fee_schedule, context.trusted_local_operator_signers)
-                .map_err(FindingAdmissionError::FeeScheduleUnauthorized)?;
+        FindingFeeScheduleGate::Ungoverned => {
+            verify_trusted_fee_schedule(
+                context.fee_schedule,
+                context.trusted_local_operator_signers,
+            )
+            .map_err(FindingAdmissionError::FeeScheduleUnauthorized)?;
         }
         FindingFeeScheduleGate::Fiscal { resolver, binding } => {
             authorize_fiscal_open_market_fee_schedule(
