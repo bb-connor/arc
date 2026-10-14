@@ -25,7 +25,7 @@ def decode_broker_output(value):
     evidence = value["evidence"]
     if (
         not isinstance(evidence, dict)
-        or evidence.get("schema") != "chio.broker-execution-evidence.v2"
+        or evidence.get("schema") != "chio.broker-execution-evidence.v1"
     ):
         raise WorkerError("invalid_broker_evidence")
     body = value["body"]

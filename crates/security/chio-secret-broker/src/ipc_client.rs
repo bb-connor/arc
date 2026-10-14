@@ -774,7 +774,7 @@ mod preconnected_execution_tests {
     fn preconnected_execute_returns_validated_outcome_and_exact_canonical_frames() {
         let request: BrokerExecuteRequest = read_vector("broker-execute-request-v1.json");
         let execute_response: BrokerExecuteResponse =
-            read_vector("broker-execute-response-v2.json");
+            read_vector("broker-execute-response-v1.json");
         let response_frame = canonical_json_bytes(&IpcResponse {
             operation: IpcOperation::Execute,
             accepted: true,
@@ -967,7 +967,7 @@ mod preconnected_execution_tests {
         let mut request: BrokerExecuteRequest = read_vector("broker-execute-request-v1.json");
         request.invocation_id = "invocation-production-misbound".to_string();
         let execute_response: BrokerExecuteResponse =
-            read_vector("broker-execute-response-v2.json");
+            read_vector("broker-execute-response-v1.json");
         let response_frame = canonical_json_bytes(&IpcResponse {
             operation: IpcOperation::Execute,
             accepted: true,

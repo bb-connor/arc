@@ -45,7 +45,7 @@ enum ErrorKind {
 
 const SEMANTIC_CASES: [(&str, &str, ErrorKind, &str); 19] = [
     (
-        "v2_response_headers_rebound",
+        "response_headers_rebound",
         "response_header_binding_mismatch",
         ErrorKind::ResponseRejected,
         "response headers differ from signed evidence",
@@ -160,11 +160,9 @@ const SEMANTIC_CASES: [(&str, &str, ErrorKind, &str); 19] = [
     ),
 ];
 
-const SCHEMA_REJECTED_CASES: [&str; 6] = [
-    "v2_evidence_requires_response_header_commitment",
-    "v2_response_refuses_legacy_evidence",
-    "v2_receipt_body_requires_response_header_commitment",
-    "v2_receipt_envelope_refuses_legacy_body",
+const SCHEMA_REJECTED_CASES: [&str; 4] = [
+    "evidence_requires_response_header_commitment",
+    "receipt_body_requires_response_header_commitment",
     "execute_response_receipt_missing",
     "receipt_forbidden_credential_value",
 ];
@@ -376,7 +374,7 @@ fn verify_semantics(id: &str, bytes: &[u8]) -> Result<()> {
             let receipt: SignedBrokerReceipt = decode_json(bytes, "broker receipt")?;
             verify_execution_receipt(&receipt, &completion_receipt_authority())
         }
-        "execute_response_receipt_signature_tampered" | "v2_response_headers_rebound" => {
+        "execute_response_receipt_signature_tampered" | "response_headers_rebound" => {
             let response: BrokerExecuteResponse = decode_json(bytes, "broker execute response")?;
             validate_execute_response(
                 &related_execute_request(),
@@ -470,7 +468,7 @@ fn receipt_and_registration_authority() -> PublicKey {
 
 fn completion_receipt_authority() -> PublicKey {
     PublicKey::from_hex(COMPLETION_RECEIPT_AUTHORITY_HEX)
-        .test_expect("fixed v2 completion receipt authority must parse")
+        .test_expect("fixed completion receipt authority must parse")
 }
 
 fn assert_error(id: &str, error: &BrokerError, kind: ErrorKind, message: &str) {

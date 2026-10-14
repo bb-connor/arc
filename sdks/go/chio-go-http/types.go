@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: fdbe3617027caed17bb2f0ce40abe83e7ec91a3e09034b079017c9645e1867dd
+// Schema content SHA-256: 58273fb73ffda4722b7b046039ca6e56c68373e238494d152b8728eec13ee79e
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -1047,11 +1047,6 @@ const (
 	SecurityBrokerExecutionEvidenceV1SchemaChioBrokerExecutionEvidenceV1 SecurityBrokerExecutionEvidenceV1Schema = "chio.broker-execution-evidence.v1"
 )
 
-// Defines values for SecurityBrokerExecutionEvidenceV2Schema.
-const (
-	SecurityBrokerExecutionEvidenceV2SchemaChioBrokerExecutionEvidenceV2 SecurityBrokerExecutionEvidenceV2Schema = "chio.broker-execution-evidence.v2"
-)
-
 // Defines values for SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledge.
 const (
 	SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledgeCommitted    SecurityBrokerExecutionFailureReceiptBodyV1DispatchKnowledge = "committed"
@@ -1101,30 +1096,12 @@ const (
 	SecurityBrokerExecutionReceiptBodyV1SchemaChioBrokerExecutionReceiptV1 SecurityBrokerExecutionReceiptBodyV1Schema = "chio.broker-execution-receipt.v1"
 )
 
-// Defines values for SecurityBrokerExecutionReceiptBodyV2Outcome.
-const (
-	SecurityBrokerExecutionReceiptBodyV2OutcomeCompleted SecurityBrokerExecutionReceiptBodyV2Outcome = "completed"
-)
-
-// Defines values for SecurityBrokerExecutionReceiptBodyV2Schema.
-const (
-	SecurityBrokerExecutionReceiptBodyV2SchemaChioBrokerExecutionReceiptV2 SecurityBrokerExecutionReceiptBodyV2Schema = "chio.broker-execution-receipt.v2"
-)
-
 // Defines values for SecurityBrokerExecutionReceiptEnvelopeV1Algorithm.
 const (
 	SecurityBrokerExecutionReceiptEnvelopeV1AlgorithmEd25519 SecurityBrokerExecutionReceiptEnvelopeV1Algorithm = "ed25519"
 	SecurityBrokerExecutionReceiptEnvelopeV1AlgorithmHybrid  SecurityBrokerExecutionReceiptEnvelopeV1Algorithm = "hybrid"
 	SecurityBrokerExecutionReceiptEnvelopeV1AlgorithmP256    SecurityBrokerExecutionReceiptEnvelopeV1Algorithm = "p256"
 	SecurityBrokerExecutionReceiptEnvelopeV1AlgorithmP384    SecurityBrokerExecutionReceiptEnvelopeV1Algorithm = "p384"
-)
-
-// Defines values for SecurityBrokerExecutionReceiptEnvelopeV2Algorithm.
-const (
-	SecurityBrokerExecutionReceiptEnvelopeV2AlgorithmEd25519 SecurityBrokerExecutionReceiptEnvelopeV2Algorithm = "ed25519"
-	SecurityBrokerExecutionReceiptEnvelopeV2AlgorithmHybrid  SecurityBrokerExecutionReceiptEnvelopeV2Algorithm = "hybrid"
-	SecurityBrokerExecutionReceiptEnvelopeV2AlgorithmP256    SecurityBrokerExecutionReceiptEnvelopeV2Algorithm = "p256"
-	SecurityBrokerExecutionReceiptEnvelopeV2AlgorithmP384    SecurityBrokerExecutionReceiptEnvelopeV2Algorithm = "p384"
 )
 
 // Defines values for SecurityBrokerPrepareDispatchAcknowledgementV1Schema.
@@ -5074,16 +5051,6 @@ type SecurityBrokerExecuteResponseV1 struct {
 	Status           int64                                    `json:"status"`
 }
 
-// SecurityBrokerExecuteResponseV2 defines model for SecurityBrokerExecuteResponseV2.
-type SecurityBrokerExecuteResponseV2 struct {
-	Body             []int64                                  `json:"body"`
-	Evidence         SecurityBrokerExecutionEvidenceV2        `json:"evidence"`
-	Headers          []SecurityBrokerExecuteRequestV1Header   `json:"headers"`
-	Receipt          SecurityBrokerExecutionReceiptEnvelopeV2 `json:"receipt"`
-	ReceiptReference string                                   `json:"receiptReference"`
-	Status           int64                                    `json:"status"`
-}
-
 // SecurityBrokerExecutionEvidenceV1 defines model for SecurityBrokerExecutionEvidenceV1.
 type SecurityBrokerExecutionEvidenceV1 struct {
 	AttemptId             SecurityBrokerExecutionEvidenceV1Identifier `json:"attemptId"`
@@ -5095,6 +5062,7 @@ type SecurityBrokerExecutionEvidenceV1 struct {
 	LeaderEpoch           int64                                       `json:"leaderEpoch"`
 	RequestDigest         SecurityBrokerExecutionEvidenceV1Digest     `json:"requestDigest"`
 	ResponseBodySha256    SecurityBrokerExecutionEvidenceV1Digest     `json:"responseBodySha256"`
+	ResponseHeadersSha256 SecurityBrokerExecutionEvidenceV1Digest     `json:"responseHeadersSha256"`
 	RevocationCommitIndex int64                                       `json:"revocationCommitIndex"`
 	RevocationSetDigest   SecurityBrokerExecutionEvidenceV1Digest     `json:"revocationSetDigest"`
 	Schema                SecurityBrokerExecutionEvidenceV1Schema     `json:"schema"`
@@ -5109,33 +5077,6 @@ type SecurityBrokerExecutionEvidenceV1Digest = string
 
 // SecurityBrokerExecutionEvidenceV1Identifier defines model for SecurityBrokerExecutionEvidenceV1Identifier.
 type SecurityBrokerExecutionEvidenceV1Identifier = string
-
-// SecurityBrokerExecutionEvidenceV2 defines model for SecurityBrokerExecutionEvidenceV2.
-type SecurityBrokerExecutionEvidenceV2 struct {
-	AttemptId             SecurityBrokerExecutionEvidenceV2Identifier `json:"attemptId"`
-	AuthorityCommitIndex  int64                                       `json:"authorityCommitIndex"`
-	BudgetCommitIndex     int64                                       `json:"budgetCommitIndex"`
-	CapabilityDigest      SecurityBrokerExecutionEvidenceV2Digest     `json:"capabilityDigest"`
-	HoldId                SecurityBrokerExecutionEvidenceV2Identifier `json:"holdId"`
-	InvocationId          SecurityBrokerExecutionEvidenceV2Identifier `json:"invocationId"`
-	LeaderEpoch           int64                                       `json:"leaderEpoch"`
-	RequestDigest         SecurityBrokerExecutionEvidenceV2Digest     `json:"requestDigest"`
-	ResponseBodySha256    SecurityBrokerExecutionEvidenceV2Digest     `json:"responseBodySha256"`
-	ResponseHeadersSha256 SecurityBrokerExecutionEvidenceV2Digest     `json:"responseHeadersSha256"`
-	RevocationCommitIndex int64                                       `json:"revocationCommitIndex"`
-	RevocationSetDigest   SecurityBrokerExecutionEvidenceV2Digest     `json:"revocationSetDigest"`
-	Schema                SecurityBrokerExecutionEvidenceV2Schema     `json:"schema"`
-	UpstreamStatus        int64                                       `json:"upstreamStatus"`
-}
-
-// SecurityBrokerExecutionEvidenceV2Schema defines model for SecurityBrokerExecutionEvidenceV2.Schema.
-type SecurityBrokerExecutionEvidenceV2Schema string
-
-// SecurityBrokerExecutionEvidenceV2Digest defines model for SecurityBrokerExecutionEvidenceV2Digest.
-type SecurityBrokerExecutionEvidenceV2Digest = string
-
-// SecurityBrokerExecutionEvidenceV2Identifier defines model for SecurityBrokerExecutionEvidenceV2Identifier.
-type SecurityBrokerExecutionEvidenceV2Identifier = string
 
 // SecurityBrokerExecutionFailureReceiptBodyV1 defines model for SecurityBrokerExecutionFailureReceiptBodyV1.
 type SecurityBrokerExecutionFailureReceiptBodyV1 struct {
@@ -5245,55 +5186,6 @@ type SecurityBrokerExecutionReceiptBodyV1Quota struct {
 	MaximumExecutions int64                                          `json:"maximumExecutions"`
 }
 
-// SecurityBrokerExecutionReceiptBodyV2 defines model for SecurityBrokerExecutionReceiptBodyV2.
-type SecurityBrokerExecutionReceiptBodyV2 struct {
-	AuthorizeEventId        SecurityBrokerExecutionReceiptBodyV2Identifier   `json:"authorizeEventId"`
-	BrokerCapabilityId      SecurityBrokerExecutionReceiptBodyV2Identifier   `json:"brokerCapabilityId"`
-	BrokerQuotaKeyId        SecurityBrokerExecutionReceiptBodyV2Identifier   `json:"brokerQuotaKeyId"`
-	CallerHeadersSha256     SecurityBrokerExecutionReceiptBodyV2Digest       `json:"callerHeadersSha256"`
-	CallerOptionsSha256     SecurityBrokerExecutionReceiptBodyV2Digest       `json:"callerOptionsSha256"`
-	CaptureEventId          SecurityBrokerExecutionReceiptBodyV2Identifier   `json:"captureEventId"`
-	CredentialReferenceHash SecurityBrokerExecutionReceiptBodyV2Digest       `json:"credentialReferenceHash"`
-	CredentialVersion       int64                                            `json:"credentialVersion"`
-	Evidence                SecurityBrokerExecutionEvidenceV2                `json:"evidence"`
-	IssuedAtUnixSeconds     int64                                            `json:"issuedAtUnixSeconds"`
-	NormalizedDestination   SecurityBrokerCapabilityBodyV1Destination        `json:"normalizedDestination"`
-	OperationId             SecurityBrokerExecutionReceiptBodyV2Identifier   `json:"operationId"`
-	Outcome                 SecurityBrokerExecutionReceiptBodyV2Outcome      `json:"outcome"`
-	ParentCapabilityId      SecurityBrokerExecutionReceiptBodyV2Identifier   `json:"parentCapabilityId"`
-	ProviderAdapterId       SecurityBrokerExecutionReceiptBodyV2Identifier   `json:"providerAdapterId"`
-	ProviderAdapterVersion  int64                                            `json:"providerAdapterVersion"`
-	Quotas                  []SecurityBrokerExecutionReceiptBodyV2Quota      `json:"quotas"`
-	ReceiptId               SecurityBrokerExecutionReceiptBodyV2Identifier   `json:"receiptId"`
-	RequestBodyBytes        int64                                            `json:"requestBodyBytes"`
-	RequestBodySha256       SecurityBrokerExecutionReceiptBodyV2Digest       `json:"requestBodySha256"`
-	ResponseBodyBytes       int64                                            `json:"responseBodyBytes"`
-	Schema                  SecurityBrokerExecutionReceiptBodyV2Schema       `json:"schema"`
-	SourceReceiptIds        []SecurityBrokerExecutionReceiptBodyV2Identifier `json:"sourceReceiptIds"`
-	Subject                 SecurityBrokerExecutionReceiptBodyV2PublicKey    `json:"subject"`
-}
-
-// SecurityBrokerExecutionReceiptBodyV2Outcome defines model for SecurityBrokerExecutionReceiptBodyV2.Outcome.
-type SecurityBrokerExecutionReceiptBodyV2Outcome string
-
-// SecurityBrokerExecutionReceiptBodyV2Schema defines model for SecurityBrokerExecutionReceiptBodyV2.Schema.
-type SecurityBrokerExecutionReceiptBodyV2Schema string
-
-// SecurityBrokerExecutionReceiptBodyV2Digest defines model for SecurityBrokerExecutionReceiptBodyV2Digest.
-type SecurityBrokerExecutionReceiptBodyV2Digest = string
-
-// SecurityBrokerExecutionReceiptBodyV2Identifier defines model for SecurityBrokerExecutionReceiptBodyV2Identifier.
-type SecurityBrokerExecutionReceiptBodyV2Identifier = string
-
-// SecurityBrokerExecutionReceiptBodyV2PublicKey defines model for SecurityBrokerExecutionReceiptBodyV2PublicKey.
-type SecurityBrokerExecutionReceiptBodyV2PublicKey = string
-
-// SecurityBrokerExecutionReceiptBodyV2Quota defines model for SecurityBrokerExecutionReceiptBodyV2Quota.
-type SecurityBrokerExecutionReceiptBodyV2Quota struct {
-	KeyId             SecurityBrokerExecutionReceiptBodyV2Identifier `json:"keyId"`
-	MaximumExecutions int64                                          `json:"maximumExecutions"`
-}
-
 // SecurityBrokerExecutionReceiptEnvelopeV1 defines model for SecurityBrokerExecutionReceiptEnvelopeV1.
 type SecurityBrokerExecutionReceiptEnvelopeV1 struct {
 	Algorithm SecurityBrokerExecutionReceiptEnvelopeV1Algorithm `json:"algorithm"`
@@ -5310,23 +5202,6 @@ type SecurityBrokerExecutionReceiptEnvelopeV1PublicKey = string
 
 // SecurityBrokerExecutionReceiptEnvelopeV1Signature defines model for SecurityBrokerExecutionReceiptEnvelopeV1Signature.
 type SecurityBrokerExecutionReceiptEnvelopeV1Signature = string
-
-// SecurityBrokerExecutionReceiptEnvelopeV2 defines model for SecurityBrokerExecutionReceiptEnvelopeV2.
-type SecurityBrokerExecutionReceiptEnvelopeV2 struct {
-	Algorithm SecurityBrokerExecutionReceiptEnvelopeV2Algorithm `json:"algorithm"`
-	Body      SecurityBrokerExecutionReceiptBodyV2              `json:"body"`
-	Signature SecurityBrokerExecutionReceiptEnvelopeV2Signature `json:"signature"`
-	Signer    SecurityBrokerExecutionReceiptEnvelopeV2PublicKey `json:"signer"`
-}
-
-// SecurityBrokerExecutionReceiptEnvelopeV2Algorithm defines model for SecurityBrokerExecutionReceiptEnvelopeV2.Algorithm.
-type SecurityBrokerExecutionReceiptEnvelopeV2Algorithm string
-
-// SecurityBrokerExecutionReceiptEnvelopeV2PublicKey defines model for SecurityBrokerExecutionReceiptEnvelopeV2PublicKey.
-type SecurityBrokerExecutionReceiptEnvelopeV2PublicKey = string
-
-// SecurityBrokerExecutionReceiptEnvelopeV2Signature defines model for SecurityBrokerExecutionReceiptEnvelopeV2Signature.
-type SecurityBrokerExecutionReceiptEnvelopeV2Signature = string
 
 // SecurityBrokerPrepareDispatchAcknowledgementV1 defines model for SecurityBrokerPrepareDispatchAcknowledgementV1.
 type SecurityBrokerPrepareDispatchAcknowledgementV1 struct {

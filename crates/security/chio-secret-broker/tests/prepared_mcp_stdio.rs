@@ -92,7 +92,7 @@ fn executable_preserves_one_broker_dispatch_and_rejects_a_tampered_completion() 
                 .set_write_timeout(Some(Duration::from_secs(5)))
                 .test_expect("write deadline");
         }
-        let mut response: BrokerExecuteResponse = fixture("broker-execute-response-v2.json");
+        let mut response: BrokerExecuteResponse = fixture("broker-execute-response-v1.json");
         if tampered {
             response.body.extend(b"untrusted-secret-sentinel");
         }

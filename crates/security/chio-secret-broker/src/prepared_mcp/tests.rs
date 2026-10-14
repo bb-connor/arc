@@ -68,7 +68,7 @@ fn lines(messages: &[Value]) -> Vec<u8> {
 #[test]
 fn original_prepared_stream_executes_once_and_returns_only_signed_structured_content() {
     let request: BrokerExecuteRequest = fixture("broker-execute-request-v1.json");
-    let response: BrokerExecuteResponse = fixture("broker-execute-response-v2.json");
+    let response: BrokerExecuteResponse = fixture("broker-execute-response-v1.json");
     let envelope = canonical_json_bytes(&IpcResponse {
         operation: IpcOperation::Execute,
         accepted: true,
