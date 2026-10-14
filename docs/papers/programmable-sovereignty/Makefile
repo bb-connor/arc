@@ -20,19 +20,36 @@
 #   check-log TARGET=stem   Scan stem.log for fatal errors / undefined refs / citations.
 #   check-bibtex TARGET=stem Scan stem.blg for warnings or errors.
 #   check-pages TARGET=stem MAX=N  Fail if body-page count (pages preceding the
-#                                  References heading) exceeds N. References and
-#                                  pages they share are excluded; the body count
-#                                  is what USENIX Security measures against the
-#                                  per-cycle page limit.
+#                                  References heading) exceeds N. The heading's
+#                                  page is read from the References entry that
+#                                  hyperref records in stem.aux, so the .tex
+#                                  must add References to the table of contents
+#                                  (\phantomsection\addcontentsline before
+#                                  \bibliography). The body count is what USENIX
+#                                  Security measures against the per-cycle limit.
 #   submit-check            build-usenix + all three checks against paper-usenix.
 #   submit-check-acmart     same gate against paper.tex (sanity-check fallback).
+#   refresh-results         Re-run both benchmark scripts in place (results land
+#                           in bench/results and the claim ledger's generated
+#                           Measurements region is rewritten), rebuild both PDFs,
+#                           then regenerate the supplementary artifact pinned at
+#                           the current HEAD. Commit the refreshed results, PDFs,
+#                           ledger, and supplementary files together; the
+#                           generator's --check then verifies that commit.
+#                           Benchmark knobs: CHIO_BENCH_SAMPLES,
+#                           CHIO_CRITERION_SAMPLES, CHIO_SUSTAINED_SECONDS,
+#                           CHIO_BENCH_MAX_LOAD (see bench/run-bilateral-admission.sh).
 #   clean                   remove aux files but keep PDFs.
 
 LATEX     ?= pdflatex
 BIBTEX    ?= bibtex
 PDFINFO   ?= pdfinfo
 PDFTOTEXT ?= pdftotext
+PYTHON    ?= python3
 LATEXOPTS ?= -interaction=nonstopmode -halt-on-error -file-line-error
+
+# Repository root, two directories above docs/papers.
+REPO ?= $(abspath $(CURDIR)/../../..)
 
 # Default body-page limit for USENIX Security.
 MAX ?= 13
@@ -41,7 +58,7 @@ MAX ?= 13
 TARGET ?= paper-usenix
 
 .PHONY: all build-acmart build-usenix check-log check-bibtex check-pages \
-        submit-check submit-check-acmart clean
+        submit-check submit-check-acmart refresh-results clean
 
 all: submit-check
 
@@ -119,23 +136,31 @@ check-bibtex:
 	if [ $$fail -eq 0 ]; then echo "[check-bibtex] OK"; fi; \
 	exit $$fail
 
+# The References page comes from the table-of-contents entry hyperref writes
+# to the .aux file when the bibliography is registered with \addcontentsline:
+#   \@writefile{toc}{\contentsline {section}{References}{9}{section*.30}...}
+# The .out bookmark names the same anchor but carries no page number, so the
+# .aux entry is the anchor. A missing entry fails closed rather than falling
+# back to a text search of the PDF, which misfires on body lines that begin
+# with the word "References".
 check-pages:
 	@if [ ! -f $(TARGET).pdf ]; then \
 	  echo "[check-pages] FAIL: $(TARGET).pdf not found"; exit 1; \
+	fi
+	@if [ ! -f $(TARGET).aux ]; then \
+	  echo "[check-pages] FAIL: $(TARGET).aux not found; build $(TARGET) first"; exit 1; \
 	fi
 	@total=$$($(PDFINFO) $(TARGET).pdf | awk '/^Pages:/ {print $$2}'); \
 	if [ -z "$$total" ]; then \
 	  echo "[check-pages] FAIL: could not parse page count"; exit 1; \
 	fi; \
-	refs_page=0; \
-	for p in $$(seq 1 $$total); do \
-	  if $(PDFTOTEXT) -layout -f $$p -l $$p $(TARGET).pdf - 2>/dev/null \
-	      | grep -qiE '(^|[[:space:]]{2,})References([[:space:]]|$$)'; then \
-	    refs_page=$$p; break; \
-	  fi; \
-	done; \
-	if [ $$refs_page -eq 0 ]; then \
-	  echo "[check-pages] FAIL: could not locate References heading in PDF"; \
+	refs_page=$$(sed -n 's/^\\@writefile{toc}{\\contentsline {section}{\(\\numberline {[^}]*}\)\{0,1\}References}{\([0-9][0-9]*\)}.*/\2/p' $(TARGET).aux | head -n 1); \
+	if [ -z "$$refs_page" ]; then \
+	  printf '%s\n' '[check-pages] FAIL: $(TARGET).aux has no References contents entry; add \phantomsection\addcontentsline{toc}{section}{References} before \bibliography in $(TARGET).tex'; \
+	  exit 1; \
+	fi; \
+	if [ "$$refs_page" -lt 1 ] || [ "$$refs_page" -gt "$$total" ]; then \
+	  echo "[check-pages] FAIL: References page $$refs_page is outside 1..$$total"; \
 	  exit 1; \
 	fi; \
 	body=$$((refs_page - 1)); \
@@ -164,6 +189,26 @@ submit-check-acmart: build-acmart
 	@$(MAKE) --no-print-directory check-bibtex TARGET=paper
 	@$(MAKE) --no-print-directory check-pages  TARGET=paper MAX=$(MAX)
 	@echo "[submit-check-acmart] VERDICT: PASS (acmart fallback is submission-ready)"
+
+# ---- Evidence refresh ------------------------------------------------------
+#
+# Runs in place: the benchmark scripts write bench/results and rewrite the
+# claim ledger's generated region, both PDFs are rebuilt from the refreshed
+# macros, and the artifact generator pins the supplementary package at HEAD.
+# The generator compares benchmark inputs (crates, scripts, corpora) with HEAD
+# and content-addresses the paper's own outputs, so the refreshed files are
+# committed together afterwards.
+
+refresh-results:
+	@echo "[refresh-results] bilateral admission benchmark"
+	bash bench/run-bilateral-admission.sh
+	@echo "[refresh-results] replay corpus benchmark"
+	bash bench/run-replay-corpus.sh
+	@$(MAKE) --no-print-directory build-usenix
+	@$(MAKE) --no-print-directory build-acmart
+	@echo "[refresh-results] regenerating the supplementary artifact"
+	$(PYTHON) $(REPO)/scripts/generate-programmable-sovereignty-artifact.py \
+	  --source-commit "$$(git -C $(REPO) rev-parse HEAD)"
 
 # ---- Housekeeping ----------------------------------------------------------
 

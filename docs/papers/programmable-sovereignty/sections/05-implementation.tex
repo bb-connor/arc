@@ -2,50 +2,77 @@
 \label{sec:implementation}
 
 The implementation follows the receiver's control flow. The kernel first
-validates the capability, scope, revocation state, budget, and guards. A
+validates the capability, scope, revocation state, and guards. A
 cross-organization request then enters
 \codepath{ChioRuntimeAdmissionHook::evaluate}, which loads the referenced
 artifacts, checks the treaty and continuation, verifies the bilateral
-statement, and returns either a named denial or an accepted result. The tool
-server is invoked only after these stages succeed.
+statement, and returns either a named denial or an accepted result. Budget
+admission runs after the hook returns, so a treaty denial never charges the
+capability budget. The tool server is invoked only after these stages succeed.
 
 \subsection{Receiver-Owned Resolution}
 
-Trusted runtime state classifies each request. Local requests follow the local
-admission path. A request classified as federated must carry a complete set of
-identifiers and bindings; malformed or missing context denies.
-\codepath{treaty_ref_from_request} rejects request-carried trust roots, peer
-directories, signing keys, revocation records, and dynamic trust bundles. The
-hook accepts identifiers for those objects and resolves them through its own
-\codepath{RuntimeAdmissionStores}.
+Trusted runtime state classifies each request: the receiving edge sets
+\codepath{federated_origin_kernel_id}, and the caller cannot. Local requests
+follow the local admission path. A request classified as federated must carry
+a complete set of identifiers and bindings; malformed or missing context
+denies. \codepath{treaty_ref_from_request} reads only identifiers and digests
+from the treaty context and resolves every artifact through the hook's own
+\codepath{RuntimeAdmissionStores}. That identifier-only parsing plus store
+resolution is the structural guarantee that request metadata cannot install
+trust material. As an explicit second layer, the parser rejects eleven
+trust-shaped keys (trust roots and bundles, treaty scopes, ladder manifests,
+signing keys, peer directories, and dynamic trust inputs) with named
+request-smuggling codes.
 
-The receiver loads the treaty scope, participant manifests, pinned keys,
-revocation state, continuation, governance receipts, and referenced execution
-receipts. It checks schemas, hashes, validity intervals, participant
-uniqueness, action-class coverage, and the receiver's minimum ladder mode. The
-hook reserves the continuation while admission is in progress, consumes it
-before an admitted dispatch, and releases it after a pre-dispatch denial or
-abort.
+The receiver loads the treaty scope, ladder intersection, continuation,
+lineage bundle, bilateral invocation, bilateral DSSE envelope, and the
+admission bundle that names the capability lease and governance receipt. It
+checks schemas, hashes, validity intervals, participant uniqueness,
+action-class coverage, and the receiver's minimum ladder mode. The hook
+consumes the continuation during admission evaluation with a single store
+operation, records the consumed identifier in the accepted result, and
+releases it only on pre-dispatch denial or abort. If release fails, the kernel
+keeps the continuation consumed rather than freeing it and records the failure
+in the denial receipt.
 
 \subsection{Bilateral Statement}
 
-\codepath{verify_chio_bilateral_invocation} enforces the strict DSSE profile.
-Both signatures cover the same pre-authentication encoding of one canonical
-statement. The statement binds the invocation and treaty identifiers,
-ladder-intersection and continuation hashes, action and consistency classes,
-capability, request and outcome hashes, lineage, local and remote receipt
-hashes, and signer identifiers. The verifier rejects the wrong payload type,
-an incorrect signature count, duplicate key identifiers, noncanonical JSON,
-unknown statement or predicate types, missing subjects, and reuse of one
-public key.
+Three functions verify the bilateral statement before dispatch.
+\codepath{verify_treaty_dsse_evidence}, inside the hook, decodes the
+statement, requires the strict predicate type
+\codepath{chio.bilateral-cosign-invocation.v1}, validates the
+policy-evaluation summary and requires an allow verdict, compares the treaty
+binding reference (treaty identifier, treaty-scope and ladder-intersection
+digests, continuation digest, action class, consistency model, and request
+digest) with the artifacts it resolved, checks the tool-argument hash against
+that request digest, matches the lease and governance references against its
+admission bundle, and requires the signer set to equal the two treaty
+participants with distinct public keys. It then calls
+\codepath{verify_chio_bilateral_dsse_envelope} and afterwards checks the
+lineage-bundle and bilateral-invocation bindings.
 
-It then compares the authenticated values with receiver-owned state: peer
-pins, live manifests, the revocation epoch, receipt signatures and hashes, the
-capability lease, policy results, and required governance evidence. The
-\codepath{BilateralCoSigningError::code} mapping gives these failures stable
-diagnostic codes. The cryptographic result is authorization by two configured
-keys. Whether those keys have independent organizational custody is outside
-the verifier.
+\codepath{verify_chio_bilateral_dsse_envelope} enforces the strict DSSE
+profile. It checks the payload type, exactly two signatures, byte equality
+between the payload and its canonical form, the statement and predicate types,
+the predicate schema, one subject carrying the canonical receipt name, two
+distinct configured keys with distinct key identifiers and matching
+fingerprints, and finally both Ed25519 signatures over the same
+pre-authentication encoding. Its failures carry
+\codepath{BilateralCoSigningError::code} values such as
+\codepath{dsse.malformed}, \codepath{statement.malformed},
+\codepath{predicate.type_unrecognised}, and
+\codepath{signer.independence_required}.
+
+After \codepath{evaluate_cross_boundary_admission} accepts,
+\codepath{VerifiedFederationTreatyMaterial::verify} verifies the envelope
+again against the participant keys, checks the participants and tool name,
+recomputes the canonical request hash, requires the policy allow result,
+checks lease expiry against the injected clock, and compares the treaty,
+ladder, action, consistency, and co-sign fields with the accepted admission
+report. The cryptographic result is authorization by two configured keys.
+Whether those keys have independent organizational custody is outside the
+verifier.
 
 \subsection{Binding Admission to the Signed Receipt}
 
@@ -53,9 +80,12 @@ An accepted admission result is converted into
 \codepath{VerifiedFederationTreatyMaterial}. Its constructor checks the
 request's origin and local participant, distinct participant keys, the DSSE
 predicate, the canonical request hash, the policy allow result, the capability
-lease, the treaty and ladder hashes, the action and consistency classes, and
-the accepted admission-report digest. The kernel stores this object for the
-current request rather than retaining a loose collection of request metadata.
+lease, the treaty and ladder hashes, and the action and consistency classes.
+It then binds the local accepted admission-report digest into the treaty
+binding reference, replacing any peer-supplied value rather than comparing
+against it, so a locally signed receipt never carries a peer-supplied report
+digest. The kernel stores this object for the current request rather than
+retaining a loose collection of request metadata.
 
 Receipt construction rechecks the request, participants, tool, action hash,
 and receipt contents against that object. Only then does it attach the treaty
@@ -81,18 +111,43 @@ allow decision still depends on the full set of checks above.
 \subsection{Runtime and Offline Review}
 
 \codepath{run_runtime_loopback_scenario} drives a deterministic three-vendor
-workflow through persistent SQLite receipt stores. It produces the treaty
-scope, ladder intersection, continuation, lineage, bilateral DSSE statement,
-local and remote receipts, and a buyer package. Producer mode stops after
-generation and schema validation. Full mode also invokes the buyer CLI and
-performs semantic package review. The offline \codepath{verify_package} path
-checks the linked artifacts, hashes, and signatures without access to the
-vendor processes.
+workflow through SQLite receipt and authority stores with a JSON runtime
+admission store. It produces the treaty scope, ladder intersection,
+continuation, lineage, bilateral DSSE statement, local and remote receipts,
+and a buyer package. Producer mode stops after generation and schema
+validation. Full mode also invokes the buyer CLI and performs semantic package
+review. The offline \codepath{verify_package} path checks the linked
+artifacts, hashes, and signatures without access to the vendor processes.
 
-The negative matrix calls the same public verification surfaces. Envelope
-cases call the strict verifier; store and policy cases call the admission hook.
-A separate dispatch-capable benchmark installs a test tool server and checks
-that its invocation counter remains zero after denial.
+\codepath{verify_package} calls \codepath{verify_chio_bilateral_invocation},
+the strict operational verifier, and that is where the remaining
+receiver-state comparisons run: peer pins and key fingerprints, the strict
+envelope verification, ladder-manifest freshness for both participants, the
+revocation epoch, the resolved receipt's signature, kernel key, tool name, and
+hashes, the capability lease, policy-verdict agreement, and required
+governance evidence. Its failures carry \codepath{VerifierError::code}
+values such as \codepath{peer.unpinned_or_keyid_mismatch},
+\codepath{peer.revoked_at_epoch}, \codepath{ladder.manifest_stale},
+\codepath{capability.lease_expired_or_unknown}, and
+\codepath{governance.receipt_required_missing}. The pre-dispatch hook does not
+call this verifier.
+
+The negative matrix reaches five surfaces. Five cases (04, 15, 16, 17, and
+20) run through \codepath{ChioRuntimeAdmissionHook::evaluate}; three (05,
+06, and 07) through the strict operational verifier
+\codepath{verify_chio_bilateral_invocation}; six (08 to 12 and 18) through
+the envelope verifier or signer, of which only 09 reaches
+\codepath{verify_chio_bilateral_dsse_envelope} while the others exercise the
+signature-slice envelope verifier or the signer; three (13, 14, and 19)
+through the partial verifier \codepath{verify_bilateral_cosign_invocation},
+which its own documentation scopes as not fully conformant; and three (01,
+02, and 03) through pure runtime-core validators,
+\codepath{bounded_treaty_receipt_view_from_verified_artifacts} and
+\codepath{evaluate_cross_boundary_admission}, without any DSSE verifier. A
+separate dispatch-capable benchmark installs a test tool server and checks
+that its invocation counter remains zero after a denial and equals the
+iteration count after an admission. Table~\ref{tab:artifacts} lists the
+surfaces the evaluation exercises.
 
 \begin{table*}[t]
 \caption{Implementation surfaces exercised by the evaluation.}
@@ -103,11 +158,14 @@ that its invocation counter remains zero after denial.
 Surface & Purpose & Evaluation \\
 \midrule
 \codepath{ChioRuntimeAdmissionHook::evaluate}
-& Receiver-owned resolution and pre-dispatch decision
-& Runtime tests and dispatch-capable denial benchmark \\
+& Receiver-owned resolution, treaty binding checks, and pre-dispatch decision
+& Runtime tests and dispatch-capable admission benchmarks \\
+\codepath{verify_chio_bilateral_dsse_envelope}
+& Strict envelope verification: canonical bytes, two distinct configured keys, both signatures
+& Hook and kernel binding paths, federation tests, negative matrix \\
 \codepath{verify_chio_bilateral_invocation}
-& Strict DSSE and treaty-binding checks
-& Federation tests and negative matrix \\
+& Offline strict verification with peer pins, manifest freshness, revocation epoch, and receipt store
+& Buyer-package verification, federation tests, negative matrix \\
 \codepath{VerifiedFederationTreatyMaterial}
 & Couples accepted treaty evidence to receipt construction
 & Kernel federation and receipt tests \\

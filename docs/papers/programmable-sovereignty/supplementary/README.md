@@ -3,9 +3,7 @@
 Paper: "Receiver-Owned Bilateral Admission for Cross-Organization Agent Tool
 Calls"
 
-Target: USENIX Security 2027, Cycle 1
-
-Snapshot date: 2026-07-26
+Target: USENIX Security 2027 (submission cycle to be confirmed)
 
 This package records the exact boundary of the paper's formal, implementation,
 and experimental claims. The artifact manifest pins the source snapshot,
@@ -29,6 +27,22 @@ submission page limit. It also records excluded claims and assumptions.
   It contains no build cache, symbolic links, extended attributes, or
   machine-local files.
 
+## Provenance
+
+Benchmark result files carry the commit at which they were produced. The
+artifact manifest is committed afterwards and pins a later source commit; it
+proves that the benchmark input tree (crates, examples, specs, scripts, and
+toolchain files) is byte-identical between the producer commit and the pinned
+source commit, so results and source describe the same code. The result files
+also record the host identity (CPU model, online cores, memory, kernel, rustc)
+in `bench/results/bilateral-admission-environment.json`, and the paper reads
+that identity through generated macros.
+
+The Rust toolchain is pinned by `rust-toolchain.toml`. `Cargo.lock` and
+`rust-toolchain.toml` are recorded in the manifest informationally rather than
+hash-pinned: they identify the toolchain and dependency set of the recorded
+run, and a bump to either does not by itself invalidate the artifact.
+
 ## Fast Verification
 
 From the repository root:
@@ -38,11 +52,12 @@ bash scripts/check-programmable-sovereignty-artifact.sh
 ```
 
 This command regenerates the artifact in check mode, verifies every file,
-symbol, theorem, script, result, and hash, extracts the Lean archive into a
-private temporary directory, and runs `lake build` there. If the recorded
-source commit is available locally, the checker also compares the current
-snapshot with that commit. The content-addressed checks do not require the
-commit object to remain reachable.
+symbol, theorem, script, result, and hash, checks that the claim ledger's
+measurement block matches the recorded results, extracts the Lean archive
+into a private temporary directory, and runs `lake build` there. If the
+recorded source commit is available locally, the checker also compares the
+current snapshot with that commit. The content-addressed checks do not require
+the commit object to remain reachable.
 
 ## Full Reproduction
 
@@ -71,4 +86,7 @@ Cryptography, canonical JSON, clocks, storage, domain completeness,
 organizational key control, complexity-limit enforcement, and the Rust runtime are outside the
 theorem. The independent Rust suite compares a separate reference interpreter
 with the runtime evaluator on inputs within those limits. This is differential
-evidence, not extraction or an implementation-refinement proof.
+evidence, not extraction or an implementation-refinement proof. The
+assumptions the paper's table cites by identifier are registered in
+`formal/assumptions.toml`, with approved wording in
+`docs/reference/CLAIM_REGISTRY.md`.
