@@ -131,7 +131,7 @@ async fn chat_maps_upstream_429_to_rate_limited() {
 #[tokio::test]
 async fn chat_stream_gates_sse_response() {
     let server = MockServer::start().await;
-    let sse = "event: tool-call-end\ndata: {\"tool_call\":{\"id\":\"call_live_2\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"}}}\n\n";
+    let sse = "event: message-start\ndata: {\"type\":\"message-start\"}\n\nevent: tool-call-end\ndata: {\"tool_call\":{\"id\":\"call_live_2\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"}}}\n\nevent: message-end\ndata: {\"type\":\"message-end\"}\n\n";
     Mock::given(method("POST"))
         .and(path("/v2/chat"))
         .and(header("authorization", "Bearer live-key"))

@@ -22,6 +22,8 @@ mod lifecycle_payload;
 mod provider_contract;
 #[path = "registry_security/terminal_payload.rs"]
 mod terminal_payload;
+#[path = "registry_security/termination.rs"]
+mod termination;
 
 const SERVER_ID: &str = "cohere-security";
 const TOOL_NAME: &str = "get_weather";
@@ -96,10 +98,16 @@ fn stream_payload(tool_name: &str) -> Vec<u8> {
             "function": {"name": tool_name, "arguments": "{}"}
         }
     });
-    let mut stream = b"event: tool-call-end\ndata: ".to_vec();
-    stream.extend_from_slice(&serde_json::to_vec(&data).test_unwrap());
-    stream.extend_from_slice(b"\n\n");
-    stream
+    message(&frame(Some("tool-call-end"), data)).into_bytes()
+}
+
+/// Wrap frames in the message-start and message-end a complete stream carries.
+fn message(frames: &str) -> String {
+    format!(
+        "{}{frames}{}",
+        frame(Some("message-start"), json!({"type":"message-start"})),
+        frame(Some("message-end"), json!({"type":"message-end"}))
+    )
 }
 
 fn allow() -> VerdictResult {
@@ -219,6 +227,29 @@ fn gate(raw: &[u8]) -> Result<usize, chio_tool_call_fabric::ProviderError> {
         .map(|gated| gated.invocations.len())
 }
 
+fn assert_malformed(raw: &str, expected: &str) {
+    let (config, registry, _) = signed_registry();
+    let adapter =
+        CohereAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry)
+            .test_unwrap();
+    let evaluated = Cell::new(0);
+    let result = adapter.gate_sse_stream(raw.as_bytes(), |_| {
+        evaluated.set(evaluated.get() + 1);
+        Ok(allow())
+    });
+    match result {
+        Err(chio_tool_call_fabric::ProviderError::Malformed(message)) => {
+            assert_eq!(message, expected);
+        }
+        other => panic!("expected Malformed({expected}), got {other:?}"),
+    }
+    assert_eq!(
+        evaluated.get(),
+        0,
+        "an unterminated stream reached evaluation"
+    );
+}
+
 fn frame(event: Option<&str>, data: serde_json::Value) -> String {
     match event {
         Some(event) => format!("event: {event}\ndata: {data}\n\n"),
@@ -256,23 +287,23 @@ fn plain_json_chat_body_with_tool_calls_fails_closed() {
 
 #[test]
 fn data_only_tool_call_end_frame_is_evaluated() {
-    let raw = frame(
+    let raw = message(&frame(
         None,
         json!({"type":"tool-call-end","tool_call":{"id":"call-data-only","type":"function",
             "function":{"name":TOOL_NAME,"arguments":"{}"}}}),
-    );
+    ));
     assert_eq!(gate(raw.as_bytes()).test_unwrap(), 1);
 }
 
 #[test]
 fn start_and_delta_without_end_fails_closed() {
-    let raw = format!("{}{}", start_frame(""), delta_frame("{}"));
-    assert!(gate(raw.as_bytes()).is_err());
+    let raw = message(&format!("{}{}", start_frame(""), delta_frame("{}")));
+    assert_malformed(&raw, "Cohere message-end arrived inside a tool call");
 }
 
 #[test]
 fn start_delta_end_stream_is_assembled_and_evaluated() {
-    let raw = format!(
+    let raw = message(&format!(
         "{}{}{}{}",
         start_frame(""),
         delta_frame("{\"city\":"),
@@ -281,7 +312,7 @@ fn start_delta_end_stream_is_assembled_and_evaluated() {
             Some("tool-call-end"),
             json!({"type":"tool-call-end","index":0})
         ),
-    );
+    ));
     assert_eq!(gate(raw.as_bytes()).test_unwrap(), 1);
 }
 
