@@ -254,7 +254,7 @@ pub enum RedactionPhase {
 pub enum DeliveryLane {
     #[default]
     Durable,
-    Legacy,
+    NonDurable,
     Prepay,
     Stream,
     NoOutput,
@@ -1128,6 +1128,24 @@ pub fn category_counts(scenarios: &[VerdictScenario]) -> BTreeMap<ScenarioCatego
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn delivery_lane_accepts_non_durable() -> Result<(), serde_json::Error> {
+        let lane = serde_json::from_value::<DeliveryLane>(serde_json::json!("non_durable"))?;
+        assert_eq!(lane, DeliveryLane::NonDurable);
+        Ok(())
+    }
+
+    #[test]
+    fn delivery_lane_rejects_unknown_name() {
+        let Err(error) = serde_json::from_value::<DeliveryLane>(serde_json::json!("legacy")) else {
+            panic!("unknown delivery lane accepted");
+        };
+        assert_eq!(
+            error.to_string(),
+            "unknown variant `legacy`, expected one of `durable`, `non_durable`, `prepay`, `stream`, `no_output`"
+        );
+    }
 
     fn valid_scenario() -> VerdictScenario {
         VerdictScenario {
