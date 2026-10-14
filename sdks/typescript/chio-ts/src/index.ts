@@ -9,3 +9,12 @@ export * from "./dpop.ts";
 export * from "./receipt_query_client.ts";
 export * from "./finding.ts";
 export * from "./cognition_market.ts";
+export {
+  DescriptionError, ProgramExpr, compileProgram, namespaceDigest, parallel,
+  parseCompiledDescription, parseDescription, revisionDigest, validateCompiledProgram, validateComputer,
+} from "./computer.ts";
+export type {
+  CompiledDescription, ComputerDescription, ComputerImage, ComputerRecord,
+  ComputerRevision, ContentRef, LeafDescriptor, ProgramDescription,
+  ProgramOccurrence, ResourceBinding, ResourceOperation, ResourceRequirement, SchemaShape,
+} from "./computer.ts";
