@@ -28,40 +28,40 @@ const MAX_TEXT_CHARS: usize = 2_048;
 const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 
 #[derive(Debug, Error, PartialEq, Eq)]
-pub enum IouEnvelopeV2Error {
+pub enum ReceivableIouError {
     #[error("invalid canonical evidence: {0}")]
     Input(#[from] chio_core_types::canonical::SharedUntrustedJsonError),
-    #[error("invalid v2 iou field '{0}'")]
+    #[error("invalid receivable iou field '{0}'")]
     InvalidField(&'static str),
-    #[error("v2 iou source binding does not match: {0}")]
+    #[error("receivable iou source binding does not match: {0}")]
     BindingMismatch(&'static str),
-    #[error("v2 iou source is not credit eligible: {0}")]
+    #[error("receivable iou source is not credit eligible: {0}")]
     NotEligible(&'static str),
-    #[error("v2 iou receipt verification failed")]
+    #[error("receivable iou receipt verification failed")]
     ReceiptVerification,
-    #[error("v2 iou receipt signer is not trusted")]
+    #[error("receivable iou receipt signer is not trusted")]
     ReceiptSignerUntrusted,
-    #[error("v2 iou credit authority verification failed")]
+    #[error("receivable iou credit authority verification failed")]
     CreditAuthorityVerification,
-    #[error("v2 iou committed credit admission verification failed")]
+    #[error("receivable iou committed credit admission verification failed")]
     CreditAdmissionVerification,
-    #[error("v2 iou issuer verification failed")]
+    #[error("receivable iou issuer verification failed")]
     IssuerVerification,
-    #[error("v2 iou canonicalization failed: {0}")]
+    #[error("receivable iou canonicalization failed: {0}")]
     Canonicalization(String),
-    #[error("v2 iou signing failed: {0}")]
+    #[error("receivable iou signing failed: {0}")]
     Signing(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum IouEnvelopeCryptoFloorV2 {
+pub enum ReceivableIouCryptoFloor {
     AllowClassical,
     AllowHybrid,
     PqRequired,
 }
 
-impl IouEnvelopeCryptoFloorV2 {
+impl ReceivableIouCryptoFloor {
     #[must_use]
     pub const fn allows(self, algorithm: SigningAlgorithm) -> bool {
         match self {
@@ -82,12 +82,12 @@ impl IouEnvelopeCryptoFloorV2 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IouEnvelopeReceiptTrustV2 {
+pub struct ReceivableIouReceiptTrust {
     trusted_kernel_key_hexes: Vec<String>,
     crypto_floor: ReceiptCryptoFloor,
 }
 
-impl IouEnvelopeReceiptTrustV2 {
+impl ReceivableIouReceiptTrust {
     #[must_use]
     pub fn new<I>(trusted_kernel_keys: I, crypto_floor: ReceiptCryptoFloor) -> Self
     where
@@ -123,20 +123,20 @@ impl IouEnvelopeReceiptTrustV2 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IouEnvelopeIssuerTrustV2 {
+pub struct ReceivableIouIssuerTrust {
     issuer_id: String,
     issuer_key_epoch: u64,
     issuer_key: PublicKey,
-    crypto_floor: IouEnvelopeCryptoFloorV2,
+    crypto_floor: ReceivableIouCryptoFloor,
 }
 
-impl IouEnvelopeIssuerTrustV2 {
+impl ReceivableIouIssuerTrust {
     pub fn new(
         issuer_id: String,
         issuer_key_epoch: u64,
         issuer_key: PublicKey,
-        crypto_floor: IouEnvelopeCryptoFloorV2,
-    ) -> Result<Self, IouEnvelopeV2Error> {
+        crypto_floor: ReceivableIouCryptoFloor,
+    ) -> Result<Self, ReceivableIouError> {
         validate_text("trusted_issuer_id", &issuer_id)?;
         validate_positive("trusted_issuer_key_epoch", issuer_key_epoch)?;
         Ok(Self {
@@ -163,14 +163,14 @@ impl IouEnvelopeIssuerTrustV2 {
     }
 
     #[must_use]
-    pub const fn crypto_floor(&self) -> IouEnvelopeCryptoFloorV2 {
+    pub const fn crypto_floor(&self) -> ReceivableIouCryptoFloor {
         self.crypto_floor
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct IouEnvelopeBodyV2 {
+pub struct ReceivableIouBody {
     schema: String,
     iou_id: String,
     operation_id: String,
@@ -211,10 +211,10 @@ struct IouIdPreimage<'a> {
     receipt_digest: &'a str,
 }
 
-impl IouEnvelopeBodyV2 {
-    fn validate(&self) -> Result<(), IouEnvelopeV2Error> {
+impl ReceivableIouBody {
+    fn validate(&self) -> Result<(), ReceivableIouError> {
         if self.schema != RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA {
-            return Err(IouEnvelopeV2Error::InvalidField("schema"));
+            return Err(ReceivableIouError::InvalidField("schema"));
         }
         for (field, value) in [
             ("iou_id", &self.iou_id),
@@ -253,7 +253,7 @@ impl IouEnvelopeBodyV2 {
             validate_text("tenant_id", tenant_id)?;
         }
         if self.issuer_id == self.original_creditor_id {
-            return Err(IouEnvelopeV2Error::InvalidField("issuer_identity"));
+            return Err(ReceivableIouError::InvalidField("issuer_identity"));
         }
         validate_amount(&self.amount)?;
         validate_positive(
@@ -266,11 +266,11 @@ impl IouEnvelopeBodyV2 {
         let credit_bind_bytes = self
             .credit_facility_bind
             .canonical_bytes()
-            .map_err(|_| IouEnvelopeV2Error::InvalidField("credit_facility_bind"))?;
+            .map_err(|_| ReceivableIouError::InvalidField("credit_facility_bind"))?;
         let receipt_timestamp_unix_ms = self
             .receipt_timestamp_unix_seconds
             .checked_mul(1_000)
-            .ok_or(IouEnvelopeV2Error::InvalidField(
+            .ok_or(ReceivableIouError::InvalidField(
                 "receipt_timestamp_unix_seconds",
             ))?;
         if receipt_timestamp_unix_ms > self.issued_at_unix_ms
@@ -280,12 +280,12 @@ impl IouEnvelopeBodyV2 {
             || self.credit_authority_digest != sha256_hex(&credit_bind_bytes)
             || self.iou_id != self.derived_iou_id()?
         {
-            return Err(IouEnvelopeV2Error::InvalidField("iou_terms"));
+            return Err(ReceivableIouError::InvalidField("iou_terms"));
         }
         Ok(())
     }
 
-    fn derived_iou_id(&self) -> Result<String, IouEnvelopeV2Error> {
+    fn derived_iou_id(&self) -> Result<String, ReceivableIouError> {
         domain_digest(
             IOU_ID_DOMAIN,
             &IouIdPreimage {
@@ -436,21 +436,21 @@ impl IouEnvelopeBodyV2 {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SignedIouEnvelopeV2 {
-    body: IouEnvelopeBodyV2,
+pub struct SignedReceivableIou {
+    body: ReceivableIouBody,
     signer_key: PublicKey,
     algorithm: SigningAlgorithm,
     signature: Signature,
 }
 
-impl SignedIouEnvelopeV2 {
+impl SignedReceivableIou {
     fn sign_with_backend<B: SigningBackend>(
-        body: IouEnvelopeBodyV2,
+        body: ReceivableIouBody,
         backend: &B,
-    ) -> Result<Self, IouEnvelopeV2Error> {
+    ) -> Result<Self, ReceivableIouError> {
         body.validate()?;
         let (signature, _) = sign_canonical_with_backend(backend, &body)
-            .map_err(|error| IouEnvelopeV2Error::Signing(error.to_string()))?;
+            .map_err(|error| ReceivableIouError::Signing(error.to_string()))?;
         Ok(Self {
             body,
             signer_key: backend.public_key(),
@@ -459,20 +459,20 @@ impl SignedIouEnvelopeV2 {
         })
     }
 
-    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, IouEnvelopeV2Error> {
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, ReceivableIouError> {
         let signed: Self = crate::input::canonical(bytes, crate::input::MAX_EVIDENCE_BYTES)?;
         signed.body.validate()?;
         Ok(signed)
     }
 
-    pub fn canonical_bytes(&self) -> Result<Vec<u8>, IouEnvelopeV2Error> {
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, ReceivableIouError> {
         self.body.validate()?;
         canonical_json_bytes(self)
-            .map_err(|error| IouEnvelopeV2Error::Canonicalization(error.to_string()))
+            .map_err(|error| ReceivableIouError::Canonicalization(error.to_string()))
     }
 
     #[must_use]
-    pub const fn body(&self) -> &IouEnvelopeBodyV2 {
+    pub const fn body(&self) -> &ReceivableIouBody {
         &self.body
     }
 
@@ -492,7 +492,7 @@ impl SignedIouEnvelopeV2 {
     }
 }
 
-pub struct IouEnvelopeMintContextV2<'a> {
+pub struct ReceivableIouMintContext<'a> {
     pub atom: &'a ObligationAtomV1,
     pub disposition: &'a ObligationDispositionRecordV1,
     pub settlement_lifecycle: &'a ObligationSettlementLifecycleV1,
@@ -503,20 +503,20 @@ pub struct IouEnvelopeMintContextV2<'a> {
     pub trusted_issued_at_unix_ms: u64,
 }
 
-pub struct IouEnvelopeVerificationContextV2<'a> {
+pub struct ReceivableIouVerificationContext<'a> {
     pub atom: &'a ObligationAtomV1,
     pub disposition: &'a ObligationDispositionRecordV1,
     pub settlement_lifecycle: &'a ObligationSettlementLifecycleV1,
     pub receipt: &'a ChioReceipt,
-    pub receipt_trust: &'a IouEnvelopeReceiptTrustV2,
+    pub receipt_trust: &'a ReceivableIouReceiptTrust,
     pub credit_facility_bind_trust: &'a CreditFacilityBindTrustV1,
-    pub issuer_trust: &'a IouEnvelopeIssuerTrustV2,
+    pub issuer_trust: &'a ReceivableIouIssuerTrust,
     pub trusted_now_unix_ms: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VerifiedIouEnvelopeV2 {
-    signed: SignedIouEnvelopeV2,
+pub struct VerifiedReceivableIou {
+    signed: SignedReceivableIou,
     body_digest: String,
     envelope_digest: String,
     signature_digest: String,
@@ -524,9 +524,9 @@ pub struct VerifiedIouEnvelopeV2 {
     credit_facility_bind: VerifiedCreditFacilityBindV1,
 }
 
-impl VerifiedIouEnvelopeV2 {
+impl VerifiedReceivableIou {
     #[must_use]
-    pub const fn body(&self) -> &IouEnvelopeBodyV2 {
+    pub const fn body(&self) -> &ReceivableIouBody {
         self.signed.body()
     }
 
@@ -566,12 +566,12 @@ impl VerifiedIouEnvelopeV2 {
     }
 }
 
-pub fn verify_iou_envelope_v2<S: CreditAdmissionStore>(
+pub fn verify_receivable_iou<S: CreditAdmissionStore>(
     canonical_envelope: &[u8],
     credit_admission_store: &CreditAdmissionStoreAdapter<S>,
-    context: &IouEnvelopeVerificationContextV2<'_>,
-) -> Result<VerifiedIouEnvelopeV2, IouEnvelopeV2Error> {
-    let signed = SignedIouEnvelopeV2::from_canonical_bytes(canonical_envelope)?;
+    context: &ReceivableIouVerificationContext<'_>,
+) -> Result<VerifiedReceivableIou, ReceivableIouError> {
+    let signed = SignedReceivableIou::from_canonical_bytes(canonical_envelope)?;
     let signature_algorithm = signed.signature.algorithm();
     if signed.body.issuer_id != context.issuer_trust.issuer_id
         || signed.body.issuer_key_epoch != context.issuer_trust.issuer_key_epoch
@@ -585,19 +585,19 @@ pub fn verify_iou_envelope_v2<S: CreditAdmissionStore>(
         || !signed
             .signer_key
             .verify_canonical(&signed.body, &signed.signature)
-            .map_err(|error| IouEnvelopeV2Error::Canonicalization(error.to_string()))?
+            .map_err(|error| ReceivableIouError::Canonicalization(error.to_string()))?
     {
-        return Err(IouEnvelopeV2Error::IssuerVerification);
+        return Err(ReceivableIouError::IssuerVerification);
     }
     verify_receipt(context.receipt, context.receipt_trust)?;
     if signed.signer_key == context.receipt.kernel_key {
-        return Err(IouEnvelopeV2Error::InvalidField("issuer_key_role"));
+        return Err(ReceivableIouError::InvalidField("issuer_key_role"));
     }
     let credit_bind_bytes = signed
         .body
         .credit_facility_bind
         .canonical_bytes()
-        .map_err(|_| IouEnvelopeV2Error::CreditAuthorityVerification)?;
+        .map_err(|_| ReceivableIouError::CreditAuthorityVerification)?;
     let credit_facility_bind = verify_credit_facility_bind(
         &credit_bind_bytes,
         &CreditFacilityBindVerificationContextV1 {
@@ -605,14 +605,14 @@ pub fn verify_iou_envelope_v2<S: CreditAdmissionStore>(
             trusted_at_unix_ms: context.atom.created_at_unix_ms(),
         },
     )
-    .map_err(|_| IouEnvelopeV2Error::CreditAuthorityVerification)?;
+    .map_err(|_| ReceivableIouError::CreditAuthorityVerification)?;
     if signed.signer_key()
         == credit_facility_bind
             .signed()
             .creditor_signature()
             .signer_key()
     {
-        return Err(IouEnvelopeV2Error::InvalidField("issuer_key_role"));
+        return Err(ReceivableIouError::InvalidField("issuer_key_role"));
     }
     let expected = build_body(
         context.atom,
@@ -625,14 +625,14 @@ pub fn verify_iou_envelope_v2<S: CreditAdmissionStore>(
         signed.body.issued_at_unix_ms,
     )?;
     if signed.body != expected || signed.body.issued_at_unix_ms > context.trusted_now_unix_ms {
-        return Err(IouEnvelopeV2Error::BindingMismatch("signed_body"));
+        return Err(ReceivableIouError::BindingMismatch("signed_body"));
     }
     require_committed_credit_admission(
         credit_admission_store,
         context.atom,
         &credit_facility_bind,
     )?;
-    Ok(VerifiedIouEnvelopeV2 {
+    Ok(VerifiedReceivableIou {
         body_digest: domain_digest(IOU_BODY_DIGEST_DOMAIN, &signed.body)?,
         envelope_digest: sha256_hex(canonical_envelope),
         signature_digest: sha256_hex(signed.signature.to_hex().as_bytes()),
@@ -642,15 +642,15 @@ pub fn verify_iou_envelope_v2<S: CreditAdmissionStore>(
     })
 }
 
-pub(crate) fn mint_iou_envelope_v2<B: SigningBackend, S: CreditAdmissionStore>(
+pub(crate) fn mint_receivable_iou<B: SigningBackend, S: CreditAdmissionStore>(
     backend: &B,
-    receipt_trust: &IouEnvelopeReceiptTrustV2,
+    receipt_trust: &ReceivableIouReceiptTrust,
     credit_admission_store: &CreditAdmissionStoreAdapter<S>,
-    context: &IouEnvelopeMintContextV2<'_>,
-) -> Result<SignedIouEnvelopeV2, IouEnvelopeV2Error> {
+    context: &ReceivableIouMintContext<'_>,
+) -> Result<SignedReceivableIou, ReceivableIouError> {
     verify_receipt(context.receipt, receipt_trust)?;
     if backend.public_key() == context.receipt.kernel_key {
-        return Err(IouEnvelopeV2Error::InvalidField("issuer_key_role"));
+        return Err(ReceivableIouError::InvalidField("issuer_key_role"));
     }
     if &backend.public_key()
         == context
@@ -659,7 +659,7 @@ pub(crate) fn mint_iou_envelope_v2<B: SigningBackend, S: CreditAdmissionStore>(
             .creditor_signature()
             .signer_key()
     {
-        return Err(IouEnvelopeV2Error::InvalidField("issuer_key_role"));
+        return Err(ReceivableIouError::InvalidField("issuer_key_role"));
     }
     let body = build_body(
         context.atom,
@@ -676,21 +676,21 @@ pub(crate) fn mint_iou_envelope_v2<B: SigningBackend, S: CreditAdmissionStore>(
         context.atom,
         context.credit_facility_bind,
     )?;
-    SignedIouEnvelopeV2::sign_with_backend(body, backend)
+    SignedReceivableIou::sign_with_backend(body, backend)
 }
 
 fn require_committed_credit_admission<S: CreditAdmissionStore>(
     credit_admission_store: &CreditAdmissionStoreAdapter<S>,
     atom: &ObligationAtomV1,
     credit_facility_bind: &VerifiedCreditFacilityBindV1,
-) -> Result<(), IouEnvelopeV2Error> {
+) -> Result<(), ReceivableIouError> {
     let admission = credit_admission_store
         .lookup_committed_by_operation(credit_facility_bind.body().operation_id())
-        .map_err(|_| IouEnvelopeV2Error::CreditAdmissionVerification)?
-        .ok_or(IouEnvelopeV2Error::CreditAdmissionVerification)?;
+        .map_err(|_| ReceivableIouError::CreditAdmissionVerification)?
+        .ok_or(ReceivableIouError::CreditAdmissionVerification)?;
     admission
         .validate_committed_binding(atom, credit_facility_bind)
-        .map_err(|_| IouEnvelopeV2Error::BindingMismatch("committed_credit_admission"))
+        .map_err(|_| ReceivableIouError::BindingMismatch("committed_credit_admission"))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -703,27 +703,27 @@ fn build_body(
     issuer_id: &str,
     issuer_key_epoch: u64,
     issued_at_unix_ms: u64,
-) -> Result<IouEnvelopeBodyV2, IouEnvelopeV2Error> {
+) -> Result<ReceivableIouBody, ReceivableIouError> {
     atom.validate()
-        .map_err(|_| IouEnvelopeV2Error::BindingMismatch("obligation_atom"))?;
+        .map_err(|_| ReceivableIouError::BindingMismatch("obligation_atom"))?;
     disposition
         .validate_against(atom)
-        .map_err(|_| IouEnvelopeV2Error::BindingMismatch("obligation_disposition"))?;
+        .map_err(|_| ReceivableIouError::BindingMismatch("obligation_disposition"))?;
     settlement_lifecycle
         .validate_against(atom)
-        .map_err(|_| IouEnvelopeV2Error::BindingMismatch("settlement_lifecycle"))?;
+        .map_err(|_| ReceivableIouError::BindingMismatch("settlement_lifecycle"))?;
     let (facility_id, credit_authority_digest) = match atom.credit_election() {
         ObligationCreditElectionV1::CreditFacility {
             facility_id,
             authority_digest,
         } => (facility_id.clone(), authority_digest.clone()),
         ObligationCreditElectionV1::NotCredit => {
-            return Err(IouEnvelopeV2Error::NotEligible("credit_election"));
+            return Err(ReceivableIouError::NotEligible("credit_election"));
         }
     };
     credit_facility_bind
         .ensure_current_at(atom.created_at_unix_ms())
-        .map_err(|_| IouEnvelopeV2Error::CreditAuthorityVerification)?;
+        .map_err(|_| ReceivableIouError::CreditAuthorityVerification)?;
     let bind = credit_facility_bind.body();
     if credit_facility_bind.artifact_digest() != credit_authority_digest
         || bind.economic_intent_digest() != atom.economic_intent_digest()
@@ -738,7 +738,7 @@ fn build_body(
         || bind.tool_server() != receipt.tool_server
         || bind.tool_name() != receipt.tool_name
     {
-        return Err(IouEnvelopeV2Error::BindingMismatch("credit_facility_bind"));
+        return Err(ReceivableIouError::BindingMismatch("credit_facility_bind"));
     }
     if receipt
         .metadata
@@ -747,27 +747,27 @@ fn build_body(
         .and_then(serde_json::Value::as_str)
         != Some(bind.request_id())
     {
-        return Err(IouEnvelopeV2Error::BindingMismatch("request_id"));
+        return Err(ReceivableIouError::BindingMismatch("request_id"));
     }
     if !matches!(disposition.disposition(), ObligationDispositionV1::PerCall) {
-        return Err(IouEnvelopeV2Error::NotEligible("disposition"));
+        return Err(ReceivableIouError::NotEligible("disposition"));
     }
     if !matches!(
         settlement_lifecycle.state(),
         ObligationSettlementStateV1::Pending
     ) {
-        return Err(IouEnvelopeV2Error::NotEligible("settlement_lifecycle"));
+        return Err(ReceivableIouError::NotEligible("settlement_lifecycle"));
     }
     let receipt_digest = sha256_hex(
         &canonical_json_bytes(receipt)
-            .map_err(|error| IouEnvelopeV2Error::Canonicalization(error.to_string()))?,
+            .map_err(|error| ReceivableIouError::Canonicalization(error.to_string()))?,
     );
     if receipt.id != atom.source_receipt_id() || receipt_digest != atom.source_receipt_digest() {
-        return Err(IouEnvelopeV2Error::BindingMismatch("source_receipt"));
+        return Err(ReceivableIouError::BindingMismatch("source_receipt"));
     }
     let financial = receipt
         .financial_metadata()
-        .ok_or(IouEnvelopeV2Error::NotEligible("financial_metadata"))?;
+        .ok_or(ReceivableIouError::NotEligible("financial_metadata"))?;
     let economic = economic_authorization(receipt)?;
     validate_economics(
         atom,
@@ -781,7 +781,7 @@ fn build_body(
         receipt
             .timestamp
             .checked_mul(1_000)
-            .ok_or(IouEnvelopeV2Error::InvalidField(
+            .ok_or(ReceivableIouError::InvalidField(
                 "receipt_timestamp_unix_seconds",
             ))?;
     if receipt_timestamp_unix_ms < bind.issued_at_unix_ms()
@@ -789,18 +789,18 @@ fn build_body(
         || atom.created_at_unix_ms() > issued_at_unix_ms
         || issued_at_unix_ms >= atom.due_at_unix_ms()
     {
-        return Err(IouEnvelopeV2Error::BindingMismatch("issuance_time"));
+        return Err(ReceivableIouError::BindingMismatch("issuance_time"));
     }
     validate_text("issuer_id", issuer_id)?;
     validate_positive("issuer_key_epoch", issuer_key_epoch)?;
-    let mut body = IouEnvelopeBodyV2 {
+    let mut body = ReceivableIouBody {
         schema: RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA.to_owned(),
         iou_id: String::new(),
         operation_id: bind.operation_id().to_owned(),
         obligation_id: atom.obligation_id().to_owned(),
         obligation_atom_digest: atom
             .digest()
-            .map_err(|_| IouEnvelopeV2Error::BindingMismatch("obligation_atom_digest"))?,
+            .map_err(|_| ReceivableIouError::BindingMismatch("obligation_atom_digest"))?,
         receipt_id: receipt.id.clone(),
         receipt_digest,
         receipt_timestamp_unix_seconds: receipt.timestamp,
@@ -818,7 +818,7 @@ fn build_body(
         amount: atom.amount().clone(),
         current_disposition_digest: disposition
             .digest(atom)
-            .map_err(|_| IouEnvelopeV2Error::BindingMismatch("disposition_digest"))?,
+            .map_err(|_| ReceivableIouError::BindingMismatch("disposition_digest"))?,
         due_at_unix_ms: atom.due_at_unix_ms(),
         facility_id,
         credit_authority_digest,
@@ -833,51 +833,51 @@ fn build_body(
 
 fn verify_receipt(
     receipt: &ChioReceipt,
-    trust: &IouEnvelopeReceiptTrustV2,
-) -> Result<(), IouEnvelopeV2Error> {
+    trust: &ReceivableIouReceiptTrust,
+) -> Result<(), ReceivableIouError> {
     if !trust.contains(&receipt.kernel_key) {
-        return Err(IouEnvelopeV2Error::ReceiptSignerUntrusted);
+        return Err(ReceivableIouError::ReceiptSignerUntrusted);
     }
     if !receipt
         .verify_signature_with_floor(trust.crypto_floor)
-        .map_err(|_| IouEnvelopeV2Error::ReceiptVerification)?
+        .map_err(|_| ReceivableIouError::ReceiptVerification)?
     {
-        return Err(IouEnvelopeV2Error::ReceiptVerification);
+        return Err(ReceivableIouError::ReceiptVerification);
     }
     if !receipt
         .action
         .verify_hash()
-        .map_err(|_| IouEnvelopeV2Error::ReceiptVerification)?
+        .map_err(|_| ReceivableIouError::ReceiptVerification)?
         || !receipt.is_allowed()
     {
-        return Err(IouEnvelopeV2Error::ReceiptVerification);
+        return Err(ReceivableIouError::ReceiptVerification);
     }
     Ok(())
 }
 
 fn economic_authorization(
     receipt: &ChioReceipt,
-) -> Result<EconomicAuthorizationReceiptMetadata, IouEnvelopeV2Error> {
+) -> Result<EconomicAuthorizationReceiptMetadata, ReceivableIouError> {
     let governed = receipt
         .governed_transaction_metadata()
-        .ok_or(IouEnvelopeV2Error::NotEligible("economic_authorization"))?;
+        .ok_or(ReceivableIouError::NotEligible("economic_authorization"))?;
     let approval_artifact_digest = governed
         .approval
         .as_ref()
         .filter(|approval| approval.approved)
         .and_then(|approval| approval.approval_artifact_digest.clone())
-        .ok_or(IouEnvelopeV2Error::BindingMismatch("governed_transaction"))?;
+        .ok_or(ReceivableIouError::BindingMismatch("governed_transaction"))?;
     if governed.server_id != receipt.tool_server || governed.tool_name != receipt.tool_name {
-        return Err(IouEnvelopeV2Error::BindingMismatch("governed_transaction"));
+        return Err(ReceivableIouError::BindingMismatch("governed_transaction"));
     }
     let economic = governed
         .economic_authorization
-        .ok_or(IouEnvelopeV2Error::NotEligible("economic_authorization"))?;
+        .ok_or(ReceivableIouError::NotEligible("economic_authorization"))?;
     if economic.economic_intent_digest.as_deref() != Some(governed.intent_hash.as_str())
         || economic.pre_action_authority_digest.as_deref()
             != Some(approval_artifact_digest.as_str())
     {
-        return Err(IouEnvelopeV2Error::BindingMismatch("economic_intent"));
+        return Err(ReceivableIouError::BindingMismatch("economic_intent"));
     }
     Ok(economic)
 }
@@ -889,12 +889,12 @@ fn validate_economics(
     economic: &EconomicAuthorizationReceiptMetadata,
     facility_id: &str,
     credit_authority_digest: &str,
-) -> Result<(), IouEnvelopeV2Error> {
+) -> Result<(), ReceivableIouError> {
     if financial.cost_charged == 0
         || financial.settlement_status != SettlementStatus::Pending
         || economic.settlement.settlement_status != SettlementStatus::Pending
     {
-        return Err(IouEnvelopeV2Error::NotEligible("settlement_status"));
+        return Err(ReceivableIouError::NotEligible("settlement_status"));
     }
     let amount = atom.amount();
     if financial.cost_charged != amount.units
@@ -924,7 +924,7 @@ fn validate_economics(
         || financial.root_budget_holder != economic.budget.root_budget_holder
         || economic.budget.root_budget_holder != atom.debtor_id()
     {
-        return Err(IouEnvelopeV2Error::BindingMismatch("economic_terms"));
+        return Err(ReceivableIouError::BindingMismatch("economic_terms"));
     }
     if economic
         .amount_bounds
@@ -932,32 +932,32 @@ fn validate_economics(
         .as_ref()
         .is_some_and(|hold| hold.currency != amount.currency || hold.units < amount.units)
     {
-        return Err(IouEnvelopeV2Error::BindingMismatch("amount_bounds"));
+        return Err(ReceivableIouError::BindingMismatch("amount_bounds"));
     }
     let payee_binding_digest = derive_obligation_payee_binding_digest(
         &economic.payee.beneficiary_id,
         &economic.payee.settlement_destination_ref,
     )
-    .map_err(|_| IouEnvelopeV2Error::BindingMismatch("payee_binding_digest"))?;
+    .map_err(|_| ReceivableIouError::BindingMismatch("payee_binding_digest"))?;
     if payee_binding_digest != atom.payee_binding_digest()
         || receipt.content_hash.len() != 64
         || receipt.policy_hash.len() != 64
     {
-        return Err(IouEnvelopeV2Error::BindingMismatch("receipt_economics"));
+        return Err(ReceivableIouError::BindingMismatch("receipt_economics"));
     }
     Ok(())
 }
 
-fn domain_digest(domain: &[u8], value: &impl Serialize) -> Result<String, IouEnvelopeV2Error> {
+fn domain_digest(domain: &[u8], value: &impl Serialize) -> Result<String, ReceivableIouError> {
     let canonical = canonical_json_bytes(value)
-        .map_err(|error| IouEnvelopeV2Error::Canonicalization(error.to_string()))?;
+        .map_err(|error| ReceivableIouError::Canonicalization(error.to_string()))?;
     let mut preimage = Vec::with_capacity(domain.len() + canonical.len());
     preimage.extend_from_slice(domain);
     preimage.extend_from_slice(&canonical);
     Ok(sha256_hex(&preimage))
 }
 
-fn validate_text(field: &'static str, value: &str) -> Result<(), IouEnvelopeV2Error> {
+fn validate_text(field: &'static str, value: &str) -> Result<(), ReceivableIouError> {
     let disallowed_control =
         |character: char| matches!(character as u32, 0x00..=0x1f | 0x7f..=0x9f);
     if value.is_empty()
@@ -965,13 +965,13 @@ fn validate_text(field: &'static str, value: &str) -> Result<(), IouEnvelopeV2Er
         || value.chars().count() > MAX_TEXT_CHARS
         || value.chars().any(disallowed_control)
     {
-        Err(IouEnvelopeV2Error::InvalidField(field))
+        Err(ReceivableIouError::InvalidField(field))
     } else {
         Ok(())
     }
 }
 
-fn validate_digest(field: &'static str, value: &str) -> Result<(), IouEnvelopeV2Error> {
+fn validate_digest(field: &'static str, value: &str) -> Result<(), ReceivableIouError> {
     if value.len() == 64
         && value
             .bytes()
@@ -979,19 +979,19 @@ fn validate_digest(field: &'static str, value: &str) -> Result<(), IouEnvelopeV2
     {
         Ok(())
     } else {
-        Err(IouEnvelopeV2Error::InvalidField(field))
+        Err(ReceivableIouError::InvalidField(field))
     }
 }
 
-fn validate_positive(field: &'static str, value: u64) -> Result<(), IouEnvelopeV2Error> {
+fn validate_positive(field: &'static str, value: u64) -> Result<(), ReceivableIouError> {
     if value == 0 || value > I_JSON_MAX_SAFE_INTEGER {
-        Err(IouEnvelopeV2Error::InvalidField(field))
+        Err(ReceivableIouError::InvalidField(field))
     } else {
         Ok(())
     }
 }
 
-fn validate_amount(amount: &MonetaryAmount) -> Result<(), IouEnvelopeV2Error> {
+fn validate_amount(amount: &MonetaryAmount) -> Result<(), ReceivableIouError> {
     validate_positive("amount_units", amount.units)?;
     if amount.currency.len() != 3
         || !amount
@@ -999,7 +999,7 @@ fn validate_amount(amount: &MonetaryAmount) -> Result<(), IouEnvelopeV2Error> {
             .bytes()
             .all(|byte| byte.is_ascii_uppercase())
     {
-        return Err(IouEnvelopeV2Error::InvalidField("amount_currency"));
+        return Err(ReceivableIouError::InvalidField("amount_currency"));
     }
     Ok(())
 }

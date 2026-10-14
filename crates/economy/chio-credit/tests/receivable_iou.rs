@@ -27,9 +27,9 @@ use chio_credit::obligation::{
     ObligationDispositionRecordV1, ObligationSettlementLifecycleV1, VerifiedCreditFacilityBindV1,
 };
 use chio_credit::{
-    verify_iou_envelope_v2, CreditEvaluatorHook, IouEnvelopeCryptoFloorV2,
-    IouEnvelopeIssuerTrustV2, IouEnvelopeMintContextV2, IouEnvelopeReceiptTrustV2,
-    IouEnvelopeV2Error, IouEnvelopeVerificationContextV2, LocalCreditAccount, SignedIouEnvelopeV2,
+    verify_receivable_iou, CreditEvaluatorHook, LocalCreditAccount, ReceivableIouCryptoFloor,
+    ReceivableIouError, ReceivableIouIssuerTrust, ReceivableIouMintContext,
+    ReceivableIouReceiptTrust, ReceivableIouVerificationContext, SignedReceivableIou,
     RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA,
 };
 use credit_admission_support::{
@@ -350,7 +350,7 @@ fn fixture_with_receipt_authority(
     let issuer_key = issuer.public_key();
     let account = LocalCreditAccount::new_with_receipt_trust(
         Ed25519Backend::new(issuer),
-        IouEnvelopeReceiptTrustV2::new([kernel.public_key()], ReceiptCryptoFloor::AllowClassical),
+        ReceivableIouReceiptTrust::new([kernel.public_key()], ReceiptCryptoFloor::AllowClassical),
     );
     Ok(Fixture {
         account,
@@ -367,11 +367,11 @@ fn fixture_with_receipt_authority(
     })
 }
 
-fn mint(fixture: &Fixture) -> Result<SignedIouEnvelopeV2, IouEnvelopeV2Error> {
+fn mint(fixture: &Fixture) -> Result<SignedReceivableIou, ReceivableIouError> {
     let credit_admission = fixture.credit_admission_store.adapter();
-    fixture.account.mint_obligation_iou_v2(
+    fixture.account.mint_receivable_iou(
         &credit_admission,
-        &IouEnvelopeMintContextV2 {
+        &ReceivableIouMintContext {
             atom: &fixture.atom,
             disposition: &fixture.disposition,
             settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -440,19 +440,19 @@ fn validate_schema(artifact: &impl serde::Serialize) -> TestResult {
     chio_spec_validate::validate_value(
         &path,
         &schema,
-        &std::path::PathBuf::from("<iou-v2>"),
+        &std::path::PathBuf::from("<receivable-iou>"),
         &serde_json::to_value(artifact)?,
     )?;
     Ok(())
 }
 
 #[test]
-fn obligation_led_v2_mints_and_verifies_exact_evidence() -> TestResult {
+fn obligation_led_receivable_iou_mints_and_verifies_exact_evidence() -> TestResult {
     let fixture = fixture(CREDITOR_ID, SettlementStatus::Pending)?;
     let signed = mint(&fixture)?;
     let canonical = signed.canonical_bytes()?;
     validate_schema(&signed)?;
-    let parsed = SignedIouEnvelopeV2::from_canonical_bytes(&canonical)?;
+    let parsed = SignedReceivableIou::from_canonical_bytes(&canonical)?;
     assert_eq!(parsed.body().schema(), RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA);
     assert_eq!(
         parsed.body().operation_id(),
@@ -468,16 +468,16 @@ fn obligation_led_v2_mints_and_verifies_exact_evidence() -> TestResult {
     );
     assert_eq!(parsed.body().issued_at_unix_ms(), IOU_ISSUED_AT_MS);
 
-    let issuer_trust = IouEnvelopeIssuerTrustV2::new(
+    let issuer_trust = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),
         7,
         fixture.issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
-    let verified = verify_iou_envelope_v2(
+    let verified = verify_receivable_iou(
         &canonical,
         &fixture.credit_admission_store.adapter(),
-        &IouEnvelopeVerificationContextV2 {
+        &ReceivableIouVerificationContext {
             atom: &fixture.atom,
             disposition: &fixture.disposition,
             settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -504,22 +504,22 @@ fn obligation_led_v2_mints_and_verifies_exact_evidence() -> TestResult {
 fn v2_requires_the_exact_committed_credit_admission() -> TestResult {
     let missing = fixture(CREDITOR_ID, SettlementStatus::Pending)?;
     let canonical = mint(&missing)?.canonical_bytes()?;
-    let issuer_trust = IouEnvelopeIssuerTrustV2::new(
+    let issuer_trust = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),
         7,
         missing.issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     missing.credit_admission_store.clear()?;
     assert_eq!(
         mint(&missing),
-        Err(IouEnvelopeV2Error::CreditAdmissionVerification)
+        Err(ReceivableIouError::CreditAdmissionVerification)
     );
     assert_eq!(
-        verify_iou_envelope_v2(
+        verify_receivable_iou(
             &canonical,
             &missing.credit_admission_store.adapter(),
-            &IouEnvelopeVerificationContextV2 {
+            &ReceivableIouVerificationContext {
                 atom: &missing.atom,
                 disposition: &missing.disposition,
                 settlement_lifecycle: &missing.settlement_lifecycle,
@@ -530,7 +530,7 @@ fn v2_requires_the_exact_committed_credit_admission() -> TestResult {
                 trusted_now_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::CreditAdmissionVerification)
+        Err(ReceivableIouError::CreditAdmissionVerification)
     );
 
     let failed = fixture(CREDITOR_ID, SettlementStatus::Pending)?;
@@ -539,7 +539,7 @@ fn v2_requires_the_exact_committed_credit_admission() -> TestResult {
         .fail("credit store unavailable")?;
     assert_eq!(
         mint(&failed),
-        Err(IouEnvelopeV2Error::CreditAdmissionVerification)
+        Err(ReceivableIouError::CreditAdmissionVerification)
     );
 
     let noncommitted = fixture(CREDITOR_ID, SettlementStatus::Pending)?;
@@ -559,7 +559,7 @@ fn v2_requires_the_exact_committed_credit_admission() -> TestResult {
         .replace(serde_json::from_value(value)?)?;
     assert_eq!(
         mint(&noncommitted),
-        Err(IouEnvelopeV2Error::CreditAdmissionVerification)
+        Err(ReceivableIouError::CreditAdmissionVerification)
     );
 
     let mismatched = fixture(CREDITOR_ID, SettlementStatus::Pending)?;
@@ -574,7 +574,7 @@ fn v2_requires_the_exact_committed_credit_admission() -> TestResult {
         .replace(serde_json::from_value(value)?)?;
     assert_eq!(
         mint(&mismatched),
-        Err(IouEnvelopeV2Error::BindingMismatch(
+        Err(ReceivableIouError::BindingMismatch(
             "committed_credit_admission"
         ))
     );
@@ -589,31 +589,31 @@ fn v2_rejects_unknown_noncanonical_legacy_and_untrusted_envelopes() -> TestResul
     let mut value: serde_json::Value = serde_json::from_slice(&canonical)?;
 
     let noncanonical = serde_json::to_vec_pretty(&value)?;
-    assert!(SignedIouEnvelopeV2::from_canonical_bytes(&noncanonical).is_err());
+    assert!(SignedReceivableIou::from_canonical_bytes(&noncanonical).is_err());
 
     value["body"]["schema"] = serde_json::json!("chio.credit.iou-envelope.v9");
     let unknown = canonical_json_bytes(&value)?;
     assert_eq!(
-        SignedIouEnvelopeV2::from_canonical_bytes(&unknown),
-        Err(IouEnvelopeV2Error::InvalidField("schema"))
+        SignedReceivableIou::from_canonical_bytes(&unknown),
+        Err(ReceivableIouError::InvalidField("schema"))
     );
 
     let Some(legacy) = fixture.account.evaluate(&fixture.receipt)? else {
         return Err("priced legacy receipt omitted its v1 IOU".into());
     };
-    assert!(SignedIouEnvelopeV2::from_canonical_bytes(&canonical_json_bytes(&legacy)?).is_err());
+    assert!(SignedReceivableIou::from_canonical_bytes(&canonical_json_bytes(&legacy)?).is_err());
 
-    let wrong_issuer = IouEnvelopeIssuerTrustV2::new(
+    let wrong_issuer = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),
         7,
         Keypair::generate().public_key(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     assert_eq!(
-        verify_iou_envelope_v2(
+        verify_receivable_iou(
             &canonical,
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeVerificationContextV2 {
+            &ReceivableIouVerificationContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -624,14 +624,14 @@ fn v2_rejects_unknown_noncanonical_legacy_and_untrusted_envelopes() -> TestResul
                 trusted_now_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::IssuerVerification)
+        Err(ReceivableIouError::IssuerVerification)
     );
 
-    let issuer_trust = IouEnvelopeIssuerTrustV2::new(
+    let issuer_trust = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),
         7,
         fixture.issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     let wrong_bind_trust = CreditFacilityBindTrustV1::new(CreditFacilityBindTrustInputV1 {
         authority_id: AUTHORITY_ID.to_owned(),
@@ -646,10 +646,10 @@ fn v2_rejects_unknown_noncanonical_legacy_and_untrusted_envelopes() -> TestResul
         max_lifetime_ms: 100_000,
     })?;
     assert_eq!(
-        verify_iou_envelope_v2(
+        verify_receivable_iou(
             &canonical,
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeVerificationContextV2 {
+            &ReceivableIouVerificationContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -660,15 +660,15 @@ fn v2_rejects_unknown_noncanonical_legacy_and_untrusted_envelopes() -> TestResul
                 trusted_now_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::CreditAuthorityVerification)
+        Err(ReceivableIouError::CreditAuthorityVerification)
     );
     let mut algorithm_value: serde_json::Value = serde_json::from_slice(&canonical)?;
     algorithm_value["algorithm"] = serde_json::json!("p256");
     assert_eq!(
-        verify_iou_envelope_v2(
+        verify_receivable_iou(
             &canonical_json_bytes(&algorithm_value)?,
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeVerificationContextV2 {
+            &ReceivableIouVerificationContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -679,16 +679,16 @@ fn v2_rejects_unknown_noncanonical_legacy_and_untrusted_envelopes() -> TestResul
                 trusted_now_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::IssuerVerification)
+        Err(ReceivableIouError::IssuerVerification)
     );
 
     let mut mismatched_receipt = fixture.receipt.clone();
     mismatched_receipt.algorithm = Some(SigningAlgorithm::P256);
     assert_eq!(
-        verify_iou_envelope_v2(
+        verify_receivable_iou(
             &canonical,
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeVerificationContextV2 {
+            &ReceivableIouVerificationContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -699,7 +699,7 @@ fn v2_rejects_unknown_noncanonical_legacy_and_untrusted_envelopes() -> TestResul
                 trusted_now_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::ReceiptVerification)
+        Err(ReceivableIouError::ReceiptVerification)
     );
     Ok(())
 }
@@ -709,13 +709,13 @@ fn v2_rejects_payee_substitution_paid_receipts_and_floor_downgrades() -> TestRes
     let missing_authority = fixture_with_authority(CREDITOR_ID, SettlementStatus::Pending, false)?;
     assert_eq!(
         mint(&missing_authority),
-        Err(IouEnvelopeV2Error::BindingMismatch("governed_transaction"))
+        Err(ReceivableIouError::BindingMismatch("governed_transaction"))
     );
 
     let substituted = fixture("tools.seller.example", SettlementStatus::Pending)?;
     assert_eq!(
         mint(&substituted),
-        Err(IouEnvelopeV2Error::BindingMismatch("economic_terms"))
+        Err(ReceivableIouError::BindingMismatch("economic_terms"))
     );
 
     for receipt_credit_authority in [
@@ -731,14 +731,14 @@ fn v2_rejects_payee_substitution_paid_receipts_and_floor_downgrades() -> TestRes
         )?;
         assert_eq!(
             mint(&fixture),
-            Err(IouEnvelopeV2Error::BindingMismatch("economic_terms"))
+            Err(ReceivableIouError::BindingMismatch("economic_terms"))
         );
     }
 
     let substituted_facility = fixture_with_receipt_facility("facility:other")?;
     assert_eq!(
         mint(&substituted_facility),
-        Err(IouEnvelopeV2Error::BindingMismatch("economic_terms"))
+        Err(ReceivableIouError::BindingMismatch("economic_terms"))
     );
 
     let fixture = fixture(CREDITOR_ID, SettlementStatus::Pending)?;
@@ -763,9 +763,9 @@ fn v2_rejects_payee_substitution_paid_receipts_and_floor_downgrades() -> TestRes
         due_at_unix_ms: DUE_AT_MS,
     })?;
     assert_eq!(
-        fixture.account.mint_obligation_iou_v2(
+        fixture.account.mint_receivable_iou(
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeMintContextV2 {
+            &ReceivableIouMintContext {
                 atom: &raw_atom,
                 disposition: &ObligationDispositionRecordV1::produced(&raw_atom)?,
                 settlement_lifecycle: &ObligationSettlementLifecycleV1::pending(&raw_atom)?,
@@ -776,14 +776,14 @@ fn v2_rejects_payee_substitution_paid_receipts_and_floor_downgrades() -> TestRes
                 trusted_issued_at_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::BindingMismatch("credit_facility_bind"))
+        Err(ReceivableIouError::BindingMismatch("credit_facility_bind"))
     );
 
     let issuer_as_creditor = crate::fixture(CREDITOR_ID, SettlementStatus::Pending)?;
     assert_eq!(
-        issuer_as_creditor.account.mint_obligation_iou_v2(
+        issuer_as_creditor.account.mint_receivable_iou(
             &issuer_as_creditor.credit_admission_store.adapter(),
-            &IouEnvelopeMintContextV2 {
+            &ReceivableIouMintContext {
                 atom: &issuer_as_creditor.atom,
                 disposition: &issuer_as_creditor.disposition,
                 settlement_lifecycle: &issuer_as_creditor.settlement_lifecycle,
@@ -794,26 +794,26 @@ fn v2_rejects_payee_substitution_paid_receipts_and_floor_downgrades() -> TestRes
                 trusted_issued_at_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::InvalidField("issuer_identity"))
+        Err(ReceivableIouError::InvalidField("issuer_identity"))
     );
 
     let paid = crate::fixture(CREDITOR_ID, SettlementStatus::Settled)?;
     assert_eq!(
         mint(&paid),
-        Err(IouEnvelopeV2Error::NotEligible("settlement_status"))
+        Err(ReceivableIouError::NotEligible("settlement_status"))
     );
 
     let strict_receipt_account = LocalCreditAccount::new_with_receipt_trust(
         Ed25519Backend::new(Keypair::generate()),
-        IouEnvelopeReceiptTrustV2::new(
+        ReceivableIouReceiptTrust::new(
             [fixture.receipt.kernel_key.clone()],
             ReceiptCryptoFloor::PqRequired,
         ),
     );
     assert_eq!(
-        strict_receipt_account.mint_obligation_iou_v2(
+        strict_receipt_account.mint_receivable_iou(
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeMintContextV2 {
+            &ReceivableIouMintContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -824,21 +824,21 @@ fn v2_rejects_payee_substitution_paid_receipts_and_floor_downgrades() -> TestRes
                 trusted_issued_at_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::ReceiptVerification)
+        Err(ReceivableIouError::ReceiptVerification)
     );
 
     let canonical = mint(&fixture)?.canonical_bytes()?;
-    let pq_issuer_trust = IouEnvelopeIssuerTrustV2::new(
+    let pq_issuer_trust = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),
         7,
         fixture.issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::PqRequired,
+        ReceivableIouCryptoFloor::PqRequired,
     )?;
     assert_eq!(
-        verify_iou_envelope_v2(
+        verify_receivable_iou(
             &canonical,
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeVerificationContextV2 {
+            &ReceivableIouVerificationContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -849,13 +849,13 @@ fn v2_rejects_payee_substitution_paid_receipts_and_floor_downgrades() -> TestRes
                 trusted_now_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::IssuerVerification)
+        Err(ReceivableIouError::IssuerVerification)
     );
 
     assert_eq!(
-        fixture.account.mint_obligation_iou_v2(
+        fixture.account.mint_receivable_iou(
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeMintContextV2 {
+            &ReceivableIouMintContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -866,20 +866,20 @@ fn v2_rejects_payee_substitution_paid_receipts_and_floor_downgrades() -> TestRes
                 trusted_issued_at_unix_ms: ATOM_CREATED_AT_MS - 1,
             },
         ),
-        Err(IouEnvelopeV2Error::BindingMismatch("issuance_time"))
+        Err(ReceivableIouError::BindingMismatch("issuance_time"))
     );
 
-    let issuer_trust = IouEnvelopeIssuerTrustV2::new(
+    let issuer_trust = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),
         7,
         fixture.issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     assert_eq!(
-        verify_iou_envelope_v2(
+        verify_receivable_iou(
             &canonical,
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeVerificationContextV2 {
+            &ReceivableIouVerificationContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -890,7 +890,7 @@ fn v2_rejects_payee_substitution_paid_receipts_and_floor_downgrades() -> TestRes
                 trusted_now_unix_ms: IOU_ISSUED_AT_MS - 1,
             },
         ),
-        Err(IouEnvelopeV2Error::BindingMismatch("signed_body"))
+        Err(ReceivableIouError::BindingMismatch("signed_body"))
     );
     Ok(())
 }
@@ -904,9 +904,9 @@ fn v2_rejects_source_receipt_key_reused_for_iou_minting() -> TestResult {
     );
 
     assert_eq!(
-        account.mint_obligation_iou_v2(
+        account.mint_receivable_iou(
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeMintContextV2 {
+            &ReceivableIouMintContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -917,7 +917,7 @@ fn v2_rejects_source_receipt_key_reused_for_iou_minting() -> TestResult {
                 trusted_issued_at_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::InvalidField("issuer_key_role"))
+        Err(ReceivableIouError::InvalidField("issuer_key_role"))
     );
     Ok(())
 }
@@ -933,18 +933,18 @@ fn v2_verifier_rejects_source_receipt_key_reused_by_valid_iou_signature() -> Tes
     value["algorithm"] = serde_json::to_value(backend.algorithm())?;
     value["signature"] = serde_json::to_value(signature)?;
     let canonical = canonical_json_bytes(&value)?;
-    let issuer_trust = IouEnvelopeIssuerTrustV2::new(
+    let issuer_trust = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),
         7,
         fixture.receipt.kernel_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
 
     assert_eq!(
-        verify_iou_envelope_v2(
+        verify_receivable_iou(
             &canonical,
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeVerificationContextV2 {
+            &ReceivableIouVerificationContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -955,7 +955,7 @@ fn v2_verifier_rejects_source_receipt_key_reused_by_valid_iou_signature() -> Tes
                 trusted_now_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::InvalidField("issuer_key_role"))
+        Err(ReceivableIouError::InvalidField("issuer_key_role"))
     );
     Ok(())
 }
@@ -968,9 +968,9 @@ fn v2_rejects_creditor_key_reused_under_an_issuer_alias() -> TestResult {
         fixture.account.receipt_trust().clone(),
     );
     assert_eq!(
-        creditor_account.mint_obligation_iou_v2(
+        creditor_account.mint_receivable_iou(
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeMintContextV2 {
+            &ReceivableIouMintContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -981,7 +981,7 @@ fn v2_rejects_creditor_key_reused_under_an_issuer_alias() -> TestResult {
                 trusted_issued_at_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::InvalidField("issuer_key_role"))
+        Err(ReceivableIouError::InvalidField("issuer_key_role"))
     );
 
     let signed = mint(&fixture)?;
@@ -993,17 +993,17 @@ fn v2_rejects_creditor_key_reused_under_an_issuer_alias() -> TestResult {
     value["algorithm"] = serde_json::to_value(backend.algorithm())?;
     value["signature"] = serde_json::to_value(signature)?;
     let canonical = canonical_json_bytes(&value)?;
-    let issuer_trust = IouEnvelopeIssuerTrustV2::new(
+    let issuer_trust = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),
         7,
         backend.public_key(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
     assert_eq!(
-        verify_iou_envelope_v2(
+        verify_receivable_iou(
             &canonical,
             &fixture.credit_admission_store.adapter(),
-            &IouEnvelopeVerificationContextV2 {
+            &ReceivableIouVerificationContext {
                 atom: &fixture.atom,
                 disposition: &fixture.disposition,
                 settlement_lifecycle: &fixture.settlement_lifecycle,
@@ -1014,7 +1014,7 @@ fn v2_rejects_creditor_key_reused_under_an_issuer_alias() -> TestResult {
                 trusted_now_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(IouEnvelopeV2Error::InvalidField("issuer_key_role"))
+        Err(ReceivableIouError::InvalidField("issuer_key_role"))
     );
     Ok(())
 }
@@ -1023,20 +1023,20 @@ fn v2_rejects_creditor_key_reused_under_an_issuer_alias() -> TestResult {
 fn v2_rejects_missing_or_mismatched_receipt_request_id() -> TestResult {
     let fixture = fixture(CREDITOR_ID, SettlementStatus::Pending)?;
     let canonical = mint(&fixture)?.canonical_bytes()?;
-    let issuer_trust = IouEnvelopeIssuerTrustV2::new(
+    let issuer_trust = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),
         7,
         fixture.issuer_key.clone(),
-        IouEnvelopeCryptoFloorV2::AllowClassical,
+        ReceivableIouCryptoFloor::AllowClassical,
     )?;
 
     for request_id in [None, Some("request-credit-replay")] {
         let (receipt, atom, disposition, settlement_lifecycle) =
             replace_receipt_request_id(&fixture, request_id)?;
         assert_eq!(
-            fixture.account.mint_obligation_iou_v2(
+            fixture.account.mint_receivable_iou(
                 &fixture.credit_admission_store.adapter(),
-                &IouEnvelopeMintContextV2 {
+                &ReceivableIouMintContext {
                     atom: &atom,
                     disposition: &disposition,
                     settlement_lifecycle: &settlement_lifecycle,
@@ -1047,13 +1047,13 @@ fn v2_rejects_missing_or_mismatched_receipt_request_id() -> TestResult {
                     trusted_issued_at_unix_ms: IOU_ISSUED_AT_MS,
                 },
             ),
-            Err(IouEnvelopeV2Error::BindingMismatch("request_id"))
+            Err(ReceivableIouError::BindingMismatch("request_id"))
         );
         assert_eq!(
-            verify_iou_envelope_v2(
+            verify_receivable_iou(
                 &canonical,
                 &fixture.credit_admission_store.adapter(),
-                &IouEnvelopeVerificationContextV2 {
+                &ReceivableIouVerificationContext {
                     atom: &atom,
                     disposition: &disposition,
                     settlement_lifecycle: &settlement_lifecycle,
@@ -1064,7 +1064,7 @@ fn v2_rejects_missing_or_mismatched_receipt_request_id() -> TestResult {
                     trusted_now_unix_ms: IOU_ISSUED_AT_MS,
                 },
             ),
-            Err(IouEnvelopeV2Error::BindingMismatch("request_id"))
+            Err(ReceivableIouError::BindingMismatch("request_id"))
         );
     }
     Ok(())
