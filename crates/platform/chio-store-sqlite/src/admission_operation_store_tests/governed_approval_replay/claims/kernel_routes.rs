@@ -188,6 +188,8 @@ impl Route {
             ..
         } = self.fixture;
         drop(self.kernel);
+        let source_path = self.source.path.clone();
+        drop(self.source);
         drop(store);
         drop(authority);
         let authority = crate::test_authority::open_serving(&database, &lock_root)?;
@@ -200,18 +202,19 @@ impl Route {
             lock_root,
             _clock: None,
         };
+        let source = Arc::new(Source::reopen(source_path, &fixture.store)?);
         let mut kernel = kernel_recovery::kernel_with_signer(&fixture, self.signer.clone())?;
         kernel
             .set_governed_approval_policy(APPROVAL_TENANT.into(), vec![self.signer.public_key()])?;
         kernel.set_operation_owned_governed_approval_source(
             self.binding.clone(),
-            self.source.clone(),
+            source.clone(),
         )?;
         kernel.set_governed_approval_replay_store(Box::new(RefuseLegacy(self.legacy.clone())));
         kernel.register_tool_server(Box::new(Server(self.calls.clone())));
         Ok(Self {
             fixture,
-            source: self.source,
+            source,
             binding: self.binding,
             signer: self.signer,
             kernel,
