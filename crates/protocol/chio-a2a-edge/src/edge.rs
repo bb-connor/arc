@@ -95,6 +95,12 @@ fn reject_request_bound_artifacts_without_stable_request_id(
     ))
 }
 
+/// Origin request ID for a caller-supplied request ID. It is derived from that
+/// ID alone, so a retry or a replay after restart presents the same request.
+fn stable_origin_request_id(request_id: &str) -> String {
+    format!("a2a-request-{request_id}")
+}
+
 #[cfg(test)]
 fn test_registry_from_unverified_manifests(
     manifests: &[ToolManifest],
@@ -492,7 +498,7 @@ impl ChioA2aEdge {
             request,
             arguments,
             execution,
-            task_id.clone(),
+            stable_origin_request_id(request_id),
             request_id.to_string(),
         )?;
         let orchestrated = execute_orchestrated_a2a_request(
@@ -593,15 +599,17 @@ impl ChioA2aEdge {
         let deadline = AuthorityDeadline::for_timeout_ms(now, DEFERRED_A2A_TASK_TTL_MILLIS)?;
         self.ensure_deferred_task_capacity(now)?;
         let task_id = self.next_task_id()?;
-        let kernel_request_id =
-            request_id.map_or_else(|| format!("a2a-stream-{task_id}"), str::to_string);
+        let (origin_request_id, kernel_request_id) = request_id.map_or_else(
+            || (task_id.clone(), format!("a2a-stream-{task_id}")),
+            |request_id| (stable_origin_request_id(request_id), request_id.to_string()),
+        );
         let orchestrated_request = Self::build_execution_request(
             binding,
             skill_id,
             request,
             extract_arguments_from_message(&request.message)?,
             execution,
-            task_id.clone(),
+            origin_request_id,
             kernel_request_id,
         )?;
 
