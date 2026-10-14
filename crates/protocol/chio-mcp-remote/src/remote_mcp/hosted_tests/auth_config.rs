@@ -19,6 +19,12 @@ fn local_oauth_config() -> RemoteServeHttpConfig {
     config
 }
 
+fn cli_refusal(message: &str) -> String {
+    format!(
+        "urn:chio:error:cli:other [cli:error]: {message} (Preserve the original message and migrate the call site to a specific registry code when touched.)"
+    )
+}
+
 fn startup_refusal(config: RemoteServeHttpConfig) -> String {
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
@@ -49,9 +55,9 @@ fn public_base_url_rejects_non_https_non_loopback_scheme() {
         config.public_base_url = Some(public_base_url.to_string());
         assert_eq!(
             startup_refusal(config),
-            format!(
+            cli_refusal(&format!(
                 "--public-base-url must use https unless its host is loopback: {public_base_url}"
-            )
+            ))
         );
     }
 }
@@ -62,6 +68,6 @@ fn remote_auth_config_rejects_offline_access_scope() {
     config.auth_scopes = vec!["mcp:invoke".to_string(), "offline_access".to_string()];
     assert_eq!(
         startup_refusal(config),
-        "--auth-scope must not include offline_access"
+        cli_refusal("--auth-scope must not include offline_access")
     );
 }
