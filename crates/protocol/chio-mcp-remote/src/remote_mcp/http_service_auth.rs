@@ -440,6 +440,10 @@ fn build_authorization_server_metadata(
     }))
 }
 
+/// Protected resource metadata and challenges never advertise a scope for
+/// refresh tokens; the resource server has no use for one.
+const OFFLINE_ACCESS_SCOPE: &str = "offline_access";
+
 fn build_remote_auth_mode(
     config: &RemoteServeHttpConfig,
     local_addr: SocketAddr,
@@ -491,6 +495,15 @@ fn build_remote_auth_mode(
         return Ok(RemoteAuthMode::StaticBearer {
             token: validated_static_bearer_token(token, "--auth-token")?,
         });
+    }
+    if config
+        .auth_scopes
+        .iter()
+        .any(|scope| scope == OFFLINE_ACCESS_SCOPE)
+    {
+        return Err(CliError::cli_other_error(format!(
+            "--auth-scope must not include {OFFLINE_ACCESS_SCOPE}"
+        )));
     }
 
     if let Some(seed_path) = config.auth_server_seed_path.as_deref() {
@@ -686,6 +699,17 @@ fn normalize_public_base_url(
             "invalid --public-base-url for remote MCP edge: {error}"
         ))
     })?;
+    let loopback = match parsed.host() {
+        Some(url::Host::Domain(domain)) => domain == "localhost",
+        Some(url::Host::Ipv4(address)) => address.is_loopback(),
+        Some(url::Host::Ipv6(address)) => address.is_loopback(),
+        None => false,
+    };
+    if parsed.scheme() != "https" && !(parsed.scheme() == "http" && loopback) {
+        return Err(CliError::cli_other_error(format!(
+            "--public-base-url must use https unless its host is loopback: {base_url}"
+        )));
+    }
     Ok(parsed.to_string().trim_end_matches('/').to_string())
 }
 

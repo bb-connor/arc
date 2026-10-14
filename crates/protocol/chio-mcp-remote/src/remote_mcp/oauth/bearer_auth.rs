@@ -1,11 +1,17 @@
 use super::*;
 
 impl ProtectedResourceMetadata {
-    pub(super) fn bearer_challenge(&self) -> String {
-        let mut challenge = format!(
-            "Bearer resource_metadata=\"{}\"",
+    /// RFC 6750 section 3 challenge. `error` is absent when the request
+    /// carried no token.
+    fn bearer_challenge(&self, error: Option<&str>) -> String {
+        let mut challenge = String::from("Bearer ");
+        if let Some(error) = error {
+            challenge.push_str(&format!("error=\"{error}\", "));
+        }
+        challenge.push_str(&format!(
+            "resource_metadata=\"{}\"",
             self.resource_metadata_url
-        );
+        ));
         if !self.scopes_supported.is_empty() {
             challenge.push_str(&format!(", scope=\"{}\"", self.scopes_supported.join(" ")));
         }
@@ -225,24 +231,51 @@ pub(super) fn extract_bearer_token(
         .filter(|token| !token.is_empty())
         .map(ToOwned::to_owned)
         .ok_or_else(|| {
-            unauthorized_bearer_response(
-                "missing or invalid bearer token",
-                protected_resource_metadata,
-            )
+            let challenge = protected_resource_metadata
+                .map(|metadata| metadata.bearer_challenge(None))
+                .unwrap_or_else(|| "Bearer".to_string());
+            bearer_challenge_response(StatusCode::UNAUTHORIZED, "missing bearer token", &challenge)
         })
 }
 
+/// A presented token was refused. OAuth modes answer `401` with
+/// `error="invalid_token"`; static bearer and admin credentials, which publish
+/// no protected resource metadata, answer with a bare `Bearer` challenge.
 pub(super) fn unauthorized_bearer_response(
     message: &str,
     protected_resource_metadata: Option<&ProtectedResourceMetadata>,
 ) -> Response {
-    let mut response = plain_http_error(StatusCode::UNAUTHORIZED, message);
     let challenge = protected_resource_metadata
-        .map(ProtectedResourceMetadata::bearer_challenge)
+        .map(|metadata| metadata.bearer_challenge(Some("invalid_token")))
         .unwrap_or_else(|| "Bearer".to_string());
+    bearer_challenge_response(StatusCode::UNAUTHORIZED, message, &challenge)
+}
+
+/// A valid token lacks a required scope: `403` with
+/// `error="insufficient_scope"` and the scopes the request needs.
+fn insufficient_scope_response(
+    message: &str,
+    required_scopes: &[String],
+    protected_resource_metadata: Option<&ProtectedResourceMetadata>,
+) -> Response {
+    let mut challenge = format!(
+        "Bearer error=\"insufficient_scope\", scope=\"{}\"",
+        required_scopes.join(" ")
+    );
+    if let Some(metadata) = protected_resource_metadata {
+        challenge.push_str(&format!(
+            ", resource_metadata=\"{}\"",
+            metadata.resource_metadata_url
+        ));
+    }
+    bearer_challenge_response(StatusCode::FORBIDDEN, message, &challenge)
+}
+
+fn bearer_challenge_response(status: StatusCode, message: &str, challenge: &str) -> Response {
+    let mut response = plain_http_error(status, message);
     response.headers_mut().insert(
         WWW_AUTHENTICATE,
-        HeaderValue::from_str(&challenge).unwrap_or_else(|_| HeaderValue::from_static("Bearer")),
+        HeaderValue::from_str(challenge).unwrap_or_else(|_| HeaderValue::from_static("Bearer")),
     );
     response
 }
@@ -436,8 +469,9 @@ impl JwtBearerVerifier {
                 .iter()
                 .all(|scope| scopes.iter().any(|granted| granted == scope))
         {
-            return Err(unauthorized_bearer_response(
+            return Err(insufficient_scope_response(
                 "JWT bearer token is missing required scope",
+                &self.required_scopes,
                 protected_resource_metadata,
             ));
         }
@@ -708,8 +742,9 @@ impl IntrospectionBearerVerifier {
                 .iter()
                 .all(|scope| scopes.iter().any(|granted| granted == scope))
         {
-            return Err(unauthorized_bearer_response(
+            return Err(insufficient_scope_response(
                 "bearer token is missing required scope",
+                &self.required_scopes,
                 input.protected_resource_metadata,
             ));
         }
