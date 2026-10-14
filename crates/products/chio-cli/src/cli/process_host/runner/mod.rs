@@ -132,7 +132,7 @@ pub(super) fn run(state: &Path, plan: &Path) -> Result<(), CliError> {
         host.lease.directory.validate_path_identity()?;
         let mut report = serde_json::json!({"schema": "chio.process.run-report.v1", "complete": result.is_ok() && publication.is_ok() && drained.is_ok() && cleaned.is_ok() && socket_cleaned.is_ok() && revoke_error.is_none() && !cancelled && completion.complete && pending_container_records == 0, "pending_container_records": pending_container_records, "abandoned_socket_intents": abandoned_socket_intents, "workers": journal.snapshots()?});
         if plan.failure_policy == FailurePolicy::Supervised {
-            report["schema"] = serde_json::json!("chio.process.run-report.v2");
+            report["schema"] = serde_json::json!("chio.process.supervised-run-report.v1");
             report["failure_policy"] = serde_json::json!(plan.failure_policy);
             report["handled_failures"] = serde_json::json!(completion.handled_failures);
             report["unhandled_failures"] = serde_json::json!(completion.unhandled_failures);

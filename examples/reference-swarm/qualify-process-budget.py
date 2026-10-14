@@ -45,7 +45,7 @@ def main():
             "arguments": {"path": str(effect)},
         })
     calls = harness.initialize(planned, aggregate_invocations=2, plan={
-        "schema": "chio.process.swarm-plan.v2", "profile_id": "budget-contention",
+        "schema": "chio.process.shared-family-swarm-plan.v1", "profile_id": "budget-contention",
         "graphs": [
             {"graph_id": "first", "calls": planned[:2]},
             {"graph_id": "second", "calls": planned[2:]},

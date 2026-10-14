@@ -46,7 +46,7 @@ capabilities:
         "limits": {"max_processes": 5, "max_depth": 1, "max_calls": 20},
     })
     plan = write(directory / "plan.json", {
-        "schema": "chio.process.swarm-plan.v2", "profile_id": "shared-family",
+        "schema": "chio.process.shared-family-swarm-plan.v1", "profile_id": "shared-family",
         "graphs": [{
             "graph_id": f"graph-{index}",
             "calls": [{
