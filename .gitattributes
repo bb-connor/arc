@@ -40,3 +40,6 @@ deploy/docker/security-evidence-apk-sources/build-tools/abuild/sources/*.tar.gz 
 # Retained benchmark tables are RFC 4180 CSV (CRLF line endings) pinned by
 # the programmable-sovereignty artifact manifest.
 docs/papers/programmable-sovereignty/bench/**/*.csv whitespace=cr-at-eol
+# Operator record templates are RFC 4180 CSV (CRLF line endings) and are
+# pinned by digest in the kernel-continuation verification record.
+docs/research/kernel-continuation/**/*.csv whitespace=cr-at-eol

@@ -13,6 +13,7 @@
 # Research notes, evaluations, and paper drafts.
 docs/research/**
 docs/papers/**
+docs/market/open-agent-work/**
 # Workflow that validates the withheld paper artifact.
 .github/workflows/paper-artifact-check.yml
 docs/reference/COMPETITIVE_LANDSCAPE.md

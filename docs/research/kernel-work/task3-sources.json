@@ -1,0 +1,16 @@
+{
+  "sources": [
+    {
+      "id": "S30",
+      "title": "Interface Automata",
+      "authors": [
+        "Luca de Alfaro",
+        "Thomas A. Henzinger"
+      ],
+      "year": 2001,
+      "url": "https://web.cs.wpi.edu/~heineman/html/teaching_/CS562/p109-de_alfaro.pdf",
+      "sha256": "e1f5f47ff8923286324860aad22915224918300b97fbd77b54572c1219758e52",
+      "reading": "Sections 1 and 3: temporal interfaces, composition and compatibility; no claim of a reduction of KW1 to this formalism."
+    }
+  ]
+}
