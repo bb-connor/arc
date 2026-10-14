@@ -372,3 +372,59 @@ fn local_authorization_server_rejects_approval_without_consent_nonce() {
         );
     }
 }
+
+#[test]
+fn local_authorization_server_rejects_unregistered_redirect_uri() {
+    let server = start_local_oauth_http_server("admin-token");
+    let metadata: Value = server
+        .get_protected_resource_metadata()
+        .json()
+        .expect("protected resource metadata");
+    let resource = metadata["resource"].as_str().expect("resource").to_string();
+    let challenge = pkce_challenge("chio-auth-verifier");
+    for (client_id, redirect_uri) in [
+        (
+            "https://unknown.example/app",
+            "http://localhost:7777/callback",
+        ),
+        ("https://client.example/app", "http://localhost:7777/other"),
+        (
+            "https://client.example/app",
+            "http://localhost:7777/callback/",
+        ),
+        (
+            "https://client.example/app",
+            "http://127.0.0.1:7777/callback",
+        ),
+    ] {
+        let refused = server
+            .client
+            .get(format!("{}/oauth/authorize", server.base_url))
+            .query(&[
+                ("response_type", "code"),
+                ("client_id", client_id),
+                ("redirect_uri", redirect_uri),
+                ("state", "state-123"),
+                ("resource", resource.as_str()),
+                ("scope", "mcp:invoke"),
+                ("code_challenge", challenge.as_str()),
+                ("code_challenge_method", "S256"),
+            ])
+            .send()
+            .expect("send authorize request");
+        assert_eq!(
+            refused.status(),
+            reqwest::StatusCode::BAD_REQUEST,
+            "{client_id} {redirect_uri}"
+        );
+        assert!(refused.headers().get(LOCATION).is_none());
+        let body: Value = refused.json().expect("refusal json");
+        assert_eq!(
+            body,
+            json!({
+                "error": "invalid_request",
+                "error_description": "urn:chio:error:transport:invalid-request-shape",
+            })
+        );
+    }
+}
