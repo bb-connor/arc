@@ -357,6 +357,11 @@ impl<'a> PostEffectObligation<'a> {
             return Discharged {
                 kernel: self.kernel,
                 delivery: Some(match terminal_response {
+                    // The terminal unknown outcome is persisted; the caller still
+                    // receives the tool's URL elicitations to complete them.
+                    Some(_) if matches!(&source, KernelError::UrlElicitationsRequired { .. }) => {
+                        Delivery::Saga(Box::new(source))
+                    }
                     Some(response) => Delivery::Terminal(Box::new(response)),
                     None => Delivery::Saga(Box::new(delivery_error.unwrap_or(source))),
                 }),

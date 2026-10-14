@@ -80,15 +80,14 @@ fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
         store: store.clone(),
     }));
 
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("unknown URL elicitation persists its original terminal refusal");
-    assert_eq!(
-        response.reason.as_deref(),
-        Some("URL elicitation required before tool execution")
-    );
+    assert_durable_url_elicitation(kernel.evaluate_tool_call_blocking(&request));
     let retained = assert_original_unknown_incident(&store, &request);
-    assert_unknown_replay(Ok(response), &retained, &store);
+    assert_eq!(kernel.receipt_log().len(), 1);
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_blocking(&request),
+        &retained,
+        &store,
+    );
     assert_eq!(kernel.receipt_log().len(), 1);
     let projection = assert_unknown_replay(
         kernel.evaluate_tool_call_blocking(&request),
@@ -204,15 +203,14 @@ fn dpop_profile_removal_distinguishes_selected_authority_from_configuration() {
             );
         }
         assert!(!kernel.can_redispatch_unknown_read(&request));
-        let response = kernel
-            .evaluate_tool_call_blocking(&request)
-            .expect("unknown read persists its original terminal refusal");
-        assert_eq!(
-            response.reason.as_deref(),
-            Some("URL elicitation required before tool execution")
-        );
+        assert_durable_url_elicitation(kernel.evaluate_tool_call_blocking(&request));
         let retained = assert_original_unknown_incident(&store, &request);
-        assert_unknown_replay(Ok(response), &retained, &store);
+        assert_eq!(kernel.receipt_log().len(), 1);
+        assert_unknown_replay(
+            kernel.evaluate_tool_call_blocking(&request),
+            &retained,
+            &store,
+        );
         assert_eq!(kernel.receipt_log().len(), 1);
         let claim = store.state.lock().expect("state").claim.clone();
         assert_eq!(retained.dpop_replay_ledger_digest().is_some(), selected);
@@ -259,15 +257,14 @@ fn durable_server_url_elicitation_finalizes_the_pool_claim() {
         .set_finding_pool_ledger(ledger.clone())
         .expect("qualified finding pool ledger");
 
-    let response = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("unknown URL elicitation persists its original terminal refusal");
-    assert_eq!(
-        response.reason.as_deref(),
-        Some("URL elicitation required before tool execution")
-    );
+    assert_durable_url_elicitation(kernel.evaluate_tool_call_blocking(&request));
     let terminal = assert_original_unknown_incident(&store, &request);
-    assert_unknown_replay(Ok(response), &terminal, &store);
+    assert_eq!(kernel.receipt_log().len(), 1);
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_blocking(&request),
+        &terminal,
+        &store,
+    );
     assert!(ledger
         .list_claimed_admission_operations(None, 10)
         .expect("read finalized pool claims")
@@ -441,15 +438,24 @@ fn nested_durable_url_elicitation_terminalizes_as_outcome_unknown() {
         .expect("begin parent request");
     let mut client = NoopNestedFlowClient;
 
-    let response = kernel
-        .evaluate_tool_call_with_nested_flow_client(&parent_context, &request, &mut client, None)
-        .expect("unknown nested URL elicitation persists its original terminal refusal");
-    assert_eq!(
-        response.reason.as_deref(),
-        Some("URL elicitation required before tool execution")
-    );
+    assert_durable_url_elicitation(kernel.evaluate_tool_call_with_nested_flow_client(
+        &parent_context,
+        &request,
+        &mut client,
+        None,
+    ));
     let retained = assert_original_unknown_incident(&store, &request);
-    assert_unknown_replay(Ok(response), &retained, &store);
+    assert_eq!(kernel.receipt_log().len(), 1);
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &request,
+            &mut client,
+            None,
+        ),
+        &retained,
+        &store,
+    );
     assert_eq!(kernel.receipt_log().len(), 1);
     assert_unknown_replay(
         kernel.evaluate_tool_call_with_nested_flow_client(

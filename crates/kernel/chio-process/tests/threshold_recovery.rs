@@ -171,10 +171,10 @@ fn threshold_recovery(controlled_clock: bool) -> TestResult {
         }
         assert!(
             matches!(
-                first,
+                &first,
                 Err(chio_process::ProcessError::Kernel(
-                    KernelError::UrlElicitationsRequired { .. }
-                ))
+                    KernelError::UrlElicitationsRequired { message, elicitations }
+                )) if message == "outcome unavailable after dispatch" && elicitations.is_empty()
             ),
             "{first:?}"
         );

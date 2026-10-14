@@ -284,7 +284,7 @@ mod revocation_durability;
 use durable_admission::{durable_admission_fixture, TestAdmissionOperationStore};
 #[path = "tests/durable_admission_url_elicitation_support.rs"]
 mod durable_admission_url_elicitation_support;
-use durable_admission_url_elicitation_support::DurableUrlElicitationServer;
+use durable_admission_url_elicitation_support::{assert_durable_url_elicitation, DurableUrlElicitationServer};
 #[path = "tests/chio_runtime.rs"]
 mod chio_runtime;
 use chio_runtime::{
