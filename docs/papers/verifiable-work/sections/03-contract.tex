@@ -1,0 +1,145 @@
+\section{Delegation and work commitments}
+\label{sec:contract}
+A work commitment connects the decisions through which a proposed task acquires
+permission, resources and an execution identity. The owner allocates an
+allowance, a provider offers to perform the task, the holder selects that offer,
+and the allocator freezes the choice. For paid work, the payer reserves funds
+under an agreement referring to the selected call. The receiver admits the call
+only when these records agree with its own authorization.
+
+Consider a buyer who funds an API survey and a follow-on review by an
+intermediary agent. After the survey identifies a problem, the intermediary
+hires a specialist from its own funds. The specialist completes its task and
+earns payment, but the intermediary crashes before returning a result to the
+buyer. The program now contains completed work, an earned claim and an
+unfinished parent task. Each must retain its identity and terms. In particular,
+adding the specialist to the plan must not renew the survey's execution right,
+and failure of the intermediary must not cancel the specialist's payment.
+We use this example to develop the commitment and its lifecycle.
+
+\Needspace{12\baselineskip}
+\subsection{Bounded delegation}
+A work slot specifies a task that may be delegated or assigned to a provider:
+\[
+ S=(i,h,E,A,b,c,t,d,Q).
+\]
+Here $i$ is the slot identifier, $h$ its holder, $E$ the permitted tool operations,
+$A$ the permitted readers, $b$ the spending ceiling in currency $c$, $t$ the
+expiry, $d$ the remaining delegation depth and $Q$ the acceptance predicate.
+Root creation is an owner-controlled operation.
+
+The holder signs a subdivision that names the parent allocation and the complete
+child slot. The allocator accepts it only if the child's operations and readers
+are subsets of the parent's, its expiry is no later, its depth is smaller and
+its currency is unchanged. Child ceilings must satisfy
+\[
+ \sum_{j\in\operatorname{children}(S)} b_j\leq b_S.
+\]
+The allocator records the child and updates the parent's assigned amount in one
+transaction. A slot with children cannot execute, and a selected slot cannot
+acquire children. Thus the parent and its descendants cannot both spend the
+same allowance. An internal slot's unused remainder can support later children.
+
+Each allocation is identified by a digest of the allocator's persistent
+namespace, the root slot and the target slot. This prevents an offer made for
+one owner's allocation from being reused at another honest allocator that chose
+the same local names. The child may have its own acceptance predicate: a survey
+and a specialist review require different checks. The parent task still needs
+its own result and acceptance.
+
+\subsection{Provider selection}
+The provider signs an offer containing the allocation and slot digests, its
+receiving key, the tool operation and input, a price ceiling and an expiry.
+The holder selects the offer together with a request identifier and the digest
+of a capability issued by the receiver. Until the selection is sealed, a revision
+check permits replacement while rejecting stale choices.
+
+Sealing is the point after which the choice cannot change. The allocator first
+freezes the selection, then stores a signed dispatch permit before returning
+it. The permit contains the slot and signed selection. A receiver can check
+these records without contacting the allocator at dispatch time; exclusive
+allocation still depends on the allocator's protected state.
+
+The receiver compares the permit with the caller, receiving key, capability,
+tool, input and request actually presented. Its capability permits one invocation
+of that operation with monetary ceilings no greater than the signed offer.
+Validity, revocation and local policy are checked at admission. Consequently,
+an offer for one input cannot authorize a different input merely because both
+calls use the same tool.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+ font=\small,>=Latex,
+ box/.style={draw=ink,rounded corners=2pt,align=center,
+             text width=2.8cm,minimum height=1.15cm}]
+\node[box] (a) {Allocator\\Freeze the\\selected call};
+\node[box,right=0.65cm of a] (r) {Receiver kernel\\Admit and record\\its execution};
+\node[box,right=0.65cm of r,text width=2.1cm] (v) {Verifier\\Check the\\agreed result};
+\node[box,right=0.65cm of v] (s) {Escrow\\Record decision\\and pay};
+\draw[->,thick] (a) -- (r);
+\draw[->,thick] (r) -- (v);
+\draw[->,thick] (v) -- (s);
+\draw[->,thick] (s.south) -- ++(0,-0.65) -| (r.south);
+\path (r.south) -- (s.south)
+ node[midway,below=0.68cm,font=\scriptsize]
+ {verify reserved funds before dispatch};
+\end{tikzpicture}
+\caption{Each authority checks records referring to the same call. The receiver
+checks local permission and reserved funds before execution. Its evidence feeds
+the verifier, whose recorded decision governs payment.}
+\label{fig:work}
+\end{figure}
+
+\subsection{Payment agreements}
+Paid work adds a payment agreement to the commitment. Figure~\ref{fig:work}
+shows how the execution and settlement authorities use it. The agreement
+identifies the complete final request, payer, beneficiary,
+verifier, asset, amount, settlement system and deadlines. Before dispatch, the
+receiver requires evidence, under its chosen settlement observation rule, that
+the agreement's allocation holds the required funds. The escrow identifier
+includes the chain and contract, so identical allocation names on another rail
+do not identify the same reserve.
+
+A subcontract has its own backing. The intermediary in our example funds the
+specialist from money it already controls. The payment it expects from the buyer
+remains locked under a different agreement. The intermediary therefore bears
+the subcontract cost if its own task fails; the specialist's earned payment does
+not depend on completion of that task.
+
+\subsection{Binding decisions to the invocation}
+The receiver connects the commitment to the program by checking its signed task
+graph. The graph identifies tasks and their dependencies, assigns ceilings from
+the program's declared pool, and carries routes naming the receiving kernels.
+Its authorization records identify the capabilities permitted for those tasks.
+
+Suppose the specialist's permit and capability authorize receiver $R_1$, but a
+correctly signed graph routes the same task to $R_2$. Both sets of signatures
+can verify even though the records disagree. The receiver rejects this
+combination because its own key, the offer's receiving key and the signed
+route's destination must match. Authenticating each record separately would
+miss that comparison.
+
+The same principle applies to the other references. The slot, request and graph
+task must have one task identity. The graph allocation must name the delegated
+allocation digest and agree on amount and currency. The permit and graph
+authorization records must name the same capability. These checks establish
+which invocation the otherwise separate records authorize.
+
+These checks form the common admission contract. A planner can select a new
+provider or add a task by producing records that satisfy it; the receiving kernel
+enforces the same relationship between authority, resources and invocation for
+each such choice. The planner's decomposition of the work can change while this
+relationship remains fixed.
+
+The payment agreement authenticates the complete request, including its
+delegation, graph and treaty references. Its financial allocation has a separate
+identifier linked through that agreement. The references are acyclic: the request
+contains admission evidence; the agreement commits to the request; the escrow
+commits to the agreement. Delegation and admission records use canonical JSON
+and versioned domains~\cite{jcs}; settlement decisions use EIP-712~\cite{eip712}.
+
+The receiver installs these checks from protected configuration before both
+fresh admission and recovery. Omitting request context or removing local
+configuration therefore cannot select a path that skips them. The exact signed
+fields and encodings are given in Appendix~\ref{app:profiles}.

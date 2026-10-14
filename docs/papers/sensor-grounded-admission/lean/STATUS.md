@@ -2,11 +2,13 @@
 
 This file records the proof status of the four theorems that accompany
 the sensor-grounded admission paper. The Lean source is in
-`SensorGroundedAdmission.lean` beside this note. The full file
-compiles under Lean 4.28.0-rc1 with Lake 5.0.0-src+3b0f286 against the
-`Chio.Treaty.PredicateLang` and `Chio.Treaty.Intersection` modules of
-the deployed substrate's Lean root. Reproduction instructions are in
-`build-log.md`.
+`SensorGroundedAdmission.lean` beside this note. The file is paper-local:
+it elaborates under Lean 4.28.0 (Lake 5.0.0-src+7e01a1b) with `lake env
+lean` run from the substrate's Lean root, beside (not inside) that root.
+It imports `Chio.Treaty.PredicateLang` and `Chio.Treaty.Intersection` but
+uses no declaration from either. It is not imported by `Chio.lean`, not
+built by `lake build`, and not in `formal/theorem-inventory.json`.
+Reproduction instructions are in `build-log.md`.
 
 All four theorem statements are non-`sorry` and depend only on the
 standard kernel axioms `propext`, `Classical.choice`, `Quot.sound`.
@@ -149,7 +151,7 @@ Theorem 3 remains the one supporting theorem whose
 verdict above describes the structural-projection content the
 theorem does carry.
 
-The four theorems compile cleanly under Lean 4.28.0-rc1 with no
+The four theorems compile cleanly under Lean 4.28.0 with no
 `sorry`. Axiom dependencies after the strengthenings:
 
 - Theorem 1: `propext`, `Classical.choice`, `Quot.sound`.
