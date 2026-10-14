@@ -308,6 +308,12 @@ fn refused(message: &str) -> AuthorityStoreError {
     AuthorityStoreError::Fence(message.into())
 }
 
+pub(super) fn encode_lifecycle(
+    lifecycle: &chio_kernel::authority::lifecycle::AuthorityKeyLifecycle,
+) -> Result<String, AuthorityStoreError> {
+    persistence::encode(lifecycle)
+}
+
 pub(super) fn decode_lifecycle(
     text: &str,
 ) -> Result<chio_kernel::authority::lifecycle::AuthorityKeyLifecycle, AuthorityStoreError> {

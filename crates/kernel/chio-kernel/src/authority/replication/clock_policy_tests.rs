@@ -1,4 +1,5 @@
 use super::*;
+use crate::authority::AuthorityTrustedKeySnapshot;
 
 fn envelope() -> Result<(SignedAuthoritySnapshot, AuthorityReplicationAnchor), AuthorityStoreError>
 {
@@ -14,7 +15,7 @@ fn envelope() -> Result<(SignedAuthoritySnapshot, AuthorityReplicationAnchor), A
                 public_key_hex: key,
                 generation: 1,
                 activated_at: 100,
-                lifecycle: Some(super::super::lifecycle::AuthorityKeyLifecycle::Active),
+                lifecycle: super::super::lifecycle::AuthorityKeyLifecycle::Active,
             }],
         },
     )?;

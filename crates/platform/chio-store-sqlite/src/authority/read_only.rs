@@ -262,8 +262,8 @@ impl SqliteAuthorityInspection {
     }
 }
 
-/// Accept only storage the writable owner fully provisioned at this binary's
-/// schema revision. Anything older needs the owner to migrate it first.
+/// Accept only storage the writable owner provisioned at this binary's schema
+/// revision.
 fn validate_existing_schema(connection: &Connection) -> Result<(), AuthorityInspectionError> {
     let user_tables: i64 = connection.query_row(
         "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
@@ -277,22 +277,22 @@ fn validate_existing_schema(connection: &Connection) -> Result<(), AuthorityInsp
         connection.query_row("PRAGMA application_id", [], |row| row.get(0))?;
     if application_id == 0 {
         return Err(AuthorityStoreError::Schema(
-            "authority storage predates schema stamping; the authority owner must migrate it"
-                .into(),
+            "authority storage carries no Chio schema stamp".into(),
         )
         .into());
     }
-    let version = crate::check_schema_version(
+    if crate::check_current_schema(
         connection,
         AUTHORITY_STORE_SCHEMA_KEY,
-        AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION,
-        AUTHORITY_STORE_LEGACY_ANCHOR_TABLES,
+        AUTHORITY_STORE_SCHEMA_VERSION,
+        AUTHORITY_STORE_ANCHOR_TABLES,
     )
-    .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
-    if version != AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION {
-        return Err(AuthorityStoreError::Schema(format!(
-            "authority storage schema version {version} needs migration by the authority owner"
-        ))
+    .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?
+        != crate::SchemaState::Current
+    {
+        return Err(AuthorityStoreError::Schema(
+            "authority storage is provisioned without a schema stamp".into(),
+        )
         .into());
     }
     let journal_mode: String = connection.query_row("PRAGMA journal_mode", [], |row| row.get(0))?;
