@@ -473,7 +473,7 @@ mod snapshot_wire_tests {
                 None,
             ),
             (
-                ReceiptQuerySnapshotError::ExportRefused("legacy lineage".into()),
+                ReceiptQuerySnapshotError::ExportRefused("unsupported lineage".into()),
                 "receipt_query_export_refused",
                 None,
             ),

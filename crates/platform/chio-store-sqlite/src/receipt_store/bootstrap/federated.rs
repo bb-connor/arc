@@ -228,10 +228,7 @@ impl SqliteReceiptStore {
                     provenance,
                     signed_capability_json
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
-                ON CONFLICT(share_id, capability_id) DO UPDATE SET
-                    provenance = excluded.provenance,
-                    signed_capability_json = excluded.signed_capability_json
-                WHERE federated_share_capability_lineage.provenance = 'legacy_projection'
+                ON CONFLICT(share_id, capability_id) DO NOTHING
                 "#,
                     params![
                         import.share_id,
@@ -426,7 +423,6 @@ impl SqliteReceiptStore {
                                     crate::capability_lineage::signed_capability_from_row(row, 20)?,
                             },
                             20,
-                            false,
                         )?,
                     ))
                 },
@@ -615,7 +611,6 @@ impl SqliteReceiptStore {
                                 crate::capability_lineage::signed_capability_from_row(row, 10)?,
                         },
                         10,
-                        false,
                     )
                 })?
                 .collect::<Result<Vec<_>, _>>()?;

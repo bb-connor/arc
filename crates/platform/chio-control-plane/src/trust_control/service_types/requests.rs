@@ -942,7 +942,7 @@ mod capability_snapshot_tests {
             anchor.provenance,
             chio_kernel::CapabilitySnapshotProvenance::SyntheticAnchor
         );
-        anchor.validate_for_transport()?;
+        anchor.validate()?;
         Ok(())
     }
 

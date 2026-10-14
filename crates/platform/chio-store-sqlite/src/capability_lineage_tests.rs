@@ -316,55 +316,6 @@ fn lineage_delta_rejects_cursor_and_limit_overflow() -> Result<(), Box<dyn std::
 }
 
 #[test]
-fn signed_capability_upgrade_advances_replication_cursor() -> Result<(), Box<dyn std::error::Error>>
-{
-    let source_path = unique_db_path("cl-signed-upgrade-source");
-    let destination_path = unique_db_path("cl-signed-upgrade-destination");
-    let source = SqliteReceiptStore::open(&source_path)?;
-    let destination = SqliteReceiptStore::open(&destination_path)?;
-    let subject = Keypair::generate();
-    let issuer = Keypair::generate();
-    let token = make_token("cap-signed-upgrade", &subject, &issuer, 1000, 2000);
-
-    source.record_capability_snapshot(&token, None)?;
-    source.writer_handle().run_write({
-        let capability_id = token.id.clone();
-        move |connection| {
-            connection.execute(
-                "UPDATE capability_lineage \
-                     SET signed_capability_json = NULL, provenance = 'legacy_projection' \
-                     WHERE capability_id = ?1",
-                params![capability_id],
-            )?;
-            Ok(())
-        }
-    })?;
-    let unsigned_seq: u64 = source.connection()?.query_row(
-        "SELECT rowid FROM capability_lineage WHERE capability_id = ?1",
-        params![token.id],
-        |row| row.get::<_, i64>(0).map(|seq| seq.max(0) as u64),
-    )?;
-    assert!(source.list_capability_snapshots_after_seq(0, 1).is_err());
-
-    source.record_capability_snapshot(&token, None)?;
-    let delta = source.list_capability_snapshots_after_seq(unsigned_seq, 10)?;
-    assert_eq!(delta.len(), 1);
-    assert!(delta[0].seq > unsigned_seq);
-    assert!(delta[0].snapshot.signed_capability.is_some());
-    assert_eq!(source.max_lineage_seq()?, delta[0].seq);
-
-    destination.upsert_capability_snapshot(&delta[0].snapshot)?;
-    assert!(destination
-        .get_lineage(&token.id)?
-        .and_then(|snapshot| snapshot.signed_capability)
-        .is_some());
-
-    let _ = fs::remove_file(source_path);
-    let _ = fs::remove_file(destination_path);
-    Ok(())
-}
-
-#[test]
 fn reopen_does_not_normalize_synthetic_anchor_with_signed_token(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("cl-corrupt-synthetic-signed");
@@ -553,8 +504,9 @@ fn get_lineage_rejects_negative_persisted_unsigned_fields() {
                     expires_at,
                     grants_json,
                     delegation_depth,
-                    parent_capability_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)
+                    parent_capability_id,
+                    provenance
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, 'signed_token')
                 "#,
             params![
                 "cap-corrupt-read",
@@ -591,8 +543,9 @@ fn record_child_snapshot_rejects_negative_parent_depth() {
                     expires_at,
                     grants_json,
                     delegation_depth,
-                    parent_capability_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)
+                    parent_capability_id,
+                    provenance
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, 'signed_token')
                 "#,
             params![
                 "cap-corrupt-parent",
@@ -642,8 +595,9 @@ fn lineage_replication_rejects_negative_snapshot_fields() {
                     expires_at,
                     grants_json,
                     delegation_depth,
-                    parent_capability_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)
+                    parent_capability_id,
+                    provenance
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, 'signed_token')
                 "#,
             params![
                 "cap-corrupt-repl",

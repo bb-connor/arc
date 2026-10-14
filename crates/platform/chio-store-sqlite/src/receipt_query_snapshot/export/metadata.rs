@@ -433,12 +433,7 @@ pub(super) fn lineage(
                         crate::capability_lineage::snapshot_columns_from_row,
                     )
                     .map_err(|error| metadata_row_error(error, INVALID_LINEAGE_METADATA))?;
-                snapshot
-                    .validate_for_local_read()
-                    .map_err(lineage_validation_error)?;
-                snapshot
-                    .validate_for_transport()
-                    .map_err(lineage_validation_error)?;
+                snapshot.validate().map_err(lineage_validation_error)?;
                 Ok(Some(snapshot))
             })?;
             let Some(snapshot) = snapshot else {

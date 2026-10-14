@@ -580,6 +580,7 @@ impl SqliteReceiptStore {
                 RECEIPT_STORE_ANCHOR_TABLES,
             )
             .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+            crate::capability_lineage::reject_unsigned_projection_lineage(&connection, "main")?;
             if schema_state != crate::SchemaState::Current {
                 return Err(ReceiptStoreError::Conflict(
                     "receipt database carries no receipt schema version; open it with \
@@ -644,6 +645,7 @@ impl SqliteReceiptStore {
             RECEIPT_STORE_ANCHOR_TABLES,
         )
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        crate::capability_lineage::reject_unsigned_projection_lineage(&connection, "main")?;
         configure_sqlite_connection(&mut connection, options.pool.max_page_count)?;
         let schema_migration =
             connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
@@ -1392,8 +1394,8 @@ impl SqliteReceiptStore {
                 delegation_depth     INTEGER NOT NULL DEFAULT 0,
                 parent_capability_id TEXT REFERENCES capability_lineage(capability_id),
                 federated_parent_capability_id TEXT,
-                provenance TEXT NOT NULL DEFAULT 'legacy_projection'
-                    CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+                provenance TEXT NOT NULL
+                    CHECK (provenance IN ('signed_token', 'synthetic_anchor')),
                 signed_capability_json TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_capability_lineage_subject
@@ -1456,8 +1458,8 @@ impl SqliteReceiptStore {
                 delegation_depth INTEGER NOT NULL DEFAULT 0,
                 parent_capability_id TEXT,
                 federated_parent_capability_id TEXT,
-                provenance TEXT NOT NULL DEFAULT 'legacy_projection'
-                    CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+                provenance TEXT NOT NULL
+                    CHECK (provenance IN ('signed_token', 'synthetic_anchor')),
                 signed_capability_json TEXT,
                 PRIMARY KEY (share_id, capability_id)
             );

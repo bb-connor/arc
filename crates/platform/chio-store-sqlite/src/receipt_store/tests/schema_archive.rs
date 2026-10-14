@@ -199,3 +199,23 @@ fn current_archive_schema_rejects_substituted_cost_indexes(
     }
     Ok(())
 }
+
+#[test]
+fn archive_admitting_unsigned_projection_lineage_is_refused(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::evidence_retention::create_archive_schema;
+
+    let mut connection = rusqlite::Connection::open_in_memory()?;
+    connection.execute_batch(
+        "ATTACH DATABASE ':memory:' AS archive;
+         CREATE TABLE archive.capability_lineage (
+             capability_id TEXT PRIMARY KEY,
+             provenance TEXT NOT NULL DEFAULT 'legacy_projection'
+                 CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection'))
+         );",
+    )?;
+    assert!(matches!(create_archive_schema(&mut connection),
+        Err(chio_kernel::ReceiptStoreError::Conflict(message))
+            if message == "archive.capability_lineage admits unsigned projection provenance; refusing to open"));
+    Ok(())
+}
