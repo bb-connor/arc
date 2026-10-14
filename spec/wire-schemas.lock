@@ -5190,6 +5190,11 @@ files = ["crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.stop-epoch.v1"
+files = ["crates/kernel/chio-kernel/src/stop.rs"]
+first_seen = "01a1098250"
+
+[[schema]]
 value = "chio.structured-budget-request.v1"
 files = ["crates/platform/chio-control-plane/src/trust_control/service_types/structured_budget.rs"]
 first_seen = "51e46336b1"
