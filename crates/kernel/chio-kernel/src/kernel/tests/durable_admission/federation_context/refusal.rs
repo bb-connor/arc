@@ -295,3 +295,49 @@ fn federated_refusal_replay_rejects_a_poisoned_artifact_cache() -> TestResult {
     assert_eq!(case.fixture.kernel.receipt_log().len(), 1);
     Ok(())
 }
+
+#[test]
+fn startup_recovery_terminalizes_a_federated_admission_without_its_original_treaty() -> TestResult {
+    let fixture = fixture("federated-startup-recovery")?;
+    let (kernel, admissions) = recovered_kernel(&fixture)?;
+    let matching = resolve_required_matching_grants(
+        &fixture.request.capability,
+        &fixture.request.tool_name,
+        &fixture.request.server_id,
+        &fixture.request.arguments,
+        fixture.request.model_metadata.as_ref(),
+    )
+    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+    let admission = kernel
+        .begin_durable_tool_admission(&fixture.request, &matching, current_unix_timestamp_ms())
+        .map_err(|failure| *failure.error)?
+        .ok_or("retained federated admission")?;
+    drop(admission);
+    assert_eq!(kernel.reconcile_recoverable_admissions()?, 1);
+    assert_eq!(
+        fixture.store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    let receipt = fixture
+        .store
+        .state
+        .lock()
+        .map_err(|_| "admission state")?
+        .receipt
+        .clone()
+        .ok_or("recovery refusal receipt")?;
+    assert!(receipt.verify_signature()?);
+    assert!(kernel.dual_signed_receipt(&receipt.id).is_none());
+    assert!(kernel.federation_dsse_envelope(&receipt.id).is_none());
+    assert_eq!(kernel.reconcile_recoverable_admissions()?, 0);
+    let error = recover(&kernel, &fixture.request)
+        .expect_err("a caller replay withholds federation delivery without the treaty");
+    assert_federation_failure(
+        &error,
+        &receipt.id,
+        "terminal refusal original federation treaty is absent",
+    );
+    assert_eq!(admissions.load(Ordering::SeqCst), 0);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}

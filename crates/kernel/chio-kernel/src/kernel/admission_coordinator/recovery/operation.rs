@@ -18,6 +18,23 @@ pub(super) fn phase(operation: &AdmissionOperationV1) -> AdmissionRecoveryPhase 
     }
 }
 
+/// Startup recovery has no caller to deliver to. Once the terminal refusal is
+/// committed and traced, a failed federation step withholds only the bilateral
+/// artifacts: the operation stays terminal, and a caller replay delivers or
+/// fails closed through its own federation step.
+fn terminalized_without_caller(
+    result: Result<ToolCallResponse, KernelError>,
+) -> Result<(), KernelError> {
+    match result {
+        Ok(_)
+        | Err(KernelError::DeliveryFailedAfterReceipt {
+            step: crate::kernel::ReceiptDeliveryStep::Federation,
+            ..
+        }) => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
 impl ChioKernel {
     pub(super) fn recover_one_admission(
         &self,
@@ -35,7 +52,7 @@ impl ChioKernel {
             AdmissionOperationState::AwaitingCallerReport => Ok(false),
             AdmissionOperationState::DispatchCommitted => {
                 if !self.retain_authenticated_caller_wait(operation, now)? {
-                    self.terminalize_dispatch_committed_admission(
+                    terminalized_without_caller(self.terminalize_dispatch_committed_admission(
                         operation,
                         now,
                         None,
@@ -46,7 +63,7 @@ impl ChioKernel {
                             metadata: None,
                             verified_payee_binding: None,
                         },
-                    )?;
+                    ))?;
                 }
                 Ok(true)
             }
@@ -66,7 +83,7 @@ impl ChioKernel {
             | AdmissionOperationState::ApprovalReserved
             | AdmissionOperationState::ReadyToDispatch
             | AdmissionOperationState::CapturePending => {
-                self.compensate_durable_admission_before_dispatch(operation,
+                terminalized_without_caller(self.compensate_durable_admission_before_dispatch(operation,
                     serde_json::json!({"authority": "startup-recovery", "cause": "no-authoritative-budget-participant"}), now, None,
                     DurableRefusalResponse {
                         reason: "admission recovered before dispatch",
@@ -74,7 +91,7 @@ impl ChioKernel {
                         matched_grant_index: None,
                         metadata: None,
                         verified_payee_binding: None,
-                    })?;
+                    }))?;
                 Ok(true)
             }
             AdmissionOperationState::ApprovalRequired => {
@@ -84,7 +101,7 @@ impl ChioKernel {
                 let Some(deadline) = deadline.filter(|deadline| *deadline <= now) else {
                     return Ok(false);
                 };
-                self.compensate_durable_admission_before_dispatch(operation,
+                terminalized_without_caller(self.compensate_durable_admission_before_dispatch(operation,
                     serde_json::json!({"authority": "startup-recovery", "cause": "approval-deadline-elapsed", "proposal_deadline_unix_ms": deadline}), now, None,
                     DurableRefusalResponse {
                         reason: "approval proposal deadline elapsed before dispatch",
@@ -92,7 +109,7 @@ impl ChioKernel {
                         matched_grant_index: None,
                         metadata: None,
                         verified_payee_binding: None,
-                    })?;
+                    }))?;
                 Ok(true)
             }
             AdmissionOperationState::Finalizing => {
