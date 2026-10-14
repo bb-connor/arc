@@ -240,7 +240,7 @@ fn streaming_tool_is_adapted_with_truthful_caveats() {
     let BridgeFidelity::Adapted { caveats } = &skill.bridge_fidelity else {
         panic!("expected adapted fidelity");
     };
-    assert!(caveats.iter().any(|c| c.contains("deferred tasks")));
+    assert!(caveats.iter().any(|c| c.contains("blocking `SendMessage`")));
     assert!(caveats.iter().any(|c| c.contains("terminal task payload")));
 }
 

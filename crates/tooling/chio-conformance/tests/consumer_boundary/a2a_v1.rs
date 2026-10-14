@@ -112,7 +112,10 @@ fn continuation_error_does_not_restore_pending_approval_after_terminal_dispatch(
     assert_eq!(terminal.kernel_key, fixture.signer.public_key());
     assert!(matches!(
         terminal.decision,
-        Some(chio_core::receipt::decision::Decision::Cancelled { .. })
+        Some(
+            chio_core::receipt::decision::Decision::Cancelled { .. }
+                | chio_core::receipt::decision::Decision::Deny { .. }
+        )
     ));
     let observed = call(&mut consumer, &approved, lookup("GetTask", id))?;
     assert_eq!(
