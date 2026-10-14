@@ -100,7 +100,7 @@ use chio_security_types::ports::OpaqueReceiptRef;
 use chio_supervisor::{
     HealthFlag, HealthLevel, SupervisedOutcome, SupervisedThread, SupervisorConfig,
 };
-use r2d2::{Pool, PooledConnection};
+use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, Connection, OptionalExtension};
 
@@ -123,6 +123,8 @@ pub struct SqliteReceiptStore {
     pub(crate) strict_tenant_isolation: std::sync::atomic::AtomicBool,
     /// Staged-rollout flag: read-only after open.
     pub(crate) incremental_verification: bool,
+    /// The attached native bank whose debt every commit of this file keeps.
+    native_debt: Arc<native_finishing::NativeReceiptDebtGuard>,
 }
 
 type FederatedShareSubjectCorpus = (
@@ -130,7 +132,6 @@ type FederatedShareSubjectCorpus = (
     Vec<StoredToolReceipt>,
     Vec<CapabilitySnapshot>,
 );
-pub(crate) type SqliteStoreConnection = PooledConnection<SqliteConnectionManager>;
 
 const RECEIPT_GROUP_COMMIT_MAX_BATCH: usize = 64;
 const RECEIPT_GROUP_COMMIT_FLUSH_DELAY: Duration = Duration::from_micros(500);
@@ -610,6 +611,7 @@ impl ReceiptCommitActor {
         incremental_verification: bool,
         rollback_anchor: Option<Arc<crate::rollback_generation::RollbackGenerationAnchor>>,
         sink_qualification: Option<Arc<ReceiptSinkQualification>>,
+        native_debt: Arc<native_finishing::NativeReceiptDebtGuard>,
     ) -> Self {
         let (sender, receiver) = receipt_commit_channel();
         let health = Arc::new(ReceiptCommitWriterHealth::default());
@@ -635,6 +637,7 @@ impl ReceiptCommitActor {
         let actor_sink_qualification = sink_qualification.clone();
         let supervisor = SupervisedThread::spawn(config, move |_shutdown| {
             let _ = actor_thread_id.set(thread::current().id());
+            native_finishing::enter_receipt_writer(&native_debt);
             receipt_commit_actor_loop(
                 pool.clone(),
                 &receiver,
@@ -1750,13 +1753,28 @@ fn handle_non_append_command(
                     // write whose resync then fails receives the resync error,
                     // not a stale `Ok`.
                     let (respond, write_state) = if appends_receipts {
-                        execute_anchored_receipt_write(
-                            &mut connection,
-                            head,
-                            incremental_verification,
-                            rollback_anchor,
-                            job,
-                        )
+                        let lifted = native_finishing::lift_native_page_cap(&connection);
+                        let executed = match lifted {
+                            Err(error) => {
+                                let (respond, _) = job.reject(error);
+                                (respond, ReceiptWriterJobState::Failed)
+                            }
+                            Ok(()) => execute_anchored_receipt_write(
+                                &mut connection,
+                                head,
+                                incremental_verification,
+                                rollback_anchor,
+                                job,
+                            ),
+                        };
+                        // A funded native append ran with its quoted cache
+                        // profile; the pooled writer gets its own back.
+                        if let Err(error) = native_finishing::restore_writer_profile(&connection) {
+                            if let Ok(mut last_error) = health.last_error.lock() {
+                                *last_error = Some(error.to_string());
+                            }
+                        }
+                        executed
                     } else {
                         let (respond, succeeded) = match job {
                             WriterClosure::Metadata(job) => job(Ok(&mut connection)),
@@ -1779,6 +1797,13 @@ fn handle_non_append_command(
                         if fail_closed_on_error && !committed {
                             poison_head_from_writer_error(head_state, health);
                         }
+                        return None;
+                    }
+                    if let ReceiptWriterJobState::Refused(error) = write_state {
+                        drop(inflight_guard);
+                        let committed = respond(Err(error));
+                        record_write_job_outcome(health, committed);
+                        completion.complete();
                         return None;
                     }
                     if let ReceiptWriterJobState::CommitFailed(error) = write_state {
@@ -3031,6 +3056,7 @@ fn append_receipt_batch(
     requests: &[ReceiptCommitRequest],
 ) -> Result<Vec<Result<u64, ReceiptStoreError>>, ReceiptStoreError> {
     let mut connection = receipt_pool_connection(pool, sink_qualification)?;
+    native_finishing::lift_native_page_cap(&connection)?;
     ensure_checkpoint_transparency_guards(&connection)?;
     if incremental_verification {
         // O(1) predecessor check (+ bounded catch-up), not a chain rebuild.
@@ -3070,6 +3096,12 @@ fn append_receipt_batch(
         validate_adopted_claim_log_delta(&tx, head.claim_log_max_seq, baseline_max)?;
     }
     let mut results = Vec::with_capacity(requests.len());
+    // Price this batch exactly before its first mutation: every request is
+    // quoted through the authenticated receipt write schema inside the
+    // transaction, and the summed quote is the batch's Intake price. The
+    // writer's actual anchor determines whether it advances a generation;
+    // an unquotable request refuses before any append.
+    native_finishing::authorize_ordinary_receipt_batch(&tx, requests, rollback_anchor.is_some())?;
     let mut database_mutated = false;
     for request in requests {
         #[cfg(test)]
@@ -3150,6 +3182,11 @@ fn append_receipt_batch(
     if delta_count > 0 {
         validate_adopted_claim_log_delta(&tx, baseline_max, post_max)?;
     }
+    // A write that would borrow outstanding native finishing debt refuses
+    // before COMMIT; the batch rolls back and the verified head is unchanged.
+    if let Err(error) = native_finishing::require_receipt_commit(&tx) {
+        return Ok(receipt_batch_error_results(requests.len(), error));
+    }
     // A duplicate can still mutate lineage, so anchor every successful write.
     match (rollback_anchor, rollback_generation, database_mutated) {
         (Some(anchor), Some(generation), true) => {
@@ -3184,6 +3221,7 @@ fn append_receipt_batch(
         .saturating_add(pre_delta)
         .saturating_add(delta_count);
     head.claim_log_max_seq = post_max.max(baseline_max);
+    native_finishing::clear_ordinary_commit();
     Ok(results)
 }
 
@@ -3204,6 +3242,8 @@ fn receipt_batch_error_results(
 
 enum ReceiptWriterJobState {
     Failed,
+    /// Refused before COMMIT without touching the verified head.
+    Refused(ReceiptStoreError),
     Committed,
     CommitFailed(ReceiptStoreError),
 }
@@ -3256,6 +3296,9 @@ fn execute_anchored_receipt_write(
     };
     if !succeeded {
         return (respond, ReceiptWriterJobState::Failed);
+    }
+    if let Err(error) = native_finishing::require_receipt_commit(&tx) {
+        return (respond, ReceiptWriterJobState::Refused(error));
     }
     let commit = match (rollback_anchor, generation) {
         (Some(anchor), Some(generation)) => {
@@ -3497,6 +3540,13 @@ mod evidence_retention;
 mod liability_claims;
 #[path = "receipt_store/liability_market.rs"]
 mod liability_market;
+#[path = "receipt_store/native_finishing.rs"]
+mod native_finishing;
+pub use native_finishing::NativeReceiptBankAttachment;
+pub(crate) use native_finishing::{
+    native_receipt_sink_profile, NativeReceiptBankViewData, NativeReceiptFundingData,
+    SqliteStoreConnection,
+};
 #[path = "receipt_store/reports.rs"]
 mod reports;
 #[path = "receipt_store/support.rs"]

@@ -1,4 +1,4 @@
-//! Immutable origin claims bind each original operation to one workflow.
+//! Immutable origin claims retain one current continuation per original operation.
 //! Unsupported ownership records refuse before serving and pricing.
 use super::*;
 use crate::admission_operation_store::setup::VerifiedUnusedSetupGeneration;
@@ -73,7 +73,8 @@ fn verify_pristine_creation(
 }
 
 /// The immutable origin claim is the single original-owner authority. A
-/// consumed claim is permanent; a different prospective owner conflicts.
+/// claim owns at most one current generation; its current-owner head decides
+/// which generation that is. Historical bound generations are not current.
 pub(in crate::admission_operation_store) fn original_owner_is_current(
     tx: &Connection,
     record: &RecoveryWorkflowRecordV1,
@@ -84,10 +85,7 @@ pub(in crate::admission_operation_store) fn original_owner_is_current(
     require_predecessor_original_owner_absence(tx)?;
     let (claim, _) = origins::load_immutable_claim(tx, origin)?;
     verify_pristine_creation(tx, record)?;
-    Ok(claim.scope == record.scope
-        && claim.workflow_id == record.workflow_id
-        && claim.continuation_id == record.continuation_id
-        && claim.origin == *origin)
+    super::storage::successor_binding::verify_current_owner(tx, record, &claim)
 }
 
 pub(in crate::admission_operation_store) fn require_current_original_owner(
@@ -152,20 +150,135 @@ pub(in crate::admission_operation_store) fn verify_original_owner_inventory(
     ))
 }
 
-/// Closes an unprobed setup selection only through the complete successor
-/// owner contract, which is not integrated at the supported catalog. Setup
-/// pinning replacement reaches this boundary through
-/// setup::service::retire_for_replacement; its caller retains the proof, cut
-/// and serving-owner checks, and ordinary selection replacement must not
-/// bypass consumed-origin fencing.
+/// Retire an unused setup generation through the normal cancellation writer.
+/// The transaction-bound witness proves no admission or Process debt, and the
+/// authenticated purpose allocation proves no native debt. Closing admission
+/// spends exactly one Control purpose, retires its live allocation and
+/// permits a distinct successor.
 pub(in crate::admission_operation_store) fn retire_unused_setup_generation_with_origin<'owner>(
-    _tx: &Transaction<'_>,
-    _owner: &'owner SqliteServingOwner,
-    _proof: VerifiedUnusedSetupGeneration<'_, '_>,
-    _now: u64,
-    _cut: &NativeSourceTransactionOrigin<'owner>,
-) -> Result<ProtectedMutationDelta, AdmissionOperationStoreError> {
-    Err(invariant(
-        "original owner requires the complete successor format",
-    ))
+    tx: &Transaction<'_>,
+    owner: &'owner SqliteServingOwner,
+    proof: VerifiedUnusedSetupGeneration<'_, '_>,
+    cut: &NativeSourceTransactionOrigin<'owner>,
+) -> Result<(), AdmissionOperationStoreError> {
+    cut.verify(tx).map_err(map_owner_error)?;
+    if !cut.matches_owner(owner) {
+        return Err(invariant(
+            "setup retirement changed its actual source owner",
+        ));
+    }
+    proof.verify(tx)?;
+    let mut record = proof.record().clone();
+    require_current_original_owner(tx, &record)?;
+    let quota = super::workflow_reservations::unused_setup_quota(tx, &record)?;
+    record.admission_closed = true;
+    record.control = WorkflowControlV1::Cancelled;
+    save_workflow(tx, owner, &mut record, WorkflowWriteClass::Control)?;
+    quota.require_one_control_charge(tx)?;
+    let closed = workflow_tx(tx, &record.scope, &record.workflow_id)?;
+    if !closed.admission_closed
+        || closed.control != WorkflowControlV1::Cancelled
+        || closed.admission.is_some()
+        || closed.captured
+        || closed.native_link.is_some()
+        || closed.process_reservation.is_some()
+        || closed.effect != EffectObservationV1::NeverAdmitted
+        || !super::active_workflows::retirement_committed(tx, &closed.scope, &closed.workflow_id)?
+    {
+        return Err(invariant(
+            "setup retirement lost its closed effect-free custody",
+        ));
+    }
+    Ok(())
+}
+
+/// Retire an unused materialized setup generation after its genuine unused
+/// Process reservation closure is authenticated. The unprobed selection was
+/// genuinely rotated away - its native flow source moved past the retained
+/// snapshot, its pinned profile or serving writer changed, or its initial
+/// qualification window expired - so no probe can ever qualify through it,
+/// and its reserved logical call was never finalized or dispatched. The
+/// physical closure permanently forbids every Process participant writer
+/// for this reservation while preserving the original charge. The
+/// authenticated live role is rechecked inside this owning writer, then
+/// closing admission retires the live allocation through the normal
+/// cancellation writer, which permits a distinct successor.
+pub(in crate::admission_operation_store) fn retire_unused_materialized_setup_generation_with_origin<
+    'owner,
+>(
+    tx: &Transaction<'_>,
+    owner: &'owner SqliteServingOwner,
+    closure: &dyn RecoveryUnusedReservationClosurePort,
+    record: &RecoveryWorkflowRecordV1,
+    fence: &StoreMutationFence,
+    cut: &NativeSourceTransactionOrigin<'owner>,
+) -> Result<(), AdmissionOperationStoreError> {
+    cut.verify(tx).map_err(map_owner_error)?;
+    if !cut.matches_owner(owner) {
+        return Err(invariant(
+            "unused setup retirement changed its actual source owner",
+        ));
+    }
+    require_current_original_owner(tx, record)?;
+    // Undispatched effect-free custody: the unprobed selection never
+    // captured, linked a native operation, admitted an effect or retained a
+    // hold or finality. Its materialized action and reservation stay
+    // immutable historical custody.
+    if record.control != WorkflowControlV1::Active
+        || record.captured
+        || record.native_link.is_some()
+        || record.effect != EffectObservationV1::NeverAdmitted
+        || record.historical_hold.is_some()
+        || auxiliary_historical_hold(tx, record)?.is_some()
+        || record.provider_finality.is_some()
+    {
+        return Err(invariant(
+            "unused setup retirement requires undispatched effect-free custody",
+        ));
+    }
+    let reservation: RecoveryProcessReservationV1 = chio_core_types::recovery::decode_contract(
+        record
+            .process_reservation
+            .as_ref()
+            .ok_or_else(|| invariant("unused setup retirement lost its reserved process call"))?
+            .as_str()
+            .as_bytes(),
+    )
+    .map_err(|_| invariant("unused setup retirement lost its reserved process call"))?;
+    // The physical closure commits its immutable row before this writer
+    // seals the cancelled admission, and the live role is rechecked here
+    // through the actual Process runtime and its journal.
+    let role = closure
+        .close_unused_recovery_reservation(&reservation)
+        .map_err(|_| invariant("unused recovery reservation closure refused"))?;
+    role.verify_for(&reservation, fence.store_uuid.as_str())
+        .map_err(|_| invariant("unused recovery reservation closure is not authenticated"))?;
+    let mut closed = record.clone();
+    // The permanent Process closure row and immutable journal events retain
+    // the historical reservation and admission custody; the live record
+    // keeps only its sealed closed state.
+    closed.admission = None;
+    closed.process_reservation = None;
+    closed.admission_closed = true;
+    closed.control = WorkflowControlV1::Cancelled;
+    save_workflow(tx, owner, &mut closed, WorkflowWriteClass::Control)?;
+    let persisted = workflow_tx(tx, &record.scope, &record.workflow_id)?;
+    if !persisted.admission_closed
+        || persisted.control != WorkflowControlV1::Cancelled
+        || persisted.admission.is_some()
+        || persisted.process_reservation.is_some()
+        || persisted.captured
+        || persisted.native_link.is_some()
+        || persisted.effect != EffectObservationV1::NeverAdmitted
+        || !super::active_workflows::retirement_committed(
+            tx,
+            &persisted.scope,
+            &persisted.workflow_id,
+        )?
+    {
+        return Err(invariant(
+            "unused setup retirement lost its closed effect-free custody",
+        ));
+    }
+    Ok(())
 }

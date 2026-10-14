@@ -819,7 +819,7 @@ impl ChioKernel {
                 "finding recovery terminal status revalidation failed: {reason}"
             ))
         })?;
-        self.materialize_durable_admission_receipt(&receipt)?;
+        self.materialize_admission_receipt(admission, &receipt)?;
         self.mirror_durable_admission_receipt(&receipt)?;
         if let Some(binding) = recovery.as_ref() {
             let verifier = self.finding_recovery_verifier.as_ref().ok_or_else(|| {
@@ -1841,6 +1841,30 @@ impl ChioKernel {
         .map_err(|_| {
             KernelError::ReceiptSigningFailed("receipt signing callback panicked".into())
         })??;
+        // A native original's account priced its terminal record and receipt
+        // sink from the original receipt envelope. A larger signed receipt
+        // keeps its custody rather than overrunning a prepaid write.
+        if let Some(profile) = admission
+            .original_retained_request()
+            .and_then(|original| original.native_output_retention())
+        {
+            let bytes = chio_core::canonical::canonical_json_bytes(&receipt)
+                .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?;
+            if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > profile.envelopes().receipt() {
+                return Err(KernelError::DurableAdmission(
+                    "signed native receipt exceeds its original receipt envelope".to_owned(),
+                ));
+            }
+            // The receipt id first exists here. Its prepaid append prices no
+            // lineage refresh, so no statement may already name it; after the
+            // terminal publishes it as owed, the sink refuses any new name.
+            super::native_acquisition::store_call(|| {
+                runtime.store.require_native_receipt_unnamed(
+                    &receipt.id,
+                    self.native_receipt_store_registration.as_ref(),
+                )
+            })?;
+        }
         let mutation_guard = runtime.lock_mutations()?;
         // A callback cannot extend custody. Check the exact physical operation
         // and original claim at freshly sampled time, without renewing it.
@@ -2042,8 +2066,11 @@ impl ChioKernel {
                 )
             })?;
         drop(mutation_guard);
-        self.materialize_durable_admission_receipt(&projected_receipt)?;
+        self.materialize_admission_receipt(admission, &projected_receipt)?;
         self.mirror_durable_admission_receipt(&projected_receipt)?;
+        // The terminal and its receipt are retained: a native-only account
+        // releases whatever its finished program did not spend.
+        self.settle_native_finishing_after_terminal(admission.operation.binding().operation_id())?;
         if let Some(binding) = recovery.as_ref() {
             let verifier = self.finding_recovery_verifier.as_ref().ok_or_else(|| {
                 KernelError::DurableAdmission(

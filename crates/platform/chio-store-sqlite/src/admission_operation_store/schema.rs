@@ -1,6 +1,7 @@
 use super::*;
 mod physical_write_catalog;
 mod recovery;
+mod release_codec_catalog;
 #[cfg(test)]
 pub(in crate::admission_operation_store) use physical_write_catalog::command_catalog_difference_for_test;
 #[cfg(test)]
@@ -76,10 +77,11 @@ pub(crate) fn initialize_admission_operation_schema(
     .map_err(|error| invariant(error.to_string()))?;
     // These were unqualified development formats introduced within the recovery
     // PR. Refuse before any migration instead of guessing at retained custody.
-    if (35..=41).contains(&on_disk) {
+    if (35..ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION).contains(&on_disk) {
         return Err(invariant("experimental recovery store format is unsupported; preserve the database and use its matching development revision for inspection"));
     }
     if on_disk == ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
+        release_codec_catalog::complete_supported_transition(connection)?;
         return verify_admission_operation_invariants(connection);
     }
     migration_v17::preserving_parent_names(connection, |connection| {
@@ -145,7 +147,12 @@ fn migrate_schema(
     if on_disk == 34 {
         verify_admission_operation_schema(&transaction, 34)?;
         verify_admission_operation_data_invariants(&transaction)?;
+        super::security_participant_state::verify_all(&transaction)?;
     }
+    // Successor native DDL only extends a verified genuine predecessor
+    // catalog. Hydrated initializations keep their historical catalog digest,
+    // and this migration appends no global commit under any owner fence.
+    super::security_participant_state::schema::verify_predecessor_catalog(&transaction, on_disk)?;
     if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
         // The legacy report-after-effect contract could refund an executed
         // caller as pre-dispatch compensation. A refunded terminal is not
@@ -704,12 +711,11 @@ fn expected_admission_operation_schema(
             .map_err(sqlite_error)?;
     }
     if version >= 28 {
+        let native = super::security_participant_state::schema::native_catalog_version(version)?;
         expected
-            .execute_batch(&if version == 28 {
-                super::security_participant_state::schema::predecessor_sql()
-            } else {
-                super::security_participant_state::schema::sql()?
-            })
+            .execute_batch(&super::security_participant_state::schema::sql_version(
+                native,
+            )?)
             .map_err(sqlite_error)?;
     }
     if version >= 30 {

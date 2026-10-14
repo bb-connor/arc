@@ -19,7 +19,7 @@ impl SqliteAdmissionOperationStore {
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
         super::super::super::observed_time(&tx, now)?;
-        super::super::super::verify_coverage(&tx).map_err(map_owner_error)?;
+        super::super::super::verify_current_catalogs(&tx)?;
         let Some(stored) = load_by_operation_id_tx(&tx, operation)? else {
             return Ok(None);
         };
@@ -41,8 +41,15 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_his
         }
         return Ok(None);
     };
-    let initialized = super::super::super::records::load_metadata(tx, acquired.authority.as_str())?
-        .ok_or_else(|| invalid("native egress initialization is absent"))?;
+    acquired.require_own_commit(tx)?;
+    if let Some(record) = &committed {
+        record.require_own_commit(tx)?;
+    }
+    let initialized = super::super::super::records::load_current_named(
+        tx,
+        acquired.authority.as_str(),
+        &acquired.initialization,
+    )?;
     let acquisition_digest = AdmissionDigest::try_new("native_egress_event", acquired.digest()?)?;
     let fence = match acquired.result {
         NativeEgressResult::Acquired(fence) => fence,

@@ -320,6 +320,68 @@ fn shared_generation_changes_are_captured_and_old_retry_is_historical_only() -> 
 }
 
 #[test]
+fn related_contexts_cross_every_encoded_width_when_a_join_invalidates_them() -> TestResult {
+    let fixture = fixture();
+    let source = imported(&fixture, "source")?;
+    let initialized = hydrate(&fixture, &source)?;
+    // Each join stores its own session's context at the next generation, so
+    // the contexts hold generations 1 through 127: the integer widths 0, 1 and
+    // their 1 to 2 byte boundary. A final join that restricts the shared
+    // principal invalidates all of them to 128, past each width transition.
+    let join = |index: u32, restricted: bool| -> TestResult<u64> {
+        let (_, mut request) = request("native-join")?;
+        request.transition_id = RecordId::new(format!("join-{index}"))?;
+        request.key.session_id = SessionId::new(format!("session-{index}"))?;
+        if restricted {
+            request.principal_join = InformationLabel::try_known(
+                Default::default(),
+                std::collections::BTreeSet::from([chio_security_types::Compartment::new(
+                    "restricted",
+                )?]),
+            )?;
+        }
+        let context = SecurityInvocationContext::v1(SecurityInvocationContextV1::new(
+            request.key.tenant_id.clone(),
+            request.key.session_id.clone(),
+            request.key.principal_id.clone(),
+            request.key.isolation_epoch_id.clone(),
+            request.key.lineage_id.clone(),
+            1,
+        ));
+        let (operation, lease) = setup(&fixture, &format!("operation-{index}"), &context)?;
+        Ok(fixture
+            .store
+            .join_security_participant_flow(
+                &operation,
+                &lease,
+                &initialized,
+                &context,
+                &request,
+                now_ms(),
+            )?
+            .context_generation)
+    };
+    for index in 0..127 {
+        assert_eq!(join(index, false)?, u64::from(index) + 1);
+    }
+    assert_eq!(join(127, true)?, 128);
+    let connection = fixture.store.connection()?;
+    let contexts = |predicate: &str| -> rusqlite::Result<i64> {
+        connection.query_row(
+            &format!(
+                "SELECT COUNT(*) FROM security_participant_state_flow_contexts
+                 WHERE security_authority_id = 'source' AND tenant_id = 'native-tenant' AND {predicate}"
+            ),
+            [],
+            |row| row.get(0),
+        )
+    };
+    assert_eq!(contexts("generation <> 128")?, 0);
+    assert_eq!(contexts("generation = 128")?, 128);
+    Ok(())
+}
+
+#[test]
 fn excessive_row_capture_aborts_the_complete_owned_join() -> TestResult {
     use rusqlite::functions::FunctionFlags;
     use std::sync::atomic::{AtomicUsize, Ordering};

@@ -1,4 +1,11 @@
 use super::*;
+use crate::admission_operation_store::knowledge::account::NewKnowledgeAccount;
+use crate::admission_operation_store::knowledge::publication_capacity;
+use crate::admission_operation_store::knowledge::publication_source::VerifiedKnowledgePublicationIntake;
+use crate::admission_operation_store::knowledge::{
+    AuthenticatedKnowledgeIntakeSource, DerivedWrite, PreparedKnowledgeClosure,
+    VerifiedHandleCensus, VerifiedImportManifestBaseline,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[path = "active_workflows.rs"]
@@ -16,6 +23,14 @@ mod foreign_fixture_admission;
 mod knowledge_encoding;
 #[path = "logical_reference.rs"]
 mod logical_reference;
+#[path = "native_finishing_account.rs"]
+mod native_finishing_account;
+#[path = "native_finishing_bank.rs"]
+pub(in crate::admission_operation_store) mod native_finishing_bank;
+#[path = "native_influence.rs"]
+mod native_influence;
+#[path = "native_journal_seal.rs"]
+mod native_journal_seal;
 #[path = "original_owner.rs"]
 mod original_owner;
 #[path = "planning_budgets.rs"]
@@ -38,10 +53,40 @@ pub(in crate::admission_operation_store) use logical_reference::{
     persist_product_reference_retirement, reserve_product_reference_intake,
     verify_knowledge_reference_account, ReservedProductReferenceIntake,
 };
+pub(crate) use native_finishing_account::{
+    authority_current_write_price, authority_current_write_profile, native_authority_debt,
+    native_authority_file_page_debt, native_authority_table_row_debt, native_receipt_is_owed,
+    native_registered_file_debt, AuthorityCurrentWritePrice, NativeAuthorityDebtData,
+    NativeAuthorityPageDebtData, NativeRegisteredFileDebtData,
+};
+pub(in crate::admission_operation_store) use native_finishing_account::{
+    load_native_finishing_account, load_native_finishing_account_for_source,
+    native_finishing_account_key, native_finishing_bank_key, native_finishing_bank_readback,
+    native_finishing_bank_scope, native_finishing_debt_for_file, native_finishing_flow_scope,
+    native_finishing_publication, native_finishing_version_commit,
+    persist_native_finishing_transition, persist_prepared_native_finishing_account,
+    process_file_enrollments, process_return_bank_readback, unsettled_native_only_accounts,
+    NativeFinishingAccountV1, NativeFinishingDispositionV1, NativeFinishingFileRoleV1,
+    NativeFinishingFileV1, NativeFinishingIdentityV1, NativeFinishingLiabilityV1,
+    NativeFinishingPageRecipeV1, NativeFinishingProcessEnrollmentV1, NativeFinishingProcessV1,
+    NativeFinishingPurposeV1, NativeFinishingStateV1, NativeFinishingTransitionAllowanceV1,
+    RetainedNativeFinishingAccount, NATIVE_FINISHING_ACCOUNT_MAX_BYTES,
+    NATIVE_FINISHING_BANK_MAX_BYTES,
+};
+pub(in crate::admission_operation_store) use native_finishing_bank::NativeFinishingWidthRecipeV1;
+pub(crate) use native_finishing_bank::{
+    generation_width_class_floor, native_finishing_generation, native_finishing_width_debt,
+    width_class_ceiling,
+};
+pub(in crate::admission_operation_store) use native_influence::{
+    persist_imported_influence_root, persist_native_influence_heads,
+};
+pub(in crate::admission_operation_store) use native_journal_seal::persist_native_journal_seal;
 pub(in crate::admission_operation_store) use original_owner::{
     original_owner_is_current, require_current_original_owner,
-    require_predecessor_original_owner_absence, retire_unused_setup_generation_with_origin,
-    verify_original_owner_inventory,
+    require_predecessor_original_owner_absence,
+    retire_unused_materialized_setup_generation_with_origin,
+    retire_unused_setup_generation_with_origin, verify_original_owner_inventory,
 };
 pub(in crate::admission_operation_store) use protected_mutation_delta::ProtectedMutationDelta;
 pub(in crate::admission_operation_store) use settled_command_aliases::{
@@ -73,6 +118,8 @@ mod projection_presence_tests;
 
 #[path = "protected_source_reference.rs"]
 mod protected_source_reference;
+#[path = "successor_binding.rs"]
+pub(in crate::admission_operation_store) mod successor_binding;
 pub(in crate::admission_operation_store) use protected_source_reference::{
     matches_historical_source_payload_at_cut, source_reference, verify_source_reference,
     HistoricalProtectedSourceData, ProtectedSourceReference,
@@ -374,21 +421,27 @@ pub(in crate::admission_operation_store) fn save(
     if native.is_some() || payload.is_empty() || payload.len() > MAX_RECOVERY_RECORD_BYTES {
         return Err(invariant("recovery record quota exhausted"));
     }
-    let (patterns, recovery_planning) = generic_pool(key, scope, kind)?;
+    let pool = generic_pool(key, scope, kind)?;
     super::resources::check_intake_committing(tx)?;
-    if recovery_planning {
-        return planning_budgets::save(tx, owner, key, scope, kind, payload);
-    }
-    let existing = raw(tx, key)?;
+    let members = match pool {
+        GenericPool::RecoveryPlanning => {
+            return planning_budgets::save(tx, owner, key, scope, kind, payload);
+        }
+        GenericPool::Family(pattern) => format!("r.record_key GLOB '{pattern}'"),
+        GenericPool::Knowledge => generic_knowledge_predicate("r.record_key"),
+    };
+    let existing = raw_checked(tx, key)?;
     let (retained, events): (i64, i64) = tx
         .query_row(
-            "SELECT coalesce(sum(length(payload)),0),
+            &format!(
+                "SELECT coalesce(sum(length(payload)),0),
             (SELECT count(*) FROM main.admission_operation_recovery_events e
              JOIN main.admission_operation_recovery_records r ON r.record_key=e.record_key
-             WHERE r.record_key GLOB ?1 OR r.record_key GLOB ?2 OR r.record_key GLOB ?3)
+             WHERE {members})
          FROM main.admission_operation_recovery_records r
-         WHERE r.record_key GLOB ?1 OR r.record_key GLOB ?2 OR r.record_key GLOB ?3",
-            params![patterns[0], patterns[1], patterns[2]],
+         WHERE {members}"
+            ),
+            [],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(sqlite_error)?;
@@ -402,29 +455,470 @@ pub(in crate::admission_operation_store) fn save(
     persist_record(tx, owner, key, scope, kind, payload, None)
 }
 
+/// Persist one prepared authenticated Knowledge closure in the settlement
+/// band. The closure is bound to its own writer, current authority and exact
+/// source heads; each of its one or two derived records is owed 1:1 by an
+/// already admitted owning record, so the intake quotas are not consulted.
+/// Every CAS precedes the first write. It frees no history and finances no
+/// native work.
+pub(in crate::admission_operation_store) fn persist_knowledge_closure<'tx, 'conn>(
+    tx: &Transaction<'conn>,
+    owner: &SqliteServingOwner,
+    closure: PreparedKnowledgeClosure<'tx, 'conn>,
+) -> Result<(Vec<ProtectedSourceReference>, ProtectedMutationDelta), AdmissionOperationStoreError> {
+    crate::admission_operation_store::schema::verify_active_owner(tx, owner, Some(&owner.fence))?;
+    if !std::ptr::eq::<Connection>(
+        std::ops::Deref::deref(closure.transaction()),
+        std::ops::Deref::deref(tx),
+    ) {
+        return Err(invariant("knowledge closure changed its physical writer"));
+    }
+    if closure.scope().authority_domain.as_str() != owner.fence.store_uuid {
+        return Err(invariant("knowledge closure changed its authority"));
+    }
+    closure.verify(tx)?;
+    persist_derived(
+        tx,
+        owner,
+        closure.writes(),
+        super::resources::check_committing,
+        "knowledge closure",
+    )
+}
+
+/// Persist one authenticated Knowledge intake in the physical intake band.
+/// The source is bound to its own writer, current authority and exact source
+/// heads, and its closed write set is rederived here before any write.
+pub(in crate::admission_operation_store) fn persist_knowledge_intake<'tx, 'conn>(
+    tx: &Transaction<'conn>,
+    owner: &SqliteServingOwner,
+    intake: AuthenticatedKnowledgeIntakeSource<'tx, 'conn>,
+) -> Result<(Vec<ProtectedSourceReference>, ProtectedMutationDelta), AdmissionOperationStoreError> {
+    crate::admission_operation_store::schema::verify_active_owner(tx, owner, Some(&owner.fence))?;
+    if !std::ptr::eq::<Connection>(
+        std::ops::Deref::deref(intake.transaction()),
+        std::ops::Deref::deref(tx),
+    ) {
+        return Err(invariant("knowledge intake changed its physical writer"));
+    }
+    if intake.scope().authority_domain.as_str() != owner.fence.store_uuid {
+        return Err(invariant("knowledge intake changed its authority"));
+    }
+    intake.verify(tx)?;
+    persist_derived(
+        tx,
+        owner,
+        intake.writes(),
+        super::resources::check_intake_committing,
+        "knowledge intake",
+    )
+}
+
+/// Every CAS precedes the band check and the first write; the written heads
+/// must follow the prior event and global heads exactly.
+fn persist_derived(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    writes: &[DerivedWrite],
+    band: fn(&Connection) -> Result<(), AdmissionOperationStoreError>,
+    label: &str,
+) -> Result<(Vec<ProtectedSourceReference>, ProtectedMutationDelta), AdmissionOperationStoreError> {
+    let mut versions = Vec::with_capacity(writes.len());
+    let mut encoded_bytes = 0_u64;
+    for write in writes {
+        let (key, scope, payload) = (write.key(), write.scope_key(), write.payload());
+        if payload.is_empty() || payload.len() > MAX_RECOVERY_RECORD_BYTES {
+            return Err(invariant(format!("{label} exceeds its record bound")));
+        }
+        encoded_bytes = encoded_bytes
+            .checked_add(
+                u64::try_from(payload.len())
+                    .map_err(|_| invariant(format!("{label} byte count overflow")))?,
+            )
+            .ok_or_else(|| invariant(format!("{label} byte count overflow")))?;
+        versions.push(match (write.expected(), raw_checked(tx, key)?) {
+            (Some(expected), Some(row)) => {
+                verify_source_reference(tx, expected)?;
+                let ordinary: bool = tx
+                    .query_row(
+                        "SELECT native_namespace IS NULL AND native_request IS NULL
+                         FROM main.admission_operation_recovery_records WHERE record_key=?1",
+                        [key],
+                        |row| row.get(0),
+                    )
+                    .map_err(sqlite_error)?;
+                if !ordinary
+                    || expected.record_key() != key
+                    || expected.scope_key() != scope
+                    || expected.kind() != "command"
+                    || row.kind != "command"
+                    || row.scope != scope
+                    || row.version != expected.version()
+                {
+                    return Err(invariant(format!("{label} lost its current CAS")));
+                }
+                row.version
+                    .checked_add(1)
+                    .ok_or_else(|| invariant(format!("{label} version exhausted")))?
+            }
+            (None, None) => 1,
+            _ => return Err(invariant(format!("{label} lost its current CAS"))),
+        });
+    }
+    band(tx)?;
+    let (events, commits) = closure_heads(tx)?;
+    let mut written = Vec::with_capacity(writes.len());
+    for (write, version) in writes.iter().zip(versions) {
+        persist_record(
+            tx,
+            owner,
+            write.key(),
+            write.scope_key(),
+            "command",
+            write.payload(),
+            None,
+        )?;
+        let terminal = source_reference(tx, write.key())?;
+        let ordinal = u64::try_from(written.len() + 1)
+            .map_err(|_| invariant(format!("{label} write count overflow")))?;
+        if terminal.version() != version
+            || terminal.scope_key() != write.scope_key()
+            || terminal.kind() != "command"
+            || events.checked_add(ordinal) != Some(terminal.event_sequence())
+            || commits.checked_add(ordinal) != Some(terminal.global_commit_sequence())
+        {
+            return Err(invariant(format!("{label} changed its exact footprint")));
+        }
+        written.push(terminal);
+    }
+    let mutations = u64::try_from(written.len())
+        .map_err(|_| invariant(format!("{label} write count overflow")))?;
+    if events
+        .checked_add(mutations)
+        .zip(commits.checked_add(mutations))
+        != Some(closure_heads(tx)?)
+    {
+        return Err(invariant(format!("{label} changed its exact footprint")));
+    }
+    Ok((
+        written,
+        ProtectedMutationDelta {
+            mutations,
+            encoded_bytes,
+        },
+    ))
+}
+
+fn closure_heads(tx: &Connection) -> Result<(u64, u64), AdmissionOperationStoreError> {
+    let (events, commits): (i64, i64) = tx
+        .query_row(
+            "SELECT (SELECT coalesce(max(sequence),0) FROM main.admission_operation_recovery_events),
+                    (SELECT head_sequence FROM main.authority_global_commit_meta WHERE singleton=1)",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(sqlite_error)?;
+    Ok((
+        stored_u64(events, "knowledge closure event head")?,
+        stored_u64(commits, "knowledge closure global head")?,
+    ))
+}
+
+/// Knowledge families written only through their typed proofs. Generic save
+/// refuses them.
+const TYPED_KNOWLEDGE_PATTERNS: [&str; 17] = [
+    "knowledge-handle:*",
+    "knowledge-handle-index:*",
+    "knowledge-handle-baseline:*",
+    "knowledge-import:*",
+    "knowledge-import-map:*",
+    "knowledge-pin:operator:v2:*",
+    "knowledge-pin:native-operation:v2:*",
+    "knowledge-pin:pending-approval:v2:*",
+    "knowledge-checkpoint:v2:*",
+    "knowledge-release:v2:*",
+    "knowledge-publication:*",
+    "knowledge-version:*",
+    "knowledge-certificate:*",
+    "knowledge-publication-lease:*",
+    "knowledge-publication-object:*",
+    "knowledge-publication-capacity:*",
+    "knowledge-publication-ready:*",
+];
+
+/// The installation rows that use generic save, each a prefix followed by
+/// exactly one 64-hex identity: the physical owner, the profile and the
+/// runtime enforcement marker.
+const GENERIC_KNOWLEDGE_INSTALLATION: [&str; 3] = [
+    "knowledge-owner:",
+    "knowledge-profile:",
+    "knowledge-runtime:",
+];
+
+/// Untyped pins (confined pins and the maintained quota fixtures). The three
+/// typed pin owners are excluded.
+const GENERIC_KNOWLEDGE_PIN: &str = "knowledge-pin:";
+
+/// The pool's Knowledge families, and the only `knowledge-*` keys generic
+/// save accepts. Native, encoded, closure, reference and every typed family
+/// keep their own authority and physical accounting and are not counted.
+fn generic_knowledge_family(key: &str) -> bool {
+    let installation = GENERIC_KNOWLEDGE_INSTALLATION.iter().any(|prefix| {
+        key.strip_prefix(prefix).is_some_and(|identity| {
+            identity.len() == 64
+                && identity
+                    .bytes()
+                    .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+        })
+    });
+    installation || (key.starts_with(GENERIC_KNOWLEDGE_PIN) && !typed_knowledge_family(key))
+}
+
+fn typed_knowledge_family(key: &str) -> bool {
+    TYPED_KNOWLEDGE_PATTERNS
+        .iter()
+        .any(|pattern| key.starts_with(pattern.trim_end_matches('*')))
+}
+
+/// The SQL predicate over `column` that selects exactly the keys
+/// `generic_knowledge_family` accepts. Every fragment is a closed constant.
+pub(in crate::admission_operation_store) fn generic_knowledge_predicate(column: &str) -> String {
+    let installation = GENERIC_KNOWLEDGE_INSTALLATION.iter().map(|prefix| {
+        format!(
+            "({column} GLOB '{prefix}*' AND length({column})={} \
+             AND substr({column},{}) NOT GLOB '*[^0-9a-f]*')",
+            prefix.len() + 64,
+            prefix.len() + 1
+        )
+    });
+    let typed_pins = TYPED_KNOWLEDGE_PATTERNS
+        .iter()
+        .filter(|pattern| pattern.starts_with(GENERIC_KNOWLEDGE_PIN))
+        .map(|pattern| format!(" AND {column} NOT GLOB '{pattern}'"))
+        .collect::<String>();
+    let pins = format!("({column} GLOB '{GENERIC_KNOWLEDGE_PIN}*'{typed_pins})");
+    format!(
+        "({})",
+        installation.chain([pins]).collect::<Vec<_>>().join(" OR ")
+    )
+}
+
+/// The one quota a generic protected record is charged to.
+enum GenericPool {
+    RecoveryPlanning,
+    Family(&'static str),
+    Knowledge,
+}
+
+/// Persist one verified reservation, then its live slot derived from the
+/// written record, in the intake band. The intake proof is verified while
+/// the publication is still absent; any refusal rolls back both.
+pub(in crate::admission_operation_store) fn persist_knowledge_publication_reservation<'conn>(
+    tx: &Transaction<'conn>,
+    owner: &SqliteServingOwner,
+    intake: &VerifiedKnowledgePublicationIntake<'_, 'conn>,
+) -> Result<(), AdmissionOperationStoreError> {
+    crate::admission_operation_store::schema::verify_active_owner(tx, owner, Some(&owner.fence))?;
+    intake.verify(tx)?;
+    let reservation = publication_capacity::reservation_write(intake)?;
+    persist_derived(
+        tx,
+        owner,
+        std::slice::from_ref(&reservation),
+        super::resources::check_intake_committing,
+        "knowledge publication reservation",
+    )?;
+    let allocation =
+        publication_capacity::derive_allocation(tx, intake.scope(), intake.source_key())?;
+    persist_derived(
+        tx,
+        owner,
+        &allocation,
+        super::resources::check_intake_committing,
+        "knowledge publication allocation",
+    )?;
+    Ok(())
+}
+
+/// Persist the empty publication counter of a new account, then its ready
+/// record anchored to the written counter, under the installation writer's
+/// new-account proof.
+pub(in crate::admission_operation_store) fn persist_knowledge_account_bootstrap<'conn>(
+    tx: &Transaction<'conn>,
+    owner: &SqliteServingOwner,
+    proof: &NewKnowledgeAccount<'_, 'conn>,
+) -> Result<(), AdmissionOperationStoreError> {
+    crate::admission_operation_store::schema::verify_active_owner(tx, owner, Some(&owner.fence))?;
+    proof.verify(tx)?;
+    let counter = publication_capacity::bootstrap_write(tx, proof, None)?;
+    let (written, _) = persist_derived(
+        tx,
+        owner,
+        std::slice::from_ref(&counter),
+        super::resources::check_intake_committing,
+        "knowledge account bootstrap",
+    )?;
+    let counter = written
+        .first()
+        .ok_or_else(|| invariant("knowledge account bootstrap lost its counter"))?;
+    let ready = publication_capacity::bootstrap_write(tx, proof, Some(counter))?;
+    persist_derived(
+        tx,
+        owner,
+        std::slice::from_ref(&ready),
+        super::resources::check_intake_committing,
+        "knowledge account bootstrap",
+    )?;
+    Ok(())
+}
+
+/// Persist the one import manifest baseline of this authority at startup, in
+/// the settlement band. The proof is bound to this writer and owner.
+pub(in crate::admission_operation_store) fn persist_knowledge_import_baseline<'conn>(
+    tx: &Transaction<'conn>,
+    owner: &SqliteServingOwner,
+    baseline: VerifiedImportManifestBaseline<'_, 'conn>,
+) -> Result<(), AdmissionOperationStoreError> {
+    crate::admission_operation_store::schema::verify_active_owner(tx, owner, Some(&owner.fence))?;
+    baseline.verify(tx, owner)?;
+    let (key, payload) = (baseline.key(), baseline.payload());
+    if !key.starts_with("knowledge-import-baseline:")
+        || payload.is_empty()
+        || payload.len() > MAX_RECOVERY_RECORD_BYTES
+        || raw_checked(tx, key)?.is_some()
+        || retained_history(tx, key)?
+    {
+        return Err(invariant("import baseline record refused"));
+    }
+    super::resources::check_committing(tx)?;
+    persist_record(
+        tx,
+        owner,
+        key,
+        baseline.scope_key(),
+        "command",
+        payload,
+        None,
+    )
+}
+
+/// One `knowledge-checkpoint:v2:` row exactly as the prior-44 generic writer
+/// retained it.
+#[cfg(feature = "admission-test-support")]
+pub(in crate::admission_operation_store) fn retain_prior_format_checkpoint_fixture(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+    scope: &str,
+    payload: &[u8],
+) -> Result<(), AdmissionOperationStoreError> {
+    if !key.starts_with("knowledge-checkpoint:v2:") || raw_checked(tx, key)?.is_some() {
+        return Err(invariant("prior checkpoint fixture refused"));
+    }
+    persist_record(tx, owner, key, scope, "command", payload, None)
+}
+
+/// One import manifest or map row exactly as the prior-44 generic writer
+/// retained it.
+#[cfg(feature = "admission-test-support")]
+pub(in crate::admission_operation_store) fn retain_prior_format_import_fixture(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+    scope: &str,
+    payload: &[u8],
+) -> Result<(), AdmissionOperationStoreError> {
+    if !(key.starts_with("knowledge-import:") || key.starts_with("knowledge-import-map:"))
+        || raw_checked(tx, key)?.is_some()
+    {
+        return Err(invariant("prior import fixture refused"));
+    }
+    persist_record(tx, owner, key, scope, "command", payload, None)
+}
+
+/// One raw protected record for store unit tests that seed exact rows.
+#[cfg(test)]
+pub(in crate::admission_operation_store) fn persist_test_record(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+    scope: &str,
+    payload: &[u8],
+) -> Result<(), AdmissionOperationStoreError> {
+    persist_record(tx, owner, key, scope, "command", payload, None)
+}
+
+/// Persist one record of the one-time handle migration: a census index or the
+/// authority baseline, each new with no retained history, in the settlement
+/// band. Each is owed by the prior-44 rows the migration authenticated.
+pub(in crate::admission_operation_store) fn persist_knowledge_handle_census(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    census: VerifiedHandleCensus,
+) -> Result<(), AdmissionOperationStoreError> {
+    crate::admission_operation_store::schema::verify_active_owner(tx, owner, Some(&owner.fence))?;
+    let (key, payload) = (census.key(), census.payload());
+    if !(key.starts_with("knowledge-handle-index:")
+        || key.starts_with("knowledge-handle-baseline:"))
+        || payload.is_empty()
+        || payload.len() > MAX_RECOVERY_RECORD_BYTES
+        || raw_checked(tx, key)?.is_some()
+        || retained_history(tx, key)?
+    {
+        return Err(invariant("handle migration record refused"));
+    }
+    super::resources::check_committing(tx)?;
+    persist_record(tx, owner, key, census.scope_key(), "command", payload, None)
+}
+
+/// One handle row exactly as the prior-44 generic writer retained it.
+#[cfg(feature = "admission-test-support")]
+pub(in crate::admission_operation_store) fn retain_prior_format_handle_fixture(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    key: &str,
+    scope: &str,
+    payload: &[u8],
+) -> Result<(), AdmissionOperationStoreError> {
+    if !key.starts_with("knowledge-handle:") || raw_checked(tx, key)?.is_some() {
+        return Err(invariant("prior handle fixture refused"));
+    }
+    persist_record(tx, owner, key, scope, "command", payload, None)
+}
+
 fn generic_pool(
     key: &str,
     scope: &str,
     kind: &str,
-) -> Result<([&'static str; 3], bool), AdmissionOperationStoreError> {
-    let recovery_planning = ["deployment:*", "deployment-history:*", "recovery-origin:*"];
+) -> Result<GenericPool, AdmissionOperationStoreError> {
     if key == format!("deployment:{scope}")
         || key.starts_with(&format!("deployment-history:{scope}:"))
     {
         if kind == "deployment" {
-            return Ok((recovery_planning, true));
+            return Ok(GenericPool::RecoveryPlanning);
         }
-    } else if key.starts_with("recovery-origin:") {
+    } else if key.starts_with("recovery-origin:")
+        || key.starts_with("recovery-successor:")
+        || key.starts_with("recovery-owner:")
+    {
         if kind == "command" {
-            return Ok((recovery_planning, true));
+            return Ok(GenericPool::RecoveryPlanning);
         }
     } else if key.starts_with("semantic-") {
         if matches!(kind, "command" | "deployment") {
-            return Ok((["semantic-*", "semantic-*", "semantic-*"], false));
+            return Ok(GenericPool::Family("semantic-*"));
         }
     } else if kind == "command" {
+        if typed_knowledge_family(key) {
+            return Err(invariant("protected record family has a typed writer"));
+        }
+        if key.starts_with("knowledge-") {
+            if generic_knowledge_family(key) {
+                return Ok(GenericPool::Knowledge);
+            }
+            return Err(invariant("protected record namespace or kind refused"));
+        }
         for (prefix, pattern) in [
-            ("knowledge-", "knowledge-*"),
             ("confined-", "confined-*"),
             ("product-", "product-*"),
             ("protected-setup:", "protected-setup*"),
@@ -433,7 +927,7 @@ fn generic_pool(
             ("protected-setup-retired:", "protected-setup*"),
         ] {
             if key.starts_with(prefix) {
-                return Ok(([pattern, pattern, pattern], false));
+                return Ok(GenericPool::Family(pattern));
             }
         }
     }
@@ -452,7 +946,7 @@ fn persist_record(
     if payload.is_empty() || payload.len() > MAX_RECOVERY_RECORD_BYTES {
         return Err(invariant("recovery record quota exhausted"));
     }
-    let version = raw(tx, key)?.map_or(Ok(1), |row| {
+    let version = raw_checked(tx, key)?.map_or(Ok(1), |row| {
         if row.scope != scope || row.kind != kind {
             return Err(invariant("protected record ownership changed"));
         }
@@ -566,6 +1060,8 @@ pub(crate) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
     active_workflows::verify_all(tx)?;
     settled_command_aliases::verify_all(tx)?;
     verify_original_owner_inventory(tx)?;
+    successor_binding::verify_owner_inventory(tx)?;
+    native_finishing_account::verify_native_finishing_inventory(tx)?;
     super::origins::verify_history(tx)?;
     Ok(())
 }

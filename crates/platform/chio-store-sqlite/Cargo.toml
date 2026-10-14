@@ -25,7 +25,7 @@ lineage = []
 cognition-market-test-support = []
 # Native fault and modeled predecessor fixtures for cross-crate admission tests.
 # Default-off; no arbitrary SQL or fault controls are exposed in production.
-admission-test-support = []
+admission-test-support = ["chio-semantic-contracts/admission-test-support"]
 # Deterministic fault-injection hooks used only by the separate-process chaos
 # harness. Default-off so production store builds expose no environment-driven
 # pause points.
@@ -49,6 +49,7 @@ chio-kernel = { workspace = true, features = ["finding-market"] }
 chio-kernel-core = { workspace = true }
 chio-security-types = { workspace = true, features = ["std"] }
 chio-flow = { workspace = true }
+chio-process = { workspace = true }
 chio-settle = { workspace = true }
 chio-sqlite-file-identity = { version = "=0.1.0", path = "../chio-sqlite-file-identity" }
 chio-supervisor = { workspace = true }
@@ -62,7 +63,7 @@ r2d2_sqlite = "0.33.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 subtle = "2.6"
-rusqlite = { workspace = true, features = ["functions", "hooks"] }
+rusqlite = { workspace = true, features = ["functions", "hooks", "preupdate_hook"] }
 rand_core = { workspace = true }
 rustix = { workspace = true }
 libc = "0.2"
@@ -72,6 +73,7 @@ uuid = { workspace = true, features = ["v7"] }
 zeroize = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
+rusqlite = { workspace = true, features = ["blob"] }
 async-trait = { workspace = true }
 chio-kernel = { workspace = true, features = ["admission-test-support"] }
 chio-quarantine = { workspace = true }

@@ -495,7 +495,7 @@ jobs:
 
   kani-public-pr:
     name: kani-public-pr (all lane=pr harnesses)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -521,14 +521,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
 
-      - name: Install cargo-kani
-        env:
-          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-kani-tool-target
-        run: |
-          set -euo pipefail
-          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
-          cargo kani setup
-          bash scripts/check-kani-toolchain.sh
+      - name: Install Kani (patched source build)
+        uses: ./.github/actions/setup-kani
+
+      - name: Verify Kani version
+        run: bash scripts/check-kani-toolchain.sh
 
       - name: Verify all PR Kani harnesses
         env:

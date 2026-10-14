@@ -126,9 +126,6 @@ pub(in crate::admission_operation_store::product) fn append_reclamation<'tx, 'co
 }
 
 impl<'tx, 'conn> VerifiedProductEvidenceReclamation<'tx, 'conn> {
-    pub(in crate::admission_operation_store) fn transaction(&self) -> &'tx Transaction<'conn> {
-        self.writer.transaction
-    }
     pub(in crate::admission_operation_store) fn serving_owner(&self) -> &SqliteServingOwner {
         self.writer.serving_owner
     }
@@ -139,11 +136,6 @@ impl<'tx, 'conn> VerifiedProductEvidenceReclamation<'tx, 'conn> {
         &self,
     ) -> &protected::ProtectedSourceReference {
         self.source.original()
-    }
-    pub(in crate::admission_operation_store) fn archive(
-        &self,
-    ) -> &protected::ProtectedSourceReference {
-        self.source.archive()
     }
     pub(in crate::admission_operation_store) fn terminal(
         &self,

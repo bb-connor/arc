@@ -7,6 +7,8 @@ on:
   pull_request:
     paths:
       - ".github/workflows/proof-mutants.yml"
+      - ".github/actions/setup-kani/action.yml"
+      - "formal/rust-verification/patches/kani-catch-unwind.patch"
       - ".cargo/config.toml"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -179,14 +181,15 @@ jobs:
           GH_FUZZ_BUDGET_MINUTES: 48000
         run: ./scripts/check-fuzz-budget.sh "${{ github.repository }}"
 
+      - name: Install Kani (patched source build)
+        uses: ./.github/actions/setup-kani
+
       - name: Install pinned mutation and proof tools
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-proof-mutant-tools
         run: |
           set -euo pipefail
           cargo install cargo-mutants --version 25.3.1 --locked
-          cargo install kani-verifier --version "${CHIO_KANI_VERSION}" --locked
-          cargo kani setup
           cargo mutants --version
           bash scripts/check-kani-toolchain.sh
 

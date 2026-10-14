@@ -19,6 +19,7 @@ pub(super) fn next_flow_generation(
     let next = current
         .checked_add(1)
         .ok_or_else(PortError::integrity_failure)?;
+    let next = transaction.generation_preserving_owed_output(tenant_id, next)?;
     transaction
         .execute(sql::STORE_SEQUENCE, params![tenant_id, to_i64(next)?])
         .map_err(sqlite_error)?;

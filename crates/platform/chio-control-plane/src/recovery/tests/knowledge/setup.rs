@@ -8,7 +8,6 @@ mod cli_host;
 mod coverage;
 mod denied_mediation;
 mod journal_availability;
-mod legacy_retirement;
 mod live_mediator;
 mod mandatory_policy;
 mod policy;

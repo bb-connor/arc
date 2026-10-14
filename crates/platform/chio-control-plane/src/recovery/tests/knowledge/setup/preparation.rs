@@ -338,20 +338,62 @@ async fn setup_foreign_resume_cannot_acquire_the_pinned_benign_identity() -> Tes
     Ok(())
 }
 
-#[tokio::test]
-async fn setup_stale_unprobed_selection_can_be_replaced_without_waiting_for_expiry() -> TestResult {
+/// A genuine rotation that leaves an unprobed materialized setup selection
+/// unable to ever qualify again: its native flow source moved, or its pinned
+/// profile rotated.
+#[derive(Clone, Copy)]
+enum UnusedSetupRotation {
+    StaleNativeSource,
+    ChangedProfile,
+}
+
+async fn rotate_unprobed_selection(
+    f: &KnowledgeFixture,
+    rotation: UnusedSetupRotation,
+) -> TestResult<ToolCallRequest> {
+    match rotation {
+        UnusedSetupRotation::StaleNativeSource => {
+            // A later denied materialization under the same native context
+            // moves the flow source past the selection's retained snapshot.
+            f.f.denied_seed_named("fresh-setup-replacement").await
+        }
+        UnusedSetupRotation::ChangedProfile => {
+            // A selected additional inspector rotates the deployment, so the
+            // selection's pinned source profile genuinely changed.
+            second_inspector(f)?;
+            f.f.denied_seed_named("fresh-setup-replacement").await
+        }
+    }
+}
+
+/// Replace an unprobed materialized selection through a genuine rotation and
+/// prove its unused custody is actually closed: the old admission closes with
+/// its immutable original, the Process reservation closure commits before any
+/// replay, the live allocation retires, no effect or double charge appears,
+/// and the distinct replacement stays current and usable. This is unused
+/// custody retirement, not an end-to-end native effect acceptance.
+async fn unprobed_selection_replacement_closes_its_unused_custody(
+    rotation: UnusedSetupRotation,
+) -> TestResult {
     let state = Box::pin(selected_self_test()).await?;
     let f = &state.fixture;
     let previous_workflow = state.service.workflow().clone();
     let previous = f.f.record(&previous_workflow)?;
-    let seed = f.f.denied_seed_named("fresh-setup-replacement").await?;
+    assert!(previous.process_reservation.is_some());
+    let seed = Box::pin(rotate_unprobed_selection(f, rotation)).await?;
+    // The rotated selection can no longer qualify its own probe.
+    let expected_probe_refusal = match rotation {
+        UnusedSetupRotation::StaleNativeSource => crate::recovery::RecoveryRuntimeError::Conflict,
+        UnusedSetupRotation::ChangedProfile => crate::recovery::RecoveryRuntimeError::Unavailable,
+    };
     assert_eq!(
         state
             .service
             .probe(&f.f.control, &previous_workflow)
             .await
             .err(),
-        Some(crate::recovery::RecoveryRuntimeError::Conflict)
+        Some(expected_probe_refusal),
+        "a rotated unprobed selection must refuse its own probe before replacement"
     );
     let creation = f.f.command(
         "fresh-setup-replacement-create",
@@ -380,6 +422,7 @@ async fn setup_stale_unprobed_selection_can_be_replaced_without_waiting_for_expi
         &f.f.control,
         RecoveryPermission::Create,
     )?;
+    let calls_before_pin = f.f.process.process("root")?.tree_calls;
     let pinned = store
         .pin_setup_creation(
             &creator,
@@ -388,11 +431,15 @@ async fn setup_stale_unprobed_selection_can_be_replaced_without_waiting_for_expi
                 receipt_key: &f.f.kernel.receipt_signing_public_key(),
                 operator: &Keypair::from_seed(&[211; 32]).public_key(),
                 process: &f.f.process,
+                unused_closure: &f.f.process,
             },
             &fence,
             now_ms()?,
         )
-        .map_err(|error| format!("replacement pin after fresh actor, mediator inventory and original custody: {error}"))?;
+        .map_err(|error| {
+            format!("replacement pin after fresh actor, mediator inventory and original custody: {error}")
+        })?;
+    assert_eq!(f.f.process.process("root")?.tree_calls, calls_before_pin);
     let host = RecoverySetupHost {
         runtime: f.f.runtime.clone(),
         store: Arc::new(f.f.authority.admission_operation_store()),
@@ -400,7 +447,9 @@ async fn setup_stale_unprobed_selection_can_be_replaced_without_waiting_for_expi
         knowledge: Arc::new(f.runtime.clone()),
         operator: Keypair::from_seed(&[211; 32]),
     };
-    let replacement = RecoverySetupService::for_creation(host, &f.f.control, &creation).await?;
+    let replacement = RecoverySetupService::for_creation(host, &f.f.control, &creation)
+        .await
+        .map_err(|error| format!("reopen replacement setup service: {error}"))?;
     assert_eq!(replacement.workflow(), &pinned);
     assert_ne!(replacement.workflow(), &previous_workflow);
     let retired = f.f.record(&previous_workflow)?;
@@ -409,8 +458,66 @@ async fn setup_stale_unprobed_selection_can_be_replaced_without_waiting_for_expi
     assert_eq!(retired.creation_seed, previous.creation_seed);
     assert!(!retired.captured);
     assert!(retired.native_link.is_none());
+    // The retired generation is actually closed and its live allocation is
+    // retired, not merely marked: admission is closed with no intent and the
+    // allocation row advanced to its retirement version.
+    assert!(retired.admission_closed && retired.admission.is_none());
+    assert_eq!(retired.effect, EffectObservationV1::NeverAdmitted);
+    assert!(retired.process_reservation.is_none());
+    {
+        let connection = rusqlite::Connection::open_with_flags(
+            f.f.path.join("admission.db"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
+        let allocation: i64 = connection.query_row(
+            "SELECT version FROM admission_operation_recovery_records
+             WHERE record_key GLOB ('recovery-workflow-allocation:*:' || ?1)",
+            [previous_workflow.as_str()],
+            |row| row.get(0),
+        )?;
+        assert_eq!(
+            allocation, 2,
+            "the retired generation's live allocation is retired"
+        );
+    }
+    // The retired generation's reserved Process call is permanently closed:
+    // observe the immutable closure row directly BEFORE replaying its writer,
+    // so replay cannot create the evidence the retirement was required to
+    // commit, with the original charge preserved and no double charge.
+    let closed_reservation: RecoveryProcessReservationV1 = previous
+        .process_reservation
+        .as_ref()
+        .map(|encoded| chio_core_types::recovery::decode_contract(encoded.as_str().as_bytes()))
+        .transpose()?
+        .ok_or("the retired generation lost its reserved process call")?;
+    let journal = rusqlite::Connection::open_with_flags(
+        f.f.path.join("process.db"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    let already_closed: bool = journal.query_row(
+        "SELECT EXISTS(SELECT 1 FROM process_unused_recovery_reservations
+         WHERE process_id=?1 AND operation_key=?2 AND continuation_id=?3)",
+        rusqlite::params![
+            closed_reservation.process_id,
+            closed_reservation.operation_key,
+            closed_reservation.continuation_id.as_str(),
+        ],
+        |row| row.get(0),
+    )?;
+    assert!(
+        already_closed,
+        "setup replacement must commit the Process closure"
+    );
+    drop(journal);
+    let calls_before_replay = f.f.process.process("root")?.tree_calls;
+    let replayed = chio_kernel::recovery::RecoveryUnusedReservationClosurePort::close_unused_recovery_reservation(
+        &f.f.process,
+        &closed_reservation,
+    )?;
+    replayed.verify_for(&closed_reservation, fence.store_uuid.as_str())?;
     assert_eq!(external_count(&f.f.path)?, 0);
-    let replacement_calls = f.f.process.process("root")?.tree_calls;
+    let calls_after_replay = f.f.process.process("root")?.tree_calls;
+    assert_eq!(calls_after_replay, calls_before_replay);
     let old_resume = f.f.command(
         "retired-setup-resume",
         RecoveryCommandBodyV1::ResumeWorkflow {
@@ -425,17 +532,37 @@ async fn setup_stale_unprobed_selection_can_be_replaced_without_waiting_for_expi
         .await
         .is_err());
     assert_eq!(external_count(&f.f.path)?, 0);
-    assert_eq!(f.f.process.process("root")?.tree_calls, replacement_calls);
-    let workflow =
-        Box::pin(f.f.ready_named("fresh-setup-replacement", "fresh-setup-replacement")).await?;
+    assert_eq!(f.f.process.process("root")?.tree_calls, calls_after_replay);
+    let workflow = Box::pin(f.f.ready_named("fresh-setup-replacement", "fresh-setup-replacement"))
+        .await
+        .map_err(|error| format!("materialize replacement setup workflow: {error}"))?;
     assert_eq!(replacement.workflow(), &workflow);
     let calls = f.f.process.process("root")?.tree_calls;
-    let probe = replacement.probe(&f.f.control, &workflow).await?;
+    let probe = replacement
+        .probe(&f.f.control, &workflow)
+        .await
+        .map_err(|error| format!("execute replacement native setup probe: {error}"))?;
     assert_eq!(probe.body().benign_workflow, workflow);
     assert_eq!(external_count(&f.f.path)?, 1);
     assert_eq!(f.f.process.process("root")?.tree_calls, calls);
     assert!(!f.f.record(&previous_workflow)?.captured);
     Ok(())
+}
+
+#[tokio::test]
+async fn setup_stale_unprobed_selection_can_be_replaced_without_waiting_for_expiry() -> TestResult {
+    Box::pin(unprobed_selection_replacement_closes_its_unused_custody(
+        UnusedSetupRotation::StaleNativeSource,
+    ))
+    .await
+}
+
+#[tokio::test]
+async fn setup_profile_changed_unprobed_selection_closes_its_unused_reservation() -> TestResult {
+    Box::pin(unprobed_selection_replacement_closes_its_unused_custody(
+        UnusedSetupRotation::ChangedProfile,
+    ))
+    .await
 }
 
 #[tokio::test]
@@ -458,5 +585,210 @@ async fn setup_a_bare_runtime_cannot_skip_the_selected_live_mediator() -> TestRe
     );
     assert_eq!(external_count(&f.f.path)?, 0);
     assert_eq!(f.f.process.process("root")?.tree_calls, calls);
+    Ok(())
+}
+
+/// Protected store counts that a stale selected-setup attempt must not move:
+/// recovery records and events are admission custody history, operation
+/// commits are the append chain, global commits are authority anchoring and
+/// terminal records are receipt custody.
+fn takeover_protected_counts(fixture: &RecoveryFixture) -> TestResult<(i64, i64, i64, i64, i64)> {
+    Ok(rusqlite::Connection::open(fixture.path.join("admission.db"))?.query_row(
+        "SELECT (SELECT count(*) FROM admission_operation_recovery_records), (SELECT count(*) FROM admission_operation_recovery_events), (SELECT count(*) FROM admission_operation_commits), (SELECT count(*) FROM authority_global_commits), (SELECT count(*) FROM admission_operation_terminal_records WHERE record_kind='receipt')",
+        [],
+        |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
+        },
+    )?)
+}
+
+/// Writer A keeps its genuine live Kernel, Store and Process handles while a
+/// new writer B takes over the same store with a strictly higher serving
+/// epoch. A's selected setup preparation genuinely worked at A's own epoch.
+/// After the takeover B constructs a matching live native mediator
+/// composition, retires A's unprobed selection through the genuine
+/// WriterChanged replacement path, and demonstrates a real selected-setup
+/// preparation positive for its own pinned selection before the parked
+/// finishing boundary. No probe, benign effect or native finishing is
+/// executed. A's corresponding selected setup routes then refuse with the
+/// exact typed fenced result while A stays alive, and none of the stale
+/// attempts disturbs the retained workflow bytes, B's retained preparation
+/// identity, protected counts, Process state or external effects. Baselines
+/// are taken after B's legitimate replacement work, so only the stale
+/// attempts are required to be mutation free.
+#[tokio::test]
+async fn setup_selected_preparation_refuses_the_stale_owner_while_the_fresh_writer_progresses(
+) -> TestResult {
+    let state = Box::pin(selected_self_test()).await?;
+    let f = &state.fixture;
+    let workflow = state.service.workflow().clone();
+    let a_fence = f.f.authority.mutation_fence();
+    let a_store = f.f.authority.admission_operation_store();
+    let a_receipt_key = f.f.kernel.receipt_signing_public_key();
+    let a_actor = f.f.kernel.authenticate_recovery_actor(
+        f.f.runtime.scope(),
+        &f.f.control,
+        RecoveryPermission::Inspect,
+    )?;
+    // A's selected setup route genuinely prepares while A still serves.
+    let a_prepared = a_store.setup_preparation(&a_actor, &a_fence, now_ms()?)?;
+    assert!(matches!(
+        &a_prepared.command.command,
+        RecoveryCommandBodyV1::ResumeWorkflow { workflow_id, .. } if workflow_id == &workflow
+    ));
+    assert_eq!(a_prepared.probe.benign_workflow, workflow);
+    assert_eq!(external_count(&f.f.path)?, 0);
+    // Retain A's original immutable identity while A still serves. Every
+    // authoritative post-takeover read must go through B, so this pre-takeover
+    // record is the only legitimate reference for the retired identity.
+    let a_record = f.f.record(&workflow)?;
+    // Releases the actual serving OS lock only. No fabricated epoch, poison
+    // bit, rewritten authority record or replacement database is introduced,
+    // and every A handle stays alive throughout.
+    f.f.authority.release_serving_lock_for_stale_owner_test()?;
+    let b = KnowledgeFixture::from(RecoveryFixture::open(f.f.path.clone(), None, false)?)
+        .map_err(|error| format!("fresh writer fixture open on the same store: {error}"))?;
+    let b_fence = b.f.authority.mutation_fence();
+    assert_eq!(b_fence.store_uuid, a_fence.store_uuid);
+    assert!(
+        b_fence.owner_epoch > a_fence.owner_epoch,
+        "the fresh writer must serve a strictly higher epoch on the same store"
+    );
+    assert_eq!(b.f.runtime.scope(), f.f.runtime.scope());
+    assert_eq!(b.f.process.runtime_id(), f.f.process.runtime_id());
+    // B's genuine progress: a real denied original, its retained custody, and
+    // the actual creation pin that retires A's unprobed selection through the
+    // WriterChanged replacement classification and pins B's own selection.
+    let seed = b.f.denied_seed_named("fresh-writer-selected-setup").await?;
+    require_eligible_original(&b, &seed)?;
+    let creation = b.f.command(
+        "fresh-writer-selected-setup-create",
+        RecoveryCommandBodyV1::CreateWorkflow {
+            creation_key: CreationKey::new("fresh-writer-selected-setup")?,
+            template: RecoveryTemplateV1::SupportTicketPublicIssue,
+            request_seed: text(&seed)?,
+        },
+    )?;
+    let host = RecoverySetupHost {
+        runtime: b.f.runtime.clone(),
+        store: Arc::new(b.f.authority.admission_operation_store()),
+        fence: b_fence.clone(),
+        knowledge: Arc::new(b.runtime.clone()),
+        operator: Keypair::from_seed(&[211; 32]),
+    };
+    let service = RecoverySetupService::for_creation(host, &b.f.control, &creation)
+        .await
+        .map_err(|error| format!("fresh writer selected setup pin: {error}"))?;
+    let b_workflow =
+        Box::pin(b.f.ready_named("fresh-writer-selected-setup", "fresh-writer-selected-setup"))
+            .await
+            .map_err(|error| format!("fresh writer selected setup readiness: {error}"))?;
+    assert_eq!(service.workflow(), &b_workflow);
+    assert_ne!(&b_workflow, &workflow);
+    // The selected-setup preparation positive itself: the real store prepares
+    // B's own selected workflow with the matching actor, fence, runtime and
+    // source, bound to B's current serving fence. No probe is run.
+    let b_store = b.f.authority.admission_operation_store();
+    let b_actor = b.f.kernel.authenticate_recovery_actor(
+        b.f.runtime.scope(),
+        &b.f.control,
+        RecoveryPermission::Inspect,
+    )?;
+    let prepared = b_store.setup_preparation(&b_actor, &b_fence, now_ms()?)?;
+    assert!(
+        matches!(
+            &prepared.command.command,
+            RecoveryCommandBodyV1::ResumeWorkflow {
+                workflow_id,
+                expected_revision,
+            } if workflow_id == &b_workflow
+                && *expected_revision == b.f.record(&b_workflow)?.revision
+        ),
+        "the fresh writer's preparation must bind its own selected workflow and revision"
+    );
+    assert_eq!(prepared.probe.benign_workflow, b_workflow);
+    assert_eq!(&prepared.probe.scope, b.f.runtime.scope());
+    assert!(prepared.report.is_none() && prepared.signed_probe.is_none());
+    assert_eq!(
+        prepared.previous_serving_fence,
+        SourceDigest::from_bytes(chio_kernel::recovery::recovery_digest(
+            chio_core_types::recovery::RecoveryDigestDomain::ServingFence,
+            &b_fence,
+        )?),
+        "the prepared selection must be pinned to the fresh writer's own serving fence"
+    );
+    assert_eq!(external_count(&b.f.path)?, 0);
+    // B's takeover genuinely closed A's unused selection custody: the old
+    // workflow retired with its original identity, closed admission, no
+    // captured effect and no live reservation. This is B's legitimate work,
+    // not a mutation the stale attempts are allowed to touch.
+    let retired = b.f.record(&workflow)?;
+    assert_eq!(retired.control, WorkflowControlV1::Cancelled);
+    assert_eq!(retired.origin, a_record.origin);
+    assert_eq!(retired.creation_seed, a_record.creation_seed);
+    assert!(retired.admission_closed && retired.admission.is_none());
+    assert_eq!(retired.effect, EffectObservationV1::NeverAdmitted);
+    assert!(!retired.captured);
+    assert!(retired.native_link.is_none());
+    assert!(retired.process_reservation.is_none());
+    // Baselines are taken after B's legitimate work.
+    let baseline = takeover_protected_counts(&b.f)?;
+    let stale_workflow_bytes = chio_core_types::canonical_json_bytes(&b.f.record(&workflow)?)?;
+    let fresh_workflow_bytes = chio_core_types::canonical_json_bytes(&b.f.record(&b_workflow)?)?;
+    // The same persisted Process namespace is observed only through B's
+    // current authority. A's public Process reads also check the stale fence.
+    let fresh_calls = b.f.process.process("root")?.tree_calls;
+    let effects = external_count(&b.f.path)?;
+    assert_eq!(effects, 0);
+    // A's corresponding selected setup routes refuse with the exact typed
+    // fenced result while A stays alive through its own retained handles.
+    assert!(matches!(
+        a_store.setup_preparation(&a_actor, &a_fence, now_ms()?),
+        Err(
+            chio_store_sqlite::admission_operation_store::NativeSetupPreparationError::Store(
+                chio_kernel::admission_operation::AdmissionOperationStoreError::Fenced
+            )
+        )
+    ));
+    assert!(matches!(
+        a_store.configure_protected_setup(
+            f.f.runtime.scope(),
+            &workflow,
+            &a_receipt_key,
+            &Keypair::from_seed(&[211; 32]).public_key(),
+            &a_fence,
+            now_ms()?,
+        ),
+        Err(chio_kernel::admission_operation::AdmissionOperationStoreError::Fenced)
+    ));
+    // None of the stale attempts moved protected counts, either workflow's
+    // canonical bytes, the Process call trees, or external effects, and B's
+    // preparation identity is retained when re-read through B.
+    assert_eq!(takeover_protected_counts(&b.f)?, baseline);
+    assert_eq!(
+        chio_core_types::canonical_json_bytes(&b.f.record(&workflow)?)?,
+        stale_workflow_bytes
+    );
+    assert_eq!(
+        chio_core_types::canonical_json_bytes(&b.f.record(&b_workflow)?)?,
+        fresh_workflow_bytes
+    );
+    let replay = b_store.setup_preparation(&b_actor, &b_fence, now_ms()?)?;
+    assert_eq!(replay.command, prepared.command);
+    assert_eq!(replay.probe, prepared.probe);
+    assert!(replay.report.is_none() && replay.signed_probe.is_none());
+    assert_eq!(
+        replay.previous_serving_fence,
+        prepared.previous_serving_fence
+    );
+    assert_eq!(service.workflow(), &b_workflow);
+    assert_eq!(b.f.process.process("root")?.tree_calls, fresh_calls);
+    assert_eq!(external_count(&b.f.path)?, effects);
     Ok(())
 }

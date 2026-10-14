@@ -1,7 +1,7 @@
 use super::*;
 
 fn historical_issuance() -> TestResult<NonceFixture> {
-    let mut fixture = unowned_prepared_nonce_fixture(None)?;
+    let mut fixture = pre_recovery_unowned_prepared_nonce_fixture(None)?;
     let command = issue_command(&fixture)?;
     let at = now_ms();
     let issued = fixture

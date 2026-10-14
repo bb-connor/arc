@@ -193,18 +193,20 @@ pub(super) fn classify_captured_origin(
             label = label.join_restrictions(status).map_err(refused)?;
         }
     }
-    let annotation_answers = captured
-        .invocation
-        .annotations
-        .as_slice()
-        .iter()
-        .map(|annotation| {
-            Ok((
-                semantic_key_digest(annotation.authority_key()).map_err(refused)?,
-                &annotation.body().input,
-            ))
-        })
-        .collect::<Result<Vec<_>, AdmissionOperationStoreError>>()?;
+    let mut externally_influenced =
+        action.externally_influenced || captured.contract.external_influence;
+    let mut annotation_answers = Vec::new();
+    for annotation in captured.invocation.annotations.as_slice() {
+        let body = annotation.body();
+        label = label
+            .join_restrictions(&body.restrictions)
+            .map_err(refused)?;
+        externally_influenced |= body.externally_influenced;
+        annotation_answers.push((
+            semantic_key_digest(annotation.authority_key()).map_err(refused)?,
+            &body.input,
+        ));
+    }
     let annotations_complete = captured
         .route
         .annotators
@@ -227,7 +229,7 @@ pub(super) fn classify_captured_origin(
     }
     Ok(CapturedOriginClassification {
         label,
-        externally_influenced: action.externally_influenced || captured.contract.external_influence,
+        externally_influenced,
         unknown,
         withheld_status_audience,
     })

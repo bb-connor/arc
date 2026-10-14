@@ -59,7 +59,7 @@ fn fused_claim_cannot_fabricate_security_participant_custody() -> AnchoredTestRe
 #[test]
 fn fused_claim_rejects_expiry_at_the_authority_clock_before_callback() -> AnchoredTestResult {
     let fixture = fixture();
-    let now = now_ms() / 1_000 * 1_000;
+    let now = clock_origin_ms(&fixture)?;
     let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, []);
     let operation = prepared_operation(
         &fixture.fence,

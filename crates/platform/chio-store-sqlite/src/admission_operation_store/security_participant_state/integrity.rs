@@ -14,7 +14,12 @@ pub(crate) fn projection_reference(
         return Err(invalid("native initialization sequence is invalid"));
     }
     if sequence > 1 {
-        return super::history::load(connection, key, sequence)
+        // Append, receipt verification and the cold chain's per-entry check
+        // all compute this structural digest; at append the record's commit
+        // row does not exist yet. The cold coverage walk and every retained
+        // read separately full-validate the record against its exact own
+        // commit through history::load_committed.
+        return super::history::load_for_projection_reference(connection, key, sequence)
             .map_err(invalid)?
             .ok_or_else(|| invalid("native mutation reference is absent"))?
             .digest()
@@ -31,13 +36,14 @@ pub(in crate::admission_operation_store) fn verify_coverage(
 ) -> Result<(), SqliteServingOwnerError> {
     if !schema::verify(connection).map_err(invalid)? {
         return if global_count(connection)? == 0 {
-            Ok(())
+            super::history::segments::verify_seal_owners(connection, &[]).map_err(invalid)
         } else {
             Err(invalid("native references lack their catalog"))
         };
     }
     let records = records::verify_all(connection).map_err(invalid)?;
     verify_initializations(connection, &records)?;
+    super::history::segments::verify_seal_owners(connection, &records).map_err(invalid)?;
     let mutations: i64 = connection
         .query_row(
             "SELECT COUNT(*) FROM security_participant_state_mutations",
@@ -54,20 +60,9 @@ pub(in crate::admission_operation_store) fn verify_coverage(
         for sequence in
             2..=super::history::head(connection, initialized.authority.as_str()).map_err(invalid)?
         {
-            let record = super::history::load(connection, initialized.authority.as_str(), sequence)
+            super::history::load_committed(connection, initialized.authority.as_str(), sequence)
                 .map_err(invalid)?
                 .ok_or_else(|| invalid("native mutation disappeared"))?;
-            let count: i64 = connection.query_row(
-                "SELECT COUNT(*) FROM authority_global_commits WHERE projection_kind = ?1 AND projection_key = ?2
-                 AND projection_sequence = ?3 AND mutation_kind = ?4 AND projection_reference_digest = ?5
-                 AND store_uuid = ?6 AND store_lease_id = ?7 AND store_owner_epoch = ?8",
-                params![PROJECTION_KIND, record.authority.as_str(), i64::try_from(sequence).map_err(invalid)?,
-                    super::history::MUTATION, record.digest().map_err(invalid)?, record.lease.fence.store_uuid,
-                    record.lease.fence.lease_id, i64::try_from(record.lease.fence.owner_epoch).map_err(invalid)?], |row| row.get(0),
-            ).map_err(invalid)?;
-            if count != 1 {
-                return Err(invalid("native mutation lacks its exact global commit"));
-            }
         }
     }
     let orphans: bool = connection
@@ -85,6 +80,9 @@ pub(in crate::admission_operation_store) fn verify_coverage(
     super::egress::verify_coverage(connection, &records)?;
     super::output::verify_coverage(connection, &records)?;
     super::nonce_preflight::verify_coverage(connection, &records)?;
+    for initialized in &records {
+        super::history::segments::verify_authority(connection, initialized).map_err(invalid)?;
+    }
     Ok(())
 }
 

@@ -85,12 +85,6 @@ impl<'tx, 'conn> AuthenticatedNativeStatusSource<'tx, 'conn> {
     pub(in crate::admission_operation_store) fn key(&self) -> &FlowStateKey {
         &self.identity.key
     }
-    pub(in crate::admission_operation_store) fn authority(&self) -> &str {
-        self.identity.binding.security_authority_id().as_str()
-    }
-    pub(in crate::admission_operation_store) fn serving_domain(&self) -> &str {
-        self.identity.binding.store_uuid().as_str()
-    }
     pub(in crate::admission_operation_store) fn terminal_version(&self) -> u64 {
         self.identity.operation.version()
     }
@@ -365,13 +359,6 @@ pub(in crate::admission_operation_store) struct AuthenticatedNativeStatusAppend<
     append: super::super::commit_chain::AdmissionCommitAppendReceipt,
 }
 impl<'tx, 'conn> AuthenticatedNativeStatusAppend<'tx, 'conn> {
-    pub(in crate::admission_operation_store) fn matches_owner(
-        &self,
-        owner: &SqliteServingOwner,
-    ) -> bool {
-        std::ptr::eq(self.source.owner, owner) && self.source.origin.matches_owner(owner)
-    }
-
     pub(in crate::admission_operation_store) fn source(
         &self,
     ) -> &AuthenticatedNativeStatusSource<'tx, 'conn> {

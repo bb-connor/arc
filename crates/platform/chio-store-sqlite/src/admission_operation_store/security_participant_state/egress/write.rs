@@ -232,7 +232,8 @@ impl SqliteAdmissionOperationStore {
                 )?)
             }
         };
-        let egress_head = head(&tx, actual.authority.as_str())?;
+        let mut segment = super::super::history::segments::SegmentSnapshot::capture(&tx, &actual)?;
+        let egress_head = segment.head(&tx, super::super::history::segments::Family::Egress)?;
         let previous = if egress_head == 0 {
             actual.digest.clone()
         } else {
@@ -241,8 +242,7 @@ impl SqliteAdmissionOperationStore {
                 .digest()?
         };
         let (mut current_rows, mut current_bytes) =
-            super::super::history::ordered::latest_totals(&tx, &actual)?;
-        let before = footprint(&tx)?;
+            super::super::history::ordered::latest_totals(&tx, &segment)?;
         let (command, decision_at) = if matches!(command, NativeEgressCommand::Acquire(_)) {
             (command, decision_at)
         } else {
@@ -286,7 +286,7 @@ impl SqliteAdmissionOperationStore {
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
         super::super::cutpoint(12)?;
         // Domain callbacks cannot append initialization or journal records.
-        if footprint(&tx)? != before {
+        if !segment.unchanged(&tx)? {
             return Err(invalid(
                 "native egress domain mutation escaped its journal boundary",
             ));
@@ -331,21 +331,16 @@ impl SqliteAdmissionOperationStore {
             current_bytes,
         };
         record.validate(&tx)?;
+        super::super::storage::require_tenant_live(
+            &tx,
+            actual.authority.as_str(),
+            fence.key.tenant_id.as_str(),
+        )?;
+        crate::admission_operation_store::recovery::resources::check_intake_committing(&tx)?;
+        let append = super::super::history::segments::Append::egress(&record)?;
+        segment.prepare_pre_effect_append(&tx, &self.serving_owner, &append)?;
         record.insert(&tx)?;
-        let expected = (
-            before.0,
-            before.1,
-            before
-                .2
-                .checked_add(1)
-                .ok_or_else(|| invalid("native journal count overflow"))?,
-            before.3,
-        );
-        if head(&tx, actual.authority.as_str())? != record.sequence || footprint(&tx)? != expected {
-            return Err(invalid("native egress append introduced other history"));
-        }
-        super::super::history::ordered::validate_history_bounds(&tx, actual.authority.as_str())?;
-        super::super::storage::verify_no_orphans(&tx)?;
+        segment.appended(&tx, append.entry())?;
         super::super::cutpoint(13)?;
         self.serving_owner
             .append_global_commit(
@@ -356,21 +351,7 @@ impl SqliteAdmissionOperationStore {
                 record.sequence,
             )
             .map_err(map_owner_error)?;
-        if footprint(&tx)?
-            != (
-                expected.0,
-                expected.1,
-                expected.2,
-                expected
-                    .3
-                    .checked_add(1)
-                    .ok_or_else(|| invalid("native global count overflow"))?,
-            )
-        {
-            return Err(invalid(
-                "native egress global append introduced other history",
-            ));
-        }
+        segment.committed(&tx, append.entry())?;
         super::super::cutpoint(14)?;
         #[cfg(test)]
         let _commit_clock =
@@ -405,12 +386,4 @@ fn physical_commit_time(
         super::super::super::schema::authority_validation_time(tx, prepared_at)?;
     }
     Ok(observed.max(prepared_at))
-}
-
-fn footprint(
-    connection: &Connection,
-) -> Result<(i64, i64, i64, i64), AdmissionOperationStoreError> {
-    connection.query_row("SELECT (SELECT COUNT(*) FROM security_participant_state_initializations),
-        (SELECT COUNT(*) FROM security_participant_state_mutations), (SELECT COUNT(*) FROM security_participant_egress_events),
-        (SELECT COUNT(*) FROM authority_global_commits)", [], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))).map_err(sqlite_error)
 }

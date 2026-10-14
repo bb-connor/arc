@@ -16,11 +16,21 @@ pub(crate) use nonce_preflight::NativeNoncePreflightJoinAuthority;
 pub(crate) use output::NativeOutputJoinAuthority;
 pub(super) mod knowledge;
 pub(crate) use knowledge::NativeKnowledgeJoinAuthority;
+mod finishing_account;
+pub(in crate::admission_operation_store) use finishing_account::{
+    authorize_native_finishing_growth, native_finishing_at_terminal, spend_native_finishing_purpose,
+};
 mod finishing_funding;
 pub(in crate::admission_operation_store) mod finishing_plan;
 mod history;
 pub(crate) use egress::NativeEgressAuthority;
 pub use egress::SecurityParticipantEgressHistory;
+pub(in crate::admission_operation_store) use history::segments::{
+    NativeSealAdmission, VerifiedNativeJournalSeal,
+};
+pub(in crate::admission_operation_store) use knowledge::{
+    VerifiedImportedInfluenceRoot, VerifiedNativeInfluenceHeads,
+};
 mod integrity;
 mod mutations;
 mod observation;
@@ -134,6 +144,7 @@ impl SqliteAdmissionOperationStore {
             if existing.expectation_id() != expectation {
                 return Err(invalid("native initialization generation conflict"));
             }
+            knowledge::verify_imported_scope_index(&tx, &existing)?;
             return Ok(existing);
         }
         let record = records::new(&source, observed, fence)?;
@@ -145,6 +156,8 @@ impl SqliteAdmissionOperationStore {
         self.serving_owner
             .append_global_commit(&tx, MUTATION_KIND, PROJECTION_KIND, authority.as_str(), 1)
             .map_err(map_owner_error)?;
+        // The source verified above is the one indexed, in this same commit.
+        knowledge::install_imported_scope_index(&tx, &self.serving_owner, &record)?;
         cutpoint(4)?;
         self.commit_write(tx)?;
         #[cfg(test)]
@@ -173,8 +186,8 @@ impl SqliteAdmissionOperationStore {
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
         observed_time(&tx, trusted_now_unix_ms)?;
-        verify_coverage(&tx).map_err(map_owner_error)?;
-        let record = records::load(&tx, authority.as_str())?;
+        verify_current_catalogs(&tx)?;
+        let record = records::load_current(&tx, authority.as_str())?;
         if record
             .as_ref()
             .is_some_and(|record| record.fence.store_uuid != fence.store_uuid)
@@ -185,52 +198,126 @@ impl SqliteAdmissionOperationStore {
     }
 }
 
+/// Every native journal family catalog, checked in a warm read without
+/// reading history. A family the recorded format includes must hold its exact
+/// catalog; an absent family must predate that format and have no global
+/// reference. These are the catalog rules of the cold family walks.
+fn verify_current_catalogs(tx: &Connection) -> Result<(), AdmissionOperationStoreError> {
+    type Present = fn(&Connection) -> Result<bool, AdmissionOperationStoreError>;
+    type Catalog = fn(&Connection) -> Result<(), AdmissionOperationStoreError>;
+    let version: i32 = tx
+        .query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    let families: [(&str, i32, Present, Catalog); 3] = [
+        (
+            "security_participant_egress",
+            30,
+            egress::exists,
+            egress::verify_catalog,
+        ),
+        (
+            "security_participant_output",
+            32,
+            output::exists,
+            output::verify_catalog,
+        ),
+        (
+            "security_participant_nonce_preflight",
+            33,
+            nonce_preflight::exists,
+            nonce_preflight::verify_catalog,
+        ),
+    ];
+    for (projection, introduced, present, catalog) in families {
+        if present(tx)? {
+            catalog(tx)?;
+            continue;
+        }
+        let referenced: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM authority_global_commits WHERE projection_kind = ?1)",
+                [projection],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        if referenced || version >= introduced {
+            return Err(invalid(format!(
+                "{projection} requires its current catalog"
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn observed_time(tx: &Transaction<'_>, supplied: u64) -> Result<u64, AdmissionOperationStoreError> {
     super::schema::authority_validation_time(tx, supplied)?;
     let observed = super::schema::observe_authority_time(tx)?;
-    let high_water: i64 = tx.query_row(
-        "SELECT MAX(value) FROM (
-         SELECT COALESCE(MAX(initialized_at), 0) AS value FROM security_participant_state_initializations
-         UNION ALL SELECT COALESCE(MAX(observed_at_unix_ms), 0) FROM security_participant_migration_events
-         UNION ALL SELECT COALESCE(MAX(observed_at), 0) FROM security_participant_state_mutations)",
-        [], |row| row.get(0),
-    ).map_err(sqlite_error)?;
-    let high_water = if egress::exists(tx)? {
-        let egress: i64 = tx
-            .query_row(
-                "SELECT COALESCE(MAX(observed_at),0) FROM security_participant_egress_events",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(sqlite_error)?;
-        high_water.max(egress)
-    } else {
-        high_water
-    };
-    let high_water = if output::exists(tx)? {
-        let output: i64 = tx
-            .query_row(
-                "SELECT COALESCE(MAX(observed_at),0) FROM security_participant_output_events",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(sqlite_error)?;
-        high_water.max(output)
-    } else {
-        high_water
-    };
-    if observed < u64::try_from(high_water).map_err(invalid)? {
+    if observed < native_high_water(tx)? {
         return Err(invalid("native initialization clock regressed"));
     }
     Ok(observed)
+}
+
+/// The latest native observation, without a history scan. Every native writer
+/// refuses to append below it, and the cold walk refuses a sequence gap or an
+/// earlier observation after a later one across each authority's families
+/// (`history/ordered.rs`), with each family loader binding its stored
+/// `observed_at` column to the canonical record. So each initialized
+/// authority's last row in a family carries that family's high water.
+/// Initializations and migration events are bounded tables.
+fn native_high_water(tx: &Connection) -> Result<u64, AdmissionOperationStoreError> {
+    let mut high_water: i64 = tx
+        .query_row(
+            "SELECT MAX(value) FROM (
+             SELECT COALESCE(MAX(initialized_at), 0) AS value
+               FROM security_participant_state_initializations
+             UNION ALL SELECT COALESCE(MAX(observed_at_unix_ms), 0)
+               FROM security_participant_migration_events
+             UNION ALL SELECT COALESCE(MAX((SELECT observed_at
+               FROM security_participant_state_mutations AS latest
+               WHERE latest.security_authority_id = initialized.security_authority_id
+               ORDER BY latest.sequence DESC LIMIT 1)), 0)
+               FROM security_participant_state_initializations AS initialized)",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    for (present, table) in [
+        (egress::exists(tx)?, "security_participant_egress_events"),
+        (output::exists(tx)?, "security_participant_output_events"),
+    ] {
+        if !present {
+            continue;
+        }
+        let latest: i64 = tx
+            .query_row(
+                &format!(
+                    "SELECT COALESCE(MAX((SELECT observed_at FROM {table} AS latest
+                     WHERE latest.security_authority_id = initialized.security_authority_id
+                     ORDER BY latest.sequence DESC LIMIT 1)), 0)
+                     FROM security_participant_state_initializations AS initialized"
+                ),
+                [],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        high_water = high_water.max(latest);
+    }
+    u64::try_from(high_water).map_err(invalid)
 }
 
 fn invalid(detail: impl std::fmt::Display) -> AdmissionOperationStoreError {
     invariant(format!("native security state: {detail}"))
 }
 
-/// Test-only construction of a genuine v28 initialization from its compiled
-/// predecessor schema. No existing history is rewritten into old evidence.
+/// Test-only construction of a genuine initialization from the compiled
+/// native catalog selected by the recorded admission stamp (`recorded_version`:
+/// v28 for admission 28, v29 for admission 29 through 34). No existing history
+/// is rewritten into old evidence.
 #[cfg(test)]
 pub(crate) fn hydrate_predecessor_fixture(
     store: &SqliteAdmissionOperationStore,
@@ -242,13 +329,16 @@ pub(crate) fn hydrate_predecessor_fixture(
     let tx = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
-    if schema::recorded_version(&tx)? != 28 {
-        return Err(invalid("predecessor fixture is not v28"));
+    let version = schema::recorded_version(&tx)?;
+    if !matches!(version, 28 | 29) {
+        return Err(invalid(
+            "predecessor fixture is not a supported predecessor",
+        ));
     }
-    let record = records::new_with_catalog(source, now, fence, schema::digest_version(28)?)?;
-    storage::hydrate_at_version(&tx, source, 28)?;
+    let record = records::new_with_catalog(source, now, fence, schema::digest_version(version)?)?;
+    storage::hydrate_at_version(&tx, source, version)?;
     records::insert(&tx, &record)?;
-    records::verify_all_version(&tx, 28)?;
+    records::verify_all_version(&tx, version)?;
     store
         .serving_owner
         .append_global_commit(
@@ -264,6 +354,20 @@ pub(crate) fn hydrate_predecessor_fixture(
     Ok(record)
 }
 
+/// Decide an Output entry that cannot fit the live journal segment, without
+/// appending it. The owed band refuses without an allowance; the pre-effect
+/// band seals first. Returns whether a seal was written.
+#[cfg(test)]
+pub(crate) fn decide_unfitting_output_fixture(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    initialization: &SecurityParticipantStateInitialization,
+    owed: bool,
+) -> Result<bool, AdmissionOperationStoreError> {
+    history::segments::decide_unfitting_output(tx, owner, initialization, owed)
+        .map(|boundary| boundary == history::segments::Boundary::Sealed)
+}
+
 #[cfg(test)]
 fn cutpoint(stage: u8) -> Result<(), AdmissionOperationStoreError> {
     super::tests::security_participant_state::cutpoint(stage)
@@ -273,4 +377,6 @@ fn cutpoint(_: u8) -> Result<(), AdmissionOperationStoreError> {
     Ok(())
 }
 
-pub(super) use observation::verify_recovery_initialization;
+pub(super) use observation::{
+    verify_current_recovery_initialization, verify_recovery_initialization,
+};

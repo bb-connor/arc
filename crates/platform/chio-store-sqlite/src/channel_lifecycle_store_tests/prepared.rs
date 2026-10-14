@@ -303,6 +303,81 @@ fn assert_verified_public_api(
 ) {
 }
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+struct GlobalCommitRow {
+    commit_sequence: i64,
+    mutation_kind: String,
+    projection_kind: String,
+    projection_key: String,
+    projection_sequence: i64,
+    projection_reference_digest: String,
+    authority_projection_digest: String,
+    previous_chain_digest: String,
+    chain_digest: String,
+    store_uuid: String,
+    store_lease_id: Option<String>,
+    store_owner_epoch: i64,
+}
+
+/// The exact retained authority global commit history. Provisioning and
+/// serving-owner recovery may legitimately install their own global commits
+/// before any operation runs, so tests tie their assertions to the observed
+/// baseline plus the exact delta of the named operation.
+fn global_commit_history(connection: &rusqlite::Connection) -> TestResult<Vec<GlobalCommitRow>> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT commit_sequence, mutation_kind, projection_kind, projection_key,
+               projection_sequence, projection_reference_digest,
+               authority_projection_digest, previous_chain_digest, chain_digest,
+               store_uuid, store_lease_id, store_owner_epoch
+        FROM authority_global_commits
+        ORDER BY commit_sequence
+        "#,
+    )?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok(GlobalCommitRow {
+                commit_sequence: row.get(0)?,
+                mutation_kind: row.get(1)?,
+                projection_kind: row.get(2)?,
+                projection_key: row.get(3)?,
+                projection_sequence: row.get(4)?,
+                projection_reference_digest: row.get(5)?,
+                authority_projection_digest: row.get(6)?,
+                previous_chain_digest: row.get(7)?,
+                chain_digest: row.get(8)?,
+                store_uuid: row.get(9)?,
+                store_lease_id: row.get(10)?,
+                store_owner_epoch: row.get(11)?,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
+}
+
+fn projection_counts(connection: &rusqlite::Connection) -> TestResult<(i64, i64, i64, i64, i64)> {
+    Ok(connection.query_row(
+        r#"
+        SELECT
+            (SELECT COUNT(*) FROM admission_operations),
+            (SELECT COUNT(*) FROM admission_operation_commits),
+            (SELECT COUNT(*) FROM channel_state_records),
+            (SELECT COUNT(*) FROM channel_lifecycle_records),
+            (SELECT COUNT(*) FROM channel_prepared_admission_plans)
+        "#,
+        [],
+        |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
+        },
+    )?)
+}
+
 fn created_prepared_record(
     fixture: &Fixture,
     request_id: &str,
@@ -387,9 +462,54 @@ fn exact_replay_returns_the_same_plan_without_a_second_commit() -> TestResult {
     let operation = prepared_operation(&fixture.fence, "exact-replay")?;
     let plan = prepared_plan(&operation, &fixture.fence)?;
     let trusted_now = now_ms()?;
+    let baseline_anchor_generation = fixture.authority.anchor_generation()?;
+    let baseline_global_commits = {
+        let connection = fixture.store.connection()?;
+        global_commit_history(&connection)?
+    };
     fixture
         .store
         .begin_channel_prepared_inner(&operation, &plan, &fixture.fence, trusted_now)?;
+    // One genuine first prepared begin advances the durable anchor exactly once.
+    let after_begin_anchor_generation = fixture.authority.anchor_generation()?;
+    assert_eq!(
+        after_begin_anchor_generation,
+        baseline_anchor_generation
+            .checked_add(1)
+            .ok_or("anchor generation overflowed")?
+    );
+    let after_begin_global_commits = {
+        let connection = fixture.store.connection()?;
+        global_commit_history(&connection)?
+    };
+    // The first begin appends exactly one authority global commit for this
+    // named operation and preserves every prior retained row unchanged.
+    assert_eq!(
+        after_begin_global_commits.len(),
+        baseline_global_commits
+            .len()
+            .checked_add(1)
+            .ok_or("global commit count overflowed")?
+    );
+    assert_eq!(
+        &after_begin_global_commits[..baseline_global_commits.len()],
+        &baseline_global_commits[..]
+    );
+    let baseline_head = baseline_global_commits
+        .last()
+        .ok_or("authority global commit history was empty before the begin")?;
+    let appended = after_begin_global_commits
+        .last()
+        .ok_or("the first prepared begin appended no authority global commit")?;
+    assert_eq!(appended.commit_sequence, baseline_head.commit_sequence + 1);
+    assert_eq!(appended.mutation_kind, "begin");
+    assert_eq!(appended.projection_kind, "admission");
+    assert_eq!(
+        appended.projection_key,
+        operation.binding().operation_id().as_str()
+    );
+    assert_eq!(appended.projection_sequence, 1);
+    assert_eq!(appended.previous_chain_digest, baseline_head.chain_digest);
     let replay = fixture.store.begin_channel_prepared_inner(
         &operation,
         &plan,
@@ -408,30 +528,17 @@ fn exact_replay_returns_the_same_plan_without_a_second_commit() -> TestResult {
         Some(plan.reservation.proposal_digest()?.as_str())
     );
     assert_eq!(record.plan(), &plan);
+    // The exact replay causes no second write, global append or anchor advance.
+    assert_eq!(
+        fixture.authority.anchor_generation()?,
+        after_begin_anchor_generation
+    );
     let connection = fixture.store.connection()?;
-    let counts: (i64, i64, i64, i64, i64, i64) = connection.query_row(
-        r#"
-        SELECT
-            (SELECT COUNT(*) FROM admission_operations),
-            (SELECT COUNT(*) FROM admission_operation_commits),
-            (SELECT COUNT(*) FROM channel_state_records),
-            (SELECT COUNT(*) FROM channel_lifecycle_records),
-            (SELECT COUNT(*) FROM channel_prepared_admission_plans),
-            (SELECT COUNT(*) FROM authority_global_commits)
-        "#,
-        [],
-        |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                row.get(3)?,
-                row.get(4)?,
-                row.get(5)?,
-            ))
-        },
-    )?;
-    assert_eq!(counts, (1, 1, 1, 1, 1, 2));
+    assert_eq!(projection_counts(&connection)?, (1, 1, 1, 1, 1));
+    assert_eq!(
+        global_commit_history(&connection)?,
+        after_begin_global_commits
+    );
     Ok(())
 }
 
@@ -465,6 +572,11 @@ fn injected_plan_failure_rolls_back_every_prepared_projection() -> TestResult {
     let fixture = fixture()?;
     let operation = prepared_operation(&fixture.fence, "rollback")?;
     let plan = prepared_plan(&operation, &fixture.fence)?;
+    let baseline_anchor_generation = fixture.authority.anchor_generation()?;
+    let baseline_global_commits = {
+        let connection = fixture.store.connection()?;
+        global_commit_history(&connection)?
+    };
     {
         let connection = fixture.store.connection()?;
         connection.execute_batch(
@@ -483,29 +595,15 @@ fn injected_plan_failure_rolls_back_every_prepared_projection() -> TestResult {
         .is_err());
     let connection = fixture.store.connection()?;
     connection.execute_batch("DROP TRIGGER fail_channel_prepared_begin")?;
-    let counts: (i64, i64, i64, i64, i64, i64) = connection.query_row(
-        r#"
-        SELECT
-            (SELECT COUNT(*) FROM admission_operations),
-            (SELECT COUNT(*) FROM admission_operation_commits),
-            (SELECT COUNT(*) FROM channel_state_records),
-            (SELECT COUNT(*) FROM channel_lifecycle_records),
-            (SELECT COUNT(*) FROM channel_prepared_admission_plans),
-            (SELECT COUNT(*) FROM authority_global_commits)
-        "#,
-        [],
-        |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                row.get(3)?,
-                row.get(4)?,
-                row.get(5)?,
-            ))
-        },
-    )?;
-    assert_eq!(counts, (0, 0, 0, 0, 0, 1));
+    assert_eq!(projection_counts(&connection)?, (0, 0, 0, 0, 0));
+    // The failed begin preserves the exact pre-operation global and anchor
+    // history: every prepared projection and the operation's own global
+    // append rolled back together.
+    assert_eq!(global_commit_history(&connection)?, baseline_global_commits);
+    assert_eq!(
+        fixture.authority.anchor_generation()?,
+        baseline_anchor_generation
+    );
     Ok(())
 }
 
@@ -676,6 +774,11 @@ fn prepared_record_load_rejects_a_mismatched_begin_participant() -> TestResult {
     let record = created_prepared_record(&fixture, "mismatched-begin-participant")?;
     {
         let connection = fixture.store.connection()?;
+        let guard_sql: String = connection.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = 'admission_operation_commits_immutable'",
+            [],
+            |row| row.get(0),
+        )?;
         connection.execute_batch("DROP TRIGGER admission_operation_commits_immutable;")?;
         let changed = connection.execute(
             r#"
@@ -689,14 +792,14 @@ fn prepared_record_load_rejects_a_mismatched_begin_participant() -> TestResult {
             ],
         )?;
         assert_eq!(changed, 1);
+        connection.execute_batch(&guard_sql)?;
     }
-    assert!(matches!(
-        fixture
-            .store
-            .load_channel_prepared(record.operation().binding().operation_id()),
-        Err(ChannelLifecycleStoreError::Invalid(_))
-    ));
-    Ok(())
+    assert_prepared_corruption_refuses_and_poisons(
+        &fixture,
+        &record,
+        "retained channel prepared plan evidence is inconsistent",
+        "admission operation invariant failed: admission operation commit chain digest is invalid",
+    )
 }
 
 #[test]
@@ -705,6 +808,11 @@ fn prepared_record_load_rejects_mismatched_begin_fence_evidence() -> TestResult 
     let record = created_prepared_record(&fixture, "mismatched-begin-fence")?;
     {
         let connection = fixture.store.connection()?;
+        let guard_sql: String = connection.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = 'admission_operation_commits_immutable'",
+            [],
+            |row| row.get(0),
+        )?;
         connection.execute_batch("DROP TRIGGER admission_operation_commits_immutable;")?;
         let changed = connection.execute(
             r#"
@@ -715,14 +823,14 @@ fn prepared_record_load_rejects_mismatched_begin_fence_evidence() -> TestResult 
             [record.operation().binding().operation_id().as_str()],
         )?;
         assert_eq!(changed, 1);
+        connection.execute_batch(&guard_sql)?;
     }
-    assert!(matches!(
-        fixture
-            .store
-            .load_channel_prepared(record.operation().binding().operation_id()),
-        Err(ChannelLifecycleStoreError::Invalid(_))
-    ));
-    Ok(())
+    assert_prepared_corruption_refuses_and_poisons(
+        &fixture,
+        &record,
+        "retained channel prepared plan evidence is inconsistent",
+        "admission operation invariant failed: admission operation commit log is not a dense fenced sequence",
+    )
 }
 
 #[test]
@@ -757,13 +865,12 @@ fn prepared_record_load_rejects_multiple_begin_commits() -> TestResult {
         )?;
         assert_eq!(inserted, 1);
     }
-    assert!(matches!(
-        fixture
-            .store
-            .load_channel_prepared(record.operation().binding().operation_id()),
-        Err(ChannelLifecycleStoreError::Invalid(_))
-    ));
-    Ok(())
+    assert_prepared_corruption_refuses_and_poisons(
+        &fixture,
+        &record,
+        "prepared channel plan does not have exactly one admission begin commit",
+        "admission operation invariant failed: admission operation commit log is not a dense fenced sequence",
+    )
 }
 
 #[test]
@@ -772,19 +879,64 @@ fn prepared_record_load_rejects_a_missing_begin_commit() -> TestResult {
     let record = created_prepared_record(&fixture, "missing-begin-commit")?;
     {
         let connection = fixture.store.connection()?;
+        let guard_sql: String = connection.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = 'admission_operation_commits_no_delete'",
+            [],
+            |row| row.get(0),
+        )?;
         connection.execute_batch("DROP TRIGGER admission_operation_commits_no_delete;")?;
         let deleted = connection.execute(
             "DELETE FROM admission_operation_commits WHERE operation_id = ?1 AND mutation_kind = 'begin'",
             [record.operation().binding().operation_id().as_str()],
         )?;
         assert_eq!(deleted, 1);
+        connection.execute_batch(&guard_sql)?;
     }
-    assert!(matches!(
-        fixture
-            .store
-            .load_channel_prepared(record.operation().binding().operation_id()),
-        Err(ChannelLifecycleStoreError::Invalid(_))
-    ));
+    assert_prepared_corruption_refuses_and_poisons(
+        &fixture,
+        &record,
+        "prepared channel plan does not have exactly one admission begin commit",
+        "admission operation invariant failed: admission operation commit log is not a dense fenced sequence",
+    )
+}
+
+fn assert_prepared_corruption_refuses_and_poisons(
+    fixture: &Fixture,
+    record: &ChannelPreparedAdmissionRecordV1,
+    expected_record_error: &str,
+    expected_owner_error: &str,
+) -> TestResult {
+    // Check the specific prepared-record predicate independently of the earlier
+    // authenticated history check, then exercise the unchanged public read path.
+    {
+        let mut connection = fixture.store.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        let error = load_prepared_record(&transaction, record.operation().clone(), true)
+            .expect_err("corrupted prepared evidence must not load");
+        assert!(
+            matches!(&error, ChannelLifecycleStoreError::Invalid(detail) if detail == expected_record_error),
+            "unexpected prepared-record refusal: {error:?}"
+        );
+        transaction.rollback()?;
+    }
+    let operation_id = record.operation().binding().operation_id();
+    let error = fixture
+        .store
+        .load_channel_prepared(operation_id)
+        .expect_err("corrupted history must not serve a prepared record");
+    assert!(
+        matches!(&error, ChannelLifecycleStoreError::Invalid(detail) if detail == expected_owner_error),
+        "unexpected authority refusal: {error:?}"
+    );
+    let poisoned = fixture
+        .store
+        .load_channel_prepared(operation_id)
+        .expect_err("corrupted history must poison subsequent reads");
+    assert!(
+        matches!(&poisoned, ChannelLifecycleStoreError::OutcomeUnknown(detail)
+            if detail == "sqlite authority owner is poisoned after an outcome-unknown anchor sync"),
+        "unexpected poisoned-owner refusal: {poisoned:?}"
+    );
     Ok(())
 }
 

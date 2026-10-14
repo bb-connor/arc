@@ -69,11 +69,13 @@ impl OriginalProcessSnapshot {
         )?;
         super::unused_recovery_reservation::verify_before_open(&tx)?;
         super::confined_delivery::verify_before_open(&tx)?;
-        if !matches!(metadata.0, 1..=7) {
-            return Err(ProcessError::Invalid(
+        let version = u32::try_from(metadata.0)
+            .ok()
+            .filter(|version| matches!(version, 1..=8))
+            .ok_or(ProcessError::Invalid(
                 "unsupported original process journal version",
-            ));
-        }
+            ))?;
+        super::level_for_version(&tx, version)?;
         if metadata.1.as_deref() != Some(self.namespace.as_str())
             || metadata.2.as_deref() != Some(self.authority.as_str())
             || metadata.3.as_deref() != Some(self.kernel_key.as_str())

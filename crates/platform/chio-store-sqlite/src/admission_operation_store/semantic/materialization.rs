@@ -88,7 +88,7 @@ pub(super) fn materialized_influence(
     let observed =
         super::super::security_participant_state::knowledge::budgeted_observed_influence(
             tx,
-            binding.security_authority_id().as_str(),
+            binding,
             &recovery_flow_key(context),
             budget,
         )?;
@@ -383,6 +383,11 @@ pub(super) fn verify_current_prerequisites(
             return Err(refused("prerequisite material"));
         }
         if body.kind == SemanticPrerequisiteKindV1::HistoricalFact {
+            if revocation_fence(tx, &body.scope, &body.fact, &body.resource)?
+                .is_some_and(|fence| body.issued_at_unix_ms <= fence.revoked_at_unix_ms)
+            {
+                return Err(refused("prerequisite revoked"));
+            }
             continue;
         }
         if load::<bool>(tx, &format!("{}:revoked", fact_key(body)?))?.unwrap_or(false) {
@@ -419,6 +424,11 @@ pub(super) fn verify_dispatch_prerequisites(
     for signed in record.invocation.prerequisites.as_slice() {
         let body = signed.body();
         if body.kind == SemanticPrerequisiteKindV1::HistoricalFact {
+            if revocation_fence(tx, &body.scope, &body.fact, &body.resource)?
+                .is_some_and(|fence| body.issued_at_unix_ms <= fence.revoked_at_unix_ms)
+            {
+                return Err(refused("dispatch prerequisite changed"));
+            }
             continue;
         }
         let current: SignedSemanticPrerequisiteV1 =
@@ -739,17 +749,23 @@ mod influence_read_budget_tests {
     };
 
     #[test]
-    fn exhausted_influence_budget_reads_no_retained_bodies(
+    fn ordinary_influence_read_charges_its_bounded_projections_not_retained_history(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut connection = Connection::open_in_memory()?;
-        // Only the history census is present. Reading either unauthenticated
-        // body would be both observable and invalid. This tests the work gate,
-        // not successful native capture or influence qualification.
+        // 4096 bare knowledge-join keys for this authority exist, plus the
+        // protected tables the projection lookup checks for retained history.
+        // Decoding any of those rows would be observable and invalid. This tests
+        // the work gate, not successful native capture or influence qualification.
         connection.execute_batch(
-            "CREATE TABLE admission_operation_recovery_records (record_key TEXT PRIMARY KEY)",
+            "CREATE TABLE admission_operation_recovery_records (
+                 record_key TEXT PRIMARY KEY, version INTEGER, payload BLOB,
+                 scope_key TEXT, kind TEXT, native_namespace TEXT, native_request TEXT);
+             CREATE TABLE admission_operation_recovery_events (record_key TEXT PRIMARY KEY);
+             CREATE TABLE authority_global_commits (
+                 projection_kind TEXT, projection_key TEXT);",
         )?;
         let authority = "budgeted-history";
-        for sequence in 1..=2 {
+        for sequence in 1..=4096u64 {
             connection.execute(
                 "INSERT INTO admission_operation_recovery_records(record_key) VALUES (?1)",
                 [format!("{}{:016}", prefix(authority), sequence)],
@@ -764,11 +780,19 @@ mod influence_read_budget_tests {
         };
         let tx = connection.transaction()?;
         let work = NativeInfluenceReadWorkFixture::begin()?;
-        let mut budget = VerificationBudget::new(1)?;
-        assert!(budgeted_observed_influence(&tx, authority, &key, &mut budget).is_err());
+        // Only two of the three inherited-scope projection reads fit. The
+        // refusal must come from that bounded charge while the 4096 retained
+        // history rows price nothing, and no history body may be decoded.
+        let mut budget = VerificationBudget::new(2)?;
+        let binding = NativeSecurityAuthorityBindingV1::new(
+            AdmissionIdentifier::try_new("store_uuid", "budgeted-store")?,
+            AdmissionIdentifier::try_new("security_authority_id", "budgeted-history")?,
+            AdmissionDigest::try_new("initialization_digest", sha256_hex(b"budgeted"))?,
+        );
+        assert!(budgeted_observed_influence(&tx, &binding, &key, &mut budget).is_err());
         assert_eq!(budget.remaining(), 0);
         assert_eq!(work.history_bodies(), 0);
-        assert_eq!(work.current_projections(), 0);
+        assert_eq!(work.current_projections(), 2);
         Ok(())
     }
 }

@@ -24,8 +24,8 @@ use reader::{load_owner_leaf, load_reference_state, membership, ReferenceState};
 pub(in crate::admission_operation_store) use baseline::{
     prepare_new_artifact_reference_baseline, PreparedNewArtifactReferenceBaseline,
 };
-pub(in crate::admission_operation_store::knowledge) use collected::collection_sources as verify_collected_publication_sources;
 pub(in crate::admission_operation_store) use collected::collected_publication_closure;
+pub(in crate::admission_operation_store::knowledge) use collected::collection_sources as verify_collected_publication_sources;
 pub(in crate::admission_operation_store) use owner::{ProductEvidenceOwner, ReferenceOwner};
 pub(in crate::admission_operation_store) use prepare::{
     prepare_reference_retain, prepare_reference_retirement,

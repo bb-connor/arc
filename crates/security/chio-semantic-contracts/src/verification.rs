@@ -122,7 +122,20 @@ pub fn verify_semantic_invocation(
     expected: &SemanticInvocationExpectationV1<'_>,
     budget: &mut VerificationBudget,
 ) -> Result<VerifiedSemanticInvocationV1, ContractError> {
-    verify_invocation(registry, invocation, expected, budget, true)
+    verify_invocation(registry, invocation, expected, budget, true, true)
+}
+
+/// Model a predecessor capture whose selected annotators did not all answer.
+/// Every other check is shared with the production verifier. This returns only
+/// data and cannot construct or authorize a native capture witness.
+#[cfg(feature = "admission-test-support")]
+pub fn verify_modeled_legacy_incomplete_annotations(
+    registry: &CompiledSemanticRegistryV1,
+    invocation: &SemanticInvocationV1,
+    expected: &SemanticInvocationExpectationV1<'_>,
+    budget: &mut VerificationBudget,
+) -> Result<VerifiedSemanticInvocationV1, ContractError> {
+    verify_invocation(registry, invocation, expected, budget, true, false)
 }
 
 /// Recompute only input restriction data. Every signature, binding, source,
@@ -134,7 +147,19 @@ pub fn verify_semantic_input_restrictions(
     expected: &SemanticInvocationExpectationV1<'_>,
     budget: &mut VerificationBudget,
 ) -> Result<VerifiedSemanticInputRestrictionsV1, ContractError> {
-    verify_invocation(registry, invocation, expected, budget, false)
+    verify_invocation(registry, invocation, expected, budget, false, true)
+        .map(|facts| VerifiedSemanticInputRestrictionsV1 { facts })
+}
+
+/// Input-phase counterpart of [`verify_modeled_legacy_incomplete_annotations`].
+#[cfg(feature = "admission-test-support")]
+pub fn verify_modeled_legacy_incomplete_annotation_input_restrictions(
+    registry: &CompiledSemanticRegistryV1,
+    invocation: &SemanticInvocationV1,
+    expected: &SemanticInvocationExpectationV1<'_>,
+    budget: &mut VerificationBudget,
+) -> Result<VerifiedSemanticInputRestrictionsV1, ContractError> {
+    verify_invocation(registry, invocation, expected, budget, false, false)
         .map(|facts| VerifiedSemanticInputRestrictionsV1 { facts })
 }
 
@@ -144,6 +169,7 @@ fn verify_invocation(
     expected: &SemanticInvocationExpectationV1<'_>,
     budget: &mut VerificationBudget,
     require_native_disclosure: bool,
+    require_annotation_answers: bool,
 ) -> Result<VerifiedSemanticInvocationV1, ContractError> {
     let action = &invocation.action;
     let (route, contract) = registry.resolve(expected.server, expected.tool)?;
@@ -268,7 +294,9 @@ fn verify_invocation(
     for authority in route.annotators.as_slice() {
         for input in action.inputs.as_slice() {
             budget.charge(observed_annotations.len() as u32 + 1)?;
-            if !observed_annotations.contains(&(authority.key, input.clone())) {
+            if require_annotation_answers
+                && !observed_annotations.contains(&(authority.key, input.clone()))
+            {
                 return Err(ContractError::MissingDependency);
             }
         }

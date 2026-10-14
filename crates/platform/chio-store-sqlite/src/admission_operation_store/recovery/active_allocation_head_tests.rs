@@ -24,13 +24,26 @@ impl Fixture {
             CREATE INDEX authority_global_commits_projection ON authority_global_commits
                 (projection_kind,projection_key,projection_sequence);",
         )?;
+        let scope = RecoveryScopeV1 {
+            authority_domain: AuthorityDomainId::new("metadata-head-authority")?,
+            tenant_id: RecoveryTenantId::new("metadata-head-tenant")?,
+            process_id: ProcessId::new("metadata-head-process")?,
+        };
+        // Metadata-only owner identity for the startup tally's domain lookup.
+        // No lease, fence, epoch or funded native account is claimed here.
+        connection.execute_batch(
+            "CREATE TABLE chio_serving_owner (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                store_uuid TEXT UNIQUE NOT NULL
+            )",
+        )?;
+        connection.execute(
+            "INSERT INTO chio_serving_owner(singleton,store_uuid) VALUES(1,?1)",
+            params![scope.authority_domain.as_str()],
+        )?;
         Ok(Self {
             connection,
-            scope: RecoveryScopeV1 {
-                authority_domain: AuthorityDomainId::new("metadata-head-authority")?,
-                tenant_id: RecoveryTenantId::new("metadata-head-tenant")?,
-                process_id: ProcessId::new("metadata-head-process")?,
-            },
+            scope,
             workflow: WorkflowId::new("metadata-head-workflow")?,
         })
     }
@@ -80,24 +93,29 @@ impl Fixture {
     }
 
     fn capacity(&self) -> TestResult<(String, u64, Vec<u8>)> {
-        let value = Capacity {
-            schema: CapacitySchema::V1,
-            authority_domain: self.scope.authority_domain.clone(),
-            tenant_id: None,
-            legacy_cutoff: SafeInteger::ZERO,
-            baseline: SafeInteger::ZERO,
-            admitted: SafeInteger::ZERO,
-            retired: SafeInteger::ZERO,
-        };
+        let mut value = self.initial_capacity(0)?;
         let (key, scope) = capacity_identity(&value.authority_domain, None)?;
-        self.append(&key, &scope, "command", &value)?;
-        let mut value = value;
         value.admitted = SafeInteger::new(1)?;
         let (version, payload, _) = self.append(&key, &scope, "command", &value)?;
         value.retired = SafeInteger::new(1)?;
         self.append(&key, &scope, "command", &value)?;
         assert_eq!(self.load_capacity()?.ok_or("capacity absent")?.active()?, 0);
         Ok((key, version, payload))
+    }
+
+    fn initial_capacity(&self, baseline: u64) -> TestResult<Capacity> {
+        let value = Capacity {
+            schema: CapacitySchema::V1,
+            authority_domain: self.scope.authority_domain.clone(),
+            tenant_id: None,
+            legacy_cutoff: SafeInteger::ZERO,
+            baseline: SafeInteger::new(baseline)?,
+            admitted: SafeInteger::ZERO,
+            retired: SafeInteger::ZERO,
+        };
+        let (key, scope) = capacity_identity(&value.authority_domain, None)?;
+        self.append(&key, &scope, "command", &value)?;
+        Ok(value)
     }
 
     fn allocation(&self) -> TestResult<(String, u64, Vec<u8>)> {
@@ -187,6 +205,21 @@ impl Fixture {
         );
         assert_eq!(self.connection.total_changes(), before);
     }
+
+    /// Refusal must hit this exact invariant branch without writing anything.
+    fn refuses_invariant(
+        &self,
+        detail: &str,
+        read: impl FnOnce() -> Result<(), AdmissionOperationStoreError>,
+    ) {
+        let before = self.connection.total_changes();
+        match read() {
+            Err(AdmissionOperationStoreError::Invariant(message)) => assert_eq!(message, detail),
+            Err(other) => panic!("expected refusal {detail}, got {other:?}"),
+            Ok(()) => panic!("expected refusal {detail}, accepted the current head"),
+        }
+        assert_eq!(self.connection.total_changes(), before);
+    }
 }
 
 #[test]
@@ -270,5 +303,56 @@ fn duplicate_current_allocation_global_reference_refuses_lease() -> TestResult {
     let (key, _, _) = fixture.allocation()?;
     fixture.later_global(&key, true)?;
     fixture.refuses(|| fixture.load_allocation());
+    Ok(())
+}
+
+#[test]
+fn zero_baseline_capacity_head_passes_startup_tally() -> TestResult {
+    let fixture = Fixture::new()?;
+    fixture.initial_capacity(0)?;
+    let before = fixture.connection.total_changes();
+    verify_all(&fixture.connection)?;
+    assert_eq!(fixture.connection.total_changes(), before);
+    Ok(())
+}
+
+#[test]
+fn adopted_capacity_baseline_is_refused_on_read_and_startup() -> TestResult {
+    let fixture = Fixture::new()?;
+    fixture.initial_capacity(1)?;
+    fixture.refuses_invariant("recovery active capacity adopted prior workflows", || {
+        fixture.load_capacity().map(|_| ())
+    });
+    fixture.refuses_invariant("recovery active capacity adopted prior workflows", || {
+        verify_all(&fixture.connection)
+    });
+    Ok(())
+}
+
+#[test]
+fn retained_workflow_history_refuses_absent_capacity_baseline() -> TestResult {
+    let fixture = Fixture::new()?;
+    let scope = scope_key(&fixture.scope)?;
+    let key = workflow_key(&fixture.scope, &fixture.workflow)?;
+    fixture.append(&key, &scope, "workflow", &"retained")?;
+    fixture.refuses_invariant("recovery active capacity absent", || {
+        verify_all(&fixture.connection)
+    });
+    Ok(())
+}
+
+#[test]
+fn global_workflow_reference_refuses_absent_capacity_baseline() -> TestResult {
+    let fixture = Fixture::new()?;
+    let key = workflow_key(&fixture.scope, &fixture.workflow)?;
+    fixture.connection.execute(
+        "INSERT INTO authority_global_commits
+         (commit_sequence,projection_kind,projection_key,projection_sequence,projection_reference_digest)
+         VALUES(1,'recovery',?1,1,?2)",
+        params![key, "0".repeat(64)],
+    )?;
+    fixture.refuses_invariant("recovery active capacity absent", || {
+        verify_all(&fixture.connection)
+    });
     Ok(())
 }

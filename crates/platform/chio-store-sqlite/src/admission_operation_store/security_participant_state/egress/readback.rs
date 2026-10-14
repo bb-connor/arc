@@ -55,7 +55,7 @@ impl SqliteAdmissionOperationStore {
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
         super::super::observed_time(&tx, now)?;
-        super::super::verify_coverage(&tx).map_err(map_owner_error)?;
+        super::super::verify_current_catalogs(&tx)?;
         let record = match load_operation(&tx, operation, "committed")? {
             Some(record) => Some(record),
             None => load_operation(&tx, operation, "acquired")?,
@@ -63,8 +63,12 @@ impl SqliteAdmissionOperationStore {
         let Some(record) = record else {
             return Ok(None);
         };
-        let initialized = super::super::records::load_metadata(&tx, record.authority.as_str())?
-            .ok_or_else(|| invalid("native egress initialization is absent"))?;
+        record.require_own_commit(&tx)?;
+        let initialized = super::super::records::load_current_named(
+            &tx,
+            record.authority.as_str(),
+            &record.initialization,
+        )?;
         let digest = AdmissionDigest::try_new("native_egress_event", record.digest()?)?;
         let historical_fence = record.command.fence().map_err(invalid)?;
         let committed = match record.result {

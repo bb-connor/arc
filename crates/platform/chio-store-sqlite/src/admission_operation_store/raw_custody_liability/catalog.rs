@@ -2,8 +2,7 @@
 use super::*;
 use std::sync::OnceLock;
 
-const SQLITE_SOURCE: &str =
-    "2026-03-13 10:38:09 737ae4a34738ffa0c3ff7f9bb18df914dd1cad163f28fd6b6e114a344fe6d618";
+const SQLITE_SOURCE: &str = crate::admission_operation_store::BUNDLED_SQLITE_SOURCE_ID;
 const TABLES: [&str; 7] = [
     "tool_outcome_blobs",
     "tool_outcomes",
@@ -60,12 +59,19 @@ pub(in crate::admission_operation_store) fn tool_outcome_write_profile(
             "ToolOutcome evaluation catalog differs from its compiled definition",
         ));
     }
+    let finishing = finishing_catalog(tx)?;
+    if finishing.as_slice() != expected_finishing_catalog()? {
+        return Err(invariant(
+            "native finishing producer catalog differs from its compiled definition",
+        ));
+    }
     let bytes = canonical_json_bytes(&(
-        "chio.sqlite.tool-outcome-write-profile.v1",
+        "chio.sqlite.tool-outcome-write-profile.v2",
         raw.fingerprint(),
         evaluation,
+        finishing,
         recovery::resources::tool_outcome_price_algorithm_fingerprint()?,
-        "eight actual producer tables; current admission40 and tool outcome3",
+        "twelve actual producer tables; current admission44, tool outcome3 and security release",
     ))
     .map_err(|error| invariant(error.to_string()))?;
     Ok(ToolOutcomeWriteProfileData {
@@ -103,6 +109,56 @@ fn evaluation_catalog(tx: &Connection) -> Result<Vec<CatalogEntry>, AdmissionOpe
         })
         .map_err(sqlite_error)?;
     rows.map(|row| row.map_err(sqlite_error)).collect()
+}
+
+/// The release, terminal projection, terminal record and observer producers
+/// written after an original native effect. Their guards and indexes are
+/// part of the priced write; no other trigger or index may join them.
+const FINISHING_TABLES: [&str; 4] = [
+    "tool_outcome_security_releases",
+    "admission_operation_terminal_projections",
+    "admission_operation_terminal_records",
+    "admission_operation_observer_attempts",
+];
+
+fn finishing_catalog(tx: &Connection) -> Result<Vec<CatalogEntry>, AdmissionOperationStoreError> {
+    let mut statement = tx
+        .prepare(
+            "SELECT type,name,tbl_name,sql FROM main.sqlite_schema
+             WHERE lower(tbl_name) IN (?1,?2,?3,?4)
+             ORDER BY type COLLATE BINARY,name COLLATE BINARY,tbl_name COLLATE BINARY
+             LIMIT 129",
+        )
+        .map_err(sqlite_error)?;
+    let rows = statement
+        .query_map(rusqlite::params_from_iter(FINISHING_TABLES), |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .map_err(sqlite_error)?
+        .collect::<Result<Vec<CatalogEntry>, _>>()
+        .map_err(sqlite_error)?;
+    if rows.len() > 128 {
+        return Err(invariant(
+            "native finishing producer catalog exceeds its bounded inventory",
+        ));
+    }
+    Ok(rows)
+}
+
+fn expected_finishing_catalog() -> Result<&'static [CatalogEntry], AdmissionOperationStoreError> {
+    static EXPECTED: OnceLock<Result<Vec<CatalogEntry>, String>> = OnceLock::new();
+    EXPECTED
+        .get_or_init(|| {
+            let model = super::super::schema::current_admission_write_catalog_model()
+                .map_err(|error| error.to_string())?;
+            model
+                .execute_batch(crate::tool_outcome_store::compiled_security_release_schema())
+                .map_err(|error| error.to_string())?;
+            finishing_catalog(&model).map_err(|error| error.to_string())
+        })
+        .as_ref()
+        .map(|entries| entries.as_slice())
+        .map_err(|error| invariant(error.to_string()))
 }
 
 fn expected_evaluation_catalog() -> Result<&'static [CatalogEntry], AdmissionOperationStoreError> {

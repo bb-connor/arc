@@ -9,7 +9,7 @@ fn v26_upgrade_is_empty_and_rejects_partial_future_or_aliased_state_without_repa
         Some("CREATE TABLE SECURITY_PARTICIPANT_MIGRATION_alias(value TEXT)"),
         Some("DROP TRIGGER admission_operation_commits_immutable"),
     ] {
-        let fixture = fixture();
+        let fixture = pre_recovery_fixture();
         let Fixture {
             _temp,
             database,

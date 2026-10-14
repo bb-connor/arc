@@ -3,7 +3,9 @@ use super::*;
 use crate::admission_operation_store::knowledge::encoding::chunks::{
     MAX_CHUNK_COUNT, MAX_ENCODED_SET_BYTES,
 };
-use crate::admission_operation_store::knowledge::encoding::write::VerifiedKnowledgeEncodingWrite;
+use crate::admission_operation_store::knowledge::encoding::write::{
+    EncodingAdmission, VerifiedKnowledgeEncodingWrite,
+};
 use std::ops::Deref;
 
 #[cfg(feature = "admission-test-support")]
@@ -11,6 +13,9 @@ use std::ops::Deref;
 mod extra_ordinal_fixture;
 #[cfg(feature = "admission-test-support")]
 pub(in crate::admission_operation_store) use extra_ordinal_fixture::retain_restore_extra_ordinal_fixture;
+#[cfg(feature = "admission-test-support")]
+#[path = "knowledge_encoding/release_chunk_fault.rs"]
+mod release_chunk_fault;
 
 /// This affine source plan is consumed in its original native writer. Every
 /// head and absent chunk is checked before the first append. This logical
@@ -92,13 +97,28 @@ pub(in crate::admission_operation_store) fn persist_knowledge_encoding<'tx, 'con
     };
     SafeInteger::new(next_version)
         .map_err(|_| invariant("knowledge encoding root version exhausted"))?;
-    // This is the existing reversible intake observation. It does not claim
-    // the unimplemented all-family debt bank or a filesystem space promise.
-    crate::admission_operation_store::recovery::resources::check_intake_committing(tx)?;
+    // New Journal and restore admissions keep the reversible intake
+    // observation. Only the source-proven forward outcome of an admitted
+    // restore uses the settlement band; neither claims a debt bank or a
+    // filesystem space promise.
+    match proof.admission() {
+        EncodingAdmission::Intake => {
+            crate::admission_operation_store::recovery::resources::check_intake_committing(tx)?
+        }
+        EncodingAdmission::AdmittedOutcome => {
+            crate::admission_operation_store::recovery::resources::check_committing(tx)?
+        }
+    }
     // Only the actual codec owner derives this complete body prefix. Lost
     // current rows, extra ordinals or retained event/global ghosts all refuse
     // before the first chunk or root append in this same fenced transaction.
     proof.verify_pristine_prefix(tx)?;
+    #[cfg(feature = "admission-test-support")]
+    if let Some(armed) =
+        release_chunk_fault::persist_armed_release_outcome(tx, owner, &proof, next_version)?
+    {
+        return Ok(armed);
+    }
     for chunk in proof.staged_chunks() {
         persist_record(
             tx,

@@ -55,11 +55,18 @@ pub(super) async fn initialize_public_native_source(path: &std::path::Path) -> T
     assert!(!path.join("output-retention-profile.json").exists());
     assert!(path.join("public-original-profile").exists());
     std::fs::write(path.join("empty-native-import"), "selected")?;
+    std::fs::write(path.join("no-output-retention-profile"), "absent")?;
     let fixture = RecoveryFixture::open(path.to_path_buf(), None, false)?;
     // The public input is retained by the real native writer. Its original
     // deliberately has no output-retention selection, so capture must refuse
     // after the input join and before any provider effect.
-    initialize_native_source_input(&fixture, InformationLabel::bottom(), true).await?;
+    initialize_native_source_input(
+        &fixture,
+        InformationLabel::bottom(),
+        true,
+        "native-input-genesis",
+    )
+    .await?;
     let selected = chio_core::canonical_json_bytes(
         &fixture
             .authority
@@ -131,29 +138,147 @@ async fn native_fixture_from_empty_import_with_optional_retention(
     let directory = tempfile::tempdir()?;
     std::fs::write(directory.path().join("semantic-kind"), kind)?;
     std::fs::write(directory.path().join("empty-native-import"), "selected")?;
-    if let Some(profile) = retention {
-        std::fs::write(
-            directory.path().join("output-retention-profile.json"),
-            chio_core::canonical_json_bytes(profile)?,
-        )?;
-    }
-    let fixture = match payment_adapter {
-        Some(adapter) => RecoveryFixture::open_with_payment_adapter(
-            directory.path().to_path_buf(),
-            Some(directory),
-            false,
-            adapter,
-        )?,
-        None => RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)?,
+    // The owned source Input is admitted before any profile is selected.
+    std::fs::write(directory.path().join("no-output-retention-profile"), "absent")?;
+    let Some(profile) = retention else {
+        let fixture = match payment_adapter {
+            Some(adapter) => RecoveryFixture::open_with_payment_adapter(
+                directory.path().to_path_buf(),
+                Some(directory),
+                false,
+                adapter,
+            )?,
+            None => RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)?,
+        };
+        initialize_native_source_input(&fixture, restricted_label(), false, "native-input-genesis")
+            .await?;
+        return Ok(fixture);
     };
-    initialize_native_source_input(&fixture, restricted_label(), false).await?;
+    if payment_adapter.is_some() {
+        return Err("a selected retention fixture has no payment participant".into());
+    }
+    // The first owned Input must be admitted before any profile is selected:
+    // a selected original needs its finishing preparation before the Input
+    // join, so no profile can precede the source bootstrap. The profile is
+    // selected by a normal reopen that authenticates the retained history.
+    let bootstrap = RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)?;
+    initialize_native_source_input(
+        &bootstrap,
+        restricted_label(),
+        true,
+        "native-source-bootstrap",
+    )
+    .await?;
+    let selected = chio_core::canonical_json_bytes(
+        &bootstrap
+            .authority
+            .admission_operation_store()
+            .read_semantic_installation(
+                bootstrap.runtime.scope(),
+                &bootstrap.authority.mutation_fence(),
+                now_ms()?,
+            )?,
+    )?;
+    let source = bootstrap
+        .kernel
+        .observe_recovery_source(bootstrap.runtime.scope())?;
+    let (path, directory) = release_serving_owner(bootstrap);
+    std::fs::write(
+        path.join("output-retention-profile.json"),
+        chio_core::canonical_json_bytes(profile)?,
+    )?;
+    let fixture = RecoveryFixture::open(path, directory, false)?;
+    assert_lifecycle_only_import(&fixture)?;
+    assert_eq!(
+        chio_core::canonical_json_bytes(
+            &fixture
+                .authority
+                .admission_operation_store()
+                .read_semantic_installation(
+                    fixture.runtime.scope(),
+                    &fixture.authority.mutation_fence(),
+                    now_ms()?,
+                )?
+        )?,
+        selected,
+    );
+    assert_eq!(
+        fixture
+            .kernel
+            .observe_recovery_source(fixture.runtime.scope())?
+            .snapshot(),
+        source.snapshot(),
+    );
+    refuse_selected_genesis(&fixture, profile).await?;
     Ok(fixture)
+}
+
+/// Drops every owner of the fixture's serving files. The temporary directory
+/// keeps the real files; no source role or mutation authority survives.
+fn release_serving_owner(f: RecoveryFixture) -> (std::path::PathBuf, Option<tempfile::TempDir>) {
+    let path = f.path.clone();
+    let directory = f._directory;
+    drop(f.runtime);
+    drop(f.kernel);
+    drop(f.process);
+    drop(f.authority);
+    (path, directory)
+}
+
+/// A selected original is refused by its finishing preparation before any
+/// Input join, dispatch, capture or provider effect.
+async fn refuse_selected_genesis(
+    fixture: &RecoveryFixture,
+    profile: &chio_kernel::admission_operation::NativeOutputRetentionProfileV1,
+) -> TestResult {
+    let deployment = fixture
+        .kernel
+        .recovery_deployment(fixture.runtime.scope())?;
+    let request = fixture.process.tool_request(
+        "root",
+        "native-input-genesis",
+        &fixture.seed.server_id,
+        &fixture.seed.tool_name,
+        fixture.seed.arguments.clone(),
+    )?;
+    let denied = Box::pin(fixture.process.invoke_known_only(
+        "root",
+        "native-input-genesis",
+        &request,
+    ))
+    .await?;
+    assert_eq!(denied.verdict, Verdict::Deny);
+    assert!(denied.receipt.verify_signature()?);
+    assert!(denied.output.is_none());
+    let (operation, original) = fixture
+        .authority
+        .admission_operation_store()
+        .load_unambiguous_retained_tool_request(
+            &AdmissionIdentifier::try_new("request_id", &request.request_id)?,
+            &fixture.authority.mutation_fence(),
+            now_ms()?,
+        )?
+        .ok_or("selected native genesis original absent")?;
+    original.validate_request_material(&request)?;
+    original.validate_native_security_authority(&deployment.native_authority)?;
+    original.validate_native_security_context(&deployment.security_context)?;
+    assert_eq!(original.native_output_retention(), Some(profile));
+    assert_eq!(
+        operation.state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert!(operation.dispatch_commit().is_none());
+    assert!(operation.native_dispatch_ledger_digest().is_none());
+    assert_eq!(fixture.effects.load(Ordering::SeqCst), 0);
+    assert_eq!(external_count(&fixture.path)?, 0);
+    Ok(())
 }
 
 async fn initialize_native_source_input(
     fixture: &RecoveryFixture,
     expected: InformationLabel,
     require_unselected_retention: bool,
+    label: &str,
 ) -> TestResult {
     assert_lifecycle_only_import(fixture)?;
     let deployment = fixture
@@ -171,7 +296,7 @@ async fn initialize_native_source_input(
     assert_eq!(observed.stored_context_generation(), None);
     let request = fixture.process.tool_request(
         "root",
-        "native-input-genesis",
+        label,
         &fixture.seed.server_id,
         &fixture.seed.tool_name,
         fixture.seed.arguments.clone(),
@@ -180,12 +305,7 @@ async fn initialize_native_source_input(
     assert!(request.execution_nonce.is_none());
     // Admission joins the actual classified input before the later refusal.
     // An Input guard would deny before this producer transaction.
-    let denied = Box::pin(fixture.process.invoke_known_only(
-        "root",
-        "native-input-genesis",
-        &request,
-    ))
-    .await?;
+    let denied = Box::pin(fixture.process.invoke_known_only("root", label, &request)).await?;
     assert_eq!(denied.verdict, Verdict::Deny);
     assert!(denied.receipt.verify_signature()?);
     assert!(denied.output.is_none());
@@ -337,38 +457,278 @@ async fn native_empty_import_bootstraps_only_through_its_first_owned_input() -> 
 }
 
 #[tokio::test]
-async fn native_nonempty_import_holds_fresh_influence_reads_without_rewriting_history() -> TestResult
-{
-    let fixture = native_fixture("trusted-history")?;
+async fn native_imported_history_conservatively_contributes_unknown_influence_without_rewrite(
+) -> TestResult {
+    let mut fixture = native_fixture("trusted-history")?;
+    let store = fixture.authority.admission_operation_store();
+    let fence = fixture.authority.mutation_fence();
+    let scope = fixture.runtime.scope();
     let inventory = retained_import_inventory(&fixture)?;
     assert!(inventory
         .iter()
         .any(|(table, rows)| table != "security_declassification_lifecycle" && *rows != 0));
-    let before = fixture
-        .kernel
-        .observe_recovery_source(fixture.runtime.scope())?;
-    let refusal = fixture
-        .authority
-        .admission_operation_store()
-        .observe_knowledge_influence(
-            fixture.runtime.scope(),
-            &fixture.authority.mutation_fence(),
-            now_ms()?,
-        )
-        .err()
-        .ok_or("nonempty imported history produced a usable influence observation")?;
-    assert!(
-        refusal
-            .to_string()
-            .contains("native imported influence history remains held"),
-        "import hold failed in a different prerequisite: {refusal}"
+    let sealed_source = fixture.kernel.observe_recovery_source(scope)?;
+    let sealed = sealed_source.snapshot();
+    let before = fixture.effects.load(Ordering::SeqCst);
+    let observed = store
+        .observe_knowledge_influence(scope, &fence, now_ms()?)?
+        .ok_or("matching imported history contributed no influence")?;
+    // Genuine predecessor history conservatively contributes unknown origin
+    // classifications. It never grants a trusted external classification.
+    assert!(observed.unknown);
+    assert!(!observed.externally_influenced);
+    let commitment = observed.commitment;
+    // A permitted read rewrites nothing: the sealed source snapshot, the
+    // imported inventory and the effect side all stay byte-identical.
+    assert_eq!(
+        fixture.kernel.observe_recovery_source(scope)?.snapshot(),
+        sealed
     );
-    let after = fixture
-        .kernel
-        .observe_recovery_source(fixture.runtime.scope())?;
-    assert_eq!(before.snapshot(), after.snapshot());
     assert_eq!(inventory, retained_import_inventory(&fixture)?);
-    assert_eq!(fixture.effects.load(Ordering::SeqCst), 0);
+    assert_eq!(fixture.effects.load(Ordering::SeqCst), before);
     assert_eq!(external_count(&fixture.path)?, 0);
+    // The exact commitment is stable across a genuine serving restart.
+    let path = fixture.path.clone();
+    let directory = fixture._directory.take();
+    drop(store);
+    drop(sealed_source);
+    drop(fixture);
+    let reopened = RecoveryFixture::open(path, directory, false)?;
+    let reopened_scope = reopened.runtime.scope();
+    let reopened_store = reopened.authority.admission_operation_store();
+    let reopened_fence = reopened.authority.mutation_fence();
+    let replayed = reopened_store
+        .observe_knowledge_influence(reopened_scope, &reopened_fence, now_ms()?)?
+        .ok_or("imported influence disappeared across restart")?;
+    assert!(replayed.unknown);
+    assert!(!replayed.externally_influenced);
+    assert_eq!(replayed.commitment, commitment);
+    assert_eq!(external_count(&reopened.path)?, 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn native_foreign_tenant_import_never_contaminates_another_flow() -> TestResult {
+    // Seed the sealed source with flow history of one foreign tenant only.
+    let directory = tempfile::tempdir()?;
+    std::fs::write(directory.path().join("semantic-kind"), "trusted-history")?;
+    // The marker skips the default fixture-context join below; only the
+    // foreign rows seeded here are imported.
+    std::fs::write(
+        directory.path().join("empty-native-import"),
+        "foreign-source",
+    )?;
+    let source = SqliteSecurityStateStore::open(directory.path().join("source.db"))?;
+    source.seal_declassification_live_dispatch()?;
+    let [principal_join, lineage_join, session_join] =
+        command_quotas::fixture_source_labels(directory.path(), restricted_label())?;
+    let foreign =
+        chio_kernel::SecurityInvocationContext::V1(chio_kernel::SecurityInvocationContextV1::new(
+            chio_security_types::ports::TenantId::new("foreign-import-tenant")?,
+            chio_security_types::ports::SessionId::new("foreign-import-session")?,
+            chio_security_types::PrincipalId::new("foreign-import-principal")?,
+            chio_security_types::ports::IsolationEpochId::new("foreign-import-epoch")?,
+            chio_security_types::ports::LineageId::new("foreign-import-lineage")?,
+            0,
+        ));
+    source.join(&FlowJoinRequest {
+        key: chio_kernel::recovery::recovery_flow_key(&foreign),
+        principal_join,
+        lineage_join,
+        session_join,
+        transition_id: RecordId::new("foreign-import-source")?,
+    })?;
+    drop(source);
+    let fixture = RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)?;
+    let store = fixture.authority.admission_operation_store();
+    let fence = fixture.authority.mutation_fence();
+    let scope = fixture.runtime.scope();
+    let inventory = retained_import_inventory(&fixture)?;
+    assert!(inventory
+        .iter()
+        .any(|(table, rows)| table != "security_declassification_lifecycle" && *rows != 0));
+    let before = fixture.effects.load(Ordering::SeqCst);
+    // A foreign tenant's retained history never becomes this flow's influence.
+    assert!(store
+        .observe_knowledge_influence(scope, &fence, now_ms()?)?
+        .is_none());
+    assert_eq!(inventory, retained_import_inventory(&fixture)?);
+    assert_eq!(fixture.effects.load(Ordering::SeqCst), before);
+    assert_eq!(external_count(&fixture.path)?, 0);
+    Ok(())
+}
+
+/// Drops every guard trigger of one table, applies the damage, and restores
+/// each guard from its own captured definition before any later read.
+fn with_dropped_guards(path: &std::path::Path, table: &str, damage: &str) -> TestResult<usize> {
+    let connection = rusqlite::Connection::open(path.join("admission.db"))?;
+    let guards: Vec<(String, String)> = {
+        let mut statement = connection.prepare(
+            "SELECT name, sql FROM sqlite_schema WHERE type='trigger' AND tbl_name=?1 ORDER BY name",
+        )?;
+        let rows = statement.query_map([table], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        rows.collect::<rusqlite::Result<_>>()?
+    };
+    connection.pragma_update(None, "foreign_keys", false)?;
+    for (name, _) in &guards {
+        connection.execute_batch(&format!("DROP TRIGGER \"{name}\""))?;
+    }
+    let changed = connection.execute(damage, [])?;
+    for (_, sql) in &guards {
+        connection.execute_batch(sql)?;
+    }
+    Ok(changed)
+}
+
+#[tokio::test]
+async fn native_imported_influence_read_ignores_large_foreign_tenant_history() -> TestResult {
+    // The default fixture join seeds this flow's own genuine history; a large
+    // foreign history is retained beside it in the same sealed source. The read
+    // stays inside its fixed work budget only if it never prices that history.
+    let directory = tempfile::tempdir()?;
+    std::fs::write(directory.path().join("semantic-kind"), "trusted-history")?;
+    let source = SqliteSecurityStateStore::open(directory.path().join("source.db"))?;
+    source.seal_declassification_live_dispatch()?;
+    let [principal_join, lineage_join, session_join] =
+        command_quotas::fixture_source_labels(directory.path(), restricted_label())?;
+    for index in 0..700 {
+        let foreign = chio_kernel::SecurityInvocationContext::V1(
+            chio_kernel::SecurityInvocationContextV1::new(
+                chio_security_types::ports::TenantId::new(format!(
+                    "foreign-import-tenant-{index:04}"
+                ))?,
+                chio_security_types::ports::SessionId::new(format!(
+                    "foreign-import-session-{index:04}"
+                ))?,
+                chio_security_types::PrincipalId::new(format!(
+                    "foreign-import-principal-{index:04}"
+                ))?,
+                chio_security_types::ports::IsolationEpochId::new(format!(
+                    "foreign-import-epoch-{index:04}"
+                ))?,
+                chio_security_types::ports::LineageId::new(format!(
+                    "foreign-import-lineage-{index:04}"
+                ))?,
+                0,
+            ),
+        );
+        source.join(&FlowJoinRequest {
+            key: chio_kernel::recovery::recovery_flow_key(&foreign),
+            principal_join: principal_join.clone(),
+            lineage_join: lineage_join.clone(),
+            session_join: session_join.clone(),
+            transition_id: RecordId::new(format!("foreign-import-source-{index:04}"))?,
+        })?;
+    }
+    drop(source);
+    let mut fixture =
+        RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)?;
+    let store = fixture.authority.admission_operation_store();
+    let fence = fixture.authority.mutation_fence();
+    let scope = fixture.runtime.scope();
+    let observed = store
+        .observe_knowledge_influence(scope, &fence, now_ms()?)?
+        .ok_or("own imported history contributed no influence beside foreign history")?;
+    assert!(observed.unknown);
+    assert!(!observed.externally_influenced);
+    let replayed = store
+        .observe_knowledge_influence(scope, &fence, now_ms()?)?
+        .ok_or("own imported influence disappeared beside foreign history")?;
+    assert_eq!(replayed.commitment, observed.commitment);
+    // An out-of-band write invalidates the serving owner's database view,
+    // even when it damages a foreign tenant. The public reader must refuse;
+    // the cold reopen must independently reject the corrupted sealed source.
+    let changed = with_dropped_guards(
+        &fixture.path,
+        "security_participant_migration_rows",
+        "UPDATE security_participant_migration_rows SET canonical_row = X'007b7d'
+         WHERE table_name = 'security_transitions'
+           AND CAST(canonical_row AS TEXT) LIKE '%foreign-import-tenant-0000%'",
+    )?;
+    assert!(changed >= 1, "no foreign transition row to damage");
+    assert!(store
+        .observe_knowledge_influence(scope, &fence, now_ms()?)
+        .is_err());
+    let path = fixture.path.clone();
+    let directory = fixture._directory.take();
+    drop(store);
+    drop(fixture);
+    assert!(RecoveryFixture::open(path, directory, false).is_err());
+    Ok(())
+}
+
+#[tokio::test]
+async fn tampered_imported_scope_index_refuses_influence_reads_fail_closed() -> TestResult {
+    let mut fixture = native_fixture("trusted-history")?;
+    let store = fixture.authority.admission_operation_store();
+    let fence = fixture.authority.mutation_fence();
+    let scope = fixture.runtime.scope();
+    assert!(store
+        .observe_knowledge_influence(scope, &fence, now_ms()?)?
+        .is_some());
+    // Removing every index leaf would read as a genuine absence unless the
+    // protected root still commits those leaves.
+    let removed = with_dropped_guards(
+        &fixture.path,
+        "security_participant_state_imported_scope_index",
+        "DELETE FROM security_participant_state_imported_scope_index",
+    )?;
+    assert!(removed >= 1, "no scope index leaf to remove");
+    assert!(store
+        .observe_knowledge_influence(scope, &fence, now_ms()?)
+        .is_err());
+    let path = fixture.path.clone();
+    let directory = fixture._directory.take();
+    drop(store);
+    drop(fixture);
+    assert!(RecoveryFixture::open(path, directory, false).is_err());
+    Ok(())
+}
+
+#[tokio::test]
+async fn tampered_imported_history_refuses_influence_reads_fail_closed() -> TestResult {
+    let mut fixture = native_fixture("trusted-history")?;
+    let store = fixture.authority.admission_operation_store();
+    let fence = fixture.authority.mutation_fence();
+    let scope = fixture.runtime.scope();
+    assert!(store
+        .observe_knowledge_influence(scope, &fence, now_ms()?)?
+        .is_some());
+    // The migration history triggers refuse every UPDATE and DELETE on the
+    // serving tables, so a direct tamper cannot reach the reader. Use the
+    // established authorized fixture pattern instead: capture the trigger
+    // definitions, drop exactly those guards inside this test connection,
+    // corrupt one retained transition row, and restore the triggers from
+    // their own captured SQL before any subsequent read.
+    let connection = rusqlite::Connection::open(fixture.path.join("admission.db"))?;
+    let rows_guard: String = connection.query_row(
+        "SELECT sql FROM sqlite_schema WHERE type='trigger'
+         AND name='security_participant_migration_rows_immutable'",
+        [],
+        |row| row.get(0),
+    )?;
+    connection.pragma_update(None, "foreign_keys", false)?;
+    connection.execute_batch("DROP TRIGGER security_participant_migration_rows_immutable")?;
+    let changed = connection.execute(
+        "UPDATE security_participant_migration_rows
+         SET canonical_row = X'007b7d'
+         WHERE table_name = 'security_transitions'",
+        [],
+    )?;
+    assert!(changed >= 1, "no retained transition row to tamper");
+    connection.execute_batch(&rows_guard)?;
+    drop(connection);
+    // A damaged imported row fails closed at the owner's sealed-source and
+    // row verification checks; it never reinitializes, silently contributes
+    // zero, or downgrades the refusal into a fresh observation. This is the
+    // owner external-tamper refusal, not a claim about deep row acceptance.
+    assert!(store
+        .observe_knowledge_influence(scope, &fence, now_ms()?)
+        .is_err());
+    let path = fixture.path.clone();
+    let directory = fixture._directory.take();
+    drop(store);
+    drop(fixture);
+    assert!(RecoveryFixture::open(path, directory, false).is_err());
     Ok(())
 }

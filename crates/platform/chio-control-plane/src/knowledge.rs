@@ -4,14 +4,16 @@ use chio_core_types::{capability::token::CapabilityToken, recovery::*};
 use chio_kernel::{knowledge::*, recovery::*, ChioKernel, KernelError};
 use chio_security_types::{knowledge::*, recovery::*};
 use chio_store_sqlite::admission_operation_store::{
-    ArtifactPublicationInputV1, ArtifactPublicationViewV1, NativeArtifactRecordV1,
-    NativeKnowledgeInstallationV1, SqliteAdmissionOperationStore,
+    ArtifactPublicationInputV1, ArtifactPublicationViewV1, ArtifactReservationSource,
+    NativeArtifactRecordV1, NativeKnowledgeInstallationV1, NativeKnowledgeRecipientV1,
+    SqliteAdmissionOperationStore,
 };
 use std::sync::Arc;
 use zeroize::Zeroizing;
 
 mod checkpoints;
 mod outcome;
+mod retained_archive;
 mod transfer;
 pub use outcome::ArtifactDeliveryOutcomeV1;
 
@@ -138,21 +140,13 @@ impl NativeKnowledgeRuntime {
         &self,
         actor: &AuthenticatedRecoveryActor,
     ) -> Result<NativeKnowledgeInstallationV1, KernelError> {
-        checkpoints::checkpoint_restore_phase!(
-            self,
-            ProducerBrokerValidation,
-            self.broker.validate_process(
-                &self.profile.scope.process_id,
-                &self.profile.producer_context,
-            )
+        self.broker.validate_process(
+            &self.profile.scope.process_id,
+            &self.profile.producer_context,
         )?;
-        checkpoints::checkpoint_restore_phase!(
-            self,
-            ProducerInstallationLookup,
-            self.store
-                .knowledge_installation(actor, &self.fence, now()?)
-                .map_err(unavailable)
-        )
+        self.store
+            .knowledge_installation(actor, &self.fence, now()?)
+            .map_err(unavailable)
     }
 
     fn current_retained(
@@ -196,6 +190,24 @@ impl NativeKnowledgeRuntime {
         bytes: &[u8],
         certificate: Option<&SignedArtifactCertificateV1>,
     ) -> Result<ArtifactVersionRefV1, KernelError> {
+        self.publish_with_source(
+            capability,
+            input,
+            bytes,
+            certificate,
+            ArtifactReservationSource::Publication,
+        )
+    }
+    /// The one publication workflow. Import publications carry the signed
+    /// manifest their reservation is accountable to.
+    fn publish_with_source(
+        &self,
+        capability: &CapabilityToken,
+        input: &ArtifactPublicationInputV1,
+        bytes: &[u8],
+        certificate: Option<&SignedArtifactCertificateV1>,
+        source: ArtifactReservationSource<'_>,
+    ) -> Result<ArtifactVersionRefV1, KernelError> {
         validate_bytes(input, bytes)?;
         let permission = if matches!(input.producer, ArtifactProducerV1::Adoption { .. }) {
             RecoveryPermission::KnowledgeAdopt
@@ -206,7 +218,7 @@ impl NativeKnowledgeRuntime {
         self.current(&actor)?;
         let record = self
             .store
-            .reserve_artifact(&actor, input, &self.fence, now()?)
+            .reserve_artifact_from(&actor, input, source, &self.fence, now()?)
             .map_err(unavailable)?;
         if matches!(
             record.state,
@@ -290,6 +302,37 @@ impl NativeKnowledgeRuntime {
             .store
             .prepare_artifact_read(&actor, handle, &self.fence, now()?)
             .map_err(unavailable)?;
+        let bytes = self.read_prepared(&actor, &profile, &record, &recipient)?;
+        Ok(PreparedArtifactRead {
+            record,
+            handle: handle.clone(),
+            bytes,
+        })
+    }
+    /// Verified bytes for a body that one host-selected sink receives as a
+    /// whole. No handle is minted: the store checks the same admission and
+    /// saves nothing.
+    fn read_for_recipient(
+        &self,
+        actor: &AuthenticatedRecoveryActor,
+        profile: &NativeKnowledgeInstallationV1,
+        reference: &ArtifactVersionRefV1,
+        recipient: &ArtifactRecipientId,
+    ) -> Result<(NativeArtifactRecordV1, Zeroizing<Vec<u8>>), KernelError> {
+        let (record, selection) = self
+            .store
+            .prepare_artifact_read_for_recipient(actor, reference, recipient, &self.fence, now()?)
+            .map_err(unavailable)?;
+        let bytes = self.read_prepared(actor, profile, &record, &selection)?;
+        Ok((record, bytes))
+    }
+    fn read_prepared(
+        &self,
+        actor: &AuthenticatedRecoveryActor,
+        profile: &NativeKnowledgeInstallationV1,
+        record: &NativeArtifactRecordV1,
+        recipient: &NativeKnowledgeRecipientV1,
+    ) -> Result<Zeroizing<Vec<u8>>, KernelError> {
         self.broker
             .validate_process(&recipient.recipient.scope.process_id, &recipient.context)?;
         let seal = record
@@ -301,7 +344,7 @@ impl NativeKnowledgeRuntime {
             Err(_) => {
                 self.store
                     .quarantine_artifact_version(
-                        &actor,
+                        actor,
                         &artifact_version_reference(&record.metadata).map_err(unavailable)?,
                         &self.fence,
                         now()?,
@@ -315,11 +358,7 @@ impl NativeKnowledgeRuntime {
             return Err(unavailable("stale record policy"));
         }
         validate_bytes(&record.input, &bytes)?;
-        Ok(PreparedArtifactRead {
-            record,
-            handle: handle.clone(),
-            bytes,
-        })
+        Ok(bytes)
     }
     pub fn release_into(
         &self,

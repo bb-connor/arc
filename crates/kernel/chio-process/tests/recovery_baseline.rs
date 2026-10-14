@@ -292,7 +292,7 @@ async fn measured_native_baseline() -> Result {
     let samples_ns = samples.clone();
     samples.sort_unstable();
     println!(
-        "NATIVE_RECOVERY_BASELINE {}",
+        "\nNATIVE_RECOVERY_BASELINE {}",
         json!({
             "profile":if cfg!(debug_assertions) { "debug" } else { "release" },
             "elapsed_ns":baseline_started.elapsed().as_nanos(),

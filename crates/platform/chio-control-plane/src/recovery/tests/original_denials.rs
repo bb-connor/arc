@@ -261,10 +261,15 @@ async fn recovery_origin_is_in_the_exact_review_and_signed_authorization() -> Te
         .runtime
         .execute_command(&fixture.control, &resume)
         .await?;
-    assert!(matches!(
+    assert!(
+        matches!(
+            completed.status.effect,
+            EffectObservationV1::Complete { .. }
+        ),
+        "the authorized continuation did not complete; observed effect: {:?}, release: {:?}",
         completed.status.effect,
-        EffectObservationV1::Complete { .. }
-    ));
+        completed.status.release
+    );
     let captured = fixture.record(&workflow)?;
     let grant = captured.signed_grant.ok_or("signed grant absent")?;
     assert!(grant.verify_signature()?);
@@ -294,78 +299,6 @@ async fn recovery_origin_refuses_changed_original_request_bytes() -> TestResult 
 }
 
 #[tokio::test]
-async fn recovery_originless_history_refuses_new_owners_and_retains_control() -> TestResult {
-    let fixture = RecoveryFixture::new(false)?;
-    let actor = fixture.kernel.authenticate_recovery_actor(
-        fixture.runtime.scope(),
-        &fixture.control,
-        RecoveryPermission::Create,
-    )?;
-    let template_seed = Box::pin(fixture.denied_seed_named("history-template")).await?;
-    let created = fixture.kernel.execute_recovery_command_with_origin(
-        &actor,
-        &fixture.command(
-            "history-template",
-            RecoveryCommandBodyV1::CreateWorkflow {
-                creation_key: CreationKey::new("history-template")?,
-                template: RecoveryTemplateV1::SupportTicketPublicIssue,
-                request_seed: text(&template_seed)?,
-            },
-        )?,
-        &fixture.process,
-    )?;
-    let seed = Box::pin(fixture.denied_seed_named("legacy-original")).await?;
-    let legacy =
-        chio_store_sqlite::admission_operation_store::retain_unadmitted_legacy_recovery_fixture(
-            &fixture.authority.admission_operation_store(),
-            &actor,
-            &created.workflow_id,
-            &seed,
-            &fixture.authority.mutation_fence(),
-            now_ms()?,
-        )?;
-    assert!(legacy.origin.is_none());
-    let canonical = chio_core::canonical_json_bytes(&legacy)?;
-    assert!(!serde_json::to_value(&legacy)?
-        .as_object()
-        .ok_or("legacy shape")?
-        .contains_key("origin"));
-    let replacement = create_from(&fixture, "legacy-replacement", &seed).await?;
-    assert!(
-        replacement.is_err(),
-        "unlinked legacy history cannot prove this parent is unused"
-    );
-    assert_eq!(
-        chio_core::canonical_json_bytes(&fixture.record(&legacy.workflow_id)?)?,
-        canonical
-    );
-    fixture
-        .execute(
-            "inspect-legacy",
-            RecoveryCommandBodyV1::InspectWorkflow {
-                workflow_id: legacy.workflow_id.clone(),
-            },
-        )
-        .await?;
-    fixture
-        .execute(
-            "cancel-legacy",
-            RecoveryCommandBodyV1::CancelWorkflow {
-                workflow_id: legacy.workflow_id.clone(),
-                expected_revision: legacy.revision,
-            },
-        )
-        .await?;
-    fixture
-        .runtime
-        .settle(&fixture.control, &legacy.workflow_id)?;
-    assert!(fixture.record(&legacy.workflow_id)?.origin.is_none());
-    assert_eq!(external_count(&fixture.path)?, 0);
-    assert_eq!(fixture.process.process("root")?.tree_calls, 2);
-    Ok(())
-}
-
-#[tokio::test]
 async fn recovery_origin_unknown_effect_cannot_create_a_second_continuation() -> TestResult {
     let fixture = RecoveryFixture::new(false)?;
     let id = fixture.ready().await?;
@@ -379,21 +312,27 @@ async fn recovery_origin_unknown_effect_cannot_create_a_second_continuation() ->
             },
         )
         .await?;
-    assert!(matches!(
+    assert!(
+        matches!(response.status.effect, EffectObservationV1::Unknown { .. }),
+        "the lost-response continuation did not observe an unknown effect; observed effect: {:?}, release: {:?}",
         response.status.effect,
-        EffectObservationV1::Unknown { .. }
-    ));
+        response.status.release
+    );
     let original = fixture.record(&id)?;
     assert_eq!(
         native_state(&fixture, &original)?,
         AdmissionOperationState::OutcomeUnknownAfterDispatch
     );
     assert_eq!(external_count(&fixture.path)?, 1);
+    let owners = original_owner_counts(&fixture)?;
+    let charged = fixture.process.process("root")?.tree_calls;
     let retry = create_from(&fixture, "unknown-remedy", &original.seed).await?;
     assert!(
         retry.is_err(),
         "a lost response must reconcile the original operation"
     );
+    assert_eq!(original_owner_counts(&fixture)?, owners);
+    assert_eq!(fixture.process.process("root")?.tree_calls, charged);
     assert_eq!(external_count(&fixture.path)?, 1);
     Ok(())
 }
@@ -416,21 +355,27 @@ async fn recovery_origin_delivered_denial_cannot_create_a_second_continuation() 
             },
         )
         .await?;
-    assert!(matches!(
+    assert!(
+        matches!(response.status.effect, EffectObservationV1::Unknown { .. }),
+        "the delivered-denial continuation did not observe an unknown effect; observed effect: {:?}, release: {:?}",
         response.status.effect,
-        EffectObservationV1::Unknown { .. }
-    ));
+        response.status.release
+    );
     let original = fixture.record(&id)?;
     assert_eq!(
         native_state(&fixture, &original)?,
         AdmissionOperationState::DeniedAfterDelivery
     );
     assert_eq!(external_count(&fixture.path)?, 1);
+    let owners = original_owner_counts(&fixture)?;
+    let charged = fixture.process.process("root")?.tree_calls;
     let retry = create_from(&fixture, "delivered-denial-remedy", &original.seed).await?;
     assert!(
         retry.is_err(),
         "a denial after delivery is not evidence of no effect"
     );
+    assert_eq!(original_owner_counts(&fixture)?, owners);
+    assert_eq!(fixture.process.process("root")?.tree_calls, charged);
     assert_eq!(external_count(&fixture.path)?, 1);
     Ok(())
 }
@@ -456,6 +401,52 @@ async fn recovery_origin_has_one_durable_workflow_owner() -> TestResult {
     );
     assert_eq!(external_count(&fixture.path)?, 0);
     Ok(())
+}
+
+/// Diagnostic-only first-failure arming. Enabled only when
+/// CHIO_RECOVERY_ORIGINAL_CAPTURE_DIAGNOSTIC equals exactly "1"; an unset or
+/// other value preserves existing behavior. Writes the existing
+/// setup-capture-clock-checkpoint marker in the fixture directory BEFORE
+/// RecoveryFixture::open, so the shared configure_fixture_history_hooks
+/// checkpoint installs for this fixture. Writes no fake clock, selected
+/// seconds, final expiry, retention profile, or producer material.
+fn arm_original_capture_diagnostic(path: &std::path::Path) -> TestResult {
+    if !original_capture_diagnostic_enabled() {
+        return Ok(());
+    }
+    std::fs::write(path.join("setup-capture-clock-checkpoint"), b"enabled")?;
+    Ok(())
+}
+
+fn original_capture_diagnostic_enabled() -> bool {
+    std::env::var("CHIO_RECOVERY_ORIGINAL_CAPTURE_DIAGNOSTIC").as_deref() == Ok("1")
+}
+
+/// Diagnostic-only report of the private setup-capture-checkpoint-observed
+/// fixture marker. The shared checkpoint hook reuses the same real
+/// prepare_egress -> NativeFlowResolver::prepare_dispatch ->
+/// capture_invocation prefix as normal capture_native_dispatch, and the
+/// checkpoint ALWAYS stops before any connector call, including on success.
+/// A captured observation is therefore only checkpoint capture: NOT external
+/// delivery, NOT an unknown outcome, and NOT in-flight acceptance; this print
+/// is diagnosis only and never accepts any later state. An unavailable
+/// marker reports the actual read error; no upstream cause is invented.
+fn report_original_capture_diagnostic(fixture: &RecoveryFixture) {
+    if !original_capture_diagnostic_enabled() {
+        return;
+    }
+    let observed = fixture.path.join("setup-capture-checkpoint-observed");
+    match std::fs::read_to_string(&observed) {
+        Ok(contents) => eprintln!(
+            "ORIGINAL_CAPTURE_DIAGNOSTIC setup-capture-checkpoint-observed: {contents} \
+             (diagnostic-only checkpoint capture, not external delivery, \
+             unknown outcome, or in-flight acceptance)"
+        ),
+        Err(error) => eprintln!(
+            "ORIGINAL_CAPTURE_DIAGNOSTIC setup-capture-checkpoint-observed unavailable: {error} \
+             (diagnostic-only, actual read error, no invented upstream cause)"
+        ),
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -495,6 +486,7 @@ async fn refuse_dispatched_ordinary_original(
             b"enabled",
         )?;
     }
+    arm_original_capture_diagnostic(directory.path())?;
     let fixture = RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)?;
     if !delivered_denial {
         fixture.behavior.store(1, Ordering::SeqCst);
@@ -510,17 +502,32 @@ async fn refuse_dispatched_ordinary_original(
         &fixture.seed.tool_name,
         fixture.seed.arguments.clone(),
     )?;
-    let response = match mode {
-        OriginalInvokeMode::Invoke => fixture.process.invoke("root", key, &request).await?,
+    // The original invoke returns here in both modes. Report the diagnostic
+    // before any existing assertion or propagated invoke error so the first
+    // failure is observable even when the invoke itself refuses.
+    let invocation = match mode {
+        OriginalInvokeMode::Invoke => fixture.process.invoke("root", key, &request).await,
         OriginalInvokeMode::KnownOnly => {
             fixture
                 .process
                 .invoke_known_only("root", key, &request)
-                .await?
+                .await
         }
     };
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(external_count(&fixture.path)?, 1);
+    report_original_capture_diagnostic(&fixture);
+    let response = invocation?;
+    assert_eq!(
+        response.verdict,
+        Verdict::Deny,
+        "ordinary original denial reason: {:?}",
+        response.reason
+    );
+    assert_eq!(
+        external_count(&fixture.path)?,
+        1,
+        "the ordinary original was refused before its external effect; denial reason: {:?}",
+        response.reason
+    );
     let scope = fixture.runtime.scope();
     let profile = fixture.kernel.recovery_deployment(scope)?;
     chio_kernel::recovery::RecoveryProcessOriginPort::verify_original_request(
@@ -549,6 +556,7 @@ async fn refuse_dispatched_ordinary_original(
     );
     assert!(operation.dispatch_commit().is_some());
     let before = original_owner_counts(&fixture)?;
+    let charged = fixture.process.process("root")?.tree_calls;
     let error = create_from(&fixture, "dispatched-original-remedy", &request)
         .await?
         .err()
@@ -559,6 +567,7 @@ async fn refuse_dispatched_ordinary_original(
         "a native effect refusal must not be reported as a retryable outage",
     );
     assert_eq!(original_owner_counts(&fixture)?, before);
+    assert_eq!(fixture.process.process("root")?.tree_calls, charged);
     assert_eq!(external_count(&fixture.path)?, 1);
     Ok(())
 }
@@ -573,6 +582,152 @@ async fn ordinary_unknown_original_passes_process_proof_and_is_permanently_refus
 async fn ordinary_delivered_denial_passes_process_proof_and_is_permanently_refused() -> TestResult {
     refuse_dispatched_ordinary_original(OriginalInvokeMode::Invoke, true).await?;
     refuse_dispatched_ordinary_original(OriginalInvokeMode::KnownOnly, true).await
+}
+
+async fn refuse_completed_ordinary_original(mode: OriginalInvokeMode) -> TestResult {
+    let directory = tempfile::tempdir()?;
+    std::fs::write(directory.path().join("public-original-profile"), b"enabled")?;
+    let fixture = RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)?;
+    let key = match mode {
+        OriginalInvokeMode::Invoke => "completed-original",
+        OriginalInvokeMode::KnownOnly => "known-completed-original",
+    };
+    let request = fixture.process.tool_request(
+        "root",
+        key,
+        &fixture.seed.server_id,
+        &fixture.seed.tool_name,
+        fixture.seed.arguments.clone(),
+    )?;
+    let response = match mode {
+        OriginalInvokeMode::Invoke => fixture.process.invoke("root", key, &request).await?,
+        OriginalInvokeMode::KnownOnly => {
+            fixture
+                .process
+                .invoke_known_only("root", key, &request)
+                .await?
+        }
+    };
+    assert_eq!(
+        response.verdict,
+        Verdict::Allow,
+        "the completed ordinary original was denied instead: {:?}",
+        response.reason
+    );
+    assert_eq!(external_count(&fixture.path)?, 1);
+    let scope = fixture.runtime.scope();
+    let profile = fixture.kernel.recovery_deployment(scope)?;
+    chio_kernel::recovery::RecoveryProcessOriginPort::verify_original_request(
+        &fixture.process,
+        scope,
+        &request,
+        profile.security_context.as_v1().session_id().as_str(),
+    )?;
+    let (operation, retained) = fixture
+        .authority
+        .admission_operation_store()
+        .load_unambiguous_retained_tool_request(
+            &AdmissionIdentifier::try_new("request_id", &request.request_id)?,
+            &fixture.authority.mutation_fence(),
+            now_ms()?,
+        )?
+        .ok_or("completed ordinary original custody absent")?;
+    retained.validate_request_material(&request)?;
+    assert_eq!(operation.state(), AdmissionOperationState::Completed);
+    assert!(operation.dispatch_commit().is_some());
+    let before = original_owner_counts(&fixture)?;
+    let charged = fixture.process.process("root")?.tree_calls;
+    let error = create_from(&fixture, "completed-original-remedy", &request)
+        .await?
+        .err()
+        .ok_or("a completed ordinary original acquired a new recovery owner")?;
+    assert_eq!(
+        error.to_string(),
+        "recovery original is not eligible",
+        "a completed effect refusal must not be reported as a retryable outage",
+    );
+    assert_eq!(original_owner_counts(&fixture)?, before);
+    assert_eq!(fixture.process.process("root")?.tree_calls, charged);
+    assert_eq!(external_count(&fixture.path)?, 1);
+    Ok(())
+}
+
+// Observe the completed effect before testing replay eligibility. An earlier
+// native admission refusal does not exercise this contract.
+#[tokio::test]
+async fn ordinary_completed_original_passes_process_proof_and_is_permanently_refused() -> TestResult
+{
+    refuse_completed_ordinary_original(OriginalInvokeMode::Invoke).await?;
+    refuse_completed_ordinary_original(OriginalInvokeMode::KnownOnly).await
+}
+
+#[tokio::test]
+async fn ordinary_in_flight_original_is_refused_without_a_new_owner_or_process_charge() -> TestResult
+{
+    let directory = tempfile::tempdir()?;
+    std::fs::write(directory.path().join("public-original-profile"), b"enabled")?;
+    arm_original_capture_diagnostic(directory.path())?;
+    let fixture = RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)?;
+    fixture.behavior.store(2, Ordering::SeqCst);
+    let request = fixture.process.tool_request(
+        "root",
+        "in-flight-original",
+        &fixture.seed.server_id,
+        &fixture.seed.tool_name,
+        fixture.seed.arguments.clone(),
+    )?;
+    let remedy = async {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            fixture.started.notified(),
+        )
+        .await
+        .map_err(|_| {
+            "the in-flight ordinary original did not signal its external effect within 30s"
+        })?;
+        let owners = original_owner_counts(&fixture)?;
+        let charged = fixture.process.process("root")?.tree_calls;
+        let refused = create_from(&fixture, "in-flight-original-remedy", &request).await;
+        let (owners_after, charged_after) = (
+            original_owner_counts(&fixture)?,
+            fixture.process.process("root")?.tree_calls,
+        );
+        fixture.release.notify_one();
+        assert!(
+            refused?.is_err(),
+            "an in-flight ordinary original acquired a new recovery owner"
+        );
+        assert_eq!(owners_after, owners);
+        assert_eq!(charged_after, charged);
+        Ok::<_, Box<dyn std::error::Error>>(())
+    };
+    let (response, remedy) = tokio::time::timeout(std::time::Duration::from_secs(45), async {
+        tokio::join!(
+            fixture
+                .process
+                .invoke("root", "in-flight-original", &request),
+            remedy
+        )
+    })
+    .await
+    .map_err(|_| {
+        "the in-flight ordinary original invocation and owner check did not finish within 45s"
+    })?;
+    // Diagnostic-only: report the checkpoint observation after the original
+    // invoke returned and before the propagated remedy error or any assertion.
+    report_original_capture_diagnostic(&fixture);
+    if remedy.is_err() {
+        if let Ok(observed) = &response {
+            eprintln!(
+                "ORDINARY_NATIVE_IN_FLIGHT verdict={:?} reason={:?}",
+                observed.verdict, observed.reason
+            );
+        }
+    }
+    remedy?;
+    response?;
+    assert_eq!(external_count(&fixture.path)?, 1);
+    Ok(())
 }
 
 #[tokio::test(flavor = "current_thread")]

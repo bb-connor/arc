@@ -73,6 +73,45 @@ pub trait RecoveryProcessOriginPort: Send + Sync {
     }
 }
 
+/// A live affine closure role produced by the actual Process runtime. The
+/// owning store writer authenticates the exact immutable closure through
+/// this role before sealing any cancelled admission or allocation
+/// retirement. Implementations retain their live runtime borrow; this is
+/// never a decoded closure receipt and grants no admission or refund.
+///
+/// ```compile_fail
+/// use chio_kernel::recovery::RecoveryUnusedReservationClosureRole;
+/// fn duplicate(role: Box<dyn RecoveryUnusedReservationClosureRole + '_>) {
+///     let _: Box<dyn RecoveryUnusedReservationClosureRole> = role.clone();
+/// }
+/// ```
+pub trait RecoveryUnusedReservationClosureRole {
+    /// Reverify the immutable closure row and its exact reservation binding
+    /// through the same live runtime that produced this role.
+    fn verify_for(
+        &self,
+        expected: &RecoveryProcessReservationV1,
+        authority_domain: &str,
+    ) -> Result<(), AdmissionOperationStoreError>;
+}
+
+/// Trusted host-owned genuine unused reservation closure. Only the actual
+/// Process runtime implements this port. The owning writer authenticates
+/// its actor, operator, profile and stale replacement eligibility before
+/// the physical closure is requested, then authenticates the returned live
+/// role before any cancelled admission or retirement is sealed. The store
+/// cannot depend on the Process crate directly, so this narrow typed port
+/// crosses that boundary without exposing a wire closure DTO.
+pub trait RecoveryUnusedReservationClosurePort: Send + Sync {
+    /// Close the genuinely unused reservation (reserved, never finalized or
+    /// dispatched) and return its live role for independent authentication.
+    /// Repeated calls replay the same immutable closure row.
+    fn close_unused_recovery_reservation(
+        &self,
+        reservation: &RecoveryProcessReservationV1,
+    ) -> Result<Box<dyn RecoveryUnusedReservationClosureRole + '_>, AdmissionOperationStoreError>;
+}
+
 pub trait RecoveryAuthorityPort: Send + Sync {
     /// Read native setup requirements under the current serving fence. This
     /// grants neither readiness nor execution; unsupported stores fail closed.

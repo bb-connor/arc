@@ -166,9 +166,12 @@ fn artifacts_delayed_collection_cannot_delete_a_new_storage_generation() -> Test
         .retire_artifact(&actor, &new, &fence, now_ms()?)?
         .ok_or("replacement sweep")?;
     assert_ne!(replacement.generation, seal.generation);
-    assert!(store
-        .finish_artifact_collection(&actor, &seal, &fence, now_ms()?)
-        .is_err());
+    // Replaying the completed seal must preserve the replacement's pending sweep.
+    store.finish_artifact_collection(&actor, &seal, &fence, now_ms()?)?;
+    let replayed = store
+        .retire_artifact(&actor, &new, &fence, now_ms()?)?
+        .ok_or("stale replay consumed the new generation sweep")?;
+    assert_eq!(replayed, replacement);
     f.broker.collect_private(&replacement)?;
     store.finish_artifact_collection(&actor, &replacement, &fence, now_ms()?)?;
     Ok(())
@@ -331,11 +334,46 @@ fn artifacts_restart_folds_native_knowledge_and_reuses_release_identity() -> Tes
         f.runtime.prepare_read(&f.f.control, &handle)?,
         &f.sink(),
     )?;
+    let before = f
+        .f
+        .authority
+        .admission_operation_store()
+        .observe_knowledge_influence(&f.profile.scope, &f.f.authority.mutation_fence(), now_ms()?)?
+        .ok_or("influence before restart")?;
+    assert!(before.externally_influenced);
     let original_control = f.f.control.clone();
     let path = f.f.path.clone();
     let directory = f.f._directory.take();
     drop(f);
+    let cold_work = NativeInfluenceReadWorkFixture::begin()?;
     let f = KnowledgeFixture::from(RecoveryFixture::open(path, directory, false)?)?;
+    assert!(
+        cold_work.projection_recomputations() > 0,
+        "cold owner omitted projection verification"
+    );
+    drop(cold_work);
+    let work = NativeInfluenceReadWorkFixture::begin()?;
+    let influence = f
+        .f
+        .authority
+        .admission_operation_store()
+        .observe_knowledge_influence(&f.profile.scope, &f.f.authority.mutation_fence(), now_ms()?)?
+        .ok_or("influence")?;
+    assert!(influence.externally_influenced);
+    // The cold-verified projections replay the exact pre-restart observation
+    // without traversing the retained history bodies.
+    assert_eq!(
+        chio_core::canonical_json_bytes(&before)?,
+        chio_core::canonical_json_bytes(&influence)?,
+        "observed influence changed across the closed-owner restart"
+    );
+    assert!(
+        work.history_bodies() + work.current_projections() <= 3,
+        "the restarted reader traversed {} history bodies and {} current projections",
+        work.history_bodies(),
+        work.current_projections(),
+    );
+    drop(work);
     let again = f.runtime.release_into(
         &f.f.control,
         &request,
@@ -362,13 +400,6 @@ fn artifacts_restart_folds_native_knowledge_and_reuses_release_identity() -> Tes
         private_release_observation(&f, &second.release)?.observation_generation
             > private_release_observation(&f, &first.release)?.observation_generation
     );
-    let influence = f
-        .f
-        .authority
-        .admission_operation_store()
-        .observe_knowledge_influence(&f.profile.scope, &f.f.authority.mutation_fence(), now_ms()?)?
-        .ok_or("influence")?;
-    assert!(influence.externally_influenced);
     Ok(())
 }
 #[cfg(unix)]
@@ -438,9 +469,20 @@ fn memory_open_legacy_reader_is_revoked_by_durable_activation() -> TestResult {
     assert!(connection
         .execute("UPDATE process_runtime SET version=1 WHERE singleton=1", [])
         .is_err());
-    // A simulated restore of an old journal cannot clear the native authority's
-    // marker, even if the local refusal trigger is absent in that old image.
-    connection.execute_batch("DROP TRIGGER process_knowledge_no_downgrade; UPDATE process_runtime SET version=1 WHERE singleton=1;")?;
+    // Preserve the current catalog so the read reaches native enforcement,
+    // rather than stopping at an unrelated missing-trigger refusal.
+    let version_guard: String = connection.query_row(
+        "SELECT sql FROM sqlite_schema WHERE name='process_recovery_version_monotone'",
+        [],
+        |row| row.get(0),
+    )?;
+    connection.execute_batch(
+        "DROP TRIGGER process_knowledge_no_downgrade;
+         DROP TRIGGER process_recovery_version_monotone;
+         UPDATE process_runtime SET version=1 WHERE singleton=1;",
+    )?;
+    connection.execute_batch(&version_guard)?;
+    // The restored version cannot clear the native authority's durable marker.
     assert!(f.f.process.read_blob("root", &raw.sha256).is_err());
     assert_eq!(
         registry.process("root")?.checkpoint.value,

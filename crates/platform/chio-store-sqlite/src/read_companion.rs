@@ -216,6 +216,12 @@ mod tests {
 
     use super::*;
 
+    /// SQLite opens with NOFOLLOW, so the fixture root cannot contain a symlink.
+    fn canonical_tempdir() -> tempfile::TempDir {
+        let root = std::env::temp_dir().canonicalize().expect("temp root");
+        tempfile::tempdir_in(root).expect("tempdir")
+    }
+
     fn database(directory: &Path) -> PathBuf {
         let path = directory.join("companion.sqlite3");
         let connection = Connection::open(&path).expect("create database");
@@ -232,7 +238,7 @@ mod tests {
 
     #[test]
     fn concurrent_readers_hold_separate_connections() {
-        let directory = tempfile::tempdir().expect("tempdir");
+        let directory = canonical_tempdir();
         let pool = pool(&database(directory.path())).expect("open pool");
         let mut first = pool.lease().expect("first lease");
         let mut second = pool.lease().expect("second lease");
@@ -248,7 +254,7 @@ mod tests {
 
     #[test]
     fn a_returned_connection_is_reused_rather_than_reopened() {
-        let directory = tempfile::tempdir().expect("tempdir");
+        let directory = canonical_tempdir();
         let pool = pool(&database(directory.path())).expect("open pool");
         drop(pool.lease().expect("first lease"));
         drop(pool.lease().expect("second lease"));
@@ -259,7 +265,7 @@ mod tests {
 
     #[test]
     fn a_reader_waits_for_a_return_once_the_bound_is_reached() {
-        let directory = tempfile::tempdir().expect("tempdir");
+        let directory = canonical_tempdir();
         let pool = Arc::new(pool(&database(directory.path())).expect("open"));
         let held = (0..MAX_READ_COMPANIONS)
             .map(|_| pool.lease().expect("lease to the bound"))
@@ -284,7 +290,7 @@ mod tests {
 
     #[test]
     fn a_lazy_reader_rejects_a_replaced_database_path() {
-        let directory = tempfile::tempdir().expect("tempdir");
+        let directory = canonical_tempdir();
         let path = database(directory.path());
         let pool = pool(&path).expect("open pool");
         let _first = pool.lease().expect("lease pinned database");
@@ -304,7 +310,7 @@ mod tests {
 
     #[test]
     fn a_restored_path_cannot_hide_a_connection_opened_on_a_clone() {
-        let directory = tempfile::tempdir().expect("tempdir");
+        let directory = canonical_tempdir();
         let path = database(directory.path());
         let expected = std::fs::metadata(&path).expect("expected identity");
         let parked = directory.path().join("original.sqlite3");

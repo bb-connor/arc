@@ -17,7 +17,6 @@ const SCHEMA: &str = "chio.retained-tool-admission-request.v1";
 const SECURITY_SCHEMA: &str = "chio.retained-tool-admission-request.v2";
 const NATIVE_SECURITY_SCHEMA: &str = "chio.retained-tool-admission-request.v3";
 const AUTHORITY_PROFILE_SCHEMA: &str = "chio.retained-tool-admission-request.v4";
-const OUTPUT_RETENTION_SCHEMA: &str = "chio.retained-tool-admission-request.v5";
 const ORIGINAL_SEMANTIC_SCHEMA: &str = "chio.retained-tool-admission-request.v6";
 const MAX_BYTES: usize = 262_144;
 
@@ -31,10 +30,13 @@ pub(crate) use security_binding::AdmissionSecurityBindingV1;
 ///
 /// One-shot credentials and approval artifacts are deliberately not retained.
 /// This record must not be exposed on a public receipt or collector response.
-/// The API accepts unbound v1, identity-bound v2 and native-authority-bound v3
-/// artifacts, explicit original authority profiles in v4 and original output
-/// retention data in v5. No stored
-/// version establishes a current trusted host context or claim authority.
+/// The API accepts unbound v1, identity-bound v2, native-authority-bound v3
+/// and explicit authority profile v4 artifacts. Admission without a selected
+/// native output retention profile writes v4. Admission with that profile
+/// writes v6, binding output retention and the original semantic commitment.
+/// The intermediate v5 retention format is refused at decode; its hash step
+/// survives only inside the v6 preimage. No stored version establishes a
+/// current trusted host context or claim authority.
 #[derive(Clone)]
 pub struct RetainedToolAdmissionRequestV1 {
     // Historical custody verification composes several store layers. Keep the
@@ -168,9 +170,11 @@ pub(crate) fn immutable_tool_request_hash_with_profile(
     AdmissionDigest::try_new("immutable_request_hash", sha256_hex(&bytes)).map_err(Into::into)
 }
 
-/// Extends the original V4 request commitment without changing its preimage.
-/// This is configuration binding DATA, not capture or financing authority.
-pub(crate) fn immutable_tool_request_hash_with_output_retention(
+/// One private step inside the V6 hash preimage, not a served retained
+/// format. The nested v5 schema label and these bytes are part of how every
+/// V6 commitment is built. This is configuration binding DATA, not capture
+/// or financing authority.
+fn immutable_tool_request_hash_with_output_retention(
     request: &ToolCallRequest,
     matching_grants: &[MatchingGrant<'_>],
     post_return_steps: &[FrozenEvaluationStepV1],
@@ -216,8 +220,8 @@ pub(crate) fn immutable_tool_request_hash_with_output_retention(
 }
 
 /// Fresh native originals bind the actual full semantic request before
-/// transient credentials are omitted from storage. The old V5 helper remains
-/// unchanged; the new outer commitment carries no credential bytes.
+/// transient credentials are omitted from storage. The outer commitment
+/// carries no credential bytes.
 pub(crate) fn immutable_tool_request_hash_with_original_semantics(
     request: &ToolCallRequest,
     matching_grants: &[MatchingGrant<'_>],
@@ -317,24 +321,35 @@ impl RetainedToolAdmissionRequestV1 {
         security_binding: Option<&AdmissionSecurityBindingV1>,
         authority_profile: Option<&AdmissionAuthorityProfileV1>,
     ) -> Result<Self, AdmissionOperationStoreError> {
-        Self::from_admission_with_output_retention(
+        Self::from_admission_parts(
             request,
             matching_grants,
             post_return_steps,
             security_binding,
             authority_profile,
             None,
+            None,
         )
     }
 
-    pub(crate) fn from_admission_with_output_retention(
+    /// Encode one supported original request. Native retention and its full
+    /// semantic commitment must be present together.
+    fn from_admission_parts(
         request: &ToolCallRequest,
         matching_grants: &[MatchingGrant<'_>],
         post_return_steps: &[FrozenEvaluationStepV1],
         security_binding: Option<&AdmissionSecurityBindingV1>,
         authority_profile: Option<&AdmissionAuthorityProfileV1>,
         native_output_retention: Option<&NativeOutputRetentionProfileV1>,
+        original_semantic_request_commitment: Option<
+            chio_security_types::recovery::CanonicalPayloadDigest,
+        >,
     ) -> Result<Self, AdmissionOperationStoreError> {
+        if native_output_retention.is_some() != original_semantic_request_commitment.is_some() {
+            return Err(invalid(
+                "native output retention requires its original semantic commitment",
+            ));
+        }
         if let Some(retention) = native_output_retention {
             retention
                 .validate_original_plan(post_return_steps.len())
@@ -342,8 +357,8 @@ impl RetainedToolAdmissionRequestV1 {
         }
         let request = Self::request_without_transient_credentials(request);
         let wire = RetainedRequestWire {
-            schema: if native_output_retention.is_some() {
-                OUTPUT_RETENTION_SCHEMA
+            schema: if original_semantic_request_commitment.is_some() {
+                ORIGINAL_SEMANTIC_SCHEMA
             } else {
                 Self::schema(security_binding, authority_profile)
             }
@@ -354,15 +369,14 @@ impl RetainedToolAdmissionRequestV1 {
             security_binding: security_binding.cloned(),
             authority_profile: authority_profile.cloned(),
             native_output_retention: native_output_retention.cloned(),
-            original_semantic_request_commitment: None,
+            original_semantic_request_commitment,
         };
         let canonical = canonical_json_bytes(&wire).map_err(invalid)?;
         Self::from_canonical_bytes(&canonical)
     }
 
-    /// Only the actual fresh Kernel admission constructs V6. Historical
-    /// constructors keep their original version and never synthesize a digest
-    /// from a sanitized request or today's configured native profile.
+    /// Bind fresh admission to its complete live request before omitting
+    /// transient credentials from storage.
     pub(crate) fn from_admission_with_original_semantics(
         request: &ToolCallRequest,
         matching_grants: &[MatchingGrant<'_>],
@@ -371,24 +385,20 @@ impl RetainedToolAdmissionRequestV1 {
         authority_profile: Option<&AdmissionAuthorityProfileV1>,
         native_output_retention: Option<&NativeOutputRetentionProfileV1>,
     ) -> Result<Self, AdmissionOperationStoreError> {
-        let original_semantic = native_output_retention
+        // The full-request commitment is computed from the live request
+        // before transient credentials are stripped from the stored one.
+        let original_semantic_request_commitment = native_output_retention
             .map(|_| crate::recovery::semantic_request_semantics(request).map_err(invalid))
             .transpose()?;
-        let mut retained = Self::from_admission_with_output_retention(
+        Self::from_admission_parts(
             request,
             matching_grants,
             post_return_steps,
             security_binding,
             authority_profile,
             native_output_retention,
-        )?;
-        if let Some(semantic) = original_semantic {
-            retained.wire.schema = ORIGINAL_SEMANTIC_SCHEMA.into();
-            retained.wire.original_semantic_request_commitment = Some(semantic);
-            let canonical = canonical_json_bytes(&retained.wire).map_err(invalid)?;
-            return Self::from_canonical_bytes(&canonical);
-        }
-        Ok(retained)
+            original_semantic_request_commitment,
+        )
     }
 
     /// Decode untrusted stored bytes without granting provenance or authority.
@@ -414,11 +424,12 @@ impl RetainedToolAdmissionRequestV1 {
                     "native output retention lost original native authority",
                 ));
             }
-            if wire.original_semantic_request_commitment.is_some() {
-                ORIGINAL_SEMANTIC_SCHEMA
-            } else {
-                OUTPUT_RETENTION_SCHEMA
+            if wire.original_semantic_request_commitment.is_none() {
+                return Err(invalid(
+                    "native output retention lacks its original semantic commitment",
+                ));
             }
+            ORIGINAL_SEMANTIC_SCHEMA
         } else {
             if wire.original_semantic_request_commitment.is_some() {
                 return Err(invalid(
@@ -640,19 +651,17 @@ impl RetainedToolAdmissionRequestV1 {
         &self,
         request: &ToolCallRequest,
     ) -> Result<(), AdmissionOperationStoreError> {
-        let mut candidate = Self::from_admission_with_output_retention(
+        // Preserve the recorded commitment. Live full-request equality is
+        // checked separately by validate_original_semantic_request.
+        let candidate = Self::from_admission_parts(
             request,
             &self.matching_grants()?,
             &self.wire.post_return_steps,
             self.wire.security_binding.as_ref(),
             self.wire.authority_profile.as_ref(),
             self.wire.native_output_retention.as_ref(),
+            self.original_semantic_request_commitment(),
         )?;
-        if let Some(semantic) = self.original_semantic_request_commitment() {
-            candidate.wire.schema = ORIGINAL_SEMANTIC_SCHEMA.into();
-            candidate.wire.original_semantic_request_commitment = Some(semantic);
-            candidate.canonical = canonical_json_bytes(&candidate.wire).map_err(invalid)?;
-        }
         if candidate.canonical != self.canonical {
             return Err(invalid(
                 "request differs from its retained admission material",
@@ -679,45 +688,18 @@ impl RetainedToolAdmissionRequestV1 {
         &self,
         binding: &AdmissionOperationBindingV1,
     ) -> Result<(), AdmissionOperationStoreError> {
-        if let Some(semantic) = self.original_semantic_request_commitment() {
-            let prior = immutable_tool_request_hash_with_output_retention(
-                &self.wire.request,
-                &self.matching_grants()?,
-                &self.wire.post_return_steps,
-                self.wire.security_binding.as_ref(),
-                self.wire.authority_profile.as_ref(),
-                self.wire.native_output_retention.as_ref(),
-            )?;
-            let expected = bind_original_semantics(&prior, semantic)?;
-            let capability =
-                sha256_hex(&canonical_json_bytes(&self.wire.request.capability).map_err(invalid)?);
-            let action =
-                sha256_hex(&canonical_json_bytes(&self.wire.request.arguments).map_err(invalid)?);
-            if binding.kind() != super::AdmissionOperationKind::ToolDispatch
-                || binding.request_id().as_str() != self.wire.request.request_id
-                || binding.capability_id().as_str() != self.wire.request.capability.id
-                || binding.authorization_capability_hash.as_str() != capability
-                || binding.action_parameter_hash().as_str() != action
-                || binding.immutable_request_hash() != &expected
-            {
-                return Err(invalid(
-                    "V6 retained original differs from its admission binding",
-                ));
-            }
-            return Ok(());
-        }
-        Self::validate_request_binding_with_output_retention(
-            binding,
+        let expected = self.immutable_hash_for_original_plan(
             &self.wire.request,
             &self.matching_grants()?,
             &self.wire.post_return_steps,
             self.wire.security_binding.as_ref(),
             self.wire.authority_profile.as_ref(),
             self.wire.native_output_retention.as_ref(),
-        )
+        )?;
+        Self::compare_request_binding_fields(binding, &self.wire.request, &expected)
     }
 
-    /// Reconstruct an original plan commitment with its authenticated retained
+    /// Reconstruct an original plan commitment with its recorded
     /// scalar. No current profile or stripped-request semantics is synthesized.
     pub(crate) fn immutable_hash_for_original_plan(
         &self,
@@ -728,6 +710,13 @@ impl RetainedToolAdmissionRequestV1 {
         profile: Option<&AdmissionAuthorityProfileV1>,
         retention: Option<&NativeOutputRetentionProfileV1>,
     ) -> Result<AdmissionDigest, AdmissionOperationStoreError> {
+        let commitment = self.original_semantic_request_commitment();
+        if retention.is_some() != commitment.is_some() {
+            // Decoding refuses this pairing; this is an in-memory backstop.
+            return Err(invalid(
+                "native output retention requires its original semantic commitment",
+            ));
+        }
         let prior = immutable_tool_request_hash_with_output_retention(
             request,
             matching_grants,
@@ -736,7 +725,7 @@ impl RetainedToolAdmissionRequestV1 {
             profile,
             retention,
         )?;
-        match self.original_semantic_request_commitment() {
+        match commitment {
             Some(semantic) => bind_original_semantics(&prior, semantic),
             None => Ok(prior),
         }
@@ -750,43 +739,32 @@ impl RetainedToolAdmissionRequestV1 {
         security_binding: Option<&AdmissionSecurityBindingV1>,
         authority_profile: Option<&AdmissionAuthorityProfileV1>,
     ) -> Result<(), AdmissionOperationStoreError> {
-        Self::validate_request_binding_with_output_retention(
-            binding,
+        let request_hash = immutable_tool_request_hash_with_profile(
             request,
             matching_grants,
             post_return_steps,
             security_binding,
             authority_profile,
-            None,
-        )
+        )?;
+        Self::compare_request_binding_fields(binding, request, &request_hash)
     }
 
-    fn validate_request_binding_with_output_retention(
+    /// Shared private admission-binding field comparison. Every hashed field
+    /// is checked exactly; callers supply the expected immutable request hash.
+    fn compare_request_binding_fields(
         binding: &AdmissionOperationBindingV1,
         request: &ToolCallRequest,
-        matching_grants: &[MatchingGrant<'_>],
-        post_return_steps: &[FrozenEvaluationStepV1],
-        security_binding: Option<&AdmissionSecurityBindingV1>,
-        authority_profile: Option<&AdmissionAuthorityProfileV1>,
-        native_output_retention: Option<&NativeOutputRetentionProfileV1>,
+        expected_request_hash: &AdmissionDigest,
     ) -> Result<(), AdmissionOperationStoreError> {
         let capability_hash =
             sha256_hex(&canonical_json_bytes(&request.capability).map_err(invalid)?);
         let action_hash = sha256_hex(&canonical_json_bytes(&request.arguments).map_err(invalid)?);
-        let request_hash = immutable_tool_request_hash_with_output_retention(
-            request,
-            matching_grants,
-            post_return_steps,
-            security_binding,
-            authority_profile,
-            native_output_retention,
-        )?;
         if binding.kind() != super::AdmissionOperationKind::ToolDispatch
             || binding.request_id().as_str() != request.request_id
             || binding.capability_id().as_str() != request.capability.id
             || binding.authorization_capability_hash.as_str() != capability_hash
             || binding.action_parameter_hash().as_str() != action_hash
-            || binding.immutable_request_hash() != &request_hash
+            || binding.immutable_request_hash() != expected_request_hash
         {
             return Err(invalid(
                 "retained request does not match its admission binding",

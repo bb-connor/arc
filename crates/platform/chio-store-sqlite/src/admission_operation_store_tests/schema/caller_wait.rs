@@ -93,7 +93,7 @@ fn rows(connection: &Connection, table: &str) -> AnchoredTestResult<Vec<Vec<Valu
 #[test]
 fn populated_v33_caller_wait_upgrade_preserves_original_rows_and_commit_chain() -> AnchoredTestResult
 {
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let operation = prepared_operation(
         &fixture.fence,
         AdmissionOperationKind::ToolDispatch,

@@ -17,8 +17,6 @@ pub(super) mod historical_holds;
 mod issuance;
 #[cfg(feature = "admission-test-support")]
 pub(super) mod legacy_audience_test_support;
-#[cfg(feature = "admission-test-support")]
-pub(super) mod legacy_history_test_support;
 pub(super) mod native;
 pub(in crate::admission_operation_store) mod original_resolution;
 pub(in crate::admission_operation_store) mod origins;
@@ -91,7 +89,7 @@ impl SqliteAdmissionOperationStore {
         let history_changed =
             deployment_history::preserve_installation(&tx, &self.serving_owner, deployment)?
                 || context_changed;
-        if raw(&tx, &key)?
+        if raw_checked(&tx, &key)?
             .as_ref()
             .is_some_and(|current| current.payload == encoded)
         {
@@ -408,7 +406,12 @@ impl RecoveryAuthorityPort for SqliteAdmissionOperationStore {
         fence: &StoreMutationFence,
         now: u64,
     ) -> Result<RecoveryCommandPortOutcome, RecoveryCommandPortError> {
-        self.recovery_command_outcome(actor, command, original_process, fence, now)
+        let result = self.recovery_command_outcome(actor, command, original_process, fence, now);
+        #[cfg(feature = "admission-test-support")]
+        if let Err(error) = &result {
+            eprintln!("recovery command port refusal: {error:?}");
+        }
+        result
     }
     fn load_selection(
         &self,

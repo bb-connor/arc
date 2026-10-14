@@ -1,28 +1,22 @@
 //! Every original custody transaction retains an independent full WAL amount.
 //! A quoted amount cannot create or consume a native bank purpose.
 use super::*;
-use crate::admission_operation_store::security_participant_state::finishing_plan::NativeToolOutcomeSourcePlan;
+use crate::admission_operation_store::security_participant_state::finishing_plan::VerifiedNativeInitialFinishingPlan;
 use crate::admission_operation_store::tool_outcome_liability::{
     describe_native_tool_outcome_transactions, ToolOutcomeTransactionEnvelopeData,
     ToolOutcomeTransactionPurposeData, ToolOutcomeWriteTableData,
 };
 use crate::serving_owner::{NativeSourceTransactionOrigin, SqliteServingOwner};
-
-const CURSOR_LEVELS: u64 = 20;
-const BALANCE_PAGES_PER_LEVEL: u64 = 6;
-const NEW_BALANCE_WALKS: u64 = 1;
-const EXISTING_BALANCE_WALKS: u64 = 3;
-const ALLOCATION_OR_FREE_FRAME_MULTIPLIER: u64 = 2;
-const FRAME_HEADER_BYTES: u64 = 24;
-const WAL_HEADER_BYTES: u64 = 32;
-const MAX_WAL_SECTOR_BYTES: u64 = 65_536;
-const ANCHOR_FILE_BYTES: u64 = 2 * 1_024;
+use chio_sqlite_file_identity::{
+    SqliteFramePriceProfileData, SqliteTransactionWriteShapeData, SqliteTreeWriteShapeData,
+};
+use std::collections::BTreeMap;
 
 pub(in crate::admission_operation_store) struct ToolOutcomeTransactionPriceData {
     purpose: ToolOutcomeTransactionPurposeData,
     physical: PhysicalLiabilityData,
-    admission_appends: u64,
     profile: String,
+    page_growth: u64,
 }
 
 impl ToolOutcomeTransactionPriceData {
@@ -36,8 +30,8 @@ impl ToolOutcomeTransactionPriceData {
         &self.physical
     }
 
-    pub(in crate::admission_operation_store) fn admission_appends(&self) -> u64 {
-        self.admission_appends
+    pub(in crate::admission_operation_store) fn page_growth(&self) -> u64 {
+        self.page_growth
     }
 
     pub(in crate::admission_operation_store) fn profile(&self) -> &str {
@@ -60,7 +54,7 @@ pub(in crate::admission_operation_store) fn tool_outcome_price_algorithm_fingerp
             FRAME_HEADER_BYTES,
             WAL_HEADER_BYTES,
             MAX_WAL_SECTOR_BYTES,
-            ANCHOR_FILE_BYTES,
+            SERVING_ANCHOR_FILE_BYTES,
         ),
         "possible before and maximum intermediate overflow; no future blob existence credit",
         "independent transactions retain independent WAL and history amounts",
@@ -75,7 +69,8 @@ pub(in crate::admission_operation_store) fn tool_outcome_price_algorithm_fingerp
 pub(in crate::admission_operation_store) fn price_native_tool_outcome_phases(
     tx: &Transaction<'_>,
     writer: (&SqliteServingOwner, &NativeSourceTransactionOrigin<'_>),
-    source: &impl NativeToolOutcomeSourcePlan,
+    source: &VerifiedNativeInitialFinishingPlan<'_, '_>,
+    row_ceilings: &BTreeMap<String, u64>,
 ) -> Result<Vec<ToolOutcomeTransactionPriceData>, AdmissionOperationStoreError> {
     source.verify_before(tx, writer.0, writer.1)?;
     let profile = source.physical_write_profile();
@@ -87,19 +82,30 @@ pub(in crate::admission_operation_store) fn price_native_tool_outcome_phases(
     transactions
         .iter()
         .map(|transaction| {
+            let profile = SqliteFramePriceProfileData::checked(page_size, 0).map_err(invariant)?;
+            let shape = transaction_shape(transaction, row_ceilings)?;
+            // The native authority writer retains cache_spill=0 and denies
+            // changes to it. Its verified profile also excludes auto-vacuum.
+            let price = shape.price_without_spill(&profile).map_err(invariant)?;
             Ok(ToolOutcomeTransactionPriceData {
                 purpose: transaction.purpose(),
-                physical: price_transaction(page_size, transaction)?,
-                admission_appends: transaction.admission_appends(),
-                profile: transaction_profile(source, transaction)?,
+                physical: PhysicalLiabilityData::native_transaction(
+                    price.wal_bytes(),
+                    price.disk_bytes(),
+                    0,
+                    transaction.global_appends(),
+                )?,
+                profile: transaction_profile(source, transaction, row_ceilings)?,
+                page_growth: shape.maximum_page_growth(&profile).map_err(invariant)?,
             })
         })
         .collect()
 }
 
 fn transaction_profile(
-    source: &impl NativeToolOutcomeSourcePlan,
+    source: &VerifiedNativeInitialFinishingPlan<'_, '_>,
     transaction: &ToolOutcomeTransactionEnvelopeData,
+    row_ceilings: &BTreeMap<String, u64>,
 ) -> Result<String, AdmissionOperationStoreError> {
     let rows = transaction
         .rows()
@@ -117,13 +123,21 @@ fn transaction_profile(
     let purpose = match transaction.purpose() {
         ToolOutcomeTransactionPurposeData::RawCustody => ("raw", 0),
         ToolOutcomeTransactionPurposeData::EvaluationBegin => ("evaluation_begin", 0),
-        ToolOutcomeTransactionPurposeData::EvaluationStage => ("evaluation_stage", 0),
         ToolOutcomeTransactionPurposeData::Finalization { pure_prefix } => {
             ("finalization", pure_prefix)
         }
+        ToolOutcomeTransactionPurposeData::SecurityRelease => ("security_release", 0),
+        ToolOutcomeTransactionPurposeData::TerminalProjection { observer } => {
+            ("terminal_projection", u64::from(observer))
+        }
     };
     let bytes = canonical_json_bytes(&(
-        "chio.sqlite.original-tool-outcome-transaction-envelope.v1",
+        "chio.sqlite.original-tool-outcome-transaction-envelope.v3",
+        "retained_table_rows; unchanged_table_keys; mutable_indexes_separate; each_transaction_complete",
+        row_ceilings,
+        chio_sqlite_file_identity::write_price_algorithm_descriptor(),
+        SqliteTransactionWriteShapeData::page_bounded_descriptor(),
+        SqliteTransactionWriteShapeData::no_spill_descriptor(),
         source.physical_write_profile().fingerprint(),
         sha256_hex(source.original().canonical_bytes()),
         tool_outcome_price_algorithm_fingerprint()?,
@@ -136,117 +150,56 @@ fn transaction_profile(
     Ok(sha256_hex(&bytes))
 }
 
-fn price_transaction(
-    page_size: u64,
+fn transaction_shape(
     transaction: &ToolOutcomeTransactionEnvelopeData,
-) -> Result<PhysicalLiabilityData, AdmissionOperationStoreError> {
-    if !(512..=65_536).contains(&page_size) || !page_size.is_power_of_two() {
-        return Err(invariant("original custody page profile is unsupported"));
-    }
-    let usable_payload = page_size
-        .checked_sub(4)
-        .filter(|payload| *payload > 0)
-        .ok_or_else(|| invariant("original custody overflow divisor is invalid"))?;
-    let mut frames = 1_u64;
+    row_ceilings: &BTreeMap<String, u64>,
+) -> Result<SqliteTransactionWriteShapeData, AdmissionOperationStoreError> {
+    let mut trees = Vec::new();
     for row in transaction.rows() {
-        let mutations = row.mutations();
-        let after = row.maximum_after_record_bytes();
-        if mutations == 0 || after == 0 {
-            return Err(invariant("original custody row lost its producing bound"));
-        }
-        if matches!(
+        let ceiling = row_ceilings
+            .get(row.table().table_name())
+            .copied()
+            .ok_or_else(|| invariant("original custody tree lacks its retained row ceiling"))?;
+        let shape = if matches!(
             row.table(),
             ToolOutcomeWriteTableData::AdmissionMeta | ToolOutcomeWriteTableData::GlobalMeta
         ) {
-            if row.possible_before_record_bytes().is_none()
-                || !row.index_record_bytes().is_empty()
-                || after
-                    > page_size.checked_sub(100).ok_or_else(|| {
-                        invariant("original custody singleton page margin exhausted")
-                    })?
-            {
-                return Err(invariant("original custody singleton shape is invalid"));
-            }
-            frames = add(frames, mutations)?;
-            continue;
-        }
-        let before = row.possible_before_record_bytes();
-        let walks = if before.is_some() {
-            EXISTING_BALANCE_WALKS
+            SqliteTreeWriteShapeData::singleton_root(
+                row.maximum_after_record_bytes(),
+                row.mutations(),
+            )
+        } else if let Some(before) = row.possible_before_record_bytes() {
+            // UPDATE leaves the table key unchanged. Blob rehydration may
+            // instead insert a fresh record: its one insertion balance and new
+            // image are both covered by the same-key old-plus-new shape.
+            let images = before
+                .max(row.maximum_after_record_bytes())
+                .checked_mul(row.mutations())
+                .ok_or_else(|| invariant("original custody image bound exhausted"))?;
+            SqliteTreeWriteShapeData::same_key_rewrites(row.mutations(), images)
         } else {
-            NEW_BALANCE_WALKS
-        };
-        let tree_frames = mul(
-            mul(mul(mutations, walks)?, CURSOR_LEVELS)?,
-            BALANCE_PAGES_PER_LEVEL,
-        )?;
-        let after_overflow = ceil(after, usable_payload)?;
-        let old_or_intermediate_overflow = before
-            .map(|before| ceil(before.max(after), usable_payload))
-            .transpose()?
-            .unwrap_or(0);
-        let overflow = mul(
-            add(after_overflow, old_or_intermediate_overflow)?,
-            mutations,
-        )?;
-        frames = add(
-            frames,
-            mul(
-                add(tree_frames, overflow)?,
-                ALLOCATION_OR_FREE_FRAME_MULTIPLIER,
-            )?,
-        )?;
-        for index_bytes in row.index_record_bytes() {
-            if *index_bytes == 0 {
-                return Err(invariant("original custody index lost its key bound"));
+            SqliteTreeWriteShapeData::fresh_insertions(
+                row.maximum_after_record_bytes(),
+                row.mutations(),
+            )
+        }
+        .map_err(invariant)?;
+        trees.push(shape.within_retained_rows(ceiling).map_err(invariant)?);
+        for &bytes in row.index_record_bytes() {
+            let index = if matches!(row.table(), ToolOutcomeWriteTableData::Operations) {
+                // The recovery index changes when the operation's timestamp
+                // or state changes. Retain deletion and reinsertion walks.
+                SqliteTreeWriteShapeData::record(Some(bytes), bytes, row.mutations())
+            } else {
+                // The content-addressed blob's PK index is inserted only for a
+                // fresh blob. Rehydration preserves it. Other indexed rows here
+                // are insert-only; immutable outcome/evaluation indexes are
+                // deliberately absent from their later rewrite descriptors.
+                SqliteTreeWriteShapeData::fresh_insertions(bytes, row.mutations())
             }
-            let overflow = mul(
-                ceil(*index_bytes, usable_payload)?,
-                if before.is_some() { 2 } else { 1 },
-            )?;
-            let index_frames = add(tree_frames, mul(overflow, mutations)?)?;
-            frames = add(
-                frames,
-                mul(index_frames, ALLOCATION_OR_FREE_FRAME_MULTIPLIER)?,
-            )?;
+            .map_err(invariant)?;
+            trees.push(index.within_retained_rows(ceiling).map_err(invariant)?);
         }
     }
-    // Intermediate full evaluation rewrites retain all independent history
-    // appends even within one transaction. The frame envelope permits enabled
-    // spilling, repeated tree work, old/new overflow and freelist trunk writes.
-    // It makes no cross-transaction dirty-page or same-size reuse deduction.
-    let frame_bytes = add(page_size, FRAME_HEADER_BYTES)?;
-    let padding_frames = ceil(MAX_WAL_SECTOR_BYTES, frame_bytes)?;
-    let wal_bytes = add(
-        mul(add(frames, padding_frames)?, frame_bytes)?,
-        WAL_HEADER_BYTES,
-    )?;
-    let price = PhysicalLiabilityData {
-        wal_bytes,
-        disk_bytes: add(mul(wal_bytes, 2)?, ANCHOR_FILE_BYTES)?,
-        recovery_appends: 0,
-        global_appends: transaction.global_appends(),
-    };
-    price.validate()?;
-    Ok(price)
-}
-
-fn add(left: u64, right: u64) -> Result<u64, AdmissionOperationStoreError> {
-    left.checked_add(right)
-        .ok_or_else(|| invariant("original custody physical sum exhausted"))
-}
-
-fn mul(left: u64, right: u64) -> Result<u64, AdmissionOperationStoreError> {
-    left.checked_mul(right)
-        .ok_or_else(|| invariant("original custody physical product exhausted"))
-}
-
-fn ceil(value: u64, divisor: u64) -> Result<u64, AdmissionOperationStoreError> {
-    if divisor == 0 {
-        return Err(invariant("original custody physical divisor is zero"));
-    }
-    value
-        .checked_div(divisor)
-        .and_then(|quotient| quotient.checked_add(u64::from(!value.is_multiple_of(divisor))))
-        .ok_or_else(|| invariant("original custody physical ceiling exhausted"))
+    SqliteTransactionWriteShapeData::checked(trees).map_err(invariant)
 }

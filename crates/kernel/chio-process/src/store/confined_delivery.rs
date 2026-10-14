@@ -26,12 +26,14 @@ struct ConfinedReturnSlotRow {
 }
 
 impl Store {
-    pub(crate) fn begin_verified_confined_delivery(
-        &mut self,
+    /// Consume the native proof and build the canonical admitted receipt that
+    /// the routed delivery marker retains. Nothing is written here.
+    pub(crate) fn authorize_confined_delivery(
+        &self,
         proof: VerifiedConfinedReturnDelivery,
         seal: &ArtifactBlobSealV1,
         admission: &ReturnAdmissionV1,
-    ) -> Result<(), ProcessError> {
+    ) -> Result<Vec<u8>, ProcessError> {
         self.require_enforced_knowledge()?;
         let boundary = proof.consume_for(seal, admission)?;
         let mut admission = admission.clone();
@@ -45,53 +47,59 @@ impl Store {
         if bytes.len() > 262144 {
             return Err(ProcessError::Limit("confined delivery receipt"));
         }
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        verify_before_open(&tx)?;
-        let (version, namespace, _) = metadata(&tx)?;
-        if !matches!(version, 5..=7) || namespace != self.namespace {
-            return Err(ProcessError::Conflict);
-        }
-        catalog::verify(&tx)?;
-        verify_receipt(&tx, &receipt)?;
-        let child =
-            read_process(&tx, receipt.boundary.child.as_str())?.ok_or(ProcessError::Conflict)?;
-        let parent = read_process(&tx, receipt.boundary.scope.process_id.as_str())?
-            .ok_or(ProcessError::Conflict)?;
-        require_running(&child)?;
-        require_running(&parent)?;
-        let prior: Option<Vec<u8>> = tx
-            .query_row(
-                "SELECT receipt FROM process_confined_delivery_markers WHERE child_id=?1",
-                [receipt.boundary.child.as_str()],
-                |row| row.get(0),
-            )
-            .optional()?;
-        match prior {
-            Some(prior) if prior == bytes => (),
-            Some(_) => return Err(ProcessError::Conflict),
-            None => {
-                tx.execute(
-                    "INSERT INTO process_confined_delivery_markers(child_id,parent_id,boundary_id,release_id,receipt)
-                     VALUES(?1,?2,?3,?4,?5)",
-                    params![receipt.boundary.child.as_str(),receipt.boundary.scope.process_id.as_str(),
-                        receipt.boundary.boundary.as_str(),receipt.admission.admitted.release.as_str(),bytes],
-                )?;
-                if version < 7
-                    && tx.execute(
-                        "UPDATE process_runtime SET version=7 WHERE singleton=1 AND version=?1",
-                        [version],
-                    )? != 1
-                {
-                    return Err(ProcessError::Conflict);
-                }
+        Ok(bytes)
+    }
+}
+
+/// The complete ordering body inside one writer transaction, executed only by
+/// the bank-proven routed writer: the retained cohort, the exact receipt and
+/// its slot, the running parent and child, and the permanent marker with its
+/// feature activation.
+pub(crate) fn begin_confined_delivery_call(
+    tx: &rusqlite::Transaction<'_>,
+    namespace_expected: &str,
+    bytes: &[u8],
+) -> Result<(), ProcessError> {
+    let receipt: DeliveryReceipt = serde_json::from_slice(bytes)?;
+    if chio_core_types::canonical_json_bytes(&receipt)? != bytes {
+        return Err(ProcessError::Conflict);
+    }
+    verify_before_open(tx)?;
+    let (version, namespace, _) = metadata(tx)?;
+    if !matches!(version, 5..=7) || namespace != namespace_expected {
+        return Err(ProcessError::Conflict);
+    }
+    catalog::verify(tx)?;
+    verify_receipt(tx, &receipt)?;
+    let child = read_process(tx, receipt.boundary.child.as_str())?.ok_or(ProcessError::Conflict)?;
+    let parent = read_process(tx, receipt.boundary.scope.process_id.as_str())?
+        .ok_or(ProcessError::Conflict)?;
+    require_running(&child)?;
+    require_running(&parent)?;
+    let prior: Option<Vec<u8>> = tx
+        .query_row(
+            "SELECT receipt FROM process_confined_delivery_markers WHERE child_id=?1",
+            [receipt.boundary.child.as_str()],
+            |row| row.get(0),
+        )
+        .optional()?;
+    match prior {
+        Some(prior) if prior == bytes => (),
+        Some(_) => return Err(ProcessError::Conflict),
+        None => {
+            tx.execute(
+                "INSERT INTO process_confined_delivery_markers(child_id,parent_id,boundary_id,release_id,receipt)
+                 VALUES(?1,?2,?3,?4,?5)",
+                params![receipt.boundary.child.as_str(),receipt.boundary.scope.process_id.as_str(),
+                    receipt.boundary.boundary.as_str(),receipt.admission.admitted.release.as_str(),bytes],
+            )?;
+            if version < 7 {
+                super::raise_feature_level(tx, version, 7)?;
             }
         }
-        verify_cohort(&tx)?;
-        tx.commit()?;
-        Ok(())
     }
+    verify_cohort(tx)?;
+    Ok(())
 }
 
 fn metadata(connection: &Connection) -> Result<(u32, String, String), ProcessError> {
@@ -102,8 +110,10 @@ fn metadata(connection: &Connection) -> Result<(u32, String, String), ProcessErr
          FROM process_runtime WHERE singleton=1",
         [], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
     )?;
+    // Every delivery gate reads the journal's feature level; version eight
+    // carries the level its native return activation retained.
     Ok((
-        version,
+        super::level_for_version(connection, version)?,
         namespace.ok_or(ProcessError::Conflict)?,
         authority.ok_or(ProcessError::Conflict)?,
     ))
@@ -264,7 +274,10 @@ pub(super) fn verify_before_open(connection: &Connection) -> Result<(), ProcessE
             |row| row.get(0),
         )
         .optional()?;
-    if version == Some(7) {
+    let level = version
+        .map(|version| super::level_for_version(connection, version))
+        .transpose()?;
+    if level == Some(7) {
         return verify_cohort(connection);
     }
     if catalog::family_present(connection)? {

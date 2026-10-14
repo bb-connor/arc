@@ -8,10 +8,10 @@ fn v22_upgrade_preserves_imported_approval_bytes_and_rejects_unqualified_claims(
         Some("CREATE TABLE governed_approval_replay_claim_unknown(value TEXT)"),
         Some("DROP TRIGGER governed_approval_replay_migration_events_immutable"),
     ] {
-        let fixture = fixture();
+        let fixture = pre_recovery_fixture();
         let source = Source::new(&fixture, false)?;
         let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
-        let count = global_count(&fixture);
+        let predecessor = global_commit_rows(&*fixture.store.connection()?)?;
         drop(source);
         let Fixture {
             _temp,
@@ -57,14 +57,11 @@ fn v22_upgrade_preserves_imported_approval_bytes_and_rejects_unqualified_claims(
                 Some(imported)
             );
             let connection = store.connection()?;
-            assert_eq!(
-                connection.query_row(
-                    "SELECT COUNT(*) FROM authority_global_commits",
-                    [],
-                    |row| row.get::<_, i64>(0)
-                )?,
-                count
-            );
+            assert_predecessor_history_then_startup_baselines(
+                &connection,
+                &predecessor,
+                &authority.mutation_fence(),
+            )?;
             assert_eq!(
                 connection.query_row(
                     "SELECT COUNT(*) FROM governed_approval_replay_claim_episodes",
@@ -87,7 +84,7 @@ fn v21_upgrade_introduces_only_empty_approval_history_and_rejects_unqualified_na
         Some("CREATE TABLE governed_approval_replay_unknown(value TEXT)"),
         Some("DROP TRIGGER admission_operation_commits_immutable"),
     ] {
-        let fixture = fixture();
+        let fixture = pre_recovery_fixture();
         let Fixture {
             _temp,
             database,

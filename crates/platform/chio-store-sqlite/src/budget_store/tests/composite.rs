@@ -1310,6 +1310,69 @@ fn below_threshold_cumulative_operation_captures_without_attachment() {
     let _ = fs::remove_dir_all(path);
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct ForgedCumulativeCustody {
+    hold_invocation_state: String,
+    hold_invocation_captured: i64,
+    operation_state: String,
+    operation_approval_set_digest: Option<String>,
+    account_reserved_authorized_units: i64,
+    account_captured_authorized_units: i64,
+    hold_events: i64,
+    hold_capture_events: i64,
+}
+
+fn forged_cumulative_custody(
+    connection: &Connection,
+    hold_id: &str,
+    operation_id: &str,
+) -> ForgedCumulativeCustody {
+    let (hold_invocation_state, hold_invocation_captured): (String, i64) = connection
+        .query_row(
+            "SELECT invocation_state, invocation_captured \
+             FROM budget_authorization_holds WHERE hold_id = ?1",
+            params![hold_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("read forged hold custody");
+    let (operation_state, operation_approval_set_digest): (String, Option<String>) = connection
+        .query_row(
+            "SELECT state, approval_set_digest \
+                 FROM budget_cumulative_approval_operations WHERE operation_id = ?1",
+            params![operation_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("read forged operation custody");
+    let (account_reserved_authorized_units, account_captured_authorized_units): (i64, i64) =
+        connection
+            .query_row(
+                "SELECT reserved_authorized_units, captured_authorized_units \
+                 FROM budget_cumulative_approval_accounts \
+                 WHERE authority_id = 'approval-authority'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("read forged account custody");
+    let (hold_events, hold_capture_events): (i64, i64) = connection
+        .query_row(
+            "SELECT COUNT(*), COALESCE(SUM(kind = 'capture_invocation'), 0) \
+             FROM budget_mutation_events WHERE hold_id = ?1",
+            params![hold_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("count forged hold history");
+    ForgedCumulativeCustody {
+        hold_invocation_state,
+        hold_invocation_captured,
+        operation_state,
+        operation_approval_set_digest,
+        account_reserved_authorized_units,
+        account_captured_authorized_units,
+        hold_events,
+        hold_capture_events,
+    }
+}
+
 #[test]
 fn cumulative_approval_state_flip_cannot_skip_attachment() {
     let path = unique_db_path("chio-composite-cumulative-state-flip");
@@ -1335,16 +1398,45 @@ fn cumulative_approval_state_flip_cannot_skip_attachment() {
         )
         .expect("forge coordinated cumulative state");
 
+    let database = path.join("authority.sqlite3");
+    let custody_before = {
+        let audit = Connection::open(&database).expect("open audit connection");
+        forged_cumulative_custody(&audit, "hold-state-flip", "operation-state-flip")
+    };
+
     let error = store
         .capture_invocation_reservations(owned(&store, capture_request("state-flip")))
         .expect_err("capture must require the missing approval attachment");
     assert!(
-        error.to_string().contains("invalid reservation history"),
+        matches!(
+            &error,
+            BudgetStoreError::Invariant(detail)
+                if detail.contains(
+                    "budget event `event-state-flip-authorize` breaks \
+                     the cumulative approval state machine"
+                )
+        ),
         "unexpected error: {error}"
     );
+
+    let custody_after = {
+        let audit = Connection::open(&database).expect("open audit connection");
+        forged_cumulative_custody(&audit, "hold-state-flip", "operation-state-flip")
+    };
+    assert_eq!(
+        custody_after, custody_before,
+        "the refused capture must not mutate budget or cumulative custody"
+    );
+    assert_eq!(custody_after.hold_invocation_state, "authorized");
+    assert_eq!(custody_after.hold_invocation_captured, 0);
+    assert_eq!(custody_after.operation_state, "authorized");
+    assert_eq!(custody_after.operation_approval_set_digest, None);
+    assert_eq!(custody_after.account_reserved_authorized_units, 10);
+    assert_eq!(custody_after.account_captured_authorized_units, 0);
+    assert_eq!(custody_after.hold_events, 1);
+    assert_eq!(custody_after.hold_capture_events, 0);
     drop(store);
 
-    let database = path.join("authority.sqlite3");
     let error = match SqliteAuthorityStore::open_serving(&database, path.join("locks")) {
         Ok(_) => panic!("serving must reject a cumulative approval state flip"),
         Err(error) => error,

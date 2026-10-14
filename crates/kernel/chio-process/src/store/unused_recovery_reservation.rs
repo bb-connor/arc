@@ -1,63 +1,27 @@
 //! Permanent closure preserves the charged original and forbids every participant.
 use super::*;
 use crate::recovery::{RecoveryCallReservation, UnusedRecoveryReservationClosureData};
-mod catalog;
+pub(crate) mod catalog;
 mod history;
 
 impl Store {
-    pub(crate) fn close_unused_recovery_reservation(
-        &mut self,
+    /// Authenticate the actual path and enforced level before the routed
+    /// closure. Nothing is written here.
+    pub(crate) fn authorize_unused_recovery_closure(
+        &self,
         writer: (&str, &str),
-        reservation: &RecoveryCallReservation,
-    ) -> Result<UnusedRecoveryReservationClosureData, ProcessError> {
+    ) -> Result<(), ProcessError> {
         self.require_enforced_knowledge()?;
-        self.original_snapshot(writer.0, writer.1).verify_path()?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        verify_before_open(&tx)?;
-        let (version, namespace, authority, key) = history::metadata(&tx)?;
-        if !matches!(version, 5..=7)
-            || namespace != self.namespace
-            || authority != writer.0
-            || key != writer.1
-        {
-            return Err(ProcessError::Conflict);
-        }
-        catalog::verify(&tx)?;
-        history::unused(&tx, reservation)?;
-        if let Some(existing) = history::load(&tx, reservation)? {
-            tx.commit()?;
-            return Ok(existing);
-        }
-        let (root, lineage) = history::lineage(&tx, &reservation.data.process_id)?;
-        let value = UnusedRecoveryReservationClosureData::from_actual_journal(
-            reservation.clone(),
-            authority,
-            key,
-            root,
-            lineage,
-        );
-        let bytes = chio_core_types::canonical_json_bytes(&value)?;
-        if bytes.len() > 16384 {
-            return Err(ProcessError::Limit("unused recovery closure"));
-        }
-        tx.execute(
-            "INSERT INTO process_unused_recovery_reservations(process_id,operation_key,continuation_id,closure) VALUES(?1,?2,?3,?4)",
-            params![reservation.data.process_id,reservation.data.operation_key,reservation.data.continuation_id.as_str(),bytes],
-        )?;
-        if version == 5
-            && tx.execute(
-                "UPDATE process_runtime SET version=6 WHERE singleton=1 AND version=5",
-                [],
-            )? != 1
-        {
-            return Err(ProcessError::Conflict);
-        }
-        verify_cohort(&tx)?;
-        tx.commit()?;
-        self.original_snapshot(writer.0, writer.1).verify_path()?;
-        Ok(value)
+        self.original_snapshot(writer.0, writer.1).verify_path()
+    }
+
+    /// The actual path is still the original journal after the closure
+    /// committed.
+    pub(crate) fn confirm_unused_recovery_closure(
+        &self,
+        writer: (&str, &str),
+    ) -> Result<(), ProcessError> {
+        self.original_snapshot(writer.0, writer.1).verify_path()
     }
 
     pub(crate) fn verify_unused_recovery_reservation_closure(
@@ -84,18 +48,61 @@ impl Store {
     }
 }
 
+/// The complete closure body inside one writer transaction: the retained
+/// cohorts, the exact unused history and the permanent closure row with its
+/// feature activation. Executed only by the bank-proven routed writer.
+pub(crate) fn close_unused_recovery_reservation_call(
+    tx: &rusqlite::Transaction<'_>,
+    namespace_expected: &str,
+    writer: (&str, &str),
+    reservation: &RecoveryCallReservation,
+) -> Result<UnusedRecoveryReservationClosureData, ProcessError> {
+    super::knowledge::require_enforced_level(tx)?;
+    verify_before_open(tx)?;
+    let (version, namespace, authority, key) = history::metadata(tx)?;
+    if !matches!(version, 5..=7)
+        || namespace != namespace_expected
+        || authority != writer.0
+        || key != writer.1
+    {
+        return Err(ProcessError::Conflict);
+    }
+    catalog::verify(tx)?;
+    history::unused(tx, reservation)?;
+    if let Some(existing) = history::load(tx, reservation)? {
+        return Ok(existing);
+    }
+    let (root, lineage) = history::lineage(tx, &reservation.data.process_id)?;
+    let value = UnusedRecoveryReservationClosureData::from_actual_journal(
+        reservation.clone(),
+        authority,
+        key,
+        root,
+        lineage,
+    );
+    let bytes = chio_core_types::canonical_json_bytes(&value)?;
+    if bytes.len() > 16384 {
+        return Err(ProcessError::Limit("unused recovery closure"));
+    }
+    tx.execute(
+        "INSERT INTO process_unused_recovery_reservations(process_id,operation_key,continuation_id,closure) VALUES(?1,?2,?3,?4)",
+        params![reservation.data.process_id,reservation.data.operation_key,reservation.data.continuation_id.as_str(),bytes],
+    )?;
+    if version == 5 {
+        super::raise_feature_level(tx, 5, 6)?;
+    }
+    verify_cohort(tx)?;
+    Ok(value)
+}
+
 /// The participant writer uses this check inside its actual Immediate cut.
 pub(super) fn require_open_recovery_reservation(
     connection: &Connection,
     process: &str,
     operation: &str,
 ) -> Result<(), ProcessError> {
-    let version: u32 = connection.query_row(
-        "SELECT version FROM process_runtime WHERE singleton=1",
-        [],
-        |row| row.get(0),
-    )?;
-    if !matches!(version, 1..=7) {
+    let level = super::feature_level(connection)?;
+    if !matches!(level, 1..=7) {
         return Err(ProcessError::Configuration(
             "unsupported recovery participant journal version",
         ));
@@ -177,7 +184,10 @@ pub(super) fn verify_before_open(connection: &Connection) -> Result<(), ProcessE
             |row| row.get(0),
         )
         .optional()?;
-    if matches!(version, Some(6 | 7)) {
+    let level = version
+        .map(|version| super::level_for_version(connection, version))
+        .transpose()?;
+    if matches!(level, Some(6 | 7)) {
         return verify_cohort(connection);
     }
     if catalog::family_present(connection)? {
@@ -216,6 +226,3 @@ pub(super) fn install_or_verify(connection: &Connection, version: u32) -> Result
 pub(super) fn verify_retained_version_guard(connection: &Connection) -> Result<(), ProcessError> {
     catalog::verify_retained_version_guard(connection)
 }
-
-#[cfg(test)]
-mod tests;

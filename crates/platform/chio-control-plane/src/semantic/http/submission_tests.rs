@@ -207,12 +207,8 @@ async fn run_case(reply: Reply, kind: SemanticOperationKindV1) -> TestResult {
         "fixture-provider-credential".to_owned(),
         ProviderPreconditionGuaranteeV1::AtomicIfMatch,
     )?;
-    transport.client = client_builder_with_contract(&contract)
-        .https_only(true)
-        .no_retries()
+    transport.client = client_builder(&transport.egress_contract)
         .add_root_certificate(certificate)
-        .timeout(Duration::from_secs(4))
-        .connect_timeout(Duration::from_secs(2))
         .build()?;
     let transport = Arc::new(transport);
     let submission = crate::semantic::submission_for_transport_test(request.clone());
@@ -221,7 +217,7 @@ async fn run_case(reply: Reply, kind: SemanticOperationKindV1) -> TestResult {
     let result = if observed.is_ok() {
         tokio::time::timeout(
             if reply == Reply::Timeout {
-                Duration::from_secs(5)
+                REQUEST_TIMEOUT + Duration::from_secs(2)
             } else {
                 Duration::from_secs(1)
             },
@@ -313,4 +309,112 @@ async fn semantic_http_submit_enforces_declared_and_chunked_response_bounds() ->
 #[tokio::test]
 async fn semantic_http_submit_deadline_refuses_a_provider_that_withholds_response() -> TestResult {
     run_case(Reply::Timeout, SemanticOperationKindV1::IssueWrite).await
+}
+
+const PROXY_PROBE_CHILD_MARKER: &str = "CHIO_SEMANTIC_TRANSPORT_PROXY_PROBE_CHILD";
+const PROXY_PROBE_CHILD_DONE: &str = "chio-semantic-transport-proxy-probe-child-done";
+
+#[tokio::test]
+async fn semantic_http_transport_ignores_ambient_proxy_environment() -> TestResult {
+    if std::env::var_os(PROXY_PROBE_CHILD_MARKER).is_some() {
+        run_case(Reply::Success, SemanticOperationKindV1::IssueWrite).await?;
+        // A plain client must reach the proxy, proving that the child's
+        // environment actually exercises the transport's proxy exclusion.
+        let control_target = TcpListener::bind("127.0.0.1:0").await?;
+        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: test-only positive proxy control.
+        let unprotected = reqwest::Client::builder()
+            .retry(reqwest::retry::never())
+            .timeout(Duration::from_secs(2))
+            .build()?;
+        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: controlled loopback fixture, no credentials.
+        let _ = unprotected
+            .get(format!("https://{}/probe", control_target.local_addr()?))
+            .send()
+            .await;
+        println!("{PROXY_PROBE_CHILD_DONE}");
+        return Ok(());
+    }
+    let proxy_listener = TcpListener::bind("127.0.0.1:0").await?;
+    let proxy_url = format!("http://{}", proxy_listener.local_addr()?);
+    let (stop, mut stopped) = tokio::sync::oneshot::channel::<()>();
+    let mut proxy_counter = tokio::spawn(async move {
+        let mut count = 0;
+        loop {
+            tokio::select! {
+                // Drain queued connections before acknowledging shutdown.
+                biased;
+                accepted = proxy_listener.accept() => {
+                    accepted?;
+                    count += 1;
+                }
+                _ = &mut stopped => return Ok::<usize, std::io::Error>(count),
+            }
+        }
+    });
+    let probe = async {
+        let mut command = tokio::process::Command::new(std::env::current_exe()?);
+        command.args([
+            "--exact",
+            "semantic::http::submission_tests::semantic_http_transport_ignores_ambient_proxy_environment",
+            "--nocapture",
+        ]);
+        for name in [
+            "HTTP_PROXY",
+            "http_proxy",
+            "HTTPS_PROXY",
+            "https_proxy",
+            "ALL_PROXY",
+            "all_proxy",
+        ] {
+            command.env(name, &proxy_url);
+        }
+        let mut child = command
+            .env("NO_PROXY", "")
+            .env("no_proxy", "")
+            .env(PROXY_PROBE_CHILD_MARKER, "1")
+            .stdout(std::process::Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()?;
+        let stdout = child.stdout.take().ok_or("proxy probe stdout missing")?;
+        let run = async {
+            let read_output = async {
+                let mut report = String::new();
+                stdout.take(8193).read_to_string(&mut report).await?;
+                Ok::<_, std::io::Error>(report)
+            };
+            let (status, report) = tokio::try_join!(child.wait(), read_output)?;
+            if report.len() > 8192 || !report.contains(PROXY_PROBE_CHILD_DONE) || !status.success()
+            {
+                return Err("proxy probe did not complete its fixture submission".into());
+            }
+            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+        };
+        let outcome = tokio::time::timeout(Duration::from_secs(30), run).await;
+        if !matches!(outcome, Ok(Ok(()))) {
+            // A completed child may already be reaped. The bounded wait
+            // establishes cleanup even if the signal is no longer applicable.
+            let _ = child.start_kill();
+            tokio::time::timeout(Duration::from_secs(2), child.wait())
+                .await
+                .map_err(|_| "proxy probe child did not exit during cleanup")??;
+        }
+        outcome?
+    };
+    let outcome = probe.await;
+    let _ = stop.send(());
+    let counted = tokio::time::timeout(Duration::from_secs(2), &mut proxy_counter).await;
+    let count = match counted {
+        Ok(joined) => joined??,
+        Err(error) => {
+            proxy_counter.abort();
+            let _ = proxy_counter.await;
+            return Err(error.into());
+        }
+    };
+    assert_eq!(
+        count, 1,
+        "ambient proxy control had an unexpected connection count"
+    );
+    outcome?;
+    Ok(())
 }

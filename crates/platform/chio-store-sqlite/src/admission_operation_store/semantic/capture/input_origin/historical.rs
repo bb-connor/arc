@@ -14,22 +14,16 @@ pub(in crate::admission_operation_store) struct HistoricalSemanticRefusedInputOb
     pub snapshot: &'a FlowStateSnapshot,
     pub input_global_commit: u64,
     pub observed_at_unix_ms: u64,
-    pub prior_influence: Option<&'a ArtifactInfluenceV1>,
 }
 
 /// No Deserialize or conversion to the fresh Input producer is available.
 pub(in crate::admission_operation_store) struct SemanticHistoricalInputOriginData {
     label: InformationLabel,
-    influence: ArtifactInfluenceV1,
 }
 
 impl SemanticHistoricalInputOriginData {
     pub(in crate::admission_operation_store) fn source_label(&self) -> &InformationLabel {
         &self.label
-    }
-
-    pub(in crate::admission_operation_store) fn influence(&self) -> &ArtifactInfluenceV1 {
-        &self.influence
     }
 }
 
@@ -71,7 +65,6 @@ pub(in crate::admission_operation_store) fn validate_historical_semantic_refused
         || body.native_authority != *observed.native_authority
         || body.input != *observed.input
         || body.before != *observed.before
-        || body.prior_influence.as_ref() != observed.prior_influence
         || recovery_flow_key(&body.security_context) != *observed.input.key()
         || canonical_json_bytes(&body.original_request).map_err(refused)?
             != observed.original.canonical_bytes()
@@ -86,6 +79,20 @@ pub(in crate::admission_operation_store) fn validate_historical_semantic_refused
         return Err(refused("historical semantic Input original source changed"));
     }
     validate_native_resolution(&body)?;
+    // The retained heads are data. Only their authentication against the
+    // immutable history at the cut, plus the sealed imported source, yields the
+    // prior influence; the origin's own claim is never its evidence.
+    let prior_influence = observed_influence_at_cut(
+        tx,
+        observed.native_authority,
+        observed.input.key(),
+        input_cut,
+        &body.prior_heads,
+        &mut VerificationBudget::new(4096).map_err(refused)?,
+    )?;
+    if body.prior_influence != prior_influence {
+        return Err(refused("historical semantic Input prior influence changed"));
+    }
     let scope = &body.invocation.action.scope;
     body.installation.validate_at_cut(
         tx,
@@ -143,7 +150,7 @@ pub(in crate::admission_operation_store) fn validate_historical_semantic_refused
         &body.invocation,
         request,
         contract.external_influence,
-        observed.prior_influence,
+        prior_influence.as_ref(),
     )?;
     if lower_external && !body.invocation.action.externally_influenced {
         return Err(refused(
@@ -210,7 +217,6 @@ pub(in crate::admission_operation_store) fn validate_historical_semantic_refused
     validate_joined_body(&body, observed.joined, observed.snapshot)?;
     Ok(SemanticHistoricalInputOriginData {
         label: body.source_label.clone(),
-        influence: origin_influence(&canonical, &body),
     })
 }
 

@@ -77,18 +77,3 @@ pub(in crate::admission_operation_store) fn require_retired_reference_owner(
     }
     Ok(())
 }
-
-pub(in crate::admission_operation_store) fn require_new_artifact_reference_baseline(
-    tx: &Connection,
-    reference: &ArtifactVersionRefV1,
-    expected_metadata_commit: &SourceAnchor,
-) -> Result<(), AdmissionOperationStoreError> {
-    expected_metadata_commit.verify_historical_identity(tx)?;
-    let state = load_reference_state(tx, reference)?;
-    if &state.aggregate.value.source != expected_metadata_commit {
-        return Err(refused(
-            "new artifact completion changed its metadata commitment",
-        ));
-    }
-    Ok(())
-}

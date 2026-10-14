@@ -180,7 +180,10 @@ async fn policy_report_release_rechecks_current_clearance_and_capability() -> Te
 #[tokio::test]
 async fn policy_reports_stop_at_the_retained_tenant_domain_quota() -> TestResult {
     let f = KnowledgeFixture::new()?;
-    let workflow = f.f.ready().await?;
+    let workflow =
+        f.f.ready()
+            .await
+            .map_err(|error| format!("quota stage ready: {error}"))?;
     let attachment = f.publish("quota-attachment", b"quota-evidence")?;
     let report = report(&f, &workflow, attachment)?;
     let service = maintenance(&f)?;
@@ -193,9 +196,16 @@ async fn policy_reports_stop_at_the_retained_tenant_domain_quota() -> TestResult
     }
     let mut other = f.f.kernel.recovery_deployment(f.f.runtime.scope())?;
     other.scope.process_id = ProcessId::new("report-quota-other-process")?;
+    // Root capability identity determines native lineage. Keep the shared
+    // principal and tenant while giving the second root its own lineage.
+    let fresh_root = f.f.kernel.issue_capability(
+        &f.f.seed.capability.subject,
+        f.f.seed.capability.scope.clone(),
+        600,
+    )?;
     f.f.process.create_root(
         other.scope.process_id.as_str(),
-        &f.f.seed.capability,
+        &fresh_root,
         chio_process::ProcessLimits {
             max_processes: 8,
             max_depth: 2,
@@ -206,9 +216,21 @@ async fn policy_reports_stop_at_the_retained_tenant_domain_quota() -> TestResult
     other.security_context =
         f.f.process
             .recovery_security_context(other.scope.process_id.as_str())?;
+    // A misconfigured fixture reusing the original root capability cannot
+    // silently pass: the derived native context stays distinct.
+    assert_ne!(
+        other.security_context.as_v1().lineage_root_id().as_str(),
+        f.f.process
+            .recovery_security_context(f.f.runtime.scope().process_id.as_str())?
+            .as_v1()
+            .lineage_root_id()
+            .as_str()
+    );
     other.authority_scope = recovery_authority_scope_digest(&other)?;
     let store = f.f.authority.admission_operation_store();
-    store.configure_recovery_deployment(&other)?;
+    store
+        .configure_recovery_deployment(&other)
+        .map_err(|error| format!("quota stage configure-other-deployment: {error}"))?;
     let seed = f.f.process.tool_request(
         other.scope.process_id.as_str(),
         "quota-seed",
@@ -219,7 +241,8 @@ async fn policy_reports_stop_at_the_retained_tenant_domain_quota() -> TestResult
     let denied =
         f.f.process
             .invoke_known_only(other.scope.process_id.as_str(), "quota-seed", &seed)
-            .await?;
+            .await
+            .map_err(|error| format!("quota stage real-original-denial: {error}"))?;
     assert_eq!(denied.verdict, Verdict::Deny);
     assert_eq!(external_count(&f.f.path)?, 0);
     let (original, _) = store
@@ -234,13 +257,21 @@ async fn policy_reports_stop_at_the_retained_tenant_domain_quota() -> TestResult
         AdmissionOperationState::CompensatedBeforeDispatch
     );
     assert!(original.dispatch_commit().is_none());
-    let actor = f.f.kernel.authenticate_recovery_actor(
-        &other.scope,
+    // Materialize the second workflow through a real RecoveryRuntime for the
+    // other scope, with the same kernel, process, flow and signer host
+    // dependencies as the fixture scope. The low-level kernel origin path
+    // leaves the workflow unmaterialized, and the report label joins the
+    // workflow action, so an absent action would correctly refuse Top.
+    let other_runtime = RecoveryRuntime::new(
+        f.f.kernel.clone(),
+        f.f.process.clone(),
+        f.f.runtime.flow.clone(),
+        other.scope.clone(),
+        f.f.runtime.signer.clone(),
+    )
+    .map_err(|error| format!("quota stage other-scope runtime: {error}"))?;
+    let created = Box::pin(other_runtime.execute_command(
         &f.f.control,
-        RecoveryPermission::Create,
-    )?;
-    let created = f.f.kernel.execute_recovery_command_with_origin(
-        &actor,
         &f.f.command(
             "quota-create-other",
             RecoveryCommandBodyV1::CreateWorkflow {
@@ -249,15 +280,25 @@ async fn policy_reports_stop_at_the_retained_tenant_domain_quota() -> TestResult
                 request_seed: text(&seed)?,
             },
         )?,
-        &f.f.process,
-    )?;
-    let workflow = created.workflow_id;
+    ))
+    .await
+    .map_err(|error| format!("quota stage create-other-workflow: {error}"))?;
+    let workflow = created.status.workflow_id;
     let actor = f.f.kernel.authenticate_recovery_actor(
         &other.scope,
         &f.f.control,
         RecoveryPermission::Inspect,
     )?;
-    let record = f.f.kernel.read_recovery_workflow(&actor, &workflow)?;
+    let record =
+        f.f.kernel
+            .read_recovery_workflow(&actor, &workflow)
+            .map_err(|error| format!("quota stage read-other-workflow: {error}"))?;
+    // The real runtime materializes the action before any report quota is
+    // spent; an unmaterialized workflow cannot silently pass here.
+    assert!(
+        record.action.is_some(),
+        "quota stage other-workflow action materialization"
+    );
     let other_report = DecisionReportV1 {
         scope: other.scope.clone(),
         workflow_id: workflow,
@@ -270,14 +311,16 @@ async fn policy_reports_stop_at_the_retained_tenant_domain_quota() -> TestResult
         &f.f.control,
         RecoveryPermission::Report,
     )?;
-    store.submit_decision_report(
-        &actor,
-        None,
-        &CommandId::new("quota-other-64")?,
-        &other_report,
-        &f.f.authority.mutation_fence(),
-        now_ms()?,
-    )?;
+    store
+        .submit_decision_report(
+            &actor,
+            None,
+            &CommandId::new("quota-other-64")?,
+            &other_report,
+            &f.f.authority.mutation_fence(),
+            now_ms()?,
+        )
+        .map_err(|error| format!("quota stage submit-other-report: {error}"))?;
     assert!(service
         .submit_report(&f.f.control, &CommandId::new("quota-report-65")?, &report)
         .is_err());
@@ -322,7 +365,12 @@ async fn policy_selected_operator_alone_applies_exact_proposal_and_native_target
         )
         .await
         .map_err(|error| format!("initial completed effect: {error}"))?;
-    assert_eq!(completed.verdict, Verdict::Allow);
+    assert_eq!(
+        completed.verdict,
+        Verdict::Allow,
+        "native policy baseline did not complete: {:?}",
+        completed.reason
+    );
     assert_eq!(f.f.effects.load(Ordering::SeqCst), 1);
     let store = f.f.authority.admission_operation_store();
     let old = store.read_semantic_installation(

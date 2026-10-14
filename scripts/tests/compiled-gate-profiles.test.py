@@ -24,6 +24,57 @@ def load(name, path):
     return module
 
 
+class OrdinaryExecutionLimitTest(unittest.TestCase):
+    def setUp(self):
+        self.producer = load("ordinary_limit_producer", ROOT/"scripts/compiled-gate-profiles.py")
+        self.recorder = load("ordinary_limit_recorder", ROOT/"scripts/record-rust-compilation.py")
+
+    def exercise(self, timeout, free=10*1024**3, accepted=True):
+        evidence = ROOT/"target/explicit-execution-budget"
+        runtime, host, environment = {}, {}, {}
+        configuration = evidence/"host-execution.json"
+        verifier = SimpleNamespace(gate_catalog=lambda: {"contracts": {"command": ["owned-command"]}})
+        argv = ["compiled-gate-profiles.py", "--evidence", str(evidence)]
+        if timeout is not None:
+            argv.extend(["--timeout", str(timeout)])
+        with (mock.patch.object(sys, "argv", argv),
+              mock.patch.object(self.producer, "load", side_effect=[verifier, self.recorder]),
+              mock.patch.object(self.producer.shutil, "disk_usage", return_value=SimpleNamespace(free=free)),
+              mock.patch.object(self.producer.resource, "getrlimit", return_value=(16384, 16384)),
+              mock.patch.object(self.producer.resource, "setrlimit"),
+              mock.patch.object(self.producer, "create_evidence", return_value=evidence) as create,
+              mock.patch.object(self.producer, "inventory", return_value=runtime),
+              mock.patch.object(self.producer, "write"),
+              mock.patch.object(self.producer, "prepare_host", return_value=(host, configuration, environment)),
+              mock.patch.object(self.producer, "execute", return_value=({}, runtime)) as execute,
+              mock.patch.object(self.producer, "export") as export):
+            if not accepted:
+                with self.assertRaisesRegex(self.recorder.Refusal, "host_execution_limits"):
+                    self.producer.main()
+                create.assert_not_called()
+                execute.assert_not_called()
+                export.assert_not_called()
+            else:
+                self.producer.main()
+                expected = 1800 if timeout is None else timeout
+                self.assertEqual(execute.call_args.args[-1], expected)
+                self.assertEqual(export.call_args.args[-1], expected)
+                create.assert_called_once()
+                execute.assert_called_once()
+                export.assert_called_once()
+
+    def test_default_and_explicit_finite_budgets_reach_producer_and_inspector(self):
+        for timeout in (None, 1, 7200, 7201, 21600):
+            with self.subTest(timeout=timeout):
+                self.exercise(timeout)
+
+    def test_invalid_budgets_and_disk_floor_refuse_before_evidence_creation(self):
+        for timeout in (-1, 0, 21601):
+            with self.subTest(timeout=timeout):
+                self.exercise(timeout, accepted=False)
+        self.exercise(21600, free=10*1024**3-1, accepted=False)
+
+
 class OrdinaryEvidencePathTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -37,6 +88,16 @@ class OrdinaryEvidencePathTest(unittest.TestCase):
         operation = getattr(self.producer, "create_evidence", None)
         self.assertIsNotNone(operation, "producer must validate evidence components before mutation")
         return operation(self.root, path, self.recorder)
+
+    def test_export_refuses_instrumentation_error_after_nonzero_compiler_exit(self):
+        namespace = self.root / "target/namespace"
+        records = namespace / "records"
+        records.mkdir(parents=True)
+        (records / "failed.json").write_text(json.dumps({"status": "compiler_failed", "compiler_exit": 1,
+                                                        "refusal": "unexpected_compiler_output"}))
+        with self.assertRaisesRegex(self.recorder.Refusal, "host_compilation_failed"):
+            self.producer.export(self.root, self.root/"target", None, {}, {},
+                                 {"namespace": str(namespace)}, {}, None, self.recorder, 30)
 
     def test_parent_traversal_never_creates_outside_evidence(self):
         with self.assertRaisesRegex(self.recorder.Refusal, "parent_traversal"):
@@ -333,6 +394,48 @@ print("leader complete", flush=True)
 
     def test_group_surviving_term_is_killed_even_after_leader_exits(self):
         self.exercise(exited_leader=True, group_survives_term=True)
+
+
+class OrdinaryOwnedGroupExitRaceTest(unittest.TestCase):
+    """Stop may accept a vanished group only via the bounded wait."""
+
+    def load_with_killpg(self, killpg):
+        producer = load("ordinary_exit_race_producer", ROOT/"scripts/compiled-gate-profiles.py")
+        patcher = mock.patch.object(producer.os, "killpg", side_effect=killpg)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return producer
+
+    def test_permission_error_then_verified_disappearance_permits_cleanup(self):
+        def killpg(pid, selected_signal):
+            if selected_signal == 0:
+                raise ProcessLookupError()
+            raise PermissionError()
+        producer = self.load_with_killpg(killpg)
+        process = SimpleNamespace(pid=12345, poll=mock.Mock(return_value=0))
+        # PermissionError on the stop signal defers to the same bounded
+        # wait, which here proves the group vanished.
+        producer.stop_owned_group(process)
+
+    def test_persistent_permission_error_with_live_group_refuses(self):
+        producer = load("ordinary_persistent_permission_producer",
+                        ROOT/"scripts/compiled-gate-profiles.py")
+        process = SimpleNamespace(pid=12345, poll=mock.Mock(return_value=0))
+        with mock.patch.object(producer.os, "killpg", side_effect=PermissionError()), \
+             mock.patch.object(producer, "wait_owned_group_exit", side_effect=[False, False]) as group_exit:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                producer.stop_owned_group(process)
+        # Both bounded stop attempts observed a live group before refusing.
+        self.assertEqual(group_exit.call_count, 2)
+
+    def test_probe_permission_error_means_group_still_present(self):
+        producer = self.load_with_killpg(PermissionError)
+        process = SimpleNamespace(pid=12345, poll=mock.Mock(return_value=0))
+        self.assertFalse(producer.wait_owned_group_exit(process, grace=0))
+
+    def test_process_lookup_error_still_means_vanished(self):
+        producer = self.load_with_killpg(ProcessLookupError)
+        producer.stop_owned_group(SimpleNamespace(pid=12345, poll=mock.Mock(return_value=0)))
 
 
 if __name__ == "__main__":

@@ -171,7 +171,9 @@ impl RecoveryRuntime {
                 &request.capability.signing_body(),
             )?),
             semantic_request: SemanticRequestDigest::from_bytes(
-                *sha256(semantics.as_bytes()).as_bytes(),
+                *RecoveryDigestDomain::SemanticNativeRequestSemantics
+                    .digest(&semantics)
+                    .as_bytes(),
             ),
             authorization_requirements: requirements,
             policy_digest: profile.policy_digest,
@@ -487,7 +489,12 @@ impl RecoveryRuntime {
         let body = self
             .kernel
             .reserve_recovery_issuance(actor, id, &body)
-            .map_err(|_| RecoveryRuntimeError::Unavailable)?;
+            .map_err(|error| {
+                #[cfg(test)]
+                eprintln!("recovery original reserve_recovery_issuance refusal: {error:?}");
+                let _ = error;
+                RecoveryRuntimeError::Unavailable
+            })?;
         #[cfg(test)]
         super::test_cutpoint("issuance");
         let signed = match record.signed_grant {
@@ -514,7 +521,12 @@ impl RecoveryRuntime {
                 }
                 self.kernel
                     .attach_recovery_signature(actor, id, &signed)
-                    .map_err(|_| RecoveryRuntimeError::Unavailable)?;
+                    .map_err(|error| {
+                        #[cfg(test)]
+                        eprintln!("recovery original attach_recovery_signature refusal: {error:?}");
+                        let _ = error;
+                        RecoveryRuntimeError::Unavailable
+                    })?;
                 signed
             }
         };
@@ -552,7 +564,12 @@ impl RecoveryRuntime {
         };
         self.kernel
             .finalize_recovery_envelope(actor, id, &envelope, &identity)
-            .map_err(|_| RecoveryRuntimeError::Unavailable)?;
+            .map_err(|error| {
+                #[cfg(test)]
+                eprintln!("recovery original finalize_recovery_envelope refusal: {error:?}");
+                let _ = error;
+                RecoveryRuntimeError::Unavailable
+            })?;
         #[cfg(test)]
         super::test_cutpoint("envelope");
         Ok(reservation)

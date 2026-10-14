@@ -8,8 +8,12 @@ acceptance and isolated candidate passes retain their original scope.
 
 - Preserve every original finding and its acceptance obligation. Track introduced
   defects and uninstalled candidate defects separately in the review register.
-- Keep at most two implementation streams active. One owner coordinates shared
-  Kernel, Process and Store contracts. Review precedes installation of repairs.
+- The current authorized swarm uses seven isolated Hermes/Claude implementation
+  worktrees and one read-only Opus reviewer, all from the same checkpoint. One integration owner
+  coordinates shared interfaces and owns the only build queue.
+- Finish the permitted implementation pass before running validation. Integrate
+  reviewed source, stabilize locally, then push only after the local gate passes.
+  Worker completion messages do not close findings.
 - Preserve the maintained vendor fixes and unrelated workspace files when
   consolidating older candidates. Never copy an entire older tree over the branch.
 - Use behavioral names in implementation, tests and tooling. Review identifiers
@@ -43,7 +47,9 @@ acceptance from the remaining native lifecycle and qualification gates.
 - [ ] Independently review each completed implementation package, install it in
       the integration branch, and rerun its owning checks on the combined source.
 
-The selected local candidate is
+The authoritative candidate is the complete dirty integration checkout, preserved
+by unpublished checkpoints linked from `target/recovery-execution-status.json`.
+The following installation narrative is historical. Its selected local candidate was
 `target/recovery-pr/current-review-followup/local-native-process-owner-composition-20261009T0610/source`.
 Its initial successor inventory is retained at
 `target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/selected-candidate.json`.
@@ -172,8 +178,8 @@ acceptance gates.
 
 ## Acceptance order
 
-Start with formatting, manifest consistency, focused compilation and meaningful
-regressions. Run owning tests and strict lints next. Full integration, supported
+After the complete permitted implementation pass, start with formatting,
+manifest consistency, focused compilation and meaningful regressions. Run owning tests and strict lints next. Full integration, supported
 platforms, formal obligations and hosted qualification follow a stable candidate.
 Confirm registered test names and counts before interpreting a run. Repeat a
 passed check only after a relevant source, dependency or configuration change.

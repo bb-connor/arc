@@ -1,7 +1,20 @@
 use super::transport::canonical_endpoint;
 use super::*;
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClientBuilder, HttpEgressContract,
+};
 use std::time::Duration;
+
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+
+fn client_builder(contract: &HttpEgressContract) -> ContractClientBuilder {
+    client_builder_with_contract(contract)
+        .https_only(true)
+        .no_retries()
+        .timeout(REQUEST_TIMEOUT)
+        .connect_timeout(CONNECT_TIMEOUT)
+}
 
 /// One bounded HTTP request. Credentials are selected by trusted host setup,
 /// never by tool arguments, package metadata or a recovered plan.
@@ -46,11 +59,7 @@ impl HttpSemanticTransport {
         egress_contract.max_response_bytes = egress_contract
             .max_response_bytes
             .min(MAX_RECOVERY_WIRE_BYTES as u64);
-        let client = client_builder_with_contract(&egress_contract)
-            .https_only(true)
-            .no_retries()
-            .timeout(Duration::from_secs(10))
-            .connect_timeout(Duration::from_secs(3))
+        let client = client_builder(&egress_contract)
             .build()
             .map_err(|_| refused())?;
         Ok(Self {

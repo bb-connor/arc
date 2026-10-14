@@ -103,10 +103,14 @@ fn event(
 
 impl Capacity {
     fn active(&self) -> Result<u64, AdmissionOperationStoreError> {
-        self.baseline
+        if self.baseline != SafeInteger::ZERO {
+            return Err(invariant(
+                "recovery active capacity adopted prior workflows",
+            ));
+        }
+        self.admitted
             .get()
-            .checked_add(self.admitted.get())
-            .and_then(|count| count.checked_sub(self.retired.get()))
+            .checked_sub(self.retired.get())
             .ok_or_else(|| invariant("recovery active counter is corrupt"))
     }
 
@@ -247,7 +251,9 @@ fn save_allocation(
     )
 }
 
-/// One live-owner migration creates conservative leases without deleting old identities.
+/// The first live-owner intake provisions the global zero-baseline capacity.
+/// Any workflow/allocation/capacity history predating it refuses: a supported
+/// store always creates capacity before its first workflow row exists.
 fn initialize(
     tx: &Transaction<'_>,
     owner: &SqliteServingOwner,
@@ -257,131 +263,31 @@ fn initialize(
     if let Some(global) = load_capacity(tx, &domain, None)? {
         return Ok(global);
     }
-    let partial: bool = tx.query_row(
-        "SELECT EXISTS(SELECT 1 FROM admission_operation_recovery_records WHERE record_key GLOB 'recovery-workflow-capacity:*' OR record_key GLOB 'recovery-workflow-allocation:*')
-            OR EXISTS(SELECT 1 FROM admission_operation_recovery_events WHERE record_key GLOB 'recovery-workflow-capacity:*' OR record_key GLOB 'recovery-workflow-allocation:*')
-            OR EXISTS(SELECT 1 FROM authority_global_commits WHERE projection_kind='recovery' AND (projection_key GLOB 'recovery-workflow-capacity:*' OR projection_key GLOB 'recovery-workflow-allocation:*'))",
-        [],|row|row.get(0),
-    ).map_err(sqlite_error)?;
-    if partial {
+    if any_metadata(tx)? {
         return Err(invariant(
-            "recovery active migration projection disappeared",
+            "recovery active capacity baseline is absent with retained history",
         ));
     }
-    crate::serving_owner::verify_authenticated_recovery_history(tx).map_err(map_owner_error)?;
-    let (cutoff,count): (i64,i64) = tx.query_row(
-        "SELECT (SELECT coalesce(max(sequence),0) FROM admission_operation_recovery_events),
-            (SELECT count(*) FROM admission_operation_recovery_records WHERE kind='workflow' AND record_key GLOB 'workflow:*')",
-        [],|row|Ok((row.get(0)?,row.get(1)?)),
-    ).map_err(sqlite_error)?;
+    let cutoff: i64 = tx
+        .query_row(
+            "SELECT coalesce(max(sequence),0) FROM admission_operation_recovery_events",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
     let cutoff = SafeInteger::new(stored_u64(cutoff, "recovery active cutoff")?)
         .map_err(|_| invariant("recovery cutoff refused"))?;
     let global = Capacity {
         schema: CapacitySchema::V1,
-        authority_domain: domain.clone(),
+        authority_domain: domain,
         tenant_id: None,
         legacy_cutoff: cutoff,
-        baseline: SafeInteger::new(stored_u64(count, "recovery active baseline")?)
-            .map_err(|_| invariant("recovery baseline refused"))?,
+        baseline: SafeInteger::ZERO,
         admitted: SafeInteger::ZERO,
         retired: SafeInteger::ZERO,
     };
     save_capacity(tx, owner, &global)?;
-    let mut statement = tx.prepare(
-        "SELECT record_key FROM admission_operation_recovery_records WHERE kind='workflow' AND record_key GLOB 'workflow:*'
-         ORDER BY json_extract(payload,'$.scope.tenant_id'),record_key",
-    ).map_err(sqlite_error)?;
-    let mut tenant: Option<RecoveryTenantId> = None;
-    let mut tenant_count = 0_u64;
-    for key in statement
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(sqlite_error)?
-    {
-        let key = key.map_err(sqlite_error)?;
-        let row =
-            raw(tx, &key)?.ok_or_else(|| invariant("recovery legacy workflow disappeared"))?;
-        let record: RecoveryWorkflowRecordV1 = decode(&row.payload)?;
-        if key != workflow_key(&record.scope, &record.workflow_id)?
-            || row.scope != scope_key(&record.scope)?
-            || record.revision.get() != row.version
-            || record.scope.authority_domain != domain
-        {
-            return Err(invariant("recovery legacy allocation source changed"));
-        }
-        if tenant.as_ref() != Some(&record.scope.tenant_id) {
-            if let Some(previous) = tenant.take() {
-                save_capacity(
-                    tx,
-                    owner,
-                    &Capacity {
-                        tenant_id: Some(previous),
-                        baseline: SafeInteger::new(tenant_count)
-                            .map_err(|_| invariant("recovery baseline refused"))?,
-                        ..global.clone()
-                    },
-                )?;
-            }
-            tenant = Some(record.scope.tenant_id.clone());
-            tenant_count = 0;
-        }
-        tenant_count = tenant_count
-            .checked_add(1)
-            .ok_or_else(|| invariant("recovery legacy allocation exhausted"))?;
-        save_allocation(
-            tx,
-            owner,
-            &Allocation {
-                schema: AllocationSchema::V1,
-                scope: record.scope.clone(),
-                workflow_id: record.workflow_id.clone(),
-                creation_version: record.revision,
-                creation_digest: event(tx, &key, row.version)?.1,
-                retirement: None,
-            },
-        )?;
-    }
-    if let Some(tenant) = tenant {
-        save_capacity(
-            tx,
-            owner,
-            &Capacity {
-                tenant_id: Some(tenant),
-                baseline: SafeInteger::new(tenant_count)
-                    .map_err(|_| invariant("recovery baseline refused"))?,
-                ..global.clone()
-            },
-        )?;
-    }
-    // A terminal may have finished before this first intake established live
-    // allocations. Authenticate its retained native custody after every tenant
-    // baseline exists, then retire the newly created lease exactly once. A
-    // workflow's display state alone never proves that its debt has finished.
-    // Old never-admitted cancellations retain their separate no-admission proof.
-    let mut closed = tx
-        .prepare(
-            "SELECT record_key FROM admission_operation_recovery_records
-         WHERE kind='workflow' AND record_key GLOB 'workflow:*'
-           AND (json_extract(payload,'$.control')='cancelled'
-                OR json_extract(payload,'$.captured')=1) ORDER BY record_key",
-        )
-        .map_err(sqlite_error)?;
-    for key in closed
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(sqlite_error)?
-    {
-        let row = raw(tx, &key.map_err(sqlite_error)?)?
-            .ok_or_else(|| invariant("recovery legacy closure disappeared"))?;
-        let record: RecoveryWorkflowRecordV1 = decode(&row.payload)?;
-        if record.captured {
-            if let Some(terminal) = auxiliary_captured_terminal(tx, &record)? {
-                retire_captured_terminal(tx, owner, &record, &terminal)?;
-            }
-        } else {
-            retire_cancelled(tx, owner, &record)?;
-        }
-    }
-    load_capacity(tx, &domain, None)?
-        .ok_or_else(|| invariant("recovery active migration lost its capacity"))
+    Ok(global)
 }
 
 fn capacities(
@@ -398,22 +304,18 @@ fn capacities(
     {
         tenant
     } else {
-        let legacy: bool = tx.query_row(
+        let existing_workflow: bool = tx.query_row(
             "SELECT EXISTS(SELECT 1 FROM admission_operation_recovery_records WHERE kind='workflow' AND record_key GLOB 'workflow:*' AND json_extract(payload,'$.scope.tenant_id')=?1)",
             [scope.tenant_id.as_str()],|row|row.get(0),
         ).map_err(sqlite_error)?;
-        if legacy {
+        if existing_workflow {
             return Err(invariant("recovery tenant capacity disappeared"));
         }
         let tenant = Capacity {
             tenant_id: Some(scope.tenant_id.clone()),
-            baseline: SafeInteger::ZERO,
-            ..global.clone()
-        };
-        let tenant = Capacity {
             admitted: SafeInteger::ZERO,
             retired: SafeInteger::ZERO,
-            ..tenant
+            ..global.clone()
         };
         save_capacity(tx, owner, &tenant)?;
         tenant
@@ -478,6 +380,18 @@ pub(super) fn register(
         save_capacity(tx, owner, account)?;
     }
     Ok(())
+}
+
+/// Whether the workflow's live allocation already committed its retirement.
+/// A retired lease is the verified capacity release a linked successor
+/// generation requires before the predecessor's original can transfer.
+pub(super) fn retirement_committed(
+    tx: &Connection,
+    scope: &RecoveryScopeV1,
+    workflow: &WorkflowId,
+) -> Result<bool, AdmissionOperationStoreError> {
+    Ok(load_allocation(tx, scope, workflow)?
+        .is_some_and(|allocation| allocation.retirement.is_some()))
 }
 
 /// A never-admitted cancellation seals future begin/capture through the physical workflow.
@@ -555,9 +469,9 @@ fn persist_retirement(
     record: &RecoveryWorkflowRecordV1,
     captured_terminal: Option<ProjectionDigest>,
 ) -> Result<bool, AdmissionOperationStoreError> {
+    // A supported workflow row always carries its registered allocation.
     let Some(mut allocation) = load_allocation(tx, &record.scope, &record.workflow_id)? else {
-        // Finishing legacy work never demands new intake/migration allocation.
-        return Ok(false);
+        return Err(invariant("recovery workflow allocation disappeared"));
     };
     if allocation.retirement.is_some() {
         return Ok(false);
@@ -589,10 +503,13 @@ fn persist_retirement(
     Ok(true)
 }
 
+/// Whether any workflow/allocation/capacity history is retained in records,
+/// events or authority-global commit references. Provision and the startup
+/// tally both refuse such history while the global capacity baseline is absent.
 fn any_metadata(tx: &Connection) -> Result<bool, AdmissionOperationStoreError> {
     let retained: bool = tx.query_row(
-        "SELECT EXISTS(SELECT 1 FROM admission_operation_recovery_records WHERE record_key GLOB 'recovery-workflow-capacity:*' OR record_key GLOB 'recovery-workflow-allocation:*')
-            OR EXISTS(SELECT 1 FROM admission_operation_recovery_events WHERE record_key GLOB 'recovery-workflow-capacity:*' OR record_key GLOB 'recovery-workflow-allocation:*')",
+        "SELECT EXISTS(SELECT 1 FROM admission_operation_recovery_records WHERE record_key GLOB 'recovery-workflow-capacity:*' OR record_key GLOB 'recovery-workflow-allocation:*' OR record_key GLOB 'workflow:*')
+            OR EXISTS(SELECT 1 FROM admission_operation_recovery_events WHERE record_key GLOB 'recovery-workflow-capacity:*' OR record_key GLOB 'recovery-workflow-allocation:*' OR record_key GLOB 'workflow:*')",
         [], |row| row.get(0),
     ).map_err(sqlite_error)?;
     let global_exists: bool = tx.query_row(
@@ -609,7 +526,7 @@ fn any_metadata(tx: &Connection) -> Result<bool, AdmissionOperationStoreError> {
     }
     let references: bool = tx.query_row(
         "SELECT EXISTS(SELECT 1 FROM authority_global_commits WHERE projection_kind='recovery'
-            AND (projection_key GLOB 'recovery-workflow-capacity:*' OR projection_key GLOB 'recovery-workflow-allocation:*'))",
+            AND (projection_key GLOB 'recovery-workflow-capacity:*' OR projection_key GLOB 'recovery-workflow-allocation:*' OR projection_key GLOB 'workflow:*'))",
         [], |row| row.get(0),
     ).map_err(sqlite_error)?;
     Ok(retained || references)
@@ -619,15 +536,11 @@ fn verify_counts(
     tx: &Connection,
     global: &Capacity,
     tenant: &RecoveryTenantId,
-    counts: [u64; 3],
+    counts: [u64; 2],
 ) -> Result<(), AdmissionOperationStoreError> {
     let account = load_capacity(tx, &global.authority_domain, Some(tenant))?
         .ok_or_else(|| invariant("recovery tenant capacity absent"))?;
-    if [
-        account.baseline.get(),
-        account.admitted.get(),
-        account.retired.get(),
-    ] != counts
+    if [account.admitted.get(), account.retired.get()] != counts
         || account.legacy_cutoff != global.legacy_cutoff
     {
         return Err(invariant(
@@ -653,9 +566,10 @@ pub(super) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
         AuthorityDomainId::new(&domain).map_err(|_| invariant("recovery active owner refused"))?;
     let global = load_capacity(tx, &domain, None)?
         .ok_or_else(|| invariant("recovery active capacity absent"))?;
+    // Tallies are [admitted, retired] per tenant and overall.
     let mut tenant = None;
-    let mut counts = [0_u64; 3];
-    let mut total = [0_u64; 3];
+    let mut counts = [0_u64; 2];
+    let mut total = [0_u64; 2];
     let mut tenants = 0_u64;
     let mut workflows = 0_u64;
     let mut statement = tx.prepare(
@@ -683,7 +597,7 @@ pub(super) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
                 verify_counts(tx, &global, &previous, counts)?;
             }
             tenant = Some(record.scope.tenant_id.clone());
-            counts = [0; 3];
+            counts = [0; 2];
             tenants = tenants
                 .checked_add(1)
                 .ok_or_else(|| invariant("recovery tenant count exhausted"))?;
@@ -691,17 +605,17 @@ pub(super) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
         workflows = workflows
             .checked_add(1)
             .ok_or_else(|| invariant("recovery workflow count exhausted"))?;
-        let source_sequence = event(tx, &key, allocation.creation_version.get())?.0;
-        let category = usize::from(source_sequence > global.legacy_cutoff.get());
-        if category == 1 && allocation.creation_version.get() != 1 {
+        if allocation.creation_version.get() != 1
+            || event(tx, &key, 1)?.0 <= global.legacy_cutoff.get()
+        {
             return Err(invariant(
-                "new recovery allocation changed its creation version",
+                "recovery workflow allocation predates its capacity baseline",
             ));
         }
-        counts[category] = counts[category]
+        counts[0] = counts[0]
             .checked_add(1)
             .ok_or_else(|| invariant("recovery allocation count exhausted"))?;
-        total[category] = total[category]
+        total[0] = total[0]
             .checked_add(1)
             .ok_or_else(|| invariant("recovery allocation count exhausted"))?;
         if let Some(retirement) = &allocation.retirement {
@@ -721,10 +635,10 @@ pub(super) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
                     "retired recovery allocation regained an obligation",
                 ));
             }
-            counts[2] = counts[2]
+            counts[1] = counts[1]
                 .checked_add(1)
                 .ok_or_else(|| invariant("recovery retirement count exhausted"))?;
-            total[2] = total[2]
+            total[1] = total[1]
                 .checked_add(1)
                 .ok_or_else(|| invariant("recovery retirement count exhausted"))?;
         }
@@ -743,11 +657,7 @@ pub(super) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
             .checked_add(1)
             .ok_or_else(|| invariant("recovery tenant count exhausted"))?
         || stored_u64(allocation_rows, "recovery allocation count")? != workflows
-        || [
-            global.baseline.get(),
-            global.admitted.get(),
-            global.retired.get(),
-        ] != total
+        || [global.admitted.get(), global.retired.get()] != total
     {
         return Err(invariant(
             "recovery capacity does not match retained allocations",

@@ -131,6 +131,12 @@ impl SqliteAdmissionOperationStore {
         verify_trusted_time(transaction, apply_time_unix_ms)?;
         let stored = load_by_operation_id_tx(transaction, &context.operation_id)?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
+        security_participant_state::authorize_native_finishing_growth(
+            transaction,
+            &self.serving_owner,
+            &stored.operation,
+            &[recovery::storage::NativeFinishingPurposeV1::TerminalProjection],
+        )?;
         crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
         verify_payment_terminal_source(
             transaction,
@@ -292,6 +298,11 @@ impl SqliteAdmissionOperationStore {
                 append,
             )?;
         }
+        security_participant_state::native_finishing_at_terminal(
+            transaction,
+            &self.serving_owner,
+            updated,
+        )?;
         execution_nonce::verify_reservation(transaction, updated)?;
         recovery::terminal_custody::publish_completed(transaction, &self.serving_owner, updated)?;
         terminal_from_operation(updated)

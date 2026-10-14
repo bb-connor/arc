@@ -3,6 +3,9 @@ use materialization::{step_key, verify_current_prerequisites, verify_materialize
 #[path = "capture/input_origin.rs"]
 mod input_origin;
 use input_origin::SemanticRefusedInputOriginData;
+pub(in crate::admission_operation_store) use input_origin::{
+    validate_historical_semantic_refused_input_origin, HistoricalSemanticRefusedInputObservation,
+};
 
 /// Private, transaction-borrowed semantic evidence cannot be decoded or reused.
 pub(in crate::admission_operation_store) struct SemanticCaptureWitness {
@@ -12,21 +15,6 @@ pub(in crate::admission_operation_store) struct SemanticCaptureWitness {
 impl SemanticCaptureWitness {
     pub(in crate::admission_operation_store) fn valid_until(&self) -> u64 {
         self.verified.valid_until_unix_ms
-    }
-
-    /// Classify the status channel before any provider branch is observable.
-    /// This is available only after the pure and owning native checks succeeded.
-    pub(in crate::admission_operation_store) fn withheld_status_audience(
-        &self,
-    ) -> Option<&chio_security_types::InformationLabel> {
-        if self.record.invocation.action.output != SemanticOutputDispositionV1::Withhold {
-            return None;
-        }
-        self.record
-            .contract
-            .withheld_status
-            .as_ref()
-            .map(|status| &status.audience)
     }
 }
 fn spent_key(
@@ -38,6 +26,65 @@ fn spent_key(
         scope_key(scope)?,
         evidence.as_str()
     ))
+}
+fn current_annotation_answers_required(
+    binding: &NativeSecurityAuthorityBindingV1,
+) -> Result<bool, AdmissionOperationStoreError> {
+    #[cfg(feature = "admission-test-support")]
+    {
+        Ok(!super::legacy_annotation_capture::selected(
+            binding.store_uuid().as_str(),
+        )?)
+    }
+    #[cfg(not(feature = "admission-test-support"))]
+    {
+        let _ = binding;
+        Ok(true)
+    }
+}
+
+fn verify_captured_invocation(
+    registry: &CompiledSemanticRegistryV1,
+    invocation: &SemanticInvocationV1,
+    expectation: &SemanticInvocationExpectationV1<'_>,
+    budget: &mut VerificationBudget,
+    annotations_required: bool,
+) -> Result<VerifiedSemanticInvocationV1, ContractError> {
+    #[cfg(feature = "admission-test-support")]
+    {
+        if !annotations_required {
+            return verify_modeled_legacy_incomplete_annotations(
+                registry,
+                invocation,
+                expectation,
+                budget,
+            );
+        }
+    }
+    debug_assert!(annotations_required);
+    verify_semantic_invocation(registry, invocation, expectation, budget)
+}
+
+fn verify_input_invocation(
+    registry: &CompiledSemanticRegistryV1,
+    invocation: &SemanticInvocationV1,
+    expectation: &SemanticInvocationExpectationV1<'_>,
+    budget: &mut VerificationBudget,
+    annotations_required: bool,
+) -> Result<VerifiedSemanticInputRestrictionsV1, ContractError> {
+    #[cfg(feature = "admission-test-support")]
+    {
+        if !annotations_required {
+            return verify_modeled_legacy_incomplete_annotation_input_restrictions(
+                registry,
+                invocation,
+                expectation,
+                budget,
+            );
+        }
+    }
+    debug_assert!(annotations_required);
+    verify_semantic_input_restrictions(registry, invocation, expectation, budget)
 }
 /// Only the owning first-input writer constructs this borrowed observation.
 /// Every supplied snapshot and original binding is independently checked below.
@@ -451,13 +498,26 @@ fn verify_source_tx(
             .map(|grant| grant.body().target_label()),
         now_unix_ms: now,
     };
+    let annotations_required = current_annotation_answers_required(binding)?;
     let before_input = matches!(&phase, SourcePhase::BeforeInput { .. });
     let verified = if before_input {
-        verify_semantic_input_restrictions(&registry, &invocation, &expectation, &mut budget)
-            .map(SemanticSourceFacts::Input)
+        verify_input_invocation(
+            &registry,
+            &invocation,
+            &expectation,
+            &mut budget,
+            annotations_required,
+        )
+        .map(SemanticSourceFacts::Input)
     } else {
-        verify_semantic_invocation(&registry, &invocation, &expectation, &mut budget)
-            .map(SemanticSourceFacts::Captured)
+        verify_captured_invocation(
+            &registry,
+            &invocation,
+            &expectation,
+            &mut budget,
+            annotations_required,
+        )
+        .map(SemanticSourceFacts::Captured)
     };
     let verified = verified.map_err(refused)?;
     let acl = invocation.audience.body();
@@ -472,7 +532,9 @@ fn verify_source_tx(
     }
     verify_materialized_plan(tx, &invocation, &mut budget)?;
     verify_current_prerequisites(tx, &invocation, now, &mut budget)?;
-    let input_annotation_floor = if before_input
+    let input_annotation_floor = if !annotations_required {
+        None
+    } else if before_input
         && invocation.action.output == SemanticOutputDispositionV1::Withhold
         && contract.withheld_status.is_some()
     {
@@ -718,13 +780,15 @@ impl SqliteAdmissionOperationStore {
             now,
         )?;
         materialization::verify_dispatch_prerequisites(&tx, &record, now)?;
-        annotations::verify_current_annotations(
-            &tx,
-            &record.invocation,
-            &record.route,
-            now,
-            &mut VerificationBudget::new(4096).map_err(refused)?,
-        )?;
+        if current_annotation_answers_required(&record.native_authority)? {
+            annotations::verify_current_annotations(
+                &tx,
+                &record.invocation,
+                &record.route,
+                now,
+                &mut VerificationBudget::new(4096).map_err(refused)?,
+            )?;
+        }
         let acl = record.invocation.audience.body();
         let current = current_audience(&tx, acl)?.ok_or_else(|| refused("ACL absent"))?;
         if current != record.invocation.audience || now >= acl.valid_until_unix_ms.get() {

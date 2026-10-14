@@ -55,8 +55,9 @@ pub use native_egress::{
 pub use native_flow_join::NativeSecurityFlowJoinRecordV1;
 pub use native_flow_observation::NativeSecurityFlowObservationV1;
 pub use native_input_join::{
-    NativeSecurityInputClassificationAuthority, NativeSecurityInputJoinOutcome,
-    NativeSecurityInputJoinRecordV1, NativeSecurityInputJoinRequestV1,
+    NativeSecurityInputClassificationAuthority, NativeSecurityInputFateV1,
+    NativeSecurityInputJoinOutcome, NativeSecurityInputJoinRecordV1,
+    NativeSecurityInputJoinRequestV1,
 };
 pub use native_nonce_preflight::{
     NativeSecurityNoncePreflightJoinRecordV1, NativeSecurityNoncePreflightJoinRequestV1,
@@ -73,10 +74,8 @@ pub use output_retention::{
 };
 pub use projection::*;
 pub use remote_projection::*;
-#[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash;
 pub(crate) use retained_request::immutable_tool_request_hash_with_original_semantics;
-pub(crate) use retained_request::immutable_tool_request_hash_with_output_retention;
 #[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash_with_profile;
 pub(crate) use retained_request::AdmissionSecurityBindingV1;

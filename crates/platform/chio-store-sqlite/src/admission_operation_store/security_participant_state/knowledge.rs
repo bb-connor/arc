@@ -12,11 +12,56 @@ use chio_security_types::{
 
 mod current_authority;
 pub(in crate::admission_operation_store) mod encoding;
-mod influence_sources;
+mod imported_influence;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use imported_influence::full_scan_commitment;
+pub(crate) use imported_influence::publish_imported_influence_roots_at_startup;
+pub(in crate::admission_operation_store) use imported_influence::{
+    install_imported_scope_index, verify_imported_scope_index, VerifiedImportedInfluenceRoot,
+};
+mod influence_projection;
+pub(in crate::admission_operation_store) use influence_projection::{
+    RetainedInfluenceHeads, VerifiedNativeInfluenceHeads,
+};
+pub(in crate::admission_operation_store) mod influence_slots;
 pub(in crate::admission_operation_store) mod liability;
 pub(in crate::admission_operation_store) use current_authority::CurrentNativeInfluenceAuthority;
 mod release_source;
 pub(in crate::admission_operation_store) use release_source::release_observation_source;
+
+/// Recompute projections during full-chain verification, after native and
+/// recovery history have been authenticated. Warm initialization checks do
+/// not invoke this fold.
+pub(crate) fn verify_initialized_scope_projections(
+    connection: &Connection,
+) -> Result<(), AdmissionOperationStoreError> {
+    let bindings = records::initialized_authority_bindings(connection)?;
+    if bindings.is_empty() {
+        return imported_influence::verify_imported_scope_index_coverage(connection, 0);
+    }
+    let indexed = schema::recorded_version(connection)? == schema::CURRENT_VERSION;
+    let mut pending = 0_u64;
+    for binding in &bindings {
+        influence_projection::verify_current_projections(connection, binding)?;
+        if !indexed {
+            continue;
+        }
+        // The binding census already authenticated each complete sealed source.
+        // Authenticate its initialization before rebuilding the expected index.
+        let initialization = records::load_current_metadata(connection, binding)?;
+        // A genuine historical hydration may await its startup root; it holds
+        // no root or index custody, and every other root-less authority refuses.
+        if imported_influence::historical_root_pending(connection, &initialization)? {
+            pending += 1;
+            continue;
+        }
+        imported_influence::verify_imported_scope_index(connection, &initialization)?;
+    }
+    imported_influence::verify_imported_scope_index_coverage(
+        connection,
+        u64::try_from(bindings.len()).map_err(invalid)? - pending,
+    )
+}
 
 #[cfg(feature = "admission-test-support")]
 mod encoding_test_support;
@@ -64,62 +109,85 @@ fn record_key(authority: &str, sequence: u64) -> String {
 
 /// Influence follows every native scope that can carry confidentiality. Reading
 /// an older checkpoint never discards later artifact or model observations.
-/// This charged entry is the only influence reader: one retained-history census
-/// both prices the caller's budget and bounds the private decode loop below.
+/// This charged entry is the only influence reader. The bounded warm
+/// projection reader charges one unit before loading each of this key's
+/// three current inherited-scope projections, so no knowledge-join history
+/// body is decoded and the authority's join history size never prices this
+/// read. The history bound stays with the join writer and the cold
+/// projection verifier. The sealed pre-recovery source contributes
+/// conservatively through the same entry. Its fixed proof work and each
+/// matching scope's member count are charged before reading those members;
+/// unrelated source history never consumes the caller's work budget.
 pub(in crate::admission_operation_store) fn budgeted_observed_influence(
     tx: &Connection,
-    authority: &str,
+    binding: &NativeSecurityAuthorityBindingV1,
     key: &FlowStateKey,
     budget: &mut chio_semantic_contracts::VerificationBudget,
 ) -> Result<Option<chio_security_types::knowledge::ArtifactInfluenceV1>, AdmissionOperationStoreError>
 {
-    let history = head(tx, authority)?;
-    budget
-        .charge(u32::try_from(history).map_err(invalid)?)
-        .map_err(invalid)?;
-    observed_influence_with_head(tx, authority, key, history)
+    let native = influence_projection::observe_current(tx, binding, key, budget)?;
+    let imported = imported_influence::observed(tx, binding, key, budget)?;
+    merged_observed_influence(native, imported)
 }
 
-/// Private decode loop bounded by the already-charged retained history. The
-/// caller holds a transaction, so the counted history cannot grow meanwhile.
-fn observed_influence_with_head(
+/// The scope heads a refused Input observes, retained as data with their
+/// exact protected source identity for later historical authentication.
+pub(in crate::admission_operation_store) fn retain_influence_heads(
     tx: &Connection,
-    authority: &str,
+    binding: &NativeSecurityAuthorityBindingV1,
     key: &FlowStateKey,
-    history: u64,
+) -> Result<RetainedInfluenceHeads, AdmissionOperationStoreError> {
+    influence_projection::retain_current_heads(tx, binding, key)
+}
+
+/// The same merged observation `budgeted_observed_influence` reported at a
+/// historical cut. The native part is read from retained scope heads that are
+/// authenticated against the immutable event history at that cut; the imported
+/// part is the sealed pre-recovery source. Work is the warm reader's, one unit
+/// per inherited scope plus the imported proof, never the retained history.
+pub(in crate::admission_operation_store) fn observed_influence_at_cut(
+    tx: &Connection,
+    binding: &NativeSecurityAuthorityBindingV1,
+    key: &FlowStateKey,
+    cut: u64,
+    retained: &RetainedInfluenceHeads,
+    budget: &mut chio_semantic_contracts::VerificationBudget,
+) -> Result<Option<chio_security_types::knowledge::ArtifactInfluenceV1>, AdmissionOperationStoreError>
+{
+    let native =
+        influence_projection::observe_retained_at_cut(tx, binding, key, cut, retained, budget)?;
+    let imported = imported_influence::observed(tx, binding, key, budget)?;
+    merged_observed_influence(native, imported)
+}
+
+/// Union of the native and imported observations. Imported history only ever
+/// adds unknown influence; it never grants a trusted external classification
+/// and never reduces the native observation.
+fn merged_observed_influence(
+    native: Option<chio_security_types::knowledge::ArtifactInfluenceV1>,
+    imported: Option<chio_security_types::knowledge::ArtifactInfluenceV1>,
 ) -> Result<Option<chio_security_types::knowledge::ArtifactInfluenceV1>, AdmissionOperationStoreError>
 {
     use chio_core::recovery::{knowledge_digest, RecoveryDigestDomain};
-    use chio_security_types::{knowledge::ArtifactInfluenceV1, recovery::CanonicalPayloadDigest};
-    let mut observed = Vec::new();
-    let mut external = false;
-    let mut unknown = false;
-    for sequence in 1..=history {
-        let record = load(tx, authority, sequence)?;
-        let other = &record.request.key;
-        // Principal and session rows share principal/epoch ownership; lineage
-        // confidentiality survives a new principal or isolation epoch.
-        if other.tenant_id == key.tenant_id
-            && (other.lineage_id == key.lineage_id
-                || (other.isolation_epoch_id == key.isolation_epoch_id
-                    && other.principal_id == key.principal_id))
-        {
-            external |= record.release.influence.externally_influenced;
-            unknown |= record.release.influence.unknown;
-            observed.push(record.release.influence);
+    use chio_security_types::recovery::CanonicalPayloadDigest;
+    Ok(match (native, imported) {
+        (None, None) => None,
+        (None, Some(imported)) => Some(imported),
+        (Some(native), None) => Some(native),
+        (Some(native), Some(imported)) => {
+            Some(chio_security_types::knowledge::ArtifactInfluenceV1 {
+                commitment: CanonicalPayloadDigest::from_bytes(
+                    knowledge_digest(
+                        RecoveryDigestDomain::KnowledgeObservedInfluence,
+                        &(native.commitment, imported.commitment),
+                    )
+                    .map_err(invalid)?,
+                ),
+                externally_influenced: native.externally_influenced,
+                unknown: native.unknown || imported.unknown,
+            })
         }
-    }
-    if observed.is_empty() {
-        return Ok(None);
-    }
-    Ok(Some(ArtifactInfluenceV1 {
-        commitment: CanonicalPayloadDigest::from_bytes(
-            knowledge_digest(RecoveryDigestDomain::KnowledgeObservedInfluence, &observed)
-                .map_err(invalid)?,
-        ),
-        externally_influenced: external,
-        unknown,
-    }))
+    })
 }
 impl Record {
     pub(in crate::admission_operation_store) fn validate(
@@ -128,8 +196,6 @@ impl Record {
         let label = &self.release.source_label;
         let recipient = &self.release.recipient;
         if self.sequence == 0
-            || self.current_rows > 65_536
-            || self.current_bytes > 67_108_864
             || self.scope != recipient.scope
             || self.scope != self.release.artifact.scope
             || !self.release.admitted_label.flows_to(label)
@@ -155,44 +221,51 @@ impl Record {
         Ok(())
     }
 }
+/// Absolute last knowledge join sequence. At most 4096 joins form the live
+/// tail above the latest native journal seal.
 pub(in crate::admission_operation_store) fn head(
     tx: &Connection,
     authority: &str,
 ) -> Result<u64, AdmissionOperationStoreError> {
-    let exists:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='admission_operation_recovery_records')",[],|row|row.get(0)).map_err(sqlite_error)?;
-    if !exists {
-        return Ok(0);
-    }
-    let count: i64 = tx
-        .query_row(
-            "SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB ?1",
-            [format!("{}*", prefix(authority))],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    if !(0..=4096).contains(&count) {
-        return Err(invalid("knowledge history exhausted"));
-    }
-    u64::try_from(count).map_err(invalid)
+    history::segments::knowledge_head(tx, authority)
+}
+/// Sequence of the last knowledge join key. Only a proof minted by the join
+/// writer, which authenticated the live segment in the same transaction,
+/// reads the head this way.
+pub(in crate::admission_operation_store) fn last_join_sequence(
+    tx: &Connection,
+    authority: &str,
+) -> Result<u64, AdmissionOperationStoreError> {
+    history::segments::knowledge_last(tx, authority)
 }
 pub(in crate::admission_operation_store) fn load_with_digest(
     tx: &Connection,
     authority: &str,
     sequence: u64,
 ) -> Result<(Record, String), AdmissionOperationStoreError> {
+    let (record, digest) = load_by_key(tx, &record_key(authority, sequence))?;
+    if record.sequence != sequence || record.authority != authority {
+        return Err(invalid("knowledge history changed exact protected custody"));
+    }
+    Ok((record, digest))
+}
+
+fn load_by_key(
+    tx: &Connection,
+    key: &str,
+) -> Result<(Record, String), AdmissionOperationStoreError> {
     #[cfg(feature = "admission-test-support")]
     read_work_test_support::history_body();
-    let key = record_key(authority, sequence);
-    let row = protected::raw_checked(tx, &key)?.ok_or_else(|| invalid("knowledge join absent"))?;
+    let row = protected::raw_checked(tx, key)?.ok_or_else(|| invalid("knowledge join absent"))?;
     // Require the latest event and exact authenticated global reference. An
     // older still-authentic record cannot replace its protected head.
-    let source = protected::source_reference(tx, &key)?;
-    let record = encoding::decode(tx, &key, row.version, &row.payload)?;
+    let source = protected::source_reference(tx, key)?;
+    let record = encoding::decode(tx, key, row.version, &row.payload)?;
     let header_is_local: bool = tx
         .query_row(
             "SELECT native_namespace IS NULL AND native_request IS NULL
          FROM admission_operation_recovery_records WHERE record_key=?1",
-            [&key],
+            [key],
             |row| row.get(0),
         )
         .map_err(sqlite_error)?;
@@ -202,8 +275,7 @@ pub(in crate::admission_operation_store) fn load_with_digest(
         || source.kind() != "command"
         || row.scope != protected::scope_key(&record.scope)?
         || source.scope_key() != row.scope
-        || record.sequence != sequence
-        || record.authority != authority
+        || key != record_key(&record.authority, record.sequence)
         || !header_is_local
     {
         return Err(invalid("knowledge history changed exact protected custody"));
@@ -251,7 +323,8 @@ pub(in crate::admission_operation_store) fn join_with_origin<'a>(
     origin: &crate::serving_owner::NativeSourceTransactionOrigin<'_>,
     input: KnowledgeJoin<'_>,
 ) -> Result<(Transaction<'a>, ArtifactReleaseIntentV1), AdmissionOperationStoreError> {
-    let liability = liability::prepare_native_knowledge_join_liability(&tx, owner, origin, &input)?;
+    let mut liability =
+        liability::prepare_native_knowledge_join_liability(&tx, owner, origin, &input)?;
     liability.verify_before(&tx, owner)?;
     let KnowledgeJoin {
         binding,
@@ -271,8 +344,9 @@ pub(in crate::admission_operation_store) fn join_with_origin<'a>(
     let request =
         crate::security_state::resolve_native_label_join(&tx, authority, key, source, &transition)
             .map_err(invalid)?;
-    let totals = history::ordered::latest_totals(&tx, &initialized)?;
-    let sequence = head(&tx, authority)?
+    let totals = liability.latest_totals(&tx)?;
+    let sequence = liability
+        .knowledge_head(&tx)?
         .checked_add(1)
         .ok_or_else(|| invalid("knowledge sequence overflow"))?;
     let previous = if sequence == 1 {
@@ -295,7 +369,7 @@ pub(in crate::admission_operation_store) fn join_with_origin<'a>(
             .map_err(invalid)?;
     let record = Record {
         authority: authority.to_owned(),
-        initialization: initialized.digest,
+        initialization: initialized.digest.clone(),
         sequence,
         previous,
         observed_at: now,
@@ -309,13 +383,38 @@ pub(in crate::admission_operation_store) fn join_with_origin<'a>(
     };
     record.validate()?;
     liability.verify_native_result(&tx, owner, &record)?;
+    storage::require_tenant_live(&tx, authority, record.request.key.tenant_id.as_str())?;
     let write = encoding::prepare(&tx, &record)?;
     liability.verify_encoding(write.root_payload(), write.staged_chunks())?;
     #[cfg(feature = "admission-test-support")]
     read_work_test_support::knowledge_join_readback();
     #[cfg(feature = "admission-test-support")]
     encoding_test_support::observe_wire(&record, write.root_payload());
+    let append = history::segments::Append::knowledge(&record, &write)?;
+    let write = match liability.prepare_journal_append(&tx, owner, &append)? {
+        history::segments::Boundary::Live => write,
+        history::segments::Boundary::Sealed => {
+            // The seal is a global commit after the head this encoding proof
+            // captured. A fresh proof over the same record is prepared after
+            // the seal and must encode exactly the admitted entry.
+            let write = encoding::prepare(&tx, &record)?;
+            liability.verify_encoding(write.root_payload(), write.staged_chunks())?;
+            if history::segments::Append::knowledge(&record, &write)?.entry() != append.entry() {
+                return Err(invalid(
+                    "knowledge encoding changed across its journal seal",
+                ));
+            }
+            write
+        }
+    };
     let (_source, _delta) = protected::persist_knowledge_encoding(&tx, owner, write)?;
-    history::ordered::validate_history_bounds(&tx, authority)?;
+    liability.appended(&tx, &append)?;
+    // The same owning transaction folds this observation into its three
+    // current inherited-scope projections. The liability previewed the exact
+    // mutations and verifies the persisted rows against them, so a warm read
+    // never rebuilds this fold from history.
+    let projections = liability.projection_writes();
+    influence_projection::persist_scope_head_writes(&tx, owner, binding, projections)?;
+    influence_projection::verify_scope_head_writes(&tx, binding, projections)?;
     Ok((tx, release))
 }

@@ -20,7 +20,7 @@ pub(in crate::admission_operation_store) fn native_flow_write_catalog(
 ) -> Result<NativeFlowWriteCatalogData, AdmissionOperationStoreError> {
     connection_namespace::require_native_source_namespace(connection)?;
     let version = recorded_version(connection)?;
-    if version != 29 || !verify_version(connection, version)? {
+    if version != CURRENT_VERSION || !verify_version(connection, version)? {
         return Err(invalid(
             "native flow write catalog is not the active compiled layout",
         ));
@@ -38,8 +38,11 @@ mod tests {
         let connection = Connection::open_in_memory()?;
         connection.execute_batch(&sql()?)?;
         connection.execute_batch(
-            "CREATE TABLE chio_store_schema_versions(store_key TEXT PRIMARY KEY,version INTEGER);
-             INSERT INTO chio_store_schema_versions VALUES('admission_operation',42);",
+            "CREATE TABLE chio_store_schema_versions(store_key TEXT PRIMARY KEY,version INTEGER);",
+        )?;
+        connection.execute(
+            "INSERT INTO chio_store_schema_versions VALUES('admission_operation',?1)",
+            [ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION],
         )?;
         Ok(connection)
     }
@@ -116,8 +119,11 @@ mod tests {
         let connection = model()?;
         native_flow_write_catalog(&connection)?;
         connection.execute_batch(
-            "CREATE TEMP TABLE chio_store_schema_versions(store_key TEXT,version INTEGER);
-             INSERT INTO temp.chio_store_schema_versions VALUES('admission_operation',42);",
+            "CREATE TEMP TABLE chio_store_schema_versions(store_key TEXT,version INTEGER);",
+        )?;
+        connection.execute(
+            "INSERT INTO temp.chio_store_schema_versions VALUES('admission_operation',?1)",
+            [ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION],
         )?;
         assert!(native_flow_write_catalog(&connection).is_err());
         Ok(())

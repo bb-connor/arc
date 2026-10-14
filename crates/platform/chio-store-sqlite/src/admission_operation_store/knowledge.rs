@@ -9,8 +9,11 @@ use chio_security_types::{knowledge::*, recovery::*, InformationLabel};
 
 pub(in crate::admission_operation_store) mod account;
 mod checkpoints;
+mod closure;
 mod confinement;
 pub(in crate::admission_operation_store) mod encoding;
+mod handle_index;
+mod intake;
 mod lifecycle;
 mod pins;
 mod product_artifact_selection;
@@ -28,6 +31,7 @@ pub(in crate::admission_operation_store) mod references;
 mod release;
 #[cfg(feature = "admission-test-support")]
 mod release_basis_observation;
+pub(in crate::admission_operation_store) mod retained_archive;
 #[cfg(feature = "admission-test-support")]
 pub use release_basis_observation::{
     observe_artifact_release_basis, ArtifactReleaseBasisObservation,
@@ -38,17 +42,34 @@ mod traversal;
 pub(in crate::admission_operation_store) use checkpoints::AuthenticatedCheckpointRestoreEncodingSource;
 pub use checkpoints::NativeCheckpointRestore;
 pub(in crate::admission_operation_store) use checkpoints::VerifiedCheckpointHeadWrite;
+pub(in crate::admission_operation_store) use closure::DerivedWrite;
+#[cfg(feature = "admission-test-support")]
+pub use closure::KnowledgeClosureInterference;
+pub(in crate::admission_operation_store) use closure::PreparedKnowledgeClosure;
 pub(in crate::admission_operation_store) use confinement::setup_confinement_inventory;
 pub use confinement::*;
+pub(crate) use handle_index::census_handle_indices_at_startup;
+#[cfg(any(test, feature = "admission-test-support"))]
+pub use handle_index::PriorFormatHandleStartupGuard;
+pub(in crate::admission_operation_store) use handle_index::VerifiedHandleCensus;
+pub(in crate::admission_operation_store) use intake::AuthenticatedKnowledgeIntakeSource;
 pub(in crate::admission_operation_store) use product_artifact_selection::{
     retained_product_artifact, selected_product_artifact,
 };
 pub(in crate::admission_operation_store) use product_evidence::{
     retain_product_evidence, retire_product_evidence, verify_product_reference_available,
 };
+pub use publication::ArtifactReservationSource;
 pub(in crate::admission_operation_store) use reference_activation::{
     verify_reference_baseline, verify_reference_ready,
 };
+pub use retained_archive::{
+    NativeRetainedArchiveInput, NativeRetainedArchivePreparation, NativeRetainedArchiveRequest,
+};
+pub(crate) use transfer::publish_import_manifest_baseline_at_startup;
+#[cfg(any(test, feature = "admission-test-support"))]
+pub use transfer::PriorFormatImportStartupGuard;
+pub(in crate::admission_operation_store) use transfer::VerifiedImportManifestBaseline;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -275,6 +296,103 @@ pub(super) fn source(
         .map_err(refused)
 }
 
+/// Host profile input checks that precede the installation writer.
+fn validate_knowledge_profile(
+    owner: &SqliteServingOwner,
+    profile: &NativeKnowledgeInstallationV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    if profile.generation.get() == 0
+        || profile.scope.authority_domain.as_str() != owner.fence.store_uuid
+        || profile.scope.tenant_id.as_str() != profile.producer_context.as_v1().tenant_id().as_str()
+    {
+        return Err(refused("profile scope"));
+    }
+    for (index, entry) in profile.recipients.as_slice().iter().enumerate() {
+        let recipient = &entry.recipient;
+        let context = entry.context.as_v1();
+        require_finite_recipient(recipient)?;
+        if recipient.scope != profile.scope
+            || recipient.runtime.as_str() != context.session_id().as_str()
+            || recipient.principal != *context.principal_id()
+            || recipient.lineage.as_str() != context.lineage_root_id().as_str()
+            || recipient.isolation_epoch.as_str() != context.isolation_epoch_id().as_str()
+            || recipient.context_generation.get() != context.context_generation()
+            || profile.recipients.as_slice()[..index]
+                .iter()
+                .any(|prior| prior.recipient.recipient == recipient.recipient)
+        {
+            return Err(refused("recipient binding"));
+        }
+    }
+    Ok(())
+}
+
+/// Install a complete profile in the caller's fenced writer. Returns false
+/// when the exact current profile is only reverified.
+fn install_knowledge_profile(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    profile: &NativeKnowledgeInstallationV1,
+) -> Result<bool, AdmissionOperationStoreError> {
+    security_participant_state::verify_recovery_initialization(tx, &profile.native_authority)?;
+    let physical_key = physical_owner_key(profile)?;
+    let physical_owner = load::<RecoveryScopeV1>(tx, &physical_key)?;
+    if physical_owner
+        .as_ref()
+        .is_some_and(|owner| owner != &profile.scope)
+    {
+        return Err(refused(
+            "physical process belongs to a different tenant scope",
+        ));
+    }
+    let runtime = profile.producer_context.as_v1().session_id().as_str();
+    let runtime_enforced = enforced(tx, runtime)?;
+    if let Some(old) = load::<NativeKnowledgeInstallationV1>(tx, &profile_key(&profile.scope)?)? {
+        if !runtime_enforced {
+            return Err(refused("installed runtime lost its enforcement marker"));
+        }
+        if protected::encode(&old)? == protected::encode(profile)? {
+            if physical_owner.is_none() {
+                return Err(refused("physical process ownership absent"));
+            }
+            account::initialize_or_verify(tx, owner, profile)?;
+            return Ok(false);
+        }
+        if profile.generation <= old.generation
+            || profile.native_authority != old.native_authority
+            || profile.certificate_root != old.certificate_root
+            || profile.archive_root != old.archive_root
+            || profile.classifier_implementation != old.classifier_implementation
+            || profile.classifier_configuration != old.classifier_configuration
+        {
+            return Err(refused("generation"));
+        }
+    }
+    if physical_owner.is_none() {
+        save(tx, owner, &profile.scope, &physical_key, &profile.scope)?;
+    }
+    account::initialize_or_verify(tx, owner, profile)?;
+    save(
+        tx,
+        owner,
+        &profile.scope,
+        &profile_key(&profile.scope)?,
+        profile,
+    )?;
+    // A journal can serve multiple roots and tenants. Enforcement is
+    // activated once; later installations retain the first writer's custody.
+    if !runtime_enforced {
+        save(
+            tx,
+            owner,
+            &profile.scope,
+            &runtime_enforcement_key(runtime),
+            &true,
+        )?;
+    }
+    Ok(true)
+}
+
 fn mutate<T>(
     store: &SqliteAdmissionOperationStore,
     actor: &AuthenticatedRecoveryActor,
@@ -324,7 +442,12 @@ fn validate_installation(
     recovery: &RecoveryDeploymentV1,
     profile: &NativeKnowledgeInstallationV1,
 ) -> Result<(), AdmissionOperationStoreError> {
-    security_participant_state::verify_recovery_initialization(tx, &profile.native_authority)?;
+    // Callers have checked the serving owner and anchor in this transaction.
+    // Recheck selected initialization custody without replaying native history.
+    security_participant_state::verify_current_recovery_initialization(
+        tx,
+        &profile.native_authority,
+    )?;
     if load::<RecoveryScopeV1>(tx, &physical_owner_key(profile)?)?.as_ref() != Some(&profile.scope)
         || recovery.native_authority != profile.native_authority
         || recovery.policy_digest != profile.policy
@@ -423,95 +546,11 @@ impl SqliteAdmissionOperationStore {
         &self,
         profile: &NativeKnowledgeInstallationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
-        if profile.generation.get() == 0
-            || profile.scope.authority_domain.as_str() != self.serving_owner.fence.store_uuid
-            || profile.scope.tenant_id.as_str()
-                != profile.producer_context.as_v1().tenant_id().as_str()
-        {
-            return Err(refused("profile scope"));
-        }
-        for (index, entry) in profile.recipients.as_slice().iter().enumerate() {
-            let recipient = &entry.recipient;
-            let context = entry.context.as_v1();
-            require_finite_recipient(recipient)?;
-            if recipient.scope != profile.scope
-                || recipient.runtime.as_str() != context.session_id().as_str()
-                || recipient.principal != *context.principal_id()
-                || recipient.lineage.as_str() != context.lineage_root_id().as_str()
-                || recipient.isolation_epoch.as_str() != context.isolation_epoch_id().as_str()
-                || recipient.context_generation.get() != context.context_generation()
-                || profile.recipients.as_slice()[..index]
-                    .iter()
-                    .any(|prior| prior.recipient.recipient == recipient.recipient)
-            {
-                return Err(refused("recipient binding"));
-            }
-        }
+        validate_knowledge_profile(&self.serving_owner, profile)?;
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, None)?;
-        security_participant_state::verify_recovery_initialization(&tx, &profile.native_authority)?;
-        let physical_key = physical_owner_key(profile)?;
-        let physical_owner = load::<RecoveryScopeV1>(&tx, &physical_key)?;
-        if physical_owner
-            .as_ref()
-            .is_some_and(|owner| owner != &profile.scope)
-        {
-            return Err(refused(
-                "physical process belongs to a different tenant scope",
-            ));
-        }
-        let runtime = profile.producer_context.as_v1().session_id().as_str();
-        let runtime_enforced = enforced(&tx, runtime)?;
-        if let Some(old) =
-            load::<NativeKnowledgeInstallationV1>(&tx, &profile_key(&profile.scope)?)?
-        {
-            if !runtime_enforced {
-                return Err(refused("installed runtime lost its enforcement marker"));
-            }
-            if protected::encode(&old)? == protected::encode(profile)? {
-                if physical_owner.is_none() {
-                    return Err(refused("physical process ownership absent"));
-                }
-                account::initialize_or_verify(&tx, &self.serving_owner, profile)?;
-                return self.commit_write(tx);
-            }
-            if profile.generation <= old.generation
-                || profile.native_authority != old.native_authority
-                || profile.certificate_root != old.certificate_root
-                || profile.archive_root != old.archive_root
-                || profile.classifier_implementation != old.classifier_implementation
-                || profile.classifier_configuration != old.classifier_configuration
-            {
-                return Err(refused("generation"));
-            }
-        }
-        if physical_owner.is_none() {
-            save(
-                &tx,
-                &self.serving_owner,
-                &profile.scope,
-                &physical_key,
-                &profile.scope,
-            )?;
-        }
-        account::initialize_or_verify(&tx, &self.serving_owner, profile)?;
-        save(
-            &tx,
-            &self.serving_owner,
-            &profile.scope,
-            &profile_key(&profile.scope)?,
-            profile,
-        )?;
-        // A journal can serve multiple roots and tenants. Enforcement is
-        // activated once; later installations retain the first writer's custody.
-        if !runtime_enforced {
-            save(
-                &tx,
-                &self.serving_owner,
-                &profile.scope,
-                &runtime_enforcement_key(runtime),
-                &true,
-            )?;
+        if !install_knowledge_profile(&tx, &self.serving_owner, profile)? {
+            return self.commit_write(tx);
         }
         self.commit_write(tx)?;
         self.sync_after_write(&connection)

@@ -23,7 +23,7 @@ env:
 jobs:
   qualify:
     name: Release qualification
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16.6-alpine
@@ -152,6 +152,9 @@ jobs:
           [[ "${architecture}" == "amd64" ]] && architecture="x86_64"
           echo "${GITHUB_WORKSPACE}/target/formal/aeneas-toolchain/${architecture}/bin" >> "${GITHUB_PATH}"
 
+      - name: Install Kani (patched source build)
+        uses: ./.github/actions/setup-kani
+
       - name: Install Rust verification tools
         shell: bash
         env:
@@ -160,8 +163,6 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-verification-tool-target
         run: |
           set -euo pipefail
-          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
-          cargo kani setup
           sudo apt-get update
           sudo apt-get install -y opam
           opam init --disable-sandboxing --bare -y

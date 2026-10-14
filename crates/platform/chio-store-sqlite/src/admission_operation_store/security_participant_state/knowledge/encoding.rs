@@ -18,6 +18,16 @@ struct EncodingProbe {
     knowledge_join_encoding: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct ChunkedRootProbe {
+    body: ChunkCountProbe,
+}
+
+#[derive(Deserialize)]
+struct ChunkCountProbe {
+    chunk_count: u32,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum JournalChunkMarker {
@@ -90,6 +100,38 @@ pub(super) fn decode(
                 return Err(invalid());
             }
             Ok(record)
+        }
+        Some(_) => Err(invalid()),
+    }
+}
+
+/// The chunk set one stored join root commits to: its owner and body key
+/// prefix and its ordinal count, or `None` for an inline body. A chunked root
+/// is decoded canonically and bound to its own key first.
+pub(in crate::admission_operation_store::security_participant_state) fn journal_chunks(
+    key: &str,
+    bytes: &[u8],
+) -> Result<Option<(String, u32)>, AdmissionOperationStoreError> {
+    if bytes.is_empty() || bytes.len() > 262_144 {
+        return Err(invalid());
+    }
+    let probe: EncodingProbe = serde_json::from_slice(bytes).map_err(|_| invalid())?;
+    match probe.knowledge_join_encoding.as_deref() {
+        None | Some("interned_label_atoms_v1") => Ok(None),
+        Some("chunked_label_atoms_v1") => {
+            let root: JournalRoot = protected::decode(bytes)?;
+            let owner = EncodingOwner::Journal {
+                scope: root.scope.clone(),
+                authority: root.authority.clone(),
+                sequence: root.sequence,
+                release: root.release.release.clone(),
+            };
+            if root.body.owner() != &owner || owner.root_key()? != key {
+                return Err(invalid());
+            }
+            root.body.validate()?;
+            let count: ChunkedRootProbe = serde_json::from_slice(bytes).map_err(|_| invalid())?;
+            Ok(Some((root.body.chunk_prefix()?, count.body.chunk_count)))
         }
         Some(_) => Err(invalid()),
     }

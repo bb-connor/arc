@@ -49,14 +49,38 @@ fn nonce_fixture_with_approval_window(
 }
 
 fn prepared_nonce_fixture(approval_seconds: Option<u64>) -> TestResult<NonceFixture> {
-    let mut fixture = unowned_prepared_nonce_fixture(approval_seconds)?;
+    own_and_clean_nonce_fixture(unowned_prepared_nonce_fixture(approval_seconds)?)
+}
+
+/// Modeled supported-predecessor construction: the nonce history is written
+/// through a `pre_recovery_fixture` store, and the current startup follows
+/// only at the migration under test.
+fn pre_recovery_prepared_nonce_fixture(approval_seconds: Option<u64>) -> TestResult<NonceFixture> {
+    own_and_clean_nonce_fixture(pre_recovery_unowned_prepared_nonce_fixture(
+        approval_seconds,
+    )?)
+}
+
+fn own_and_clean_nonce_fixture(mut fixture: NonceFixture) -> TestResult<NonceFixture> {
     fixture.operation =
         preflight::own_and_clean(&fixture.fixture, &fixture.operation, &fixture.key)?;
     Ok(fixture)
 }
 
 fn unowned_prepared_nonce_fixture(approval_seconds: Option<u64>) -> TestResult<NonceFixture> {
-    let fixture = fixture();
+    unowned_nonce_fixture_on(fixture(), approval_seconds)
+}
+
+fn pre_recovery_unowned_prepared_nonce_fixture(
+    approval_seconds: Option<u64>,
+) -> TestResult<NonceFixture> {
+    unowned_nonce_fixture_on(pre_recovery_fixture(), approval_seconds)
+}
+
+fn unowned_nonce_fixture_on(
+    fixture: Fixture,
+    approval_seconds: Option<u64>,
+) -> TestResult<NonceFixture> {
     let (base, original) = retained_request::original(&fixture.fence)?;
     let request = original.request_for_revalidation();
     let namespace = AuthenticatedRequestNamespace::for_local_system(identifier(
@@ -319,7 +343,9 @@ fn durable_nonce_reservation_rolls_back_on_operation_or_record_write_failure() -
             [],
             |row| row.get(0),
         )?;
-        fixture.fixture.store.connection()?.execute_batch(&format!("CREATE TRIGGER fail_nonce BEFORE {mutation} ON {table} BEGIN SELECT RAISE(ABORT, 'injected nonce failure'); END;"))?;
+        // A temporary trigger reaches the exact SQL cutpoint without mutating
+        // the canonical catalog the production owner validates on entry.
+        fixture.fixture.store.connection()?.execute_batch(&format!("CREATE TEMP TRIGGER fail_nonce BEFORE {mutation} ON main.{table} BEGIN SELECT RAISE(ABORT, 'injected nonce failure'); END;"))?;
         let error = fixture
             .fixture
             .store
@@ -551,7 +577,7 @@ fn durable_nonce_v11_migration_preserves_original_commits_without_inventing_rese
         authority,
         store,
         fence,
-    } = fixture();
+    } = pre_recovery_fixture();
     let (operation, original) = retained_request::original(&fence)?;
     store.begin_with_retained_tool_request(&operation, &original, &fence, now_ms())?;
     drop(store);

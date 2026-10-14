@@ -101,7 +101,7 @@ pub(super) fn hydrate(
     tx: &Transaction<'_>,
     source: &SecurityParticipantMigrationRecord,
 ) -> Result<(), AdmissionOperationStoreError> {
-    hydrate_at_version(tx, source, 29)
+    hydrate_at_version(tx, source, schema::CURRENT_VERSION)
 }
 
 pub(super) fn hydrate_at_version(
@@ -252,21 +252,175 @@ pub(super) fn verify_rows(
     Ok(())
 }
 
-pub(super) fn verify_no_orphans(
+const MAX_TENANT_LIVE_ROWS: u64 = 65_536;
+const MAX_TENANT_LIVE_BYTES: u64 = 67_108_864;
+
+/// How a native table's rows are accounted.
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(super) enum NativeRowClass {
+    /// Insert-only identity, read by primary key and never counted as live
+    /// custody. Its growth is admitted by the physical intake band.
+    RetainedIdentity,
+    /// Current custody keyed by identity, counted per (authority, tenant).
+    Live,
+    /// At most one row per authority.
+    AuthoritySingleton,
+}
+
+/// Exhaustive over the native catalog; a table without a class refuses.
+pub(super) fn row_class(
+    table: &schema::Table,
+) -> Result<NativeRowClass, AdmissionOperationStoreError> {
+    match table.source {
+        "security_transitions" => Ok(NativeRowClass::RetainedIdentity),
+        "security_declassification_lifecycle" => Ok(NativeRowClass::AuthoritySingleton),
+        "security_flow_contexts"
+        | "security_flow_sequences"
+        | "security_isolation_epochs"
+        | "security_lineage_flow_state"
+        | "security_principal_flow_state"
+        | "security_session_flow_state"
+        | "security_session_memberships"
+        | "security_egress_fences"
+        | "security_declassification_uses"
+        | "security_declassification_receipt_outbox"
+        | "security_declassification_evidence_identity"
+        | "security_declassification_tombstones" => Ok(NativeRowClass::Live),
+        _ => Err(invalid("native table has no row class")),
+    }
+}
+
+fn row_bytes(table: &schema::Table) -> Result<String, AdmissionOperationStoreError> {
+    Ok(retained_security_columns(table.source)
+        .map_err(invalid)?
+        .iter()
+        .map(|name| format!("COALESCE(length(CAST(\"{name}\" AS BLOB)), 0)"))
+        .collect::<Vec<_>>()
+        .join(" + "))
+}
+
+/// Live rows and retained bytes of one (authority, tenant).
+pub(super) struct TenantLive {
+    rows: u64,
+    bytes: u64,
+}
+
+/// An index range over the (authority, tenant) primary-key prefix of every
+/// Live table. Bounded because every writer checks before the bound passes.
+pub(super) fn tenant_live(
+    connection: &Connection,
+    authority: &str,
+    tenant: &str,
+) -> Result<TenantLive, AdmissionOperationStoreError> {
+    let mut live = TenantLive { rows: 0, bytes: 0 };
+    for table in schema::TABLES {
+        if row_class(table)? != NativeRowClass::Live {
+            continue;
+        }
+        let (rows, bytes): (i64, i64) = connection
+            .query_row(
+                &format!(
+                    "SELECT COUNT(*), COALESCE(SUM({}), 0) FROM {}
+                     WHERE security_authority_id = ?1 AND tenant_id = ?2",
+                    row_bytes(table)?,
+                    table.native
+                ),
+                params![authority, tenant],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(sqlite_error)?;
+        live.rows = live
+            .rows
+            .checked_add(u64::try_from(rows).map_err(invalid)?)
+            .ok_or_else(|| invalid("native live row count overflow"))?;
+        live.bytes = live
+            .bytes
+            .checked_add(u64::try_from(bytes).map_err(invalid)?)
+            .ok_or_else(|| invalid("native live byte count overflow"))?;
+    }
+    Ok(live)
+}
+
+/// Every native writer calls this after its row changes and before its
+/// append, for its typed tenant. The refusal is scoped to that tenant: an
+/// existing key updates in place and a replay writes nothing, so only new
+/// identity keys or growth past the bound refuse.
+pub(super) fn require_tenant_live(
+    connection: &Connection,
+    authority: &str,
+    tenant: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let live = tenant_live(connection, authority, tenant)?;
+    if live.rows > MAX_TENANT_LIVE_ROWS || live.bytes > MAX_TENANT_LIVE_BYTES {
+        return Err(invariant("native tenant live state exhausted"));
+    }
+    Ok(())
+}
+
+/// Open only. Every native row belongs to an initialized authority, with no
+/// count bound on retained identity rows; every (authority, tenant) live
+/// account is within its bound; the authority singleton holds one row at most.
+pub(super) fn verify_native_inventory_cold(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
-    let mut total = 0_u64;
+    let mut live = Vec::new();
     for table in schema::TABLES {
-        let (count, orphan): (i64, bool) = connection.query_row(&format!("SELECT COUNT(*), COALESCE(MAX(NOT EXISTS(
-            SELECT 1 FROM security_participant_state_initializations AS initialized
-            WHERE initialized.security_authority_id = state.security_authority_id)), 0) FROM {} AS state", table.native),
-            [], |row| Ok((row.get(0)?, row.get(1)?))).map_err(sqlite_error)?;
-        total = total
-            .checked_add(u64::try_from(count).map_err(invalid)?)
-            .ok_or_else(|| invalid("native row count overflow"))?;
-        if orphan || total > 65_536 {
-            return Err(invalid("orphan or excessive native state"));
+        let orphan: bool = connection
+            .query_row(
+                &format!(
+                    "SELECT EXISTS(SELECT 1 FROM {} AS state WHERE NOT EXISTS(
+                     SELECT 1 FROM security_participant_state_initializations AS initialized
+                     WHERE initialized.security_authority_id = state.security_authority_id))",
+                    table.native
+                ),
+                [],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        if orphan {
+            return Err(invalid("orphan native state"));
         }
+        match row_class(table)? {
+            NativeRowClass::Live => live.push(format!(
+                "SELECT security_authority_id AS authority, tenant_id AS tenant, {} AS bytes FROM {}",
+                row_bytes(table)?,
+                table.native
+            )),
+            NativeRowClass::AuthoritySingleton => {
+                let repeated: bool = connection
+                    .query_row(
+                        &format!(
+                            "SELECT EXISTS(SELECT 1 FROM {} GROUP BY security_authority_id
+                             HAVING COUNT(*) > 1)",
+                            table.native
+                        ),
+                        [],
+                        |row| row.get(0),
+                    )
+                    .map_err(sqlite_error)?;
+                if repeated {
+                    return Err(invalid("native authority singleton is repeated"));
+                }
+            }
+            NativeRowClass::RetainedIdentity => {}
+        }
+    }
+    let exhausted: bool = connection
+        .query_row(
+            &format!(
+                "SELECT EXISTS(SELECT 1 FROM ({}) GROUP BY authority, tenant
+                 HAVING COUNT(*) > ?1 OR SUM(bytes) > ?2)",
+                live.join(" UNION ALL ")
+            ),
+            params![
+                i64::try_from(MAX_TENANT_LIVE_ROWS).map_err(invalid)?,
+                i64::try_from(MAX_TENANT_LIVE_BYTES).map_err(invalid)?
+            ],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if exhausted {
+        return Err(invalid("native tenant live state exceeds its bound"));
     }
     Ok(())
 }

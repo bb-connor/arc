@@ -1,21 +1,27 @@
 //! Initial setup validity ends before a fresh selected effect can be acquired.
 use super::*;
+use chio_kernel::admission_operation::AdmissionOperationStoreError;
 
 struct ExtendedValiditySetup {
     fixture: KnowledgeFixture,
     _service: RecoverySetupService,
     prepared: NativeSetupPreparationV1,
+    replacement_original: Option<ToolCallRequest>,
 }
 
 async fn materialize_selected_setup(
     f: &KnowledgeFixture,
     create: &RecoveryCommandV1,
 ) -> TestResult<WorkflowId> {
-    // Replay the independently retained creation directly. The general fixture
-    // helper would repeat original denial lookup using its real-time clock.
-    let created = Box::pin(f.f.runtime.execute_command(&f.f.control, create)).await?;
+    // Replay the independently retained creation without repeating original
+    // denial lookup.
+    let created = Box::pin(f.f.runtime.execute_command(&f.f.control, create))
+        .await
+        .map_err(|error| format!("setup validity phase=create replay: {error}"))?;
     let workflow = created.status.workflow_id;
-    let record = f.f.record(&workflow)?;
+    let record =
+        f.f.record(&workflow)
+            .map_err(|error| format!("setup validity phase=created workflow: {error}"))?;
     let action = record.action.as_ref().ok_or("late setup action")?;
     let digest = recovery_digest(
         chio_core_types::recovery::RecoveryDigestDomain::ActionIntent,
@@ -36,9 +42,16 @@ async fn materialize_selected_setup(
             offer_id: OfferId::new(&offer)?,
         },
     )?;
-    Box::pin(f.f.runtime.execute_command(&f.f.control, &select)).await?;
-    let intent = f.f.runtime.approval_intent(&f.f.control, &workflow)?;
-    let record = f.f.record(&workflow)?;
+    Box::pin(f.f.runtime.execute_command(&f.f.control, &select))
+        .await
+        .map_err(|error| format!("setup validity phase=select offer: {error}"))?;
+    let intent =
+        f.f.runtime
+            .approval_intent(&f.f.control, &workflow)
+            .map_err(|error| format!("setup validity phase=approval intent: {error}"))?;
+    let record =
+        f.f.record(&workflow)
+            .map_err(|error| format!("setup validity phase=selected workflow: {error}"))?;
     let action = record.action.as_ref().ok_or("late setup approval action")?;
     let evidence = AuthorityCoverageAttestationV1 {
         schema: AuthorityCoverageSchema::V1,
@@ -70,23 +83,51 @@ async fn materialize_selected_setup(
             approval: text(&approval)?,
         },
     )?;
-    Box::pin(f.f.runtime.execute_command(&f.f.control, &approve)).await?;
+    Box::pin(f.f.runtime.execute_command(&f.f.control, &approve))
+        .await
+        .map_err(|error| format!("setup validity phase=submit approval: {error}"))?;
     Ok(workflow)
 }
 
 async fn extended_validity_setup() -> TestResult<ExtendedValiditySetup> {
-    extended_validity_setup_with_capture_checkpoint(false).await
+    extended_validity_setup_with_options(false, false).await
 }
 
-async fn extended_validity_setup_with_capture_checkpoint(
+/// A second authenticated original is denied before the selection, so the
+/// native clock never has to move backwards to create it after late setup.
+async fn extended_validity_setup_with_replacement_original() -> TestResult<ExtendedValiditySetup> {
+    extended_validity_setup_with_options(false, true).await
+}
+
+async fn extended_validity_setup_with_options(
     checkpoint: bool,
+    replacement_original: bool,
 ) -> TestResult<ExtendedValiditySetup> {
     let directory = tempfile::tempdir()?;
     if checkpoint {
+        use chio_kernel::admission_operation::{
+            NativeOutputEnvelopeBoundsV1, NativeOutputRetentionProfileV1,
+        };
+        // The capture checkpoint requires an explicitly selected native output
+        // plan. Selection does not prepare or fund its physical finishing account.
+        let retention = NativeOutputRetentionProfileV1::new(NativeOutputEnvelopeBoundsV1::new(
+            1024 * 1024,
+            1024 * 1024,
+            1024 * 1024,
+            1024 * 1024,
+            1,
+        )?);
+        std::fs::write(
+            directory.path().join("output-retention-profile.json"),
+            chio_core::canonical_json_bytes(&retention)?,
+        )?;
         std::fs::write(
             directory.path().join("setup-capture-clock-checkpoint"),
             "selected",
         )?;
+    } else {
+        // Without the checkpoint this setup keeps its original unselected.
+        std::fs::write(directory.path().join("no-output-retention-profile"), "absent")?;
     }
     std::fs::write(directory.path().join("semantic-kind"), "read")?;
     // Both the original capability and the native policy clock must remain
@@ -97,6 +138,17 @@ async fn extended_validity_setup_with_capture_checkpoint(
         .map_err(|error| format!("setup validity phase=native fixture open: {error}"))?;
     let f = KnowledgeFixture::from(recovery)
         .map_err(|error| format!("setup validity phase=current knowledge fixture: {error}"))?;
+    let replacement_original = if replacement_original {
+        let original = Box::pin(f.f.denied_seed_named("replacement-setup-original"))
+            .await
+            .map_err(|error| {
+                format!("setup validity phase=replacement original denial: {error}")
+            })?;
+        require_eligible_original(&f, &original)?;
+        Some(original)
+    } else {
+        None
+    };
     let original = Box::pin(f.f.denied_seed_named("ticket-1"))
         .await
         .map_err(|error| format!("setup validity phase=original denial: {error}"))?;
@@ -138,10 +190,7 @@ async fn extended_validity_setup_with_capture_checkpoint(
         .and_then(|seconds| seconds.checked_sub(10))
         .ok_or("setup validity late clock")?;
     let prepared = {
-        let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-            late_seconds,
-            std::iter::empty::<String>(),
-        );
+        let _clock = scope_synchronous_fixture_clock(late_seconds);
         let workflow = Box::pin(materialize_selected_setup(&f, &create))
             .await
             .map_err(|error| format!("setup validity phase=late action and approval: {error}"))?;
@@ -211,6 +260,7 @@ async fn extended_validity_setup_with_capture_checkpoint(
         fixture: f,
         _service: service,
         prepared,
+        replacement_original,
     })
 }
 
@@ -219,10 +269,7 @@ async fn setup_selected_command_before_initial_expiry_still_dispatches_once() ->
     let state = Box::pin(extended_validity_setup()).await?;
     let f = &state.fixture;
     let valid_seconds = state.prepared.probe.expires_at_unix_ms.get() / 1_000 - 1;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        valid_seconds,
-        std::iter::empty::<String>(),
-    );
+    let _clock = scope_synchronous_fixture_clock(valid_seconds);
     let calls = f.f.process.process("root")?.tree_calls;
     let result =
         f.f.runtime
@@ -231,7 +278,13 @@ async fn setup_selected_command_before_initial_expiry_still_dispatches_once() ->
             .map_err(|error| format!("setup validity phase=valid public Resume: {error}"))?;
     let receipt = result
         .original_response
-        .ok_or("valid setup completion projection")?
+        .ok_or_else(|| {
+            format!(
+                "valid setup completion projection absent: status effect={:?}; {}",
+                result.status.effect,
+                dispatch_diagnostic(f, &state.prepared.probe.benign_workflow),
+            )
+        })?
         .receipt;
     assert!(receipt.is_allowed() && receipt.verify_signature()?);
     assert_eq!(external_count(&f.f.path)?, 1);
@@ -246,10 +299,7 @@ async fn setup_expired_selected_command_refuses_without_an_effect_or_charge() ->
     let state = Box::pin(extended_validity_setup()).await?;
     let f = &state.fixture;
     let expired_seconds = state.prepared.probe.expires_at_unix_ms.get() / 1_000 + 1;
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        expired_seconds,
-        std::iter::empty::<String>(),
-    );
+    let _clock = scope_synchronous_fixture_clock(expired_seconds);
     let actor = f.f.kernel.authenticate_recovery_actor(
         f.f.runtime.scope(),
         &f.f.control,
@@ -303,6 +353,22 @@ enum SetupCaptureWindow {
     ExpiresBeforeCommit,
 }
 
+/// Public workflow custody after a dispatch, for refusals that carry no error.
+fn dispatch_diagnostic(f: &KnowledgeFixture, workflow: &WorkflowId) -> String {
+    let effects = external_count(&f.f.path).ok();
+    match f.f.record(workflow) {
+        Ok(record) => format!(
+            "workflow effect={:?} control={:?} captured={} linked={} external_effects={effects:?} authority_high_water={:?}",
+            record.effect,
+            record.control,
+            record.captured,
+            record.native_link.is_some(),
+            retained_authority_high_water(f).ok(),
+        ),
+        Err(error) => format!("workflow unreadable: {error}; external_effects={effects:?}"),
+    }
+}
+
 // Observe exactly the two durable clocks used by the admission authority.
 // This read grants no progress, changes no high-water mark and writes no rows.
 fn retained_authority_high_water(f: &KnowledgeFixture) -> TestResult<u64> {
@@ -321,7 +387,7 @@ fn retained_authority_high_water(f: &KnowledgeFixture) -> TestResult<u64> {
 }
 
 async fn capture_at_selected_setup_window(window: SetupCaptureWindow) -> TestResult {
-    let state = Box::pin(extended_validity_setup_with_capture_checkpoint(true))
+    let state = Box::pin(extended_validity_setup_with_options(true, false))
         .await
         .map_err(|error| format!("setup capture phase=prepared native fixture: {error}"))?;
     let f = &state.fixture;
@@ -353,10 +419,7 @@ async fn capture_at_selected_setup_window(window: SetupCaptureWindow) -> TestRes
         f.f.path.join("setup-capture-selected-seconds"),
         capture_seconds.to_string(),
     )?;
-    let _entry_clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        entry_seconds,
-        std::iter::empty::<String>(),
-    );
+    let _entry_clock = scope_synchronous_fixture_clock(entry_seconds);
     let before =
         f.f.record(&state.prepared.probe.benign_workflow)
             .map_err(|error| format!("setup capture phase=live retained workflow: {error}"))?;
@@ -395,11 +458,19 @@ async fn capture_at_selected_setup_window(window: SetupCaptureWindow) -> TestRes
         f.f.runtime
             .execute_command(&f.f.control, &state.prepared.command)
             .await;
+    let public = match &result {
+        Ok(result) => format!(
+            "Ok(status effect={:?}, projection={})",
+            result.status.effect,
+            result.original_response.is_some()
+        ),
+        Err(error) => format!("Err({error:?})"),
+    };
     let observation = std::fs::read_to_string(f.f.path.join("setup-capture-checkpoint-observed"))
         .map_err(|error| {
         format!(
-            "setup capture phase=actual native checkpoint missing; public={:?}: {error}",
-            result.as_ref().err()
+            "setup capture phase=actual native checkpoint missing; public={public}; {}: {error}",
+            dispatch_diagnostic(f, &state.prepared.probe.benign_workflow),
         )
     })?;
     // This default-off checkpoint always stops connector use, including after
@@ -427,10 +498,7 @@ async fn capture_at_selected_setup_window(window: SetupCaptureWindow) -> TestRes
     // The real capture checkpoint may commit at its selected later time. All
     // subsequent metadata and custody reads use that time, never an earlier
     // restored entry sample that would violate the native monotone clock.
-    let _capture_clock = chio_kernel::scope_fixed_runtime_for_current_thread(
-        inspect_seconds,
-        std::iter::empty::<String>(),
-    );
+    let _capture_clock = scope_synchronous_fixture_clock(inspect_seconds);
     let after_calls = f
         .f
         .process
@@ -469,8 +537,7 @@ async fn capture_at_selected_setup_window(window: SetupCaptureWindow) -> TestRes
     if final_expiry {
         let cutpoint = std::fs::read_to_string(&final_observed_path).map_err(|error| {
             format!(
-                "setup final capture phase=verified cutpoint missing; public={:?}; checkpoint={observation}: {error}",
-                result.as_ref().err(),
+                "setup final capture phase=verified cutpoint missing; public={public}; checkpoint={observation}: {error}",
             )
         })?;
         let scalars = cutpoint
@@ -534,4 +601,303 @@ async fn setup_pending_capture_after_initial_expiry_refuses_the_real_native_ledg
 async fn setup_pending_capture_crossing_initial_expiry_before_commit_rolls_back_its_native_ledger(
 ) -> TestResult {
     capture_at_selected_setup_window(SetupCaptureWindow::ExpiresBeforeCommit).await
+}
+
+#[tokio::test]
+async fn setup_expired_unprobed_selection_retires_without_refunding_its_call() -> TestResult {
+    let state = Box::pin(extended_validity_setup()).await?;
+    let f = &state.fixture;
+    // Materialization advanced the persisted authority clock. Keep subsequent
+    // reads and writes beyond that clock as well as the initial setup window.
+    let expired_seconds = state.prepared.probe.expires_at_unix_ms.get() / 1_000 + 1;
+    let _clock = scope_synchronous_fixture_clock(expired_seconds);
+    let old_workflow = &state.prepared.probe.benign_workflow;
+    let previous = f.f.record(old_workflow)?;
+    let reservation: RecoveryProcessReservationV1 = chio_core_types::recovery::decode_contract(
+        previous
+            .process_reservation
+            .as_ref()
+            .ok_or("unused setup reservation")?
+            .as_str()
+            .as_bytes(),
+    )?;
+    let now = expired_seconds * 1_000;
+    let store = f.f.authority.admission_operation_store();
+    let fence = f.f.authority.mutation_fence();
+    let deployment = f.f.kernel.recovery_deployment(f.f.runtime.scope())?;
+    f.runtime
+        .validate_setup_binding(f.f.runtime.scope(), &deployment.native_authority)?;
+    let inspector = f.f.kernel.authenticate_recovery_actor(
+        f.f.runtime.scope(),
+        &f.f.control,
+        RecoveryPermission::Inspect,
+    )?;
+    assert!(matches!(
+        store.setup_preparation(&inspector, &fence, now),
+        Err(NativeSetupPreparationError::Expired)
+    ));
+    // Reuse the authenticated original denial. The replacement changes only
+    // its continuation; no new call is needed to advance the native source.
+    let original: ToolCallRequest =
+        chio_core_types::recovery::decode_contract(previous.creation_seed.as_str().as_bytes())?;
+    let calls = f.f.process.process("root")?.tree_calls;
+    let replacement = pin_setup_replacement(f, &original, "expired-setup-replacement", now)??;
+    assert_ne!(&replacement, old_workflow);
+    let retired = f.f.record(old_workflow)?;
+    assert_eq!(retired.control, WorkflowControlV1::Cancelled);
+    assert_eq!(retired.origin, previous.origin);
+    assert_eq!(retired.creation_seed, previous.creation_seed);
+    assert!(retired.admission_closed && retired.admission.is_none());
+    assert!(retired.process_reservation.is_none());
+    assert!(!retired.captured && retired.native_link.is_none());
+    assert_eq!(retired.effect, EffectObservationV1::NeverAdmitted);
+    let current = f.f.record(&replacement)?;
+    assert_eq!(current.origin, previous.origin);
+    assert_eq!(current.creation_seed, previous.creation_seed);
+    assert_eq!(current.control, WorkflowControlV1::Active);
+    assert!(current.action.is_none() && current.process_reservation.is_none());
+    assert_eq!(retained_allocation_version(f, old_workflow)?, 2);
+    // Inspect physical custody before invoking the idempotent closure port.
+    let journal = rusqlite::Connection::open_with_flags(
+        f.f.path.join("process.db"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    let closed: bool = journal.query_row(
+        "SELECT EXISTS(SELECT 1 FROM process_unused_recovery_reservations
+         WHERE process_id=?1 AND operation_key=?2 AND continuation_id=?3)",
+        rusqlite::params![
+            reservation.process_id,
+            reservation.operation_key,
+            reservation.continuation_id.as_str()
+        ],
+        |row| row.get(0),
+    )?;
+    assert!(closed);
+    drop(journal);
+    assert_eq!(f.f.process.process("root")?.tree_calls, calls);
+    let replay = chio_kernel::recovery::RecoveryUnusedReservationClosurePort::close_unused_recovery_reservation(
+        &f.f.process, &reservation,
+    )?;
+    replay.verify_for(&reservation, fence.store_uuid.as_str())?;
+    assert_eq!(f.f.process.process("root")?.tree_calls, calls);
+    assert_eq!(external_count(&f.f.path)?, 0);
+    Ok(())
+}
+
+fn retained_allocation_version(f: &KnowledgeFixture, workflow: &WorkflowId) -> TestResult<i64> {
+    let connection = rusqlite::Connection::open_with_flags(
+        f.f.path.join("admission.db"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    Ok(connection.query_row(
+        "SELECT version FROM admission_operation_recovery_records
+         WHERE record_key GLOB ('recovery-workflow-allocation:*:' || ?1)",
+        [workflow.as_str()],
+        |row| row.get(0),
+    )?)
+}
+
+/// The outer result is a fixture failure. The inner result is the native
+/// owner's decision for the trusted selected-operator replacement.
+fn pin_setup_replacement(
+    f: &KnowledgeFixture,
+    original: &ToolCallRequest,
+    key: &str,
+    now: u64,
+) -> TestResult<Result<WorkflowId, AdmissionOperationStoreError>> {
+    let creator = f.f.kernel.authenticate_recovery_actor(
+        f.f.runtime.scope(),
+        &f.f.control,
+        RecoveryPermission::Create,
+    )?;
+    let command = f.f.command(
+        key,
+        RecoveryCommandBodyV1::CreateWorkflow {
+            creation_key: CreationKey::new(key)?,
+            template: RecoveryTemplateV1::SupportTicketPublicIssue,
+            request_seed: text(original)?,
+        },
+    )?;
+    Ok(f.f
+        .authority
+        .admission_operation_store()
+        .pin_setup_creation(
+            &creator,
+            &command,
+            chio_store_sqlite::admission_operation_store::NativeSetupCreationHost {
+                receipt_key: &f.f.kernel.receipt_signing_public_key(),
+                operator: &Keypair::from_seed(&[211; 32]).public_key(),
+                process: &f.f.process,
+                unused_closure: &f.f.process,
+            },
+            &f.f.authority.mutation_fence(),
+            now,
+        ))
+}
+
+#[tokio::test]
+async fn setup_cancelled_unprobed_selection_is_replaced_after_its_initial_window() -> TestResult {
+    let state = Box::pin(extended_validity_setup_with_replacement_original()).await?;
+    let f = &state.fixture;
+    let old_workflow = &state.prepared.probe.benign_workflow;
+    let replacement_original = state
+        .replacement_original
+        .as_ref()
+        .ok_or("replacement setup original")?;
+    let expiry_seconds = state.prepared.probe.expires_at_unix_ms.get() / 1_000;
+    {
+        let _clock = scope_synchronous_fixture_clock(expiry_seconds - 1);
+        let live = f.f.record(old_workflow)?;
+        Box::pin(f.f.execute(
+            "cancel-unprobed-setup",
+            RecoveryCommandBodyV1::CancelWorkflow {
+                workflow_id: old_workflow.clone(),
+                expected_revision: live.revision,
+            },
+        ))
+        .await?;
+    }
+    let expired_seconds = expiry_seconds + 1;
+    let _clock = scope_synchronous_fixture_clock(expired_seconds);
+    let now = expired_seconds * 1_000;
+    let cancelled = f.f.record(old_workflow)?;
+    assert_eq!(cancelled.control, WorkflowControlV1::Cancelled);
+    assert!(!cancelled.captured && cancelled.native_link.is_none());
+    let retained = chio_core_types::canonical_json_bytes(&cancelled)?;
+    let allocation = retained_allocation_version(f, old_workflow)?;
+    let calls = f.f.process.process("root")?.tree_calls;
+    let replacement =
+        pin_setup_replacement(f, replacement_original, "cancelled-setup-replacement", now)?
+            .map_err(|error| format!("replace cancelled unprobed setup selection: {error}"))?;
+    assert_ne!(&replacement, old_workflow);
+    // Replacing the selection leaves the cancelled workflow, its original and
+    // its allocation exactly as cancellation left them.
+    assert_eq!(
+        chio_core_types::canonical_json_bytes(&f.f.record(old_workflow)?)?,
+        retained
+    );
+    assert_eq!(retained_allocation_version(f, old_workflow)?, allocation);
+    let current = f.f.record(&replacement)?;
+    assert_eq!(current.control, WorkflowControlV1::Active);
+    assert_ne!(current.origin, cancelled.origin);
+    assert_ne!(current.creation_seed, cancelled.creation_seed);
+    assert!(current.action.is_none() && current.process_reservation.is_none());
+    assert_eq!(external_count(&f.f.path)?, 0);
+    assert_eq!(f.f.process.process("root")?.tree_calls, calls);
+    Ok(())
+}
+
+/// The benign effect ran, but its probe evidence was never committed before
+/// the initial window closed.
+#[tokio::test]
+async fn setup_dispatched_unprobed_selection_is_replaced_after_expiry_without_touching_its_effect(
+) -> TestResult {
+    let state = Box::pin(extended_validity_setup_with_replacement_original()).await?;
+    let f = &state.fixture;
+    let old_workflow = &state.prepared.probe.benign_workflow;
+    let replacement_original = state
+        .replacement_original
+        .as_ref()
+        .ok_or("replacement setup original")?;
+    let expiry_seconds = state.prepared.probe.expires_at_unix_ms.get() / 1_000;
+    let reservation: RecoveryProcessReservationV1 = {
+        // Preparation advanced the retained authority clock near the deadline.
+        // Enter that window before reading the retained reservation as well.
+        let _clock = scope_synchronous_fixture_clock(expiry_seconds - 1);
+        let reservation = chio_core_types::recovery::decode_contract(
+            f.f.record(old_workflow)?
+                .process_reservation
+                .as_ref()
+                .ok_or("dispatched setup reservation")?
+                .as_str()
+                .as_bytes(),
+        )?;
+        let result = Box::pin(
+            f.f.runtime
+                .execute_command(&f.f.control, &state.prepared.command),
+        )
+        .await
+        .map_err(|error| format!("dispatch selected setup command: {error}"))?;
+        assert!(result
+            .original_response
+            .ok_or_else(|| {
+                format!(
+                    "dispatched setup completion projection absent: status effect={:?}; {}",
+                    result.status.effect,
+                    dispatch_diagnostic(f, old_workflow),
+                )
+            })?
+            .receipt
+            .is_allowed());
+        reservation
+    };
+    let expired_seconds = expiry_seconds + 1;
+    let _clock = scope_synchronous_fixture_clock(expired_seconds);
+    let now = expired_seconds * 1_000;
+    let dispatched = f.f.record(old_workflow)?;
+    assert!(dispatched.captured && dispatched.native_link.is_some());
+    assert_eq!(external_count(&f.f.path)?, 1);
+    let inspector = f.f.kernel.authenticate_recovery_actor(
+        f.f.runtime.scope(),
+        &f.f.control,
+        RecoveryPermission::Inspect,
+    )?;
+    assert!(matches!(
+        f.f.authority.admission_operation_store().setup_preparation(
+            &inspector,
+            &f.f.authority.mutation_fence(),
+            now,
+        ),
+        Err(NativeSetupPreparationError::Expired)
+    ));
+    let retained = chio_core_types::canonical_json_bytes(&dispatched)?;
+    let allocation = retained_allocation_version(f, old_workflow)?;
+    let calls = f.f.process.process("root")?.tree_calls;
+    // The dispatched effect still owns its original, so a second self-test on
+    // that same original is refused and changes nothing.
+    let same_original: ToolCallRequest =
+        chio_core_types::recovery::decode_contract(dispatched.creation_seed.as_str().as_bytes())?;
+    assert!(
+        pin_setup_replacement(f, &same_original, "duplicate-dispatched-setup", now)?.is_err(),
+        "a dispatched original must not receive a second self-test"
+    );
+    assert_eq!(
+        chio_core_types::canonical_json_bytes(&f.f.record(old_workflow)?)?,
+        retained
+    );
+    let replacement =
+        pin_setup_replacement(f, replacement_original, "dispatched-setup-replacement", now)?
+            .map_err(|error| format!("replace dispatched unprobed setup selection: {error}"))?;
+    assert_ne!(&replacement, old_workflow);
+    assert_eq!(
+        chio_core_types::canonical_json_bytes(&f.f.record(old_workflow)?)?,
+        retained,
+        "replacement must not close or migrate the dispatched workflow"
+    );
+    assert_eq!(retained_allocation_version(f, old_workflow)?, allocation);
+    let journal = rusqlite::Connection::open_with_flags(
+        f.f.path.join("process.db"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    let closed_as_unused: bool = journal.query_row(
+        "SELECT EXISTS(SELECT 1 FROM process_unused_recovery_reservations
+         WHERE process_id=?1 AND operation_key=?2 AND continuation_id=?3)",
+        rusqlite::params![
+            reservation.process_id,
+            reservation.operation_key,
+            reservation.continuation_id.as_str()
+        ],
+        |row| row.get(0),
+    )?;
+    assert!(
+        !closed_as_unused,
+        "a dispatched reservation is never unused custody"
+    );
+    let current = f.f.record(&replacement)?;
+    assert_eq!(current.control, WorkflowControlV1::Active);
+    assert_ne!(current.origin, dispatched.origin);
+    assert!(current.action.is_none() && current.process_reservation.is_none());
+    assert_eq!(external_count(&f.f.path)?, 1);
+    assert_eq!(f.f.process.process("root")?.tree_calls, calls);
+    Ok(())
 }

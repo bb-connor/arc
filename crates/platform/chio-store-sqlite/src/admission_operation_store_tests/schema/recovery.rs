@@ -25,10 +25,36 @@ pub(super) fn remove_empty_recovery_tables(connection: &Connection) -> rusqlite:
         0,
         "predecessor fixture cannot discard global recovery references"
     );
+    let indexed: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table'
+         AND name = 'security_participant_state_imported_scope_index')",
+        [],
+        |row| row.get(0),
+    )?;
+    if indexed {
+        remove_empty_imported_scope_index(connection)?;
+    }
     connection.execute_batch(
         "DROP TABLE admission_operation_recovery_events;
          DROP TABLE admission_operation_recovery_records;",
     )
+}
+
+/// The native v29 catalog is the current catalog without this table. It may be
+/// removed alone only while it holds no row.
+pub(in crate::admission_operation_store::tests) fn remove_empty_imported_scope_index(
+    connection: &Connection,
+) -> rusqlite::Result<()> {
+    assert_eq!(
+        connection.query_row(
+            "SELECT COUNT(*) FROM security_participant_state_imported_scope_index",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?,
+        0,
+        "predecessor fixture cannot discard an imported scope index"
+    );
+    connection.execute_batch("DROP TABLE security_participant_state_imported_scope_index")
 }
 
 fn rows(connection: &Connection, table: &str) -> AnchoredTestResult<Vec<Vec<Value>>> {
@@ -51,7 +77,7 @@ fn rows(connection: &Connection, table: &str) -> AnchoredTestResult<Vec<Vec<Valu
 #[test]
 fn recovery_populated_v34_upgrade_preserves_original_operations_and_global_chain(
 ) -> AnchoredTestResult {
-    let f = fixture();
+    let f = pre_recovery_fixture();
     let operation = prepared_operation(
         &f.fence,
         AdmissionOperationKind::ToolDispatch,
@@ -162,7 +188,7 @@ fn recovery_os_death_before_upgrade_commit_is_restartable_and_byte_preserving() 
 {
     use std::os::unix::process::ExitStatusExt;
     use std::time::{Duration, Instant};
-    let f = fixture();
+    let f = pre_recovery_fixture();
     let operation = prepared_operation(
         &f.fence,
         AdmissionOperationKind::ToolDispatch,
@@ -257,7 +283,7 @@ fn recovery_os_death_before_upgrade_commit_is_restartable_and_byte_preserving() 
 #[test]
 fn experimental_recovery_formats_are_refused_without_rewriting_native_history() -> AnchoredTestResult
 {
-    for version in 35..=41 {
+    for version in 35..ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
         let f = fixture();
         let operation = prepared_operation(
             &f.fence,

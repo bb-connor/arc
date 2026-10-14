@@ -1334,7 +1334,7 @@ fn assert_not_applied(
 #[test]
 fn assignment_commit_is_atomic_and_exact_replay_is_idempotent() -> AnchoredTestResult {
     let fixture = fixture();
-    let base = now_ms() + 100;
+    let base = clock_origin_ms(&fixture)? + 100;
     let _clock =
         chio_kernel::scope_fixed_runtime_for_current_thread(base / 1_000, std::iter::empty());
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "atomic", base)?;
@@ -1516,7 +1516,7 @@ fn assignment_commit_is_atomic_and_exact_replay_is_idempotent() -> AnchoredTestR
 #[test]
 fn terminal_projection_failure_rolls_back_assignment_and_result() -> AnchoredTestResult {
     let fixture = fixture();
-    let base = now_ms() + 100;
+    let base = clock_origin_ms(&fixture)? + 100;
     let _clock =
         chio_kernel::scope_fixed_runtime_for_current_thread(base / 1_000, std::iter::empty());
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "terminal-rollback", base)?;
@@ -1541,10 +1541,13 @@ fn terminal_projection_failure_rolls_back_assignment_and_result() -> AnchoredTes
     )?;
     {
         let connection = fixture.store.connection()?;
+        // A temporary trigger reaches the exact economic_mutation_result
+        // insertion cutpoint without mutating the canonical catalog the
+        // production owner validates on entry.
         connection.execute_batch(
             r#"
-            CREATE TRIGGER reject_factor_terminal_projection
-            BEFORE INSERT ON admission_operation_terminal_records
+            CREATE TEMP TRIGGER reject_factor_terminal_projection
+            BEFORE INSERT ON main.admission_operation_terminal_records
             WHEN NEW.record_kind = 'economic_mutation_result'
             BEGIN
                 SELECT RAISE(ABORT, 'injected terminal projection failure');
@@ -1552,9 +1555,16 @@ fn terminal_projection_failure_rolls_back_assignment_and_result() -> AnchoredTes
             "#,
         )?;
     }
-    assert!(case
-        .commit(&factor_store, &recovery, &fixture.fence, case.commit_at)
-        .is_err());
+    let error = match case.commit(&factor_store, &recovery, &fixture.fence, case.commit_at) {
+        Ok(_) => return Err("injected terminal projection failure was not reached".into()),
+        Err(error) => error,
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("injected terminal projection failure"),
+        "{error}"
+    );
     let unchanged = fixture
         .store
         .load_obligation(receivable.atom.obligation_id())?
@@ -1581,7 +1591,7 @@ fn terminal_projection_failure_rolls_back_assignment_and_result() -> AnchoredTes
 #[test]
 fn stale_status_produces_durable_not_applied_without_advancing_the_head() -> AnchoredTestResult {
     let fixture = fixture();
-    let base = now_ms() + 100;
+    let base = clock_origin_ms(&fixture)? + 100;
     let _clock =
         chio_kernel::scope_fixed_runtime_for_current_thread(base / 1_000, std::iter::empty());
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "stale", base)?;
@@ -1674,7 +1684,7 @@ fn expiry_reasons_are_distinct_and_durable() -> AnchoredTestResult {
         ),
     ] {
         let fixture = fixture();
-        let base = now_ms() + 100;
+        let base = clock_origin_ms(&fixture)? + 100;
         let _clock =
             chio_kernel::scope_fixed_runtime_for_current_thread(base / 1_000, std::iter::empty());
         let receivable = persist_receivable(&fixture, AUTHORITY_A, suffix, base)?;
@@ -1709,7 +1719,7 @@ fn expiry_reasons_are_distinct_and_durable() -> AnchoredTestResult {
 #[test]
 fn serving_owner_rotation_fences_stale_recovery_then_accepts_a_new_claim() -> AnchoredTestResult {
     let fixture = fixture();
-    let base = now_ms() + 100;
+    let base = clock_origin_ms(&fixture)? + 100;
     let _clock =
         chio_kernel::scope_fixed_runtime_for_current_thread(base / 1_000, std::iter::empty());
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "owner-rotation", base)?;
@@ -1768,7 +1778,7 @@ fn serving_owner_rotation_fences_stale_recovery_then_accepts_a_new_claim() -> An
 fn retained_configuration_replays_after_claim_trust_rotation_with_shared_coordinates(
 ) -> AnchoredTestResult {
     let fixture = fixture();
-    let base = now_ms() + 100;
+    let base = clock_origin_ms(&fixture)? + 100;
     let _clock =
         chio_kernel::scope_fixed_runtime_for_current_thread(base / 1_000, std::iter::empty());
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "retained", base)?;
@@ -1817,7 +1827,7 @@ fn retained_configuration_replays_after_claim_trust_rotation_with_shared_coordin
 #[test]
 fn authority_generation_fences_stale_clone_across_aba_rotation() -> AnchoredTestResult {
     let fixture = fixture();
-    let base = now_ms() + 100;
+    let base = clock_origin_ms(&fixture)? + 100;
     let _clock =
         chio_kernel::scope_fixed_runtime_for_current_thread(base / 1_000, std::iter::empty());
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "aba", base)?;
@@ -1868,7 +1878,7 @@ fn authority_generation_fences_stale_clone_across_aba_rotation() -> AnchoredTest
 #[test]
 fn stored_result_tampering_is_rejected_on_load_and_retry() -> AnchoredTestResult {
     let fixture = fixture();
-    let base = now_ms() + 100;
+    let base = clock_origin_ms(&fixture)? + 100;
     let _clock =
         chio_kernel::scope_fixed_runtime_for_current_thread(base / 1_000, std::iter::empty());
     let receivable = persist_receivable(&fixture, AUTHORITY_A, "tamper", base)?;
@@ -1913,7 +1923,7 @@ fn stored_result_tampering_is_rejected_on_load_and_retry() -> AnchoredTestResult
 fn stored_claim_evidence_and_authority_configuration_tampering_is_rejected() -> AnchoredTestResult {
     for suffix in ["receipt", "iou", "configuration"] {
         let fixture = fixture();
-        let base = now_ms() + 100;
+        let base = clock_origin_ms(&fixture)? + 100;
         let _clock =
             chio_kernel::scope_fixed_runtime_for_current_thread(base / 1_000, std::iter::empty());
         let receivable = persist_receivable(&fixture, AUTHORITY_A, suffix, base)?;

@@ -50,13 +50,14 @@ pub(super) fn assess_current_annotations(
             || semantic_key_digest(current.authority_key()).map_err(refused)? != signer
             || !current.verify_signature().map_err(refused)?
             || current_body.issued_at_unix_ms.get() > now
-            || current_body.valid_until_unix_ms.get() <= now
             || body.issued_at_unix_ms.get() > now
             || body.valid_until_unix_ms.get() <= now
         {
             return Err(refused("current annotation authority or time changed"));
         }
-        basis_changed |= current != *proof;
+        // A lapsed current observation is an ordinary basis change that keeps its
+        // restrictions, so a withheld read exposes no separate refusal category.
+        basis_changed |= current != *proof || current_body.valid_until_unix_ms.get() <= now;
         restriction_floor = restriction_floor
             .join_restrictions(&current_body.restrictions)
             .map_err(refused)?;

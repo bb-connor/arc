@@ -5,6 +5,7 @@ thread_local! {
     static ACTIVE: Cell<bool> = const { Cell::new(false) };
     static HISTORY_BODIES: Cell<u64> = const { Cell::new(0) };
     static CURRENT_PROJECTIONS: Cell<u64> = const { Cell::new(0) };
+    static PROJECTION_RECOMPUTATIONS: Cell<u64> = const { Cell::new(0) };
     static KNOWLEDGE_JOIN_PREVIEWS: Cell<u64> = const { Cell::new(0) };
     static KNOWLEDGE_JOIN_READBACKS: Cell<u64> = const { Cell::new(0) };
 }
@@ -20,6 +21,7 @@ impl NativeInfluenceReadWorkFixture {
         }
         HISTORY_BODIES.with(|count| count.set(0));
         CURRENT_PROJECTIONS.with(|count| count.set(0));
+        PROJECTION_RECOMPUTATIONS.with(|count| count.set(0));
         KNOWLEDGE_JOIN_PREVIEWS.with(|count| count.set(0));
         KNOWLEDGE_JOIN_READBACKS.with(|count| count.set(0));
         Ok(Self {
@@ -33,6 +35,10 @@ impl NativeInfluenceReadWorkFixture {
 
     pub fn current_projections(&self) -> u64 {
         CURRENT_PROJECTIONS.with(Cell::get)
+    }
+
+    pub fn projection_recomputations(&self) -> u64 {
+        PROJECTION_RECOMPUTATIONS.with(Cell::get)
     }
 
     pub fn knowledge_join_previews(&self) -> u64 {
@@ -68,9 +74,14 @@ pub(super) fn history_body() {
     }
 }
 
-#[allow(dead_code)]
 pub(super) fn current_projection() {
     if ACTIVE.with(Cell::get) {
         CURRENT_PROJECTIONS.with(|count| count.set(count.get().saturating_add(1)));
+    }
+}
+
+pub(super) fn projection_recomputation() {
+    if ACTIVE.with(Cell::get) {
+        PROJECTION_RECOMPUTATIONS.with(|count| count.set(count.get().saturating_add(1)));
     }
 }

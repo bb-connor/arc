@@ -793,12 +793,24 @@ impl ChioKernel {
                 crate::admission_operation::AdmissionOperationError::FindingPoolLedgerAlreadyConfigured,
             );
         }
-        self.durable_admission_runtime = Some(DurableAdmissionRuntime::new(
+        let runtime = DurableAdmissionRuntime::new(
             store,
             outcome_store,
             fence,
             &self.config.keypair.public_key().to_hex(),
-        )?);
+        )?;
+        // The registered sink preserves this store's native finishing debt
+        // from its first commit after the runtime is installed.
+        if let Some(registration) = self.native_receipt_store_registration.as_ref() {
+            runtime
+                .attach_native_receipt_sink(registration)
+                .map_err(|_| {
+                    crate::admission_operation::AdmissionOperationError::AttachmentConflict {
+                        field: "native_receipt_sink",
+                    }
+                })?;
+        }
+        self.durable_admission_runtime = Some(runtime);
         Ok(())
     }
 
@@ -839,6 +851,11 @@ impl ChioKernel {
         &mut self,
         registration: crate::receipt_store::NativeReceiptStoreRegistration,
     ) -> Result<(), KernelError> {
+        if let Some(runtime) = self.durable_admission_runtime.as_ref() {
+            runtime
+                .attach_native_receipt_sink(&registration)
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        }
         self.try_set_receipt_store_handle(registration.receipt_store_handle())?;
         self.native_receipt_store_registration = Some(registration);
         Ok(())

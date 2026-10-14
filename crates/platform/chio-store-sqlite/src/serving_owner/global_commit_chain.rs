@@ -2307,6 +2307,10 @@ mod tests {
         let connection = Connection::open_in_memory()?;
         connection.execute_batch(
             r#"
+            CREATE TABLE chio_store_schema_versions (
+                store_key TEXT PRIMARY KEY,
+                version INTEGER NOT NULL
+            );
             CREATE TABLE admission_operation_commits (
                 operation_id TEXT NOT NULL,
                 commit_sequence INTEGER NOT NULL
@@ -2368,6 +2372,10 @@ mod tests {
                 1
             );
             "#,
+        )?;
+        connection.execute(
+            "INSERT INTO chio_store_schema_versions (store_key, version) VALUES ('admission_operation', ?1)",
+            [crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION],
         )?;
         Ok(connection)
     }
@@ -2525,10 +2533,8 @@ mod tests {
         ] {
             let connection = factor_projection_fixture()?;
             insert_factor_global_commit(&connection, key, generation)?;
-            assert_eq!(
-                verify_global_projection_coverage(&connection).is_ok(),
-                exact
-            );
+            let coverage = verify_global_projection_coverage(&connection);
+            assert_eq!(coverage.is_ok(), exact, "{key}/{generation}: {coverage:?}");
         }
         Ok(())
     }

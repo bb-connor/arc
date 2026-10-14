@@ -1,5 +1,5 @@
 use chio_core_types::crypto::sha256_hex;
-use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{read_process, require_running, Store};
 use crate::{
@@ -7,49 +7,41 @@ use crate::{
     STATE_BLOB_PROTOCOL,
 };
 
-impl Store {
-    pub fn put_blob(&mut self, id: &str, bytes: &[u8]) -> Result<StateBlobRef, ProcessError> {
-        self.put_blob_with_provenance(id, bytes, true)
+/// Retain an immutable blob inside the bank-proven writer transaction.
+pub(crate) fn put_blob_call(
+    tx: &rusqlite::Transaction<'_>,
+    id: &str,
+    bytes: &[u8],
+) -> Result<StateBlobRef, ProcessError> {
+    if bytes.len() > MAX_STATE_BLOB_BYTES {
+        return Err(ProcessError::Invalid("state blob is too large"));
     }
-    fn put_blob_with_provenance(
-        &mut self,
-        id: &str,
-        bytes: &[u8],
-        legacy: bool,
-    ) -> Result<StateBlobRef, ProcessError> {
-        if bytes.len() > MAX_STATE_BLOB_BYTES {
-            return Err(ProcessError::Invalid("state blob is too large"));
+    let sha256 = sha256_hex(bytes);
+    let process = read_process(tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
+    require_running(&process)?;
+    if let Some(stored) = read_bytes(tx, id, &sha256)? {
+        if stored != bytes {
+            return Err(ProcessError::BlobCorrupt);
         }
-        let sha256 = sha256_hex(bytes);
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let process =
-            read_process(&tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
-        require_running(&process)?;
-        if let Some(stored) = read_bytes(&tx, id, &sha256)? {
-            if stored != bytes {
-                return Err(ProcessError::BlobCorrupt);
-            }
-        } else {
-            let storage = usage(&tx, &process)?;
-            if storage.tree_bytes + bytes.len() as u64 > u64::from(storage.limits.max_bytes)
-                || storage.tree_blobs >= u64::from(storage.limits.max_blobs)
-            {
-                return Err(ProcessError::Limit("immutable process state"));
-            }
-            tx.execute(
-                "INSERT INTO process_state_blobs(process_id,sha256,data,legacy_quarantined,knowledge_generation) VALUES(?1,?2,?3,?4,?5)",
-                params![id, sha256, bytes,legacy,uuid::Uuid::new_v4().to_string()],
-            )?;
+    } else {
+        let storage = usage(tx, &process)?;
+        if storage.tree_bytes + bytes.len() as u64 > u64::from(storage.limits.max_bytes)
+            || storage.tree_blobs >= u64::from(storage.limits.max_blobs)
+        {
+            return Err(ProcessError::Limit("immutable process state"));
         }
-        tx.commit()?;
-        Ok(StateBlobRef {
-            sha256,
-            bytes: bytes.len() as u32,
-        })
+        tx.execute(
+            "INSERT INTO process_state_blobs(process_id,sha256,data,legacy_quarantined,knowledge_generation) VALUES(?1,?2,?3,?4,?5)",
+            params![id, sha256, bytes, 1, uuid::Uuid::new_v4().to_string()],
+        )?;
     }
+    Ok(StateBlobRef {
+        sha256,
+        bytes: bytes.len() as u32,
+    })
+}
 
+impl Store {
     pub fn read_blob(&self, id: &str, sha256: &str) -> Result<Vec<u8>, ProcessError> {
         self.require_running(id)?;
         let bytes = read_bytes(&self.connection, id, sha256)?.ok_or(ProcessError::BlobMissing)?;

@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn v16_upgrade_preserves_old_hashes_and_anchors_then_appends_v2() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let now = now_ms() / 1_000 * 1_000;
     let _clock =
         chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, std::iter::empty());
@@ -131,7 +131,7 @@ fn current_version_cannot_silently_regenerate_a_missing_observation_column() -> 
 
 #[test]
 fn failed_upgrade_rolls_back_and_restores_foreign_key_enforcement() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let mut connection = fixture.store.connection()?;
     super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
     connection.execute_batch(

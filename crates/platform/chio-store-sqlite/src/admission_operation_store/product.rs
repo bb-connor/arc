@@ -7,10 +7,10 @@ use chio_security_types::{flow::PrincipalId, knowledge::*, recovery::*, Informat
 
 pub(in crate::admission_operation_store) mod evidence_reclamation;
 mod evidence_source;
+pub(in crate::admission_operation_store) use evidence_source::product_evidence_source;
 use evidence_source::require_product_evidence_owners;
-pub(in crate::admission_operation_store) use evidence_source::{
-    product_evidence_source, verify_product_evidence_source,
-};
+#[cfg(feature = "admission-test-support")]
+pub(in crate::admission_operation_store) use evidence_source::verify_product_evidence_source;
 mod lifecycle;
 pub(in crate::admission_operation_store) mod reference_intake;
 pub(super) use lifecycle::complete_policy_review;

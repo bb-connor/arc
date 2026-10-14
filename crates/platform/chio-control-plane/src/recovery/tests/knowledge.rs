@@ -20,8 +20,10 @@ mod confinement;
 mod custody;
 mod distinct_labels;
 mod host;
+mod import_reservations;
 mod influence;
 mod live_capacity;
+mod native_journal_segments;
 mod pins;
 mod product;
 mod qualification;
@@ -716,13 +718,68 @@ fn artifacts_copy_restore_archive_and_aliases_preserve_every_origin() -> TestRes
     let mut trailing = bytes.clone();
     trailing.push(0);
     assert!(f.runtime.import_archive(&f.f.control, &trailing).is_err());
+    // A different root produces a fresh import identity, so reduced clearance
+    // must refuse first admission as well as the already delivered import.
+    let copy_handle = f.runtime.handle(
+        &f.f.control,
+        &copy,
+        &ArtifactRecipientId::new("agent-root")?,
+    )?;
+    f.runtime.export_into(
+        &f.f.control,
+        &copy_handle,
+        &RequestId::new("export-copy")?,
+        &signer,
+        &sink,
+    )?;
+    let fresh_archive = sink
+        .delivered
+        .lock()
+        .map_err(|_| "sink")?
+        .get(1)
+        .ok_or("fresh archive")?
+        .clone();
+    assert_ne!(fresh_archive, bytes);
     let mut deployment = f.f.kernel.recovery_deployment(&f.profile.scope)?;
+    let original_deployment = deployment.clone();
     let mut actors = deployment.actors.as_slice().to_vec();
     actors[0].preview_clearance = InformationLabel::bottom();
     deployment.actors = NonEmptyBoundedList::new(actors)?;
     deployment.authority_scope = recovery_authority_scope_digest(&deployment)?;
     store.configure_recovery_deployment(&deployment)?;
     assert!(f.runtime.import_archive(&f.f.control, &bytes).is_err());
+    let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
+    let publication_count = || -> Result<i64, rusqlite::Error> {
+        connection.query_row(
+            "SELECT count(*) FROM admission_operation_recovery_records
+             WHERE record_key GLOB 'knowledge-publication:*'",
+            [],
+            |row| row.get(0),
+        )
+    };
+    let before = publication_count()?;
+    assert!(f
+        .runtime
+        .import_archive(&f.f.control, &fresh_archive)
+        .is_err());
+    assert_eq!(publication_count()?, before);
+    store.configure_recovery_deployment(&original_deployment)?;
+    let imported_copy = f.runtime.import_archive(&f.f.control, &fresh_archive)?;
+    let imported_versions = store.artifact_transfer_inventory(
+        &actor,
+        &imported_copy,
+        &f.f.authority.mutation_fence(),
+        now_ms()?,
+    )?;
+    assert_eq!(imported_versions.len(), copy_inventory.len());
+    for reference in &imported_versions {
+        let metadata = f.metadata(reference)?;
+        assert!(restricted_label().flows_to(&metadata.label));
+        assert!(matches!(
+            metadata.producer,
+            ArtifactProducerV1::Import { .. }
+        ));
+    }
     Ok(())
 }
 #[test]

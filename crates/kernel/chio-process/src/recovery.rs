@@ -110,7 +110,7 @@ impl ProcessRuntime {
                 host_binding: self.recovery_host_binding(server_id)?,
             },
         };
-        self.with_store(|store| store.reserve_recovery(&reservation))?;
+        self.writer.reserve_recovery(&reservation)?;
         Ok(reservation)
     }
 
@@ -145,19 +145,12 @@ impl ProcessRuntime {
         {
             return Err(ProcessError::Conflict);
         }
-        self.with_store(|store| {
-            store.finalize_recovery(reservation, request, &binding.binding_hash)?;
-            if let Some(nonce) = custody.original_execution_nonce() {
-                store.retain_nonce(
-                    &reservation.data.process_id,
-                    &reservation.data.operation_key,
-                    1,
-                    &binding.binding_hash,
-                    nonce,
-                )?;
-            }
-            Ok(())
-        })
+        self.writer.finalize_recovery(
+            reservation,
+            request,
+            &binding.binding_hash,
+            custody.original_execution_nonce(),
+        )
     }
 
     /// Load the frozen complete process digests for protected custody creation.

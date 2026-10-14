@@ -1,4 +1,4 @@
-//! Default-off byte observations for two exact native fixture requests.
+//! Default-off byte observations for one exact native fixture request.
 use super::*;
 use chio_security_types::knowledge::ArtifactReleaseKindV1;
 use chio_security_types::recovery::RequestId;
@@ -6,10 +6,9 @@ use std::collections::BTreeMap;
 use std::sync::{Mutex, OnceLock};
 
 const FIXTURE_REQUEST: &str = "bounded-envelope-restore";
-const CHUNK_FIXTURE_REQUEST: &str = "chunked-checkpoint-lost-ack";
 
 fn fixture_request(request: &RequestId) -> bool {
-    matches!(request.as_str(), FIXTURE_REQUEST | CHUNK_FIXTURE_REQUEST)
+    request.as_str() == FIXTURE_REQUEST
 }
 const MAX_OBSERVERS: usize = 16;
 type FixtureKey = (String, String, String, String);

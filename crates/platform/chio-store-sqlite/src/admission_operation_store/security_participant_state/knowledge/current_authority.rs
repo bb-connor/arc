@@ -10,6 +10,7 @@ pub(in crate::admission_operation_store) struct CurrentNativeInfluenceAuthority<
     owner: &'owner SqliteServingOwner,
     origin: NativeSourceTransactionOrigin<'owner>,
     initialized: SecurityParticipantStateInitialization,
+    binding: NativeSecurityAuthorityBindingV1,
 }
 
 impl<'tx, 'conn, 'owner> CurrentNativeInfluenceAuthority<'tx, 'conn, 'owner> {
@@ -33,6 +34,7 @@ impl<'tx, 'conn, 'owner> CurrentNativeInfluenceAuthority<'tx, 'conn, 'owner> {
             owner,
             origin,
             initialized,
+            binding: binding.clone(),
         })
     }
 
@@ -44,64 +46,14 @@ impl<'tx, 'conn, 'owner> CurrentNativeInfluenceAuthority<'tx, 'conn, 'owner> {
         AdmissionOperationStoreError,
     > {
         self.verify()?;
-        self.require_supported_import_influence()?;
-        // This warm read pays the same retained-history charge before any
-        // authenticated body is decoded as the capture and release readers.
+        // This warm read uses the same charged reader as the capture and release
+        // callers. The sealed pre-recovery source contributes conservatively
+        // through it, never a silent zero.
         let mut budget = chio_semantic_contracts::VerificationBudget::new(
             chio_security_types::recovery::MAX_RECOVERY_VERIFICATION_WORK,
         )
         .map_err(invalid)?;
-        super::budgeted_observed_influence(
-            self.transaction,
-            self.initialized.authority.as_str(),
-            key,
-            &mut budget,
-        )
-    }
-
-    fn require_supported_import_influence(&self) -> Result<(), AdmissionOperationStoreError> {
-        // Source40 has no compatible imported influence-origin adapter. Read
-        // the actual sealed source and authenticate every retained row against
-        // its original fingerprint. Current mutable rows, a zero count, or an
-        // initialization header alone cannot replace that source custody.
-        let source = security_participant_migration::load_imported_source(
-            self.transaction,
-            self.initialized.authority.as_str(),
-        )?;
-        if source.expectation_id() != self.initialized.expectation_id()
-            || source.snapshot().digest().map_err(invalid)? != self.initialized.fingerprint
-            || source
-                .snapshot()
-                .binding()
-                .destination_store_uuid()
-                .as_str()
-                != self.owner.fence.store_uuid
-            || source.snapshot().binding().security_authority_id().as_str()
-                != self.initialized.authority.as_str()
-        {
-            return Err(invalid(
-                "native imported influence changed its sealed source",
-            ));
-        }
-        let relevant = source.snapshot().tables().iter().any(|table| {
-            table.row_count != 0
-                && matches!(
-                    table.table.as_str(),
-                    "security_flow_contexts"
-                        | "security_principal_flow_state"
-                        | "security_lineage_flow_state"
-                        | "security_session_flow_state"
-                        | "security_transitions"
-                        | "security_egress_fences"
-                        | "security_declassification_uses"
-                        | "security_declassification_evidence_identity"
-                        | "security_declassification_receipt_outbox"
-                )
-        });
-        if relevant {
-            return Err(invalid("native imported influence history remains held"));
-        }
-        Ok(())
+        super::budgeted_observed_influence(self.transaction, &self.binding, key, &mut budget)
     }
 
     fn verify(&self) -> Result<(), AdmissionOperationStoreError> {

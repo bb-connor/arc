@@ -51,12 +51,9 @@ impl ProcessStateReader {
                 | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )?;
         connection.busy_timeout(Duration::from_secs(5))?;
-        let version: u32 = connection.query_row(
-            "SELECT version FROM process_runtime WHERE singleton=1",
-            [],
-            |row| row.get(0),
-        )?;
-        if !matches!(version, 1 | 2) {
+        // The raw reader serves only raw Knowledge journals, including one
+        // whose native return activation retained a raw feature level.
+        if !matches!(crate::store::feature_level(&connection)?, 1 | 2) {
             return Err(ProcessError::Configuration(
                 "unsupported process journal version",
             ));
@@ -65,12 +62,7 @@ impl ProcessStateReader {
     }
 
     fn require_raw_knowledge(&self) -> Result<(), ProcessError> {
-        let version: u32 = self.connection.query_row(
-            "SELECT version FROM process_runtime WHERE singleton=1",
-            [],
-            |row| row.get(0),
-        )?;
-        if version >= 3 {
+        if crate::store::feature_level(&self.connection)? >= 3 {
             return Err(ProcessError::Configuration(
                 "durable knowledge requires mediated release",
             ));

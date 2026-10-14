@@ -19,7 +19,13 @@ async fn native_current_selected_annotation_keeps_the_authored_withheld_status_a
     let response = runtime
         .execute_step(&f.process, "root", "current-annotation-status", &request)
         .await?;
-    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(
+        response.verdict,
+        Verdict::Allow,
+        "reason={:?} effects={}",
+        response.reason,
+        f.effects.load(Ordering::SeqCst)
+    );
     assert_eq!(f.effects.load(Ordering::SeqCst), 1);
     let audience = &profile.package.body().operations.as_slice()[0]
         .withheld_status
@@ -122,6 +128,83 @@ async fn native_changed_selected_annotation_refusal_keeps_the_authored_status_au
 }
 
 #[tokio::test]
+async fn native_lapsed_selected_annotation_refusal_keeps_the_authored_status_audience() -> TestResult
+{
+    let f = native_fixture("annotated-read-weak-manifest")?;
+    let (runtime, mut request, mut profile) = prepare(
+        &f,
+        "lapsed-annotation-status",
+        SemanticOutputDispositionV1::Withhold,
+    )?;
+    let neutral = attach_neutral_annotation(&f, &mut request, &mut profile)?;
+    let mut restrictive = neutral.body().clone();
+    restrictive.restrictions = InformationLabel::Top;
+    let issued = now_ms()?.max(
+        neutral
+            .body()
+            .issued_at_unix_ms
+            .get()
+            .checked_add(1)
+            .ok_or("annotation clock overflow")?,
+    );
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
+    while now_ms()? < issued {
+        if std::time::Instant::now() >= deadline {
+            return Err("annotation authority clock did not advance".into());
+        }
+        tokio::task::yield_now().await;
+    }
+    let lapse = issued
+        .checked_add(250)
+        .ok_or("annotation deadline overflow")?;
+    restrictive.issued_at_unix_ms = SafeInteger::new(issued)?;
+    restrictive.valid_until_unix_ms = SafeInteger::new(lapse)?;
+    let restrictive = SignedSemanticAnnotationV1::sign(restrictive, &profile.annotator)?;
+    f.authority
+        .admission_operation_store()
+        .install_semantic_annotation(&restrictive)?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while now_ms()? < lapse {
+        if std::time::Instant::now() >= deadline {
+            return Err("annotation lapse clock did not advance".into());
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    assert!(
+        now_ms()? < profile.invocation.action.valid_until_unix_ms.get(),
+        "the answered annotation must remain fresh while the current observation lapses"
+    );
+    let result = runtime
+        .execute_step(&f.process, "root", "lapsed-annotation-status", &request)
+        .await;
+    assert!(
+        result.is_err()
+            || result
+                .as_ref()
+                .is_ok_and(|response| response.verdict == Verdict::Deny),
+        "a lapsed current annotation must refuse before provider submission"
+    );
+    assert_eq!(f.effects.load(Ordering::SeqCst), 0);
+    let audience = &profile.package.body().operations.as_slice()[0]
+        .withheld_status
+        .as_ref()
+        .ok_or("authored status audience absent")?
+        .audience;
+    let after = f.kernel.observe_recovery_source(&profile.plan.scope)?;
+    let after = after.snapshot().ok_or("returned source absent")?;
+    assert!(
+        audience.flows_to(&after.principal_label),
+        "a lapsed annotation refusal must retain its authored status audience"
+    );
+    assert!(audience.flows_to(&after.lineage_label));
+    assert!(audience.flows_to(&after.session_label));
+    assert_eq!(after.principal_label, restrictive.body().restrictions);
+    assert_eq!(after.lineage_label, restrictive.body().restrictions);
+    assert_eq!(after.session_label, restrictive.body().restrictions);
+    Ok(())
+}
+
+#[tokio::test]
 async fn native_failed_external_read_status_taints_later_exact_inputs() -> TestResult {
     let f = empty_import::native_fixture_from_empty_import("external-history").await?;
     std::fs::write(f.path.join("provider-error"), "enabled")?;
@@ -137,7 +220,12 @@ async fn native_failed_external_read_status_taints_later_exact_inputs() -> TestR
                 .as_ref()
                 .is_ok_and(|response| response.verdict == Verdict::Deny)
     );
-    assert_eq!(f.effects.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        f.effects.load(Ordering::SeqCst),
+        1,
+        "external read refusal before provider submission: {:?}",
+        result.as_ref().map(|response| &response.reason)
+    );
     let (operation, _) = f
         .authority
         .admission_operation_store()

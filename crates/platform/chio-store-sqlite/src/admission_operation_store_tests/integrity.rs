@@ -1,7 +1,10 @@
 use super::*;
 
-#[test]
-fn post_open_tampering_is_rejected_by_every_read_path_and_rows_cannot_be_deleted() {
+/// One independently damaged owner: the committed operation row is advanced
+/// past the commit history that authenticated it, through the owner's own
+/// connection so its `data_version` fence cannot explain the change away. The
+/// retained-row delete guard is proven on the same untainted owner.
+fn owner_with_tampered_operation_row() -> (Fixture, AdmissionOperationV1, u64) {
     let fixture = fixture();
     let operation = prepared_operation(
         &fixture.fence,
@@ -33,25 +36,159 @@ fn post_open_tampering_is_rejected_by_every_read_path_and_rows_cannot_be_deleted
             )
             .expect("tamper row after open");
     }
-    for result in [
+    (fixture, operation, begun_at)
+}
+
+/// The read path's own first serving transaction must refuse the corrupted
+/// row with its exact first-detection invariant: the owner's entry gate
+/// authenticates the whole store and the row no longer matches the commit
+/// history that recorded it. That refusal permanently poisons the serving
+/// owner, and a later read on the same owner is refused by that exact
+/// poisoned fence: never reset, bypassed or revalidated into serving damage.
+fn assert_read_refuses_tampering_then_stays_fenced(
+    read: impl Fn(&Fixture, &AdmissionOperationV1, u64) -> Result<(), AdmissionOperationStoreError>,
+) {
+    let (fixture, operation, begun_at) = owner_with_tampered_operation_row();
+    let refused = read(&fixture, &operation, begun_at);
+    assert!(
+        matches!(
+            &refused,
+            Err(AdmissionOperationStoreError::Invariant(detail))
+                if detail == "invalid sqlite authority store: admission operation invariant failed: latest admission operation commit does not match its projection"
+        ),
+        "{refused:?}"
+    );
+    let fenced = read(&fixture, &operation, begun_at);
+    assert!(
+        matches!(
+            &fenced,
+            Err(AdmissionOperationStoreError::OutcomeUnknown(detail))
+                if detail == "sqlite authority owner is poisoned after an outcome-unknown anchor sync"
+        ),
+        "{fenced:?}"
+    );
+}
+
+#[test]
+fn post_open_tampering_is_rejected_by_every_read_path_and_rows_cannot_be_deleted() {
+    assert_read_refuses_tampering_then_stays_fenced(|fixture, operation, _| {
         fixture
             .store
             .load_by_operation_id(operation.binding().operation_id())
-            .map(|_| ()),
+            .map(|_| ())
+    });
+    assert_read_refuses_tampering_then_stays_fenced(|fixture, operation, _| {
         fixture
             .store
             .load_by_replay_key(&operation.replay_key())
-            .map(|_| ()),
-        fixture.store.list_recoverable(begun_at, 10).map(|_| ()),
+            .map(|_| ())
+    });
+    assert_read_refuses_tampering_then_stays_fenced(|fixture, _, begun_at| {
+        fixture
+            .store
+            .list_recoverable(begun_at, None, 10)
+            .map(|_| ())
+    });
+    assert_read_refuses_tampering_then_stays_fenced(|fixture, operation, _| {
         fixture
             .store
             .load_terminal_replay(&operation.replay_key())
-            .map(|_| ()),
-    ] {
-        assert!(matches!(
-            result,
-            Err(AdmissionOperationStoreError::Invariant(_))
-        ));
+            .map(|_| ())
+    });
+}
+
+/// Foreign-key damage must refuse and fence the serving owner through its own
+/// entry gate, whether the orphaned child is an ordinary rowid table or a
+/// WITHOUT ROWID table whose `PRAGMA foreign_key_check` row identity is NULL.
+/// The NULL identity is reported truthfully, never decoded into an opaque
+/// sqlite error, defaulted into a row number, or accepted as pristine.
+#[test]
+fn foreign_key_damage_in_rowid_and_without_rowid_children_refuses_and_fences_the_owner() {
+    // An ordinary rowid child: the diagnostic names the offending rowid.
+    {
+        let fixture = fixture();
+        {
+            let connection = fixture.store.connection().expect("connection");
+            connection
+                .execute_batch("PRAGMA foreign_keys = OFF;")
+                .expect("disable foreign keys");
+            connection
+                .execute(
+                    "INSERT INTO admission_operation_tool_requests (operation_id, request_json)
+                     VALUES ('orphaned-operation', X'7b7d')",
+                    [],
+                )
+                .expect("insert orphaned rowid child");
+            connection
+                .execute_batch("PRAGMA foreign_keys = ON;")
+                .expect("enable foreign keys");
+        }
+        let refused = fixture.store.list_recoverable(now_ms(), None, 10);
+        assert!(
+            matches!(
+                &refused,
+                Err(AdmissionOperationStoreError::Invariant(detail))
+                    if detail == "invalid sqlite authority store: sqlite foreign key violation in `admission_operation_tool_requests` row 1"
+            ),
+            "{refused:?}"
+        );
+        let fenced = fixture.store.list_recoverable(now_ms(), None, 10);
+        assert!(
+            matches!(
+                &fenced,
+                Err(AdmissionOperationStoreError::OutcomeUnknown(detail))
+                    if detail == "sqlite authority owner is poisoned after an outcome-unknown anchor sync"
+            ),
+            "{fenced:?}"
+        );
+    }
+    // A WITHOUT ROWID child: SQLite reports a NULL row identity, and the
+    // diagnostic reports that truth instead of failing to decode it.
+    {
+        let fixture = fixture();
+        {
+            let connection = fixture.store.connection().expect("connection");
+            connection
+                .execute_batch("PRAGMA foreign_keys = OFF;")
+                .expect("disable foreign keys");
+            connection
+                .execute(
+                    "INSERT INTO runtime_replay_migration_events
+                     (runtime_authority_id, sequence, mutation_kind, expectation_digest,
+                      inventory_sha256, event_digest, observed_at_unix_ms, store_uuid,
+                      store_lease_id, store_owner_epoch)
+                     VALUES ('orphaned-runtime', 1, 'expect_runtime_replay_source',
+                             printf('%064d', 0), printf('%064d', 0), printf('%064d', 0),
+                             1, ?1, ?2, ?3)",
+                    params![
+                        &fixture.fence.store_uuid,
+                        &fixture.fence.lease_id,
+                        i64::try_from(fixture.fence.owner_epoch).expect("epoch")
+                    ],
+                )
+                .expect("insert orphaned without rowid child");
+            connection
+                .execute_batch("PRAGMA foreign_keys = ON;")
+                .expect("enable foreign keys");
+        }
+        let refused = fixture.store.list_recoverable(now_ms(), None, 10);
+        assert!(
+            matches!(
+                &refused,
+                Err(AdmissionOperationStoreError::Invariant(detail))
+                    if detail == "invalid sqlite authority store: sqlite foreign key violation in `runtime_replay_migration_events` row NULL (WITHOUT ROWID table)"
+            ),
+            "{refused:?}"
+        );
+        let fenced = fixture.store.list_recoverable(now_ms(), None, 10);
+        assert!(
+            matches!(
+                &fenced,
+                Err(AdmissionOperationStoreError::OutcomeUnknown(detail))
+                    if detail == "sqlite authority owner is poisoned after an outcome-unknown anchor sync"
+            ),
+            "{fenced:?}"
+        );
     }
 }
 
@@ -132,7 +269,7 @@ fn a_new_serving_epoch_reclaims_an_unexpired_stale_owner_lease() {
     let second_store = second.admission_operation_store();
     assert_eq!(
         second_store
-            .list_recoverable(now + 1, 10)
+            .list_recoverable(now + 1, None, 10)
             .expect("recover stale owner"),
         vec![operation.clone()]
     );

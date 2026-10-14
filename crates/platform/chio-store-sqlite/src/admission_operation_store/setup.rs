@@ -13,6 +13,11 @@ pub struct NativeSetupCreationHost<'a> {
     pub receipt_key: &'a PublicKey,
     pub operator: &'a PublicKey,
     pub process: &'a dyn RecoveryProcessOriginPort,
+    /// Genuine unused reservation closure boundary. The actual Process
+    /// runtime implements this; the owning writer authenticates the
+    /// returned live role before sealing any cancelled admission or
+    /// retirement.
+    pub unused_closure: &'a dyn RecoveryUnusedReservationClosurePort,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -176,19 +181,15 @@ fn save(
 fn creation(
     record: &RecoveryWorkflowRecordV1,
 ) -> Result<CanonicalPayloadDigest, AdmissionOperationStoreError> {
-    let digest = match &record.origin {
-        Some(origin) => digest(
-            RecoveryDigestDomain::SetupCreation,
-            &(&record.creation_seed, origin),
-        ),
-        // Retained legacy selections keep their historical commitment, but
-        // the changed setup source profile cannot qualify fresh capture.
-        None => digest(
-            RecoveryDigestDomain::SetupCreationLegacy,
-            &record.creation_seed,
-        ),
-    };
-    digest.map(CanonicalPayloadDigest::from_bytes)
+    let origin = record
+        .origin
+        .as_ref()
+        .ok_or_else(|| refused("setup workflow requires its original call"))?;
+    digest(
+        RecoveryDigestDomain::SetupCreation,
+        &(&record.creation_seed, origin),
+    )
+    .map(CanonicalPayloadDigest::from_bytes)
 }
 fn profile(
     tx: &Connection,
@@ -301,7 +302,6 @@ mod gate;
 mod incoming_proof;
 mod inventory;
 mod original_scope;
-mod retirement;
 #[cfg(test)]
 mod selection_tests;
 mod service;
@@ -309,7 +309,6 @@ mod unused_generation;
 pub(super) use context::register_native_setup_context;
 pub(super) use gate::{require_capture, require_command, require_ready};
 use inventory::required_coverage;
-pub use retirement::{NativeSetupRetirementAuthorizationV1, NativeSetupRetirementBodyV1};
 pub(super) use unused_generation::{UnusedSetupReplacementReason, VerifiedUnusedSetupGeneration};
 
 fn preparation(value: &Selection) -> NativeSetupPreparationV1 {

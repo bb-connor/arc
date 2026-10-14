@@ -24,8 +24,8 @@ pub(in crate::admission_operation_store) enum NativeInitialFinishingPhase {
 }
 
 /// Actual original-source custody at the first pre-effect financing cut.
-/// Unlike the later CapturePending role, this does not require an Input that
-/// has not yet been produced. Its authenticated absence is a phase fact, never
+/// This does not require an Input that has not yet been produced. Its
+/// authenticated absence is a phase fact, never
 /// a zero bank balance, a clean influence observation or a capture permission.
 pub(in crate::admission_operation_store) struct VerifiedNativeInitialFinishingPlan<
     'source,
@@ -42,7 +42,9 @@ pub(in crate::admission_operation_store) struct VerifiedNativeInitialFinishingPl
     before: Option<FlowStateSnapshot>,
     before_generation: Option<u64>,
     source_head: (u64, String),
+    segment: history::segments::SegmentSnapshot,
     journal_usage: (u64, u64),
+    seal_allowance: NativeSealAllowanceData,
     native_catalog: String,
     physical_profile: ToolOutcomeWriteProfileData,
     global_envelope: NativeToolOutcomeGlobalEnvelopeData,
@@ -140,7 +142,11 @@ pub(in crate::admission_operation_store) fn prepare_native_initial_finishing_pla
             "initial native financing has a stale original context",
         ));
     }
-    let journal_usage = history::ordered::journal_totals(tx, initialized.authority.as_str())?;
+    let segment = history::segments::SegmentSnapshot::capture(tx, &initialized)?;
+    let journal_usage = segment.totals(tx)?;
+    // The owed Output append may need one seal after the effect; it is priced
+    // here, before the effect, for this exact authority.
+    let seal_allowance = describe_native_seal_allowance(owner, &initialized)?;
     let profile = original
         .native_output_retention()
         .ok_or_else(|| invalid("initial native financing lacks the original output profile"))?;
@@ -159,7 +165,6 @@ pub(in crate::admission_operation_store) fn prepare_native_initial_finishing_pla
         evaluation: profile.envelopes().evaluation(),
         resolved: profile.envelopes().resolved(),
         receipt: profile.envelopes().receipt(),
-        selected_pure_steps: original.post_return_steps().len(),
     };
     let global_envelope =
         global_envelope::describe_original_tool_outcome_global(owner, custody.operation)?;
@@ -175,7 +180,9 @@ pub(in crate::admission_operation_store) fn prepare_native_initial_finishing_pla
         before,
         before_generation,
         source_head,
+        segment,
         journal_usage,
+        seal_allowance,
         native_catalog: catalog.fingerprint().into(),
         physical_profile,
         global_envelope,
@@ -223,31 +230,30 @@ impl VerifiedNativeInitialFinishingPlan<'_, '_> {
     pub(in crate::admission_operation_store) fn key(&self) -> &FlowStateKey {
         &self.key
     }
-    pub(in crate::admission_operation_store) fn binding(
-        &self,
-    ) -> &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1 {
-        self.custody.binding
-    }
-    pub(in crate::admission_operation_store) fn lease(&self) -> &AdmissionRecoveryLease {
-        self.custody.lease
-    }
     pub(in crate::admission_operation_store) fn initial_source_head(&self) -> &(u64, String) {
         &self.source_head
     }
-    pub(in crate::admission_operation_store) fn native_journal_usage(&self) -> (u64, u64) {
-        self.journal_usage
+    pub(in crate::admission_operation_store) fn native_seal_price(
+        &self,
+    ) -> &NativeSealAllowanceData {
+        &self.seal_allowance
     }
     pub(in crate::admission_operation_store) fn initialized(
         &self,
     ) -> &SecurityParticipantStateInitialization {
         &self.initialized
     }
+    /// The pristine record the owed seal of this plan's segment would write.
+    pub(in crate::admission_operation_store) fn next_seal_record(
+        &self,
+        tx: &Transaction<'_>,
+    ) -> Result<(String, String), AdmissionOperationStoreError> {
+        self.segment.next_seal_record(tx)
+    }
 }
 
-impl source_plan::sealed::Sealed for VerifiedNativeInitialFinishingPlan<'_, '_> {}
-
-impl NativeToolOutcomeSourcePlan for VerifiedNativeInitialFinishingPlan<'_, '_> {
-    fn verify_before(
+impl VerifiedNativeInitialFinishingPlan<'_, '_> {
+    pub(in crate::admission_operation_store) fn verify_before(
         &self,
         tx: &Transaction<'_>,
         owner: &SqliteServingOwner,
@@ -287,8 +293,8 @@ impl NativeToolOutcomeSourcePlan for VerifiedNativeInitialFinishingPlan<'_, '_> 
             || records::load_current_metadata(tx, self.custody.binding)? != self.initialized
             || current.0 != self.before
             || current.1 != self.before_generation
-            || history::ordered::journal_totals(tx, self.initialized.authority.as_str())?
-                != self.journal_usage
+            || self.segment.totals(tx)? != self.journal_usage
+            || describe_native_seal_allowance(owner, &self.initialized)? != self.seal_allowance
         {
             return Err(invalid(
                 "initial native financing changed its retained sources",
@@ -296,22 +302,28 @@ impl NativeToolOutcomeSourcePlan for VerifiedNativeInitialFinishingPlan<'_, '_> 
         }
         require_unproduced_original(tx, self.custody.operation)
     }
-    fn original(&self) -> &RetainedToolAdmissionRequestV1 {
+    pub(in crate::admission_operation_store) fn original(&self) -> &RetainedToolAdmissionRequestV1 {
         &self.original
     }
-    fn operation(&self) -> &AdmissionOperationV1 {
+    pub(in crate::admission_operation_store) fn operation(&self) -> &AdmissionOperationV1 {
         self.custody.operation
     }
-    fn frozen_steps(&self) -> &[FrozenEvaluationStepV1] {
+    pub(in crate::admission_operation_store) fn frozen_steps(&self) -> &[FrozenEvaluationStepV1] {
         self.original.post_return_steps()
     }
-    fn tool_outcome_envelope(&self) -> &NativeToolOutcomeEnvelopeData {
+    pub(in crate::admission_operation_store) fn tool_outcome_envelope(
+        &self,
+    ) -> &NativeToolOutcomeEnvelopeData {
         &self.envelope
     }
-    fn physical_write_profile(&self) -> &ToolOutcomeWriteProfileData {
+    pub(in crate::admission_operation_store) fn physical_write_profile(
+        &self,
+    ) -> &ToolOutcomeWriteProfileData {
         &self.physical_profile
     }
-    fn global_commit_envelope(&self) -> &NativeToolOutcomeGlobalEnvelopeData {
+    pub(in crate::admission_operation_store) fn global_commit_envelope(
+        &self,
+    ) -> &NativeToolOutcomeGlobalEnvelopeData {
         &self.global_envelope
     }
 }

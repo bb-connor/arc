@@ -122,6 +122,26 @@ class ModelBoundaryTest(unittest.TestCase):
         self.assertEqual(model.attempts[0]["provider_requests"], 0)
         self.assertEqual(model.attempts[0]["framework_completion"], model.attempts[0]["completion"])
 
+    def test_observed_product_projection_survives_the_crewai_stop_contract(self):
+        from preflight import ExplicitAction
+        from chio_sdk.recovery_host import RecoveryHostOutcome
+        class Owner:
+            attempts = 0
+            def execute_sync(self, choice):
+                return asyncio.run(self.execute(choice))
+            async def execute(self, choice):
+                self.attempts += 1
+                return RecoveryHostOutcome("complete", "native-command", "native-workflow",
+                                           effect="complete", control="active", release="released")
+        owner = Owner()
+        model = ExplicitAction()
+        output = crew_trial(owner, model, "Call recovery once with choice resume.")
+        self.assertEqual(owner.attempts, 1)
+        self.assertEqual(model.calls, 1)
+        self.assertEqual(output, {"category": "complete", "command_id": "native-command",
+                                  "workflow_id": "native-workflow", "effect": "complete",
+                                  "control": "active", "release": "released"})
+
     def test_real_crewai_stop_contract_executes_action_without_trusting_invented_observation(self):
         from chio_sdk.recovery_host import RecoveryHostOutcome
         class Owner:

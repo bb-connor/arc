@@ -297,11 +297,11 @@ fn v24_upgrade_preserves_import_events_and_bytes_without_inventing_activation() 
         Some("CREATE TABLE dpop_replay_authority_unknown(value TEXT)"),
         Some("DROP TRIGGER dpop_replay_migration_events_immutable"),
     ] {
-        let fixture = fixture();
+        let fixture = pre_recovery_fixture();
         let source = Source::new(&fixture, false)?;
         let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
         let domain = domain(&imported)?;
-        let before = global_count(&fixture);
+        let predecessor = global_commit_rows(&*fixture.store.connection()?)?;
         drop(source);
         let Fixture {
             _temp,
@@ -337,6 +337,11 @@ fn v24_upgrade_preserves_import_events_and_bytes_without_inventing_activation() 
             assert_eq!(Connection::open(&database)?.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'", [], |row| row.get::<_, i32>(0))?, 24);
         } else {
             result?;
+            assert_eq!(
+                global_commit_rows(&Connection::open(&database)?)?,
+                predecessor,
+                "the upgrade appends no global commit"
+            );
             let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
             let store = authority.admission_operation_store();
             let fence = authority.mutation_fence();
@@ -351,14 +356,11 @@ fn v24_upgrade_preserves_import_events_and_bytes_without_inventing_activation() 
             assert!(store
                 .load_dpop_replay_activation(&domain, &fence, now_ms())
                 .is_err());
-            assert_eq!(
-                store.connection()?.query_row(
-                    "SELECT COUNT(*) FROM authority_global_commits",
-                    [],
-                    |row| row.get::<_, i64>(0)
-                )?,
-                before
-            );
+            assert_predecessor_history_then_startup_baselines(
+                &*store.connection()?,
+                &predecessor,
+                &fence,
+            )?;
         }
     }
     Ok(())

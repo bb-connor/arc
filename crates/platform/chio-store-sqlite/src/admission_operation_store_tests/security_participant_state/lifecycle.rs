@@ -33,7 +33,7 @@ fn concurrent_exact_hydration_commits_only_one_initialization() -> AnchoredTestR
 #[test]
 fn independently_observed_clock_rollback_denies_hydration_and_readback() -> AnchoredTestResult {
     let fixture = fixture();
-    let now = now_ms() / 1_000 * 1_000;
+    let now = clock_origin_ms(&fixture)? + 1_000;
     let _clock =
         chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, std::iter::empty());
     let source = imported(&fixture, "source")?;

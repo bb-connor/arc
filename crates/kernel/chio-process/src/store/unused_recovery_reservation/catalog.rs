@@ -1,7 +1,7 @@
 //! Retained closure guards match the compiled SQL before any open-time repair.
 use super::*;
 
-pub(super) const SQL: &str = include_str!("schema.sql");
+pub(crate) const SQL: &str = include_str!("schema.sql");
 const FAMILY_NAMES: [&str; 9] = [
     "process_unused_recovery_reservations",
     "process_unused_recovery_closure_no_update",
@@ -18,7 +18,7 @@ const BACKING_NAMES: [&str; 2] = [
     "process_recovery_no_delete",
 ];
 
-pub(super) fn family_present(connection: &Connection) -> Result<bool, ProcessError> {
+pub(crate) fn family_present(connection: &Connection) -> Result<bool, ProcessError> {
     let count: i64 = connection.query_row(
         "SELECT count(*) FROM sqlite_schema WHERE name GLOB 'process_unused_recovery_*'",
         [],
@@ -30,7 +30,7 @@ pub(super) fn family_present(connection: &Connection) -> Result<bool, ProcessErr
     Ok(count != 0)
 }
 
-pub(super) fn verify(connection: &Connection) -> Result<(), ProcessError> {
+pub(crate) fn verify(connection: &Connection) -> Result<(), ProcessError> {
     // SQLite's own normalized catalog derives the expected exact table, index
     // and trigger definitions from compiled SQL, without normalizing literals.
     let compiled = Connection::open_in_memory()?;
@@ -110,14 +110,48 @@ fn verify_version_guard_against(
     if actual == definition(compiled)? {
         return Ok(());
     }
-    let version: u32 = connection.query_row(
-        "SELECT version FROM process_runtime WHERE singleton=1",
-        [],
-        |row| row.get(0),
-    )?;
+    let version: Option<u32> = connection
+        .query_row(
+            "SELECT version FROM process_runtime WHERE singleton=1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    // The first shipped journal schema predates the guard: the original
+    // version one production schema, retained byte for byte as the
+    // historical fixture, carries no process_recovery_version_monotone
+    // trigger. Guard absence is the documented state of exactly that
+    // schema, a real version one journal or the retained historical model
+    // holding that schema without its runtime row. Every later version
+    // mandates the guard. The caller separately verifies the complete exact
+    // predecessor catalog; this check alone does not authorize migration.
+    if actual.is_none() {
+        return if matches!(version, Some(1) | None) {
+            Ok(())
+        } else {
+            Err(ProcessError::Configuration(
+                "unused recovery version guard changed",
+            ))
+        };
+    }
+    let Some(version) = version else {
+        return Err(ProcessError::Configuration(
+            "unused recovery version guard changed",
+        ));
+    };
+    // Each retained guard is the exact text an earlier supported binary left
+    // on a journal it served; open replaces it before any further upgrade. A
+    // journal that already moved to version eight carries only the current one.
+    let mut retained = Vec::new();
     if matches!(version, 1..=6) {
+        retained.push(include_str!("retained_version_guard.sql"));
+    }
+    if matches!(version, 1..=7) {
+        retained.push(include_str!("predecessor_version_guard.sql"));
+    }
+    for guard in retained {
         compiled.execute_batch("DROP TRIGGER process_recovery_version_monotone")?;
-        compiled.execute_batch(include_str!("retained_version_guard.sql"))?;
+        compiled.execute_batch(guard)?;
         if actual == definition(compiled)? {
             return Ok(());
         }

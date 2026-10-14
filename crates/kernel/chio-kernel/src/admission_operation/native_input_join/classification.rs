@@ -2,6 +2,7 @@
 use super::*;
 use crate::admission_operation::{
     AdmissionOperationV1, AdmissionRecoveryLease, NativeSecurityAuthorityBindingV1,
+    NativeSecurityInputFateV1,
 };
 use std::cell::Cell;
 
@@ -121,6 +122,18 @@ impl<'call> NativeSecurityInputClassificationAuthority<'call> {
             ));
         }
         record.validate()?;
+        // An acknowledgment cannot name a classification its own retained
+        // record contradicts: Eligible requires a retained Eligible fate, and
+        // a Refused acknowledgment carries a retained Refused or Unproved one.
+        let consistent = match classification {
+            Classification::Eligible => record.fate == NativeSecurityInputFateV1::Eligible,
+            Classification::Refused => record.fate != NativeSecurityInputFateV1::Eligible,
+        };
+        if !consistent {
+            return Err(invalid(
+                "classified input acknowledgment contradicts its retained fate",
+            ));
+        }
         if record.input != *self.input
             || record.join.binding != *self.binding
             || record.join.operation_id != *self.operation.binding().operation_id()

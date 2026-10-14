@@ -326,6 +326,7 @@ impl ChioKernel {
             return Ok(());
         }
         self.terminalize_dispatch_committed_admission(operation, now)
+            .map(|_| ())
     }
     pub fn reserve_recovery_review(
         &self,

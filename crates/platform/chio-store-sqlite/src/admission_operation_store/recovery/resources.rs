@@ -6,14 +6,13 @@ use super::*;
 const MIB: u64 = 1024 * 1024;
 
 mod physical_liability;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use physical_liability::price_raw_custody_liability;
 pub(in crate::admission_operation_store) use physical_liability::{
-    physical_command_write_profile, price_native_knowledge_join_liability,
-    price_native_tool_outcome_phases, price_protected_command_liability,
-    price_raw_custody_liability, raw_custody_price_algorithm_fingerprint,
-    require_intake_preserving_liability, require_progress_preserving_liability,
-    tool_outcome_price_algorithm_fingerprint, NativeKnowledgeJoinPriceData,
-    PhysicalCommandWriteProfileData, PhysicalLiabilityData, ProtectedCommandLiabilityPlan,
-    ToolOutcomeTransactionPriceData,
+    physical_command_write_profile, price_native_tool_outcome_phases,
+    price_protected_command_liability, price_protected_command_with_row_limits,
+    raw_custody_price_algorithm_fingerprint, tool_outcome_price_algorithm_fingerprint,
+    PhysicalLiabilityData, ProtectedCommandLiabilityPlan,
 };
 
 #[cfg(test)]
@@ -37,56 +36,124 @@ pub(super) fn check(
     connection: &Connection,
     intake: bool,
 ) -> Result<(), AdmissionOperationStoreError> {
-    check_usage(connection, intake, true)
+    check_usage(connection, intake, true, None)
 }
 
 /// Native capture observes pressure inside its writer without checkpointing.
-pub(super) fn check_committing(
+pub(in crate::admission_operation_store) fn check_committing(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
-    check_usage(connection, false, false)
+    check_usage(connection, false, false, None)
 }
 
 /// New participant records preserve physical capacity owed to existing work.
-pub(super) fn check_intake_committing(
+pub(in crate::admission_operation_store) fn check_intake_committing(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
-    check_usage(connection, true, false)
+    check_usage(connection, true, false, None)
+}
+
+/// One prepaid native finishing purpose spends its own priced amount after
+/// its account transition already removed it from the bank. Every other
+/// outstanding reserve on this file and its volume stays untouched.
+pub(in crate::admission_operation_store) fn check_funded_committing(
+    connection: &Connection,
+    spent: &PhysicalLiabilityData,
+) -> Result<(), AdmissionOperationStoreError> {
+    check_usage(connection, false, false, Some(spent))
 }
 
 fn check_usage(
     connection: &Connection,
     intake: bool,
     checkpoint: bool,
+    spent: Option<&PhysicalLiabilityData>,
 ) -> Result<(), AdmissionOperationStoreError> {
     let usage = physical_usage(connection, checkpoint)?;
     if !admits(usage, intake) {
         return Err(invariant("recovery disk headroom exhausted"));
     }
-    Ok(())
+    preserve_native_finishing_debt(connection, usage, intake, spent)
+}
+
+/// Apply the managed write-capacity policy with every outstanding native
+/// finishing debt: this file's own debt and other registered files on the
+/// same volume. An unopened bank owes nothing and leaves the floors above.
+fn preserve_native_finishing_debt(
+    connection: &Connection,
+    usage: PhysicalUsage,
+    intake: bool,
+    spent: Option<&PhysicalLiabilityData>,
+) -> Result<(), AdmissionOperationStoreError> {
+    use chio_sqlite_file_identity::{
+        require_physical_write_capacity, SqlitePhysicalDebtAmountData, SqliteWriteCapacityStageData,
+    };
+    let Some(debt) = super::storage::native_finishing_debt_for_file(connection)? else {
+        return Ok(());
+    };
+    let amount = |liability: &PhysicalLiabilityData| {
+        SqlitePhysicalDebtAmountData::checked(liability.wal_bytes(), liability.disk_bytes())
+            .map_err(invariant)
+    };
+    let others = debt
+        .other_files
+        .iter()
+        .map(amount)
+        .collect::<Result<Vec<_>, _>>()?;
+    let current = match spent {
+        Some(liability) => amount(liability)?,
+        None => SqlitePhysicalDebtAmountData::checked(0, 0).map_err(invariant)?,
+    };
+    require_physical_write_capacity(
+        if intake {
+            SqliteWriteCapacityStageData::Intake
+        } else {
+            SqliteWriteCapacityStageData::OwedProgress
+        },
+        usage.wal,
+        usage.available,
+        &amount(&debt.this_file)?,
+        &others,
+        &current,
+    )
+    .map_err(|error| {
+        #[cfg(feature = "admission-test-support")]
+        eprintln!(
+            "native capacity refusal intake={intake} pending_wal={} owed_wal={} current_wal={} available_disk={} owed_disk={} current_disk={} other_disk={:?}",
+            usage.wal,
+            debt.this_file.wal_bytes(),
+            current.wal_bytes(),
+            usage.available,
+            debt.this_file.disk_bytes(),
+            current.disk_bytes(),
+            others.iter().map(|amount| amount.disk_bytes()).collect::<Vec<_>>(),
+        );
+        invariant(error)
+    })
 }
 
 fn physical_usage(
     connection: &Connection,
     checkpoint: bool,
 ) -> Result<PhysicalUsage, AdmissionOperationStoreError> {
-    let path = connection
+    connection
         .path()
         .ok_or_else(|| invariant("recovery requires a persistent authority"))?;
     let wal = wal_pressure(connection, checkpoint)?;
-    #[cfg(unix)]
-    let available = {
-        let stat = rustix::fs::statvfs(path)
-            .map_err(|_| invariant("recovery disk capacity is unavailable"))?;
-        stat.f_bavail
-            .checked_mul(stat.f_frsize)
-            .ok_or_else(|| invariant("recovery disk capacity refused"))?
-    };
-    #[cfg(not(unix))]
-    let available = {
-        return Err(invariant("recovery disk capacity profile is unsupported"));
-    };
+    // Capacity of the filesystem holding SQLite's actual open main file, not
+    // whatever a path names after a rename.
+    let available = chio_sqlite_file_identity::main_database_available_bytes(connection)
+        .map_err(|_| invariant("recovery disk capacity is unavailable"))?;
     Ok(PhysicalUsage { wal, available })
+}
+
+/// Committed WAL frame pressure of `connection`'s main file. The observer is
+/// read-only and never checkpoints, so another file's writer may call it at
+/// its COMMIT boundary.
+pub(crate) fn observed_wal_pressure(
+    connection: &Connection,
+) -> Result<u64, AdmissionOperationStoreError> {
+    wal_pressure(connection, false)
 }
 
 fn wal_pressure(

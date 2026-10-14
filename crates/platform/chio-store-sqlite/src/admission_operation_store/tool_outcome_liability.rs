@@ -1,18 +1,22 @@
 //! Original-bound future ToolOutcome transaction envelopes are DATA, not loans.
 //! Only the actual native finishing source supplies the original producing plan.
-use super::security_participant_state::finishing_plan::NativeToolOutcomeSourcePlan;
+use super::security_participant_state::finishing_plan::VerifiedNativeInitialFinishingPlan;
 use super::*;
 use chio_kernel::tool_outcome::{EvaluationModeV1, EvaluationPhaseV1};
 
 mod rows;
 pub(super) use rows::{ToolOutcomeRowEnvelopeData, ToolOutcomeWriteTableData};
 
+/// The terminal record CHECK bound; a larger signed receipt cannot be retained.
+const MAX_TERMINAL_RECORD_BYTES: u64 = 1_048_576;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ToolOutcomeTransactionPurposeData {
     RawCustody,
     EvaluationBegin,
-    EvaluationStage,
     Finalization { pure_prefix: u64 },
+    SecurityRelease,
+    TerminalProjection { observer: bool },
 }
 
 pub(super) struct ToolOutcomeTransactionEnvelopeData {
@@ -45,6 +49,7 @@ struct ToolOutcomeEnvelopeData {
     resolved_bytes: u64,
     outcome_bytes: u64,
     evaluation_bytes: u64,
+    receipt_bytes: u64,
     request_id_bytes: u64,
     claimant_bytes: u64,
     coordinator_lease_bytes: u64,
@@ -52,11 +57,10 @@ struct ToolOutcomeEnvelopeData {
     global_index_bytes: u64,
 }
 
-/// The declared source interface is authored with the native role owner. This
-/// target is unregistered until that real role and its complete catalog exist.
+/// Only the authenticated pre-effect original supplies these row envelopes.
 /// Source verification must precede both the row description and pricing.
 pub(super) fn describe_native_tool_outcome_transactions(
-    source: &impl NativeToolOutcomeSourcePlan,
+    source: &VerifiedNativeInitialFinishingPlan<'_, '_>,
 ) -> Result<Vec<ToolOutcomeTransactionEnvelopeData>, AdmissionOperationStoreError> {
     let original = source.original();
     let profile = original
@@ -85,6 +89,7 @@ pub(super) fn describe_native_tool_outcome_transactions(
         resolved_bytes: produced.resolved_bytes(),
         outcome_bytes: produced.outcome_bytes(),
         evaluation_bytes: produced.evaluation_bytes(),
+        receipt_bytes: produced.receipt_bytes(),
         request_id_bytes: u64::try_from(source.operation().binding().request_id().as_str().len())
             .map_err(|_| invariant("original request identifier bytes exhausted"))?,
         claimant_bytes: u64::try_from(produced.claimant_maximum_bytes())
@@ -97,6 +102,21 @@ pub(super) fn describe_native_tool_outcome_transactions(
         global_index_bytes: global.maximum_index_record_bytes(),
     };
     validate_envelope(&envelope, profile.envelopes())?;
+    let requirements = source.operation().binding().participant_requirements();
+    // The terminal producer writes one record per terminal participant. Only
+    // the receipt, tool outcome and observation records have priced native
+    // shapes; any other terminal participant refuses before the effect.
+    if requirements.payment
+        || requirements.authorization_consumption
+        || requirements.outcome_eligibility
+        || requirements.obligation
+        || requirements.channel
+        || requirements.credit_exposure
+    {
+        return Err(invariant(
+            "original terminal participant has no priced native finishing writer",
+        ));
+    }
     let purposes = [
         ToolOutcomeTransactionPurposeData::RawCustody,
         ToolOutcomeTransactionPurposeData::EvaluationBegin,
@@ -104,6 +124,10 @@ pub(super) fn describe_native_tool_outcome_transactions(
         // final pair atomically. N rewrites still retain N admission/globals.
         ToolOutcomeTransactionPurposeData::Finalization {
             pure_prefix: selected,
+        },
+        ToolOutcomeTransactionPurposeData::SecurityRelease,
+        ToolOutcomeTransactionPurposeData::TerminalProjection {
+            observer: requirements.observation_attempt_zero,
         },
     ];
     purposes
@@ -129,6 +153,8 @@ fn validate_envelope(
         || envelope.outcome_bytes > outcome_maximum
         || envelope.evaluation_bytes == 0
         || envelope.evaluation_bytes > bounds.evaluation().min(evaluation_maximum)
+        || envelope.receipt_bytes == 0
+        || envelope.receipt_bytes > bounds.receipt().min(MAX_TERMINAL_RECORD_BYTES)
         || !(1..=2_048).contains(&envelope.request_id_bytes)
         || !(1..=512).contains(&envelope.claimant_bytes)
         || !(1..=512).contains(&envelope.coordinator_lease_bytes)
@@ -149,7 +175,8 @@ fn transaction(
     let appends = match purpose {
         ToolOutcomeTransactionPurposeData::RawCustody
         | ToolOutcomeTransactionPurposeData::EvaluationBegin => 2,
-        ToolOutcomeTransactionPurposeData::EvaluationStage => 1,
+        ToolOutcomeTransactionPurposeData::SecurityRelease
+        | ToolOutcomeTransactionPurposeData::TerminalProjection { .. } => 1,
         ToolOutcomeTransactionPurposeData::Finalization { pure_prefix } => pure_prefix
             .checked_add(1)
             .ok_or_else(|| invariant("original finalization append capacity exhausted"))?,

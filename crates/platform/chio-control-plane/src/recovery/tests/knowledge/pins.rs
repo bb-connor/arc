@@ -123,20 +123,29 @@ async fn artifacts_operator_pin_retirement_cannot_release_unknown_native_custody
     let workflow = f.f.ready().await?;
     f.f.behavior.store(1, Ordering::SeqCst);
     let record = f.f.record(&workflow)?;
-    f.f.runtime
-        .execute_command(
-            &f.f.control,
-            &f.f.command(
-                "native-pin-retirement-resume",
-                RecoveryCommandBodyV1::ResumeWorkflow {
-                    workflow_id: workflow.clone(),
-                    expected_revision: record.revision,
-                },
-            )?,
-        )
-        .await?;
+    let response =
+        f.f.runtime
+            .execute_command(
+                &f.f.control,
+                &f.f.command(
+                    "native-pin-retirement-resume",
+                    RecoveryCommandBodyV1::ResumeWorkflow {
+                        workflow_id: workflow.clone(),
+                        expected_revision: record.revision,
+                    },
+                )?,
+            )
+            .await?;
     let record = f.f.record(&workflow)?;
-    assert!(matches!(record.effect, EffectObservationV1::Unknown { .. }));
+    assert!(
+        matches!(record.effect, EffectObservationV1::Unknown { .. }),
+        "native pin custody did not reach an unknown effect: status={:?}, result={:?}",
+        response.status,
+        response
+            .original_response
+            .as_ref()
+            .map(|value| &value.result)
+    );
     let operation = record.native_link.ok_or("unknown native custody absent")?;
     let evidence = EvidenceRef::new(&format!("operation:{}", operation.as_str()))?;
     let store = f.f.authority.admission_operation_store();
@@ -168,5 +177,59 @@ async fn artifacts_operator_pin_retirement_cannot_release_unknown_native_custody
     f.runtime.collect(&f.f.control, &operator_reference)?;
     assert!(f.runtime.collect(&f.f.control, &native_reference).is_err());
     assert_eq!(external_count(&f.f.path)?, 1);
+    Ok(())
+}
+
+#[test]
+fn artifacts_operator_pins_stop_at_the_tenant_owner_bound_without_foreign_effect() -> TestResult {
+    // At most 4096 active reference owners per (authority, tenant) account.
+    const TENANT_ACTIVE_OWNERS: usize = 4096;
+    use super::retention::{active_reference_owners, custody};
+    let _clock = scope_synchronous_fixture_clock(now_ms()? / 1_000);
+    let f = KnowledgeFixture::new()?;
+    let other = super::live_capacity::scoped_host(&f, "pin-other-tenant", "pin-other-root")?;
+    let pinned = f.publish("tenant-pin-bound", b"tenant-pin-bound")?;
+    let input = f.input("foreign-tenant-pin", b"foreign-tenant-pin")?;
+    let foreign = other
+        .runtime
+        .publish(&f.f.control, &input, b"foreign-tenant-pin", None)?;
+    let store = f.f.authority.admission_operation_store();
+    let fence = f.f.authority.mutation_fence();
+    let admin = f.actor(RecoveryPermission::KnowledgeAdmin)?;
+    let evidence = |ordinal: usize| EvidenceRef::new(&format!("tenant-pin-{ordinal}"));
+    for ordinal in 0..TENANT_ACTIVE_OWNERS {
+        store.pin_artifact(&admin, &pinned, &evidence(ordinal)?, &fence, now_ms()?)?;
+    }
+    assert_eq!(
+        active_reference_owners(&f, &pinned, "operator_pin")?,
+        TENANT_ACTIVE_OWNERS
+    );
+    let full = custody(&f)?;
+    let overflow = evidence(TENANT_ACTIVE_OWNERS)?;
+    assert!(store
+        .pin_artifact(&admin, &pinned, &overflow, &fence, now_ms()?)
+        .is_err());
+    assert_eq!(custody(&f)?, full, "the refused pin writes nothing");
+
+    let foreign_admin = f.f.kernel.authenticate_recovery_actor(
+        &foreign.scope,
+        &f.f.control,
+        RecoveryPermission::KnowledgeAdmin,
+    )?;
+    store.pin_artifact(
+        &foreign_admin,
+        &foreign,
+        &EvidenceRef::new("foreign-tenant-pin")?,
+        &fence,
+        now_ms()?,
+    )?;
+    assert_eq!(active_reference_owners(&f, &foreign, "operator_pin")?, 1);
+
+    store.retire_operator_artifact_pin(&admin, &pinned, &evidence(0)?, &fence, now_ms()?)?;
+    store.pin_artifact(&admin, &pinned, &overflow, &fence, now_ms()?)?;
+    assert_eq!(
+        active_reference_owners(&f, &pinned, "operator_pin")?,
+        TENANT_ACTIVE_OWNERS
+    );
     Ok(())
 }

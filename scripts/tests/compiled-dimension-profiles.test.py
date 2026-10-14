@@ -23,13 +23,14 @@ spec.loader.exec_module(profiles)
 
 
 class CompiledDimensionProfilesTest(unittest.TestCase):
-    def owning_capture_fixture(self, root):
+    def owning_capture_fixture(self, root, output_name="chio_control_plane-public"):
         """Actual recorder/inspector/exporter composition with simulated unit rows.
 
         The publisher and original filesystem custody are real. No Rust or
         Cargo command is executed, and these controls never claim qualification.
         """
         subprocess.run(["git","init","--quiet"],cwd=root,check=True)
+        (root/".gitignore").write_text("/target/\n")
         for name in ["compiled-dimension-profiles.py","record-rust-compilation.py","verify-recovery-qualification.py"]:
             path = root/"scripts"/name;path.parent.mkdir(exist_ok=True);path.write_bytes((ROOT/"scripts"/name).read_bytes())
         def module(name):
@@ -56,7 +57,7 @@ class CompiledDimensionProfilesTest(unittest.TestCase):
             "CARGO_NET_OFFLINE":"true","CARGO_TERM_COLOR":"never","LC_ALL":"C"}
         target,namespace = root/"target/compiled",root/"target/publications"
         namespace.mkdir(mode=0o700)
-        output = target/"debug/deps/chio_control_plane-public";output.parent.mkdir(parents=True)
+        output = target/"debug/deps"/output_name;output.parent.mkdir(parents=True)
         output.write_bytes(b"SIMULATED-UNIT-IMAGE-NEVER-EXECUTED\n");output.chmod(0o500)
         options = {"schema":"chio.compiled-dimension-capture-options.v2","dimension":"live_provider",
             "source_binding":inventory["source_binding"],"mode":"host-trusted-fresh","tools":tools,"environment":environment,
@@ -182,7 +183,47 @@ class CompiledDimensionProfilesTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"^qualification.compiled_dimension_rows$"):
                 auditor.inspect_compiler_profile_request(path)
 
-
+    def test_original_inspector_classifies_secret_shaped_subjects_before_open(self):
+        # Dummy public image bytes only; no credential content is ever read.
+        # The original subprocess inspector must refuse the secret-shaped
+        # subject, and the direct inspector call must classify it before open.
+        for case in ["produced-root","executed-copy"]:
+            with self.subTest(case=case),tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                if case == "produced-root":
+                    captured,image,auditor = self.owning_capture_fixture(root,output_name="credentials.toml")
+                    name = "dimension/live_provider/native-host-library"
+                    produced,executed,copies = {name:[image]},{name:[image]},[]
+                    secret = image["path"]
+                else:
+                    captured,image,auditor = self.owning_capture_fixture(root)
+                    name = "dimension/live_provider/native-host-library"
+                    destination = root/"target/executed/credentials.toml"
+                    destination.parent.mkdir(parents=True)
+                    destination.write_bytes(Path(image["path"]).read_bytes())
+                    destination.chmod(0o500)
+                    copied = {"path":str(destination),"sha256":image["sha256"],"size":image["size"]}
+                    receipt = {"schema":"chio.compiled-subject-copy-custody.v1","source":image,"destination":copied,
+                        "source_identity":profiles.metadata_identity(os.stat(image["path"],follow_symlinks=False)),
+                        "destination_identity":profiles.metadata_identity(os.stat(destination,follow_symlinks=False)),
+                        "source_before_sha256":image["sha256"],"source_after_sha256":image["sha256"],
+                        "destination_sha256":image["sha256"]}
+                    produced,executed,copies = {name:[image]},{name:[copied]},[receipt]
+                    secret = str(destination)
+                with self.assertRaisesRegex(ValueError,"^qualification.compiled_dimension_custody$"):
+                    captured.observe("native-host-library",produced,executed,copies)
+                request_path = captured.output/"native-host-library.custody-request.json"
+                attempts = []
+                original = auditor.regular_input
+                def guarded(path):
+                    if Path(path) == Path(secret):
+                        attempts.append(str(path))
+                        raise AssertionError("secret-shaped original subject was opened")
+                    return original(path)
+                with patch.object(auditor,"regular_input",side_effect=guarded):
+                    with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_input_policy$"):
+                        auditor.inspect_compiler_profile_request(request_path)
+                self.assertEqual(attempts,[])
 
     def test_new_output_refuses_replacement_of_an_original_intermediate_parent(self):
         with tempfile.TemporaryDirectory() as temporary:

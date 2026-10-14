@@ -41,6 +41,14 @@ tokio = { workspace = true }
 [lints]
 workspace = true
 
+[[test]]
+name = "native_return_source"
+required-features = ["admission-test-support"]
+
+[[test]]
+name = "unused_recovery_reservations"
+required-features = ["admission-test-support"]
+
 [[example]]
 name = "polyglot_swarm"
 required-features = ["worker-server"]

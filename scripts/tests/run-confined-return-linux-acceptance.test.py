@@ -37,7 +37,9 @@ CASES = [
     "linux_duplicate_launch_and_cancel_preserve_the_observation_and_consumed_slot",
     "linux_fixed_environment_rejects_parent_controlled_channels",
     "linux_launch_cutpoints_never_duplicate_measurement_or_reset_observation",
+    "linux_original_return_acknowledgement_survives_expiry_without_launch_authority",
     "linux_parent_cancellation_withholds_returns_before_and_after_native_join",
+    "linux_post_delivery_fault_preserves_possible_delivery_before_acknowledgement",
     "linux_rejected_projection_leaves_no_candidate_blob_or_extra_charge",
     "linux_return_cutpoints_reopen_the_native_writer_without_second_disclosure",
     "linux_sink_attempt_is_durably_uncertain_before_first_byte",
@@ -52,6 +54,8 @@ CASES = [
 ADDED_CASES = {
     "linux_acknowledgement_retains_delivery_after_cancel_and_authority_change",
     "linux_cancellation_reports_an_already_ordered_parent_return",
+    "linux_original_return_acknowledgement_survives_expiry_without_launch_authority",
+    "linux_post_delivery_fault_preserves_possible_delivery_before_acknowledgement",
     "linux_rejected_projection_leaves_no_candidate_blob_or_extra_charge",
     "linux_sink_attempt_is_durably_uncertain_before_first_byte",
     "linux_staged_return_survives_execution_deadline",
@@ -589,7 +593,7 @@ class AcceptanceRunnerTests(unittest.TestCase):
         source = ROOT / "crates/platform/chio-control-plane/src/recovery/tests/knowledge/confinement/linux.rs"
         actual = re.findall(r"(?m)^fn (linux_[A-Za-z0-9_]+)\(", source.read_text())
         self.assertCountEqual(actual, CASES)
-        self.assertEqual(len(actual), 18)
+        self.assertEqual(len(actual), 20)
 
     def test_zero_execution_after_valid_inventory_is_refused(self):
         self.require_refused("zero_execution")
@@ -792,7 +796,7 @@ class AcceptanceRunnerTests(unittest.TestCase):
     def test_prepared_cache_reuses_bound_targets_and_runs_every_build_and_test(self):
         status, result = self.invoke("prepared_valid")
         self.assertEqual(status, 0, result.get("reason"))
-        self.assertEqual(result["linux_tests"], 18)
+        self.assertEqual(result["linux_tests"], 20)
         self.assertEqual(len(result["commands"]), 13)
         self.assertEqual(result["command_timeout_seconds"], 3600)
         self.assertEqual(result["compilation_preparation"]["cache_targets"], {

@@ -14,7 +14,13 @@ mod framing;
 mod historical;
 #[path = "input_origin/source_records.rs"]
 mod source_records;
+use crate::admission_operation_store::security_participant_state::knowledge::{
+    observed_influence_at_cut, retain_influence_heads, RetainedInfluenceHeads,
+};
 use framing::FramingSources;
+pub(in crate::admission_operation_store) use historical::{
+    validate_historical_semantic_refused_input_origin, HistoricalSemanticRefusedInputObservation,
+};
 use source_records::{AudienceSources, SourceRecord};
 
 const MAX_ORIGIN_BYTES: usize = 16 * 1024 * 1024;
@@ -39,6 +45,7 @@ struct RefusedInputOriginBody {
     audience: AudienceSources,
     annotations: BoundedList<SourceRecord<SignedSemanticAnnotationV1>, 8>,
     prior_influence: Option<ArtifactInfluenceV1>,
+    prior_heads: RetainedInfluenceHeads,
     selected_source_cut: SafeInteger,
     observed_at_unix_ms: SafeInteger,
     source_label: InformationLabel,
@@ -51,38 +58,19 @@ struct RefusedInputOriginBody {
 pub(in crate::admission_operation_store) struct SemanticRefusedInputOriginData {
     body: RefusedInputOriginBody,
     canonical: CanonicalBytes,
-    influence: ArtifactInfluenceV1,
 }
 
 impl SemanticRefusedInputOriginData {
-    pub(in crate::admission_operation_store) fn native_authority(
+    pub(in crate::admission_operation_store) fn before_state(&self) -> &FlowStateSnapshot {
+        &self.body.before
+    }
+
+    /// The exact canonical origin as the immutable value a native Input
+    /// record retains. Re-encoding it reproduces its own canonical bytes.
+    pub(in crate::admission_operation_store) fn canonical_body_json(
         &self,
-    ) -> &NativeSecurityAuthorityBindingV1 {
-        &self.body.native_authority
-    }
-
-    pub(in crate::admission_operation_store) fn source_key(&self) -> &FlowStateKey {
-        self.body.input.key()
-    }
-
-    pub(in crate::admission_operation_store) fn operation_id(&self) -> &AdmissionOperationId {
-        &self.body.operation
-    }
-
-    pub(in crate::admission_operation_store) fn source_label(&self) -> &InformationLabel {
-        &self.body.source_label
-    }
-
-    pub(in crate::admission_operation_store) fn influence(&self) -> &ArtifactInfluenceV1 {
-        &self.influence
-    }
-
-    pub(in crate::admission_operation_store) fn canonical_origin(&self) -> &CanonicalBytes {
-        &self.canonical
-    }
-
-    pub(in crate::admission_operation_store) fn selected_source_cut(&self) -> u64 {
-        self.body.selected_source_cut.get()
+    ) -> Result<serde_json::Value, AdmissionOperationStoreError> {
+        serde_json::from_slice(self.canonical.as_bytes()).map_err(refused)
     }
 
     /// These are data relationships. The separate native writer must prove
@@ -176,12 +164,30 @@ pub(super) fn authenticate_refused_input_origin(
         audience: AudienceSources::load(tx, record.invocation.audience.body())?,
         annotations: source_records::selected_annotations(tx, &record.invocation)?,
         prior_influence: verified.prior_influence.clone(),
+        prior_heads: retain_influence_heads(
+            tx,
+            observed.binding,
+            &recovery_flow_key(observed.context),
+        )?,
         selected_source_cut: SafeInteger::new(selected_cut).map_err(refused)?,
         observed_at_unix_ms: SafeInteger::new(observed.now).map_err(refused)?,
         source_label,
         externally_influenced: false,
         unknown: false,
     };
+    // The retained heads must reproduce the exact influence this assessment
+    // framed, or the cold reader could never authenticate the record.
+    let retained = observed_influence_at_cut(
+        tx,
+        observed.binding,
+        &recovery_flow_key(observed.context),
+        selected_cut,
+        &body.prior_heads,
+        &mut VerificationBudget::new(4096).map_err(refused)?,
+    )?;
+    if retained != body.prior_influence {
+        return Err(refused("refused semantic Input influence heads changed"));
+    }
     let request = observed
         .classification
         .ok_or_else(|| refused("refused semantic Input original request callback absent"))?
@@ -196,27 +202,7 @@ pub(super) fn authenticate_refused_input_origin(
     if canonical.is_empty() || canonical.len() > MAX_ORIGIN_BYTES {
         return Err(refused("refused semantic Input origin envelope exhausted"));
     }
-    let influence = origin_influence(&canonical, &body);
-    Ok(SemanticRefusedInputOriginData {
-        body,
-        canonical,
-        influence,
-    })
-}
-
-fn origin_influence(
-    canonical: &CanonicalBytes,
-    body: &RefusedInputOriginBody,
-) -> ArtifactInfluenceV1 {
-    ArtifactInfluenceV1 {
-        commitment: CanonicalPayloadDigest::from_bytes(
-            *RecoveryDigestDomain::SemanticNativeInputOrigin
-                .digest(canonical)
-                .as_bytes(),
-        ),
-        externally_influenced: body.externally_influenced,
-        unknown: body.unknown,
-    }
+    Ok(SemanticRefusedInputOriginData { body, canonical })
 }
 
 struct InputClassification {
@@ -291,7 +277,6 @@ fn classify_body(
             || annotation.input != original.body().input
             || !current.verify_signature().map_err(refused)?
             || annotation.issued_at_unix_ms.get() > now
-            || annotation.valid_until_unix_ms.get() <= now
             || (!annotation.facts.as_slice().is_empty() && !authority.may_attest_facts)
             || !annotation
                 .facts
@@ -303,7 +288,8 @@ fn classify_body(
                 "refused semantic Input selected annotation authority",
             ));
         }
-        changed |= current != original;
+        // A lapsed current observation only refuses and keeps its restrictions.
+        changed |= current != original || annotation.valid_until_unix_ms.get() <= now;
         external |= annotation.externally_influenced;
         annotation_floor = annotation_floor
             .join_restrictions(&annotation.restrictions)

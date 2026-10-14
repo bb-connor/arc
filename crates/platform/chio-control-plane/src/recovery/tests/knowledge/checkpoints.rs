@@ -1431,160 +1431,45 @@ fn checkpoint_chunk_snapshot(
         .clone())
 }
 
-fn checkpoint_chunk_kernel_error_class(error: &KernelError) -> &'static str {
-    match error {
-        KernelError::CapabilityExpired => "capability_expired",
-        KernelError::CapabilityNotYetValid => "capability_not_yet_valid",
-        KernelError::CapabilityRevoked(_) => "capability_revoked",
-        KernelError::InvalidSignature => "invalid_signature",
-        KernelError::UntrustedIssuer => "untrusted_issuer",
-        KernelError::RecoveryAuthorityDenied => "recovery_authority_denied",
-        KernelError::RecoveryMediationRequired => "recovery_mediation_required",
-        KernelError::DurableAdmission(_) => "durable_admission",
-        KernelError::DurableAdmissionRetained(_) => "durable_admission_retained",
-        KernelError::Internal(reason) if reason == "chunked restore acknowledgement lost" => {
-            "expected_lost_acknowledgement"
-        }
-        KernelError::Internal(_) => "internal",
-        _ => "other_kernel_error",
-    }
-}
-
-fn checkpoint_chunk_test_error_class(error: &(dyn std::error::Error + 'static)) -> &'static str {
-    if let Some(error) = error.downcast_ref::<KernelError>() {
-        return checkpoint_chunk_kernel_error_class(error);
-    }
-    if let Some(error) =
-        error.downcast_ref::<chio_kernel::admission_operation::AdmissionOperationStoreError>()
-    {
-        use chio_kernel::admission_operation::AdmissionOperationStoreError;
-        return match error {
-            AdmissionOperationStoreError::RecoveryAuthorityDenied => "store_authority_denied",
-            AdmissionOperationStoreError::RecoveryMediationRequired => "store_mediation_required",
-            AdmissionOperationStoreError::Unavailable(_) => "store_unavailable",
-            AdmissionOperationStoreError::Fenced => "store_fenced",
-            AdmissionOperationStoreError::NotFound => "store_not_found",
-            AdmissionOperationStoreError::Invariant(_) => "store_invariant",
-            AdmissionOperationStoreError::OutcomeUnknown(_) => "store_outcome_unknown",
-            AdmissionOperationStoreError::Operation(_) => "store_operation",
-        };
-    }
-    "other_test_error"
-}
-
-mod chunk_phase_progress;
-
-// Tag the exact caller before evaluating an operation, including callbacks and
-// assertion helpers. The result and its original typed error remain unchanged.
-macro_rules! checkpoint_chunk_phase {
-    ($fixture:expr, $phase:literal, $index:expr, $operation:expr) => {{
-        let phase: &'static str = $phase;
-        let index: Option<usize> = $index;
-        eprintln!(
-            "{}",
-            serde_json::json!({"phase": phase, "index": index, "status": "entered"})
-        );
-        checkpoint_chunk_phase_result($fixture, phase, index, $operation)
-    }};
-}
-
-fn checkpoint_chunk_phase_result<T, E: 'static>(
-    fixture: Option<&KnowledgeFixture>,
-    phase: &'static str,
-    index: Option<usize>,
-    result: Result<T, E>,
-) -> Result<T, E> {
-    match &result {
-        Ok(_) => eprintln!(
-            "{}",
-            serde_json::json!({"phase": phase, "index": index, "status": "complete"})
-        ),
-        Err(error) => {
-            let diagnostic = serde_json::json!({
-                "phase": phase,
-                "index": index,
-                "status": "error",
-                "error_class": checkpoint_chunk_phase_error_class(error),
-                "progress": fixture.map(chunk_phase_progress::checkpoint_chunk_failure_progress),
-            });
-            eprintln!("{diagnostic}");
-        }
-    }
-    result
-}
-
-fn checkpoint_chunk_phase_error_class<E: 'static>(error: &E) -> &'static str {
-    let error: &dyn std::any::Any = error;
-    if let Some(error) = error.downcast_ref::<Box<dyn std::error::Error>>() {
-        return checkpoint_chunk_test_error_class(error.as_ref());
-    }
-    if let Some(error) = error.downcast_ref::<KernelError>() {
-        return checkpoint_chunk_kernel_error_class(error);
-    }
-    if let Some(error) =
-        error.downcast_ref::<chio_kernel::admission_operation::AdmissionOperationStoreError>()
-    {
-        return checkpoint_chunk_test_error_class(error);
-    }
-    if error.is::<rusqlite::Error>() {
-        return "diagnostic_sql_error";
-    }
-    if error.is::<serde_json::Error>() {
-        return "diagnostic_json_error";
-    }
-    "other_test_error"
-}
-
 #[test]
 fn memory_checkpoint_chunked_restore_preserves_exact_custody_and_reopen() -> TestResult {
-    use std::collections::{BTreeMap, BTreeSet};
     let _clock = scope_synchronous_fixture_clock(now_ms()? / 1_000);
-    let mut f = checkpoint_chunk_phase!(
-        None,
-        "chunk_custody_fixture_open",
-        None,
-        KnowledgeFixture::new()
-    )?;
+    memory_checkpoint_chunked_restore_preserves_exact_custody_and_reopen_body(false)
+}
+
+/// Diagnostic for the open producer/broker predicate obligation: the fixed
+/// clock of the acceptance test above cannot identify the historical retry
+/// restore failure, so this runs the same complete body on the actual clock
+/// with the reviewed process observer registered across the final restore and
+/// retry calls. It intentionally has no fixed clock, is excluded from normal
+/// runs, and may legitimately fail. Its emitted closed stage/error classes
+/// identify the observed refusal without changing the original result.
+#[test]
+#[ignore = "explicit actual-clock diagnostic: preserves a possible producer refusal and emits its validation stage"]
+fn memory_checkpoint_chunked_restore_producer_observed_on_actual_clock() -> TestResult {
+    memory_checkpoint_chunked_restore_preserves_exact_custody_and_reopen_body(true)
+}
+
+fn memory_checkpoint_chunked_restore_preserves_exact_custody_and_reopen_body(
+    observe_checkpoint_producer: bool,
+) -> TestResult {
+    use std::collections::{BTreeMap, BTreeSet};
+    let mut f = KnowledgeFixture::new()?;
     let original_process_capability = chio_core::canonical_json_bytes(&f.f.seed.capability)?;
     let original_process_id = f.profile.scope.process_id.clone();
     assert_eq!(
         f.f.seed.capability.expires_at - f.f.seed.capability.issued_at,
         600
     );
-    let historical = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_historical_label",
-        None,
-        checkpoint_chunk_label("history", 6, 64)
-    )?;
+    let historical = checkpoint_chunk_label("history", 6, 64)?;
     let incoming = [
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_incoming_label",
-            Some(0),
-            checkpoint_chunk_label("one", 4, 60)
-        )?,
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_incoming_label",
-            Some(1),
-            checkpoint_chunk_label("two", 4, 60)
-        )?,
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_incoming_label",
-            Some(2),
-            checkpoint_chunk_label("three", 4, 60)
-        )?,
+        checkpoint_chunk_label("one", 4, 60)?,
+        checkpoint_chunk_label("two", 4, 60)?,
+        checkpoint_chunk_label("three", 4, 60)?,
     ];
     let mut joined = historical.clone();
-    for (label_index, label) in incoming.iter().enumerate() {
-        joined = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_input_label_join",
-            Some(label_index),
-            joined.join_restrictions(label)
-        )?;
+    for label in &incoming {
+        joined = joined.join_restrictions(label)?;
     }
     let InformationLabel::Known {
         owners,
@@ -1596,712 +1481,244 @@ fn memory_checkpoint_chunked_restore_preserves_exact_custody_and_reopen() -> Tes
     };
     // A stricter finite audience contains every owner and only its self-reader.
     // It accepts each full source without copying a large label into a profile.
-    let clearance = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_finite_clearance",
-        None,
-        InformationLabel::try_known(
-            owners
-                .keys()
-                .map(|owner| (owner.clone(), BTreeSet::from([owner.clone()])))
-                .collect::<BTreeMap<_, _>>(),
-            compartments.clone(),
-        )
+    let clearance = InformationLabel::try_known(
+        owners
+            .keys()
+            .map(|owner| (owner.clone(), BTreeSet::from([owner.clone()])))
+            .collect::<BTreeMap<_, _>>(),
+        compartments.clone(),
     )?;
     assert!(!matches!(clearance, InformationLabel::Top));
     assert!(joined.flows_to(&clearance));
     assert!(historical.flows_to(&clearance));
-    for (label_index, label) in incoming.iter().enumerate() {
+    for label in &incoming {
         assert!(label.flows_to(&clearance));
-        assert!(
-            checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_custody_incoming_label_bytes",
-                Some(label_index),
-                chio_core_types::canonical_json_bytes(label)
-            )?
-            .len()
-                < 64 * 1024
-        );
+        assert!(chio_core_types::canonical_json_bytes(label)?.len() < 64 * 1024);
     }
-    assert!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_historical_label_bytes",
-            None,
-            chio_core_types::canonical_json_bytes(&historical)
-        )?
-        .len()
-            < 104 * 1024
-    );
-    assert!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_joined_label_lower_bound",
-            None,
-            chio_core_types::canonical_json_bytes(&joined)
-        )?
-        .len()
-            > 256 * 1024
-    );
-    assert!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_joined_label_upper_bound",
-            None,
-            chio_core_types::canonical_json_bytes(&joined)
-        )?
-        .len()
-            < 512 * 1024
-    );
-
+    assert!(chio_core_types::canonical_json_bytes(&historical)?.len() < 104 * 1024);
+    assert!(chio_core_types::canonical_json_bytes(&joined)?.len() > 256 * 1024);
+    assert!(chio_core_types::canonical_json_bytes(&joined)?.len() < 512 * 1024);
     let store = f.f.authority.admission_operation_store();
-    let mut deployment = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_native_deployment_read",
-        None,
-        f.f.kernel.recovery_deployment(&f.profile.scope)
-    )?;
+    let mut deployment = f.f.kernel.recovery_deployment(&f.profile.scope)?;
     let mut actors = deployment.actors.as_slice().to_vec();
     actors[0].preview_clearance = clearance.clone();
-    deployment.actors = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_actor_list",
-        None,
-        NonEmptyBoundedList::new(actors)
-    )?;
-    deployment.authority_scope = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_authority_scope_digest",
-        None,
-        recovery_authority_scope_digest(&deployment)
-    )?;
-    checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_actor_installation",
-        None,
-        store.configure_recovery_deployment(&deployment)
-    )
-    .map_err(|error| format!("chunk finite actor installation: {error}"))?;
+    deployment.actors = NonEmptyBoundedList::new(actors)?;
+    deployment.authority_scope = recovery_authority_scope_digest(&deployment)?;
+    store
+        .configure_recovery_deployment(&deployment)
+        .map_err(|error| format!("chunk finite actor installation: {error}"))?;
     let mut profile = f.profile.clone();
-    profile.generation = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_profile_generation",
-        None,
-        SafeInteger::new(2)
-    )?;
+    profile.generation = SafeInteger::new(2)?;
     let mut recipients = profile.recipients.as_slice().to_vec();
     recipients[0].recipient.clearance = clearance;
-    profile.recipients = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_recipient_list",
-        None,
-        NonEmptyBoundedList::new(recipients)
-    )?;
-    checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_profile_installation",
-        None,
-        store.configure_knowledge(&profile)
-    )
-    .map_err(|error| format!("chunk finite recipient installation: {error}"))?;
+    profile.recipients = NonEmptyBoundedList::new(recipients)?;
+    store
+        .configure_knowledge(&profile)
+        .map_err(|error| format!("chunk finite recipient installation: {error}"))?;
     f.profile = profile.clone();
-
     let body = b"exact-chunked-checkpoint-material";
     let mut saved = Vec::new();
     for (index, label) in incoming.iter().enumerate() {
-        let reference = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_incoming_publication",
-            Some(index),
-            publish_label(&f, &format!("chunk-incoming-{index}"), body, label.clone())
-        )
-        .map_err(|error| format!("chunk genuine incoming publication {index}: {error}"))?;
-        let checkpoint = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_checkpoint_save",
-            Some(index),
-            f.runtime.checkpoint(
+        let reference = publish_label(&f, &format!("chunk-incoming-{index}"), body, label.clone())
+            .map_err(|error| format!("chunk genuine incoming publication {index}: {error}"))?;
+        let checkpoint = f
+            .runtime
+            .checkpoint(
                 &f.f.control,
-                &checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_custody_checkpoint_identity",
-                    Some(index),
-                    CheckpointId::new(&format!("chunk-checkpoint-{index}"))
-                )?,
+                &CheckpointId::new(&format!("chunk-checkpoint-{index}"))?,
                 0,
                 std::slice::from_ref(&reference),
                 &[],
             )
-        )
-        .map_err(|error| format!("chunk genuine bounded checkpoint {index}: {error}"))?;
+            .map_err(|error| format!("chunk genuine bounded checkpoint {index}: {error}"))?;
         assert_eq!(checkpoint.label, *label);
-        assert!(
-            checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_custody_checkpoint_envelope_bytes",
-                Some(index),
-                chio_core_types::canonical_json_bytes(&checkpoint)
-            )?
-            .len()
-                <= 65_536
-        );
+        assert!(chio_core_types::canonical_json_bytes(&checkpoint)?.len() <= 65_536);
         saved.push(checkpoint);
     }
-    let before = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_initial_native_snapshot",
-        None,
-        checkpoint_chunk_snapshot(&f)
-    )?;
+    let before = checkpoint_chunk_snapshot(&f)?;
     assert_eq!(before.principal_label, InformationLabel::bottom());
     assert_eq!(before.lineage_label, InformationLabel::bottom());
     assert_eq!(before.session_label, InformationLabel::bottom());
-
     // The initial artifact's exact metadata and classification certificate fit
     // ordinary protected rows. Every later native floor comes from real reads
     // and restores of the already published, bounded checkpoint envelopes.
-    let reference = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_historical_publication",
-        None,
-        publish_label(
-            &f,
-            "chunk-native-history",
-            b"native-history",
-            historical.clone(),
-        )
+    let reference = publish_label(
+        &f,
+        "chunk-native-history",
+        b"native-history",
+        historical.clone(),
     )
     .map_err(|error| format!("chunk genuine historical publication: {error}"))?;
-    let handle = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_historical_handle",
-        None,
-        f.runtime.handle(
-            &f.f.control,
-            &reference,
-            &checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_custody_historical_recipient_identity",
-                None,
-                ArtifactRecipientId::new("agent-root")
-            )?,
-        )
+    let handle = f.runtime.handle(
+        &f.f.control,
+        &reference,
+        &ArtifactRecipientId::new("agent-root")?,
     )?;
     let history_sink = f.sink();
-    checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_historical_release",
-        None,
-        f.runtime.release_into(
+    f.runtime
+        .release_into(
             &f.f.control,
-            &checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_custody_historical_request_identity",
-                None,
-                RequestId::new("chunk-native-history")
-            )?,
-            checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_custody_historical_prepare_read",
-                None,
-                f.runtime.prepare_read(&f.f.control, &handle)
-            )?,
+            &RequestId::new("chunk-native-history")?,
+            f.runtime.prepare_read(&f.f.control, &handle)?,
             &history_sink,
         )
-    )
-    .map_err(|error| format!("chunk genuine historical release: {error}"))?;
+        .map_err(|error| format!("chunk genuine historical release: {error}"))?;
     assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_historical_sink_lock",
-            None,
-            history_sink.delivered.lock().map_err(|_| "history sink")
-        )?
-        .as_slice(),
+        history_sink
+            .delivered
+            .lock()
+            .map_err(|_| "history sink")?
+            .as_slice(),
         &[b"native-history".to_vec()]
     );
-    let history = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_historical_native_snapshot",
-        None,
-        checkpoint_chunk_snapshot(&f)
-    )?;
+    let history = checkpoint_chunk_snapshot(&f)?;
     assert_eq!(history.principal_label, historical);
     assert_eq!(history.lineage_label, historical);
     assert_eq!(history.session_label, historical);
     let mut expected = historical.clone();
     for (index, checkpoint) in saved.iter().take(2).enumerate() {
         let sink = f.sink();
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_intermediate_restore",
-            Some(index),
-            f.runtime.restore_into(
+        f.runtime
+            .restore_into(
                 &f.f.control,
                 &checkpoint.checkpoint,
                 1,
-                &checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_custody_intermediate_request_identity",
-                    Some(index),
-                    RequestId::new(&format!("chunk-native-floor-{index}"))
-                )?,
+                &RequestId::new(&format!("chunk-native-floor-{index}"))?,
                 &sink,
             )
-        )
-        .map_err(|error| format!("chunk genuine intermediate restore {index}: {error}"))?;
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_intermediate_frame",
-            Some(index),
-            assert_exact_checkpoint_frame(&sink, checkpoint, body)
-        )?;
-        expected = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_intermediate_expected_label",
-            Some(index),
-            expected.join_restrictions(&incoming[index])
-        )?;
-        let observed = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_intermediate_native_snapshot",
-            Some(index),
-            checkpoint_chunk_snapshot(&f)
-        )?;
+            .map_err(|error| format!("chunk genuine intermediate restore {index}: {error}"))?;
+        assert_exact_checkpoint_frame(&sink, checkpoint, body)?;
+        expected = expected.join_restrictions(&incoming[index])?;
+        let observed = checkpoint_chunk_snapshot(&f)?;
         assert_eq!(observed.principal_label, expected);
         assert_eq!(observed.lineage_label, expected);
         assert_eq!(observed.session_label, expected);
     }
-
-    let checkpoint = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_final_checkpoint_presence",
-        None,
-        saved.last().ok_or("final chunk checkpoint absent")
-    )?
-    .clone();
-    let request = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_final_request_identity",
-        None,
-        RequestId::new("chunked-checkpoint-lost-ack")
-    )?;
-    let _restore_inner_trace = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_inner_restore_observer_install",
-        None,
-        f.runtime
-            .observe_checkpoint_restore_stages_for_test(&request)
-    )?;
-    let _process_validation_trace = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_process_validation_observer_install",
-        None,
-        f.broker
-            .observe_checkpoint_process_validation_fixture(&f.profile.scope.process_id, &request)
-    )?;
+    let checkpoint = saved.last().ok_or("final chunk checkpoint absent")?.clone();
+    let request = RequestId::new("chunked-checkpoint-lost-ack")?;
+    // The reviewed default-off observer registers for exactly this fixture
+    // request immediately before the lost-ack final restore sequence, so it
+    // stays scoped across the final restore, retry and replay calls. It only
+    // emits closed stage/error classes to stderr; it never alters broker
+    // decisions, custody or the coarse public refusal.
+    let checkpoint_producer_observer = observe_checkpoint_producer
+        .then(|| {
+            f.broker.observe_checkpoint_process_validation_fixture(
+                &f.profile.scope.process_id,
+                &request,
+            )
+        })
+        .transpose()?;
     let captured = Arc::new(Mutex::new(None::<(u64, Vec<u8>)>));
     let capture = captured.clone();
     let capture_store = f.f.authority.admission_operation_store();
-    let capture_actor = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_capture_read_authority",
-        None,
-        f.actor(RecoveryPermission::KnowledgeRead)
-    )?;
+    let capture_actor = f.actor(RecoveryPermission::KnowledgeRead)?;
     let capture_fence = f.f.authority.mutation_fence();
     let capture_request = request.clone();
     let capture_database = f.f.path.join("admission.db");
     let faulty = f.runtime.clone().with_test_cutpoint(Arc::new(move |stage| {
         if stage == KnowledgeCutpoint::ReleaseCommitted
-            && checkpoint_chunk_phase!(
-                None,
-                "chunk_custody_capture_lock_read",
-                None,
-                capture
-                    .lock()
-                    .map_err(|_| KernelError::Internal("root capture".into()))
-            )?
-            .is_none()
+            && capture
+                .lock()
+                .map_err(|_| KernelError::Internal("root capture".into()))?
+                .is_none()
         {
-            let (release, state) = checkpoint_chunk_phase!(
-                None,
-                "chunk_custody_capture_owner_presence",
-                None,
-                checkpoint_chunk_phase!(
-                    None,
-                    "chunk_custody_capture_owner_read",
-                    None,
-                    capture_store.checkpoint_restore_outcome_fixture(
-                        &capture_actor,
-                        &capture_request,
-                        &capture_fence,
-                        checkpoint_chunk_phase!(
-                            None,
-                            "chunk_custody_capture_clock",
-                            None,
-                            now_ms()
-                        )
-                        .map_err(|error| {
-                            KernelError::Internal(format!("capture clock: {error}"))
-                        })?,
-                    )
+            let (release, state) = capture_store
+                .checkpoint_restore_outcome_fixture(
+                    &capture_actor,
+                    &capture_request,
+                    &capture_fence,
+                    now_ms().map_err(|error| {
+                        KernelError::Internal(format!("capture clock: {error}"))
+                    })?,
                 )
                 .map_err(|error| KernelError::Internal(format!("capture owner: {error}")))?
-                .ok_or_else(|| KernelError::Internal("capture outcome absent".into()))
-            )?;
+                .ok_or_else(|| KernelError::Internal("capture outcome absent".into()))?;
             if state != ArtifactDeliveryStateV1::Admitted {
-                return checkpoint_chunk_phase!(
-                    None,
-                    "chunk_custody_capture_not_admitted",
-                    None,
-                    Err(KernelError::Internal(
-                        "capture follows outcome mutation".into(),
-                    ))
-                );
+                return Err(KernelError::Internal(
+                    "capture follows outcome mutation".into(),
+                ));
             }
-            let connection = checkpoint_chunk_phase!(
-                None,
-                "chunk_custody_capture_database_open",
-                None,
-                rusqlite::Connection::open(&capture_database)
-            )
-            .map_err(|error| KernelError::Internal(format!("capture connection: {error}")))?;
-            let original: (i64, Vec<u8>) = checkpoint_chunk_phase!(
-                None,
-                "chunk_custody_capture_root_query",
-                None,
-                connection.query_row(
+            let connection = rusqlite::Connection::open(&capture_database)
+                .map_err(|error| KernelError::Internal(format!("capture connection: {error}")))?;
+            let original: (i64, Vec<u8>) = connection
+                .query_row(
                     "SELECT version,payload FROM admission_operation_recovery_records
                  WHERE record_key GLOB 'knowledge-restore:*'
                    AND json_extract(payload,'$.intent.release')=?1",
                     [release.as_str()],
-                    |row| Ok((
-                        checkpoint_chunk_phase!(
-                            None,
-                            "chunk_custody_capture_version_column",
-                            None,
-                            row.get(0)
-                        )?,
-                        checkpoint_chunk_phase!(
-                            None,
-                            "chunk_custody_capture_payload_column",
-                            None,
-                            row.get(1)
-                        )?
-                    )),
+                    |row| Ok((row.get(0)?, row.get(1)?)),
                 )
-            )
-            .map_err(|error| KernelError::Internal(format!("capture source: {error}")))?;
+                .map_err(|error| KernelError::Internal(format!("capture source: {error}")))?;
             if original.0 != 1 {
-                return checkpoint_chunk_phase!(
-                    None,
-                    "chunk_custody_capture_not_original_version",
-                    None,
-                    Err(KernelError::Internal(
-                        "capture lost original version".into(),
-                    ))
-                );
+                return Err(KernelError::Internal(
+                    "capture lost original version".into(),
+                ));
             }
-            *checkpoint_chunk_phase!(
-                None,
-                "chunk_custody_capture_lock_write",
-                None,
-                capture
-                    .lock()
-                    .map_err(|_| KernelError::Internal("root capture".into()))
-            )? = Some((
-                checkpoint_chunk_phase!(
-                    None,
-                    "chunk_custody_capture_version_conversion",
-                    None,
-                    u64::try_from(original.0)
-                        .map_err(|_| KernelError::Internal("capture version".into()))
-                )?,
+            *capture
+                .lock()
+                .map_err(|_| KernelError::Internal("root capture".into()))? = Some((
+                u64::try_from(original.0)
+                    .map_err(|_| KernelError::Internal("capture version".into()))?,
                 original.1,
             ));
         }
         if stage == KnowledgeCutpoint::DeliveryCompleted {
-            return checkpoint_chunk_phase!(
-                None,
-                "chunk_custody_delivery_completed_fault",
-                None,
-                Err(KernelError::Internal(
-                    "chunked restore acknowledgement lost".into(),
-                ))
-            );
+            return Err(KernelError::Internal(
+                "chunked restore acknowledgement lost".into(),
+            ));
         }
         Ok(())
     }));
-    let encoding_observer = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_encoding_observer_install",
-        None,
-        store.observe_knowledge_join_encoding_fixture(&f.profile.scope, &request)
-    )?;
     let sink = f.sink();
-    let final_restore = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_final_restore",
-        None,
-        faulty.restore_into(&f.f.control, &checkpoint.checkpoint, 1, &request, &sink)
-    );
-    let delivered_frames = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_final_sink_lock",
-        None,
-        sink.delivered.lock().map_err(|_| "chunk final sink")
-    )?
-    .len();
-    if delivered_frames == 0 {
-        let release_committed = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_diagnostic_capture_lock",
-            None,
-            captured.lock().map_err(|_| "root capture")
-        )?
-        .is_some();
-        let journal = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_diagnostic_journal_wire_bytes",
-            None,
-            store.knowledge_join_encoding_fixture(&f.profile.scope, &request)
-        )?;
-        let restore = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_diagnostic_restore_wire_bytes",
-            None,
-            store.restore_record_encoding_fixture(&f.profile.scope, &request)
-        )?;
-        let current_auth = match checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_diagnostic_current_authority",
-            None,
-            f.actor(RecoveryPermission::KnowledgeRead)
-        ) {
-            Ok(actor) => serde_json::json!({
-                "accepted": actor.permission() == RecoveryPermission::KnowledgeRead,
-                "error_class": null,
-            }),
-            Err(error) => serde_json::json!({
-                "accepted": false,
-                "error_class": checkpoint_chunk_test_error_class(error.as_ref()),
-            }),
-        };
-        let outcome = match checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_diagnostic_current_outcome",
-            None,
-            restore_outcome(&f, &request)
-        ) {
-            Ok((_, state)) => serde_json::json!({
-                "present": true,
-                "state": state,
-                "error_class": null,
-            }),
-            Err(error) => serde_json::json!({
-                "present": false,
-                "state": null,
-                "error_class": checkpoint_chunk_test_error_class(error.as_ref()),
-            }),
-        };
-        let native_phase = match checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_diagnostic_native_snapshot",
-            None,
-            checkpoint_chunk_snapshot(&f)
-        ) {
-            Ok(snapshot) => {
-                let before_join = snapshot.principal_label == expected
-                    && snapshot.lineage_label == expected
-                    && snapshot.session_label == expected;
-                let after_join = snapshot.principal_label == joined
-                    && snapshot.lineage_label == joined
-                    && snapshot.session_label == joined;
-                let label_bytes = [
-                    checkpoint_chunk_phase!(
-                        Some(&f),
-                        "chunk_custody_diagnostic_principal_bytes",
-                        None,
-                        chio_core_types::canonical_json_bytes(&snapshot.principal_label)
-                    )
-                    .map(|bytes| bytes.len())
-                    .ok(),
-                    checkpoint_chunk_phase!(
-                        Some(&f),
-                        "chunk_custody_diagnostic_lineage_bytes",
-                        None,
-                        chio_core_types::canonical_json_bytes(&snapshot.lineage_label)
-                    )
-                    .map(|bytes| bytes.len())
-                    .ok(),
-                    checkpoint_chunk_phase!(
-                        Some(&f),
-                        "chunk_custody_diagnostic_session_bytes",
-                        None,
-                        chio_core_types::canonical_json_bytes(&snapshot.session_label)
-                    )
-                    .map(|bytes| bytes.len())
-                    .ok(),
-                ];
-                serde_json::json!({
-                    "observed": true,
-                    "before_join": before_join,
-                    "after_join": after_join,
-                    "label_bytes": label_bytes,
-                    "error_class": null,
-                })
-            }
-            Err(error) => serde_json::json!({
-                "observed": false,
-                "before_join": null,
-                "after_join": null,
-                "label_bytes": null,
-                "error_class": checkpoint_chunk_test_error_class(error.as_ref()),
-            }),
-        };
-        let diagnostic = serde_json::json!({
-            "phase": "chunk_final_restore_before_delivery",
-            "restore_returned_success": final_restore.is_ok(),
-            "restore_error_class": final_restore.as_ref().err()
-                .map(checkpoint_chunk_kernel_error_class),
-            "delivered_frames": delivered_frames,
-            "release_committed": release_committed,
-            "journal_wire_and_change_image_bytes": journal,
-            "restore_wire_bytes": restore,
-            "current_read_authority": current_auth,
-            "authenticated_outcome": outcome,
-            "native_phase": native_phase,
-        });
-        return Err(checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_diagnostic_json_encoding",
-            None,
-            serde_json::to_string(&diagnostic)
-        )?
-        .into());
-    }
+    let final_restore =
+        faulty.restore_into(&f.f.control, &checkpoint.checkpoint, 1, &request, &sink);
     assert!(final_restore.is_err());
-    checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_final_frame",
-        None,
-        assert_exact_checkpoint_frame(&sink, &checkpoint, body)
-    )?;
-    drop(encoding_observer);
-    let (release, fate) = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_final_outcome",
-        None,
-        restore_outcome(&f, &request)
-    )?;
+    assert_exact_checkpoint_frame(&sink, &checkpoint, body)?;
+    let (release, fate) = restore_outcome(&f, &request)?;
     assert_eq!(fate, ArtifactDeliveryStateV1::Uncertain);
-    let observed = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_final_native_snapshot",
-        None,
-        checkpoint_chunk_snapshot(&f)
-    )?;
+    let observed = checkpoint_chunk_snapshot(&f)?;
     assert_eq!(observed.principal_label, joined);
     assert_eq!(observed.lineage_label, joined);
     assert_eq!(observed.session_label, joined);
-
-    let connection = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_outcome_database_open",
-        None,
-        rusqlite::Connection::open(f.f.path.join("admission.db"))
-    )?;
-    let (root_key, payload): (String, Vec<u8>) = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_outcome_root_query",
-        None,
-        connection.query_row(
-            "SELECT record_key,payload FROM admission_operation_recovery_records
+    let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
+    let (root_key, payload): (String, Vec<u8>) = connection.query_row(
+        "SELECT record_key,payload FROM admission_operation_recovery_records
          WHERE record_key GLOB 'knowledge-restore:*'
            AND json_extract(payload,'$.intent.release')=?1",
-            [release.as_str()],
-            |row| Ok((
-                checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_custody_outcome_root_key_column",
-                    None,
-                    row.get(0)
-                )?,
-                checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_custody_outcome_root_payload_column",
-                    None,
-                    row.get(1)
-                )?
-            )),
-        )
+        [release.as_str()],
+        |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
-    let root: serde_json::Value = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_outcome_root_json",
-        None,
-        serde_json::from_slice(&payload)
-    )?;
+    let root: serde_json::Value = serde_json::from_slice(&payload)?;
     assert_eq!(
         root["checkpoint_restore_encoding"],
         "chunked_label_atoms_v1"
     );
     assert_eq!(root["body"]["knowledge_chunk_encoding"], "label_atoms_v1");
     assert!(payload.len() <= 262_144);
-    let journal_payload: Vec<u8> = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_outcome_journal_query",
-        None,
-        connection.query_row(
-            "SELECT payload FROM admission_operation_recovery_records
+    let journal_payload: Vec<u8> = connection.query_row(
+        "SELECT payload FROM admission_operation_recovery_records
          WHERE record_key GLOB 'knowledge-join:*'
            AND json_extract(payload,'$.release.release')=?1",
-            [release.as_str()],
-            |row| checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_custody_sql_result_column",
-                None,
-                row.get(0)
-            ),
-        )
+        [release.as_str()],
+        |row| row.get(0),
     )?;
-    let journal: serde_json::Value = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_outcome_journal_json",
-        None,
-        serde_json::from_slice(&journal_payload)
-    )?;
+    let journal: serde_json::Value = serde_json::from_slice(&journal_payload)?;
     assert_eq!(journal["knowledge_join_encoding"], "chunked_label_atoms_v1");
     assert_eq!(
         journal["body"]["knowledge_chunk_encoding"],
         "label_atoms_v1"
     );
     assert!(journal_payload.len() <= 262_144);
-    let journal_chunks = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_journal_chunk_count",
-        None,
-        journal["body"]["chunk_count"]
-            .as_u64()
-            .ok_or("journal chunks")
-    )?;
+    let journal_chunks = journal["body"]["chunk_count"]
+        .as_u64()
+        .ok_or("journal chunks")?;
     assert!(journal_chunks > 1);
-    let journal_digest = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_journal_body_digest",
-        None,
-        journal["body"]["body_digest"]
-            .as_str()
-            .ok_or("journal chunk digest")
-    )?;
-    let actual_journal_chunks: i64 = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_physical_journal_chunks",
-        None,
-        connection.query_row(
-            "SELECT count(*) FROM admission_operation_recovery_records
+    let journal_digest = journal["body"]["body_digest"]
+        .as_str()
+        .ok_or("journal chunk digest")?;
+    let actual_journal_chunks: i64 = connection.query_row(
+        "SELECT count(*) FROM admission_operation_recovery_records
          WHERE record_key GLOB 'knowledge-encoding-chunk:*'
            AND json_extract(payload,'$.owner.kind')='journal'
            AND json_extract(payload,'$.owner.release')=?1
@@ -2309,55 +1726,23 @@ fn memory_checkpoint_chunked_restore_preserves_exact_custody_and_reopen() -> Tes
            AND version=1 AND kind='command'
            AND native_namespace IS NULL AND native_request IS NULL
            AND length(payload)<=262144",
-            (release.as_str(), journal_digest),
-            |row| checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_custody_sql_result_column",
-                None,
-                row.get(0)
-            ),
-        )
+        (release.as_str(), journal_digest),
+        |row| row.get(0),
     )?;
-    assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_physical_journal_count_conversion",
-            None,
-            u64::try_from(actual_journal_chunks)
-        )?,
-        journal_chunks
-    );
-    let expected_chunks = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_restore_chunk_count",
-        None,
-        root["body"]["chunk_count"].as_u64().ok_or("chunk count")
-    )?;
+    assert_eq!(u64::try_from(actual_journal_chunks)?, journal_chunks);
+    let expected_chunks = root["body"]["chunk_count"].as_u64().ok_or("chunk count")?;
     assert!(expected_chunks > 1);
     assert!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_restore_body_bytes",
-            None,
-            root["body"]["body_bytes"]
-                .as_u64()
-                .ok_or("chunk body bytes")
-        )? > 262_144
+        root["body"]["body_bytes"]
+            .as_u64()
+            .ok_or("chunk body bytes")?
+            > 262_144
     );
-    let digest = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_restore_body_digest",
-        None,
-        root["body"]["body_digest"]
-            .as_str()
-            .ok_or("chunk body digest")
-    )?;
-    let (count, bounded): (i64, bool) = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_physical_restore_chunks",
-        None,
-        connection.query_row(
-            "SELECT count(*),coalesce(min(version=1 AND kind='command'
+    let digest = root["body"]["body_digest"]
+        .as_str()
+        .ok_or("chunk body digest")?;
+    let (count, bounded): (i64, bool) = connection.query_row(
+        "SELECT count(*),coalesce(min(version=1 AND kind='command'
             AND native_namespace IS NULL AND native_request IS NULL
             AND length(payload)<=262144),0)
          FROM admission_operation_recovery_records
@@ -2365,235 +1750,107 @@ fn memory_checkpoint_chunked_restore_preserves_exact_custody_and_reopen() -> Tes
            AND json_extract(payload,'$.owner.kind')='restore'
            AND json_extract(payload,'$.owner.record_key')=?1
            AND json_extract(payload,'$.body_digest')=?2",
-            (&root_key, digest),
-            |row| Ok((
-                checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_custody_physical_restore_count_column",
-                    None,
-                    row.get(0)
-                )?,
-                checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_custody_physical_restore_bounds_column",
-                    None,
-                    row.get(1)
-                )?
-            )),
-        )
+        (&root_key, digest),
+        |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
-    assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_physical_restore_count_conversion",
-            None,
-            u64::try_from(count)
-        )?,
-        expected_chunks
-    );
+    assert_eq!(u64::try_from(count)?, expected_chunks);
     assert!(
         bounded,
         "every real immutable chunk keeps the original row ceiling"
     );
-
-    let native_before_retry = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_retry_native_baseline",
-        None,
-        checkpoint_chunk_snapshot(&f)
-    )?;
-    let native_journals_before: i64 = checkpoint_chunk_phase!(Some(&f), "chunk_custody_retry_journal_baseline", None, connection.query_row(
+    let native_before_retry = checkpoint_chunk_snapshot(&f)?;
+    let native_journals_before: i64 = connection.query_row(
         "SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-join:*'",
-        [], |row| checkpoint_chunk_phase!(Some(&f), "chunk_custody_sql_result_column", None, row.get(0)),
-    ))?;
+        [], |row| row.get(0),
+    )?;
     let retry_sink = f.sink();
-    let completed = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_retry_restore",
-        None,
-        f.runtime.restore_into(
-            &f.f.control,
-            &checkpoint.checkpoint,
-            1,
-            &request,
-            &retry_sink,
-        )
+    let completed = f.runtime.restore_into(
+        &f.f.control,
+        &checkpoint.checkpoint,
+        1,
+        &request,
+        &retry_sink,
     )?;
     assert_eq!(completed.release, release);
-    checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_retry_frame",
-        None,
-        assert_exact_checkpoint_frame(&retry_sink, &checkpoint, body)
-    )?;
+    assert_exact_checkpoint_frame(&retry_sink, &checkpoint, body)?;
     assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_retry_outcome",
-            None,
-            restore_outcome(&f, &request)
-        )?
-        .1,
+        restore_outcome(&f, &request)?.1,
         ArtifactDeliveryStateV1::Delivered
     );
-    assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_retry_native_snapshot",
-            None,
-            checkpoint_chunk_snapshot(&f)
-        )?,
-        native_before_retry
-    );
-    let native_journals_after_retry: i64 = checkpoint_chunk_phase!(Some(&f), "chunk_custody_retry_journal_count", None, connection.query_row(
+    assert_eq!(checkpoint_chunk_snapshot(&f)?, native_before_retry);
+    let native_journals_after_retry: i64 = connection.query_row(
         "SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-join:*'",
-        [], |row| checkpoint_chunk_phase!(Some(&f), "chunk_custody_sql_result_column", None, row.get(0)),
-    ))?;
+        [], |row| row.get(0),
+    )?;
     assert_eq!(native_journals_after_retry, native_journals_before);
     let later_sink = f.sink();
-    assert!(checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_delivered_replay_restore",
-        None,
-        faulty.restore_into(
+    assert!(faulty
+        .restore_into(
             &f.f.control,
             &checkpoint.checkpoint,
             1,
             &request,
             &later_sink,
         )
-    )
-    .is_err());
-    checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_delivered_replay_frame",
-        None,
-        assert_exact_checkpoint_frame(&later_sink, &checkpoint, body)
-    )?;
+        .is_err());
+    assert_exact_checkpoint_frame(&later_sink, &checkpoint, body)?;
     assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_delivered_replay_outcome",
-            None,
-            restore_outcome(&f, &request)
-        )?
-        .1,
+        restore_outcome(&f, &request)?.1,
         ArtifactDeliveryStateV1::Delivered
     );
-    assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_delivered_replay_native_snapshot",
-            None,
-            checkpoint_chunk_snapshot(&f)
-        )?,
-        native_before_retry
-    );
-    let native_journals_after_replay: i64 = checkpoint_chunk_phase!(Some(&f), "chunk_custody_delivered_replay_journal_count", None, connection.query_row(
+    assert_eq!(checkpoint_chunk_snapshot(&f)?, native_before_retry);
+    let native_journals_after_replay: i64 = connection.query_row(
         "SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-join:*'",
-        [], |row| checkpoint_chunk_phase!(Some(&f), "chunk_custody_sql_result_column", None, row.get(0)),
-    ))?;
+        [], |row| row.get(0),
+    )?;
     assert_eq!(native_journals_after_replay, native_journals_before);
-    let (original_version, original_root) = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_original_capture_presence",
-        None,
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_original_capture_lock",
-            None,
-            captured.lock().map_err(|_| "root capture")
-        )?
+    let (original_version, original_root) = captured
+        .lock()
+        .map_err(|_| "root capture")?
         .clone()
-        .ok_or("original root capture absent")
-    )?;
+        .ok_or("original root capture absent")?;
     assert_eq!(original_version, 1);
-    let original_root_json: serde_json::Value = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_original_root_json",
-        None,
-        serde_json::from_slice(&original_root)
-    )?;
+    let original_root_json: serde_json::Value = serde_json::from_slice(&original_root)?;
     assert_eq!(
         original_root_json["checkpoint_restore_encoding"],
         "chunked_label_atoms_v1"
     );
-    let current_version: i64 = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_custody_current_root_version",
-        None,
-        connection.query_row(
-            "SELECT version FROM admission_operation_recovery_records WHERE record_key=?1",
-            [&root_key],
-            |row| checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_custody_sql_result_column",
-                None,
-                row.get(0)
-            ),
-        )
+    let current_version: i64 = connection.query_row(
+        "SELECT version FROM admission_operation_recovery_records WHERE record_key=?1",
+        [&root_key],
+        |row| row.get(0),
     )?;
     assert_eq!(current_version, 3);
     assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_custody_historical_original_read",
-            None,
-            store.checkpoint_restore_historical_outcome_fixture(
-                &checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_custody_historical_read_authority",
-                    None,
-                    f.actor(RecoveryPermission::KnowledgeRead)
-                )?,
-                &request,
-                original_version,
-                &original_root,
-                &f.f.authority.mutation_fence(),
-                checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_custody_historical_read_clock",
-                    None,
-                    now_ms()
-                )?,
-            )
+        store.checkpoint_restore_historical_outcome_fixture(
+            &f.actor(RecoveryPermission::KnowledgeRead)?,
+            &request,
+            original_version,
+            &original_root,
+            &f.f.authority.mutation_fence(),
+            now_ms()?,
         )?,
         (release.clone(), ArtifactDeliveryStateV1::Admitted)
     );
+    // Release the observer's retained runtime before the original owner is
+    // dropped and the store is reopened under its successor.
+    drop(checkpoint_producer_observer);
     drop(faulty);
-
     let original = f.f.control.clone();
     let path = f.f.path.clone();
     let directory = f.f._directory.take();
     drop(connection);
     drop(store);
-    drop(_process_validation_trace);
-    drop(_restore_inner_trace);
     drop(f);
-    let mut reopened = checkpoint_chunk_phase!(
-        None,
-        "chunk_custody_reopen_fixture",
-        None,
-        RecoveryFixture::open(path, directory, false)
-    )?;
+    let mut reopened = RecoveryFixture::open(path, directory, false)?;
     reopened.control = original;
-    let broker = Arc::new(checkpoint_chunk_phase!(
-        None,
-        "chunk_custody_reopen_broker",
-        None,
-        reopened.process.enable_durable_knowledge()
-    )?);
-    let runtime = checkpoint_chunk_phase!(
-        None,
-        "chunk_custody_reopen_runtime",
-        None,
-        NativeKnowledgeRuntime::new(
-            reopened.kernel.clone(),
-            Arc::new(reopened.authority.admission_operation_store()),
-            broker.clone(),
-            profile.clone(),
-            reopened.authority.mutation_fence(),
-        )
+    let broker = Arc::new(reopened.process.enable_durable_knowledge()?);
+    let runtime = NativeKnowledgeRuntime::new(
+        reopened.kernel.clone(),
+        Arc::new(reopened.authority.admission_operation_store()),
+        broker.clone(),
+        profile.clone(),
+        reopened.authority.mutation_fence(),
     )?;
     let reopened = KnowledgeFixture {
         f: reopened,
@@ -2608,84 +1865,43 @@ fn memory_checkpoint_chunked_restore_preserves_exact_custody_and_reopen() -> Tes
         original_process_capability
     );
     let replay_sink = reopened.sink();
-    let replay = checkpoint_chunk_phase!(
-        Some(&reopened),
-        "chunk_custody_reopen_restore",
-        None,
-        reopened.runtime.restore_into(
-            &reopened.f.control,
-            &checkpoint.checkpoint,
-            1,
-            &request,
-            &replay_sink,
-        )
+    let replay = reopened.runtime.restore_into(
+        &reopened.f.control,
+        &checkpoint.checkpoint,
+        1,
+        &request,
+        &replay_sink,
     )?;
     assert_eq!(replay.release, release);
-    checkpoint_chunk_phase!(
-        Some(&reopened),
-        "chunk_custody_reopen_frame",
-        None,
-        assert_exact_checkpoint_frame(&replay_sink, &checkpoint, body)
-    )?;
+    assert_exact_checkpoint_frame(&replay_sink, &checkpoint, body)?;
     assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&reopened),
-            "chunk_custody_reopen_outcome",
-            None,
-            restore_outcome(&reopened, &request)
-        )?
-        .1,
+        restore_outcome(&reopened, &request)?.1,
         ArtifactDeliveryStateV1::Delivered
     );
-    let replayed = checkpoint_chunk_phase!(
-        Some(&reopened),
-        "chunk_custody_reopen_native_snapshot",
-        None,
-        checkpoint_chunk_snapshot(&reopened)
-    )?;
+    let replayed = checkpoint_chunk_snapshot(&reopened)?;
     assert_eq!(replayed, native_before_retry);
-    let replayed_connection = checkpoint_chunk_phase!(
-        Some(&reopened),
-        "chunk_custody_reopen_database_open",
-        None,
-        rusqlite::Connection::open(reopened.f.path.join("admission.db"))
-    )?;
-    let native_journals_after_reopen: i64 = checkpoint_chunk_phase!(Some(&reopened), "chunk_custody_reopen_journal_count", None, replayed_connection.query_row(
+    let replayed_connection = rusqlite::Connection::open(reopened.f.path.join("admission.db"))?;
+    let native_journals_after_reopen: i64 = replayed_connection.query_row(
         "SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-join:*'",
-        [], |row| checkpoint_chunk_phase!(Some(&reopened), "chunk_custody_sql_result_column", None, row.get(0)),
-    ))?;
+        [], |row| row.get(0),
+    )?;
     assert_eq!(native_journals_after_reopen, native_journals_before);
     assert_eq!(replayed.principal_label, joined);
     assert_eq!(replayed.lineage_label, joined);
     assert_eq!(replayed.session_label, joined);
     assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&reopened),
-            "chunk_custody_reopen_historical_original_read",
-            None,
-            reopened
-                .f
-                .authority
-                .admission_operation_store()
-                .checkpoint_restore_historical_outcome_fixture(
-                    &checkpoint_chunk_phase!(
-                        Some(&reopened),
-                        "chunk_custody_reopen_historical_read_authority",
-                        None,
-                        reopened.actor(RecoveryPermission::KnowledgeRead)
-                    )?,
-                    &request,
-                    original_version,
-                    &original_root,
-                    &reopened.f.authority.mutation_fence(),
-                    checkpoint_chunk_phase!(
-                        Some(&reopened),
-                        "chunk_custody_reopen_historical_read_clock",
-                        None,
-                        now_ms()
-                    )?,
-                )
-        )?,
+        reopened
+            .f
+            .authority
+            .admission_operation_store()
+            .checkpoint_restore_historical_outcome_fixture(
+                &reopened.actor(RecoveryPermission::KnowledgeRead)?,
+                &request,
+                original_version,
+                &original_root,
+                &reopened.f.authority.mutation_fence(),
+                now_ms()?,
+            )?,
         (release, ArtifactDeliveryStateV1::Admitted)
     );
     assert_eq!(reopened.f.effects.load(Ordering::SeqCst), 0);
@@ -2695,46 +1911,16 @@ fn memory_checkpoint_chunked_restore_preserves_exact_custody_and_reopen() -> Tes
 #[test]
 fn memory_checkpoint_uncertain_ack_refuses_an_authenticated_extra_chunk_prefix() -> TestResult {
     use std::collections::{BTreeMap, BTreeSet};
-    let mut f = checkpoint_chunk_phase!(
-        None,
-        "chunk_prefix_fixture_open",
-        None,
-        KnowledgeFixture::new()
-    )?;
-    let historical = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_historical_label",
-        None,
-        checkpoint_chunk_label("history", 6, 64)
-    )?;
+    let mut f = KnowledgeFixture::new()?;
+    let historical = checkpoint_chunk_label("history", 6, 64)?;
     let incoming = [
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_incoming_label",
-            Some(0),
-            checkpoint_chunk_label("one", 4, 60)
-        )?,
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_incoming_label",
-            Some(1),
-            checkpoint_chunk_label("two", 4, 60)
-        )?,
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_incoming_label",
-            Some(2),
-            checkpoint_chunk_label("three", 4, 60)
-        )?,
+        checkpoint_chunk_label("one", 4, 60)?,
+        checkpoint_chunk_label("two", 4, 60)?,
+        checkpoint_chunk_label("three", 4, 60)?,
     ];
     let mut joined = historical.clone();
-    for (label_index, label) in incoming.iter().enumerate() {
-        joined = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_input_label_join",
-            Some(label_index),
-            joined.join_restrictions(label)
-        )?;
+    for label in &incoming {
+        joined = joined.join_restrictions(label)?;
     }
     let InformationLabel::Known {
         owners,
@@ -2746,311 +1932,127 @@ fn memory_checkpoint_uncertain_ack_refuses_an_authenticated_extra_chunk_prefix()
     };
     // A stricter finite audience contains every owner and only its self-reader.
     // It accepts each full source without copying a large label into a profile.
-    let clearance = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_finite_clearance",
-        None,
-        InformationLabel::try_known(
-            owners
-                .keys()
-                .map(|owner| (owner.clone(), BTreeSet::from([owner.clone()])))
-                .collect::<BTreeMap<_, _>>(),
-            compartments.clone(),
-        )
+    let clearance = InformationLabel::try_known(
+        owners
+            .keys()
+            .map(|owner| (owner.clone(), BTreeSet::from([owner.clone()])))
+            .collect::<BTreeMap<_, _>>(),
+        compartments.clone(),
     )?;
     assert!(!matches!(clearance, InformationLabel::Top));
     assert!(joined.flows_to(&clearance));
     assert!(historical.flows_to(&clearance));
-    for (label_index, label) in incoming.iter().enumerate() {
+    for label in &incoming {
         assert!(label.flows_to(&clearance));
-        assert!(
-            checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_prefix_incoming_label_bytes",
-                Some(label_index),
-                chio_core_types::canonical_json_bytes(label)
-            )?
-            .len()
-                < 64 * 1024
-        );
+        assert!(chio_core_types::canonical_json_bytes(label)?.len() < 64 * 1024);
     }
-    assert!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_historical_label_bytes",
-            None,
-            chio_core_types::canonical_json_bytes(&historical)
-        )?
-        .len()
-            < 104 * 1024
-    );
-    assert!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_joined_label_lower_bound",
-            None,
-            chio_core_types::canonical_json_bytes(&joined)
-        )?
-        .len()
-            > 256 * 1024
-    );
-    assert!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_joined_label_upper_bound",
-            None,
-            chio_core_types::canonical_json_bytes(&joined)
-        )?
-        .len()
-            < 512 * 1024
-    );
-
+    assert!(chio_core_types::canonical_json_bytes(&historical)?.len() < 104 * 1024);
+    assert!(chio_core_types::canonical_json_bytes(&joined)?.len() > 256 * 1024);
+    assert!(chio_core_types::canonical_json_bytes(&joined)?.len() < 512 * 1024);
     let store = f.f.authority.admission_operation_store();
-    let mut deployment = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_native_deployment_read",
-        None,
-        f.f.kernel.recovery_deployment(&f.profile.scope)
-    )?;
+    let mut deployment = f.f.kernel.recovery_deployment(&f.profile.scope)?;
     let mut actors = deployment.actors.as_slice().to_vec();
     actors[0].preview_clearance = clearance.clone();
-    deployment.actors = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_actor_list",
-        None,
-        NonEmptyBoundedList::new(actors)
-    )?;
-    deployment.authority_scope = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_authority_scope_digest",
-        None,
-        recovery_authority_scope_digest(&deployment)
-    )?;
-    checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_actor_installation",
-        None,
-        store.configure_recovery_deployment(&deployment)
-    )
-    .map_err(|error| format!("chunk finite actor installation: {error}"))?;
+    deployment.actors = NonEmptyBoundedList::new(actors)?;
+    deployment.authority_scope = recovery_authority_scope_digest(&deployment)?;
+    store
+        .configure_recovery_deployment(&deployment)
+        .map_err(|error| format!("chunk finite actor installation: {error}"))?;
     let mut profile = f.profile.clone();
-    profile.generation = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_profile_generation",
-        None,
-        SafeInteger::new(2)
-    )?;
+    profile.generation = SafeInteger::new(2)?;
     let mut recipients = profile.recipients.as_slice().to_vec();
     recipients[0].recipient.clearance = clearance;
-    profile.recipients = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_recipient_list",
-        None,
-        NonEmptyBoundedList::new(recipients)
-    )?;
-    checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_profile_installation",
-        None,
-        store.configure_knowledge(&profile)
-    )
-    .map_err(|error| format!("chunk finite recipient installation: {error}"))?;
+    profile.recipients = NonEmptyBoundedList::new(recipients)?;
+    store
+        .configure_knowledge(&profile)
+        .map_err(|error| format!("chunk finite recipient installation: {error}"))?;
     f.profile = profile.clone();
-
     let body = b"exact-chunked-checkpoint-material";
     let mut saved = Vec::new();
     for (index, label) in incoming.iter().enumerate() {
-        let reference = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_incoming_publication",
-            Some(index),
-            publish_label(&f, &format!("chunk-incoming-{index}"), body, label.clone())
-        )
-        .map_err(|error| format!("chunk genuine incoming publication {index}: {error}"))?;
-        let checkpoint = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_checkpoint_save",
-            Some(index),
-            f.runtime.checkpoint(
+        let reference = publish_label(&f, &format!("chunk-incoming-{index}"), body, label.clone())
+            .map_err(|error| format!("chunk genuine incoming publication {index}: {error}"))?;
+        let checkpoint = f
+            .runtime
+            .checkpoint(
                 &f.f.control,
-                &checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_prefix_checkpoint_identity",
-                    Some(index),
-                    CheckpointId::new(&format!("chunk-checkpoint-{index}"))
-                )?,
+                &CheckpointId::new(&format!("chunk-checkpoint-{index}"))?,
                 0,
                 std::slice::from_ref(&reference),
                 &[],
             )
-        )
-        .map_err(|error| format!("chunk genuine bounded checkpoint {index}: {error}"))?;
+            .map_err(|error| format!("chunk genuine bounded checkpoint {index}: {error}"))?;
         assert_eq!(checkpoint.label, *label);
-        assert!(
-            checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_prefix_checkpoint_envelope_bytes",
-                Some(index),
-                chio_core_types::canonical_json_bytes(&checkpoint)
-            )?
-            .len()
-                <= 65_536
-        );
+        assert!(chio_core_types::canonical_json_bytes(&checkpoint)?.len() <= 65_536);
         saved.push(checkpoint);
     }
-    let before = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_initial_native_snapshot",
-        None,
-        checkpoint_chunk_snapshot(&f)
-    )?;
+    let before = checkpoint_chunk_snapshot(&f)?;
     assert_eq!(before.principal_label, InformationLabel::bottom());
     assert_eq!(before.lineage_label, InformationLabel::bottom());
     assert_eq!(before.session_label, InformationLabel::bottom());
-
     // The initial artifact's exact metadata and classification certificate fit
     // ordinary protected rows. Every later native floor comes from real reads
     // and restores of the already published, bounded checkpoint envelopes.
-    let reference = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_historical_publication",
-        None,
-        publish_label(
-            &f,
-            "chunk-native-history",
-            b"native-history",
-            historical.clone(),
-        )
+    let reference = publish_label(
+        &f,
+        "chunk-native-history",
+        b"native-history",
+        historical.clone(),
     )
     .map_err(|error| format!("chunk genuine historical publication: {error}"))?;
-    let handle = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_historical_handle",
-        None,
-        f.runtime.handle(
-            &f.f.control,
-            &reference,
-            &checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_prefix_historical_recipient_identity",
-                None,
-                ArtifactRecipientId::new("agent-root")
-            )?,
-        )
+    let handle = f.runtime.handle(
+        &f.f.control,
+        &reference,
+        &ArtifactRecipientId::new("agent-root")?,
     )?;
     let history_sink = f.sink();
-    checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_historical_release",
-        None,
-        f.runtime.release_into(
+    f.runtime
+        .release_into(
             &f.f.control,
-            &checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_prefix_historical_request_identity",
-                None,
-                RequestId::new("chunk-native-history")
-            )?,
-            checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_prefix_historical_prepare_read",
-                None,
-                f.runtime.prepare_read(&f.f.control, &handle)
-            )?,
+            &RequestId::new("chunk-native-history")?,
+            f.runtime.prepare_read(&f.f.control, &handle)?,
             &history_sink,
         )
-    )
-    .map_err(|error| format!("chunk genuine historical release: {error}"))?;
+        .map_err(|error| format!("chunk genuine historical release: {error}"))?;
     assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_historical_sink_lock",
-            None,
-            history_sink.delivered.lock().map_err(|_| "history sink")
-        )?
-        .as_slice(),
+        history_sink
+            .delivered
+            .lock()
+            .map_err(|_| "history sink")?
+            .as_slice(),
         &[b"native-history".to_vec()]
     );
-    let history = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_historical_native_snapshot",
-        None,
-        checkpoint_chunk_snapshot(&f)
-    )?;
+    let history = checkpoint_chunk_snapshot(&f)?;
     assert_eq!(history.principal_label, historical);
     assert_eq!(history.lineage_label, historical);
     assert_eq!(history.session_label, historical);
     let mut expected = historical.clone();
     for (index, checkpoint) in saved.iter().take(2).enumerate() {
         let sink = f.sink();
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_intermediate_restore",
-            Some(index),
-            f.runtime.restore_into(
+        f.runtime
+            .restore_into(
                 &f.f.control,
                 &checkpoint.checkpoint,
                 1,
-                &checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_prefix_intermediate_request_identity",
-                    Some(index),
-                    RequestId::new(&format!("chunk-native-floor-{index}"))
-                )?,
+                &RequestId::new(&format!("chunk-native-floor-{index}"))?,
                 &sink,
             )
-        )
-        .map_err(|error| format!("chunk genuine intermediate restore {index}: {error}"))?;
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_intermediate_frame",
-            Some(index),
-            assert_exact_checkpoint_frame(&sink, checkpoint, body)
-        )?;
-        expected = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_intermediate_expected_label",
-            Some(index),
-            expected.join_restrictions(&incoming[index])
-        )?;
-        let observed = checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_intermediate_native_snapshot",
-            Some(index),
-            checkpoint_chunk_snapshot(&f)
-        )?;
+            .map_err(|error| format!("chunk genuine intermediate restore {index}: {error}"))?;
+        assert_exact_checkpoint_frame(&sink, checkpoint, body)?;
+        expected = expected.join_restrictions(&incoming[index])?;
+        let observed = checkpoint_chunk_snapshot(&f)?;
         assert_eq!(observed.principal_label, expected);
         assert_eq!(observed.lineage_label, expected);
         assert_eq!(observed.session_label, expected);
     }
-
-    let checkpoint = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_final_checkpoint_presence",
-        None,
-        saved.last().ok_or("final chunk checkpoint absent")
-    )?
-    .clone();
-    let request = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_final_request_identity",
-        None,
-        RequestId::new("chunked-checkpoint-prefix-refusal")
-    )?;
+    let checkpoint = saved.last().ok_or("final chunk checkpoint absent")?.clone();
+    let request = RequestId::new("chunked-checkpoint-prefix-refusal")?;
     let store = f.f.authority.admission_operation_store();
-    let _fault = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_prefix_fault_install",
-        None,
-        store.inject_checkpoint_restore_extra_prefix_fixture(&f.profile.scope, &request)
-    )?;
-    assert!(checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_prefix_fault_initial_observation",
-        None,
-        store.checkpoint_restore_extra_prefix_fixture(&f.profile.scope, &request)
-    )?
-    .is_none());
+    let _fault =
+        store.inject_checkpoint_restore_extra_prefix_fixture(&f.profile.scope, &request)?;
+    assert!(store
+        .checkpoint_restore_extra_prefix_fixture(&f.profile.scope, &request)?
+        .is_none());
     type Baseline = (
         String,
         Vec<u8>,
@@ -3063,94 +2065,93 @@ fn memory_checkpoint_uncertain_ack_refuses_an_authenticated_extra_chunk_prefix()
     let baseline = Arc::new(Mutex::new(None::<Baseline>));
     let captured = baseline.clone();
     let capture_store = f.f.authority.admission_operation_store();
-    let capture_actor = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_capture_read_authority",
-        None,
-        f.actor(RecoveryPermission::KnowledgeRead)
-    )?;
+    let capture_actor = f.actor(RecoveryPermission::KnowledgeRead)?;
     let capture_fence = f.f.authority.mutation_fence();
     let capture_request = request.clone();
     let capture_profile = f.profile.clone();
-    let _restore_inner_trace = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_inner_restore_observer_install",
-        None,
-        f.runtime
-            .observe_checkpoint_restore_stages_for_test(&request)
-    )?;
-    let _process_validation_trace = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_process_validation_observer_install",
-        None,
-        f.broker
-            .observe_checkpoint_process_validation_fixture(&f.profile.scope.process_id, &request)
-    )?;
     let capture_database = f.f.path.join("admission.db");
     let faulty = f.runtime.clone().with_test_cutpoint(Arc::new(move |stage| {
         if stage == KnowledgeCutpoint::ReleaseCommitted {
-            let (release, state) = checkpoint_chunk_phase!(None, "chunk_prefix_capture_owner_presence", None, checkpoint_chunk_phase!(None, "chunk_prefix_capture_owner_read", None, capture_store.checkpoint_restore_outcome_fixture(
-                &capture_actor, &capture_request, &capture_fence,
-                checkpoint_chunk_phase!(None, "chunk_prefix_capture_clock", None, now_ms()).map_err(|error| KernelError::Internal(format!("prefix capture clock: {error}")))?,
-            )).map_err(|error| KernelError::Internal(format!("prefix capture source: {error}")))?
-                .ok_or_else(|| KernelError::Internal("prefix source absent before ACK".into())))?;
+            let (release, state) = capture_store
+                .checkpoint_restore_outcome_fixture(
+                    &capture_actor,
+                    &capture_request,
+                    &capture_fence,
+                    now_ms().map_err(|error| {
+                        KernelError::Internal(format!("prefix capture clock: {error}"))
+                    })?,
+                )
+                .map_err(|error| KernelError::Internal(format!("prefix capture source: {error}")))?
+                .ok_or_else(|| KernelError::Internal("prefix source absent before ACK".into()))?;
             if state != ArtifactDeliveryStateV1::Admitted {
-                return checkpoint_chunk_phase!(None, "chunk_prefix_capture_not_admitted", None, Err(KernelError::Internal("prefix fixture did not reach real admission".into())));
+                return Err(KernelError::Internal("prefix fixture did not reach real admission".into()));
             }
-            let connection = checkpoint_chunk_phase!(None, "chunk_prefix_capture_database_open", None, rusqlite::Connection::open(&capture_database)
-                ).map_err(|error| KernelError::Internal(format!("prefix capture connection: {error}")))?;
-            let original: (String, i64, Vec<u8>) = checkpoint_chunk_phase!(None, "chunk_prefix_capture_root_query", None, connection.query_row(
-                "SELECT record_key,version,payload FROM admission_operation_recovery_records
-                 WHERE record_key GLOB 'knowledge-restore:*' AND json_extract(payload,'$.intent.release')=?1",
-                [release.as_str()], |row| Ok((checkpoint_chunk_phase!(None, "chunk_prefix_capture_key_column", None, row.get(0))?,checkpoint_chunk_phase!(None, "chunk_prefix_capture_version_column", None, row.get(1))?,checkpoint_chunk_phase!(None, "chunk_prefix_capture_payload_column", None, row.get(2))?)),
-            )).map_err(|error| KernelError::Internal(format!("prefix capture root: {error}")))?;
-            let root: serde_json::Value = checkpoint_chunk_phase!(None, "chunk_prefix_capture_root_json", None, serde_json::from_slice(&original.2)
-                ).map_err(|error| KernelError::Internal(format!("prefix capture wire: {error}")))?;
-            if original.1 != 1 || root["checkpoint_restore_encoding"] != "chunked_label_atoms_v1"
-                || root["body"]["body_bytes"].as_u64().unwrap_or(0) <= 262_144
-                || root["body"]["chunk_count"].as_u64().unwrap_or(0) < 5 {
-                return checkpoint_chunk_phase!(None, "chunk_prefix_capture_not_chunked", None, Err(KernelError::Internal("prefix fixture missed genuine chunk prerequisite".into())));
+            let connection = rusqlite::Connection::open(&capture_database)
+                .map_err(|error| KernelError::Internal(format!("prefix capture connection: {error}")))?;
+            let original: (String, i64, Vec<u8>) = connection
+                .query_row("SELECT record_key,version,payload FROM admission_operation_recovery_records
+                 WHERE record_key GLOB 'knowledge-restore:*' AND json_extract(payload,'$.intent.release')=?1", [release.as_str()], |row| {
+                    Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+                })
+                .map_err(|error| KernelError::Internal(format!("prefix capture root: {error}")))?;
+            let root: serde_json::Value = serde_json::from_slice(&original.2)
+                .map_err(|error| KernelError::Internal(format!("prefix capture wire: {error}")))?;
+            if original.1 != 1
+                || root["checkpoint_restore_encoding"] != "chunked_label_atoms_v1"
+                || root["body"]["body_bytes"]
+                    .as_u64()
+                    .unwrap_or(0)
+                    <= 262_144
+                || root["body"]["chunk_count"]
+                    .as_u64()
+                    .unwrap_or(0)
+                    < 5
+            {
+                return Err(KernelError::Internal("prefix fixture missed genuine chunk prerequisite".into()));
             }
-            let (head, chain): (i64,String) = checkpoint_chunk_phase!(None, "chunk_prefix_capture_global_head", None, connection.query_row(
-                "SELECT head_sequence,head_chain_digest FROM authority_global_commit_meta WHERE singleton=1",
-                [], |row| Ok((checkpoint_chunk_phase!(None, "chunk_prefix_capture_global_sequence_column", None, row.get(0))?,checkpoint_chunk_phase!(None, "chunk_prefix_capture_global_digest_column", None, row.get(1))?)),
-            )).map_err(|error| KernelError::Internal(format!("prefix baseline head: {error}")))?;
-            let records: i64 = checkpoint_chunk_phase!(None, "chunk_prefix_capture_records_count", None, connection.query_row("SELECT count(*) FROM admission_operation_recovery_records", [], |row| checkpoint_chunk_phase!(None, "chunk_prefix_sql_result_column", None, row.get(0)))
-                ).map_err(|error| KernelError::Internal(format!("prefix baseline records: {error}")))?;
-            let journals: i64 = checkpoint_chunk_phase!(None, "chunk_prefix_capture_journal_count", None, connection.query_row("SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-join:*'", [], |row| checkpoint_chunk_phase!(None, "chunk_prefix_sql_result_column", None, row.get(0)))
-                ).map_err(|error| KernelError::Internal(format!("prefix baseline journals: {error}")))?;
-            let native = checkpoint_chunk_phase!(None, "chunk_prefix_capture_native_observation", None, capture_store.observe_security_participant_flow(
-                &capture_profile.native_authority, &recovery_flow_key(&capture_profile.producer_context),
-                &capture_fence, checkpoint_chunk_phase!(None, "chunk_prefix_capture_native_clock", None, now_ms()).map_err(|error| KernelError::Internal(format!("prefix native clock: {error}")))?,
-            )).map_err(|error| KernelError::Internal(format!("prefix native snapshot: {error}")))?;
-            let snapshot = checkpoint_chunk_phase!(None, "chunk_prefix_capture_native_presence", None, native.snapshot().ok_or_else(|| KernelError::Internal("prefix native snapshot absent".into())))?.clone();
-            *checkpoint_chunk_phase!(None, "chunk_prefix_capture_baseline_lock", None, captured.lock().map_err(|_| KernelError::Internal("prefix baseline poisoned".into())))? = Some((original.0,original.2,head,chain,records,journals,snapshot));
+            let (head, chain): (i64, String) = connection
+                .query_row("SELECT head_sequence,head_chain_digest FROM authority_global_commit_meta WHERE singleton=1", [], |row| {
+                    Ok((row.get(0)?, row.get(1)?))
+                })
+                .map_err(|error| KernelError::Internal(format!("prefix baseline head: {error}")))?;
+            let records: i64 = connection
+                .query_row("SELECT count(*) FROM admission_operation_recovery_records", [], |row| row.get(0))
+                .map_err(|error| KernelError::Internal(format!("prefix baseline records: {error}")))?;
+            let journals: i64 = connection
+                .query_row("SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-join:*'", [], |row| row.get(0))
+                .map_err(|error| KernelError::Internal(format!("prefix baseline journals: {error}")))?;
+            let native = capture_store
+                .observe_security_participant_flow(
+                    &capture_profile.native_authority,
+                    &recovery_flow_key(&capture_profile.producer_context),
+                    &capture_fence,
+                    now_ms().map_err(|error| {
+                        KernelError::Internal(format!("prefix native clock: {error}"))
+                    })?,
+                )
+                .map_err(|error| KernelError::Internal(format!("prefix native snapshot: {error}")))?;
+            let snapshot = native
+                .snapshot()
+                .ok_or_else(|| KernelError::Internal("prefix native snapshot absent".into()))?
+                .clone();
+            *captured
+                .lock()
+                .map_err(|_| KernelError::Internal("prefix baseline poisoned".into()))? = Some((
+                original.0, original.2, head, chain, records, journals, snapshot,
+            ));
         }
         if stage == KnowledgeCutpoint::DeliveryCompleted {
-            return checkpoint_chunk_phase!(None, "chunk_prefix_delivery_completed_fault", None, Err(KernelError::Internal("prefix fixture loses original delivery ACK".into())));
+            return Err(KernelError::Internal("prefix fixture loses original delivery ACK".into()));
         }
         Ok(())
     }));
     let sink = f.sink();
-    assert!(checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_prefix_refusal_restore",
-        None,
-        faulty.restore_into(&f.f.control, &checkpoint.checkpoint, 1, &request, &sink)
-    )
-    .is_err());
-    let observation = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_prefix_fault_presence",
-        None,
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_prefix_fault_observation",
-            None,
-            store.checkpoint_restore_extra_prefix_fixture(&f.profile.scope, &request)
-        )?
-        .ok_or("prefix fixture never reached actual typed Uncertain ACK")
-    )?;
+    assert!(faulty
+        .restore_into(&f.f.control, &checkpoint.checkpoint, 1, &request, &sink)
+        .is_err());
+    let observation = store
+        .checkpoint_restore_extra_prefix_fixture(&f.profile.scope, &request)?
+        .ok_or("prefix fixture never reached actual typed Uncertain ACK")?;
     assert_eq!(
         observation.0, 1,
         "one actual authenticated extra append before global-head capture"
@@ -3160,96 +2161,38 @@ fn memory_checkpoint_uncertain_ack_refuses_an_authenticated_extra_chunk_prefix()
         "actual Uncertain ACK requires chunks"
     );
     assert!(observation.2 >= 5);
-    let (root_key, original, head, chain, records, journals, snapshot) = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_baseline_presence",
-        None,
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_baseline_lock",
-            None,
-            baseline.lock().map_err(|_| "prefix baseline poisoned")
-        )?
+    let (root_key, original, head, chain, records, journals, snapshot) = baseline
+        .lock()
+        .map_err(|_| "prefix baseline poisoned")?
         .clone()
-        .ok_or("prefix original admission capture absent")
-    )?;
+        .ok_or("prefix original admission capture absent")?;
     // A failed writer without the pristine-prefix check may already disclose
     // a frame. Preserve exact RED evidence without requiring delivery on a
     // correct refusal, which occurs during Uncertain ACK before the sink.
-    let delivered_frames = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_final_sink_lock",
-        None,
-        sink.delivered.lock().map_err(|_| "prefix sink")
-    )?
-    .len();
+    let delivered_frames = sink.delivered.lock().map_err(|_| "prefix sink")?.len();
     if delivered_frames != 0 {
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_disclosed_frame",
-            None,
-            assert_exact_checkpoint_frame(&sink, &checkpoint, body)
-        )?;
+        assert_exact_checkpoint_frame(&sink, &checkpoint, body)?;
     }
-    let connection = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_outcome_database_open",
-        None,
-        rusqlite::Connection::open(f.f.path.join("admission.db"))
+    let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
+    let after: (i64, Vec<u8>) = connection.query_row(
+        "SELECT version,payload FROM admission_operation_recovery_records WHERE record_key=?1",
+        [&root_key],
+        |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
-    let after: (i64, Vec<u8>) = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_outcome_root_query",
-        None,
-        connection.query_row(
-            "SELECT version,payload FROM admission_operation_recovery_records WHERE record_key=?1",
-            [&root_key],
-            |row| Ok((
-                checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_prefix_outcome_version_column",
-                    None,
-                    row.get(0)
-                )?,
-                checkpoint_chunk_phase!(
-                    Some(&f),
-                    "chunk_prefix_outcome_payload_column",
-                    None,
-                    row.get(1)
-                )?
-            )),
-        )
+    let current_head: (i64, String) = connection.query_row("SELECT head_sequence,head_chain_digest FROM authority_global_commit_meta WHERE singleton=1", [], |row| Ok((row.get(0)?, row.get(1)?)))?;
+    let current_records: i64 = connection.query_row(
+        "SELECT count(*) FROM admission_operation_recovery_records",
+        [],
+        |row| row.get(0),
     )?;
-    let current_head: (i64,String) = checkpoint_chunk_phase!(Some(&f), "chunk_prefix_outcome_global_head", None, connection.query_row("SELECT head_sequence,head_chain_digest FROM authority_global_commit_meta WHERE singleton=1", [], |row| Ok((checkpoint_chunk_phase!(Some(&f), "chunk_prefix_outcome_global_sequence_column", None, row.get(0))?,checkpoint_chunk_phase!(Some(&f), "chunk_prefix_outcome_global_digest_column", None, row.get(1))?))))?;
-    let current_records: i64 = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_outcome_records_count",
-        None,
-        connection.query_row(
-            "SELECT count(*) FROM admission_operation_recovery_records",
-            [],
-            |row| checkpoint_chunk_phase!(
-                Some(&f),
-                "chunk_prefix_sql_result_column",
-                None,
-                row.get(0)
-            ),
-        )
-    )?;
-    let current_journals: i64 = checkpoint_chunk_phase!(Some(&f), "chunk_prefix_outcome_journal_count", None, connection.query_row("SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-join:*'", [], |row| checkpoint_chunk_phase!(Some(&f), "chunk_prefix_sql_result_column", None, row.get(0))))?;
-    let current_snapshot = checkpoint_chunk_phase!(
-        Some(&f),
-        "chunk_prefix_outcome_native_snapshot",
-        None,
-        checkpoint_chunk_snapshot(&f)
-    )?;
+    let current_journals: i64 = connection.query_row("SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-join:*'", [], |row| row.get(0))?;
+    let current_snapshot = checkpoint_chunk_snapshot(&f)?;
     assert_eq!(
         current_snapshot, snapshot,
         "ACK must not make another native observation"
     );
     assert_eq!(current_journals, journals);
     assert_eq!(f.f.effects.load(Ordering::SeqCst), 0);
-    eprintln!("actual-prefix-fixture phase=uncertain-ack body_bytes={} planned_chunks={} extra_appends={} root_version={} records_before={} records_after={} global_before={} global_after={}", observation.1, observation.2, observation.0, after.0, records, current_records, head, current_head.0);
     assert_eq!(after.0, 1, "owning Uncertain ACK must refuse the extra authenticated owner/body prefix before root advancement");
     assert_eq!(after.1, original, "original root bytes survive refused ACK");
     assert_eq!(
@@ -3262,13 +2205,7 @@ fn memory_checkpoint_uncertain_ack_refuses_an_authenticated_extra_chunk_prefix()
         "authenticated extra append and ACK family must roll back together"
     );
     assert_eq!(
-        checkpoint_chunk_phase!(
-            Some(&f),
-            "chunk_prefix_outcome_custody_read",
-            None,
-            restore_outcome(&f, &request)
-        )?
-        .1,
+        restore_outcome(&f, &request)?.1,
         ArtifactDeliveryStateV1::Admitted
     );
     assert_eq!(
@@ -3276,4 +2213,104 @@ fn memory_checkpoint_uncertain_ack_refuses_an_authenticated_extra_chunk_prefix()
         "a refused Uncertain ACK must not reach the delivery sink"
     );
     Ok(())
+}
+
+#[test]
+fn memory_restore_delivery_progress_settles_under_high_wal_and_refunds_once() -> TestResult {
+    use super::retention::{active_reference_owners, census_retired, custody, HighWal};
+    let f = KnowledgeFixture::new()?;
+    let bytes = b"high-wal-restore";
+    let reference = f.publish("high-wal-restore-material", bytes)?;
+    let id = CheckpointId::new("high-wal-restore")?;
+    let checkpoint =
+        f.runtime
+            .checkpoint(&f.f.control, &id, 0, std::slice::from_ref(&reference), &[])?;
+    let store = f.f.authority.admission_operation_store();
+    let fence = f.f.authority.mutation_fence();
+    let reader = f.actor(RecoveryPermission::KnowledgeRead)?;
+    let request = RequestId::new("high-wal-restore")?;
+    let recipient = f.profile.recipients.as_slice()[0].recipient.clone();
+    // Admission is ordinary encoded intake and happens before pressure,
+    // through the same typed input the Runtime submits.
+    store.admit_checkpoint_restore(
+        &reader,
+        NativeCheckpointRestore {
+            checkpoint: &checkpoint,
+            recipient: &recipient,
+            request: &request,
+            installation_generation: f.profile.generation,
+        },
+        &fence,
+        now_ms()?,
+    )?;
+    assert_eq!(
+        active_reference_owners(&f, &reference, "checkpoint_restore")?,
+        1
+    );
+    let pressure = HighWal::begin(&f)?;
+    let admitted = custody(&f)?;
+    // A fresh restore admission is ordinary encoded intake and refuses here.
+    assert_eq!(
+        store
+            .admit_checkpoint_restore(
+                &reader,
+                NativeCheckpointRestore {
+                    checkpoint: &checkpoint,
+                    recipient: &recipient,
+                    request: &RequestId::new("high-wal-fresh-restore")?,
+                    installation_generation: f.profile.generation,
+                },
+                &fence,
+                now_ms()?,
+            )
+            .err(),
+        super::retention::invariant_refusal("recovery disk headroom exhausted")
+    );
+    assert_eq!(custody(&f)?, admitted);
+    let refused = super::retained_owner::UncertainSink::new(recipient.clone());
+    assert!(f
+        .runtime
+        .restore_into(&f.f.control, &id, 1, &request, &refused)
+        .is_err());
+    assert_eq!(refused.attempts(), 1, "the failure must reach the sink");
+    let uncertain = custody(&f)?;
+    // The inline restore root advances once to Uncertain; the failed sink's
+    // repeat writes nothing. Uncertain retains custody and refunds nothing.
+    assert_eq!(
+        (
+            uncertain.events - admitted.events,
+            uncertain.commits - admitted.commits
+        ),
+        (1, 1)
+    );
+    assert_eq!(
+        active_reference_owners(&f, &reference, "checkpoint_restore")?,
+        1
+    );
+    assert_eq!(census_retired(&uncertain)?, census_retired(&admitted)?);
+
+    let sink = f.sink();
+    f.runtime
+        .restore_into(&f.f.control, &id, 1, &request, &sink)
+        .map_err(|error| format!("replayed restore under pressure: {error}"))?;
+    let delivered = custody(&f)?;
+    // The Delivered root plus the single-reference refund.
+    assert_eq!(
+        (
+            delivered.events - uncertain.events,
+            delivered.commits - uncertain.commits
+        ),
+        (5, 5)
+    );
+    assert_eq!(
+        active_reference_owners(&f, &reference, "checkpoint_restore")?,
+        0
+    );
+    assert_eq!(census_retired(&delivered)?, census_retired(&uncertain)? + 1);
+    assert_restored_checkpoint(&sink, "high-wal-restore", 1, bytes)?;
+    f.runtime
+        .restore_into(&f.f.control, &id, 1, &request, &sink)
+        .map_err(|error| format!("delivered restore replay: {error}"))?;
+    assert_eq!(custody(&f)?, delivered, "Delivered is sticky");
+    pressure.release()
 }

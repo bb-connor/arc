@@ -212,5 +212,68 @@ fn artifacts_publication_quota_refuses_matching_and_distinct_pre_activation_gues
     );
     assert_eq!(raw_blob_rows(&f.f.path)?, raw_before);
     assert_eq!(f.f.process.process(process.as_str())?.tree_calls, calls);
+    // Aborting both refused publications must behave identically: orphan
+    // resolution accepts the exact staged object identity only, so matching
+    // hidden raw content becomes neither a publication seal nor a false
+    // Collected retirement, and no hidden raw custody is observed.
+    let store = f.f.authority.admission_operation_store();
+    let fence = f.f.authority.mutation_fence();
+    let admin = f.actor(RecoveryPermission::KnowledgeAdmin)?;
+    let live = store.inspect_live_publication_count(&admin, &fence, now_ms()?)?;
+    let sweeps = retained_count(&f, "knowledge-sweep:")?;
+    let object_sweeps = retained_count(&f, "knowledge-object-sweep:")?;
+    for (id, candidate) in [
+        ("matching-pre-activation-guess", hidden.as_slice()),
+        ("distinct-pre-activation-guess", distinct.as_slice()),
+    ] {
+        let input = f.input(id, candidate)?;
+        f.runtime.abort_publication(&f.f.control, &input)?;
+        f.runtime.abort_publication(&f.f.control, &input)?;
+        let record = store.artifact_publication_for_collection(
+            &f.actor(RecoveryPermission::KnowledgeAdmin)?,
+            &input,
+            &fence,
+            now_ms()?,
+        )?;
+        assert!(
+            record.seal.is_none(),
+            "no seal may bind to a refused record"
+        );
+        assert_eq!(record.state, ArtifactPublicationStateV1::Retired);
+        assert_eq!(
+            store.inspect_live_publication_count(&admin, &fence, now_ms()?)?,
+            live,
+            "abort must not assume a collection refund"
+        );
+        assert_eq!(retained_count(&f, "knowledge-sweep:")?, sweeps);
+        assert_eq!(
+            retained_count(&f, "knowledge-object-sweep:")?,
+            object_sweeps
+        );
+        assert_eq!(f.broker.storage_usage(&process)?, full);
+        assert_eq!(process_blob_custody(&f)?, before);
+    }
+    assert_eq!(raw_blob_rows(&f.f.path)?, raw_before);
+    assert_eq!(f.f.process.process(process.as_str())?.tree_calls, calls);
+    Ok(())
+}
+
+#[test]
+fn artifacts_collection_refuses_never_staged_process_object() -> TestResult {
+    let f = KnowledgeFixture::new()?;
+    let seal = f.broker.stage(
+        &ArtifactObjectId::new("staged-object")?,
+        &f.profile.scope.process_id,
+        b"staged-object-content",
+    )?;
+    let mut absent = seal.clone();
+    absent.object = ArtifactObjectId::new("never-staged-object")?;
+    let custody = process_blob_custody(&f)?;
+    assert!(f.broker.collect_private(&absent).is_err());
+    assert!(f.broker.collect_private(&absent).is_err());
+    assert_eq!(process_blob_custody(&f)?, custody);
+    f.broker.collect_private(&seal)?;
+    f.broker.collect_private(&seal)?;
+    assert!(f.broker.read_private(&seal).is_err());
     Ok(())
 }

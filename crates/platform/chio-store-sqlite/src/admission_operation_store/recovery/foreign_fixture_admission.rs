@@ -16,9 +16,10 @@ pub(in crate::admission_operation_store) fn fill_intake_events(
     let mut connection = store.connection()?;
     let tx = store.begin_write(&mut connection, Some(fence))?;
     command_quota_test_support::install_fixture_observed_time_index(&tx)?;
+    let pool = generic_knowledge_predicate("record_key");
     let (events, bytes): (i64, i64) = tx.query_row(
-        "SELECT (SELECT count(*) FROM admission_operation_recovery_events WHERE record_key GLOB 'knowledge-*'),
-            (SELECT coalesce(sum(length(payload)),0) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-*')",
+        &format!("SELECT (SELECT count(*) FROM admission_operation_recovery_events WHERE {pool}),
+            (SELECT coalesce(sum(length(payload)),0) FROM admission_operation_recovery_records WHERE {pool})"),
         [], |row| Ok((row.get(0)?,row.get(1)?)),
     ).map_err(sqlite_error)?;
     let current = stored_u64(events, "fixture event count")?;

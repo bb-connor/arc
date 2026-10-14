@@ -6,8 +6,9 @@ a capability token scoped to that role, so:
 
 * A researcher agent whose role scope grants ``search`` tools cannot
   invoke a ``write`` tool, even if the LLM hallucinates the call.
-* Delegation between agents produces attenuated child capabilities
-  (``child ⊆ parent``) via :meth:`chio_sdk.ChioClient.attenuate_capability`.
+* Delegation requests an attenuated child capability (``child ⊆ parent``).
+  The SDK refuses minting without the parent subject signer; refusal preserves
+  the existing capabilities and tool bindings.
 """
 
 from __future__ import annotations
@@ -16,7 +17,6 @@ import logging
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from chio_sdk.errors import ChioValidationError
 from chio_sdk.models import ChioScope, CapabilityToken
 from crewai import Crew
 
@@ -139,12 +139,19 @@ class ChioCrew(Crew):
         delegate_role: str,
         new_scope: ChioScope,
     ) -> CapabilityToken:
-        """Produce a child token for an agent-to-agent delegation.
+        """Request an attenuated token through the SDK's delegation contract.
 
-        The child is strictly narrower than the delegator's token.
+        The current SDK denies the request fail-closed: minting a child
+        token requires the parent subject signer, which the sidecar does
+        not hold. Refusal leaves role tokens and tool bindings unchanged.
+
         Raises :class:`ChioCrewConfigError` if ``delegator_role`` has no
-        active token, and :class:`chio_sdk.errors.ChioValidationError` if
-        ``new_scope`` is not a subset of the delegator's scope.
+        active token, :class:`chio_sdk.errors.ChioValidationError` if
+        ``new_scope`` is not a subset of the delegator's scope (delegation
+        may only narrow), and :class:`chio_sdk.errors.ChioDeniedError`
+        (reason code ``chio_attenuation_requires_subject_signer``) when
+        the SDK refuses to mint the child token, which is the current
+        behavior.
         """
         parent = self.token_for(delegator_role)
         if parent is None:
@@ -152,13 +159,9 @@ class ChioCrew(Crew):
                 f"delegator role {delegator_role!r} has no minted capability; "
                 "call provision_capabilities() first"
             )
-        try:
-            child = await self.chio_client.attenuate_capability(
-                parent, new_scope=new_scope
-            )
-        except ChioValidationError:
-            # Re-raise unchanged so callers can match on the SDK type.
-            raise
+        child = await self.chio_client.attenuate_capability(
+            parent, new_scope=new_scope
+        )
 
         self.__dict__["_role_tokens"][delegate_role] = child
         # Rebind this role's tools to the new (narrower) token.

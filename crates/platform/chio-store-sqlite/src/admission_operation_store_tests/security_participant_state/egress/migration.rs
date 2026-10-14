@@ -25,10 +25,26 @@ fn global_history(connection: &Connection) -> AnchoredTestResult<Vec<(i64, Strin
 #[test]
 fn v29_upgrade_preserves_native_initialization_join_bytes_and_global_digests() -> AnchoredTestResult
 {
-    let fixture = fixture();
-    let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let fixture = pre_recovery_fixture();
+    let source = imported(&fixture, "source")?;
+    // Ordinary operation and join writers need the empty recovery catalog to
+    // prove no recovery owns the operation, so it stays until they finish. The
+    // native catalog is exactly v29 once the empty imported scope index is gone.
+    // This constructs valid old input; it does not qualify the old writers.
+    {
+        let connection = fixture.store.connection()?;
+        crate::admission_operation_store::tests::schema::remove_empty_imported_scope_index(
+            &connection,
+        )?;
+        connection.execute_batch("UPDATE chio_store_schema_versions SET version = 29 WHERE store_key = 'admission_operation'")?;
+    }
+    let initialized =
+        native::hydrate_predecessor_fixture(&fixture.store, &source, &fixture.fence, now_ms())?;
     let mut pending = pending(&fixture, "egress-upgrade", None)?;
+    // Refuses if any step wrote recovery custody or a future journal.
+    drop_empty_egress(&*fixture.store.connection()?)?;
     let before_joins = joins(&fixture)?;
+    assert!(!before_joins.is_empty());
     let before_global = global_history(&*fixture.store.connection()?)?;
     let Fixture {
         _temp,
@@ -41,8 +57,6 @@ fn v29_upgrade_preserves_native_initialization_join_bytes_and_global_digests() -
     drop(store);
     drop(authority);
     let connection = Connection::open(&database)?;
-    drop_empty_egress(&connection)?;
-    connection.execute_batch("UPDATE chio_store_schema_versions SET version = 29 WHERE store_key = 'admission_operation'")?;
     native::verify_coverage(&connection)?;
     drop(connection);
     SqliteAuthorityStore::provision(&database, &lock_root)?;
@@ -87,7 +101,7 @@ fn v29_upgrade_rejects_partial_or_alias_future_catalog_without_repair() -> Ancho
         "CREATE TABLE SECURITY_PARTICIPANT_EGRESS_alias(value TEXT)",
         "CREATE VIEW security_participant_egress_events AS SELECT 1",
     ] {
-        let fixture = fixture();
+        let fixture = pre_recovery_fixture();
         let Fixture {
             _temp,
             database,

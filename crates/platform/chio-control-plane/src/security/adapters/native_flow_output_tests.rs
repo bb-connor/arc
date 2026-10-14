@@ -419,3 +419,64 @@ fn native_output_journal_inherits_all_current_labels_when_output_is_public() -> 
     assert_eq!(counts(&fixture)?, (1, 1, 0));
     reopen(fixture, &output)
 }
+
+/// Uncheckpointed WAL bytes, observed the way physical admission observes them.
+fn wal_backlog(database: &std::path::Path) -> TestResult<u64> {
+    let observer = rusqlite::Connection::open_with_flags(
+        database,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )?;
+    let (busy, log, checkpointed): (i64, i64, i64) =
+        observer.query_row("PRAGMA main.wal_checkpoint(NOOP)", [], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })?;
+    let page_size: i64 = observer.query_row("PRAGMA main.page_size", [], |row| row.get(0))?;
+    if busy != 0 || log < checkpointed {
+        return Err("WAL observation refused".into());
+    }
+    Ok(u64::try_from(log - checkpointed)? * (u64::try_from(page_size)? + 24) + 32)
+}
+
+fn native_journal_seals(database: &std::path::Path) -> TestResult<i64> {
+    Ok(rusqlite::Connection::open(database)?.query_row(
+        "SELECT COUNT(*) FROM authority_global_commits
+         WHERE projection_kind = 'recovery' AND projection_key GLOB 'native-journal-seal:*'",
+        [],
+        |row| row.get(0),
+    )?)
+}
+
+/// The owed Output join is admitted in the settlement band. Inside a live
+/// journal segment it commits, sealing nothing, while the uncheckpointed WAL
+/// already exceeds the intake band.
+#[test]
+fn native_output_journal_commits_under_intake_pressure_within_settlement() -> TestResult {
+    const MIB: u64 = 1024 * 1024;
+    let mut fixture = super::super::super::public_fixture()?;
+    let database = fixture._directory.path().join("admission.db");
+    // A pinned reader keeps every later frame in the WAL. The genuine
+    // finalization then persists a large resolved output.
+    let reader = rusqlite::Connection::open(&database)?;
+    reader.execute_batch("BEGIN")?;
+    let _: i64 = reader.query_row("SELECT COUNT(*) FROM admission_operations", [], |row| {
+        row.get(0)
+    })?;
+    let resolved = chio_kernel::ToolCallOutput::Value(serde_json::json!({
+        "padding": "x".repeat(72 * 1024 * 1024),
+    }));
+    let finalizing =
+        finalizing_with_output(&mut fixture, false, InformationLabel::bottom(), &resolved)?;
+    let backlog = wal_backlog(&database)?;
+    assert!(
+        (64 * MIB..128 * MIB).contains(&backlog),
+        "WAL backlog {backlog} is not between the intake and settlement bands"
+    );
+    let seals = native_journal_seals(&database)?;
+    let intent = finalizing.intent(super::super::super::restricted_label())?;
+    let output = finalizing.join(&fixture, &intent)?;
+    assert_eq!(counts(&fixture)?, (1, 1, 0));
+    assert_eq!(native_journal_seals(&database)?, seals);
+    reader.execute_batch("ROLLBACK")?;
+    drop(reader);
+    reopen(fixture, &output)
+}

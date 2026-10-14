@@ -29,6 +29,66 @@ fn tamper_with_triggers_restored(fixture: &Fixture, table: &str, sql: &str) -> A
     Ok(())
 }
 
+/// The exact permanent refusal a poisoned serving owner returns on every later
+/// call: the fence from the first detection is never reset or bypassed, and
+/// the damaged data is never revalidated into serving.
+fn assert_poisoned_owner_refusal(error: AdmissionOperationStoreError, sql: &str) {
+    assert!(
+        matches!(
+            error,
+            AdmissionOperationStoreError::OutcomeUnknown(ref detail)
+                if detail == "sqlite authority owner is poisoned after an outcome-unknown anchor sync"
+        ),
+        "{sql}: {error:?}"
+    );
+}
+
+/// Substituting the retained runtime authority identifier orphans every
+/// migration event and tombstone row. That foreign-key damage is the earlier
+/// specific integrity refusal: the serving owner's entry gate names an
+/// orphaned child and fails the whole owner closed before any runtime replay
+/// verification runs. Each read path proves that first detection on its own
+/// untainted owner, then the permanent poisoned fence on the same owner.
+fn assert_substituted_authority_orphans_are_refused_and_fence<R: std::fmt::Debug>(
+    sql: &str,
+    read: impl Fn(
+        &Fixture,
+        &Source,
+        &RuntimeReplayMigrationRecordV1,
+    ) -> Result<R, AdmissionOperationStoreError>,
+) -> AnchoredTestResult {
+    let fixture = fixture();
+    let source = Source::new(&fixture, false);
+    let expected = pin(&fixture, &source)?;
+    import(&fixture, &source, &expected)?;
+    let callbacks_before = source.calls();
+    let commits_before = global_count(&fixture.store);
+    tamper_with_triggers_restored(&fixture, "runtime_replay_migration_expectations", sql)?;
+    let refused = read(&fixture, &source, &expected).expect_err(sql);
+    assert!(
+        matches!(
+            &refused,
+            AdmissionOperationStoreError::Invariant(detail)
+                if detail == "invalid sqlite authority store: sqlite foreign key violation in `runtime_replay_migration_events` row NULL (WITHOUT ROWID table)"
+                    || detail == "invalid sqlite authority store: sqlite foreign key violation in `runtime_replay_legacy_tombstones` row NULL (WITHOUT ROWID table)"
+        ),
+        "{sql}: {refused:?}"
+    );
+    let fenced = read(&fixture, &source, &expected).expect_err(sql);
+    assert_poisoned_owner_refusal(fenced, sql);
+    assert_eq!(
+        source.calls(),
+        callbacks_before,
+        "corrupt destination must reject before callbacks: {sql}"
+    );
+    assert_eq!(
+        global_count(&fixture.store),
+        commits_before,
+        "corrupt destination must never be repaired: {sql}"
+    );
+    Ok(())
+}
+
 #[test]
 fn destination_inventory_event_and_tombstone_corruption_is_never_repaired() -> AnchoredTestResult {
     for (table, sql) in [
@@ -50,6 +110,26 @@ fn destination_inventory_event_and_tombstone_corruption_is_never_repaired() -> A
         ("runtime_replay_legacy_tombstones", "UPDATE runtime_replay_legacy_tombstones SET expectation_id = 'different-expectation' WHERE participant_kind = 'destructive_lease'"),
         ("runtime_replay_legacy_tombstones", "DELETE FROM runtime_replay_legacy_tombstones WHERE participant_kind = 'destructive_lease'"),
     ] {
+        // Substituting the retained runtime authority identifier orphans the
+        // migration event and tombstone rows, so the serving owner's earlier
+        // foreign-key integrity refusal (and its permanent poisoned fence)
+        // applies instead of the domain replay integrity refusal.
+        if table == "runtime_replay_migration_expectations"
+            && sql
+                == "UPDATE runtime_replay_migration_expectations SET runtime_authority_id = 'substituted-runtime'"
+        {
+            assert_substituted_authority_orphans_are_refused_and_fence(sql, |fixture, _, _| {
+                load(fixture)
+            })?;
+            assert_substituted_authority_orphans_are_refused_and_fence(sql, |fixture, source, _| {
+                pin(fixture, source)
+            })?;
+            assert_substituted_authority_orphans_are_refused_and_fence(
+                sql,
+                |fixture, source, expected| import(fixture, source, expected),
+            )?;
+            continue;
+        }
         let fixture = fixture();
         let source = Source::new(&fixture, false);
         let expected = pin(&fixture, &source)?;

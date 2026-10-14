@@ -70,7 +70,13 @@ impl CheckpointFixture {
     fn seed(&self, key: &str, checkpoint: &LabeledCheckpointV1) -> TestResult {
         let mut connection = self.store.connection()?;
         let tx = self.store.begin_write(&mut connection, None)?;
-        save(&tx, &self.store.serving_owner, &self.scope, key, checkpoint)?;
+        protected::persist_test_record(
+            &tx,
+            &self.store.serving_owner,
+            key,
+            &scope_key(&self.scope)?,
+            &protected::encode(checkpoint)?,
+        )?;
         self.store.commit_write(tx)?;
         self.store.sync_after_write(&connection)?;
         Ok(())
@@ -87,7 +93,15 @@ impl CheckpointFixture {
     fn retain(&self, checkpoint: &LabeledCheckpointV1) -> TestResult {
         let mut connection = self.store.connection()?;
         let tx = self.store.begin_write(&mut connection, None)?;
-        retain_checkpoint_revision(&tx, &self.store.serving_owner, checkpoint)?;
+        if let Some(write) = derive_revision(&tx, checkpoint)? {
+            protected::persist_test_record(
+                &tx,
+                &self.store.serving_owner,
+                write.key(),
+                write.scope_key(),
+                write.payload(),
+            )?;
+        }
         self.store.commit_write(tx)?;
         self.store.sync_after_write(&connection)?;
         Ok(())

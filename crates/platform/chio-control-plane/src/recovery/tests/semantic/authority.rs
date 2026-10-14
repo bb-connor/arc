@@ -138,7 +138,9 @@ async fn native_current_selected_annotation_refuses_an_older_permissive_answer()
 
 #[tokio::test]
 async fn native_framing_binds_actual_model_provenance_before_knowledge_history() -> TestResult {
-    let f = native_fixture("write")?;
+    // A clean origin: imported predecessor history is conservative unknown
+    // influence by contract, so only an empty import has none to observe.
+    let f = empty_import::native_fixture_from_empty_import("write").await?;
     let (runtime, mut request, mut p) = prepare(
         &f,
         "model-provenance",

@@ -1,28 +1,18 @@
 //! Durable raw-route refusal shared by every open of this journal.
 use super::*;
 impl Store {
-    pub(crate) fn enable_knowledge(&mut self) -> Result<(), ProcessError> {
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        super::unused_recovery_reservation::verify_before_open(&tx)?;
-        super::confined_delivery::verify_before_open(&tx)?;
-        tx.execute(
-            "UPDATE process_runtime SET version=5 WHERE singleton=1 AND version IN (1,2,3,4)",
-            [],
-        )?;
-        tx.commit()?;
-        self.require_enforced_knowledge()
-    }
-    pub(crate) fn require_raw_knowledge(&self) -> Result<(), ProcessError> {
-        let version: u32 = self.connection.query_row(
-            "SELECT version FROM process_runtime WHERE singleton=1",
-            [],
-            |row| row.get(0),
-        )?;
+    /// Whether this journal still needs the knowledge activation write. The
+    /// retained cohorts are authenticated first; no state is written here.
+    pub(crate) fn knowledge_activation_pending(&self) -> Result<bool, ProcessError> {
         super::unused_recovery_reservation::verify_before_open(&self.connection)?;
         super::confined_delivery::verify_before_open(&self.connection)?;
-        if !matches!(version, 1 | 2) {
+        Ok(matches!(super::feature_level(&self.connection)?, 1..=4))
+    }
+    pub(crate) fn require_raw_knowledge(&self) -> Result<(), ProcessError> {
+        let level = super::feature_level(&self.connection)?;
+        super::unused_recovery_reservation::verify_before_open(&self.connection)?;
+        super::confined_delivery::verify_before_open(&self.connection)?;
+        if !matches!(level, 1 | 2) {
             return Err(ProcessError::Configuration(
                 "durable knowledge requires mediated release",
             ));
@@ -52,19 +42,7 @@ impl Store {
                 "durable knowledge backend is unsupported",
             ));
         }
-        let version: u32 = self.connection.query_row(
-            "SELECT version FROM process_runtime WHERE singleton=1",
-            [],
-            |row| row.get(0),
-        )?;
-        super::unused_recovery_reservation::verify_before_open(&self.connection)?;
-        super::confined_delivery::verify_before_open(&self.connection)?;
-        if !matches!(version, 5..=7) {
-            return Err(ProcessError::Configuration(
-                "durable knowledge is not enforced",
-            ));
-        }
-        Ok(())
+        require_enforced_level(&self.connection)
     }
     pub(crate) fn public_process(&self, id: &str) -> Result<ProcessSnapshot, ProcessError> {
         let mut process = self.process(id)?;
@@ -100,16 +78,6 @@ impl Store {
         self.read_retained_knowledge_blob(process, digest, generation)
     }
 
-    pub(crate) fn retained_knowledge_generation(
-        &self,
-        process: &str,
-        digest: &str,
-    ) -> Result<String, ProcessError> {
-        self.require_enforced_knowledge()?;
-        self.process(process)?;
-        self.connection.query_row("SELECT knowledge_generation FROM process_state_blobs WHERE process_id=?1 AND sha256=?2",params![process,digest],|row|row.get(0)).optional()?.ok_or(ProcessError::BlobMissing)
-    }
-
     pub(crate) fn read_retained_knowledge_blob(
         &self,
         process: &str,
@@ -127,18 +95,31 @@ impl Store {
         }
         Ok(bytes)
     }
-    pub(crate) fn collect_blob(
-        &mut self,
-        process: &str,
-        digest: &str,
-        generation: &str,
-    ) -> Result<(), ProcessError> {
-        self.require_enforced_knowledge()?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        tx.execute("DELETE FROM process_state_blobs WHERE process_id=?1 AND sha256=?2 AND knowledge_generation=?3 AND legacy_quarantined=0", params![process,digest,generation])?;
-        tx.commit()?;
-        Ok(())
+}
+
+/// The complete activation body inside one writer transaction: the retained
+/// cohorts are authenticated and a predecessor level is raised to the
+/// enforced knowledge level exactly once.
+pub(crate) fn enable_knowledge_call(tx: &rusqlite::Transaction<'_>) -> Result<(), ProcessError> {
+    super::unused_recovery_reservation::verify_before_open(tx)?;
+    super::confined_delivery::verify_before_open(tx)?;
+    let level = super::feature_level(tx)?;
+    if matches!(level, 1..=4) {
+        super::raise_feature_level(tx, level, 5)?;
     }
+    Ok(())
+}
+
+/// The enforced-knowledge level gate over any connection, including the
+/// writer transaction of a routed write.
+pub(crate) fn require_enforced_level(connection: &Connection) -> Result<(), ProcessError> {
+    let level = super::feature_level(connection)?;
+    super::unused_recovery_reservation::verify_before_open(connection)?;
+    super::confined_delivery::verify_before_open(connection)?;
+    if !matches!(level, 5..=7) {
+        return Err(ProcessError::Configuration(
+            "durable knowledge is not enforced",
+        ));
+    }
+    Ok(())
 }

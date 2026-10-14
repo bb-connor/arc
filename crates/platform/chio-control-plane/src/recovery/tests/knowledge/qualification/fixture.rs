@@ -71,7 +71,9 @@ struct Initial {
 
 async fn initial(workflow: &str) -> TestResult<Initial> {
     let mut f = KnowledgeFixture::from(super::super::super::semantic::native_fixture("read")?)?;
-    let id = Box::pin(f.f.ready()).await?;
+    let id = Box::pin(f.f.ready())
+        .await
+        .map_err(|error| format!("qualification workflow preparation: {error}"))?;
     let artifact = if workflow == "artifact" {
         Some(publish_label(
             &f,
@@ -83,7 +85,10 @@ async fn initial(workflow: &str) -> TestResult<Initial> {
         None
     };
     let service = setup(&f, &id)?;
-    let probe = service.probe(&f.f.control, &id).await?;
+    let probe = service
+        .probe(&f.f.control, &id)
+        .await
+        .map_err(|error| format!("qualification initial setup probe: {error}"))?;
     drop(service);
     Ok(Initial {
         setup_process_charges: f.f.process.process("root")?.tree_calls,
@@ -128,7 +133,10 @@ async fn selected_writer(
 ) -> TestResult<CaseFixture> {
     let f = open(&mut previous)?;
     let service = setup(&f, &previous.workflow)?;
-    service.qualify(&f.f.control, &previous.probe).await?;
+    service
+        .qualify(&f.f.control, &previous.probe)
+        .await
+        .map_err(|error| format!("qualification reopened setup: {error}"))?;
     drop(service);
     let id = if workflow == "support" {
         Box::pin(f.f.ready_named("trial-work", "trial-work")).await?
@@ -185,7 +193,9 @@ async fn selected_writer(
     };
     match case {
         "lost_ack_restart" => {
-            Box::pin(fixture.execute()).await?;
+            Box::pin(fixture.execute())
+                .await
+                .map_err(|error| format!("qualification initial delivery: {error}"))?;
             // Discard the initiating result, close every writer and reopen
             // the same independently durable native/provider stores.
             previous.path = fixture.f.f.path.clone();
@@ -200,7 +210,12 @@ async fn selected_writer(
             // intentionally not an exact acknowledgement-recovery identity.
             f.f.control = control;
             let service = setup(&f, &previous.workflow)?;
-            service.qualify(&f.f.control, &previous.probe).await?;
+            service
+                .qualify(&f.f.control, &previous.probe)
+                .await
+                .map_err(|error| {
+                    format!("qualification acknowledgement recovery setup: {error}")
+                })?;
             drop(service);
             let sink = DurableSink {
                 native: f.sink(),

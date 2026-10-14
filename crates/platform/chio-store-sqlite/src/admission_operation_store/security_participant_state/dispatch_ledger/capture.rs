@@ -35,9 +35,9 @@ pub(crate) struct VerifiedNativeCapture<'tx> {
 }
 
 /// Fresh capture needs its original, prepaid finishing obligations. Neither a
-/// retained bounds profile nor an absent predecessor profile supplies funding.
-/// Until the complete native phase factory exists, authenticate the original
-/// owner and refuse here, before any physical capture or dispatch mutation.
+/// retained bounds profile nor an absent predecessor profile supplies funding:
+/// only the exact Confirmed account of this original, with every post-effect
+/// native purpose still outstanding, admits the capture transaction.
 fn require_native_capture_finishing_funding(
     tx: &Transaction<'_>,
     owner: &SqliteServingOwner,
@@ -49,9 +49,12 @@ fn require_native_capture_finishing_funding(
     verify_participant_recovery_tx(tx, owner, custody.operation, custody.lease, now)?;
     original.validate_native_security_authority(custody.binding)?;
     original.validate_native_security_context(custody.security_context)?;
-    Err(invalid(
-        "fresh native capture lacks authenticated finishing funding",
-    ))
+    super::super::finishing_account::require_confirmed_native_finishing(
+        tx,
+        custody.operation,
+        original,
+        custody.binding,
+    )
 }
 
 impl<'tx> VerifiedNativeCapture<'tx> {
@@ -336,6 +339,9 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 .declassification
                 .as_ref()
                 .and_then(|grant| grant.body.expires_at_unix_seconds().checked_mul(1000)),
+            self.semantic
+                .as_ref()
+                .map(|semantic| semantic.valid_until()),
         )?;
         #[cfg(feature = "admission-test-support")]
         let _setup_clock = expiry_test_support::setup_clock_after_state_verification(
@@ -357,7 +363,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         self.validate_setup_capture_time(commit_now)?;
         #[cfg(feature = "admission-test-support")]
         {
-            expiry_test_support::annotate_rejection(delayed, self.validate_time(commit_now))
+            expiry_test_support::annotate_rejection(tx, delayed, self.validate_time(commit_now))
         }
         #[cfg(not(feature = "admission-test-support"))]
         {

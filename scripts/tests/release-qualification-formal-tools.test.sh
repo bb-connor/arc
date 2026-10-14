@@ -15,6 +15,12 @@ workflow = Path(sys.argv[1])
 generator = Path(sys.argv[2]).read_text(encoding="utf-8")
 checker = Path(sys.argv[3]).read_text(encoding="utf-8")
 lines = workflow.read_text(encoding="utf-8").splitlines()
+text = "\n".join(lines)
+cache = text.index("uses: Swatinem/rust-cache@")
+setup = text.index("uses: ./.github/actions/setup-kani")
+qualification = text.index("./scripts/qualify-release.sh")
+if not cache < setup < qualification:
+    raise SystemExit("release qualification must install patched Kani after cache restore and before execution")
 
 required_markers = {
     "CHIO_AENEAS_RELEASE_TAG": "Aeneas release pin",
@@ -27,8 +33,8 @@ required_markers = {
     "./scripts/install-aeneas-toolchain.py": "authenticated Aeneas installer",
     "target/formal/aeneas-toolchain/${architecture}/bin": "authenticated Aeneas tool path",
     "Install Rust verification tools": "Kani and Creusot install step",
-    "cargo install kani-verifier": "Kani installer",
-    "cargo kani setup": "Kani setup",
+    "uses: ./.github/actions/setup-kani": "patched source-built Kani installer",
+    "bash scripts/check-kani-toolchain.sh": "Kani toolchain version probe",
     "git clone https://github.com/creusot-rs/creusot": "Creusot source checkout",
     "cargo creusot version": "Creusot post-install probe",
     "cargo install wasm-bindgen-cli --version \"$(cat .tooling/wasm-bindgen.version)\" --locked": "pinned wasm-bindgen-cli installer",

@@ -10,6 +10,7 @@ use chio_kernel::{ChioKernel, ToolInvocationContext};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::native_return_custody::CurrentWriter;
 use crate::store::Store;
 use crate::{ProcessError, ProcessSnapshot};
 
@@ -17,6 +18,7 @@ use crate::{ProcessError, ProcessSnapshot};
 #[derive(Clone)]
 pub struct ProcessRegistry {
     pub(crate) store: Arc<Mutex<Store>>,
+    pub(crate) writer: CurrentWriter,
     pub(crate) namespace: String,
     pub(crate) enforcement: chio_kernel::knowledge::DurableKnowledgeEnforcement,
 }
@@ -64,14 +66,25 @@ impl ProcessRegistry {
                 .ok_or(ProcessError::Configuration(
                     "a qualified durable admission store is required",
                 ))?;
-        let mut store = Store::open(path.as_ref(), authority, &kernel.public_key().to_hex())?;
+        let kernel_key = kernel.public_key().to_hex();
+        let store = Store::open(path.as_ref(), authority, &kernel_key)?;
         let enforcement = kernel.durable_knowledge_enforcement()?;
-        if enforcement.enforced(&store.namespace)? {
-            store.enable_knowledge()?;
-        }
         let namespace = store.namespace.clone();
+        let store = Arc::new(Mutex::new(store));
+        // Every write to this journal, including its open-time layout
+        // installation and knowledge activation, runs through the Kernel's
+        // current-write scope of the same durable runtime.
+        let writer = CurrentWriter::new(
+            store.clone(),
+            kernel.original_process_current_write_enforcement()?,
+        );
+        writer.complete_startup()?;
+        if enforcement.enforced(&namespace)? {
+            writer.activate_knowledge()?;
+        }
         Ok(Self {
-            store: Arc::new(Mutex::new(store)),
+            store,
+            writer,
             namespace,
             enforcement,
         })
@@ -89,7 +102,7 @@ impl ProcessRegistry {
     /// Install private subject keys for an explicitly enabled native delegation
     /// service. Existing key bindings cannot change. Never expose them to guests.
     pub fn provision_signers(&self, keys: &[(String, &Keypair)]) -> Result<(), ProcessError> {
-        self.with_store(|store| store.provision_signers(keys))
+        self.writer.provision_signers(keys)
     }
 
     /// Use a persisted process key inside the trusted host. The callback is
@@ -114,13 +127,10 @@ impl ProcessRegistry {
         &self,
         read: impl FnOnce(&mut Store) -> Result<T, ProcessError>,
     ) -> Result<T, ProcessError> {
-        let enforced = self.enforcement.enforced(&self.namespace)?;
-        self.with_store(|store| {
-            if enforced {
-                store.enable_knowledge()?;
-            }
-            read(store)
-        })
+        if self.enforcement.enforced(&self.namespace)? {
+            self.writer.activate_knowledge()?;
+        }
+        self.with_store(read)
     }
 
     /// Commit a signed child, its key and work binding in one transaction.
@@ -135,7 +145,7 @@ impl ProcessRegistry {
             &Keypair,
         ) -> Result<CapabilityToken, ProcessError>,
     ) -> Result<ChildWork, ProcessError> {
-        self.with_store(|store| store.submit_child(submission, issue))
+        self.writer.submit_child(submission, issue)
     }
 
     pub fn child_work(&self) -> Result<Vec<ChildWork>, ProcessError> {
@@ -164,7 +174,8 @@ impl ProcessRegistry {
             &std::collections::BTreeMap<String, Vec<String>>,
         ) -> Result<(), ProcessError>,
     ) -> Result<String, ProcessError> {
-        self.with_store(|store| store.wait_for_settled_children(context, children, validate))
+        self.writer
+            .wait_for_settled_children(context, children, validate)
     }
 
     /// Record direct-child dependencies after host validation of the complete
@@ -178,7 +189,7 @@ impl ProcessRegistry {
             &std::collections::BTreeMap<String, Vec<String>>,
         ) -> Result<(), ProcessError>,
     ) -> Result<String, ProcessError> {
-        self.with_store(|store| store.wait_for_children(context, children, validate))
+        self.writer.wait_for_children(context, children, validate)
     }
 
     fn with_store<T>(

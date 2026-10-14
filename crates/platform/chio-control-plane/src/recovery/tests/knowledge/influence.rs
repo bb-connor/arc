@@ -45,6 +45,11 @@ fn native_knowledge_release_matches_its_complete_join_liability_preview() -> Tes
         .map_err(|error| format!("native join preview owning release: {error}"))?;
     assert_eq!(work.knowledge_join_previews(), 1);
     assert_eq!(work.knowledge_join_readbacks(), 1);
+    assert_eq!(
+        work.projection_recomputations(),
+        0,
+        "ordinary release rebuilt influence history"
+    );
     let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
     let (roots, globals): (i64, i64) = connection.query_row(
         "SELECT (SELECT count(*) FROM admission_operation_recovery_records
@@ -149,5 +154,153 @@ fn memory_lineage_influence_survives_a_new_principal_isolation_epoch() -> TestRe
         .ok_or("lineage lost influence across epoch")?;
     assert!(inherited.externally_influenced);
     assert!(inherited.unknown);
+    Ok(())
+}
+
+// New slots begin at revision one even when their authority already has joins.
+#[test]
+fn native_influence_scope_first_join_can_follow_other_scopes() -> TestResult {
+    let f = KnowledgeFixture::new()?;
+    let reference = publish_label(
+        &f,
+        "fresh-scope-source",
+        b"fresh-scope-first-observation",
+        restricted_label(),
+    )?;
+    for sequence in 0..2 {
+        let handle = f.runtime.handle(
+            &f.f.control,
+            &reference,
+            &ArtifactRecipientId::new("agent-root")?,
+        )?;
+        f.runtime.release_into(
+            &f.f.control,
+            &RequestId::new(&format!("fresh-scope-earlier-{sequence}"))?,
+            f.runtime
+                .prepare_read(&f.f.control, &handle)
+                .map_err(|error| format!("fresh-scope prepare read: {error}"))?,
+            &f.sink(),
+        )?;
+    }
+    let store = f.f.authority.admission_operation_store();
+    let original =
+        f.f.process
+            .recovery_security_context(f.profile.scope.process_id.as_str())?;
+    // The new runtime retains the existing principal and lineage, and derives
+    // a fresh session. Its first session projection follows earlier joins.
+    let process = ProcessRuntime::open(f.f.path.join("fresh-process.db"), f.f.kernel.clone())?
+        .with_security_profile(ProcessSecurityProfile {
+            tenant_id: original.as_v1().tenant_id().as_str().into(),
+            isolation_epoch_id: original.as_v1().isolation_epoch_id().as_str().into(),
+            generation: original.as_v1().context_generation(),
+        })?;
+    let process_id = ProcessId::new("fresh-knowledge-root")?;
+    process.create_root(
+        process_id.as_str(),
+        &f.f.seed.capability,
+        ProcessLimits {
+            max_processes: 8,
+            max_depth: 2,
+            max_calls: 32,
+            state: Default::default(),
+        },
+    )?;
+    let new_context = process.recovery_security_context(process_id.as_str())?;
+    assert_eq!(
+        new_context.as_v1().principal_id(),
+        original.as_v1().principal_id()
+    );
+    assert_ne!(
+        new_context.as_v1().session_id(),
+        original.as_v1().session_id()
+    );
+    assert_eq!(
+        new_context.as_v1().lineage_root_id(),
+        original.as_v1().lineage_root_id()
+    );
+    let mut deployment = f.f.kernel.recovery_deployment(&f.profile.scope)?;
+    deployment.scope.process_id = process_id;
+    deployment.security_context = new_context.clone();
+    deployment.authority_scope = recovery_authority_scope_digest(&deployment)?;
+    store.configure_recovery_deployment(&deployment)?;
+    let mut profile = f.profile.clone();
+    profile.scope = deployment.scope.clone();
+    profile.producer_context = new_context.clone();
+    let mut recipient = profile.recipients.as_slice()[0].recipient.clone();
+    recipient.scope = profile.scope.clone();
+    recipient.runtime = ProtectedText::new(process.runtime_id())?;
+    recipient.principal = new_context.as_v1().principal_id().clone();
+    recipient.lineage = IsolationLineageId::new(new_context.as_v1().lineage_root_id().as_str())?;
+    recipient.isolation_epoch =
+        ProtectedText::new(new_context.as_v1().isolation_epoch_id().as_str())?;
+    recipient.context_generation = SafeInteger::new(new_context.as_v1().context_generation())?;
+    let mut recipients = profile.recipients.as_slice().to_vec();
+    recipients[0].recipient = recipient;
+    recipients[0].context = new_context.clone();
+    profile.recipients = NonEmptyBoundedList::new(recipients)?;
+    profile.generation = SafeInteger::new(1)?;
+    assert_eq!(profile.native_authority, f.profile.native_authority);
+    store.configure_knowledge(&profile)?;
+    let broker = Arc::new(process.enable_durable_knowledge()?);
+    let runtime = NativeKnowledgeRuntime::new(
+        f.f.kernel.clone(),
+        Arc::new(f.f.authority.admission_operation_store()),
+        broker,
+        profile.clone(),
+        f.f.authority.mutation_fence(),
+    )
+    .map_err(|error| format!("fresh-scope runtime installation: {error}"))?;
+    let mut input = f.input("fresh-scope-adopted", b"fresh-scope-late-first-join")?;
+    input.producer = ArtifactProducerV1::Adoption {
+        evidence: EvidenceRef::new("fresh-scope-adopted")?,
+    };
+    let reservation = runtime
+        .reserve(&f.f.control, &input)
+        .map_err(|error| format!("fresh-scope reserve: {error}"))?;
+    let proof = certificate(&f, &reservation, restricted_label())?;
+    let adopted = runtime
+        .publish(
+            &f.f.control,
+            &input,
+            b"fresh-scope-late-first-join",
+            Some(&proof),
+        )
+        .map_err(|error| format!("fresh-scope publication: {error}"))?;
+    let handle = runtime
+        .handle(
+            &f.f.control,
+            &adopted,
+            &ArtifactRecipientId::new("agent-root")?,
+        )
+        .map_err(|error| format!("fresh-scope handle: {error}"))?;
+    let sink = RecordingSink {
+        recipient: profile.recipients.as_slice()[0].recipient.clone(),
+        delivered: Mutex::new(Vec::new()),
+        path: f.f.path.join("admission.db"),
+    };
+    runtime
+        .release_into(
+            &f.f.control,
+            &RequestId::new("fresh-scope-late-join")?,
+            runtime.prepare_read(&f.f.control, &handle)?,
+            &sink,
+        )
+        .map_err(|error| format!("fresh-scope release: {error}"))?;
+    let work = NativeInfluenceReadWorkFixture::begin()?;
+    let observed = store
+        .observe_knowledge_influence(
+            &deployment.scope,
+            &f.f.authority.mutation_fence(),
+            now_ms()?,
+        )?
+        .ok_or("the fresh inherited scope lost its late first join")?;
+    assert!(observed.externally_influenced);
+    assert!(observed.unknown);
+    assert!(
+        work.history_bodies() + work.current_projections() <= 3,
+        "the fresh-scope reader traversed {} history bodies and {} current projections",
+        work.history_bodies(),
+        work.current_projections(),
+    );
     Ok(())
 }

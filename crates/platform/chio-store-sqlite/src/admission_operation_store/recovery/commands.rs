@@ -565,11 +565,8 @@ pub(in crate::admission_operation_store) fn apply(
                     provider_finality: None,
                     provider_lookups: SafeInteger::ZERO,
                 };
-                // The supported catalog retains the permanent immutable origin
-                // claim. The complete successor-owner contract is not
-                // integrated, so a retained predecessor prototype catalog must
-                // stay absent and a consumed claim conflicts with any other
-                // prospective owner.
+                // The immutable claim opens or transfers through its current-owner
+                // head in this writer. Unsupported ownership tables must stay absent.
                 require_predecessor_original_owner_absence(tx)?;
                 origins::claim(tx, owner, &new)?;
                 save_workflow(tx, owner, &mut new, WorkflowWriteClass::Planning)?;
@@ -579,15 +576,8 @@ pub(in crate::admission_operation_store) fn apply(
         body => {
             let (id, revision) = selector(body)?;
             let mut record = workflow_preview_tx(tx, actor, deployment, id)?;
-            if record.origin.is_none()
-                && matches!(body, RecoveryCommandBodyV1::CancelWorkflow { .. })
-            {
-                // Historical control keeps its exact retained source without
-                // acquiring a fresh original or effect authority. The removed
-                // successor-ownership prototype must stay absent.
-                require_predecessor_original_owner_absence(tx)?;
-            } else {
-                require_current_original_owner(tx, &record)?;
+            if !original_owner_is_current(tx, &record)? {
+                return Err(RecoveryCommandPortError::Conflict);
             }
             let held = historical_holds::effective(tx, &record)?.is_some();
             if revision.is_some_and(|revision| revision != record.revision) {

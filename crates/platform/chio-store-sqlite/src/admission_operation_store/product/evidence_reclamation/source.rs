@@ -18,11 +18,6 @@ impl ProductEvidenceReclamationSource {
     ) -> &protected::ProtectedSourceReference {
         &self.original
     }
-    pub(in crate::admission_operation_store) fn archive(
-        &self,
-    ) -> &protected::ProtectedSourceReference {
-        &self.archive
-    }
     pub(in crate::admission_operation_store) fn terminal(
         &self,
     ) -> &protected::ProtectedSourceReference {

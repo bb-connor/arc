@@ -65,6 +65,7 @@ fi
 
 python3 - <<'PY'
 from pathlib import Path
+import hashlib
 import re
 import tomllib
 
@@ -74,13 +75,57 @@ for name in ["ci", "formal-pr-smoke", "nightly", "release-qualification", "proof
         raise SystemExit(f"{name} does not pin the compatible Kani release")
     if "bash scripts/check-kani-toolchain.sh" not in text:
         raise SystemExit(f"{name} does not verify the installed compiler")
+    if "uses: ./.github/actions/setup-kani" not in text:
+        raise SystemExit(f"{name} does not install Kani through the shared setup owner")
+    if "cargo install kani-verifier" in text or "cargo kani setup" in text:
+        raise SystemExit(f"{name} still acquires a stock hosted Kani bundle")
 smoke = Path(".github/workflows/formal-pr-smoke.yml").read_text()
-if smoke.count("${{ runner.os }}-${{ runner.arch }}-kani-${{ env.CHIO_KANI_VERSION }}-${{ hashFiles('scripts/check-kani-toolchain.sh') }}") != 2:
-    raise SystemExit("Kani caches omit the platform or toolchain contract")
+if smoke.count("uses: ./.github/actions/setup-kani") != 2:
+    raise SystemExit("formal PR Kani jobs must install through the shared setup owner")
 if "if ! bash scripts/check-kani-toolchain.sh" in smoke:
     raise SystemExit("cached Kani probing must follow explicit pinned installation and setup")
-if smoke.count('cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}" --force') != 2:
-    raise SystemExit("cached Kani proxies are not replaced by the pinned installer")
+if "~/.kani" in smoke:
+    raise SystemExit("formal PR Kani jobs must not restore stock hosted-bundle caches")
+patch = Path("formal/rust-verification/patches/kani-catch-unwind.patch").read_bytes()
+if hashlib.sha256(patch).hexdigest() != (
+    "84440a2046d1fc81bfdac1003c91a974103dc05b6fd5bb2435227b6024c5f2c4"
+):
+    raise SystemExit("committed catch_unwind patch bytes drifted from the reviewed pin")
+action = Path(".github/actions/setup-kani/action.yml").read_text()
+for pin in (
+    "0d2328a93f0e0ff66132d6bfa1a7d884877cf862",
+    "84440a2046d1fc81bfdac1003c91a974103dc05b6fd5bb2435227b6024c5f2c4",
+    "b250680abd40ff1aaa07081d0497dc2755ed112e",
+    "cargo run --locked --target-dir target/tools -p build-kani -- build-dev --release --locked",
+    "submodule update --init charon",
+    "[[ \"${RUNNER_PLATFORM}\" == 'Linux-X64' ]]",
+    "b3721aa541038384d7801ea3aeabbcddc3e8845ac8f1cbff637cf8dec7481ac8",
+    "RUSTUP_TOOLCHAIN=nightly-2026-08-21",
+    "CARGO_BUILD_JOBS=2",
+    "kani-src/target",
+    "/etc/os-release",
+    "bash \"${GITHUB_WORKSPACE}/scripts/check-kani-toolchain.sh\"",
+):
+    if pin not in action:
+        raise SystemExit(f"setup-kani lost a required pin: {pin}")
+cache_paths = re.findall(r"^\s+path: (.+)$", action, re.MULTILINE)
+if cache_paths != ["${{ runner.temp }}/kani-src/target"]:
+    raise SystemExit("setup-kani must cache only its build output directory")
+if smoke.count('".github/actions/setup-kani/action.yml"') != 1:
+    raise SystemExit("formal PR paths do not trigger on setup-kani changes")
+rust_common = next(
+    line for line in smoke.splitlines() if line.lstrip().startswith("rust_common=")
+)
+for route in ("setup-kani/action\\.yml", "patches/kani-catch-unwind\\.patch"):
+    if route not in rust_common:
+        raise SystemExit(f"formal PR Kani jobs are not selected by route: {route}")
+mutants = Path(".github/workflows/proof-mutants.yml").read_text()
+for route in (
+    '".github/actions/setup-kani/action.yml"',
+    '"formal/rust-verification/patches/kani-catch-unwind.patch"',
+):
+    if route not in mutants:
+        raise SystemExit(f"proof-mutants is not triggered by route: {route}")
 manifest = tomllib.loads(Path(".kani/harnesses.toml").read_text())
 for crate in {entry["crate"] for entry in manifest["harness"] if entry["lane"] == "pr"}:
     files = list(Path("crates").glob(f"*/{crate}/Cargo.toml"))

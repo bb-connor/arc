@@ -55,8 +55,19 @@ pub(super) fn remove_empty_v33_nonce_preflight(connection: &Connection) -> rusql
 #[test]
 fn v32_upgrade_adds_empty_nonce_preflight_journal_without_rewriting_native_history(
 ) -> AnchoredTestResult {
-    let fixture = fixture();
-    let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let fixture = pre_recovery_fixture();
+    let source = imported(&fixture, "source")?;
+    // The v32 catalog predates recovery: build it while no recovery custody
+    // exists and record the initialization under the compiled catalog its
+    // recorded admission stamp selects.
+    {
+        let connection = fixture.store.connection()?;
+        remove_empty_v33_nonce_preflight(&connection)?;
+        connection.execute_batch("UPDATE chio_store_schema_versions SET version = 32 WHERE store_key = 'admission_operation'")?;
+    }
+    let initialized =
+        native::hydrate_predecessor_fixture(&fixture.store, &source, &fixture.fence, now_ms())?;
+    assert!(initialized.requires_imported_influence_upgrade()?);
     let Fixture {
         _temp,
         database,
@@ -68,8 +79,6 @@ fn v32_upgrade_adds_empty_nonce_preflight_journal_without_rewriting_native_histo
     drop(store);
     drop(authority);
     let connection = Connection::open(&database)?;
-    remove_empty_v33_nonce_preflight(&connection)?;
-    connection.execute_batch("UPDATE chio_store_schema_versions SET version = 32 WHERE store_key = 'admission_operation'")?;
     let before: Vec<(i64, String)> = {
         let mut statement = connection.prepare("SELECT commit_sequence, chain_digest FROM authority_global_commits ORDER BY commit_sequence")?;
         let rows = statement
@@ -117,7 +126,7 @@ fn v32_nonce_preflight_journal_upgrade_rejects_partial_future_catalog_without_re
             authority,
             store,
             ..
-        } = fixture();
+        } = pre_recovery_fixture();
         drop(store);
         drop(authority);
         let connection = Connection::open(&database)?;

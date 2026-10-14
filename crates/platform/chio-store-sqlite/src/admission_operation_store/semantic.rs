@@ -13,13 +13,16 @@ mod annotations;
 mod capture;
 mod constraints;
 mod delivery;
+#[cfg(feature = "admission-test-support")]
+mod legacy_annotation_capture;
 mod materialization;
 pub(in crate::admission_operation_store) mod output;
 mod policy;
 pub(in crate::admission_operation_store) mod status;
 pub(super) use capture::{capture_tx, verify_capture_tx, SemanticCaptureWitness};
 pub(in crate::admission_operation_store) use capture::{
-    verify_input_tx, SemanticInputObservation,
+    validate_historical_semantic_refused_input_origin, verify_input_tx,
+    HistoricalSemanticRefusedInputObservation, SemanticInputObservation,
 };
 pub(in crate::admission_operation_store) use policy::policy_application_receipt;
 pub use policy::{

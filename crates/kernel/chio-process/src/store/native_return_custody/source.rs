@@ -7,7 +7,7 @@ pub(super) fn verify_prepared_pricing_cut(
 ) -> Result<(), ProcessError> {
     let connection: &Connection = tx;
     let address = std::ptr::from_ref(connection) as usize;
-    let profile = catalog::prepare_profile(
+    let profile = catalog::prepare_active_profile(
         tx,
         &source.path,
         &source.data.journal_namespace,
@@ -29,7 +29,7 @@ pub(super) fn verify_prepared_pricing_cut(
     Ok(())
 }
 
-fn source_row_digest(
+pub(super) fn source_row_digest(
     tx: &Connection,
     source: &ProcessReturnSourceDataV1,
 ) -> Result<String, ProcessError> {
@@ -85,6 +85,51 @@ fn source_row_digest(
         attempt,
         nonce_digest,
     ))
+}
+
+/// Revalidate a prepared source inside a later owning writer transaction. The
+/// same connection, file identity, kernel key, active write recipe and exact
+/// journal row cut must still match the preparation. Other intervening writes
+/// do not invalidate the source; changing its bound rows does.
+pub(super) fn verify_retained_source(
+    tx: &Transaction<'_>,
+    source: &PreparedProcessReturnSource,
+) -> Result<(), ProcessError> {
+    let connection: &Connection = tx;
+    if std::ptr::from_ref(connection) as usize != source.prepared_connection {
+        return Err(ProcessError::Conflict);
+    }
+    let file = chio_sqlite_file_identity::main_database_file_identity(tx)
+        .map_err(|_| ProcessError::Conflict)?;
+    if file.device != source.data.file_device
+        || file.inode != source.data.file_inode
+        || file.link_count != 1
+        || digest(&source.kernel_key)? != source.data.kernel_key_digest
+    {
+        return Err(ProcessError::Conflict);
+    }
+    let profile = catalog::prepare_active_profile(
+        tx,
+        &source.path,
+        &source.data.journal_namespace,
+        &source.data.journal_authority,
+        &source.kernel_key,
+    )?;
+    if profile.catalog_digest() == source.data.catalog_digest {
+        if profile.recipe_digest() != source.profile.recipe_digest() {
+            return Err(ProcessError::Conflict);
+        }
+    } else if !cohort::family_present(tx)?
+        || !catalog::predecessor_catalog_digests()?.contains(&source.data.catalog_digest)
+    {
+        // The only legitimate catalog transition after preparation is the
+        // journal completing its own funded cohort activation.
+        return Err(ProcessError::Conflict);
+    }
+    if source_row_digest(tx, &source.data)? != source.rows_digest {
+        return Err(ProcessError::Conflict);
+    }
+    Ok(())
 }
 
 pub(super) fn verify_source_request(

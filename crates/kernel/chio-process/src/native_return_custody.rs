@@ -12,6 +12,16 @@ pub use crate::store::native_return_custody::{
     ProcessReturnTransactionData,
 };
 
+mod current_write;
+mod finishing;
+mod provider;
+mod writers;
+pub(crate) use current_write::CurrentWriter;
+pub use current_write::ProcessNativeCurrentWrite;
+pub use provider::{
+    ProcessNativeEnrollmentData, ProcessNativeFinishingSource, ProcessNativeReconciliationData,
+};
+
 /// The actual Process factory owns this capsule. It exposes descriptive DATA
 /// and no constructor, clone, deserializer, connection or mutation callback.
 /// Native pricing still requires the borrowed actual Process source cut.
@@ -99,8 +109,16 @@ impl ProcessRuntime {
         source: &PreparedProcessReturnParticipant,
         funding: FundedProcessReturnEnrollment,
     ) -> Result<ProcessReturnAccountCustody, ProcessError> {
+        #[cfg(feature = "admission-test-support")]
+        if let Some(observer) = &self.recovery_test_cutpoint {
+            observer(crate::RecoveryProcessTestCutpoint::NativeFinishingPrepared);
+        }
         let original =
             self.with_store(|store| store.enroll_funded_native_return(&source.original, funding))?;
+        #[cfg(feature = "admission-test-support")]
+        if let Some(observer) = &self.recovery_test_cutpoint {
+            observer(crate::RecoveryProcessTestCutpoint::NativeFinishingEnrolled);
+        }
         Ok(ProcessReturnAccountCustody { original })
     }
 

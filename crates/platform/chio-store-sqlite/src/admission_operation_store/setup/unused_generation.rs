@@ -24,37 +24,8 @@ pub(in crate::admission_operation_store) struct VerifiedUnusedSetupGeneration<'t
 }
 
 impl<'tx, 'conn> VerifiedUnusedSetupGeneration<'tx, 'conn> {
-    pub(in crate::admission_operation_store) fn transaction(&self) -> &'tx Transaction<'conn> {
-        self.transaction
-    }
-
     pub(in crate::admission_operation_store) fn record(&self) -> &RecoveryWorkflowRecordV1 {
         &self.record
-    }
-
-    pub(in crate::admission_operation_store) fn selected_creation_digest(
-        &self,
-    ) -> CanonicalPayloadDigest {
-        self.selected_creation
-    }
-
-    pub(in crate::admission_operation_store) fn selection_source(
-        &self,
-    ) -> &protected::ProtectedSourceReference {
-        &self.selection
-    }
-
-    pub(in crate::admission_operation_store) fn workflow_source(
-        &self,
-    ) -> &protected::ProtectedSourceReference {
-        &self.workflow
-    }
-
-    pub(in crate::admission_operation_store) fn replacement_reason(
-        &self,
-    ) -> Result<UnusedSetupReplacementReason, AdmissionOperationStoreError> {
-        self.verify(self.transaction)?;
-        Ok(self.reason)
     }
 
     pub(in crate::admission_operation_store) fn verify(

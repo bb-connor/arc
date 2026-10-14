@@ -92,6 +92,7 @@ impl RecoverySetupService {
                     receipt_key: &host.runtime.kernel.receipt_signing_public_key(),
                     operator: &host.operator.public_key(),
                     process: &host.runtime.process,
+                    unused_closure: &host.runtime.process,
                 },
                 &host.fence,
                 now()?,

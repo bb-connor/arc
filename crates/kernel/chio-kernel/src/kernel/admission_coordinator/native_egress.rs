@@ -474,15 +474,8 @@ impl AcquiredNativeSecurityEgress<'_> {
     }
 
     fn commit_current(&self) -> Result<NativeSecurityEgressHistoryV1, KernelError> {
-        self.commit_current_with_declassification(None)
-    }
-
-    fn commit_current_with_declassification(
-        &self,
-        consumption: Option<&chio_security_types::ports::DeclassificationConsumptionEvidenceCommit>,
-    ) -> Result<NativeSecurityEgressHistoryV1, KernelError> {
         let (lease, now) = self.prepare_commit_context()?;
-        self.commit_prepared(&lease, now, consumption)
+        self.commit_prepared(&lease, now, None)
     }
 
     fn prepare_commit_context(&self) -> Result<(AdmissionRecoveryLease, u64), KernelError> {

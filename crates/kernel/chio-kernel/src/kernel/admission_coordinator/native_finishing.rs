@@ -177,7 +177,148 @@ impl ChioKernel {
     }
 }
 
+impl ChioKernel {
+    /// Settle the original account after its Process member committed its
+    /// reconciliation. The physical owner reads the Process journal back
+    /// through the concrete source; no caller DATA can settle an account.
+    pub fn settle_original_native_finishing(
+        &self,
+        provider: &dyn NativeProcessFinishingSourceProvider,
+    ) -> Result<(), KernelError> {
+        let runtime = self.durable_runtime()?;
+        let _guard = runtime.lock_mutations()?;
+        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        store_call(|| {
+            runtime.store.settle_original_native_finishing_process(
+                provider,
+                self.native_receipt_store_registration.as_ref(),
+                &runtime.fence,
+                now,
+            )
+        })
+    }
+
+    /// Settle a native-only account once its terminal projection and receipt
+    /// are retained. Accounts with a Process member wait for reconciliation.
+    pub(in crate::kernel) fn settle_native_finishing_after_terminal(
+        &self,
+        operation_id: &crate::admission_operation::AdmissionOperationId,
+    ) -> Result<(), KernelError> {
+        let runtime = self.durable_runtime()?;
+        let _guard = runtime.lock_mutations()?;
+        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        store_call(|| {
+            runtime.store.settle_native_finishing_after_terminal(
+                operation_id,
+                self.native_receipt_store_registration.as_ref(),
+                &runtime.fence,
+                now,
+            )
+        })
+    }
+}
+
+impl ChioKernel {
+    /// A native original's receipt is retained under its prepaid ReceiptSink
+    /// purpose by the physical owner; every other receipt keeps the ordinary
+    /// durable path. The receipt writer never takes a Kernel lock, so the
+    /// mutation sequencer is held across the sink append and the spend.
+    pub(in crate::kernel) fn materialize_admission_receipt(
+        &self,
+        admission: &DurableToolAdmission,
+        receipt: &chio_core::receipt::body::ChioReceipt,
+    ) -> Result<(), KernelError> {
+        let native = admission
+            .original_retained_request()
+            .is_some_and(|original| original.native_output_retention().is_some());
+        if !native {
+            return self.materialize_durable_admission_receipt(receipt);
+        }
+        let registration = self
+            .native_receipt_store_registration
+            .as_ref()
+            .ok_or_else(|| invalid("native receipt requires its registered sink"))?;
+        let pending_visible_at_ms = self
+            .settlement_observer
+            .as_ref()
+            .map(|_| current_unix_timestamp_ms());
+        let runtime = self.durable_runtime()?;
+        let _guard = runtime.lock_mutations()?;
+        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        store_call(|| {
+            runtime.store.materialize_native_finishing_receipt(
+                admission.operation.binding().operation_id(),
+                receipt,
+                pending_visible_at_ms,
+                Some(registration),
+                &runtime.fence,
+                now,
+            )
+        })
+    }
+}
+
+impl ChioKernel {
+    /// Startup reconciliation retains each native original's missing receipt
+    /// under its prepaid purpose and returns the receipts that keep the
+    /// ordinary durable projection.
+    pub(in crate::kernel) fn reconcile_native_finishing_receipts(
+        &self,
+        receipts: &[chio_core::receipt::body::ChioReceipt],
+    ) -> Result<Vec<chio_core::receipt::body::ChioReceipt>, KernelError> {
+        let Some(registration) = self.native_receipt_store_registration.as_ref() else {
+            return Ok(receipts.to_vec());
+        };
+        let runtime = self.durable_runtime()?;
+        let pending_visible_at_ms = self
+            .settlement_observer
+            .as_ref()
+            .map(|_| current_unix_timestamp_ms());
+        let mut ordinary = Vec::new();
+        for receipt in receipts {
+            let _guard = runtime.lock_mutations()?;
+            let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+            let native = store_call(|| {
+                runtime.store.reconcile_native_finishing_receipt(
+                    receipt,
+                    pending_visible_at_ms,
+                    registration,
+                    &runtime.fence,
+                    now,
+                )
+            })?;
+            if !native {
+                ordinary.push(receipt.clone());
+            }
+        }
+        Ok(ordinary)
+    }
+
+    /// After receipt reconciliation, settle every native-only account whose
+    /// terminal and receipt are retained.
+    pub(in crate::kernel) fn settle_native_finishing_at_startup(&self) -> Result<(), KernelError> {
+        let runtime = self.durable_runtime()?;
+        let _guard = runtime.lock_mutations()?;
+        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        store_call(|| {
+            runtime.store.settle_native_finishing_at_startup(
+                self.native_receipt_store_registration.as_ref(),
+                &runtime.fence,
+                now,
+            )
+        })
+    }
+}
+
 impl DurableAdmissionRuntime {
+    /// The configured store attaches its finishing bank to the registered sink.
+    pub(crate) fn attach_native_receipt_sink(
+        &self,
+        registration: &crate::receipt_store::NativeReceiptStoreRegistration,
+    ) -> Result<(), crate::admission_operation::AdmissionOperationStoreError> {
+        self.store.attach_native_receipt_sink(registration)
+    }
+
     pub(crate) fn run_original_process_current_write_scope(
         &self,
         provider: &dyn crate::native_finishing::NativeProcessCurrentWriteProvider,

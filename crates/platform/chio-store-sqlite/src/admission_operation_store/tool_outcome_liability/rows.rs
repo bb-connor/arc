@@ -11,11 +11,19 @@ pub(in crate::admission_operation_store) enum ToolOutcomeWriteTableData {
     AdmissionMeta,
     GlobalCommits,
     GlobalMeta,
+    SecurityReleases,
+    TerminalProjections,
+    TerminalRecords,
+    ObserverAttempts,
 }
 
 impl ToolOutcomeWriteTableData {
     pub(in crate::admission_operation_store) fn table_name(self) -> &'static str {
         match self {
+            Self::SecurityReleases => "tool_outcome_security_releases",
+            Self::TerminalProjections => "admission_operation_terminal_projections",
+            Self::TerminalRecords => "admission_operation_terminal_records",
+            Self::ObserverAttempts => "admission_operation_observer_attempts",
             Self::Blobs => "tool_outcome_blobs",
             Self::Outcomes => "tool_outcomes",
             Self::Evaluations => "post_return_evaluations",
@@ -58,6 +66,16 @@ impl ToolOutcomeRowEnvelopeData {
     pub(in crate::admission_operation_store) fn index_record_bytes(&self) -> &[u64] {
         &self.index_bytes
     }
+
+    pub(in crate::admission_operation_store) fn maximum_insertions(&self) -> u64 {
+        if matches!(self.table, ToolOutcomeWriteTableData::Blobs)
+            || self.possible_before_bytes.is_none()
+        {
+            self.mutations
+        } else {
+            0
+        }
+    }
 }
 
 pub(super) fn describe_transaction_rows(
@@ -98,15 +116,6 @@ pub(super) fn describe_transaction_rows(
             rows.push(operation_shape(operation, 2)?);
             2
         }
-        ToolOutcomeTransactionPurposeData::EvaluationStage => {
-            rows.push(existing(
-                ToolOutcomeWriteTableData::Evaluations,
-                evaluation,
-                1,
-            ));
-            rows.push(operation_shape(operation, 1)?);
-            1
-        }
         ToolOutcomeTransactionPurposeData::Finalization { pure_prefix } => {
             let mutations = pure_prefix
                 .checked_add(1)
@@ -122,6 +131,71 @@ pub(super) fn describe_transaction_rows(
             ));
             rows.push(operation_shape(operation, mutations)?);
             mutations
+        }
+        ToolOutcomeTransactionPurposeData::SecurityRelease => {
+            // One immutable release record (its CHECK bound) and the actual
+            // participant update of the same admission transaction.
+            rows.push(ToolOutcomeRowEnvelopeData {
+                table: ToolOutcomeWriteTableData::SecurityReleases,
+                possible_before_bytes: None,
+                maximum_after_bytes: record_bytes(&[64, 8_192, 64, 8, 36, 36, 8])?,
+                mutations: 1,
+                index_bytes: vec![record_bytes(&[64, 8])?],
+            });
+            rows.push(operation_shape(operation, 1)?);
+            1
+        }
+        ToolOutcomeTransactionPurposeData::TerminalProjection { observer } => {
+            rows.push(ToolOutcomeRowEnvelopeData {
+                table: ToolOutcomeWriteTableData::TerminalProjections,
+                possible_before_bytes: None,
+                maximum_after_bytes: record_bytes(&[
+                    64, 8, 8, 35, 64, 64, 4_194_304, 262_144, 8, 8, 36, 36, 8,
+                ])?,
+                mutations: 1,
+                index_bytes: vec![record_bytes(&[64, 8])?],
+            });
+            // The signed receipt is bounded by the original receipt envelope;
+            // the tool outcome and observation records by their CHECK bound.
+            let mut records = vec![
+                ("receipt".len(), envelope.receipt_bytes),
+                ("tool_outcome".len(), 1_048_576),
+            ];
+            if observer {
+                records.push(("observation_attempt_zero".len(), 1_048_576));
+            }
+            for (kind, json) in records {
+                let kind = u64::try_from(kind)
+                    .map_err(|_| invariant("terminal record kind size exhausted"))?;
+                rows.push(ToolOutcomeRowEnvelopeData {
+                    table: ToolOutcomeWriteTableData::TerminalRecords,
+                    possible_before_bytes: None,
+                    maximum_after_bytes: record_bytes(&[64, kind, 512, 64, json])?,
+                    mutations: 1,
+                    index_bytes: vec![
+                        record_bytes(&[64, kind, 512, 8])?,
+                        record_bytes(&[kind, 512, 8])?,
+                        record_bytes(&[kind, 64, 8])?,
+                    ],
+                });
+            }
+            if observer {
+                rows.push(ToolOutcomeRowEnvelopeData {
+                    table: ToolOutcomeWriteTableData::ObserverAttempts,
+                    possible_before_bytes: None,
+                    maximum_after_bytes: record_bytes(&[
+                        64, 512, 9, 8, 8, 8, 2_048, 64, 1_048_576, 8, 8, 36, 36, 8,
+                    ])?,
+                    mutations: 1,
+                    index_bytes: vec![
+                        record_bytes(&[64, 8])?,
+                        record_bytes(&[512, 8])?,
+                        record_bytes(&[9, 8, 64, 8])?,
+                    ],
+                });
+            }
+            rows.push(operation_shape(operation, 1)?);
+            1
         }
     };
     append_histories(&mut rows, envelope, appends)?;

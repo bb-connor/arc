@@ -37,11 +37,8 @@ const PLANNING_RESERVATION_DOMAIN: &str = "chio.recovery.planning-reservation.v1
 const WORKFLOW_RESERVATION_DOMAIN: &str = "chio.recovery.workflow-reservation.v1";
 const EFFECT_CONTRACT_DOMAIN: &str = "chio.recovery.effect-contract.v1";
 const PREVIEW_DOMAIN: &str = "chio.recovery.preview.v1";
-const SETUP_CREATION_LEGACY_DOMAIN: &str = "chio.recovery.setup.creation.v1";
 const SETUP_CREATION_DOMAIN: &str = "chio.recovery.setup.creation.v2";
 const SETUP_SOURCE_PROFILE_DOMAIN: &str = "chio.recovery.setup.source-profile.v2";
-const SETUP_SOURCE_PROFILE_LEGACY_DOMAIN: &str = "chio.recovery.setup.source-profile.v1";
-const SETUP_RETIREMENT_DOMAIN: &str = "chio.recovery.setup.retirement.v1";
 const SETUP_BENIGN_RECEIPT_DOMAIN: &str = "chio.recovery.setup.benign-receipt.v1";
 const SETUP_DENIED_COMMAND_DOMAIN: &str = "chio.recovery.setup.denied-command.v1";
 const SETUP_NATIVE_AUTHORITY_DOMAIN: &str = "chio.recovery.setup.native-authority.v1";
@@ -133,11 +130,8 @@ registered_domains! {
     WorkflowReservation = WORKFLOW_RESERVATION_DOMAIN => "chio.recovery.workflow-reservation.v1",
     EffectContract = EFFECT_CONTRACT_DOMAIN => "chio.recovery.effect-contract.v1",
     Preview = PREVIEW_DOMAIN => "chio.recovery.preview.v1",
-    SetupCreationLegacy = SETUP_CREATION_LEGACY_DOMAIN => "chio.recovery.setup.creation.v1",
     SetupCreation = SETUP_CREATION_DOMAIN => "chio.recovery.setup.creation.v2",
     SetupSourceProfile = SETUP_SOURCE_PROFILE_DOMAIN => "chio.recovery.setup.source-profile.v2",
-    SetupSourceProfileLegacy = SETUP_SOURCE_PROFILE_LEGACY_DOMAIN => "chio.recovery.setup.source-profile.v1",
-    SetupRetirement = SETUP_RETIREMENT_DOMAIN => "chio.recovery.setup.retirement.v1",
     SetupBenignReceipt = SETUP_BENIGN_RECEIPT_DOMAIN => "chio.recovery.setup.benign-receipt.v1",
     SetupDeniedCommand = SETUP_DENIED_COMMAND_DOMAIN => "chio.recovery.setup.denied-command.v1",
     SetupNativeAuthority = SETUP_NATIVE_AUTHORITY_DOMAIN => "chio.recovery.setup.native-authority.v1",

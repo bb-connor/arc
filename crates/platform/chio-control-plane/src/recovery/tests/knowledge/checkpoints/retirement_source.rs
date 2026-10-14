@@ -334,3 +334,91 @@ fn memory_checkpoint_retirement_rolls_back_after_its_owner_write_fault() -> Test
 
     Ok(())
 }
+
+#[test]
+fn memory_checkpoint_retirement_closure_refuses_interference_then_settles_exactly() -> TestResult {
+    let f = RetirementFixture::new()?;
+    let store = f.knowledge.f.authority.admission_operation_store();
+    let fence = f.knowledge.f.authority.mutation_fence();
+    let admin = f.knowledge.actor(RecoveryPermission::KnowledgeAdmin)?;
+    let successor = NativeKnowledgeInstallationV1 {
+        generation: SafeInteger::new(f.knowledge.profile.generation.get() + 1)?,
+        ..f.knowledge.profile.clone()
+    };
+    let before = retained_state(&f.knowledge)?;
+    for (interference, refusal) in [
+        (
+            KnowledgeClosureInterference::OtherWriter,
+            "knowledge closure changed its physical writer",
+        ),
+        (
+            KnowledgeClosureInterference::SourceAdvanced,
+            "knowledge closure has no pending source",
+        ),
+        (
+            KnowledgeClosureInterference::ProfileAdvanced(Box::new(successor)),
+            "knowledge closure lost its current installation",
+        ),
+    ] {
+        assert_eq!(
+            store
+                .attempt_checkpoint_closure_for_test(
+                    &admin,
+                    &f.own.checkpoint.checkpoint,
+                    1,
+                    interference,
+                    &fence,
+                    now_ms()?,
+                )
+                .err(),
+            Some(
+                chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(
+                    refusal.to_owned()
+                )
+            )
+        );
+        assert_eq!(
+            retained_state(&f.knowledge)?,
+            before,
+            "{refusal} must roll back completely"
+        );
+    }
+    assert_current_source(&f.knowledge, &f.own)?;
+
+    retire(&f.knowledge, &f.own)?;
+    let after = retained_state(&f.knowledge)?;
+    // The revision governs one reference: one terminal plus bucket, owner
+    // leaf, aggregate and capacity census.
+    assert_eq!(
+        (after.events - before.events, after.commits - before.commits),
+        (5, 5)
+    );
+    let terminals = rows(&f.knowledge, "knowledge-checkpoint-retired:*")?;
+    let [(_, version, payload)] = terminals.as_slice() else {
+        return Err("exactly one revision retirement must exist".into());
+    };
+    assert_eq!(*version, 1);
+    let retired: serde_json::Value = serde_json::from_slice(payload)?;
+    assert_eq!(
+        retired["checkpoint"],
+        serde_json::to_value(&f.own.checkpoint.checkpoint)?
+    );
+    assert_eq!(
+        retired["revision"],
+        serde_json::to_value(&f.own.checkpoint.revision)?
+    );
+    assert_eq!(
+        retired["principal"],
+        serde_json::to_value(admin.principal())?
+    );
+    assert_eq!(checkpoint_owner(&f.knowledge, "job")?["state"], "retired");
+    assert_eq!(checkpoint_owner(&f.knowledge, "job:1")?["state"], "active");
+
+    retire(&f.knowledge, &f.own)?;
+    assert_eq!(
+        retained_state(&f.knowledge)?,
+        after,
+        "an exact replay writes, appends and refunds nothing"
+    );
+    Ok(())
+}

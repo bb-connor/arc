@@ -17,6 +17,9 @@ mod registry;
 pub use recovery::{
     ClosedUnusedRecoveryReservation, RecoveryCallReservation, UnusedRecoveryReservationClosureData,
 };
+#[cfg(feature = "admission-test-support")]
+#[doc(hidden)]
+pub mod admission_test_support;
 mod routes;
 mod security;
 mod state_reader;
@@ -66,6 +69,8 @@ pub const MAX_DISPATCH_ATTEMPTS: u32 = 3;
 #[cfg(feature = "admission-test-support")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RecoveryProcessTestCutpoint {
+    NativeFinishingPrepared,
+    NativeFinishingEnrolled,
     NativeNonceIssued,
     ProcessNonceRetained,
 }
@@ -76,6 +81,7 @@ pub enum RecoveryProcessTestCutpoint {
 pub struct ProcessRuntime {
     kernel: Arc<ChioKernel>,
     store: Arc<Mutex<Store>>,
+    writer: native_return_custody::CurrentWriter,
     original_snapshot: Arc<store::OriginalProcessSnapshot>,
     namespace: String,
     enforcement: chio_kernel::knowledge::DurableKnowledgeEnforcement,
@@ -107,9 +113,10 @@ impl ProcessRuntime {
                 .map_err(|_| ProcessError::StorePoisoned)?;
             Arc::new(store.original_snapshot(authority, &kernel.public_key().to_hex()))
         };
-        Ok(Self {
+        let runtime = Self {
             kernel,
             store: registry.store,
+            writer: registry.writer,
             original_snapshot,
             namespace,
             enforcement: registry.enforcement,
@@ -119,7 +126,12 @@ impl ProcessRuntime {
             supplemental_route: None,
             #[cfg(feature = "admission-test-support")]
             recovery_test_cutpoint: None,
-        })
+        };
+        // Restore settled native owed work before any liveness is served:
+        // retained custody and reconciliation never need a new authorized
+        // invoke. Per-account proof unavailability leaves the debt open.
+        runtime.reconcile_retained_native_returns()?;
+        Ok(runtime)
     }
 
     #[cfg(feature = "admission-test-support")]
@@ -183,6 +195,7 @@ impl ProcessRuntime {
     pub fn registry(&self) -> ProcessRegistry {
         ProcessRegistry {
             store: self.store.clone(),
+            writer: self.writer.clone(),
             namespace: self.namespace.clone(),
             enforcement: self.enforcement.clone(),
         }
@@ -228,10 +241,19 @@ impl ProcessRuntime {
                 "a root process requires a root capability",
             ));
         }
-        self.with_public_store(|store| {
-            store.create_root(id, capability, limits)?;
-            store.public_process(id)
-        })
+        // Route the root registration through the kernel's original
+        // current-write scope so the native bank proof and physical capacity
+        // are preserved before the row changes.
+        let routed_id = id.to_owned();
+        let routed_capability = capability.clone();
+        self.run_current_write(
+            move |_| store::native_return_custody::price_new_process_rows(),
+            move |tx| {
+                store::create_root_call(tx, &routed_id, &routed_capability, limits)?;
+                Ok(())
+            },
+        )?;
+        self.with_public_store(|store| store.public_process(id))
     }
 
     /// Attach a child using a capability already issued by the authority.
@@ -257,10 +279,26 @@ impl ProcessRuntime {
                 child_capability: capability,
             },
         )?;
-        self.with_public_store(|store| {
-            store.spawn(parent_id, child_id, capability, validate_child)?;
-            store.public_process(child_id)
-        })
+        // Route the child attachment through the kernel's original
+        // current-write scope so the native bank proof and physical capacity
+        // are preserved before the row changes.
+        let routed_parent = parent_id.to_owned();
+        let routed_child = child_id.to_owned();
+        let routed_capability = capability.clone();
+        self.run_current_write(
+            move |_| store::native_return_custody::price_new_process_rows(),
+            move |tx| {
+                store::attach_child(
+                    tx,
+                    &routed_parent,
+                    &routed_child,
+                    &routed_capability,
+                    validate_child,
+                )?;
+                Ok(())
+            },
+        )?;
+        self.with_public_store(|store| store.public_process(child_id))
     }
 
     pub fn process(&self, id: &str) -> Result<ProcessSnapshot, ProcessError> {
@@ -271,13 +309,10 @@ impl ProcessRuntime {
         &self,
         read: impl FnOnce(&mut Store) -> Result<T, ProcessError>,
     ) -> Result<T, ProcessError> {
-        let enforced = self.enforcement.enforced(&self.namespace)?;
-        self.with_store(|store| {
-            if enforced {
-                store.enable_knowledge()?;
-            }
-            read(store)
-        })
+        if self.enforcement.enforced(&self.namespace)? {
+            self.writer.activate_knowledge()?;
+        }
+        self.with_store(read)
     }
 
     /// Store immutable, process-owned bytes. Identical content reuses its quota slot.
@@ -285,11 +320,16 @@ impl ProcessRuntime {
         if bytes.len() > MAX_STATE_BLOB_BYTES {
             return Err(ProcessError::Invalid("state blob is too large"));
         }
-        self.with_store(|store| {
-            self.require_raw_knowledge()?;
-            store.require_raw_knowledge()?;
-            store.put_blob(id, bytes)
-        })
+        self.require_raw_knowledge()?;
+        self.with_store(|store| store.require_raw_knowledge())?;
+        // Route the insert through the kernel's original current-write scope
+        // so the native bank proof and physical capacity are preserved.
+        let routed_id = id.to_owned();
+        let routed_bytes = bytes.to_vec();
+        self.run_current_write(
+            move |_| store::native_return_custody::price_state_blob_rows(),
+            move |tx| store::put_blob_call(tx, &routed_id, &routed_bytes),
+        )
     }
 
     /// Read only blobs owned by this running process, verifying their content hash.
@@ -455,8 +495,20 @@ impl ProcessRuntime {
         } = self.derive_call_binding(process_id, operation_key, request, known_outcome_only)?;
         let route = self.routes.get(&request.server_id);
         // Validate the persisted process identity and immutable request binding
-        // before any kernel receipt attributes this attempt to the process.
-        self.with_store(|store| store.admit(process_id, operation_key, request, &binding_hash))?;
+        // before any kernel receipt attributes this attempt to the process,
+        // and route the admission through the kernel's original current-write
+        // scope so the native bank proof and physical capacity are preserved
+        // for this file and the same volume before any Process row changes.
+        // The Process writer lock is not held across the native scope.
+        {
+            let admission = self.prepare_native_current_call_admission(
+                process_id,
+                operation_key,
+                request,
+                &binding_hash,
+            )?;
+            self.writer.enforce(&admission)?;
+        }
         // Restore verified ancestor snapshots and budget-parent registrations
         // root-first. A child can run even if its parent has never invoked a
         // tool, including after the kernel's in-memory registry is recreated.
@@ -499,6 +551,9 @@ impl ProcessRuntime {
             }
         }
         let mut current = request.clone();
+        // One concrete finishing source per attempt: each attempt is its own
+        // original native operation with its own Process account.
+        let mut native_source: Option<native_return_custody::ProcessNativeFinishingSource> = None;
         loop {
             if current.execution_nonce.is_none() && self.kernel.execution_nonce_required() {
                 current.execution_nonce = self
@@ -526,15 +581,42 @@ impl ProcessRuntime {
                     .sign_planned_deny_response(&current, reason, Some(attribution))
             } else if let Some(context) = &security_context {
                 let context = self.kernel.refresh_native_security_context(context)?;
-                Box::pin(
-                    self.kernel
-                        .evaluate_tool_call_with_metadata_and_security_context(
-                            &current,
-                            Some(attribution),
-                            &context,
-                        ),
-                )
-                .await
+                if native_source.is_none() && self.kernel.native_output_retention_is_selected() {
+                    let mut original = request.clone();
+                    original.request_id = current.request_id.clone();
+                    native_source = Some(self.native_finishing_source(
+                        process_id,
+                        operation_key,
+                        &original,
+                        known_outcome_only,
+                        Some(&context),
+                    )?);
+                }
+                match &native_source {
+                    Some(source) => {
+                        Box::pin(
+                            self.kernel
+                                .evaluate_tool_call_with_metadata_and_native_finishing_provider(
+                                    &current,
+                                    Some(attribution),
+                                    &context,
+                                    source,
+                                ),
+                        )
+                        .await
+                    }
+                    None => {
+                        Box::pin(
+                            self.kernel
+                                .evaluate_tool_call_with_metadata_and_security_context(
+                                    &current,
+                                    Some(attribution),
+                                    &context,
+                                ),
+                        )
+                        .await
+                    }
+                }
             } else {
                 Box::pin(
                     self.kernel
@@ -542,37 +624,132 @@ impl ProcessRuntime {
                 )
                 .await
             };
-            // Even an error can follow a committed side effect. Keep the operation
-            // identity and call reservation forever; recovery belongs to the kernel.
+            // Strict nonce preflight: no effect has happened yet, so no custody
+            // is due. Retain the original issuance and dispatch once more.
+            #[cfg(feature = "admission-test-support")]
+            eprintln!(
+                "native Process evaluation: {:?}",
+                result.as_ref().map(|response| (
+                    response.verdict,
+                    response.output.is_some(),
+                    response.execution_nonce.is_some(),
+                    &response.terminal_state,
+                    &response.reason,
+                    response
+                        .receipt
+                        .metadata
+                        .as_ref()
+                        .and_then(|m| m.get("admission_operation"))
+                ))
+            );
+            let result = match result {
+                Ok(response)
+                    if self.kernel.execution_nonce_required()
+                        && current.execution_nonce.is_none()
+                        && response.verdict == Verdict::Allow
+                        && response.output.is_none() =>
+                {
+                    let mut response = response;
+                    let nonce = response
+                        .execution_nonce
+                        .take()
+                        .ok_or(ProcessError::Invalid(
+                            "strict nonce preflight returned no execution nonce",
+                        ))?;
+                    #[cfg(feature = "admission-test-support")]
+                    if let Some(observer) = &self.recovery_test_cutpoint {
+                        observer(RecoveryProcessTestCutpoint::NativeNonceIssued);
+                    }
+                    // Save the original issuance before dispatch, inside the
+                    // kernel's original current-write scope so the native
+                    // bank proof and physical capacity are preserved. A
+                    // restart can only re-present this nonce to the original
+                    // admission authority.
+                    {
+                        let routed_process = process_id.to_owned();
+                        let routed_operation = operation_key.to_owned();
+                        let routed_binding = binding_hash.clone();
+                        let routed_nonce = (*nonce).clone();
+                        self.run_current_write(
+                            move |_| store::native_return_custody::price_original_nonce_rows(),
+                            move |tx| {
+                                store::retain_nonce_call(
+                                    tx,
+                                    &routed_process,
+                                    &routed_operation,
+                                    attempt,
+                                    &routed_binding,
+                                    &routed_nonce,
+                                )
+                            },
+                        )
+                        .map_err(|error| {
+                            #[cfg(feature = "admission-test-support")]
+                            eprintln!("native Process nonce current write: {error:?}");
+                            error
+                        })?;
+                    }
+                    if let Some(source) = &native_source {
+                        if source.has_account()? {
+                            self.retain_original_native_nonce(source).map_err(|error| {
+                                #[cfg(feature = "admission-test-support")]
+                                eprintln!("native Process nonce custody: {error:?}");
+                                error
+                            })?;
+                        }
+                    }
+                    #[cfg(feature = "admission-test-support")]
+                    if let Some(observer) = &self.recovery_test_cutpoint {
+                        observer(RecoveryProcessTestCutpoint::ProcessNonceRetained);
+                    }
+                    current.execution_nonce = Some(*nonce);
+                    continue;
+                }
+                result => result,
+            };
+            // Even an error can follow a committed side effect, and a
+            // terminal or captured native fate outranks present-time Process
+            // liveness and any returned Kernel error: retain the account's
+            // custody and its reconciliation before either is consulted. The
+            // operation identity and call reservation are kept forever;
+            // recovery belongs to the kernel.
+            let unknown = match &result {
+                Ok(response) => outcome_unknown(response),
+                Err(_) => true,
+            };
+            #[cfg(feature = "admission-test-support")]
+            if let Err(error) = &result {
+                eprintln!("native Process Kernel result before custody: {error:?}");
+            }
+            if let Some(source) = &native_source {
+                if source.has_account()? {
+                    if unknown {
+                        self.retain_original_native_uncertainty(source)
+                            .map_err(|error| {
+                                #[cfg(feature = "admission-test-support")]
+                                eprintln!("native Process unavailable custody: {error:?}");
+                                error
+                            })?;
+                        if result.is_ok() {
+                            // A verified typed Unknown response names the
+                            // immutable native terminal. It may prove no future
+                            // raw return without claiming a known external effect.
+                            // The native owner must mint that exact fate before
+                            // any finishing reserve can be released.
+                            self.finish_original_native_return(source)?;
+                        }
+                    } else {
+                        self.finish_original_native_return(source)
+                            .map_err(|error| {
+                                #[cfg(feature = "admission-test-support")]
+                                eprintln!("native Process terminal custody: {error:?}");
+                                error
+                            })?;
+                    }
+                }
+            }
             self.with_store(|store| store.require_running(process_id))?;
             let mut response = result?;
-            if self.kernel.execution_nonce_required()
-                && current.execution_nonce.is_none()
-                && response.verdict == Verdict::Allow
-                && response.output.is_none()
-            {
-                let nonce = response
-                    .execution_nonce
-                    .take()
-                    .ok_or(ProcessError::Invalid(
-                        "strict nonce preflight returned no execution nonce",
-                    ))?;
-                #[cfg(feature = "admission-test-support")]
-                if let Some(observer) = &self.recovery_test_cutpoint {
-                    observer(RecoveryProcessTestCutpoint::NativeNonceIssued);
-                }
-                // Save the original issuance before dispatch. A restart can only
-                // re-present this nonce to the original admission authority.
-                self.with_store(|store| {
-                    store.retain_nonce(process_id, operation_key, attempt, &binding_hash, &nonce)
-                })?;
-                #[cfg(feature = "admission-test-support")]
-                if let Some(observer) = &self.recovery_test_cutpoint {
-                    observer(RecoveryProcessTestCutpoint::ProcessNonceRetained);
-                }
-                current.execution_nonce = Some(*nonce);
-                continue;
-            }
             // Returning historical nonce material never grants a new dispatch.
             // In particular an unknown outcome still returns its signed refusal.
             if response.execution_nonce.is_none() {
@@ -580,26 +757,56 @@ impl ProcessRuntime {
             }
             if attempt >= MAX_DISPATCH_ATTEMPTS
                 || known_outcome_only
-                || !outcome_unknown(&response)
+                || !unknown
                 || !self.kernel.can_redispatch_unknown_read(&current)
             {
                 return Ok(response);
             }
-            attempt = self.with_store(|store| {
-                store.advance_attempt(
-                    process_id,
-                    operation_key,
-                    &binding_hash,
-                    attempt,
-                    MAX_DISPATCH_ATTEMPTS,
-                )
-            })?;
+            native_source = None;
+            // The attempt advance runs inside the kernel's original
+            // current-write scope so the native bank proof and physical
+            // capacity are preserved before the journal moves ahead of the
+            // kernel.
+            {
+                let routed_process = process_id.to_owned();
+                let routed_operation = operation_key.to_owned();
+                let routed_binding = binding_hash.clone();
+                let priced = (
+                    routed_process.clone(),
+                    routed_operation.clone(),
+                    routed_binding.clone(),
+                );
+                let expected_attempt = attempt;
+                attempt = self.run_current_write(
+                    move |tx| {
+                        store::native_return_custody::price_attempt_advance_rows(
+                            tx,
+                            &priced.0,
+                            &priced.1,
+                            &priced.2,
+                            expected_attempt,
+                        )
+                    },
+                    move |tx| {
+                        store::advance_attempt_call(
+                            tx,
+                            &routed_process,
+                            &routed_operation,
+                            &routed_binding,
+                            expected_attempt,
+                            MAX_DISPATCH_ATTEMPTS,
+                        )
+                    },
+                )?;
+            }
             current.request_id = self.request_id_for_attempt(process_id, operation_key, attempt)?;
         }
     }
 
     /// Compare-and-swap checkpoint. Returns the new revision. Competing
-    /// workers cannot silently overwrite one another's progress.
+    /// workers cannot silently overwrite one another's progress. The write
+    /// runs inside the kernel's original current-write scope so the native
+    /// bank proof and physical capacity are preserved before the row changes.
     pub fn checkpoint(
         &self,
         process_id: &str,
@@ -610,17 +817,30 @@ impl ProcessRuntime {
         if bytes.len() > 1_048_576 {
             return Err(ProcessError::Invalid("checkpoint exceeds one MiB"));
         }
-        self.with_store(|store| {
-            self.require_raw_knowledge()?;
-            store.require_raw_knowledge()?;
-            store.checkpoint(process_id, expected_revision, value)
-        })
+        self.require_raw_knowledge()?;
+        self.with_store(|store| store.require_raw_knowledge())?;
+        let write = self.prepare_native_current_checkpoint(process_id, expected_revision, value)?;
+        self.writer.enforce(&write)?;
+        write.take_outcome::<Checkpoint>()
     }
 
     /// Permanently stop admissions and checkpoints for this process and every
-    /// descendant. It does not undo tool effects already admitted.
+    /// descendant. It does not undo tool effects already admitted. The
+    /// recursive state rewrite runs inside the kernel's original
+    /// current-write scope so the native bank proof and physical capacity
+    /// are preserved, keeping the original commit-then-report semantics for
+    /// an ordered confined return.
     pub fn cancel(&self, process_id: &str) -> Result<usize, ProcessError> {
-        self.with_store(|store| store.cancel(process_id))
+        let routed_id = process_id.to_owned();
+        let priced_id = routed_id.clone();
+        let (count, ordered) = self.run_current_write(
+            move |tx| store::native_return_custody::price_cancel_rows(tx, &priced_id),
+            move |tx| store::cancel_call(tx, &routed_id),
+        )?;
+        if ordered {
+            return Err(ProcessError::ConfinedReturnAlreadyOrdered);
+        }
+        Ok(count)
     }
 
     fn with_store<T>(

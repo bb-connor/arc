@@ -46,23 +46,18 @@ pub(in crate::admission_operation_store::knowledge) fn artifact_reference_source
     if !key.starts_with("knowledge-release:") {
         return Ok(None);
     }
-    let Some(row) = protected::raw_checked(tx, key)? else {
+    let Some((source, record)) = super::load_release_record(tx, key)? else {
         return Ok(None);
     };
-    let record: ReleaseRecord = protected::decode(&row.payload)?;
     let scope = &record.intent.artifact.scope;
     let scope_identity = scope_key(scope)?;
-    let source = protected::source_reference(tx, key)?;
     let original_handle_key = handle_key(scope, &record.handle.handle)?;
-    let handle: HandleRecord =
-        load(tx, &original_handle_key)?.ok_or_else(|| refused("release original handle absent"))?;
+    let handle = super::load_handle(tx, scope, &record.handle.handle)?;
     let handle_source = protected::source_reference(tx, &original_handle_key)?;
     let ArtifactReleaseKindV1::IndependentlyAdmitted { request } = &record.intent.kind else {
         return Err(refused("artifact release selected captured-output custody"));
     };
     if key != actor_request_key("knowledge-release", scope, &handle.principal, request)?
-        || row.kind != "command"
-        || row.scope != scope_identity
         || source.scope_key() != scope_identity
         || source.kind() != "command"
         || handle_source.scope_key() != scope_identity

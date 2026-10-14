@@ -21,6 +21,8 @@ mod monotonicity;
 #[path = "mutations/nonce_preflight.rs"]
 mod nonce_preflight;
 pub(in crate::admission_operation_store::tests) use nonce_preflight::prepare_issuance_fixture;
+#[path = "mutations/retained_input_fate.rs"]
+mod retained_input_fate;
 #[path = "mutations/shared.rs"]
 mod shared;
 
@@ -100,7 +102,7 @@ fn setup_at(
     )
 }
 
-fn setup_selected_at(
+pub(super) fn setup_selected_at(
     fixture: &Fixture,
     name: &str,
     context: &SecurityInvocationContext,

@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn populated_v19_upgrade_preserves_exact_commits_anchors_and_imported_source() -> TestResult {
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let source = imported(&fixture, false)?;
     let (operation, _) = setup(&fixture, "v19-history")?;
     let (head, commits) = {
@@ -121,7 +121,7 @@ fn commit_rows(connection: &Connection) -> rusqlite::Result<Vec<Vec<Value>>> {
 
 #[test]
 fn populated_v20_upgrade_preserves_claims_releases_and_global_history() -> TestResult {
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let source = imported(&fixture, false)?;
     let (operation, lease) = setup(&fixture, "v20-owned-history")?;
     let candidate = intent(

@@ -18,8 +18,10 @@ pub(super) fn metadata(
          FROM process_runtime WHERE singleton=1",
         [], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?)),
     )?;
+    // Every closure gate reads the journal's feature level; version eight
+    // carries the level its native return activation retained.
     Ok((
-        version,
+        crate::store::level_for_version(connection, version)?,
         namespace.ok_or(ProcessError::Conflict)?,
         authority.ok_or(ProcessError::Conflict)?,
         key.ok_or(ProcessError::Conflict)?,

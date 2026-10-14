@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from chio_sdk.errors import ChioDeniedError, ChioValidationError
 from chio_sdk.models import (
     ChioScope,
     Operation,
@@ -275,41 +276,57 @@ class TestWriterCannotSearch:
 
 
 # ---------------------------------------------------------------------------
-# (e) attenuated delegation child cannot escalate
+# (e) delegation attenuation fails closed without the parent subject signer
 # ---------------------------------------------------------------------------
 
 
 class TestAttenuatedDelegation:
-    async def test_child_cannot_escalate_beyond_parent(self) -> None:
+    async def test_attenuation_fails_closed_without_subject_signer(self) -> None:
         chio = MockChioClient()
         chio.set_policy(_scope_aware_policy(chio))
 
-        # Parent has search + browse; child should be a subset.
+        # Parent has search + browse; a child would have to be a subset.
         parent = await _mint_token(
             chio,
             subject="agent:parent",
             scope=_scope_for_tools("search", "browse"),
         )
         child_scope = _scope_for_tools("search")
-        child = await chio.attenuate_capability(parent, new_scope=child_scope)
-        # Index the child token for the policy as well.
-        chio._tokens[child.id] = child  # type: ignore[attr-defined]
 
-        # The child tries to invoke a tool the parent did not have.
+        # The narrowed request passes scope validation, but minting the
+        # child requires the parent subject signer, which the mock does
+        # not hold, so the SDK denies it fail-closed.
+        with pytest.raises(ChioDeniedError) as denied:
+            await chio.attenuate_capability(parent, new_scope=child_scope)
+        assert denied.value.reason_code == "chio_attenuation_requires_subject_signer"
+
+        # The mock saw exactly one well-formed narrowed request, and only
+        # the parent capability was ever minted: no child token exists.
+        attenuate_calls = [
+            call for call in chio.calls if call.method == "attenuate_capability"
+        ]
+        assert len(attenuate_calls) == 1
+        assert attenuate_calls[0].capability_id == parent.id
+        minted = [
+            call for call in chio.calls if call.method == "create_capability"
+        ]
+        assert len(minted) == 1
+
+        # No child token exists after the refusal; the parent capability
+        # still refuses tools outside its own scope.
         escalate_tool = ChioBaseTool(
             name="write",
             description="escalation attempt",
             server_id="srv",
-            capability_id=child.id,
+            capability_id=parent.id,
             executor=lambda **_kw: "unreached",
             chio_client=chio,
         )
-        with pytest.raises(ChioToolError):
+        with pytest.raises(ChioToolError) as escalation:
             await escalate_tool._arun(path="/out")
+        assert escalation.value.guard == "ScopeGuard"
 
         # Asking the SDK to attenuate to a *broader* scope must raise.
-        from chio_sdk.errors import ChioValidationError
-
         broader = _scope_for_tools("search", "browse", "write")
         with pytest.raises(ChioValidationError):
             await chio.attenuate_capability(parent, new_scope=broader)

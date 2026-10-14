@@ -1,6 +1,7 @@
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
@@ -13,8 +14,9 @@ use chio_core::receipt::metadata::{
     DeliveryContract, DeliveryResult, DELIVERY_CONTRACT_METADATA_KEY, DELIVERY_CONTRACT_SCHEMA,
 };
 use chio_kernel::admission_operation::{
-    AdmissionOperationState, AdmissionOperationStore, AdmissionReceiptMetadataV1,
-    AdmissionRecoveryLease, StoreMutationFence, ADMISSION_RECEIPT_METADATA_KEY,
+    AdmissionOperationId, AdmissionOperationState, AdmissionOperationStore,
+    AdmissionReceiptMetadataV1, AdmissionRecoveryLease, StoreMutationFence,
+    ADMISSION_RECEIPT_METADATA_KEY,
 };
 use chio_kernel::tool_outcome::{
     CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1,
@@ -34,6 +36,8 @@ use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
 
 #[path = "durable_admission_sqlite/federation_context.rs"]
 mod federation_context;
+#[path = "durable_admission_sqlite/recovery_sweep.rs"]
+mod recovery_sweep;
 #[path = "durable_admission_sqlite/security_release.rs"]
 mod security_release;
 
@@ -84,9 +88,10 @@ struct PaymentCalls {
     fail_next_release: AtomicBool,
 }
 
-struct FailOnceOutcomeStore {
+struct InterruptibleOutcomeStore {
     inner: SqliteToolOutcomeStore,
     fail_record: AtomicBool,
+    refused_reads: Arc<Mutex<BTreeSet<AdmissionOperationId>>>,
 }
 
 #[async_trait::async_trait]
@@ -392,7 +397,7 @@ impl PaymentAdapter for PrepaidFinalPaymentAdapter {
     }
 }
 
-impl ToolOutcomeStore for FailOnceOutcomeStore {
+impl ToolOutcomeStore for InterruptibleOutcomeStore {
     fn record_tool_returned(
         &self,
         operation: &chio_kernel::admission_operation::AdmissionOperationV1,
@@ -421,6 +426,18 @@ impl ToolOutcomeStore for FailOnceOutcomeStore {
         &self,
         operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
     ) -> Result<Option<ToolOutcomeRecordV1>, ToolOutcomeStoreError> {
+        if self
+            .refused_reads
+            .lock()
+            .map_err(|_| {
+                ToolOutcomeStoreError::Unavailable("injected outcome-read lock poisoned".to_owned())
+            })?
+            .contains(operation_id)
+        {
+            return Err(ToolOutcomeStoreError::Unavailable(
+                "injected retained outcome read failure".to_owned(),
+            ));
+        }
         self.inner.lookup_by_operation(operation_id)
     }
 
@@ -505,7 +522,7 @@ impl ToolOutcomeStore for FailOnceOutcomeStore {
     }
 }
 
-impl QualifiedToolOutcomeStore for FailOnceOutcomeStore {}
+impl QualifiedToolOutcomeStore for InterruptibleOutcomeStore {}
 
 fn kernel_config(keypair: Keypair) -> KernelConfig {
     KernelConfig {
@@ -726,9 +743,10 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
         let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
         kernel.set_durable_admission_store(
             operations.clone(),
-            Arc::new(FailOnceOutcomeStore {
+            Arc::new(InterruptibleOutcomeStore {
                 inner: outcomes,
                 fail_record: AtomicBool::new(true),
+                refused_reads: Arc::default(),
             }),
             fence.clone(),
         )?;
@@ -751,7 +769,7 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
             KernelError::DurableAdmission(ref reason)
                 if reason.contains("injected tool outcome write failure")
         ));
-        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, 10)?;
+        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, None, 10)?;
         assert_eq!(recoverable.len(), 1);
         let operation = &recoverable[0];
         assert_eq!(
@@ -865,7 +883,7 @@ fn sqlite_restart_completes_a_committed_capture_without_request_replay(
             KernelError::DurableAdmission(ref reason)
                 if reason.contains("injected capture interruption")
         ));
-        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, 10)?;
+        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, None, 10)?;
         assert_eq!(recoverable.len(), 1);
         let operation = &recoverable[0];
         assert_eq!(operation.state(), AdmissionOperationState::Finalizing);
@@ -953,7 +971,7 @@ fn sqlite_restart_completes_a_committed_release_without_request_replay(
             KernelError::DurableAdmission(ref reason)
                 if reason.contains("injected release interruption")
         ));
-        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, 10)?;
+        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, None, 10)?;
         assert_eq!(recoverable.len(), 1);
         let operation = &recoverable[0];
         assert_eq!(operation.state(), AdmissionOperationState::Finalizing);

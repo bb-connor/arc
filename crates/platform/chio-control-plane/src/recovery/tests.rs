@@ -44,6 +44,8 @@ mod connector_resources;
 mod explanations;
 #[path = "tests/linked_generations.rs"]
 mod linked_generations;
+#[path = "tests/native_lifecycle.rs"]
+mod native_lifecycle;
 #[path = "tests/native_lineage_bootstrap.rs"]
 mod native_lineage_bootstrap;
 #[path = "tests/original_action_semantics.rs"]
@@ -191,6 +193,15 @@ impl RecoveryFixture {
         };
         kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
         let retention_path = path.join("output-retention-profile.json");
+        // Native originals run under explicit operator configuration DATA,
+        // written once with a fresh fixture and reselected on every reopen.
+        // A setup exercising its absence opts out before its first open.
+        if fresh && !retention_path.exists() && !path.join("no-output-retention-profile").exists() {
+            std::fs::write(
+                &retention_path,
+                chio_core::canonical_json_bytes(&fixture_output_retention_profile()?)?,
+            )?;
+        }
         if retention_path.exists() {
             let profile: chio_kernel::admission_operation::NativeOutputRetentionProfileV1 =
                 serde_json::from_slice(&std::fs::read(retention_path)?)?;
@@ -529,6 +540,12 @@ impl RecoveryFixture {
                     ) | (
                         "nonce-attached",
                         RecoveryProcessTestCutpoint::ProcessNonceRetained
+                    ) | (
+                        "finishing-prepared",
+                        RecoveryProcessTestCutpoint::NativeFinishingPrepared
+                    ) | (
+                        "finishing-enrolled",
+                        RecoveryProcessTestCutpoint::NativeFinishingEnrolled
                     )
                 ) {
                     crate::recovery::test_cutpoint(&point);
@@ -995,6 +1012,16 @@ impl ToolServerConnection for PersistentEffectServer {
         Ok((arguments, None))
     }
 }
+fn fixture_output_retention_profile(
+) -> TestResult<chio_kernel::admission_operation::NativeOutputRetentionProfileV1> {
+    use chio_kernel::admission_operation::{
+        NativeOutputEnvelopeBoundsV1, NativeOutputRetentionProfileV1,
+    };
+    Ok(NativeOutputRetentionProfileV1::new(
+        NativeOutputEnvelopeBoundsV1::new(1024 * 1024, 1024 * 1024, 1024 * 1024, 1024 * 1024, 1)?,
+    ))
+}
+
 fn install_native_fault(kernel: &mut ChioKernel, authority: &SqliteAuthorityStore) -> TestResult {
     if std::env::var_os("CHIO_RECOVERY_CRASH_CHILD").is_none() {
         return Ok(());
@@ -1432,7 +1459,7 @@ async fn recovery_command_replay_conflict_rotation_and_revocation() -> TestResul
     };
     assert_eq!(
         f.runtime.execute_command(&f.control, &changed).await.err(),
-        Some(RecoveryRuntimeError::Conflict)
+        Some(RecoveryRuntimeError::AuthorityDenied)
     );
     let record = f.record(&id)?;
     let resume = f.command(
@@ -1753,7 +1780,10 @@ async fn recovery_workflow_flood_retains_settlement_and_tombstones() -> TestResu
         b"bounded quota campaign",
     )?;
     let f = RecoveryFixture::open(directory.path().to_path_buf(), Some(directory), false)?;
-    let id = f.ready().await?;
+    let id = f
+        .ready()
+        .await
+        .map_err(|error| format!("flood stage ready: {error}"))?;
     let record = f.record(&id)?;
     let resume = f.command(
         "resume",
@@ -1770,9 +1800,16 @@ async fn recovery_workflow_flood_retains_settlement_and_tombstones() -> TestResu
     )?;
     let mut another_process = f.kernel.recovery_deployment(f.runtime.scope())?;
     another_process.scope.process_id = ProcessId::new("another-process-scope")?;
+    // Root capability identity determines native lineage. Keep the shared
+    // principal and tenant while giving the second root its own lineage.
+    let fresh_root = f.kernel.issue_capability(
+        &f.seed.capability.subject,
+        f.seed.capability.scope.clone(),
+        600,
+    )?;
     f.process.create_root(
         another_process.scope.process_id.as_str(),
-        &f.seed.capability,
+        &fresh_root,
         ProcessLimits {
             max_processes: 8,
             max_depth: 2,
@@ -1783,10 +1820,25 @@ async fn recovery_workflow_flood_retains_settlement_and_tombstones() -> TestResu
     another_process.security_context = f
         .process
         .recovery_security_context(another_process.scope.process_id.as_str())?;
+    // A misconfigured fixture reusing the original root capability cannot
+    // silently pass: the derived native context stays distinct.
+    assert_ne!(
+        another_process
+            .security_context
+            .as_v1()
+            .lineage_root_id()
+            .as_str(),
+        f.process
+            .recovery_security_context(f.runtime.scope().process_id.as_str())?
+            .as_v1()
+            .lineage_root_id()
+            .as_str()
+    );
     another_process.authority_scope = recovery_authority_scope_digest(&another_process)?;
     f.authority
         .admission_operation_store()
-        .configure_recovery_deployment(&another_process)?;
+        .configure_recovery_deployment(&another_process)
+        .map_err(|error| format!("flood stage configure-other-deployment: {error}"))?;
     let another_actor = f.kernel.authenticate_recovery_actor(
         &another_process.scope,
         &f.control,
@@ -1809,7 +1861,8 @@ async fn recovery_workflow_flood_retains_settlement_and_tombstones() -> TestResu
         let denial = f
             .process
             .invoke_known_only(selected.scope().process_id.as_str(), &key, &seed)
-            .await?;
+            .await
+            .map_err(|error| format!("flood stage real-original-denial {key}: {error}"))?;
         assert_eq!(denial.verdict, Verdict::Deny);
         let command = f.command(
             &format!("flood-{index}"),
@@ -1820,7 +1873,8 @@ async fn recovery_workflow_flood_retains_settlement_and_tombstones() -> TestResu
             },
         )?;
         f.kernel
-            .execute_recovery_command_with_origin(selected, &command, &f.process)?;
+            .execute_recovery_command_with_origin(selected, &command, &f.process)
+            .map_err(|error| format!("flood stage native-create-with-origin {key}: {error}"))?;
     }
     for selected in [&actor, &another_actor] {
         let key = format!("flood-over-limit-{}", selected.scope().process_id.as_str());
@@ -2055,9 +2109,11 @@ async fn recovery_transport_closed_replay_and_audience_refusals() -> TestResult 
                 .body(Body::from(bytes))?,
         )
         .await?;
-    assert_eq!(response.status(), StatusCode::CONFLICT);
+    // Inspection retains no command identity. An invisible target is refused
+    // by its audience check before any identity conflict can reveal existence.
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
     let bytes = to_bytes(response.into_body(), 262144).await?;
-    assert_eq!(bytes.as_ref(), b"recovery.conflict");
+    assert_eq!(bytes.as_ref(), b"recovery.authority_denied");
     let mut unknown = envelope.clone();
     unknown["unexpected"] = "protected-canary".into();
     let response = router

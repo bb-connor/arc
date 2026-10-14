@@ -112,22 +112,19 @@ impl WorkerService {
             .try_fill_bytes(&mut bytes)
             .map_err(|_| ProcessError::Configuration("OS randomness unavailable"))?;
         let secret = hex::encode(bytes);
-        self.runtime.with_store(|store| {
-            store.issue_worker_credential(
-                process_id,
-                &sha256_hex(secret.as_bytes()),
-                expires_at,
-                now()?,
-            )
-        })?;
+        self.runtime.writer.issue_worker_credential(
+            process_id,
+            &sha256_hex(secret.as_bytes()),
+            expires_at,
+            now()?,
+        )?;
         Ok(WorkerCredential(secret))
     }
 
     /// Revoke all credentials for this exact process. Calls already admitted
     /// may finish; subsequent authentication and output release are rejected.
     pub fn revoke_credentials(&self, process_id: &str) -> Result<usize, ProcessError> {
-        self.runtime
-            .with_store(|store| store.revoke_worker_credentials(process_id))
+        self.runtime.writer.revoke_worker_credentials(process_id)
     }
 
     fn authenticate(&self, credential: &str) -> Result<String, ProcessError> {

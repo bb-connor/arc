@@ -215,6 +215,13 @@ impl SqliteToolOutcomeStore {
             load_operation_for_participant_tx(&transaction, operation.binding().operation_id())
                 .map_err(admission_error)?
                 .ok_or(ToolOutcomeStoreError::NotFound)?;
+        crate::admission_operation_store::authorize_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &stored_operation,
+            crate::admission_operation_store::NativeFinishingWrite::RawCustody,
+        )
+        .map_err(admission_error)?;
         if let Some(existing) = load_outcome_tx(&transaction, operation.binding().operation_id())? {
             let stored_blob = load_blob_state_tx(
                 &transaction,
@@ -291,6 +298,13 @@ impl SqliteToolOutcomeStore {
             trusted_now_unix_ms,
         )
         .map_err(admission_error)?;
+        crate::admission_operation_store::spend_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            operation,
+            crate::admission_operation_store::NativeFinishingWrite::RawCustody,
+        )
+        .map_err(admission_error)?;
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)?;
         Ok(ToolOutcomeInsertResultV1::Inserted {
@@ -311,6 +325,13 @@ impl SqliteToolOutcomeStore {
         let operation = load_operation_for_participant_tx(&transaction, record.operation_id())
             .map_err(admission_error)?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
+        crate::admission_operation_store::authorize_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &operation,
+            crate::admission_operation_store::NativeFinishingWrite::EvaluationBegin,
+        )
+        .map_err(admission_error)?;
         let outcome = load_outcome_tx(&transaction, record.operation_id())?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
         require_finalizing_operation(&operation, &outcome)?;
@@ -353,6 +374,13 @@ impl SqliteToolOutcomeStore {
             &recovery_lease,
             &participant_digest,
             trusted_now_unix_ms,
+        )
+        .map_err(admission_error)?;
+        crate::admission_operation_store::spend_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &operation,
+            crate::admission_operation_store::NativeFinishingWrite::EvaluationBegin,
         )
         .map_err(admission_error)?;
         self.commit_write(transaction)?;
@@ -585,6 +613,17 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, active_fence, trusted_now_unix_ms)?;
+        // The pure prefix and the terminal result are the one priced finalization.
+        let finalizing = load_operation_for_participant_tx(&transaction, operation_id)
+            .map_err(admission_error)?
+            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        crate::admission_operation_store::authorize_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &finalizing,
+            crate::admission_operation_store::NativeFinishingWrite::Finalization,
+        )
+        .map_err(admission_error)?;
         let mut version = expected_evaluation_version;
         if !pure_result_digests.is_empty() {
             let mut current = load_evaluation_tx(&transaction, operation_id)?
@@ -778,6 +817,13 @@ impl SqliteToolOutcomeStore {
             trusted_now_unix_ms,
         )
         .map_err(admission_error)?;
+        crate::admission_operation_store::spend_native_finishing_write(
+            transaction,
+            &self.serving_owner,
+            &operation,
+            crate::admission_operation_store::NativeFinishingWrite::Finalization,
+        )
+        .map_err(admission_error)?;
         Ok((terminal_evaluation.clone(), terminal_outcome.clone()))
     }
 }
@@ -788,6 +834,11 @@ impl QualifiedToolOutcomeStore for SqliteToolOutcomeStore {}
 /// guards. Returned SQL is catalog DATA and grants no mutation or loan.
 pub(crate) fn compiled_tool_outcome_schema() -> &'static str {
     TOOL_OUTCOME_SCHEMA
+}
+
+/// The security release producer's exact compiled schema. Catalog DATA only.
+pub(crate) fn compiled_security_release_schema() -> &'static str {
+    SECURITY_RELEASE_SCHEMA
 }
 
 /// The actual producer's enforced complete canonical outcome record bound.

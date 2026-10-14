@@ -8,8 +8,14 @@ pub struct NativeRetainedArchiveRequest<'a> {
     pub recipient: &'a ArtifactRecipientV1,
 }
 
-/// Private source custody returned only after the owning writer retains the
-/// complete original DAG. Dropping this value does not release durable owners.
+/// Private source custody captured for one scoped request. This is a checked
+/// description of the current sources, never a durable pin: the owning
+/// writer re-resolves the live records at admission, and every private read
+/// verifies the exact content digest of its seal, so a concurrent retirement
+/// or collection can only fail the export closed. When the release owner
+/// already holds a prior retained-archive record for this exact request, the
+/// bounded originally signed manifest travels here so a replay reuses it
+/// instead of signing again; the frame bytes and content stay ephemeral.
 ///
 /// ```compile_fail
 /// use chio_store_sqlite::admission_operation_store::NativeRetainedArchivePreparation;
@@ -22,7 +28,7 @@ pub struct NativeRetainedArchivePreparation {
     recipient: NativeKnowledgeRecipientV1,
     request: RequestId,
     authorization: ReleaseAuthorizationDigest,
-    reservation: CanonicalPayloadDigest,
+    prior_manifest: Option<SignedArtifactArchiveManifestV1>,
 }
 
 impl NativeRetainedArchivePreparation {
@@ -44,6 +50,19 @@ impl NativeRetainedArchivePreparation {
 
     pub fn request(&self) -> &RequestId {
         &self.request
+    }
+
+    /// The read authority this preparation captured from the fresh admin actor.
+    pub(crate) fn authorization(&self) -> &ReleaseAuthorizationDigest {
+        &self.authorization
+    }
+
+    /// The bounded originally signed manifest the release owner retained for
+    /// this exact request, when a prior retained-archive record exists. A
+    /// replay reuses it instead of signing again; it is still validated
+    /// against the freshly reconstructed sources and current signing root.
+    pub fn prior_manifest(&self) -> Option<&SignedArtifactArchiveManifestV1> {
+        self.prior_manifest.as_ref()
     }
 
     /// Recheck the captured private description before encoding. This neither
@@ -72,32 +91,7 @@ impl NativeRetainedArchivePreparation {
         {
             return Err(refused("retained archive recipient"));
         }
-        for record in &self.records {
-            let seal = record
-                .seal
-                .as_ref()
-                .ok_or_else(|| refused("retained archive source seal"))?;
-            if record.state != ArtifactPublicationStateV1::Available
-                || record.metadata.policy != self.profile.policy
-                || record.metadata.contract != self.profile.contract
-                || record.input.producer != record.metadata.producer
-                || record.input.content != record.metadata.content
-                || record.input.size_bytes != record.metadata.size_bytes
-                || record.input.media_type != record.metadata.media_type
-                || record.input.schema != record.metadata.schema
-                || record.input.dependencies != record.metadata.dependencies
-                || record.input.retention != record.metadata.retention
-                || seal.object != record.object
-                || seal.process != self.profile.scope.process_id
-                || seal.runtime.as_str()
-                    != self.profile.producer_context.as_v1().session_id().as_str()
-                || seal.content != record.metadata.content
-                || seal.bytes != record.metadata.size_bytes
-            {
-                return Err(refused("retained archive exact source"));
-            }
-        }
-        Ok(())
+        require_current_sources(&self.records, &self.profile)
     }
 }
 
@@ -133,9 +127,42 @@ impl std::fmt::Debug for NativeRetainedArchiveInput<'_> {
 }
 
 struct ArchiveInventory {
-    references: Vec<ArtifactVersionRefV1>,
     label: InformationLabel,
     total_bytes: u64,
+}
+
+/// Current sources must be available, sealed and bound to this profile. Both
+/// the captured description and the owning writer's fresh reload use this
+/// one check, so a cloned description cannot substitute for live custody.
+pub(super) fn require_current_sources(
+    records: &[NativeArtifactRecordV1],
+    profile: &NativeKnowledgeInstallationV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    for record in records {
+        let seal = record
+            .seal
+            .as_ref()
+            .ok_or_else(|| refused("retained archive source seal"))?;
+        if record.state != ArtifactPublicationStateV1::Available
+            || record.metadata.policy != profile.policy
+            || record.metadata.contract != profile.contract
+            || record.input.producer != record.metadata.producer
+            || record.input.content != record.metadata.content
+            || record.input.size_bytes != record.metadata.size_bytes
+            || record.input.media_type != record.metadata.media_type
+            || record.input.schema != record.metadata.schema
+            || record.input.dependencies != record.metadata.dependencies
+            || record.input.retention != record.metadata.retention
+            || seal.object != record.object
+            || seal.process != profile.scope.process_id
+            || seal.runtime.as_str() != profile.producer_context.as_v1().session_id().as_str()
+            || seal.content != record.metadata.content
+            || seal.bytes != record.metadata.size_bytes
+        {
+            return Err(refused("retained archive exact source"));
+        }
+    }
+    Ok(())
 }
 
 fn validate_inventory(
@@ -179,14 +206,13 @@ fn validate_inventory(
     if !references.contains(root) || label == InformationLabel::Top {
         return Err(refused("retained archive root"));
     }
-    Ok(ArchiveInventory {
-        references,
-        label,
-        total_bytes,
-    })
+    Ok(ArchiveInventory { label, total_bytes })
 }
 
-fn validate_frame(
+/// Recompute the exact archive frame binding from the submitted bytes. The
+/// owning writer uses the returned digest, never a caller declaration, so a
+/// signed manifest of one frame cannot admit different frame content or size.
+pub(super) fn validate_frame(
     archive_root: &PublicKey,
     scope: &RecoveryScopeV1,
     root: &ArtifactVersionRefV1,
@@ -249,6 +275,56 @@ fn validate_frame(
         return Err(refused("retained archive trailing bytes"));
     }
     Ok(knowledge_content_digest(input.bytes))
+}
+
+impl SqliteAdmissionOperationStore {
+    /// Capture one scoped retained-archive request under fresh admin
+    /// authority. The recipient is the actual selected audience from the
+    /// current installation, never a fabricated context, and the sources are
+    /// the current records: admission re-resolves them live, so this
+    /// description alone pins nothing.
+    pub fn prepare_retained_archive(
+        &self,
+        actor: &AuthenticatedRecoveryActor,
+        request: NativeRetainedArchiveRequest<'_>,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<NativeRetainedArchivePreparation, AdmissionOperationStoreError> {
+        mutate_retained_admin(self, actor, fence, now, |tx, profile, _| {
+            let selection = release::selected(profile, &request.recipient.recipient)?;
+            require_finite_recipient(&selection.recipient)?;
+            if selection.recipient != *request.recipient {
+                return Err(refused("retained archive recipient"));
+            }
+            let root = release::retained_archive_root(&tx, actor, request.root, request.recipient)?;
+            let records = traversal::dependencies(&tx, actor.scope(), std::slice::from_ref(&root))?;
+            let label = traversal::join_metadata(InformationLabel::bottom(), &records)?;
+            traversal::ensure_audience(&tx, actor, &label)?;
+            if !label.flows_to(&selection.recipient.clearance) {
+                return Err(refused("retained archive audience"));
+            }
+            let authorization = release::authority_digest(actor)?;
+            let prior_manifest = release::prior_retained_archive_manifest(
+                &tx,
+                actor,
+                &request,
+                &root,
+                &profile.policy,
+                &authorization,
+            )?;
+            let preparation = NativeRetainedArchivePreparation {
+                profile: profile.clone(),
+                records,
+                root,
+                recipient: selection.clone(),
+                request: request.request.clone(),
+                authorization,
+                prior_manifest,
+            };
+            preparation.validate_sources()?;
+            Ok((tx, preparation))
+        })
+    }
 }
 
 #[cfg(test)]

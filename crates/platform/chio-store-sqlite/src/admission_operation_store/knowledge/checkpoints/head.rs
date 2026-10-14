@@ -120,11 +120,33 @@ pub(super) fn load_visible_checkpoint(
     Ok(selected)
 }
 
+/// Retain one immutable revision through the typed intake. Its reference
+/// owner is charged separately by the existing checkpoint custody writer.
 pub(super) fn retain_checkpoint_revision(
     tx: &Transaction<'_>,
     owner: &SqliteServingOwner,
+    actor: &AuthenticatedRecoveryActor,
+    profile: &NativeKnowledgeInstallationV1,
+    now: u64,
     checkpoint: &LabeledCheckpointV1,
 ) -> Result<(), AdmissionOperationStoreError> {
+    if let Some(intake) =
+        super::super::intake::AuthenticatedKnowledgeIntakeSource::checkpoint_revision(
+            tx, actor, profile, now, checkpoint,
+        )?
+    {
+        protected::persist_knowledge_intake(tx, owner, intake)?;
+    }
+    Ok(())
+}
+
+/// The new immutable revision row, or none when the revision is retired or
+/// already retained exactly. A retained different envelope refuses; an
+/// existing revision is never upserted.
+pub(in crate::admission_operation_store::knowledge) fn derive_revision(
+    tx: &Connection,
+    checkpoint: &LabeledCheckpointV1,
+) -> Result<Option<DerivedWrite>, AdmissionOperationStoreError> {
     let revision = checkpoint.revision.get();
     validate_checkpoint_identity(
         checkpoint,
@@ -135,7 +157,7 @@ pub(super) fn retain_checkpoint_revision(
     // Retirement is one-way. Carrying a historical current envelope into a
     // later CAS must not reacquire its retired reference ownership.
     if super::retirement::revision_is_retired(tx, checkpoint)? {
-        return Ok(());
+        return Ok(None);
     }
     let key = checkpoint_revision_key(&checkpoint.scope, &checkpoint.checkpoint, revision)?;
     if let Some(retained) =
@@ -146,11 +168,46 @@ pub(super) fn retain_checkpoint_revision(
             super::history_trace::immutable_collision();
             return Err(refused("immutable checkpoint revision"));
         }
-        if protected::raw(tx, &key)?.is_some() {
-            return Ok(());
-        }
+        return Ok(None);
     }
-    // The serving authority's IMMEDIATE transaction serializes this insert.
-    // Existing retained revisions are compared above and never upserted.
-    save(tx, owner, &checkpoint.scope, &key, checkpoint)
+    Ok(Some(DerivedWrite {
+        scope_key: scope_key(&checkpoint.scope)?,
+        payload: protected::encode(checkpoint)?,
+        key,
+        expected: None,
+    }))
+}
+
+/// The current envelope advanced to its newer retained revision, CAS-bound
+/// to the exact current head, with the retained revision head it names. The
+/// exact current envelope derives no write.
+pub(in crate::admission_operation_store::knowledge) fn derive_current(
+    tx: &Connection,
+    checkpoint: &LabeledCheckpointV1,
+) -> Result<Option<(DerivedWrite, protected::ProtectedSourceReference)>, AdmissionOperationStoreError>
+{
+    let (scope, id) = (&checkpoint.scope, &checkpoint.checkpoint);
+    validate_checkpoint_identity(checkpoint, scope, id, 0)?;
+    let revision = checkpoint.revision.get();
+    if load_checkpoint(tx, scope, id, revision)?.as_ref() != Some(checkpoint) {
+        return Err(refused("checkpoint current names no retained revision"));
+    }
+    let key = checkpoint_key(scope, id)?;
+    let expected = match load_checkpoint(tx, scope, id, 0)? {
+        Some(current) if current == *checkpoint => return Ok(None),
+        Some(current) if current.revision.get() >= revision => {
+            return Err(refused("checkpoint CAS"));
+        }
+        Some(_) => Some(protected::source_reference(tx, &key)?),
+        None => None,
+    };
+    Ok(Some((
+        DerivedWrite {
+            scope_key: scope_key(scope)?,
+            payload: protected::encode(checkpoint)?,
+            key,
+            expected,
+        },
+        protected::source_reference(tx, &checkpoint_revision_key(scope, id, revision)?)?,
+    )))
 }

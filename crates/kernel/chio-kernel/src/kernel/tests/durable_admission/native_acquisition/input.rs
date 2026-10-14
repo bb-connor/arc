@@ -1,6 +1,6 @@
 use super::*;
 use crate::admission_operation::{
-    NativeSecurityInputJoinRecordV1, NativeSecurityInputJoinRequestV1,
+    NativeSecurityInputFateV1, NativeSecurityInputJoinRecordV1, NativeSecurityInputJoinRequestV1,
 };
 
 impl TestNative {
@@ -60,6 +60,9 @@ impl TestNative {
         Ok(NativeSecurityInputJoinRecordV1 {
             input: state.input.clone().unwrap_or_else(|| input.clone()),
             join,
+            fate: state
+                .retained_fate
+                .unwrap_or(NativeSecurityInputFateV1::Eligible),
         })
     }
 
@@ -75,7 +78,15 @@ impl TestNative {
     > {
         self.history(operation)?
             .map(|(operation, history)| {
-                let input = self.0.lock().expect("test input state").input.clone();
+                let (input, fate) = {
+                    let state = self.0.lock().expect("test input state");
+                    (
+                        state.input.clone(),
+                        state
+                            .retained_fate
+                            .unwrap_or(NativeSecurityInputFateV1::Eligible),
+                    )
+                };
                 Ok((
                     operation,
                     history
@@ -87,6 +98,7 @@ impl TestNative {
                                     )
                                 })?,
                                 join,
+                                fate,
                             })
                         })
                         .transpose()?,
@@ -263,6 +275,148 @@ fn input_callback_cannot_suppress_skip_repeat_or_retarget_the_join(
             !matches!(mode, HookMode::Silent | HookMode::PanicBefore)
         );
         assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+    Ok(())
+}
+
+#[test]
+fn classified_acknowledgement_cannot_be_eligible_while_its_retained_fate_is_not(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // The in-memory Store acknowledges Eligible; its retained record names a
+    // Refused or Unproved fate. The Kernel must refuse that contradiction
+    // before any confirmation, budget or dispatch.
+    for fate in [
+        NativeSecurityInputFateV1::Refused,
+        NativeSecurityInputFateV1::Unproved,
+    ] {
+        let (mut kernel, request, store, calls) = durable_admission_fixture("native-input-fate");
+        store
+            .native_recovery
+            .0
+            .lock()
+            .expect("test state")
+            .retained_fate = Some(fate);
+        kernel.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
+        kernel.set_security_pre_dispatch_hook(Arc::new(InputHook {
+            mode: HookMode::Normal,
+            raw_second: false,
+            binding: Mutex::new(selection("source")),
+        }));
+        let context = security_binding::context(&request, 1)?;
+        let response =
+            kernel.evaluate_tool_call_blocking_with_security_context(&request, &context)?;
+        assert_eq!(response.verdict, Verdict::Deny, "{fate:?}: {response:?}");
+        assert!(
+            response
+                .reason
+                .as_deref()
+                .is_some_and(|reason| reason.contains("contradicts its retained fate")),
+            "{fate:?}: {response:?}"
+        );
+        assert!(store
+            .state
+            .lock()
+            .expect("test state")
+            .budget_authorization
+            .is_none());
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+    Ok(())
+}
+
+/// Gate-level test of the Kernel's own caller-resume function over the
+/// in-memory Store. It does not prove native SQLite integration; the
+/// control-plane input fate tests exercise the real writer and readback.
+#[test]
+fn caller_resume_gate_confirms_only_a_retained_eligible_input_over_exact_custody(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::kernel::admission_coordinator::DispatchTransport;
+    let (mut kernel, request, store, _calls) = durable_admission_fixture("native-resume-gate");
+    kernel.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
+    kernel.set_security_pre_dispatch_hook(Arc::new(InputHook {
+        mode: HookMode::Normal,
+        raw_second: false,
+        binding: Mutex::new(selection("source")),
+    }));
+    let context = security_binding::context(&request, 1)?;
+    let now = current_unix_timestamp_ms();
+    let admission = kernel
+        .begin_durable_tool_admission_for_transport(
+            &request,
+            &security_binding::matching(&request)?,
+            Some(&context),
+            now,
+            DispatchTransport::KernelToolServer,
+        )?
+        .ok_or("durable native operation")?;
+    kernel.run_native_admission_preparation(&request, Some(&context), Some(&admission), now)?;
+    let (current, record) = store
+        .native_recovery
+        .input_history(Some(admission.operation.clone()))?
+        .ok_or("native input operation")?;
+    let record = record.ok_or("native input custody")?;
+    let operation = &admission.operation;
+    let binding = selection("source");
+    let gate = |input: &NativeSecurityInputJoinRequestV1,
+                binding: &NativeSecurityAuthorityBindingV1,
+                current: &AdmissionOperationV1,
+                fate: NativeSecurityInputFateV1| {
+        let mut history = record.clone();
+        history.fate = fate;
+        NativeSecurityFlowJoinAuthority::verify_resumed_input(
+            operation, binding, input, current, &history,
+        )
+    };
+    // Exact custody and a retained Eligible fate pass the gate.
+    assert!(gate(
+        &record.input,
+        &binding,
+        &current,
+        NativeSecurityInputFateV1::Eligible
+    )
+    .is_ok());
+    // Refused and Unproved are denied, never confirmed or relabeled.
+    for fate in [
+        NativeSecurityInputFateV1::Refused,
+        NativeSecurityInputFateV1::Unproved,
+    ] {
+        assert!(
+            matches!(
+                gate(&record.input, &binding, &current, fate),
+                Err(KernelError::GuardDenied(_))
+            ),
+            "{fate:?} must be denied by the fate gate"
+        );
+    }
+    // Changed custody refuses as a custody failure, before the fate is
+    // consulted, even when the retained fate would otherwise be denied.
+    let changed_input = NativeSecurityInputJoinRequestV1::new(
+        record.input.operation_id().clone(),
+        record.input.key().clone(),
+        chio_security_types::InformationLabel::try_known(
+            Default::default(),
+            std::collections::BTreeSet::from([chio_security_types::Compartment::new(
+                "changed-input",
+            )?]),
+        )?,
+    )?;
+    let mut persisted = current.to_persisted();
+    persisted.version += 1;
+    let changed_operation = AdmissionOperationV1::from_persisted(persisted)?;
+    for fate in [
+        NativeSecurityInputFateV1::Eligible,
+        NativeSecurityInputFateV1::Refused,
+    ] {
+        for result in [
+            gate(&changed_input, &binding, &current, fate),
+            gate(&record.input, &selection("other"), &current, fate),
+            gate(&record.input, &binding, &changed_operation, fate),
+        ] {
+            assert!(
+                matches!(result, Err(KernelError::DurableAdmission(_))),
+                "{fate:?}: changed custody must refuse as custody, got {result:?}"
+            );
+        }
     }
     Ok(())
 }

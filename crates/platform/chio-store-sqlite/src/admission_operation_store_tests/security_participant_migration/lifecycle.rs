@@ -228,7 +228,7 @@ fn observed_clock_rollback_cannot_be_hidden_by_a_plausible_caller_timestamp() ->
 {
     let fixture = fixture();
     let source = source(&fixture)?;
-    let now = now_ms() / 1_000 * 1_000;
+    let now = clock_origin_ms(&fixture)? + 1_000;
     let _clock =
         chio_kernel::scope_fixed_runtime_for_current_thread(now / 1_000, std::iter::empty());
     let expected = pin(&fixture, &source)?;

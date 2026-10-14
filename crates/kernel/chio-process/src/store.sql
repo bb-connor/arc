@@ -52,8 +52,28 @@ BEGIN SELECT RAISE(ABORT,'recovery reservation is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS process_recovery_no_delete BEFORE DELETE ON process_recovery_calls
 BEGIN SELECT RAISE(ABORT,'recovery reservation is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS process_recovery_version_monotone BEFORE UPDATE OF version ON process_runtime
-WHEN NEW.version < OLD.version OR NEW.version NOT BETWEEN 1 AND 7
+WHEN NEW.version < OLD.version OR NEW.version NOT BETWEEN 1 AND 8
 BEGIN SELECT RAISE(ABORT,'recovery journal cannot downgrade'); END;
+CREATE TABLE IF NOT EXISTS process_feature_level (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    level INTEGER NOT NULL CHECK (level BETWEEN 1 AND 7)
+);
+CREATE TRIGGER IF NOT EXISTS process_feature_level_retained_at_cohort
+BEFORE UPDATE OF version ON process_runtime
+WHEN NEW.version = 8 AND OLD.version BETWEEN 1 AND 7
+BEGIN INSERT INTO process_feature_level(singleton, level) VALUES (1, OLD.version); END;
+CREATE TRIGGER IF NOT EXISTS process_feature_level_retained_once
+BEFORE INSERT ON process_feature_level
+WHEN (SELECT version FROM process_runtime WHERE singleton = 1) = 8
+BEGIN SELECT RAISE(ABORT,'process feature level is retained once'); END;
+CREATE TRIGGER IF NOT EXISTS process_feature_level_monotone
+BEFORE UPDATE ON process_feature_level
+WHEN NEW.singleton != OLD.singleton OR NEW.level < OLD.level
+    OR (SELECT version FROM process_runtime WHERE singleton = 1) != 8
+BEGIN SELECT RAISE(ABORT,'process feature level cannot downgrade'); END;
+CREATE TRIGGER IF NOT EXISTS process_feature_level_no_delete
+BEFORE DELETE ON process_feature_level
+BEGIN SELECT RAISE(ABORT,'process feature level is retained'); END;
 CREATE TABLE IF NOT EXISTS worker_credentials (
     credential_hash TEXT PRIMARY KEY,
     process_id TEXT NOT NULL REFERENCES processes(id),

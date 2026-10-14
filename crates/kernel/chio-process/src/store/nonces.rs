@@ -35,46 +35,45 @@ impl Store {
             })
             .transpose()
     }
+}
 
-    pub fn retain_nonce(
-        &mut self,
-        process: &str,
-        key: &str,
-        attempt: u32,
-        request_hash: &str,
-        nonce: &SignedExecutionNonce,
-    ) -> Result<(), ProcessError> {
-        let bytes = canonical_json_bytes(nonce)?;
-        if bytes.is_empty() || bytes.len() > MAX_NONCE_BYTES {
-            return Err(ProcessError::Invalid("execution nonce exceeds its bound"));
-        }
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let snapshot = read_process(&transaction, process)?
-            .ok_or_else(|| ProcessError::NotFound(process.to_owned()))?;
-        require_running(&snapshot)?;
-        let bound: bool = transaction.query_row(
-            "SELECT EXISTS(SELECT 1 FROM process_calls WHERE process_id = ?1 AND operation_key = ?2 AND attempts = ?3 AND request_hash = ?4)",
-            params![process, key, attempt, request_hash],
-            |row| row.get(0),
-        )?;
-        if !bound {
-            return Err(ProcessError::Conflict);
-        }
-        transaction.execute(
-            "INSERT OR IGNORE INTO process_call_nonces(process_id, operation_key, attempt, nonce_json) VALUES (?1, ?2, ?3, ?4)",
-            params![process, key, attempt, bytes],
-        )?;
-        let retained: Vec<u8> = transaction.query_row(
-            "SELECT nonce_json FROM process_call_nonces WHERE process_id = ?1 AND operation_key = ?2 AND attempt = ?3",
-            params![process, key, attempt],
-            |row| row.get(0),
-        )?;
-        if retained != bytes {
-            return Err(ProcessError::Conflict);
-        }
-        transaction.commit()?;
-        Ok(())
+/// The complete retain-nonce body inside one writer transaction: running
+/// identity, the frozen attempt binding, the idempotent insert and the exact
+/// retained read-back, called only by the bank-proven routed writer.
+pub(crate) fn retain_nonce_call(
+    transaction: &rusqlite::Transaction<'_>,
+    process: &str,
+    key: &str,
+    attempt: u32,
+    request_hash: &str,
+    nonce: &SignedExecutionNonce,
+) -> Result<(), ProcessError> {
+    let bytes = canonical_json_bytes(nonce)?;
+    if bytes.is_empty() || bytes.len() > MAX_NONCE_BYTES {
+        return Err(ProcessError::Invalid("execution nonce exceeds its bound"));
     }
+    let snapshot = read_process(transaction, process)?
+        .ok_or_else(|| ProcessError::NotFound(process.to_owned()))?;
+    require_running(&snapshot)?;
+    let bound: bool = transaction.query_row(
+        "SELECT EXISTS(SELECT 1 FROM process_calls WHERE process_id = ?1 AND operation_key = ?2 AND attempts = ?3 AND request_hash = ?4)",
+        params![process, key, attempt, request_hash],
+        |row| row.get(0),
+    )?;
+    if !bound {
+        return Err(ProcessError::Conflict);
+    }
+    transaction.execute(
+        "INSERT OR IGNORE INTO process_call_nonces(process_id, operation_key, attempt, nonce_json) VALUES (?1, ?2, ?3, ?4)",
+        params![process, key, attempt, bytes],
+    )?;
+    let retained: Vec<u8> = transaction.query_row(
+        "SELECT nonce_json FROM process_call_nonces WHERE process_id = ?1 AND operation_key = ?2 AND attempt = ?3",
+        params![process, key, attempt],
+        |row| row.get(0),
+    )?;
+    if retained != bytes {
+        return Err(ProcessError::Conflict);
+    }
+    Ok(())
 }

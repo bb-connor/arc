@@ -41,7 +41,9 @@ use global_commit_chain::{
     append_global_commit, initialize_global_commit_schema, reset_derived_budget_ack_cache,
     seed_global_baseline, verify_global_commit_schema, verify_pristine_authority_tables,
 };
-use lease_history::{initialize_serving_lease_schema, verify_serving_lease_history};
+use lease_history::{
+    initialize_serving_lease_schema, serving_lease_transition_shape, verify_serving_lease_history,
+};
 pub use relocation::{
     RelocationImport, RelocationImportPhase, RelocationSeal, RELOCATION_SEAL_FORMAT,
 };
@@ -49,8 +51,7 @@ pub use relocation::{
 pub(crate) use rollback_anchor::exercise_slot_image;
 use rollback_anchor::{AnchorRecord, RollbackAnchor};
 
-/// Validate retained projection references before recognizing legacy recovery
-/// planning data without a protected allocation baseline.
+/// Authenticate retained projections against the authority's global commit chain.
 pub(crate) fn verify_authenticated_recovery_history(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
@@ -189,15 +190,64 @@ pub(crate) struct SqliteServingOwner {
     pub(crate) fence: StoreMutationFence,
     poisoned: AtomicBool,
     expected_data_version: AtomicU64,
+    /// Row changes this owner remembers on its own serving connection. A
+    /// trusted writer plus anchor sync advances it; anything else is an
+    /// unexplained local delta that only the full authenticating fallback
+    /// can accept or refuse.
+    verified_total_changes: AtomicU64,
     replay_source_migration_in_flight: AtomicBool,
+    /// Every commit on the serving connection preserves the native bank.
+    capacity: Arc<crate::native_authority_capacity::NativeAuthorityCapacity>,
+    #[cfg(test)]
+    anchor_full_validations: AtomicU64,
 }
 
 impl SqliteServingOwner {
     pub(crate) fn outcome_unknown(&self, detail: impl Into<String>) -> SqliteServingOwnerError {
+        // A COMMIT the native capacity hook refused was rolled back by SQLite:
+        // its outcome is known and the owner keeps serving.
+        if self.capacity.take_refusal() {
+            return SqliteServingOwnerError::Invalid(format!(
+                "native finishing capacity refused and rolled back the commit: {}",
+                detail.into()
+            ));
+        }
         self.poisoned.store(true, Ordering::Release);
         SqliteServingOwnerError::OutcomeUnknown(detail.into())
     }
 
+    /// The physical capacity every writer of this authority file preserves.
+    /// Bound this ordinary transaction's COMMIT by its priced current write,
+    /// checked against every owed native debt before its first write.
+    pub(crate) fn authorize_current_write(
+        &self,
+        transaction: &Transaction<'_>,
+        price: &crate::admission_operation_store::AuthorityCurrentWritePrice,
+    ) -> Result<(), SqliteServingOwnerError> {
+        self.capacity
+            .authorize_current_write(transaction, price)
+            .map_err(SqliteServingOwnerError::Invalid)
+    }
+
+    pub(crate) fn native_capacity(
+        &self,
+    ) -> &crate::native_authority_capacity::NativeAuthorityCapacity {
+        &self.capacity
+    }
+
+    /// The entry gate every serving transaction runs before it serves or
+    /// writes: the external `data_version` proof, the same-connection row
+    /// change watermark, and the rollback anchor.
+    ///
+    /// An equal watermark follows the existing bounded checks. Any local row
+    /// change the owner did not advance the watermark for, through a trusted
+    /// writer plus anchor sync, is unexplained here and only the existing
+    /// full authenticating verifier can accept or refuse it. A legitimately
+    /// rolled back statement still advances SQLite's change counter while
+    /// every authenticated row stays valid, so a passing validation re-bases
+    /// the watermark instead of poisoning; a failing one proves the current
+    /// rows diverged from anchored history and fails this owner closed. The
+    /// fallback only reads: it never modifies persistence.
     pub(crate) fn verify_authority_anchor(
         &self,
         connection: &Connection,
@@ -215,7 +265,23 @@ impl SqliteServingOwner {
                 "authority database changed outside its serving-owner connection".to_string(),
             ));
         }
-        self.rollback_anchor.verify_current(connection)
+        let changes = connection.total_changes();
+        if changes != self.verified_total_changes.load(Ordering::Acquire) {
+            #[cfg(test)]
+            self.anchor_full_validations.fetch_add(1, Ordering::Release);
+            if let Err(error) = verify_authority_store_invariants(connection) {
+                self.poisoned.store(true, Ordering::Release);
+                return Err(error);
+            }
+            self.verified_total_changes
+                .store(changes, Ordering::Release);
+        }
+        self.rollback_anchor.verify_current(connection)?;
+        // The transaction's page cap is applied here, before any of its writes,
+        // while it holds the one serving connection.
+        self.capacity
+            .begin(connection)
+            .map_err(SqliteServingOwnerError::Invalid)
     }
 
     fn require_connection_current(
@@ -341,7 +407,21 @@ impl SqliteServingOwner {
             self.poisoned.store(true, Ordering::Release);
             return Err(SqliteServingOwnerError::OutcomeUnknown(error.to_string()));
         }
+        // The trusted writer's committed rows are now part of the anchored
+        // state, so its same-connection change counter advances the
+        // remembered watermark with them.
+        self.verified_total_changes
+            .store(connection.total_changes(), Ordering::Release);
         Ok(())
+    }
+
+    /// Remember the serving connection's row-change watermark after fully
+    /// verified startup state. Every later unexplained local delta on this
+    /// connection must authenticate through the full store verifier before
+    /// any transaction serves or writes.
+    fn remember_verified_total_changes(&self, connection: &Connection) {
+        self.verified_total_changes
+            .store(connection.total_changes(), Ordering::Release);
     }
 }
 
@@ -692,6 +772,18 @@ impl SqliteAuthorityStore {
             PRAGMA foreign_keys = ON;
             "#,
         )?;
+        // The native bank's debt is preserved from this open's first write:
+        // every migration, upgrade, backfill and startup repair below commits
+        // through the capacity hook under the bank's page cap.
+        let capacity = crate::native_authority_capacity::NativeAuthorityCapacity::new(
+            &connection,
+            &record.store_uuid,
+        )
+        .map_err(SqliteServingOwnerError::Invalid)?;
+        capacity.install(&connection)?;
+        capacity
+            .begin(&connection)
+            .map_err(SqliteServingOwnerError::Invalid)?;
         initialize_serving_lease_schema(&connection)?;
         relocation::initialize_serving_relocation_schema(&connection)?;
         // An existing serving identity cannot recreate lost global custody.
@@ -713,7 +805,16 @@ impl SqliteAuthorityStore {
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         crate::finding_status_store::initialize_finding_status_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        reset_derived_budget_ack_cache(&connection)?;
+        // The derived cache reset is an ordinary writer. Keep its two
+        // statements in one gated transaction so restart cannot consume any
+        // outstanding original's physical reserve or lose the row observer
+        // between autocommit statements.
+        capacity
+            .begin(&connection)
+            .map_err(SqliteServingOwnerError::Invalid)?;
+        let cache_reset = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        reset_derived_budget_ack_cache(&cache_reset)?;
+        cache_reset.commit()?;
         for (key, supported) in [
             ("budget", BUDGET_STORE_SUPPORTED_SCHEMA_VERSION),
             ("revocation", REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION),
@@ -782,8 +883,16 @@ impl SqliteAuthorityStore {
             },
             poisoned: AtomicBool::new(false),
             expected_data_version: AtomicU64::new(expected_data_version),
+            verified_total_changes: AtomicU64::new(0),
             replay_source_migration_in_flight: AtomicBool::new(false),
+            capacity,
+            #[cfg(test)]
+            anchor_full_validations: AtomicU64::new(0),
         });
+        owner
+            .capacity
+            .begin(&connection)
+            .map_err(SqliteServingOwnerError::Invalid)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current = load_provisioning_record_tx(&transaction)?.ok_or_else(|| {
             SqliteServingOwnerError::NotProvisioned(database_path.display().to_string())
@@ -804,6 +913,27 @@ impl SqliteAuthorityStore {
                 "admission authority head is not positive".to_string(),
             ));
         }
+        // Price this ordinary lease transition and authorize its COMMIT by
+        // that exact price before the first mutation on the held transaction.
+        // A large retained history the whole-file ordinary cap cannot frame
+        // still opens, because the capacity hook checks only the rows this
+        // transaction actually writes: the previous lease release, the owner
+        // row rewrite and the fresh lease row with its two index entries.
+        // The price is bound to this one held transaction alone.
+        let opened_at_ms = now_ms()?;
+        let lease_shape = serving_lease_transition_shape(
+            record.owner_epoch > 0,
+            &record.store_uuid,
+            &lease_id,
+            &record.database_path,
+            &record.lock_root,
+        )?;
+        let lease_price = crate::admission_operation_store::authority_current_write_price(
+            &transaction,
+            &lease_shape,
+        )
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+        owner.authorize_current_write(&transaction, &lease_price)?;
         if record.owner_epoch > 0 {
             let previous_lease_id = transaction
                 .query_row(
@@ -836,7 +966,6 @@ impl SqliteAuthorityStore {
                 ));
             }
         }
-        let opened_at_ms = now_ms()?;
         let changed = transaction.execute(
             r#"
             UPDATE chio_serving_owner
@@ -876,8 +1005,12 @@ impl SqliteAuthorityStore {
             ));
         }
         verify_authority_store_invariants(&transaction)?;
+        // A COMMIT the capacity hook refused was rolled back by SQLite, so
+        // report it through the owner: a capacity refusal stays a known
+        // rollback the owner can keep serving from, and only an outcome that
+        // is genuinely unknown poisons the store.
         transaction.commit().map_err(|error| {
-            SqliteServingOwnerError::OutcomeUnknown(format!(
+            owner.outcome_unknown(format!(
                 "sqlite serving-owner epoch commit outcome is unknown: {error}"
             ))
         })?;
@@ -892,6 +1025,28 @@ impl SqliteAuthorityStore {
             &owner,
         )?;
         crate::admission_operation_store::repair_completed_at_startup(&mut connection, &owner)?;
+        // Supported pre-recovery initializations receive their protected
+        // imported influence root under this owner before any handle serves.
+        crate::admission_operation_store::publish_imported_influence_roots_at_startup(
+            &mut connection,
+            &owner,
+        )?;
+        // The one handle baseline and its census indices exist, and every
+        // handle and index verifies against them, before any handle serves.
+        crate::admission_operation_store::census_handle_indices_at_startup(
+            &mut connection,
+            &owner,
+        )?;
+        // The one import manifest baseline exists, and every import manifest
+        // verifies against it, before any import is served.
+        crate::admission_operation_store::publish_import_manifest_baseline_at_startup(
+            &mut connection,
+            &owner,
+        )?;
+        // Startup finished from fully verified state: this owner's
+        // same-connection change watermark starts here, after every verified
+        // startup write and anchor sync.
+        owner.remember_verified_total_changes(&connection);
         let read_companions = crate::read_companion::ReadCompanionPool::open(
             &database_path,
             record.database_device,
@@ -923,6 +1078,13 @@ impl SqliteAuthorityStore {
     #[cfg(test)]
     pub(crate) fn anchor_generation(&self) -> Result<u64, SqliteServingOwnerError> {
         Ok(self.owner.companion_anchor()?.generation())
+    }
+
+    /// How many times this owner's entry gate had to run the full
+    /// authenticating fallback, for bounded-cost regressions only.
+    #[cfg(test)]
+    pub(crate) fn anchor_full_validations_for_test(&self) -> u64 {
+        self.owner.anchor_full_validations.load(Ordering::Acquire)
     }
 
     #[must_use]
@@ -1810,12 +1972,21 @@ fn verify_authority_store_invariants(
     verify_serving_owner_schema(connection)?;
     let foreign_key_violation = connection
         .query_row("PRAGMA foreign_key_check", [], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?))
         })
         .optional()?;
     if let Some((table, rowid)) = foreign_key_violation {
+        // `PRAGMA foreign_key_check` reports the offending row's rowid, which
+        // is NULL for WITHOUT ROWID child tables because their rows carry no
+        // rowid at all. A NULL row identity is still a detected violation:
+        // report it truthfully instead of failing the decode, inventing a row
+        // number or treating the violation as absent.
+        let row = match rowid {
+            Some(rowid) => format!("row {rowid}"),
+            None => "row NULL (WITHOUT ROWID table)".to_owned(),
+        };
         return Err(SqliteServingOwnerError::Invalid(format!(
-            "sqlite foreign key violation in `{table}` row {rowid}"
+            "sqlite foreign key violation in `{table}` {row}"
         )));
     }
     verify_serving_lease_history(connection)?;

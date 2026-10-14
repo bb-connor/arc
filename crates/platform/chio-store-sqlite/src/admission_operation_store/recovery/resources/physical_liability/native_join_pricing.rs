@@ -10,7 +10,6 @@ use chio_sqlite_file_identity::{
 };
 
 mod protected_journal_rows;
-const SERVING_ANCHOR_BYTES: u64 = 2 * 1_024;
 
 pub(in crate::admission_operation_store) struct NativeKnowledgeJoinPriceData {
     physical: PhysicalLiabilityData,
@@ -97,10 +96,18 @@ pub(in crate::admission_operation_store) fn price_native_knowledge_join_liabilit
         ));
     }
     let journal = protected_journal_rows::describe_source_journal_trees(tx, owner, source)?;
+    // The join's inherited-scope projection mutations are real command writes
+    // in the same transaction: current rows with before images, immutable
+    // events, indexes and global framing. A repeated join updates existing
+    // slot rows; both shapes are priced per mutation with no reuse credit.
+    let projections = protected_journal_rows::describe_scope_projection_trees(tx, owner, source)?;
+    let projection_appends = projections.appends;
     trees.extend(journal.trees);
-    // These native and journal writes belong to this one actual producer
-    // transaction. Every mutation/history tree remains individually charged;
-    // transaction framing and FULL WAL padding are charged once for this cut.
+    trees.extend(projections.trees);
+    // These native, journal and projection writes belong to this one actual
+    // producer transaction. Every mutation/history tree remains individually
+    // charged; transaction framing and FULL WAL padding are charged once for
+    // this cut.
     let priced = price_transaction_write_shape(
         &frame_profile,
         &SqliteTransactionWriteShapeData::checked(trees).map_err(invariant)?,
@@ -110,29 +117,40 @@ pub(in crate::admission_operation_store) fn price_native_knowledge_join_liabilit
         wal_bytes: priced.wal_bytes(),
         disk_bytes: priced
             .disk_bytes()
-            .checked_add(SERVING_ANCHOR_BYTES)
+            .checked_add(SERVING_ANCHOR_FILE_BYTES)
             .ok_or_else(|| invariant("native join anchor disk bound exhausted"))?,
-        recovery_appends: journal.appends,
-        global_appends: journal.appends,
+        recovery_appends: journal
+            .appends
+            .checked_add(projection_appends)
+            .ok_or_else(|| invariant("native join append bound exhausted"))?,
+        global_appends: journal
+            .appends
+            .checked_add(projection_appends)
+            .ok_or_else(|| invariant("native join append bound exhausted"))?,
     };
     physical.validate()?;
     let profile = sha256_hex(
         &canonical_json_bytes(&(
-            "chio.sqlite.native-knowledge-frame-price.v3",
+            "chio.sqlite.native-knowledge-frame-price.v4",
             geometry.fingerprint(),
             flow_catalog.fingerprint(),
             command_catalog.fingerprint(),
             write_price_algorithm_descriptor(),
             facts,
             journal.facts,
+            projections.facts,
             (
-                "source-issued pristine journal rows; header9_per_cell; current40 recovery_transition; matching journal_chunk_authority_expression_index",
+                "source-issued pristine journal rows; header9_per_cell; current40 recovery_transition; matching journal_chunk_authority_expression_index and knowledge_join_release_expression_index",
                 owner.fence.store_uuid.len(), owner.fence.lease_id.len(),
-                source.journal_authority_id().len(), SERVING_ANCHOR_BYTES,
+                source.journal_authority_id().len(), SERVING_ANCHOR_FILE_BYTES,
             ),
             source.journal_records(),
             source.journal_bytes(),
             "each root and chunk retains all event/global/index costs; repeated spilling charged; no before-image reuse credit",
+            (
+                "inherited-scope projection rows; current row before image priced per update; one immutable event and index per command",
+                source.projection_writes().len(),
+            ),
         ))
         .map_err(|error| invariant(error.to_string()))?,
     );

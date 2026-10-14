@@ -1009,6 +1009,7 @@ fn economic_error(error: EconomicStateCacheError) -> ChannelLifecycleStoreError 
 
 fn owner_error(error: SqliteServingOwnerError) -> ChannelLifecycleStoreError {
     match error {
+        SqliteServingOwnerError::Invalid(detail) => invalid(detail),
         SqliteServingOwnerError::OutcomeUnknown(detail) => {
             ChannelLifecycleStoreError::OutcomeUnknown(detail)
         }

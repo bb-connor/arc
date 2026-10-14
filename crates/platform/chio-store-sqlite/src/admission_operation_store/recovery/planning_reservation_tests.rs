@@ -3,7 +3,7 @@ use super::*;
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 // These units check immutable allocation algebra and protected record preimages.
-// Actual owner/global-chain migration custody is exercised by the native case.
+// They do not replace public native workflow acceptance.
 fn empty_fixture() -> Result<Connection, Box<dyn std::error::Error>> {
     let tx = Connection::open_in_memory()?;
     tx.execute_batch(
@@ -31,8 +31,8 @@ fn fixture() -> Result<(Connection, PlanningBudget), Box<dyn std::error::Error>>
         authority_domain: AuthorityDomainId::new("planning-authority")?,
         tenant_id: None,
         legacy_cutoff_sequence: SafeInteger::new(40000)?,
-        baseline_bytes: SafeInteger::new(4478)?,
-        baseline_events: SafeInteger::new(30002)?,
+        baseline_bytes: SafeInteger::ZERO,
+        baseline_events: SafeInteger::ZERO,
         writes: SafeInteger::new(1)?,
     };
     retain(&tx, &first, 40002)?;
@@ -120,37 +120,31 @@ fn retain(tx: &Connection, budget: &PlanningBudget, sequence: i64) -> TestResult
 
 fn usage(budget: &PlanningBudget) -> Usage {
     Usage {
-        bytes: budget.baseline_bytes.get(),
-        events: budget.baseline_events.get() + budget.writes.get(),
-        before_cutoff: budget.baseline_events.get(),
+        bytes: 4478,
+        events: budget.writes.get(),
+        before_cutoff: 0,
     }
 }
 
 #[test]
-fn planning_reservation_preserves_authenticated_legacy_baseline() -> TestResult {
+fn planning_reservation_preserves_authenticated_write_count() -> TestResult {
     let (tx, mut current) = fixture()?;
     current.writes = SafeInteger::new(3)?;
     retain(&tx, &current, 40008)?;
     let retained = load(&tx, &current.authority_domain, None, &usage(&current))?
         .ok_or("allocation disappeared")?;
-    assert_eq!(retained.baseline_events.get(), 30002);
+    assert_eq!(retained.baseline_events, SafeInteger::ZERO);
     assert_eq!(retained.writes.get(), 3);
     Ok(())
 }
 
 #[test]
-fn planning_reservation_rejects_self_consistent_baseline_and_cutoff_swaps() -> TestResult {
-    for field in ["bytes", "events", "cutoff"] {
-        let (tx, mut changed) = fixture()?;
-        match field {
-            "bytes" => changed.baseline_bytes = SafeInteger::new(4479)?,
-            "events" => changed.baseline_events = SafeInteger::new(30003)?,
-            _ => changed.legacy_cutoff_sequence = SafeInteger::new(40001)?,
-        }
-        changed.writes = SafeInteger::new(3)?;
-        retain(&tx, &changed, 40008)?;
-        assert!(load(&tx, &changed.authority_domain, None, &usage(&changed)).is_err());
-    }
+fn planning_reservation_rejects_changed_cutoff() -> TestResult {
+    let (tx, mut changed) = fixture()?;
+    changed.legacy_cutoff_sequence = SafeInteger::new(40001)?;
+    changed.writes = SafeInteger::new(3)?;
+    retain(&tx, &changed, 40008)?;
+    assert!(load(&tx, &changed.authority_domain, None, &usage(&changed)).is_err());
     Ok(())
 }
 
@@ -188,26 +182,35 @@ fn planning_reservation_rejects_reordered_first_global_allocation() -> TestResul
 }
 
 #[test]
-fn planning_reservation_refuses_lazy_tenant_post_cutoff_credit() -> TestResult {
+fn planning_reservation_refuses_unallocated_tenant_history() -> TestResult {
     let (_, first) = fixture()?;
     let tenant = RecoveryTenantId::new("late-tenant")?;
-    let post_cutoff = Usage {
-        bytes: 100,
-        events: 2,
-        before_cutoff: 1,
-    };
-    assert!(new_budget(&first.authority_domain, Some(&tenant), 40000, &post_cutoff).is_err());
+    new_budget(
+        &first.authority_domain,
+        Some(&tenant),
+        40000,
+        &Usage::default(),
+    )?;
+    for before_cutoff in [1, 2] {
+        let unallocated = Usage {
+            bytes: 100,
+            events: 2,
+            before_cutoff,
+        };
+        assert!(new_budget(&first.authority_domain, Some(&tenant), 40000, &unallocated).is_err());
+    }
     Ok(())
 }
 
 #[test]
-fn planning_reservation_allows_byte_shrink_below_fixed_baseline() -> TestResult {
+fn planning_reservation_reuses_freed_byte_allowance() -> TestResult {
     let (tx, mut current) = fixture()?;
-    let mut smaller = usage(&current);
-    smaller.bytes = 100;
-    load(&tx, &current.authority_domain, None, &smaller)?.ok_or("allocation disappeared")?;
-    next_budget(&mut current, &smaller, 100, 90)?;
-    assert_eq!(current.baseline_bytes.get(), 4478);
+    let mut full = usage(&current);
+    full.bytes = GLOBAL_BYTES;
+    load(&tx, &current.authority_domain, None, &full)?.ok_or("allocation disappeared")?;
+    next_budget(&mut current, &full, 100, 100)?;
+    assert_eq!(current.writes.get(), 2);
+    assert!(next_budget(&mut current, &full, 100, 101).is_err());
     assert_eq!(current.writes.get(), 2);
     Ok(())
 }
@@ -216,10 +219,70 @@ fn planning_reservation_allows_byte_shrink_below_fixed_baseline() -> TestResult 
 fn planning_reservation_enforces_fixed_byte_allowance_on_verify_and_next_write() -> TestResult {
     let (tx, mut current) = fixture()?;
     let mut full = usage(&current);
-    full.bytes = current.baseline_bytes.get() + GLOBAL_BYTES;
+    full.bytes = GLOBAL_BYTES;
     load(&tx, &current.authority_domain, None, &full)?.ok_or("allocation disappeared")?;
     assert!(next_budget(&mut current, &full, 0, 1).is_err());
     full.bytes += 1;
     assert!(load(&tx, &current.authority_domain, None, &full).is_err());
+    Ok(())
+}
+
+#[test]
+fn planning_reservation_refuses_nonzero_first_allocation_baselines() -> TestResult {
+    for (bytes, events) in [(1, 0), (0, 1)] {
+        let (_, mut budget) = fixture()?;
+        budget.baseline_bytes = SafeInteger::new(bytes)?;
+        budget.baseline_events = SafeInteger::new(events)?;
+        let tx = empty_fixture()?;
+        retain(&tx, &budget, 40002)?;
+        let mut observed = usage(&budget);
+        observed.events += events;
+        observed.before_cutoff = events;
+        let before = tx.total_changes();
+        assert!(matches!(
+            load(&tx, &budget.authority_domain, None, &observed),
+            Err(AdmissionOperationStoreError::Invariant(message))
+                if message == "recovery planning quota counters changed"
+        ));
+        assert_eq!(tx.total_changes(), before);
+    }
+    Ok(())
+}
+
+#[test]
+fn planning_history_without_allocations_is_refused_read_only() -> TestResult {
+    for prefix in [
+        "deployment",
+        "deployment-history",
+        "recovery-origin",
+        "recovery-successor",
+        "recovery-owner",
+    ] {
+        for history in ["record", "event", "global"] {
+            let tx = empty_fixture()?;
+            tx.execute_batch(
+                "CREATE TABLE chio_serving_owner(singleton INTEGER PRIMARY KEY,store_uuid TEXT);
+                INSERT INTO chio_serving_owner VALUES(1,'planning-authority')",
+            )?;
+            verify_all(&tx)?;
+            let key = format!("{prefix}:unallocated");
+            match history {
+                "record" => tx.execute(
+                    "INSERT INTO admission_operation_recovery_records VALUES(?1,'scope','command',1,x'00',NULL,NULL)", [&key])?,
+                "event" => tx.execute(
+                    "INSERT INTO admission_operation_recovery_events VALUES(1,?1,1,'unallocated')", [&key])?,
+                _ => tx.execute("INSERT INTO authority_global_commits VALUES('recovery',?1)", [&key])?,
+            };
+            let before = tx.total_changes();
+            assert!(
+                matches!(verify_all(&tx),
+                    Err(AdmissionOperationStoreError::Invariant(message))
+                        if message == "recovery planning global allocation disappeared"
+                ),
+                "{prefix} {history} was not refused at the missing allocation boundary"
+            );
+            assert_eq!(tx.total_changes(), before);
+        }
+    }
     Ok(())
 }

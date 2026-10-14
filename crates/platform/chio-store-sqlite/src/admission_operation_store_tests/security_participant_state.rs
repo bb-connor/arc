@@ -16,6 +16,9 @@ mod cutpoints;
 #[path = "security_participant_state/egress.rs"]
 mod egress;
 #[cfg(unix)]
+#[path = "security_participant_state/imported_influence.rs"]
+mod imported_influence;
+#[cfg(unix)]
 #[path = "security_participant_state/integrity.rs"]
 mod integrity;
 #[cfg(unix)]
@@ -28,6 +31,9 @@ mod migration;
 mod mutations;
 #[cfg(unix)]
 pub(super) use mutations::prepare_issuance_fixture;
+#[cfg(unix)]
+#[path = "security_participant_state/native_live_state.rs"]
+mod native_live_state;
 #[cfg(unix)]
 #[path = "security_participant_state/observation.rs"]
 mod observation;

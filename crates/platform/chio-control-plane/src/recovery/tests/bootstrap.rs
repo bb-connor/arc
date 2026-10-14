@@ -41,9 +41,17 @@ pub(super) fn open_kernel(
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
     });
-    let receipts = SqliteReceiptStore::open(directory.join("receipts.db"))?;
+    // The production construction: the sink preserves the authority's native
+    // finishing debt from its first write.
+    let bank = authority
+        .admission_operation_store()
+        .native_receipt_bank_attachment()?;
+    let receipts = SqliteReceiptStore::open_with_native_bank(directory.join("receipts.db"), &bank)?;
     receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
-    kernel.set_receipt_store_handle(Arc::new(receipts))?;
+    // Native originals fund their receipt on this concrete registered sink.
+    kernel.set_native_receipt_store(
+        chio_kernel::receipt_store::NativeReceiptStoreRegistration::new(Arc::new(receipts)),
+    )?;
     kernel.set_durable_admission_store(
         Arc::new(authority.admission_operation_store()),
         Arc::new(authority.tool_outcome_store()),

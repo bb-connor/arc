@@ -20,8 +20,23 @@ mod nonces;
 mod objects;
 mod original_snapshot;
 mod recovery;
-mod unused_recovery_reservation;
+pub(crate) mod unused_recovery_reservation;
+pub(crate) use blobs::put_blob_call;
+pub(crate) use children::{
+    provision_signers_call, record_wait_call, submit_child_call, ChildPlan, WaitInsert,
+};
+pub(crate) use confined_delivery::begin_confined_delivery_call;
+pub(crate) use confined_slots::{
+    fill_confined_return_slot_call, reserve_confined_return_slot_call,
+};
+#[cfg(feature = "worker-server")]
+pub(crate) use credentials::{issue_worker_credential_call, revoke_worker_credentials_call};
+pub(crate) use knowledge::enable_knowledge_call;
+pub(crate) use nonces::retain_nonce_call;
+pub(crate) use objects::{collect_knowledge_object_call, stage_knowledge_object_call, Collection};
 pub(crate) use original_snapshot::OriginalProcessSnapshot;
+pub(crate) use recovery::{finalize_recovery_call, reserve_recovery_call};
+pub(crate) use unused_recovery_reservation::close_unused_recovery_reservation_call;
 
 pub(crate) struct Store {
     connection: Connection,
@@ -29,9 +44,26 @@ pub(crate) struct Store {
     path: std::path::PathBuf,
     #[cfg(unix)]
     identity: (u64, u64),
+    authority: String,
+    kernel_key: String,
+    startup: native_return_custody::StartupPlan,
 }
 
+/// The compiled replacement of the knowledge downgrade guard. The catalog
+/// stores this text verbatim from `CREATE` through `END`.
+pub(crate) const KNOWLEDGE_NO_DOWNGRADE_TRIGGER: &str =
+    "CREATE TRIGGER process_knowledge_no_downgrade BEFORE UPDATE OF version ON process_runtime
+            WHEN OLD.version>=3 AND NEW.version<OLD.version
+            BEGIN SELECT RAISE(ABORT,'knowledge enforcement is permanent'); END";
+
 impl Store {
+    /// Hold the journal file open and authenticate its layout from positive
+    /// observations without writing anything: not even a journal mode or
+    /// header is set here. A journal in the compiled layout is ready. A new
+    /// file, or an exact supported source layout, records the startup plan
+    /// (with the namespace of a new journal chosen now) that the registry
+    /// runs under the native current-write scope before any schema write.
+    /// Any other layout, including a foreign authority or key, refuses.
     pub fn open(path: &Path, authority: &str, kernel_key: &str) -> Result<Self, ProcessError> {
         let path = private_file(path)?;
         #[cfg(unix)]
@@ -48,80 +80,24 @@ impl Store {
                 | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )?;
         connection.busy_timeout(Duration::from_secs(5))?;
-        connection.pragma_update(None, "journal_mode", "WAL")?;
         connection.pragma_update(None, "synchronous", "FULL")?;
         connection.pragma_update(None, "foreign_keys", "ON")?;
-        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
         confined_delivery::verify_before_open(&tx)?;
         unused_recovery_reservation::verify_before_open(&tx)?;
-        // Earlier triggers fenced a single version instead of preventing only
-        // downgrades. Replace them before a supported journal upgrade.
-        tx.execute_batch(
-            "DROP TRIGGER IF EXISTS process_recovery_version_monotone;
-            DROP TRIGGER IF EXISTS process_knowledge_no_downgrade;",
-        )?;
-        tx.execute_batch(include_str!("store.sql"))?;
-        tx.execute_batch("CREATE TRIGGER process_knowledge_no_downgrade BEFORE UPDATE OF version ON process_runtime
-            WHEN OLD.version>=3 AND NEW.version<OLD.version
-            BEGIN SELECT RAISE(ABORT,'knowledge enforcement is permanent'); END;")?;
-        let has_legacy = tx
-            .prepare("PRAGMA table_info(process_state_blobs)")?
-            .query_map([], |row| row.get::<_, String>(1))?
-            .collect::<Result<Vec<_>, _>>()?
-            .iter()
-            .any(|column| column == "legacy_quarantined");
-        if !has_legacy {
-            tx.execute_batch("ALTER TABLE process_state_blobs ADD COLUMN legacy_quarantined INTEGER NOT NULL DEFAULT 1 CHECK(legacy_quarantined IN(0,1))")?;
-        }
-        let has_generation = tx
-            .prepare("PRAGMA table_info(process_state_blobs)")?
-            .query_map([], |row| row.get::<_, String>(1))?
-            .collect::<Result<Vec<_>, _>>()?
-            .iter()
-            .any(|column| column == "knowledge_generation");
-        if !has_generation {
-            tx.execute_batch("ALTER TABLE process_state_blobs ADD COLUMN knowledge_generation TEXT NOT NULL DEFAULT 'legacy' CHECK(length(knowledge_generation) BETWEEN 1 AND 64)")?;
-        }
-        // Journals created before dispatch attempts were recorded gain the column;
-        // their existing operations keep attempt one and its request identity.
-        let has_attempts = tx
-            .prepare("PRAGMA table_info(process_calls)")?
-            .query_map([], |row| row.get::<_, String>(1))?
-            .collect::<Result<Vec<_>, _>>()?
-            .iter()
-            .any(|column| column == "attempts");
-        if !has_attempts {
-            tx.execute_batch(
-                "ALTER TABLE process_calls ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1 CHECK (attempts >= 1)",
-            )?;
-        }
-        tx.execute(
-            "INSERT OR IGNORE INTO process_runtime(singleton, version, namespace, authority, kernel_key)
-             VALUES (1, 1, ?1, ?2, ?3)",
-            params![uuid::Uuid::new_v4().to_string(), authority, kernel_key],
-        )?;
-        let (version, namespace, stored_authority, stored_key): (u32, String, String, String) = tx.query_row(
-            "SELECT version, namespace, authority, kernel_key FROM process_runtime WHERE singleton = 1",
-            [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-        )?;
-        if !matches!(version, 1..=7) || stored_authority != authority || stored_key != kernel_key {
-            return Err(ProcessError::Configuration(
-                "process journal belongs to a different durable authority, kernel key or version",
-            ));
-        }
-        if version < 5
-            && tx.query_row(
-                "SELECT EXISTS(SELECT 1 FROM process_confined_return_slots)",
-                [],
-                |row| row.get::<_, bool>(0),
-            )?
-        {
-            return Err(ProcessError::Configuration(
-                "confined return data requires its journal version",
-            ));
-        }
-        unused_recovery_reservation::install_or_verify(&tx, version)?;
-        confined_delivery::install_or_verify(&tx, version)?;
+        native_return_custody::verify_before_open(&tx)?;
+        let startup = native_return_custody::classify(&tx, &path, authority, kernel_key)?;
+        let namespace = match &startup {
+            native_return_custody::StartupPlan::Genesis { namespace } => namespace.clone(),
+            native_return_custody::StartupPlan::Ready => {
+                let (version, namespace) = read_identity(&tx, authority, kernel_key)?;
+                verify_cohorts(&tx, version)?;
+                namespace
+            }
+            native_return_custody::StartupPlan::Upgrade(_) => {
+                read_identity(&tx, authority, kernel_key)?.1
+            }
+        };
         tx.commit()?;
         Ok(Self {
             connection,
@@ -129,7 +105,34 @@ impl Store {
             path,
             #[cfg(unix)]
             identity,
+            authority: authority.to_owned(),
+            kernel_key: kernel_key.to_owned(),
+            startup,
         })
+    }
+
+    /// Whether the journal still needs its routed startup write.
+    #[cfg(any(test, feature = "admission-test-support"))]
+    pub(crate) fn startup_pending(&self) -> bool {
+        self.startup != native_return_custody::StartupPlan::Ready
+    }
+
+    pub(crate) fn startup_complete(&mut self) {
+        self.startup = native_return_custody::StartupPlan::Ready;
+    }
+
+    /// Read-only handle for the admission-test-support inspection surface.
+    /// A production build never compiles this accessor.
+    #[cfg(any(test, feature = "admission-test-support"))]
+    pub(crate) fn inspection_connection(&self) -> &Connection {
+        &self.connection
+    }
+
+    /// Mutable handle for the admission-test-support corruption controls.
+    /// A production build never compiles this accessor.
+    #[cfg(any(test, feature = "admission-test-support"))]
+    pub(crate) fn inspection_connection_mut(&mut self) -> &mut Connection {
+        &mut self.connection
     }
 
     pub fn process(&self, id: &str) -> Result<ProcessSnapshot, ProcessError> {
@@ -192,45 +195,9 @@ impl Store {
         Ok((snapshot, result))
     }
 
-    pub fn create_root(
-        &mut self,
-        id: &str,
-        capability: &CapabilityToken,
-        limits: ProcessLimits,
-    ) -> Result<ProcessSnapshot, ProcessError> {
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if let Some(existing) = read_process(&tx, id)? {
-            if existing.parent_id.is_some()
-                || digest(&existing.capability)? != digest(capability)?
-                || existing.limits != limits
-            {
-                return Err(ProcessError::Conflict);
-            }
-        } else {
-            tx.execute("INSERT INTO processes(id, parent_id, root_id, depth, capability, limits) VALUES (?1, NULL, ?1, 0, ?2, ?3)",
-                params![id, serde_json::to_string(capability)?, serde_json::to_string(&limits)?])?;
-        }
-        tx.commit()?;
-        self.process(id)
-    }
-
-    pub fn spawn(
-        &mut self,
-        parent_id: &str,
-        child_id: &str,
-        capability: &CapabilityToken,
-        validate: impl FnOnce(&CapabilityToken, &CapabilityToken) -> Result<(), ProcessError>,
-    ) -> Result<ProcessSnapshot, ProcessError> {
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        attach_child(&tx, parent_id, child_id, capability, validate)?;
-        tx.commit()?;
-        self.process(child_id)
-    }
-
+    /// Test fixtures drive the actual admission body directly; production
+    /// admission always runs through the routed current writer.
+    #[cfg(any(test, feature = "admission-test-support"))]
     pub fn admit(
         &mut self,
         id: &str,
@@ -241,43 +208,7 @@ impl Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        unused_recovery_reservation::require_open_recovery_reservation(&tx, id, key)?;
-        let process =
-            read_process(&tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
-        require_running(&process)?;
-        if digest(&process.capability)? != digest(&request.capability)?
-            || request.agent_id != process.capability.subject.to_hex()
-        {
-            return Err(ProcessError::Conflict);
-        }
-        let existing: Option<String> = tx.query_row(
-            "SELECT request_hash FROM process_calls WHERE process_id = ?1 AND operation_key = ?2",
-            params![id, key], |row| row.get(0),
-        ).optional()?;
-        let reserved: Option<Option<String>> = tx.query_row(
-            "SELECT final_binding FROM process_recovery_calls WHERE process_id=?1 AND operation_key=?2",
-            params![id,key],|row| row.get(0),
-        ).optional()?;
-        if reserved
-            .as_ref()
-            .is_some_and(|binding| binding.as_deref() != Some(request_hash))
-            || (reserved.is_some() && existing.is_none())
-        {
-            return Err(ProcessError::Conflict);
-        }
-        match existing {
-            Some(hash) if hash != request_hash => return Err(ProcessError::Conflict),
-            Some(_) => {}
-            None => {
-                let changed = tx.execute("UPDATE processes SET tree_calls = tree_calls + 1 WHERE id = ?1 AND tree_calls < ?2",
-                    params![process.root_id, process.limits.max_calls])?;
-                if changed != 1 {
-                    return Err(ProcessError::Limit("logical tool calls"));
-                }
-                tx.execute("INSERT INTO process_calls(process_id, operation_key, request_hash) VALUES (?1, ?2, ?3)",
-                    params![id, key, request_hash])?;
-            }
-        }
+        admit_call(&tx, id, key, request, request_hash)?;
         tx.commit()?;
         Ok(())
     }
@@ -295,94 +226,222 @@ impl Store {
             .optional()?
             .unwrap_or(1))
     }
-
-    /// Record the next dispatch attempt of a running process's operation before
-    /// that attempt is dispatched, so a crash between the two leaves the journal
-    /// ahead of the kernel rather than behind it.
-    pub fn advance_attempt(
-        &mut self,
-        id: &str,
-        key: &str,
-        request_hash: &str,
-        current: u32,
-        maximum: u32,
-    ) -> Result<u32, ProcessError> {
-        if current >= maximum {
-            return Err(ProcessError::Limit("dispatch attempts"));
-        }
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let process =
-            read_process(&tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
-        require_running(&process)?;
-        let changed = tx.execute(
-            "UPDATE process_calls SET attempts = attempts + 1 WHERE process_id = ?1 AND operation_key = ?2 AND request_hash = ?3 AND attempts = ?4",
-            params![id, key, request_hash, current],
-        )?;
-        if changed != 1 {
-            return Err(ProcessError::Conflict);
-        }
-        tx.commit()?;
-        Ok(current + 1)
-    }
-
-    pub fn checkpoint(
-        &mut self,
-        id: &str,
-        expected_revision: u64,
-        value: Value,
-    ) -> Result<Checkpoint, ProcessError> {
-        let next = expected_revision
-            .checked_add(1)
-            .filter(|v| *v <= i64::MAX as u64)
-            .ok_or(ProcessError::CheckpointConflict)?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let process =
-            read_process(&tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
-        require_running(&process)?;
-        let changed = tx.execute(
-            "UPDATE processes SET checkpoint = ?1, revision = ?2 WHERE id = ?3 AND revision = ?4",
-            params![
-                serde_json::to_string(&value)?,
-                next as i64,
-                id,
-                expected_revision as i64
-            ],
-        )?;
-        if changed != 1 {
-            return Err(ProcessError::CheckpointConflict);
-        }
-        tx.commit()?;
-        Ok(Checkpoint {
-            revision: next,
-            value,
-        })
-    }
-
-    pub fn cancel(&mut self, id: &str) -> Result<usize, ProcessError> {
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        read_process(&tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
-        let count = tx.execute(
-            "WITH RECURSIVE descendants(id) AS (
-                SELECT id FROM processes WHERE id = ?1
-                UNION ALL SELECT p.id FROM processes p JOIN descendants d ON p.parent_id = d.id
-             ) UPDATE processes SET state = 'cancelled' WHERE id IN (SELECT id FROM descendants) AND state = 'running'", [id],
-        )?;
-        let ordered = confined_delivery::cancellation_has_ordered_return(&tx, id);
-        tx.commit()?;
-        if ordered? {
-            return Err(ProcessError::ConfinedReturnAlreadyOrdered);
-        }
-        Ok(count)
-    }
 }
 
-fn attach_child(
+fn read_identity(
+    connection: &Connection,
+    authority: &str,
+    kernel_key: &str,
+) -> Result<(u32, String), ProcessError> {
+    let (version, namespace, stored_authority, stored_key): (u32, String, String, String) = connection.query_row(
+        "SELECT version, namespace, authority, kernel_key FROM process_runtime WHERE singleton = 1",
+        [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+    )?;
+    if !matches!(version, 1..=8) || stored_authority != authority || stored_key != kernel_key {
+        return Err(ProcessError::Configuration(
+            "process journal belongs to a different durable authority, kernel key or version",
+        ));
+    }
+    Ok((version, namespace))
+}
+
+/// The retained recovery and delivery cohorts of a journal at its feature
+/// level. They are verified; a family that is genuinely absent is installed.
+fn verify_cohorts(connection: &Connection, version: u32) -> Result<(), ProcessError> {
+    let level = level_for_version(connection, version)?;
+    if level < 5
+        && connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM process_confined_return_slots)",
+            [],
+            |row| row.get::<_, bool>(0),
+        )?
+    {
+        return Err(ProcessError::Configuration(
+            "confined return data requires its journal version",
+        ));
+    }
+    unused_recovery_reservation::install_or_verify(connection, level)?;
+    confined_delivery::install_or_verify(connection, level)
+}
+
+fn trigger_sql(connection: &Connection, name: &str) -> Result<Option<String>, ProcessError> {
+    Ok(connection
+        .query_row(
+            "SELECT sql FROM main.sqlite_schema WHERE type='trigger' AND name=?1",
+            [name],
+            |row| row.get(0),
+        )
+        .optional()?)
+}
+
+/// The complete cancellation body inside one writer transaction: the bounded
+/// recursive state rewrite and the ordered-return observation. The original
+/// semantics commit the rewrite and then report an ordered confined return,
+/// so the body returns `(count, ordered)` and the caller decides after the
+/// commit. Shared by the direct writer and the bank-proven routed writer.
+pub(crate) fn cancel_call(
+    tx: &rusqlite::Transaction<'_>,
+    id: &str,
+) -> Result<(usize, bool), ProcessError> {
+    read_process(tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
+    let count = tx.execute(
+        "WITH RECURSIVE descendants(id) AS (
+            SELECT id FROM processes WHERE id = ?1
+            UNION ALL SELECT p.id FROM processes p JOIN descendants d ON p.parent_id = d.id
+         ) UPDATE processes SET state = 'cancelled' WHERE id IN (SELECT id FROM descendants) AND state = 'running'",
+        [id],
+    )?;
+    let ordered = confined_delivery::cancellation_has_ordered_return(tx, id)?;
+    Ok((count, ordered))
+}
+
+/// The complete advance-attempt body inside one writer transaction, shared by
+/// the direct writer and the bank-proven routed writer.
+pub(crate) fn advance_attempt_call(
+    tx: &rusqlite::Transaction<'_>,
+    id: &str,
+    key: &str,
+    request_hash: &str,
+    current: u32,
+    maximum: u32,
+) -> Result<u32, ProcessError> {
+    if current >= maximum {
+        return Err(ProcessError::Limit("dispatch attempts"));
+    }
+    let process = read_process(tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
+    require_running(&process)?;
+    let changed = tx.execute(
+        "UPDATE process_calls SET attempts = attempts + 1 WHERE process_id = ?1 AND operation_key = ?2 AND request_hash = ?3 AND attempts = ?4",
+        params![id, key, request_hash, current],
+    )?;
+    if changed != 1 {
+        return Err(ProcessError::Conflict);
+    }
+    Ok(current + 1)
+}
+
+/// The complete create-root body inside one writer transaction, shared by the
+/// direct writer and the bank-proven routed writer.
+pub(crate) fn create_root_call(
+    tx: &Connection,
+    id: &str,
+    capability: &CapabilityToken,
+    limits: ProcessLimits,
+) -> Result<(), ProcessError> {
+    if let Some(existing) = read_process(tx, id)? {
+        if existing.parent_id.is_some()
+            || digest(&existing.capability)? != digest(capability)?
+            || existing.limits != limits
+        {
+            return Err(ProcessError::Conflict);
+        }
+    } else {
+        tx.execute(
+            "INSERT INTO processes(id, parent_id, root_id, depth, capability, limits) VALUES (?1, NULL, ?1, 0, ?2, ?3)",
+            params![id, serde_json::to_string(capability)?, serde_json::to_string(&limits)?],
+        )?;
+    }
+    Ok(())
+}
+
+/// The complete admission body of one logical call, executed inside the owning
+/// writer transaction: the open-reservation guard, the persisted identity and
+/// capability binding, the frozen request and reservation expectations, the
+/// tree-wide call debit and the immutable call row. Shared by the direct
+/// writer and the bank-proven routed writer.
+pub(crate) fn admit_call(
+    tx: &Connection,
+    id: &str,
+    key: &str,
+    request: &ToolCallRequest,
+    request_hash: &str,
+) -> Result<(), ProcessError> {
+    unused_recovery_reservation::require_open_recovery_reservation(tx, id, key)?;
+    let process = read_process(tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
+    require_running(&process)?;
+    if digest(&process.capability)? != digest(&request.capability)?
+        || request.agent_id != process.capability.subject.to_hex()
+    {
+        return Err(ProcessError::Conflict);
+    }
+    let existing: Option<String> = tx
+        .query_row(
+            "SELECT request_hash FROM process_calls WHERE process_id = ?1 AND operation_key = ?2",
+            params![id, key],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let reserved: Option<Option<String>> = tx
+        .query_row(
+            "SELECT final_binding FROM process_recovery_calls WHERE process_id=?1 AND operation_key=?2",
+            params![id, key],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if reserved
+        .as_ref()
+        .is_some_and(|binding| binding.as_deref() != Some(request_hash))
+        || (reserved.is_some() && existing.is_none())
+    {
+        return Err(ProcessError::Conflict);
+    }
+    match existing {
+        Some(hash) if hash != request_hash => return Err(ProcessError::Conflict),
+        Some(_) => {}
+        None => {
+            let changed = tx.execute(
+                "UPDATE processes SET tree_calls = tree_calls + 1 WHERE id = ?1 AND tree_calls < ?2",
+                params![process.root_id, process.limits.max_calls],
+            )?;
+            if changed != 1 {
+                return Err(ProcessError::Limit("logical tool calls"));
+            }
+            tx.execute(
+                "INSERT INTO process_calls(process_id, operation_key, request_hash) VALUES (?1, ?2, ?3)",
+                params![id, key, request_hash],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+/// The complete checkpoint body of one process, executed inside the owning
+/// writer transaction: revision arithmetic, running identity and the
+/// compare-and-swap row rewrite. Shared by the direct writer and the
+/// bank-proven routed writer.
+pub(crate) fn checkpoint_call(
+    tx: &Connection,
+    id: &str,
+    expected_revision: u64,
+    value: Value,
+) -> Result<Checkpoint, ProcessError> {
+    let next = expected_revision
+        .checked_add(1)
+        .filter(|v| *v <= i64::MAX as u64)
+        .ok_or(ProcessError::CheckpointConflict)?;
+    let process = read_process(tx, id)?.ok_or_else(|| ProcessError::NotFound(id.to_owned()))?;
+    require_running(&process)?;
+    let changed = tx.execute(
+        "UPDATE processes SET checkpoint = ?1, revision = ?2 WHERE id = ?3 AND revision = ?4",
+        params![
+            serde_json::to_string(&value)?,
+            next as i64,
+            id,
+            expected_revision as i64
+        ],
+    )?;
+    if changed != 1 {
+        return Err(ProcessError::CheckpointConflict);
+    }
+    Ok(Checkpoint {
+        revision: next,
+        value,
+    })
+}
+
+/// The complete attach-child body inside one writer transaction, shared by
+/// the direct writer and the bank-proven routed writer.
+pub(crate) fn attach_child(
     tx: &Connection,
     parent_id: &str,
     child_id: &str,
@@ -478,6 +537,77 @@ fn read_process(
         },
         tree_calls,
     }))
+}
+
+/// The journal's feature cohort level. Before the native return cohort it is
+/// the runtime version itself. Activating that cohort moves the journal to
+/// version eight and retains the predecessor level, which later feature
+/// activations raise; version eight never stands in for a feature level.
+pub(crate) fn feature_level(connection: &Connection) -> Result<u32, ProcessError> {
+    let version: u32 = connection.query_row(
+        "SELECT version FROM process_runtime WHERE singleton=1",
+        [],
+        |row| row.get(0),
+    )?;
+    level_for_version(connection, version)
+}
+
+pub(crate) fn level_for_version(
+    connection: &Connection,
+    version: u32,
+) -> Result<u32, ProcessError> {
+    let retained: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='process_feature_level')",
+        [],
+        |row| row.get(0),
+    )?;
+    let level: Option<u32> = if retained {
+        connection
+            .query_row(
+                "SELECT level FROM process_feature_level WHERE singleton=1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?
+    } else {
+        None
+    };
+    match (version, level) {
+        (1..=7, None) => Ok(version),
+        (8, Some(level)) if (1..=7).contains(&level) => Ok(level),
+        _ => Err(ProcessError::Configuration(
+            "process journal feature level differs from its version",
+        )),
+    }
+}
+
+/// Raise one feature cohort from `from` to `to` inside the activating write.
+/// Before the native return cohort the runtime version carries the level.
+pub(crate) fn raise_feature_level(
+    tx: &rusqlite::Transaction<'_>,
+    from: u32,
+    to: u32,
+) -> Result<(), ProcessError> {
+    let version: u32 = tx.query_row(
+        "SELECT version FROM process_runtime WHERE singleton=1",
+        [],
+        |row| row.get(0),
+    )?;
+    let changed = if version == 8 {
+        tx.execute(
+            "UPDATE process_feature_level SET level=?2 WHERE singleton=1 AND level=?1",
+            params![from, to],
+        )?
+    } else {
+        tx.execute(
+            "UPDATE process_runtime SET version=?2 WHERE singleton=1 AND version=?1",
+            params![from, to],
+        )?
+    };
+    if changed != 1 {
+        return Err(ProcessError::Conflict);
+    }
+    Ok(())
 }
 
 fn require_running(process: &ProcessSnapshot) -> Result<(), ProcessError> {

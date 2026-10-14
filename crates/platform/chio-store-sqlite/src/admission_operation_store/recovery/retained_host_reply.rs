@@ -152,9 +152,13 @@ pub(super) fn authenticate_retained_host_reply<'authority, 'tx, 'conn>(
     let source = current_source(tx, actor, profile, record, now)?;
     // A fresh first Action gets its source from the owning observation and
     // verifies that materialized audience before persistence. A retained
-    // Action is always checked before any artifact comparison or reply.
+    // Action is always checked before any artifact comparison or reply. A
+    // workflow without an Action is visible only to its creator, so another
+    // actor cannot distinguish it from absence by any later resource outcome.
     if record.action.is_some() {
         require_current_preview(tx, actor, profile, record)?;
+    } else {
+        verify_preview(actor, profile, record)?;
     }
     let matches = match request {
         // Review preparation has always returned its retained original review

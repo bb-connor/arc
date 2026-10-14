@@ -77,8 +77,8 @@ def create_evidence(root, requested, recorder):
 
 def original_image(recorder, path, purpose):
     with recorder.HeldPath(path) as held:
-        body = held.read()
-        return {"path": str(path), "sha256": hashlib.sha256(body).hexdigest(), "size": len(body), "purpose": purpose}
+        digest, size = held.read_digest()
+        return {"path": str(path), "sha256": digest, "size": size, "purpose": purpose}
 
 
 def selected_tool(command):
@@ -135,7 +135,9 @@ def prepare_host(root, evidence, inventory, recorder):
     python_bin = Path(sys.executable).resolve().parent
     environment = {"PATH": os.pathsep.join([str(compiler.parent), str(python_bin), "/opt/homebrew/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]),
         "HOME": str(Path.home()), "CARGO_HOME": str(Path.home()/".cargo"), "RUSTC": str(compiler),
-        "RUSTDOC": str(compiler.parent/"rustdoc"), "CARGO_BUILD_JOBS": "2", "CARGO_INCREMENTAL": "0",
+        # Each unit seals search-directory membership through compilation.
+        # Serialize Cargo outputs to preserve that per-unit input boundary.
+        "RUSTDOC": str(compiler.parent/"rustdoc"), "CARGO_BUILD_JOBS": "1", "CARGO_INCREMENTAL": "0",
         "CARGO_PROFILE_DEV_DEBUG": "0", "CARGO_PROFILE_TEST_DEBUG": "0", "CARGO_NET_OFFLINE": "true",
         "CARGO_TERM_COLOR": "never", "CARGO_TARGET_DIR": str(target), "SDKROOT": str(sdk),
         "RUSTFLAGS": "-Csplit-debuginfo=off -Clinker="+str(linker),
@@ -190,16 +192,16 @@ def snapshot(root, pins, verifier, recorder):
             recorder.require(recorder.identity(path.lstat()) == recorder.identity(info), "source_changed_during_read")
         elif stat.S_ISREG(info.st_mode):
             with recorder.HeldPath(path) as held:
-                body = held.read()
-            entry.update(state="file", content_coverage="sha256-bytes", size_bytes=len(body), sha256=hashlib.sha256(body).hexdigest())
+                digest, size = held.read_digest()
+            entry.update(state="file", content_coverage="sha256-bytes", size_bytes=size, sha256=digest)
         else:
             entry.update(state="directory" if stat.S_ISDIR(info.st_mode) else "special", content_coverage="metadata-only")
     explicit = []
     for path, purpose in pins:
         with recorder.HeldPath(path) as held:
-            body = held.read()
+            digest, size = held.read_digest()
         explicit.append({"path": str(path), "purpose": purpose, "observed": {"state": "file", "content_coverage": "sha256-bytes",
-            "size_bytes": len(body), "sha256": hashlib.sha256(body).hexdigest()}})
+            "size_bytes": size, "sha256": digest}})
     recorder.require(listed == git(root, ["ls-files", "--stage", "-z"])
                      and others == git(root, ["ls-files", "--others", "--exclude-standard", "-z"])
                      and head == git(root, ["rev-parse", "--verify", "HEAD"]).decode().strip(), "source_changed_during_read")
@@ -223,6 +225,12 @@ def wait_owned_group_exit(process, grace=5):
             os.killpg(process.pid, 0)
         except ProcessLookupError:
             return True
+        except PermissionError:
+            # The probe can race exit/zombie collection of this same group
+            # exactly like the stop signals do. A permission denial never
+            # proves disappearance, so keep observing the same group until
+            # it vanishes or the bounded grace expires.
+            pass
         if time.monotonic() >= deadline:
             return False
         time.sleep(0.05)
@@ -235,6 +243,12 @@ def stop_owned_group(process):
             os.killpg(process.pid, selected_signal)
         except ProcessLookupError:
             return
+        except PermissionError:
+            # The kill signal can race exit/zombie collection of this same
+            # owned group. PermissionError alone never implies the group is
+            # gone, so still run the bounded wait and accept success only
+            # when that wait proves the group vanished.
+            pass
         if wait_owned_group_exit(process):
             return
     raise subprocess.TimeoutExpired("owned command process group", 10)
@@ -276,6 +290,7 @@ def capture_command(root, command, environment, log, timeout):
                     body = os.read(key.fd, 64*1024)
                     if body:
                         log.write(body)
+                        log.flush()
                     else:
                         selector.unregister(key.fileobj)
                         completed_pipe = True
@@ -390,7 +405,7 @@ def export(root, evidence, gate, producer, runtime, host, environment, verifier,
     # Cargo build scripts can deliberately compile feature probes that fail.
     # Preserve their outcomes; the original graph consumer accepts producers
     # only from successful units. Instrumentation refusals still fail the gate.
-    recorder.require(rows and all(type(row["compiler_exit"]) is int and
+    recorder.require(rows and all(type(row["compiler_exit"]) is int and row.get("refusal") is None and
         (row["status"] == "success" and row["compiler_exit"] == 0 or
          row["status"] == "compiler_failed" and row["compiler_exit"] != 0)
         for row in rows), "host_compilation_failed")
@@ -410,10 +425,9 @@ def export(root, evidence, gate, producer, runtime, host, environment, verifier,
     # object is still exported and independently checked by the consumer.
     for path in sorted((namespace/"artifacts").iterdir()):
         with recorder.HeldPath(path) as held:
-            body = held.read()
-        digest = hashlib.sha256(body).hexdigest()
+            digest, size = held.read_digest()
         recorder.require(digest == path.name, "host_cas_binding")
-        images[(digest, len(body))] = {"path": str(path.relative_to(evidence)), "sha256": digest, "size": len(body)}
+        images[(digest, size)] = {"path": str(path.relative_to(evidence)), "sha256": digest, "size": size}
     import tomllib
     packages = []
     for index, argument in enumerate(producer["command"][:-1]):
@@ -428,7 +442,8 @@ def export(root, evidence, gate, producer, runtime, host, environment, verifier,
                 if body.get("package", {}).get("name") in packages:
                     package_roots.add(path.parent)
     roots = [{key: image[key] for key in ["path", "sha256", "size"]} for row in rows
-             if row["kind"] == "compilation" and any(Path(row["semantics"]["source"]).is_relative_to(path) for path in package_roots)
+             if row["kind"] == "compilation" and row["status"] == "success" and row["semantics"]["source"] is not None
+             and any(Path(row["semantics"]["source"]).is_relative_to(path) for path in package_roots)
              for image in row["outputs"] if image["role"] == "unit"]
     recorder.require(roots, "host_gate_roots")
     runtime_ref = producer["provenance"]["runtime_sources_before"]
@@ -500,7 +515,7 @@ def main():
     verifier = load(root/"scripts/verify-recovery-qualification.py", "ordinary_gate_verifier")
     recorder = load(root/"scripts/record-rust-compilation.py", "ordinary_gate_recorder")
     evidence = recorder.absolute(args.evidence)
-    recorder.require(0 < args.timeout <= 7200 and shutil.disk_usage(root).free >= 10*1024**3, "host_execution_limits")
+    recorder.require(0 < args.timeout <= 21600 and shutil.disk_usage(root).free >= 10*1024**3, "host_execution_limits")
     soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
     resource.setrlimit(resource.RLIMIT_NOFILE, (min(hard, max(soft, 16384)), hard))
     evidence = create_evidence(root, evidence, recorder)

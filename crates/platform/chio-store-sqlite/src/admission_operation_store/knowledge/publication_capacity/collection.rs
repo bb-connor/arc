@@ -1,4 +1,5 @@
 //! Only original collection custody can return a logical publication slot.
+use super::super::closure::{Derivation, DerivedWrite};
 use super::*;
 
 /// A terminal command is authenticated in its complete retained framing. A
@@ -85,13 +86,22 @@ pub(super) fn verify_retained_collection(
     references::verify_collected_publication_sources(tx, record).map(|_| ())
 }
 
-fn retire_one(
+/// The exact lease and tenant capacity successors that return one live slot.
+/// They exist only after an actual collection acknowledgment and complete
+/// retained reference closure; a Retired marker alone never refunds. A slot
+/// already returned for the same acknowledgment has no pending write.
+pub(in crate::admission_operation_store::knowledge) fn pending_slot_refund(
     tx: &Transaction<'_>,
-    owner: &SqliteServingOwner,
-    record: &NativeArtifactRecordV1,
-) -> Result<(), AdmissionOperationStoreError> {
-    let (mut lease, previous_lease) = current_lease(tx, record)?;
-    let collected = collected_source(tx, record)?
+    actor: &AuthenticatedRecoveryActor,
+    publication: &str,
+) -> Result<Option<Derivation>, AdmissionOperationStoreError> {
+    let record: NativeArtifactRecordV1 =
+        load(tx, publication)?.ok_or_else(|| refused("publication slot owner absent"))?;
+    if record_publication_key(&record)? != publication || record.metadata.scope != *actor.scope() {
+        return Err(refused("publication slot changed its tenant owner"));
+    }
+    let (mut lease, previous_lease) = current_lease(tx, &record)?;
+    let collected = collected_source(tx, &record)?
         .ok_or_else(|| refused("publication slot lacks actual collection acknowledgment"))?;
     if let Some(original) = &lease.collection {
         if *original != collected {
@@ -99,9 +109,9 @@ fn retire_one(
                 "publication collection changed its first acknowledgment",
             ));
         }
-        return Ok(());
+        return Ok(None);
     }
-    let closure = references::collected_publication_closure(tx, record)?;
+    let closure = references::collected_publication_closure(tx, &record)?;
     closure.verify_current(tx)?;
     let (mut capacity, previous_capacity) = current_capacity(tx, &record.metadata.scope)?;
     protected::verify_source_reference(tx, &previous_lease)?;
@@ -128,30 +138,58 @@ fn retire_one(
             .checked_add(1)
             .ok_or_else(|| refused("publication live revision exhausted"))?,
     )?;
-    persist(
-        tx,
-        owner,
-        &lease.account,
-        previous_lease.record_key(),
-        &lease,
-        LEASE_BYTES,
-    )?;
-    persist(
-        tx,
-        owner,
-        &capacity.account,
-        previous_capacity.record_key(),
-        &capacity,
-        ACCOUNT_BYTES,
-    )?;
-    Ok(())
+    // The original publication, the sweep whose retained Collected history
+    // is the acknowledgment, and every reference source of the complete
+    // closure; the lease and capacity heads are the two writes' CAS.
+    let mut witnesses = vec![
+        protected::source_reference(tx, publication)?,
+        lifecycle::collected_sweep_source(tx, &record)?,
+    ];
+    witnesses.extend(references::verify_collected_publication_sources(
+        tx, &record,
+    )?);
+    Ok(Some(Derivation::bound(
+        vec![
+            slot_write(&lease.account, previous_lease, &lease, LEASE_BYTES)?,
+            slot_write(
+                &capacity.account,
+                previous_capacity,
+                &capacity,
+                ACCOUNT_BYTES,
+            )?,
+        ],
+        witnesses,
+    )))
 }
 
-pub(in crate::admission_operation_store::knowledge) fn acknowledge_collection(
-    tx: &Transaction<'_>,
-    owner: &SqliteServingOwner,
+fn slot_write<T: Serialize>(
+    account: &ReferenceAccount,
+    previous: protected::ProtectedSourceReference,
+    value: &T,
+    maximum: usize,
+) -> Result<DerivedWrite, AdmissionOperationStoreError> {
+    let payload = protected::encode(value)?;
+    if payload.len() > maximum {
+        return Err(refused(
+            "publication allocation exceeds its closed envelope",
+        ));
+    }
+    Ok(DerivedWrite {
+        key: previous.record_key().to_owned(),
+        scope_key: account.scope_key()?,
+        expected: Some(previous),
+        payload,
+    })
+}
+
+/// Visit every authentic publication owner of one physically collected seal,
+/// streaming historical content-addressed owners without retaining them. The
+/// visitor receives only the exact owner selector; it cannot supply a write.
+pub(in crate::admission_operation_store::knowledge) fn visit_collected_owners(
+    tx: &Connection,
     scope: &RecoveryScopeV1,
     seal: &ArtifactBlobSealV1,
+    mut settle: impl FnMut(&str) -> Result<(), AdmissionOperationStoreError>,
 ) -> Result<(), AdmissionOperationStoreError> {
     if lifecycle::logical_object(seal) {
         let key = object_key(scope, &seal.object)?;
@@ -189,14 +227,14 @@ pub(in crate::admission_operation_store::knowledge) fn acknowledge_collection(
                 "collection pointer changed its original allocation source",
             ));
         }
-        return retire_one(tx, owner, &record);
+        return settle(&pointer.publication);
     }
     // Historical content-addressed storage can have several original owners.
     // Enumerate authentic sources without a lifetime bound or a count refund.
     let mut found = false;
     super::super::publication_catalog::visit_publication_sources(tx, scope, |record, _| {
         if record.metadata.scope == *scope && record.seal.as_ref() == Some(seal) {
-            retire_one(tx, owner, record)?;
+            settle(&record_publication_key(record)?)?;
             found = true;
         }
         Ok(())

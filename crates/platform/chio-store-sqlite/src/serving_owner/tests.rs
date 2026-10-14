@@ -2279,3 +2279,32 @@ mod provisioning;
 mod relocation;
 #[path = "tests/scoped_identity.rs"]
 mod scoped_identity;
+
+#[test]
+fn the_serving_connection_never_spills_and_commits_ordinary_writes_across_restart() {
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    let authority =
+        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open serving");
+    assert!(authority
+        .revocation_store()
+        .revoke("cap-counted")
+        .expect("ordinary write"));
+    let spill: i64 = authority
+        .connection
+        .lock()
+        .expect("authority connection")
+        .query_row("PRAGMA main.cache_spill", [], |row| row.get(0))
+        .expect("spill setting");
+    assert_eq!(
+        spill, 0,
+        "no frame reaches the WAL before its checked COMMIT"
+    );
+    drop(authority);
+    let authority =
+        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("reopen serving");
+    assert!(authority
+        .revocation_store()
+        .revoke("cap-after-restart")
+        .expect("ordinary write after restart"));
+}

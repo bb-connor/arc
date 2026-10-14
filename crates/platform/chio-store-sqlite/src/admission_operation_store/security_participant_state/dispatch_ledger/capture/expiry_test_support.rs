@@ -32,6 +32,43 @@ impl SqliteAdmissionOperationStore {
             .map_err(sqlite_error)
     }
 
+    /// Pause at the final verified state until the captured semantic authority
+    /// (the earliest prerequisite, annotation, endorsement or ACL deadline) expires.
+    /// The rejection text is written to `observed_path`, because the kernel callback
+    /// boundary does not forward the inner native capture error.
+    pub fn inject_native_capture_semantic_expiry_for_test(
+        &self,
+        observed_path: &std::path::Path,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let observed_path = observed_path
+            .to_str()
+            .filter(|path| !path.is_empty() && path.len() <= 4096)
+            .ok_or_else(|| invalid("semantic expiry observation path is invalid"))?;
+        let connection = self.connection()?;
+        connection
+            .execute_batch(
+                "CREATE TEMP TABLE native_capture_semantic_expiry_test_fault (
+                    singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                    observed_path TEXT NOT NULL)",
+            )
+            .map_err(sqlite_error)?;
+        connection
+            .execute(
+                "INSERT INTO temp.native_capture_semantic_expiry_test_fault VALUES (1, ?1)",
+                [observed_path],
+            )
+            .map_err(sqlite_error)?;
+        Ok(())
+    }
+
+    pub fn clear_native_capture_semantic_expiry_for_test(
+        &self,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.connection()?
+            .execute_batch("DROP TABLE temp.native_capture_semantic_expiry_test_fault")
+            .map_err(sqlite_error)
+    }
+
     /// Pause native capture at its final verified state until its
     /// original runtime evidence expires. No main table or deadline is changed.
     pub fn inject_native_capture_runtime_expiry_for_test(
@@ -56,6 +93,7 @@ pub(super) fn wait_after_verification(
     runtime_until: Option<u64>,
     nonce_until: Option<u64>,
     declassification_until: Option<u64>,
+    semantic_until: Option<u64>,
 ) -> Result<Option<&'static str>, AdmissionOperationStoreError> {
     let installed: bool = tx.query_row(
         "SELECT EXISTS(SELECT 1 FROM sqlite_temp_schema WHERE type = 'table' AND name = 'native_capture_runtime_expiry_test_fault')",
@@ -69,11 +107,21 @@ pub(super) fn wait_after_verification(
         "SELECT EXISTS(SELECT 1 FROM sqlite_temp_schema WHERE type = 'table' AND name = 'native_capture_declassification_expiry_test_fault')",
         [], |row| row.get(0),
     ).map_err(sqlite_error)?;
-    let (kind, until) = match (installed, nonce_installed, declassification_installed) {
-        (false, false, false) => return Ok(None),
-        (true, false, false) => ("runtime", runtime_until),
-        (false, true, false) => ("nonce", nonce_until),
-        (false, false, true) => ("declassification", declassification_until),
+    let semantic_installed: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_temp_schema WHERE type = 'table' AND name = 'native_capture_semantic_expiry_test_fault')",
+        [], |row| row.get(0),
+    ).map_err(sqlite_error)?;
+    let (kind, until) = match (
+        installed,
+        nonce_installed,
+        declassification_installed,
+        semantic_installed,
+    ) {
+        (false, false, false, false) => return Ok(None),
+        (true, false, false, false) => ("runtime", runtime_until),
+        (false, true, false, false) => ("nonce", nonce_until),
+        (false, false, true, false) => ("declassification", declassification_until),
+        (false, false, false, true) => ("semantic", semantic_until),
         _ => return Err(invalid("expiry cutpoint selects multiple credentials")),
     };
     let until = until.ok_or_else(|| invalid("expiry cutpoint lacks selected credential"))?;
@@ -89,20 +137,36 @@ pub(super) fn wait_after_verification(
 }
 
 pub(super) fn annotate_rejection(
+    tx: &Transaction<'_>,
     delayed: Option<&'static str>,
     result: Result<(), AdmissionOperationStoreError>,
 ) -> Result<(), AdmissionOperationStoreError> {
     // Preserve success: this observation must never manufacture the rejection
     // under test. Its marker distinguishes final expiry from an earlier denial.
-    result.map_err(|error| {
-        if let Some(kind) = delayed {
-            invalid(format!(
-                "native capture rejected after {kind} expiry cutpoint: {error}"
-            ))
-        } else {
-            error
-        }
-    })
+    let Err(error) = result else {
+        return Ok(());
+    };
+    let Some(kind) = delayed else {
+        return Err(error);
+    };
+    let message = format!("native capture rejected after {kind} expiry cutpoint: {error}");
+    if kind == "semantic" {
+        use std::io::Write as _;
+        let path: String = tx
+            .query_row(
+                "SELECT observed_path FROM temp.native_capture_semantic_expiry_test_fault WHERE singleton=1",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .and_then(|mut observed| observed.write_all(message.as_bytes()))
+            .map_err(|_| invalid("semantic expiry observation unavailable"))?;
+    }
+    Err(invalid(message))
 }
 
 fn now() -> Result<u64, AdmissionOperationStoreError> {

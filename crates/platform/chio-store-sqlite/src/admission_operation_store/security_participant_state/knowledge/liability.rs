@@ -136,6 +136,8 @@ pub(in crate::admission_operation_store) struct VerifiedNativeKnowledgeJoinLiabi
     native_shapes: Vec<NativeWriteShapeData>,
     protected_rows: Vec<(String, String, Vec<u8>)>,
     protected_commands: Vec<ProtectedCommandLiabilityPlan>,
+    projection_writes: Vec<influence_projection::ScopeHeadWrite>,
+    segment: history::segments::SegmentSnapshot,
     retained_journal: (u64, u64),
     journal_bytes: u64,
 }
@@ -169,7 +171,9 @@ pub(in crate::admission_operation_store) fn prepare_native_knowledge_join_liabil
     .map_err(invalid)?;
     let preview = crate::security_state::preview_native_flow_join(tx, authority, &request)
         .map_err(invalid)?;
-    let sequence = head(tx, authority)?
+    let segment = history::segments::SegmentSnapshot::capture(tx, &initialized)?;
+    let sequence = segment
+        .knowledge_head(tx)?
         .checked_add(1)
         .ok_or_else(|| invalid("native knowledge liability sequence overflow"))?;
     let previous = if sequence == 1 {
@@ -178,7 +182,7 @@ pub(in crate::admission_operation_store) fn prepare_native_knowledge_join_liabil
         load_with_digest(tx, authority, sequence - 1)?.1
     };
     let (current_rows, current_bytes) = apply_totals(
-        history::ordered::latest_totals(tx, &initialized)?,
+        history::ordered::latest_totals(tx, &segment)?,
         preview.changes(),
     )?;
     let mut release = input.release.clone();
@@ -201,6 +205,18 @@ pub(in crate::admission_operation_store) fn prepare_native_knowledge_join_liabil
         current_bytes,
     };
     record.validate()?;
+    // Preview the current inherited-scope projection mutations in the same
+    // source cut: the fold base is the on-disk scope rows, and the successors
+    // are the exact payloads this join must persist. Their physical price is
+    // computed by the actual native join pricer from these writes; the
+    // journal bounds below stay journal-only and honest.
+    let projection_writes = influence_projection::preview_scope_head_writes(
+        tx,
+        input.binding,
+        &record.request.key,
+        &record.release.influence,
+        record.sequence,
+    )?;
     let protected_rows = encoding::preview_rows(&record)?;
     let mut protected_commands = Vec::with_capacity(protected_rows.len());
     let mut journal_bytes = 0_u64;
@@ -215,20 +231,9 @@ pub(in crate::admission_operation_store) fn prepare_native_knowledge_join_liabil
             .checked_add(bytes)
             .ok_or_else(|| invalid("native knowledge liability bytes overflow"))?;
     }
-    let retained_journal = history::ordered::journal_totals(tx, authority)?;
-    if retained_journal
-        .0
-        .checked_add(1)
-        .is_none_or(|count| count > 65_536)
-        || retained_journal
-            .1
-            .checked_add(journal_bytes)
-            .is_none_or(|bytes| bytes > 67_108_864)
-    {
-        return Err(invalid(
-            "proposed native knowledge journal exceeds retained source bounds",
-        ));
-    }
+    // The writer's native journal segment decision bounds this exact root and
+    // its chunks; a full live segment is sealed rather than refused.
+    let retained_journal = segment.totals(tx)?;
     let native_shapes = write_shapes(authority, preview.changes())?;
     let initial_global_head = global_head(tx)?;
     #[cfg(feature = "admission-test-support")]
@@ -244,6 +249,8 @@ pub(in crate::admission_operation_store) fn prepare_native_knowledge_join_liabil
         native_shapes,
         protected_rows,
         protected_commands,
+        projection_writes,
+        segment,
         retained_journal,
         journal_bytes,
     })
@@ -261,8 +268,7 @@ impl VerifiedNativeKnowledgeJoinLiability<'_> {
             || global_head(tx)? != self.initial_global_head
             || records::load_current_metadata(tx, &self.initialized.admission_binding()?)?
                 != self.initialized
-            || history::ordered::journal_totals(tx, self.initialized.authority.as_str())?
-                != self.retained_journal
+            || self.segment.totals(tx)? != self.retained_journal
         {
             return Err(invalid(
                 "native knowledge liability changed its initial source cut",
@@ -282,6 +288,22 @@ impl VerifiedNativeKnowledgeJoinLiability<'_> {
                 return Err(invalid(
                     "native knowledge liability lost a pristine journal member",
                 ));
+            }
+        }
+        // The previewed projection folds anchored the on-disk scope rows.
+        // Any drift between this cut and the join invalidates the successors.
+        for write in &self.projection_writes {
+            let current = protected::raw_checked(tx, write.record_key())?;
+            match (write.before_payload(), current) {
+                (Some(before), Some(row)) => {
+                    if row.payload.as_slice() != before {
+                        return Err(invalid("native knowledge projection changed its fold base"));
+                    }
+                }
+                (None, None) => {}
+                _ => {
+                    return Err(invalid("native knowledge projection changed its fold base"));
+                }
             }
         }
         Ok(())
@@ -356,6 +378,52 @@ impl VerifiedNativeKnowledgeJoinLiability<'_> {
         Ok(())
     }
 
+    /// The knowledge journal head this liability's record extends, read from
+    /// its own segment snapshot in the same writer.
+    pub(super) fn knowledge_head(
+        &self,
+        tx: &Transaction<'_>,
+    ) -> Result<u64, AdmissionOperationStoreError> {
+        self.segment.knowledge_head(tx)
+    }
+
+    /// Current native totals after the latest journal entry, read from its
+    /// own segment snapshot in the same writer.
+    pub(super) fn latest_totals(
+        &self,
+        tx: &Transaction<'_>,
+    ) -> Result<(u64, u64), AdmissionOperationStoreError> {
+        history::ordered::latest_totals(tx, &self.segment)
+    }
+
+    /// Decide this join's journal entry against the liability's own segment
+    /// snapshot. When a full live segment is sealed first, the snapshot has
+    /// verified that the seal is the only new global commit; the liability's
+    /// pinned global head and retained journal move by exactly that seal.
+    pub(super) fn prepare_journal_append(
+        &mut self,
+        tx: &Transaction<'_>,
+        owner: &SqliteServingOwner,
+        append: &history::segments::PreEffectAppend,
+    ) -> Result<history::segments::Boundary, AdmissionOperationStoreError> {
+        self.verify_owner(tx, owner)?;
+        let boundary = self.segment.prepare_pre_effect_append(tx, owner, append)?;
+        if boundary == history::segments::Boundary::Sealed {
+            self.initial_global_head = global_head(tx)?;
+            self.retained_journal = self.segment.totals(tx)?;
+        }
+        Ok(boundary)
+    }
+
+    /// The persisted root and chunks are exactly the decided journal entry.
+    pub(super) fn appended(
+        &mut self,
+        tx: &Transaction<'_>,
+        append: &history::segments::PreEffectAppend,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.segment.appended(tx, append.entry())
+    }
+
     pub(in crate::admission_operation_store) fn native_catalog_fingerprint(&self) -> &str {
         &self.native_catalog_fingerprint
     }
@@ -374,8 +442,18 @@ impl VerifiedNativeKnowledgeJoinLiability<'_> {
     ) -> &[(String, String, Vec<u8>)] {
         &self.protected_rows
     }
+    pub(in crate::admission_operation_store) fn projection_writes(
+        &self,
+    ) -> &[influence_projection::ScopeHeadWrite] {
+        &self.projection_writes
+    }
     pub(in crate::admission_operation_store) fn journal_authority_id(&self) -> &str {
         self.initialized.authority.as_str()
+    }
+    /// The source-owned release identity this journal root carries at
+    /// $.release.release, for pricing its real expression index tree only.
+    pub(in crate::admission_operation_store) fn journal_release_id(&self) -> &str {
+        self.record.release.release.as_str()
     }
     pub(in crate::admission_operation_store) fn journal_records(&self) -> u64 {
         1
@@ -406,9 +484,6 @@ pub(super) fn apply_totals(
                 .checked_add(u64::try_from(after.len()).map_err(invalid)?)
                 .ok_or_else(|| invalid("native knowledge bytes overflow"))?;
         }
-    }
-    if rows > 65_536 || bytes > 67_108_864 {
-        return Err(invalid("native knowledge current inventory exceeds bounds"));
     }
     Ok((rows, bytes))
 }

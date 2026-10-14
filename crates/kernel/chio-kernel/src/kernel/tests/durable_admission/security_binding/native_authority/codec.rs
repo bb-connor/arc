@@ -1,6 +1,8 @@
 use super::*;
 use crate::admission_operation::{
-    immutable_tool_request_hash, AdmissionSecurityBindingV1, RetainedToolAdmissionRequestV1,
+    immutable_tool_request_hash, immutable_tool_request_hash_with_original_semantics,
+    immutable_tool_request_hash_with_profile, AdmissionSecurityBindingV1,
+    RetainedToolAdmissionRequestV1,
 };
 use chio_core::canonical::canonical_json_bytes;
 
@@ -27,7 +29,10 @@ fn historical_semantic_commitment_preserves_transient_request_binding() -> TestR
     )?);
     let context = context(&request, 1)?;
     let security = AdmissionSecurityBindingV1::from_trusted_selection(
-        Some(&context), true, true, Some(binding("native-store", "source", b"initialization")?),
+        Some(&context),
+        true,
+        true,
+        Some(binding("native-store", "source", b"initialization")?),
     )?;
     let profile = NativeOutputRetentionProfileV1::new(NativeOutputEnvelopeBoundsV1::new(
         4096, 4096, 4096, 4096, 1,
@@ -36,27 +41,118 @@ fn historical_semantic_commitment_preserves_transient_request_binding() -> TestR
     let matching = matching(&request)?;
     let authority = kernel.admission_authority_profile()?;
     let retained = RetainedToolAdmissionRequestV1::from_admission_with_original_semantics(
-        &request, &matching, &steps, security.as_ref(), Some(&authority), Some(&profile),
+        &request,
+        &matching,
+        &steps,
+        security.as_ref(),
+        Some(&authority),
+        Some(&profile),
     )?;
     let original = crate::recovery::semantic_request_semantics(&request)?;
-    let sanitized = crate::recovery::semantic_request_semantics(retained.request_for_revalidation())?;
+    let sanitized =
+        crate::recovery::semantic_request_semantics(retained.request_for_revalidation())?;
     assert_ne!(original, sanitized);
     assert!(retained.request_for_revalidation().dpop_proof.is_none());
     let decoded = RetainedToolAdmissionRequestV1::from_canonical_bytes(retained.canonical_bytes())?;
     assert_eq!(decoded.canonical_bytes(), retained.canonical_bytes());
     assert_eq!(decoded.historical_semantic_request_commitment()?, original);
     decoded.validate_original_semantic_request(&request)?;
-    assert!(decoded.validate_original_semantic_request(decoded.request_for_revalidation()).is_err());
+    assert!(decoded
+        .validate_original_semantic_request(decoded.request_for_revalidation())
+        .is_err());
 
-    // A legacy original has no full-request commitment. Reading it must neither
-    // invent one nor rewrite the canonical bytes into the newer schema.
-    let legacy = RetainedToolAdmissionRequestV1::from_admission_with_output_retention(
-        &request, &matching, &steps, security.as_ref(), Some(&authority), Some(&profile),
+    // A pre-recovery V4 original has no full-request commitment. Reading it must
+    // neither invent one nor rewrite the canonical bytes into a newer schema.
+    let legacy = RetainedToolAdmissionRequestV1::from_admission_with_profile(
+        &request,
+        &matching,
+        &[],
+        security.as_ref(),
+        Some(&authority),
     )?;
+    let legacy_json: serde_json::Value = serde_json::from_slice(legacy.canonical_bytes())?;
+    assert_eq!(
+        legacy_json["schema"],
+        "chio.retained-tool-admission-request.v4"
+    );
     let bytes = legacy.canonical_bytes().to_vec();
     assert_eq!(legacy.original_semantic_request_commitment(), None);
     assert_eq!(legacy.historical_semantic_request_commitment()?, sanitized);
     assert_eq!(legacy.canonical_bytes(), bytes);
+
+    // Pin the unchanged layered V6 hash preimage, computed independently:
+    // H4 (profile-bound request) then H5 (the nested retention step) then the
+    // outer original-semantics commitment over the stored scalar bytes.
+    let v6: serde_json::Value = serde_json::from_slice(retained.canonical_bytes())?;
+    let h4 = immutable_tool_request_hash_with_profile(
+        &request,
+        &matching,
+        &steps,
+        security.as_ref(),
+        Some(&authority),
+    )?;
+    let h5_preimage = serde_json::json!({
+        "schema": "chio.tool-admission-request.v5",
+        "prior_request_hash": h4,
+        "native_output_retention": v6["native_output_retention"],
+    });
+    let h5 = sha256_hex(&canonical_json_bytes(&h5_preimage)?);
+    let v6_preimage = serde_json::json!([
+        "chio.tool-admission-request.v6",
+        h5,
+        v6["original_semantic_request_commitment"]
+    ]);
+    let live_hash = immutable_tool_request_hash_with_original_semantics(
+        &request,
+        &matching,
+        &steps,
+        security.as_ref(),
+        Some(&authority),
+        Some(&profile),
+    )?;
+    assert_eq!(
+        live_hash.as_str(),
+        sha256_hex(&canonical_json_bytes(&v6_preimage)?)
+    );
+    assert_eq!(
+        decoded.immutable_hash_for_original_plan(
+            decoded.request_for_revalidation(),
+            &matching,
+            &steps,
+            decoded.security_binding(),
+            decoded.authority_profile(),
+            decoded.native_output_retention(),
+        )?,
+        live_hash
+    );
+
+    // The refused intermediate V5 format, and a V6 record missing its
+    // original semantic commitment, both fail to decode.
+    let mut v5_schema = v6.clone();
+    v5_schema["schema"] = "chio.retained-tool-admission-request.v5".into();
+    assert!(
+        RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(&v5_schema)?)
+            .is_err()
+    );
+    v5_schema
+        .as_object_mut()
+        .ok_or("object")?
+        .remove("original_semantic_request_commitment");
+    assert!(
+        RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(&v5_schema)?)
+            .is_err()
+    );
+    let mut missing_commitment = v6.clone();
+    missing_commitment
+        .as_object_mut()
+        .ok_or("object")?
+        .remove("original_semantic_request_commitment");
+    assert!(
+        RetainedToolAdmissionRequestV1::from_canonical_bytes(&canonical_json_bytes(
+            &missing_commitment
+        )?)
+        .is_err()
+    );
     Ok(())
 }
 
@@ -69,17 +165,28 @@ fn historical_verifier_selection_uses_the_original_bounded_materializer() -> Tes
     let context = context(&request, 1)?;
     let selected = binding("native-store", "source", b"initialization")?;
     let security = AdmissionSecurityBindingV1::from_trusted_selection(
-        Some(&context), true, true, Some(selected),
+        Some(&context),
+        true,
+        true,
+        Some(selected),
     )?;
     let profile = NativeOutputRetentionProfileV1::new(NativeOutputEnvelopeBoundsV1::new(
-        1024 * 1024, 1024 * 1024, 1024 * 1024, 1024 * 1024, 1,
+        1024 * 1024,
+        1024 * 1024,
+        1024 * 1024,
+        1024 * 1024,
+        1,
     )?);
     let matching = matching(&request)?;
     let authority = kernel.admission_authority_profile()?;
     let expected = profile.materialization_identity()?;
-    let original = RetainedToolAdmissionRequestV1::from_admission_with_output_retention(
-        &request, &matching, std::slice::from_ref(&expected), security.as_ref(),
-        Some(&authority), Some(&profile),
+    let original = RetainedToolAdmissionRequestV1::from_admission_with_original_semantics(
+        &request,
+        &matching,
+        std::slice::from_ref(&expected),
+        security.as_ref(),
+        Some(&authority),
+        Some(&profile),
     )?;
     let bytes = original.canonical_bytes().to_vec();
     assert!(kernel.original_output_verifier_is_available(&original)?);
@@ -95,11 +202,19 @@ fn historical_verifier_selection_uses_the_original_bounded_materializer() -> Tes
     assert_eq!(original.canonical_bytes(), bytes);
 
     let mut changed = expected;
-    changed.implementation_digest = AdmissionDigest::try_new("implementation_digest", "a".repeat(64))?;
-    let malformed = RetainedToolAdmissionRequestV1::from_admission_with_output_retention(
-        &request, &matching, &[changed], security.as_ref(), Some(&authority), Some(&profile),
+    changed.implementation_digest =
+        AdmissionDigest::try_new("implementation_digest", "a".repeat(64))?;
+    let malformed = RetainedToolAdmissionRequestV1::from_admission_with_original_semantics(
+        &request,
+        &matching,
+        &[changed],
+        security.as_ref(),
+        Some(&authority),
+        Some(&profile),
     )?;
-    assert!(rotated.original_output_verifier_is_available(&malformed).is_err());
+    assert!(rotated
+        .original_output_verifier_is_available(&malformed)
+        .is_err());
     Ok(())
 }
 

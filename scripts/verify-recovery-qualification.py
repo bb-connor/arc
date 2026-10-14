@@ -25,7 +25,6 @@ import sys
 import tarfile
 import tomllib
 import types
-from types import SimpleNamespace
 import unicodedata
 
 SCHEMA = "chio.recovery-qualification-record.v1"
@@ -33,8 +32,20 @@ INVENTORY_VERSION = "chio.source-inventory.v4"
 MATERIALIZATION_SCHEMA = "chio.confined-source-snapshot.v2"
 SOURCE_ORIGIN_SCHEMA = "chio.rust-profile-source-origin.v2"
 SOURCE_MANIFEST_NAME = "__declared_source_snapshot__.json"
+HISTORICAL_P5_VERIFICATION_SCHEMA = "chio.recovery-p5-verification.v1"
+HISTORICAL_P6_VERIFICATION_SCHEMA = "chio.recovery-p6-verification.v1"
+HISTORICAL_P6_SOURCE_PREFIX = "docs/architecture/recoverable-agent-runtime/implementation/p6/"
+HISTORICAL_BINDING_VERSION = "chio.historical-source-binding.v1"
+# Retained inventory algorithm identity, content-addressed per supported
+# historical schema. The pinned digests are the sealed bytes of each retained
+# evidence/inventory.py; archived modules are never imported or executed.
+HISTORICAL_INVENTORY_ALGORITHMS = {
+    HISTORICAL_P5_VERIFICATION_SCHEMA: "e1c4e2d8d207040662c09859b008306fabf95e81791e0b83aa262112fda13a02",
+    HISTORICAL_P6_VERIFICATION_SCHEMA: "a1f67256af7be84293e3670797f8b3f9ead0825d51e2c680f360dcf0e4bc90a1",
+}
 COMPILED_IMAGE_MAX_BYTES = 512 * 1024**2
 COMPILED_IMAGE_POOL_MAX_BYTES = 16 * 1024**3
+COMPILER_UNSAFE_TEXT = re.compile(r"(?i)(?:api[_-]?(?:key|token)|(?:access|auth)[_-]?token|(?:^|[_-])token(?:$|[= _-])|password|credential|secret|bearer)")
 COMPILED_DIMENSION_TOOL_SHA = "e0495799c3b23d00648843615785b9c4a87f5f76876f3de44e0e3358f883a8e8"
 MATERIALIZATION_RUNNER = "scripts/run-confined-return-linux-acceptance.py"
 MATERIALIZATION_CACHE_PARTS = frozenset({".cache", ".git", ".ignored-cache", ".mypy_cache", ".next",
@@ -113,7 +124,7 @@ def source_exclusion(name):
     path = relative_path(name)
     if secret_source(name):
         return "secret-path-policy"
-    if any(path.is_relative_to(prefix) for prefix in ARTIFACT_PREFIXES):
+    if any(name == prefix or name.startswith(prefix + "/") for prefix in ARTIFACT_PREFIXES):
         return "artifact-tree-policy"
     if path.name.lower().endswith(ARCHIVE_SUFFIXES):
         return "archive-file-policy"
@@ -742,11 +753,16 @@ def validate_materialization_inputs(manifest, memberships):
                 require(type(item.get("mode")) is int and 0 <= item["mode"] <= 0o777,
                         "materialization_source_inventory")
             if state == "symlink":
-                if source_exclusion(name) is None:
-                    fields.add("link_text")
-                    require(isinstance(item.get("link_text"),str) and item["link_text"]
-                            and "\0" not in item["link_text"],"materialization_source_inventory")
-                    links.append(name)
+                # Secret, archive and artifact exclusions carry no link text the
+                # no-read policy can bind, while the pinned helper's manifest
+                # validation rejects excluded symlinks without text and
+                # materialize_metadata has no redacted symlink state: no payload
+                # row of this shape is materializable, with or without text.
+                require(source_exclusion(name) is None,"materialization_source_policy")
+                fields.add("link_text")
+                require(isinstance(item.get("link_text"),str) and item["link_text"]
+                        and "\0" not in item["link_text"],"materialization_source_inventory")
+                links.append(name)
             require(set(item) == fields,"materialization_source_inventory")
             reason = item["exclusion_reason"]
             require(reason == exclusion and exclusion is not None
@@ -1071,115 +1087,6 @@ def compiler_metadata_identity(value):
             value.st_mtime_ns,value.st_ctime_ns,value.st_nlink)
 
 
-def audit_legacy_compiler_publications(namespace, source_binding):
-    """Verify original physical publication, without claiming compiled closure.
-
-    This independent consumer reads only retained rows/markers/artifacts. It
-    never imports or executes the recorder and never reads named original
-    compiler/source paths from a row. Copied evidence needs separate custody.
-    """
-    require(isinstance(source_binding,str) and re.fullmatch(r"[a-f0-9]{64}",source_binding),
-            "compiler_source_binding")
-    namespace = Path(namespace)
-    verified,images,statuses,kinds = [],{}, {},{}
-    artifact_bytes = 0
-    record_metadata,marker_metadata,image_metadata = {},{},{}
-    with compiler_namespace_directory(namespace) as _root, \
-            compiler_namespace_directory(namespace/"records") as records, \
-            compiler_namespace_directory(namespace/"completions") as completions, \
-            compiler_namespace_directory(namespace/"artifacts") as artifacts:
-        record_names,marker_names,artifact_names = (sorted(os.listdir(descriptor))
-                                                    for descriptor in [records,completions,artifacts])
-        names = [name for name in record_names if re.fullmatch(r"[a-f0-9]{32}\.json",name)]
-        require(0 < len(names) <= 100000 and set(marker_names) == set(names),"compiler_publication_inventory")
-        incomplete = [name for name in record_names if name.startswith(".incomplete-")]
-        require(set(record_names) == {*names,*incomplete} and len(record_names) <= 100000
-                and len(artifact_names) <= 100000 and all(re.fullmatch(r"[a-f0-9]{64}",name) for name in artifact_names),
-                "compiler_publication_inventory")
-        for name in names:
-            with regular_input(namespace/"records"/name) as record_stream:
-                row,raw,record_identity = compiler_json(record_stream)
-                record_metadata[name] = compiler_metadata_identity(os.fstat(record_stream.fileno()))
-                identifier = name[:-5]
-                require(row.get("schema") == "chio.rust-compilation.v3"
-                        and row.get("invocation_id") == identifier
-                        and row.get("source_binding") == source_binding,"compiler_publication_binding")
-                publication = row.get("publication")
-                marker_path = "completions/"+name
-                require(isinstance(publication,dict) and set(publication) == {"completion","marker_identity"}
-                        and publication.get("completion") == marker_path,"compiler_publication_binding")
-                with regular_input(namespace/marker_path) as marker_stream:
-                    marker,marker_raw,marker_identity = compiler_json(marker_stream)
-                    marker_metadata[name] = compiler_metadata_identity(os.fstat(marker_stream.fileno()))
-                    for identity in [publication.get("marker_identity"),marker.get("record_identity")]:
-                        require(isinstance(identity,dict) and set(identity) == {"device","inode"}
-                                and all(type(value) is int and value >= 0 for value in identity.values()),
-                                "compiler_publication_identity")
-                    require(publication["marker_identity"] == marker_identity
-                            and marker["record_identity"] == record_identity,"compiler_publication_identity")
-                    expected = {"schema":"chio.rust-compilation-completion.v2","invocation_id":identifier,
-                        "source_binding":source_binding,"record_sha256":hashlib.sha256(raw).hexdigest(),
-                        "size":len(raw),"record_identity":record_identity}
-                    require(marker == expected,"compiler_publication_binding")
-                    kind,status = row.get("kind"),row.get("status")
-                    require(kind in {"compilation","probe"} and status in
-                            {"success","refused","compiler_failed","instrumentation_failed"},"compiler_record_outcome")
-                    if status == "success":
-                        require(type(row.get("compiler_exit")) is int and row["compiler_exit"] == 0
-                                and row.get("refusal") is None,"compiler_record_outcome")
-                    elif status == "compiler_failed":
-                        require(type(row.get("compiler_exit")) is int and row["compiler_exit"] != 0,
-                                "compiler_record_outcome")
-                    inputs,outputs = row.get("inputs"),row.get("outputs")
-                    require(isinstance(inputs,list) and isinstance(outputs,list)
-                            and len(inputs)+len(outputs) <= 100000,"compiler_artifact_binding")
-                    compiler = row.get("compiler")
-                    for image in [*inputs,*outputs,*([compiler] if compiler is not None else [])]:
-                        require(isinstance(image,dict) and isinstance(image.get("sha256"),str)
-                                and re.fullmatch(r"[a-f0-9]{64}",image["sha256"])
-                                and image.get("artifact") == "artifacts/"+image["sha256"]
-                                and type(image.get("size")) is int and 0 <= image["size"] <= 512*1024**2,
-                                "compiler_artifact_binding")
-                        artifact = image["sha256"]
-                        if artifact not in images:
-                            with regular_input(namespace/image["artifact"]) as image_stream:
-                                metadata = os.fstat(image_stream.fileno())
-                                require(metadata.st_nlink == 1 and metadata.st_size <= 512*1024**2,
-                                        "compiler_artifact_binding")
-                                digest = hashlib.sha256()
-                                count = 0
-                                for chunk in iter(lambda:image_stream.read(1024*1024),b""):
-                                    count += len(chunk)
-                                    require(count <= metadata.st_size,"compiler_namespace_changed")
-                                    digest.update(chunk)
-                                require(count == metadata.st_size,"compiler_namespace_changed")
-                                images[artifact] = {"sha256":digest.hexdigest(),"size":metadata.st_size}
-                                image_metadata[artifact] = compiler_metadata_identity(metadata)
-                                artifact_bytes += metadata.st_size
-                                require(artifact_bytes <= 16*1024**3,
-                                        "compiler_artifact_budget")
-                        require(images[artifact] == {"sha256":artifact,"size":image["size"]},"compiler_artifact_binding")
-                    statuses[status] = statuses.get(status,0)+1
-                    kinds[kind] = kinds.get(kind,0)+1
-                    verified.append({"invocation_id":identifier,"kind":kind,"status":status,
-                        "record_sha256":expected["record_sha256"],"record_identity":record_identity,
-                        "completion_sha256":hashlib.sha256(marker_raw).hexdigest(),"marker_identity":marker_identity})
-        require(record_names == sorted(os.listdir(records)) and marker_names == sorted(os.listdir(completions))
-                and artifact_names == sorted(os.listdir(artifacts)),"compiler_namespace_changed")
-        for descriptor,observed in [(records,record_metadata),(completions,marker_metadata),(artifacts,image_metadata)]:
-            for name,before in observed.items():
-                require(compiler_metadata_identity(os.stat(name,dir_fd=descriptor,follow_symlinks=False)) == before,
-                        "compiler_namespace_changed")
-    return {"schema":"chio.compiler-publication-verification.v1","source_binding":source_binding,
-        "coverage":"original-recorder-filesystem-namespace-only","verified_records":len(verified),
-        "records":verified,"status_counts":statuses,"kind_counts":kinds,"incomplete_records":len(incomplete),
-        "incomplete_records_coverage":"records-directory incomplete-prefix entries only; missing completion markers refuse verification",
-        "verified_artifacts":len(images),"verified_artifact_bytes":artifact_bytes,
-        "unreferenced_artifacts":len(set(artifact_names)-set(images)),
-        "unreferenced_artifact_coverage":"names only; unreferenced content and file types are not verified",
-        "compiled_closure_status":"not-established"}
-
-
 def same_compilation_json(left, right):
     """Preserve JSON types when joining physically observed projections."""
     return compilation_canonical(left) == compilation_canonical(right)
@@ -1283,14 +1190,21 @@ def compiler_input_custody():
             os.close(descriptor)
 
 
-def current_compiler_publications(base, namespace, source_binding):
-    """Read original v4/v3 pairs and batches without claiming past fsync success."""
+def audit_compiler_publications(namespace, source_binding):
+    """Verify retained records and batches without claiming past fsync success."""
     require(type(source_binding) is str and re.fullmatch(r"[a-f0-9]{64}", source_binding), "compiler_source_binding")
     namespace = Path(namespace)
-    with ExitStack() as stack:
-        directories = {name: stack.enter_context(base.compiler_namespace_directory(namespace/name))
+    try:
+        metadata = os.stat(namespace/"batches",follow_symlinks=False)
+    except FileNotFoundError:
+        metadata = None
+    require(metadata is not None,"compiler_retention_batch")
+    require(stat.S_ISDIR(metadata.st_mode),"compiler_namespace")
+    original_compiler_descriptor_capacity(namespace)
+    with compiler_input_custody() as held_input, ExitStack() as stack:
+        directories = {name: stack.enter_context(compiler_namespace_directory(namespace/name))
                        for name in ["records", "completions", "artifacts", "batches"]}
-        stack.enter_context(base.compiler_namespace_directory(namespace))
+        stack.enter_context(compiler_namespace_directory(namespace))
         names = {name: sorted(os.listdir(descriptor)) for name, descriptor in directories.items()}
         records = [name for name in names["records"] if re.fullmatch(r"[a-f0-9]{32}\.json", name)]
         incomplete = [name for name in names["records"] if name.startswith(".incomplete-")]
@@ -1309,9 +1223,9 @@ def current_compiler_publications(base, namespace, source_binding):
         def read_json(relative):
             if relative in decoded:
                 return decoded[relative]
-            stream = stack.enter_context(base.regular_input(namespace/relative))
-            value, raw, identity = base.compiler_json(stream)
-            metadata = base.compiler_metadata_identity(os.fstat(stream.fileno()))
+            stream = stack.enter_context(held_input(namespace/relative))
+            value, raw, identity = compiler_json(stream)
+            metadata = compiler_metadata_identity(os.fstat(stream.fileno()))
             require(metadata[-1] == 1, "compiler_publication_identity")
             reference = {"path": relative, "sha256": hashlib.sha256(raw).hexdigest(),
                          "size": len(raw), "identity": identity}
@@ -1328,7 +1242,7 @@ def current_compiler_publications(base, namespace, source_binding):
                     "compiler_artifact_binding")
             relative = image["artifact"]
             if relative not in images:
-                stream = stack.enter_context(base.regular_input(namespace/relative))
+                stream = stack.enter_context(held_input(namespace/relative))
                 info = os.fstat(stream.fileno())
                 require(info.st_nlink == 1 and info.st_size == image["size"], "compiler_artifact_binding")
                 total_bytes += info.st_size
@@ -1337,7 +1251,7 @@ def current_compiler_publications(base, namespace, source_binding):
                 for chunk in iter(lambda: stream.read(1024*1024), b""):
                     digest.update(chunk)
                 require(digest.hexdigest() == image["sha256"], "compiler_artifact_binding")
-                identity = base.compiler_metadata_identity(info)
+                identity = compiler_metadata_identity(info)
                 observed[relative] = (stream, identity, image["sha256"])
                 images[relative] = {"sha256": image["sha256"], "size": info.st_size, "identity": list(identity)}
             require(images[relative]["sha256"] == image["sha256"] and images[relative]["size"] == image["size"],
@@ -1447,8 +1361,8 @@ def current_compiler_publications(base, namespace, source_binding):
         for name, descriptor in directories.items():
             require(names[name] == sorted(os.listdir(descriptor)), "compiler_namespace_changed")
         for relative, (stream, identity, expected) in observed.items():
-            require(base.compiler_metadata_identity(os.fstat(stream.fileno())) == identity
-                    and base.compiler_metadata_identity(os.stat(namespace/relative, follow_symlinks=False)) == identity,
+            require(compiler_metadata_identity(os.fstat(stream.fileno())) == identity
+                    and compiler_metadata_identity(os.stat(namespace/relative, follow_symlinks=False)) == identity,
                     "compiler_namespace_changed")
             stream.seek(0)
             digest = hashlib.sha256()
@@ -1538,21 +1452,6 @@ def checked_public_compilation_count(publications, name):
     require(name in PRIMARY_COMPILER_PROBES and (name not in {"gnu-native","musl-static-pie"}
             or compiled >= (2 if name == "gnu-native" else 1)), "micro_primary_compilations")
     return compiled
-
-
-def audit_compiler_publications(namespace, source_binding):
-    """Current physical observations and explicit historical format handling."""
-    namespace = Path(namespace)
-    try:
-        metadata = os.stat(namespace/"batches",follow_symlinks=False)
-    except FileNotFoundError:
-        return audit_legacy_compiler_publications(namespace,source_binding)
-    require(stat.S_ISDIR(metadata.st_mode),"compiler_namespace")
-    original_compiler_descriptor_capacity(namespace)
-    with compiler_input_custody() as inputs:
-        primitives = SimpleNamespace(compiler_namespace_directory=compiler_namespace_directory,
-            regular_input=inputs,compiler_json=compiler_json,compiler_metadata_identity=compiler_metadata_identity)
-        return current_compiler_publications(primitives,namespace,source_binding)
 
 
 def compiler_graph_image(image):
@@ -1794,10 +1693,9 @@ def audit_compilation_dispatches(namespace, configuration, declaration, events, 
                                 read_raw=None, retained_raw=None):
     require(type(events) is dict and set(events) == {"schema","events"}
             and type(events["schema"]) is str
-            and events["schema"] in {"chio.compilation-supervisor-events.v1","chio.compilation-supervisor-events.v2"},
+            and events["schema"] == "chio.compilation-supervisor-events.v2",
             "micro_supervisor_events")
     require(type(events["events"]) is list and len(events["events"]) <= 100000, "micro_supervisor_events")
-    captured = events["schema"] == "chio.compilation-supervisor-events.v2"
     available = {row["invocation_id"]:row for row in publications["records"]}
     joined = set()
     verified = 0
@@ -1823,17 +1721,14 @@ def audit_compilation_dispatches(namespace, configuration, declaration, events, 
             require(event["exit"] == 86 and event["refusal"] == "compilation_response_limit",
                     "micro_supervisor_outcome")
         for dispatch in event["dispatches"]:
-            fields = {"kind","invocation_sha256","environment_sha256","cwd","compiler_exit"}
-            if captured:
-                fields |= {"schema","output"}
+            fields = {"kind","invocation_sha256","environment_sha256","cwd","compiler_exit","schema","output"}
             require(type(dispatch) is dict and set(dispatch) == fields
                     and type(dispatch["kind"]) is str
                     and dispatch["kind"] in {"compiler-probe","compiler-unit"}
                     and all(re.fullmatch(r"[a-f0-9]{64}",dispatch.get(key,"")) for key in ["invocation_sha256","environment_sha256"])
                     and type(dispatch["compiler_exit"]) is int, "micro_dispatch")
-            if captured:
-                require(dispatch["schema"] == "chio.native-compiler-dispatch.v2", "micro_dispatch")
-                audit_native_compiler_output(dispatch["output"], retained_raw)
+            require(dispatch["schema"] == "chio.native-compiler-dispatch.v2", "micro_dispatch")
+            audit_native_compiler_output(dispatch["output"], retained_raw)
             cwd = compilation_absolute_path(dispatch["cwd"])
             require(cwd.is_relative_to(candidate)
                     and not any(cwd.is_relative_to(compilation_absolute_path(configuration[key]))
@@ -1881,27 +1776,24 @@ def audit_compilation_dispatches(namespace, configuration, declaration, events, 
             require(type(semantics) is dict and type(semantics.get("native_scope")) is dict,
                     "micro_unit_native_scope")
             native = semantics["native_scope"]
-            native_fields = {"scope_id","scope_record","coverage","platform","linker","input_attribution","generated_attribution"}
-            current = declaration.get("schema") == "chio.linux-compilation-scope-declaration.v2"
-            require(current or declaration.get("schema") == "chio.linux-compilation-scope-declaration.v1",
+            native_fields = {"scope_id","scope_record","coverage","platform","linker","input_attribution",
+                             "generated_attribution","retention_batch","retention_outcome_sha256"}
+            require(declaration.get("schema") == "chio.linux-compilation-scope-declaration.v2",
                     "micro_unit_native_scope")
-            if current:
-                native_fields |= {"retention_batch","retention_outcome_sha256"}
             require(set(native) == native_fields
                     and native["scope_id"] == declaration["scope_id"] and native["platform"] == "linux-gnu"
                     and native["coverage"] == "conservative-read-scope"
                     and native["input_attribution"] == "direct-source-and-extern-plus-conservative-allowed-scope"
                     and native["generated_attribution"] == "campaign-produced"
                     and same_compilation_json(retained(namespace,native["scope_record"]),declaration), "micro_unit_native_scope")
-            if current:
-                require(same_compilation_json(native["retention_batch"],declaration["retention_batch"])
-                        and native["retention_outcome_sha256"] == declaration["retention_outcome_sha256"], "micro_unit_native_scope")
+            require(same_compilation_json(native["retention_batch"],declaration["retention_batch"])
+                    and native["retention_outcome_sha256"] == declaration["retention_outcome_sha256"], "micro_unit_native_scope")
             if "compiler_dispatch" not in semantics:
                 # The trusted recorder issues these metadata calls internally.
                 # They have no wrapper-selected compiler invocation to retain.
                 internal_arguments = {"version":["-vV"],"sysroot":["--print","sysroot"]}
                 name = semantics.get("probe")
-                require(current and set(semantics) == {"probe","native_scope"}
+                require(set(semantics) == {"probe","native_scope"}
                         and row.get("schema") == "chio.rust-compilation.v4" and row["kind"] == "probe"
                         and type(name) is str and name in internal_arguments
                         and row.get("inputs") == [] and row.get("outputs") == [] and row.get("depfiles") == [],
@@ -1981,192 +1873,6 @@ def check_compilation_alias_physical(declaration):
             else:
                 require(stat.S_ISREG(info.st_mode), "micro_physical_alias")
 
-def audit_legacy_linux_compilation_scope_records(configuration, declaration, scope, inventories,
-                                         source_binding, command, declaration_path):
-    """Join already decoded records; this does not prove kernel enforcement.
-
-    Callers must verify retained bytes, original publication/export custody,
-    source origin and primary probes separately. No original path is opened.
-    """
-    config_fields = {"schema","candidate","source_binding","profile","package_root","runtime_inventory",
-        "source_origin","scopes","images","aliases","write_roots","environment_metadata","environment","records","evidence"}
-    require(type(configuration) is dict and config_fields <= set(configuration)
-            <= config_fields | {"loader_paths","supported_targets","public_arguments","linker_selection"}
-            and configuration["schema"] == "chio.linux-compilation-launch.v1","compilation_scope_configuration")
-    require(isinstance(source_binding,str) and re.fullmatch(r"[a-f0-9]{64}",source_binding)
-            and configuration["source_binding"] == source_binding,"compilation_scope_binding")
-    candidate = compilation_absolute_path(configuration["candidate"])
-    compilation_absolute_path(configuration["package_root"])
-    writes = configuration["write_roots"]
-    require(type(writes) is list and 0 < len(writes) <= 64 and len(set(writes)) == len(writes),"compilation_scope_configuration")
-    writes = [compilation_absolute_path(value) for value in writes]
-    protected = [compilation_absolute_path(configuration[key]) for key in ["records","evidence"]]
-    require(all(path.is_relative_to(candidate/"target") for path in [*writes,*protected])
-            and protected[0] != protected[1]
-            and not any(left != right and left.is_relative_to(right) for left in writes for right in writes)
-            and not any(left.is_relative_to(right) for left in protected for right in protected if left != right)
-            and not any(path.is_relative_to(write) or write.is_relative_to(path) for path in protected for write in writes),
-            "compilation_protected_namespace")
-    profile = configuration["profile"]
-    require(type(profile) is dict and profile.get("name") in {"dev","test","release"}
-            and set(profile) <= {"name","CARGO_PROFILE_DEV_DEBUG","CARGO_PROFILE_TEST_DEBUG"}
-            and all(value in {"0","1","2"} for key,value in profile.items() if key != "name"),"compilation_scope_profile")
-    environment = configuration["environment"]
-    allowed_environment = {"PATH","HOME","CARGO_HOME","RUSTUP_HOME","RUSTUP_TOOLCHAIN","LANG","LC_ALL","TMPDIR",
-        "CARGO_TARGET_DIR","CARGO_INCREMENTAL","CARGO_BUILD_JOBS","CARGO_NET_OFFLINE","CARGO_TERM_COLOR",
-        "CARGO_PROFILE_DEV_DEBUG","CARGO_PROFILE_TEST_DEBUG","CHIO_CONFINED_CANARY_MODE"}
-    require(type(environment) is dict and set(environment) <= allowed_environment
-            and all(type(value) is str and "\x00" not in value for value in environment.values())
-            and environment.get("CARGO_INCREMENTAL") == "0" and environment.get("CARGO_NET_OFFLINE") == "true"
-            and environment.get("CARGO_TERM_COLOR") == "never","compilation_scope_environment")
-    path_entries = environment.get("PATH","").split(":")
-    require(0 < len(path_entries) <= 128 and all(path_entries),"compilation_scope_environment")
-    for value in path_entries:
-        compilation_absolute_path(value)
-    for name in ["CARGO_PROFILE_DEV_DEBUG","CARGO_PROFILE_TEST_DEBUG"]:
-        require(environment.get(name) == profile.get(name),"compilation_scope_profile")
-    require(type(inventories) is list and type(configuration["scopes"]) is list
-            and 1 <= len(inventories) == len(configuration["scopes"]) <= 64,"compilation_scope_inventory")
-    required_roles = {"candidate","vendor","toolchain","native-runtime"}
-    readonly,scope_roots = {},[]
-    expected_references = []
-    total_members = 0
-    for configured,inventory in zip(configuration["scopes"],inventories):
-        require(type(configured) is dict and set(configured) == {"role","root","selection","members"}
-                and type(inventory) is dict and set(inventory) == {"schema","role","root","selection","directories","members"}
-                and inventory["schema"] == "chio.compilation-read-scope.v1"
-                and inventory["role"] in required_roles and inventory["role"] == configured["role"]
-                and inventory["root"] == configured["root"] and inventory["selection"] == configured["selection"]
-                and inventory["selection"] in {"complete-tree","explicit-members"},"compilation_scope_inventory")
-        root = compilation_absolute_path(inventory["root"])
-        require(str(root) != "/" and not any(root.is_relative_to(path) for path in protected)
-                and (inventory["role"] == "candidate" or not any(root.is_relative_to(write)
-                    or write.is_relative_to(root) for write in writes)),"compilation_protected_namespace")
-        scope_roots.append(root)
-        require(type(inventory["directories"]) is list and type(inventory["members"]) is list
-                and len(inventory["directories"])+len(inventory["members"]) <= 100000,"compilation_scope_inventory")
-        total_members += len(inventory["members"])
-        require(total_members <= 2000000,"compilation_scope_inventory")
-        names = [member.get("path") for member in inventory["members"] if type(member) is dict]
-        require(len(names) == len(inventory["members"]) and all(type(name) is str for name in names)
-                and names == sorted(set(names)) and len({portable_path_key(name) for name in names}) == len(names),"compilation_scope_inventory")
-        for member in inventory["members"]:
-            name = str(relative_path(member["path"]))
-            path = str(root/name)
-            kind = member.get("kind")
-            if kind == "regular":
-                require(set(member) == {"path","kind","sha256","size","mode","artifact"}
-                        and type(member["mode"]) is int and 0 <= member["mode"] <= 0o7777
-                        and member["artifact"] == "artifacts/"+member.get("sha256","")
-                        and not any(PurePosixPath(path).is_relative_to(selected) for selected in [*writes,*protected]),
-                        "compilation_scope_inventory")
-                compiler_graph_image({**member,"path":path})
-                require(path not in readonly,"compilation_scope_inventory")
-                readonly[path] = {"role":inventory["role"],**member,"path":path}
-            elif kind in {"trusted-recorder-namespace","campaign-produced-namespace"}:
-                allowed = protected if kind == "trusted-recorder-namespace" else writes
-                require(set(member) == {"path","kind"} and any(PurePosixPath(path).is_relative_to(selected)
-                        for selected in allowed),"compilation_scope_inventory")
-            elif kind == "excluded":
-                require(set(member) == {"path","kind","reason"} and member["reason"] in
-                        {"secret-shaped-original","discovery-metadata"},"compilation_scope_inventory")
-            else:
-                require(kind == "link" and set(member) == {"path","kind","text","target"}
-                        and type(member["text"]) is str,"compilation_scope_inventory")
-                compilation_absolute_path(member["target"])
-        reference = compilation_json_image(inventory)
-        expected_references.append({"role":inventory["role"],"root":str(root),"coverage":"conservative-read-scope",
-                                    "inventory":{"path":reference["artifact"],**reference}})
-    require(len(set(scope_roots)) == len(scope_roots)
-            and {inventory["role"] for inventory in inventories} == required_roles
-            and any(inventory["role"] == "candidate" and inventory["root"] == str(candidate) for inventory in inventories),
-            "compilation_scope_inventory")
-    aliases = audit_compilation_aliases(configuration, readonly)
-    chains = audit_compilation_alias_chains(configuration, declaration, readonly, aliases)
-    audit_compilation_targets(configuration, declaration, readonly, aliases)
-    declaration_fields = {"schema","source_binding","scope_id","candidate","profile","scopes","runtime_inventory",
-        "source_origin","policy","images","targets","environment","generated_attribution"}
-    if chains:
-        declaration_fields.add("alias_chains")
-    require(type(declaration) is dict and set(declaration) == declaration_fields
-            and declaration["schema"] == "chio.linux-compilation-scope-declaration.v1"
-            and declaration["source_binding"] == source_binding and declaration["candidate"] == str(candidate)
-            and declaration["profile"] == profile and declaration["environment"] == environment
-            and declaration["scopes"] == expected_references and declaration["generated_attribution"] == "campaign-produced",
-            "compilation_scope_declaration")
-    scope_inputs = {"configuration":configuration,"inventories":inventories}
-    if chains:
-        scope_inputs["alias_chains"] = chains
-    scope_id = hashlib.sha256(compilation_canonical(scope_inputs)).hexdigest()
-    require(declaration["scope_id"] == scope_id,"compilation_scope_binding")
-    for key in ["runtime_inventory","source_origin"]:
-        original,retained = configuration[key],declaration[key]
-        require(type(original) is dict and set(original) == {"path","sha256"} and type(retained) is dict
-                and set(retained) == {"path","sha256","size","artifact"} and retained["path"] == str(relative_path(original["path"]))
-                and retained["sha256"] == original["sha256"] and re.fullmatch(r"[a-f0-9]{64}",retained["sha256"])
-                and type(retained["size"]) is int and 0 < retained["size"] <= 16*1024**2
-                and retained["artifact"] == "artifacts/"+retained["sha256"],"compilation_scope_origin")
-    require(type(configuration["images"]) is dict and set(configuration["images"]) == {"cargo","rustc","linker","python","recorder"}
-            and type(declaration["images"]) is dict and set(declaration["images"]) == set(configuration["images"]),"compilation_scope_images")
-    for name,configured in configuration["images"].items():
-        retained = declaration["images"][name]
-        require(type(configured) is dict and set(configured) == {"path","sha256"}
-                and type(retained) is dict and set(retained) == {"path","sha256","size","artifact"},"compilation_scope_images")
-        compiler_graph_image(retained)
-        require(retained["path"] == compilation_image_path(configured["path"], aliases) and retained["sha256"] == configured["sha256"]
-                and retained["path"] in readonly and all(retained[key] == readonly[retained["path"]][key]
-                    for key in ["sha256","size","artifact"]),"compilation_scope_images")
-    expected_policy = {"configuration":compilation_json_image(configuration),"launcher":declaration["images"]["recorder"],
-        "implementation":"outside-supervisor-landlock-regular-leaves-seccomp-v2","minimum_landlock_abi":3,
-        "write_roots":configuration["write_roots"],"environment_metadata":configuration["environment_metadata"],
-        "protected_namespaces":[configuration["records"],configuration["evidence"]],
-        "publication_authority":"outside-supervisor-actual-dispatch-original-namespace",
-        "descendant_completion":"subreaper-wait-all-no-process-group-escape",
-        "path_metadata":"stat-readlink-access-unrestricted; no regular-byte or observed-read claim",
-        "descriptor_inheritance":"cargo-predeclared-anonymous-pipes; compiler-stdin-null-stdout-stderr-nonsocket-close-above-two"}
-    require(declaration["policy"] == expected_policy,"compilation_scope_policy")
-    require(type(scope) is dict and set(scope) == declaration_fields | {"declaration","execution"}
-            and scope["schema"] == "chio.linux-compilation-scope.v1"
-            and all(scope[key] == declaration[key] for key in declaration_fields-{"schema"})
-            and scope["declaration"] == compilation_json_image(declaration),"compilation_scope_declaration")
-    execution = scope["execution"]
-    execution_fields = {"kind","command_sha256","environment_sha256","started_unix_seconds","ended_unix_seconds",
-        "command_exit","runner_exit","source_drift","linux_architecture","landlock_abi","ipc","reaped_descendants",
-        "generated_before","generated_after","logs","supervisor_events"}
-    require(type(execution) is dict and set(execution) == execution_fields and execution["kind"] in {"cargo","scope-enforcement-probe"}
-            and type(execution["command_exit"]) is int and execution["command_exit"] == 0
-            and type(execution["runner_exit"]) is int and execution["runner_exit"] == 0 and execution["source_drift"] is False
-            and execution["linux_architecture"] == "x86_64" and type(execution["landlock_abi"]) is int
-            and execution["landlock_abi"] >= 3,"compilation_scope_execution")
-    times = [execution[key] for key in ["started_unix_seconds","ended_unix_seconds"]]
-    require(all(type(value) in {int,float} and math.isfinite(value) and value >= 0 for value in times)
-            and times[1] >= times[0],"compilation_scope_execution")
-    require(type(command) is list and 0 < len(command) <= 8192 and all(type(value) is str and "\x00" not in value for value in command)
-            and execution["command_sha256"] == hashlib.sha256(compilation_canonical(command)).hexdigest(),"compilation_scope_command")
-    path = compilation_absolute_path(declaration_path)
-    require(path.parent.parent == protected[1] and path.name == "declaration.json"
-            and re.fullmatch(r"[a-f0-9]{32}",path.parent.name),"compilation_scope_environment")
-    ipc = execution["ipc"]
-    require(type(ipc) is dict and set(ipc) == {"schema","lease","channels"} and ipc["schema"] == "chio.rust-compilation-pipes.v1"
-            and type(ipc["lease"]) is list and len(ipc["lease"]) == 2 and type(ipc["channels"]) is list
-            and len(ipc["channels"]) == 4 and all(type(pair) is list and len(pair) == 2 for pair in ipc["channels"]),"compilation_scope_environment")
-    descriptors = ipc["lease"]+[value for pair in ipc["channels"] for value in pair]
-    require(all(type(value) is int and value >= 3 for value in descriptors) and len(set(descriptors)) == 10,"compilation_scope_environment")
-    effective_environment = {**environment,"RUSTC":declaration["images"]["rustc"]["path"],
-        "RUSTC_WRAPPER":declaration["images"]["recorder"]["path"],"PYTHONDONTWRITEBYTECODE":"1",
-        "CHIO_COMPILATION_SOURCE_ROOT":str(candidate),"CHIO_COMPILATION_RECORDS":configuration["records"],
-        "CHIO_COMPILATION_SOURCE_BINDING":source_binding,"CHIO_COMPILATION_SCOPE_DECLARATION":declaration_path,
-        "CHIO_COMPILATION_SCOPE_ID":scope_id,"CHIO_COMPILATION_IPC":compilation_canonical(ipc).decode("ascii")}
-    require(execution["environment_sha256"] == hashlib.sha256(compilation_canonical(effective_environment)).hexdigest(),
-            "compilation_scope_environment")
-    reaped = execution["reaped_descendants"]
-    require(type(reaped) is list and len(reaped) <= 100000 and all(type(row) is dict and set(row) == {"pid","wait_status"}
-            and type(row["pid"]) is int and row["pid"] > 0 and type(row["wait_status"]) is int and row["wait_status"] >= 0
-            for row in reaped) and len({row["pid"] for row in reaped}) == len(reaped),"compilation_scope_execution")
-    return {"schema":"chio.completed-compilation-scope-record-verification.v1","scope_id":scope_id,
-        "source_binding":source_binding,"declared_regular_inputs":len(readonly),
-        "coverage":"completed-scope-record-integrity-only","compiled_closure_status":"not-established"}
-
 def checked_current_retention(declaration, execution, source_binding):
     """Validate decoded batch composition; original physical and stream joins follow."""
     batch = declaration["retention_batch"]
@@ -2197,11 +1903,19 @@ def checked_current_retention(declaration, execution, source_binding):
 
 def audit_compilation_directory_inventory(configured, inventory):
     """Recompute READ_DIR metadata from the finite approved regular byte leaves."""
-    fields = {"schema","role","root","selection","directories","members"}
+    fields = {"schema","role","root","selection","directories","members","root_identity"}
     version = inventory.get("schema") if type(inventory) is dict else None
     require(type(version) is str and version in {"chio.compilation-read-scope.v1","chio.compilation-read-scope.v2"}
             and set(inventory) == fields | ({"directory_metadata"} if version.endswith(".v2") else set())
             and type(inventory.get("directories")) is list and type(inventory.get("members")) is list,
+            "compilation_scope_directories")
+    # The terminal inventory root identity is mandatory in every current
+    # emitted read-scope form; historical records keep their own sealed shape
+    # and are never accepted through this current audit.
+    identity = inventory["root_identity"]
+    require(type(identity) is list and len(identity) == 3
+            and all(type(value) is int and value >= 0 for value in identity)
+            and type(identity[2]) is int and stat.S_ISDIR(identity[2]),
             "compilation_scope_directories")
     directories = inventory["directories"]
     require(all(type(name) is str and name and (name == "." or not secret_source(name)) for name in directories)
@@ -2236,9 +1950,18 @@ def audit_compilation_directory_inventory(configured, inventory):
 def hold_compilation_directory_metadata(inventories, descriptors, observed):
     """Join retained READ_DIR metadata to original no-follow directory objects."""
     for inventory in inventories:
+        root = Path(compilation_absolute_path(inventory["root"]))
+        # A substituted terminal inventory root must not verify as the
+        # originally collected scope root.
+        require(not secret_source(root.as_posix().lstrip("/")), "compilation_scope_directories_physical")
+        if root not in observed:
+            descriptor = descriptors.enter_context(compiler_namespace_directory(root))
+            info = os.fstat(descriptor)
+            observed[root] = [info.st_dev,info.st_ino,info.st_mode]
+        require(same_compilation_json(observed[root],inventory["root_identity"]),
+                "compilation_scope_directories_physical")
         if inventory["schema"] != "chio.compilation-read-scope.v2":
             continue
-        root = Path(compilation_absolute_path(inventory["root"]))
         for row in inventory["directory_metadata"]:
             path = root/row["path"]
             require(not secret_source(path.as_posix().lstrip("/")), "compilation_scope_directories_physical")
@@ -2250,13 +1973,16 @@ def hold_compilation_directory_metadata(inventories, descriptors, observed):
                     "compilation_scope_directories_physical")
 
 
-def audit_current_linux_compilation_scope_records(configuration, declaration, scope, inventories,
+def audit_linux_compilation_scope_records(configuration, declaration, scope, inventories,
                                          source_binding, command, declaration_path):
-    """Join already decoded records; this does not prove kernel enforcement.
+    """Join already decoded v2 records; this does not prove kernel enforcement.
 
     Callers must verify retained bytes, original publication/export custody,
     source origin and primary probes separately. No original path is opened.
     """
+    require(type(declaration) is dict
+            and declaration.get("schema") == "chio.linux-compilation-scope-declaration.v2",
+            "compilation_scope_declaration")
     config_fields = {"schema","candidate","source_binding","profile","package_root","runtime_inventory",
         "source_origin","scopes","images","aliases","write_roots","environment_metadata","environment","records","evidence"}
     require(type(configuration) is dict and config_fields <= set(configuration)
@@ -2441,13 +2167,340 @@ def audit_current_linux_compilation_scope_records(configuration, declaration, sc
         "coverage":"completed-scope-record-integrity-only","compiled_closure_status":"not-established"}
 
 
-def audit_linux_compilation_scope_records(configuration,declaration,scope,inventories,source_binding,command,declaration_path):
-    """Versioned decoded joins; current qualification requires the v2 branch."""
-    if declaration.get("schema") == "chio.linux-compilation-scope-declaration.v1":
-        return audit_legacy_linux_compilation_scope_records(configuration,declaration,scope,inventories,
-            source_binding,command,declaration_path)
-    return audit_current_linux_compilation_scope_records(configuration,declaration,scope,inventories,
-        source_binding,command,declaration_path)
+EXPLICIT_METADATA_INSTRUMENTATION_SCHEMA = "chio.rust-compilation-dep-info-instrumentation.v2"
+EXPLICIT_METADATA_OWNERSHIP_FIELDS = {"policy", "directory", "directory_binding", "predecessor", "produced"}
+
+
+def explicit_metadata_selectors(vector):
+    """Consume original compiler tokens without mistaking values for options."""
+    valued = {"--crate-name", "--crate-type", "--edition", "--emit", "--out-dir", "--extern", "--cfg",
+              "--check-cfg", "--target", "--sysroot", "--error-format", "--json", "--cap-lints",
+              "--diagnostic-width", "--remap-path-prefix", "-o", "-C", "-L", "-l", "-A", "-D", "-W", "-F",
+              "--allow", "--warn", "--deny", "--forbid", "--force-warn"}
+    selectors, stdin_count, index = {}, 0, 1
+    while index < len(vector):
+        argument, key_index = vector[index], index
+        index += 1
+        if argument == "-":
+            stdin_count += 1
+            continue
+        if argument in {"--verbose", "-g", "-O"}:
+            continue
+        if "=" in argument and argument.split("=", 1)[0] in valued:
+            key, value = argument.split("=", 1)
+            value_index = key_index
+        elif argument[:2] in {"-C", "-L", "-l", "-A", "-D", "-W", "-F"} and len(argument) > 2:
+            key, value, value_index = argument[:2], argument[2:], key_index
+        else:
+            require(argument in valued and index < len(vector), "compiler_stdin_arguments")
+            key, value, value_index = argument, vector[index], index
+            index += 1
+        require(value and not value.startswith("@"), "compiler_stdin_arguments")
+        selectors.setdefault(key, []).append((key_index, value_index))
+    require(stdin_count == 1, "compiler_stdin_arguments")
+    return selectors
+
+
+def explicit_metadata_selector_value(vector, tokens):
+    """Selector value for the inline and two-token forms of one token pair."""
+    key_index, value_index = tokens
+    token = vector[value_index]
+    return token.split("=", 1)[1] if value_index == key_index else token
+
+
+def replay_explicit_metadata_transformation(row, original):
+    """Independently rebuild P, D and the exact effective argv from the
+    retained original arguments. The closed lane must be described by the
+    retained argv itself: exactly one -o and one bare metadata emission,
+    exactly one rlib crate selector, at most one explicit target agreeing
+    with the row, one stdin positional, no --out-dir and no duplicate
+    crate-name selector; unrelated accepted flags are preserved untouched.
+    The actual compiler owns real semantics."""
+    identifier = row.get("invocation_id")
+    require(type(identifier) is str and re.fullmatch(r"[0-9a-f]{32}", identifier),
+            "compiler_stdin_arguments")
+    selectors = explicit_metadata_selectors(original)
+    outputs = selectors.get("-o", [])
+    emissions = selectors.get("--emit", [])
+    crate_types = selectors.get("--crate-type", [])
+    targets = selectors.get("--target", [])
+    crate_names = selectors.get("--crate-name", [])
+    require(len(outputs) == 1 and len(emissions) == 1 and len(crate_types) == 1
+            and len(targets) <= 1 and len(crate_names) <= 1
+            and not selectors.get("--out-dir"),
+            "compiler_stdin_arguments")
+    semantics = row.get("semantics") or {}
+    require(explicit_metadata_selector_value(original, crate_types[0]) == "rlib"
+            and (semantics.get("target") == (explicit_metadata_selector_value(original, targets[0])
+                                              if targets else None)), "compiler_stdin_arguments")
+    require(semantics.get("crate_name") == (explicit_metadata_selector_value(original, crate_names[0])
+                                           if crate_names else None), "compiler_stdin_arguments")
+    output_text = explicit_metadata_selector_value(original, outputs[0])
+    require(outputs[0][0] != outputs[0][1] and original[outputs[0][0]] == "-o"
+            and type(output_text) is str and output_text not in {"", "-", ".", ".."}
+            and not output_text.startswith(("@", "//"))
+            and PurePosixPath(output_text).as_posix() == output_text
+            and ".." not in PurePosixPath(output_text).parts
+            and PurePosixPath(output_text).name not in {"", ".", ".."}, "compiler_stdin_arguments")
+    emit_key, emit_value = emissions[0]
+    require(explicit_metadata_selector_value(original, emissions[0]) == "metadata",
+            "compiler_stdin_arguments")
+    cwd = semantics.get("cwd")
+    require(type(cwd) is str and cwd.startswith("/") and not cwd.startswith("//"),
+            "compiler_stdin_arguments")
+    primary = output_text if output_text.startswith("/") else str(PurePosixPath(cwd) / PurePosixPath(output_text))
+    path = PurePosixPath(primary)
+    require(path.is_absolute() and path.as_posix() == primary and ".." not in path.parts
+            and "," not in primary, "compiler_stdin_arguments")
+    depfile = str(path.parent / (path.name + ".chio-" + identifier + ".d"))
+    effective = list(original)
+    replacement = "metadata=" + primary + ",dep-info=" + depfile
+    effective[emit_value] = ("--emit=" + replacement) if emit_value == emit_key else replacement
+    return primary, depfile, effective
+
+
+def audit_compiler_stdin_inputs(rows, namespace, retained, unit_publications=None):
+    """Recompute anonymous input and append-only dep-info instrumentation joins."""
+    explicit = {}
+    for row in rows:
+        semantics = row.get("semantics") or {}
+        inputs = row.get("inputs", [])
+        stdin = [image for image in inputs if image.get("role") == "stdin"]
+        instrumentation = semantics.get("dep_info_instrumentation")
+        if not stdin and instrumentation is None:
+            require(row.get("kind") != "compilation" or row.get("status") not in {"success", "compiler_failed"}
+                    or semantics.get("source") is not None, "compiler_stdin_binding")
+            continue
+        require(row.get("kind") == "compilation" and semantics.get("source") is None and len(stdin) == 1
+                and type(semantics.get("host_execution")) is dict and semantics.get("native_scope") is None
+                and semantics.get("compiler_dispatch") is None and type(row.get("compiler")) is dict,
+                "compiler_stdin_binding")
+        require(row.get("status") not in {"success", "compiler_failed"} or row.get("refusal") is None,
+                "compiler_stdin_outcome")
+        require(type(instrumentation) is dict, "compiler_stdin_instrumentation")
+
+        def payload(image, role):
+            require(type(image) is dict and image in inputs and image.get("role") == role,
+                    "compiler_stdin_binding")
+            path, digest, size = compiler_graph_image(image)
+            require(image.get("artifact") == "artifacts/" + digest
+                    and path == str(Path(namespace)/image["artifact"]) and size <= 16*1024**2,
+                    "compiler_stdin_binding")
+            raw = retained(image)
+            require(len(raw) == size and hashlib.sha256(raw).hexdigest() == digest, "compiler_stdin_binding")
+            try:
+                decoded = raw.decode("utf-8", errors="strict")
+            except UnicodeError:
+                raise ValueError("qualification.compiler_stdin_encoding") from None
+            require(not COMPILER_UNSAFE_TEXT.search(decoded), "compiler_stdin_disclosure")
+            return raw
+
+        payload(stdin[0], "stdin")
+        vectors = []
+        for name in ["original_argv", "effective_argv"]:
+            raw = payload(instrumentation[name], "compiler-arguments")
+            values = json.loads(raw, object_pairs_hook=closed_pairs)
+            require(type(values) is list and 1 < len(values) <= 8192
+                    and all(type(value) is str and "\x00" not in value for value in values)
+                    and raw == compilation_canonical(values)+b"\n", "compiler_stdin_arguments")
+            vectors.append(values)
+        original, effective = vectors
+        require(original[0] == row["compiler"]["path"] and original[1:].count("-") == 1
+                and hashlib.sha256(compilation_canonical(original)).hexdigest() == row["invocation_sha256"]
+                and hashlib.sha256(compilation_canonical(effective)).hexdigest() == instrumentation["effective_invocation_sha256"],
+                "compiler_stdin_arguments")
+        if instrumentation.get("schema") == "chio.rust-compilation-dep-info-instrumentation.v1":
+            fields = {"schema", "original_argv", "effective_argv", "added", "effective_invocation_sha256"}
+            require(set(instrumentation) == fields, "compiler_stdin_instrumentation")
+            require(not any(argument == "-o" or argument.startswith("-o=") for argument in original[1:]),
+                    "compiler_stdin_arguments")
+            emissions = []
+            for index, argument in enumerate(original[1:], 1):
+                if argument == "--emit":
+                    require(index+1 < len(original), "compiler_stdin_arguments")
+                    emissions.extend(original[index+1].split(","))
+                elif argument.startswith("--emit="):
+                    emissions.extend(argument[len("--emit="):].split(","))
+            kinds = {item.split("=", 1)[0] for item in emissions}
+            added = [] if "dep-info" in kinds else ["--emit=dep-info"]
+            require(kinds - {"dep-info"} and "link" not in kinds and instrumentation["added"] == added
+                    and effective == original+added, "compiler_stdin_arguments")
+            continue
+        primary, depfile, expected_effective = replay_explicit_metadata_transformation(row, original)
+        require(set(instrumentation) == {"schema", "mode", "original_argv", "effective_argv",
+                "effective_invocation_sha256", "primary_output", "depfile_output"}
+                and instrumentation["schema"] == EXPLICIT_METADATA_INSTRUMENTATION_SCHEMA
+                and instrumentation["mode"] == "explicit-metadata-output"
+                and instrumentation["primary_output"] == primary
+                and instrumentation["depfile_output"] == depfile
+                and effective == expected_effective, "compiler_stdin_instrumentation")
+        require(semantics.get("crate_types") == ["rlib"], "compiler_stdin_instrumentation")
+        require(type(semantics.get("emits")) is dict
+                and semantics["emits"] == {"metadata": primary, "dep-info": depfile},
+                "compiler_stdin_emits")
+        ownership = semantics.get("output_ownership")
+        require(type(ownership) is dict and set(ownership) == EXPLICIT_METADATA_OWNERSHIP_FIELDS
+                and ownership["directory"] == str(PurePosixPath(primary).parent)
+                and ownership["policy"] in {"explicit-metadata-fresh-lease",
+                                            "explicit-metadata-predecessor-retirement",
+                                            "explicit-metadata-predecessor-absence"}
+                and (ownership["policy"] != "explicit-metadata-fresh-lease")
+                == (ownership["predecessor"] is not None), "compiler_stdin_ownership")
+        directory = PurePosixPath(ownership["directory"])
+        paths = [*reversed(directory.parents), directory]
+        chain = ownership["directory_binding"]
+        require(type(chain) is list and len(chain) == len(paths)
+                and all(type(item) is dict and set(item) == {"path", "device", "inode", "mode"}
+                        and item["path"] == str(path)
+                        and all(type(item[key]) is int and item[key] >= 0 for key in ["device", "inode", "mode"])
+                        and stat.S_ISDIR(item["mode"]) for item, path in zip(chain, paths)),
+                "compiler_stdin_directory_binding")
+        produced = ownership["produced"]
+        require(row.get("status") not in {"success", "compiler_failed"} or type(produced) is dict,
+                "compiler_stdin_ownership")
+        if produced is not None:
+            require(type(produced) is dict
+                    and set(produced) <= {PurePosixPath(primary).name, PurePosixPath(depfile).name}
+                    and all(type(item) is dict and set(item) == {"device", "inode", "size"}
+                            and all(type(value) is int and value >= 0 for value in item.values())
+                            for item in produced.values()), "compiler_stdin_ownership")
+        if row.get("status") == "success":
+            require(type(produced) is dict
+                    and set(produced) == {PurePosixPath(primary).name, PurePosixPath(depfile).name},
+                    "compiler_stdin_ownership")
+        if row.get("status") in {"success", "compiler_failed"}:
+            images = row.get("outputs", [])
+            require(type(images) is list and len(images) == len(produced)
+                    and len({image.get("path") for image in images}) == len(images),
+                    "compiler_stdin_output_binding")
+            for image in images:
+                expected = {"unit": primary, "depfile": depfile}.get(image.get("role"))
+                require(expected is not None and image.get("path") == expected
+                        and PurePosixPath(expected).name in produced
+                        and type(image.get("size")) is int
+                        and produced[PurePosixPath(expected).name]["size"] == image["size"],
+                        "compiler_stdin_output_binding")
+        for image in row.get("outputs", []):
+            if image.get("role") != "unit":
+                continue
+            require(image.get("path") == primary, "compiler_stdin_output_binding")
+            require(image.get("partial") is True if row.get("status") == "compiler_failed"
+                    else image.get("partial") is not True, "compiler_stdin_output_binding")
+        if row.get("status") == "success":
+            require(any(image.get("role") == "unit" and image.get("path") == primary
+                    for image in row.get("outputs", [])), "compiler_stdin_output_binding")
+        explicit[row["invocation_id"]] = row
+    audit_explicit_metadata_retirements(rows, explicit, retained, unit_publications)
+
+
+def audit_explicit_metadata_retirements(rows, explicit, retained, unit_publications=None):
+    """Independently validate recorded same-campaign predecessor edges.
+
+    Every edge must reference a prior completed v2 anonymous host row present
+    in the audited selection, sealing the same primary output as the current
+    row, with the exact sealed output image and physical identity, cross-bound
+    record and completion references matching the independently checked
+    publication custody, no recorder refusal, one retirement per sealed output
+    version and no cycles. Caller-claimed references are never custody.
+    """
+    require(type(rows) is list and type(explicit) is dict, "compiler_stdin_predecessor")
+    by_id = {}
+    for row in rows:
+        require(isinstance(row, dict), "compiler_stdin_predecessor")
+        identifier = row.get("invocation_id")
+        require(identifier not in by_id, "compiler_stdin_predecessor")
+        by_id[identifier] = row
+    retired, fresh = set(), set()
+    for identifier, row in sorted(explicit.items()):
+        ownership = row["semantics"]["output_ownership"]
+        edge = ownership["predecessor"]
+        if edge is None:
+            primary = row["semantics"]["dep_info_instrumentation"]["primary_output"]
+            require(primary not in fresh, "compiler_stdin_predecessor")
+            fresh.add(primary)
+            continue
+        require(type(edge) is dict and set(edge) == {"invocation_id", "record", "completion", "output", "physical"},
+                "compiler_stdin_predecessor")
+        predecessor = by_id.get(edge["invocation_id"])
+        require(type(predecessor) is dict and edge["invocation_id"] in explicit
+                and predecessor.get("invocation_id") == edge["invocation_id"], "compiler_stdin_predecessor")
+        semantics = predecessor["semantics"]
+        instrumentation = semantics["dep_info_instrumentation"]
+        require(instrumentation["schema"] == EXPLICIT_METADATA_INSTRUMENTATION_SCHEMA
+                and semantics.get("source") is None and predecessor.get("refusal") is None
+                and predecessor.get("source_binding") == row.get("source_binding")
+                and semantics.get("target") == row["semantics"].get("target")
+                and predecessor.get("status") in {"success", "compiler_failed"}
+                and type(predecessor.get("compiler_exit")) is int
+                and (predecessor["compiler_exit"] == 0) == (predecessor["status"] == "success"),
+                "compiler_stdin_predecessor")
+        primary = instrumentation["primary_output"]
+        # The retired predecessor output must be the current row's own P.
+        require(primary == row["semantics"]["dep_info_instrumentation"]["primary_output"],
+                "compiler_stdin_predecessor")
+        require(semantics["output_ownership"]["directory_binding"] == ownership["directory_binding"],
+                "compiler_stdin_directory_binding")
+        # Cross-bound record and completion custody: the edge must match the
+        # independently checked publication references, never its own claim.
+        require(type(unit_publications) is dict, "compiler_stdin_predecessor")
+        unit = unit_publications.get(edge["invocation_id"])
+        require(type(unit) is dict and unit.get("invocation_id") == edge["invocation_id"]
+                and unit.get("record_status") == predecessor["status"]
+                and unit.get("compiler_exit") == predecessor["compiler_exit"]
+                and unit.get("physical_status") == "complete"
+                and (predecessor.get("publication") or {}).get("completion")
+                    == "completions/" + edge["invocation_id"] + ".json", "compiler_stdin_predecessor")
+        for side, prefix in [("record", "records/"), ("completion", "completions/")]:
+            reference = unit.get(side)
+            require(type(reference) is dict and type(reference.get("sha256")) is str
+                    and re.fullmatch(r"[a-f0-9]{64}", reference["sha256"])
+                    and type(reference.get("size")) is int
+                    and reference.get("path") == prefix + edge["invocation_id"] + ".json",
+                    "compiler_stdin_predecessor")
+            require(set(edge[side]) == {"path", "sha256", "size"}
+                    and type(edge[side]["size"]) is int
+                    and edge[side]["path"] == reference["path"]
+                    and edge[side]["sha256"] == reference["sha256"]
+                    and edge[side]["size"] == reference["size"], "compiler_stdin_predecessor")
+        image = edge["output"]
+        physical = edge["physical"]
+        if ownership["policy"] == "explicit-metadata-predecessor-absence":
+            require(type(image) is dict and image == {"path": primary, "state": "absent"}
+                    and physical is None and predecessor["status"] == "compiler_failed"
+                    and PurePosixPath(primary).name not in semantics["output_ownership"]["produced"]
+                    and not any(item.get("path") == primary for item in predecessor.get("outputs", [])),
+                    "compiler_stdin_predecessor")
+        else:
+            require(type(image) is dict and set(image) == {"path", "sha256", "size"}
+                    and image["path"] == primary
+                    and type(image.get("sha256")) is str and re.fullmatch(r"[a-f0-9]{64}", image["sha256"])
+                    and type(image.get("size")) is int, "compiler_stdin_predecessor")
+            sealed_image = next((item for item in predecessor.get("outputs", []) if item.get("role") == "unit"
+                                 and all(item.get(key) == image.get(key)
+                                         for key in ["path", "sha256", "size"])), None)
+            require(sealed_image is not None, "compiler_stdin_predecessor")
+            raw = retained(sealed_image)
+            require(len(raw) == image["size"] and hashlib.sha256(raw).hexdigest() == image["sha256"],
+                    "compiler_stdin_predecessor")
+            require(type(physical) is dict and set(physical) == {"device", "inode", "size"}
+                    and all(type(value) is int and value >= 0 for value in physical.values())
+                    and semantics["output_ownership"]["produced"].get(PurePosixPath(primary).name) == physical,
+                    "compiler_stdin_predecessor")
+        require(edge["invocation_id"] not in retired, "compiler_stdin_predecessor")
+        retired.add(edge["invocation_id"])
+        # No cycles: following recorded edges must reach a fresh lease row.
+        visited = {identifier}
+        walked = predecessor
+        while True:
+            following = walked["semantics"]["output_ownership"]["predecessor"]
+            if following is None:
+                break
+            require(type(following) is dict and following.get("invocation_id") not in visited,
+                    "compiler_stdin_predecessor")
+            visited.add(following["invocation_id"])
+            walked = by_id.get(following["invocation_id"])
+            require(type(walked) is dict and walked["invocation_id"] in explicit,
+                    "compiler_stdin_predecessor")
 
 
 def audit_compiler_unit_graph(rows, sources, roots, immutable_images=None):
@@ -2474,6 +2527,30 @@ def audit_compiler_unit_graph(rows, sources, roots, immutable_images=None):
     require(len(identifiers) == len(rows) and all(isinstance(identifier,str)
             and re.fullmatch(r"[a-f0-9]{32}",identifier) for identifier in identifiers)
             and len(set(identifiers)) == len(identifiers),"compiler_graph_inventory")
+    rows_by_id = dict(zip(identifiers, rows))
+
+    def auxiliary_ancestor(ancestor, descendant, output_path):
+        # Publication inventories are ordered by random invocation IDs, not
+        # execution order. Follow the authenticated retirement relation, even
+        # when intervening compilations produced different bytes or failed.
+        current, visited, found = descendant, set(), False
+        while True:
+            require(current["invocation_id"] not in visited, "compiler_unit_producer")
+            visited.add(current["invocation_id"])
+            semantics = current.get("semantics") or {}
+            require(semantics.get("source") is None
+                    and (semantics.get("dep_info_instrumentation") or {}).get("schema")
+                        == EXPLICIT_METADATA_INSTRUMENTATION_SCHEMA,
+                    "compiler_unit_producer")
+            edge = (semantics.get("output_ownership") or {}).get("predecessor")
+            if edge is None:
+                return found
+            require(type(edge) is dict and (edge.get("output") or {}).get("path") == output_path,
+                    "compiler_unit_producer")
+            current = rows_by_id.get(edge.get("invocation_id"))
+            require(type(current) is dict, "compiler_unit_producer")
+            found = found or current["invocation_id"] == ancestor["invocation_id"]
+
     units,producers,total_images = {},{},0
     for row in rows:
         if row.get("kind") != "compilation" or row.get("status") != "success":
@@ -2486,21 +2563,50 @@ def audit_compiler_unit_graph(rows, sources, roots, immutable_images=None):
         total_images += len(inputs)+len(outputs)
         require(total_images <= 2000000,"compiler_graph_inventory")
         direct = [image for image in inputs if image.get("role") == "source"]
-        require(direct and all(compiler_graph_image(image) in source_members for image in direct)
-                and any(image["path"] == semantics.get("source") and source_members[compiler_graph_image(image)]["role"]
-                    in {"candidate","vendor","campaign-produced"} for image in direct),"compiler_unit_source")
+        require(all(compiler_graph_image(image) in source_members for image in direct), "compiler_unit_source")
+        if semantics.get("source") is None:
+            require(sum(image.get("role") == "stdin" for image in inputs) == 1
+                    and type(semantics.get("dep_info_instrumentation")) is dict
+                    and type(semantics.get("host_execution")) is dict and semantics.get("native_scope") is None
+                    and any(image.get("role") == "depfile" for image in outputs), "compiler_unit_source")
+        else:
+            require(any(image["path"] == semantics["source"] and source_members[compiler_graph_image(image)]["role"]
+                        in {"candidate","vendor","campaign-produced"} for image in direct),"compiler_unit_source")
         identifier = row["invocation_id"]
         units[identifier] = row
         for image in outputs:
-            if image.get("role") == "unit":
-                key = compiler_graph_image(image)
-                require(key not in producers,"compiler_unit_producer")
+            if image.get("role") != "unit":
+                continue
+            key = compiler_graph_image(image)
+            if key in producers:
+                previous = units[producers[key]]
+                previous_semantics = previous.get("semantics") or {}
+                lane = (semantics.get("dep_info_instrumentation") or {}).get("schema")
+                previous_lane = (previous_semantics.get("dep_info_instrumentation") or {}).get("schema")
+                # Repeated identical unit images are admitted only along one
+                # authenticated v2 same-output retirement chain. Inventory
+                # order need not match execution order, and intervening
+                # compiles can produce different bytes. Every other repeat,
+                # including all v1 shapes,
+                # keeps the ordinary unique producer refusal. Anonymous
+                # outputs are still never roots, reachable externs or
+                # immutable substitutes.
+                require(lane == previous_lane == EXPLICIT_METADATA_INSTRUMENTATION_SCHEMA
+                        and previous_semantics.get("source") is None
+                        and semantics.get("source") is None
+                        and (auxiliary_ancestor(previous, row, key[0])
+                             or auxiliary_ancestor(row, previous, key[0])),
+                        "compiler_unit_producer")
                 producers[key] = identifier
+                continue
+            require(key not in producers,"compiler_unit_producer")
+            producers[key] = identifier
     root_units = []
     root_images = {compiler_graph_image(image) for image in roots}
     for image in sorted(root_images):
         producer = producers.get(image)
         require(producer is not None,"compiler_root_producer")
+        require(units[producer]["semantics"].get("source") is not None, "compiler_root_source")
         root_units.append(producer)
     edges,immutable_edges = {},{}
     for identifier,row in units.items():
@@ -2521,6 +2627,8 @@ def audit_compiler_unit_graph(rows, sources, roots, immutable_images=None):
         if identifier not in reached:
             reached.add(identifier)
             pending.extend(edges[identifier])
+    require(all(units[identifier]["semantics"].get("source") is not None for identifier in reached),
+            "compiler_extern_source")
     remaining = {identifier:len(set(edges[identifier])) for identifier in reached}
     consumers = {identifier:set() for identifier in reached}
     for identifier in reached:
@@ -2618,6 +2726,18 @@ def audit_ordinary_host_metadata(rows, repository, namespace, source_binding, re
         validate_source_rows(runtime["sources"])
         target = compilation_absolute_path(host["target_directory"])
         require(target.is_relative_to(repository/"target") and target != repository/"target", "compiled_host_metadata")
+        semantics = row.get("semantics") or {}
+        instrumentation = semantics.get("dep_info_instrumentation") or {}
+        if (instrumentation.get("schema") == EXPLICIT_METADATA_INSTRUMENTATION_SCHEMA
+                and row.get("status") in {"success", "compiler_failed"}):
+            primary = compilation_absolute_path(instrumentation["primary_output"])
+            depfile = compilation_absolute_path(instrumentation["depfile_output"])
+            require(semantics.get("target") in {None, host["target"]}
+                    and primary != target and depfile != target
+                    and primary.is_relative_to(target) and depfile.is_relative_to(target)
+                    and primary.parent == depfile.parent
+                    and (semantics.get("output_ownership") or {}).get("directory") == str(primary.parent),
+                    "compiler_stdin_host_scope")
         for key in ["compiler", "cargo", "linker", "sdk", "toolchain"]:
             require(not compilation_absolute_path(host[key]).is_relative_to(repository), "compiled_host_metadata")
         metadata = host["runtime_metadata"]
@@ -2751,6 +2871,7 @@ def audit_compiler_profile_namespace(namespace, repository, inventory, source_bi
                 complete = json.loads(body, object_pairs_hook=closed_pairs)
                 completed_host_images.update((item["sha256"], item["size"]) for item in complete["after"]["artifacts"])
         audit_ordinary_host_tool_image(Path(namespace), image, completed_host_images)
+    audit_compiler_stdin_inputs(rows, namespace, retained_host_image, publication["unit_publications"])
     audit_ordinary_host_metadata(rows, repository, Path(namespace), source_binding, retained_host_image, original_host_tooling)
     graph = audit_compiler_unit_graph(rows,list(inputs.values()),roots,immutable)
     require(audit_compiler_publications(namespace,source_binding) == publication,"compiler_namespace_changed")
@@ -2805,7 +2926,8 @@ def audit_execution_provenance(root, row, sources, base_commit, expected=None):
     after_digest = audited_source_manifest(after)
     require(result.get("format") == "chio.local-command-provenance.v1"
             and type(result.get("actual_command_exit")) is int and result["actual_command_exit"] == 0
-            and result.get("runner_exit") == 0 and result.get("inventories_complete") is True
+            and type(result.get("runner_exit")) is int and result["runner_exit"] == 0
+            and result.get("inventories_complete") is True
             and result.get("output_pipe_completed") is True and result.get("provenance_error") is None
             and result.get("source_drift", {}).get("detected") is False, "gate_execution_provenance")
     receipt = None
@@ -3236,7 +3358,7 @@ def audit_hosted_ci(root, evidence, candidate, sources, base_commit):
     require(sources is not None and base_commit is not None,"hosted_ci_source")
     commit = evidence.get("commit","")
     repository = evidence.get("repository","")
-    require(re.fullmatch(r"[a-f0-9]{40}",commit) is not None
+    require(re.fullmatch(r"[a-f0-9]{40}",commit) is not None and commit == base_commit
             and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",repository) is not None,"hosted_ci_commit")
     primary = artifact_json(root,evidence["check_runs"])
     checks = primary.get("check_runs",[])
@@ -3695,7 +3817,7 @@ def audit_compilation_scope_data(data, source_binding, repository, namespace, pu
     events = data["events"]
     require(type(events) is dict and set(events) == {"schema","events"}
             and type(events["schema"]) is str
-            and events["schema"] in {"chio.compilation-supervisor-events.v1","chio.compilation-supervisor-events.v2"}
+            and events["schema"] == "chio.compilation-supervisor-events.v2"
             and type(events["events"]) is list and len(events["events"]) <= 100000, "compiled_profile_linux_dispatch")
     rows = data["rows"]
     require(type(rows) is list and len(rows) <= 100000, "compiled_profile_rows")
@@ -3965,14 +4087,6 @@ def audit_linux_compiled_profile(root, linux, request, report, candidate, source
 
 PRIMARY_COMPILER_PROBES = ("allowed-read","outside-read","outside-write","evidence-read","evidence-write",
                          "network","forged-ipc","gnu-native","musl-static-pie")
-PRIMARY_COMPILER_TOOLS = {
-    "consumer/verify_public_compilation_probes.py":"c2c218095e11f6abbd862a08a2e9a0f493fd9704fec0079f2d8c5abc09c4707b",
-    "consumer/scope-record-functions.py":"fba31e53940e6d37f0170e89fce687a58f7b4fb4a5adf40b8f8b2f06743f3e38",
-    "inventory-collector.py":"6004b9a4aa2b2acbb7aaee8c5cbfb56e597b54c94e9e2c6716baf11b26601359",
-    "run-public-compiler-campaign-current.py":"bf4b1085c5c5f246fff3130d66b8b26f2417c3b30376ac4ef2b93ca928b0374b",
-}
-
-
 CURRENT_PRIMARY_COMPILER_TOOLS = {
     'consumer/verify_public_compilation_probes.py':'21f92a7d36cf5a4709addda7e3394c8e4cd0a1f919c8895a7fd8e43b42acc60e',
     'consumer/scope-record-functions.py':'f92309385f1eba536d88cd9adbd4eb02943a02a1be84efc808e8d0e29b724471',
@@ -4020,16 +4134,16 @@ PUBLIC_PAYLOAD_PRIMARY_COMPILER_TOOLS = {
 
 def audit_primary_compiler_tools(plan):
     candidate = compilation_absolute_path(plan["candidate"])
-    if plan.get("schema") == "chio.public-linux-primary-plan.v2":
-        authorization = plan.get("authorization_sha256",PRIMARY_AUTHORIZATION_SHA)
-        require(type(authorization) is str and authorization in {PRIMARY_AUTHORIZATION_SHA,
-            PUBLIC_PAYLOAD_PRIMARY_AUTHORIZATION_SHA},"compiled_profile_primary_authorization")
-        if authorization == PUBLIC_PAYLOAD_PRIMARY_AUTHORIZATION_SHA:
-            selected = [PUBLIC_PAYLOAD_PRIMARY_COMPILER_TOOLS]
-        else:
-            selected = [CURRENT_PRIMARY_COMPILER_TOOLS,DIRECTORY_PRIMARY_COMPILER_TOOLS,
-                        DESCRIPTOR_CUSTODY_PRIMARY_COMPILER_TOOLS,SCOPE_DEPENDENCY_PRIMARY_COMPILER_TOOLS]
-    else:selected = [PRIMARY_COMPILER_TOOLS]
+    require(plan.get("schema") == "chio.public-linux-primary-plan.v2",
+            "compiled_profile_primary_authorization")
+    authorization = plan.get("authorization_sha256",PRIMARY_AUTHORIZATION_SHA)
+    require(type(authorization) is str and authorization in {PRIMARY_AUTHORIZATION_SHA,
+        PUBLIC_PAYLOAD_PRIMARY_AUTHORIZATION_SHA},"compiled_profile_primary_authorization")
+    if authorization == PUBLIC_PAYLOAD_PRIMARY_AUTHORIZATION_SHA:
+        selected = [PUBLIC_PAYLOAD_PRIMARY_COMPILER_TOOLS]
+    else:
+        selected = [CURRENT_PRIMARY_COMPILER_TOOLS,DIRECTORY_PRIMARY_COMPILER_TOOLS,
+                    DESCRIPTOR_CUSTODY_PRIMARY_COMPILER_TOOLS,SCOPE_DEPENDENCY_PRIMARY_COMPILER_TOOLS]
     expected = [{str(candidate/"target/metadata"/name):digest for name,digest in roster.items()} for roster in selected]
     tools = plan.get("tools")
     require(type(tools) is list and len(tools) == len(expected[0])
@@ -4052,147 +4166,6 @@ def checked_primary_compiler_contract(plan, summary, authorization_raw):
             and plan.get("authorization_sha256") == summary.get("authorization_sha256") == authorization_sha,
             "compiled_profile_primary_authorization")
     return authorization,audit_primary_compiler_tools(plan),authorization_sha
-
-
-def audit_legacy_primary_compiler_probes(root, reference, sources):
-    """Require the actual finite native campaign, including its failures."""
-    evidence = artifact_json(root,reference)
-    require(type(evidence) is dict and set(evidence) == {"schema","plan","summary","dispatch_start",
-            "execution","controller","cases"} and evidence["schema"] == "chio.linux-compiler-primary-probes.v1",
-            "compiled_profile_primary_record")
-    plan, summary, dispatch = (artifact_json(root,evidence[key]) for key in ["plan","summary","dispatch_start"])
-    tools = audit_primary_compiler_tools(plan)
-    caps = {"total_seconds":900,"ordinary_seconds":120,"compiler_seconds":180,"retry":False}
-    require(plan.get("caps") == summary.get("caps") == dispatch.get("caps") == caps
-            and summary.get("status") == "passed-public-microprobes"
-            and summary.get("qualified") is False and summary.get("compiled_closure_status") == "not-established"
-            and type(summary.get("elapsed_from_first_dispatch_seconds")) in {int,float}
-            and math.isfinite(summary["elapsed_from_first_dispatch_seconds"])
-            and 0 < summary["elapsed_from_first_dispatch_seconds"] <= 900,
-            "compiled_profile_primary_execution")
-    candidate = compilation_absolute_path(plan["candidate"])
-    recorder_sha = next((source.get("sha256") for source in sources
-                         if source["path"] == "scripts/record-rust-compilation.py"),None)
-    micro_sources = [{"path":"scripts/record-rust-compilation.py","sha256":recorder_sha}]
-    micro_binding = binding(micro_sources,None)
-    require(recorder_sha is not None and summary.get("candidate") == dispatch.get("candidate") == str(candidate)
-            and plan.get("source_binding") == summary.get("source_binding") == dispatch.get("source_binding") == micro_binding
-            and dispatch.get("schema") == "chio.public-probe-dispatch-start.v1"
-            and dispatch.get("plan_sha256") == evidence["plan"]["sha256"], "compiled_profile_primary_source")
-    cases = evidence["cases"]
-    configs = plan.get("configs")
-    require(type(cases) is list and type(configs) is list
-            and [case.get("name") for case in cases] == [config.get("name") for config in configs] == list(PRIMARY_COMPILER_PROBES)
-            and type(summary.get("results")) is list and len(summary["results"]) == len(cases),
-            "compiled_profile_primary_denominator")
-    controller = evidence["controller"]
-    require(type(controller) is dict and set(controller) == {"path","sha256","size","original_path"},
-            "compiled_profile_primary_controller")
-    checked_compiled_blob(root,{key:controller[key] for key in ["path","sha256","size"]})
-    original_controller = compilation_absolute_path(controller["original_path"])
-    require(tools.get(str(original_controller)) == controller["sha256"], "compiled_profile_primary_controller")
-    original_plan = compilation_absolute_path(evidence["plan"].get("original_path",""))
-    require(original_plan.is_relative_to(candidate/"target/metadata"), "compiled_profile_primary_controller")
-    execution = evidence["execution"]
-    expected = {"command":["python3","-I","-B",str(original_controller.relative_to(candidate)),
-        str(original_plan.relative_to(candidate)),evidence["plan"]["sha256"]],"cwd":".","environment":{}}
-    # The provenance decoder normalizes contained absolute command paths.
-    audit_execution_provenance(root,execution,micro_sources,None,expected)
-    start = artifact_json(root,execution["provenance"]["start"])
-    require(start["repository"] == str(candidate), "compiled_profile_primary_controller")
-    for key in ["before","after"]:
-        pins = artifact_json(root,execution["provenance"][key]).get("explicit_file_pins",[])
-        require(any(pin.get("purpose") == "compiler-primary-controller" and pin.get("path") == str(original_controller)
-                    and pin.get("observed",{}).get("sha256") == controller["sha256"] for pin in pins)
-                and any(pin.get("purpose") == "compiler-primary-plan" and pin.get("path")
-                    == str(original_plan)
-                    and pin.get("observed",{}).get("sha256") == evidence["plan"]["sha256"] for pin in pins),
-                "compiled_profile_primary_controller")
-        require(all(any(pin.get("purpose") == "compiler-primary-tool" and pin.get("path") == path
-                        and pin.get("observed",{}).get("sha256") == digest for pin in pins)
-                    for path,digest in tools.items()), "compiled_profile_primary_tool")
-    logged = [json.loads(line,object_pairs_hook=closed_pairs) for line in checked_log(root,execution["log"]).splitlines()
-              if line.startswith("{")]
-    for case, config, result in zip(cases,configs,summary["results"]):
-        fields = {"name","result","runtime_before","runtime_after","command","original_audit_stdout",
-                  "original_audit_stderr","launcher_stdout","launcher_stderr"}
-        require(type(case) is dict and set(case) == fields, "compiled_profile_primary_case")
-        observed = artifact_json(root,case["result"])
-        require(observed == result and observed in logged and observed.get("name") == case["name"]
-                and observed.get("command") == config.get("command")
-                and type(observed.get("actual_exit")) is int and observed["actual_exit"] == 0
-                and observed.get("status") == "passed-command-and-original-namespace-audit"
-                and "observation_error" not in observed and "timeout_seconds" not in observed,
-                "compiled_profile_primary_case")
-        cap = 180 if case["name"] in {"gnu-native","musl-static-pie"} else 120
-        require(type(observed.get("command_timeout_seconds")) in {int,float}
-                and 0 < observed["command_timeout_seconds"] <= cap
-                and type(observed.get("elapsed_seconds")) in {int,float}
-                and 0 < observed["elapsed_seconds"] <= observed["command_timeout_seconds"]
-                and type(observed.get("pid")) is int and observed["pid"] > 0
-                and observed.get("process_group") == observed["pid"], "compiled_profile_primary_case")
-        runtime = artifact_json(root,case["runtime_before"])
-        require(runtime == artifact_json(root,case["runtime_after"]) == {"source_inventory_version":INVENTORY_VERSION,
-                "base_commit":None,"sources":micro_sources,"source_binding":micro_binding}, "compiled_profile_primary_source")
-        for key in ["runtime_before","runtime_after"]:
-            require(observed[key]["actual_exit"] == 0 and observed[key]["sha256"] == case[key]["sha256"],
-                    "compiled_profile_primary_source")
-        command = artifact_json(root,case["command"])
-        require(command == observed["command"][observed["command"].index("--")+1:], "compiled_profile_primary_case")
-        audit = observed.get("original_namespace_audit")
-        require(type(audit) is dict and set(audit) == {"command","actual_exit","stdout_sha256","stderr_sha256","scope"}
-                and type(audit["actual_exit"]) is int and audit["actual_exit"] == 0
-                and audit["stdout_sha256"] == case["original_audit_stdout"]["sha256"]
-                and audit["stderr_sha256"] == case["original_audit_stderr"]["sha256"], "compiled_profile_primary_custody")
-        case_root = candidate/"target/metadata/primary-observations"/case["name"]
-        scope_path = compilation_absolute_path(audit["scope"])
-        require(scope_path.name == "scope.json" and scope_path.parent.parent == candidate/"target/evidence"/case["name"]
-                and re.fullmatch(r"[a-f0-9]{32}",scope_path.parent.name)
-                and observed["runtime_before"]["path"] == str(case_root/"runtime-before.json")
-                and observed["runtime_after"]["path"] == str(case_root/"runtime-after.json")
-                and audit["command"] == ["/usr/bin/python3.12","-I","-B",
-                    str(candidate/"target/metadata/consumer/verify_public_compilation_probes.py"),"--auditor",
-                    str(candidate/"target/metadata/inventory-collector.py"),"--scope",str(scope_path),
-                    "--runtime-before",str(case_root/"runtime-before.json"),"--runtime-after",
-                    str(case_root/"runtime-after.json"),"--command",str(case_root/"command.json")],
-                "compiled_profile_primary_custody")
-        original = artifact_json(root,case["original_audit_stdout"])
-        require(original.get("schema") == "chio.original-public-compilation-probe-verification.v1"
-                and original.get("qualified") is False and original.get("source_binding") == micro_binding
-                and original.get("scope_path") == audit["scope"]
-                and original.get("coverage") == "original-namespace-public-microprobe-record-joins-only",
-                "compiled_profile_primary_custody")
-        output = checked_log(root,case["launcher_stdout"])
-        checked_log(root,case["launcher_stderr"])
-        checked_log(root,case["original_audit_stderr"])
-        samples = [json.loads(line,object_pairs_hook=closed_pairs) for line in output.splitlines() if line.startswith("{")]
-        samples = [sample for sample in samples if sample.get("schema") == "chio.public-linux-compilation-probe.v1"]
-        require(len(samples) == 1 and samples[0].get("mode") == case["name"], "compiled_profile_primary_observation")
-        value = samples[0].get("result",{})
-        name = case["name"]
-        if name == "allowed-read":
-            require(value == {"public_bytes":20}, "compiled_profile_primary_observation")
-        elif name in {"outside-read","outside-write","evidence-read","evidence-write"}:
-            require(value.get("expected_denial") is True and type(value.get("observed_errno")) is int
-                    and value["observed_errno"] in {errno.EACCES,errno.EPERM}, "compiled_profile_primary_observation")
-        elif name == "network":
-            require(set(value) == {"1","2"} and all(item.get("expected_denial") is True
-                and type(item.get("observed_errno")) is int and item["observed_errno"] in {errno.EACCES,errno.EPERM}
-                for item in value.values()), "compiled_profile_primary_observation")
-        elif name == "forged-ipc":
-            require(value == {"observed_refusal_exit":86}, "compiled_profile_primary_observation")
-        elif name == "gnu-native":
-            require(value.get("program_exit") == 0 and value.get("public_stdout") == "14"
-                    and type(value.get("commands")) is list and len(value["commands"]) == 2
-                    and original.get("verified_dispatches",0) >= 2
-                    and value.get("compiler_child_ipc",{}).get("observation")
-                        == "proc-macro-checked-original-pipe-identities-not-inherited", "compiled_profile_primary_observation")
-        else:
-            require(value.get("program_exit") == 0 and value.get("target") == "x86_64-unknown-linux-musl"
-                    and value.get("elf_machine") == 62 and value.get("elf_type") == 3
-                    and value.get("interpreter_present") is False and original.get("verified_dispatches",0) >= 1,
-                    "compiled_profile_primary_observation")
-    return {"case_count":len(cases),"coverage":"actual-primary-public-native-probe-executions"}
 
 
 def audit_current_compiled_publication(root,publication,runtime,producer):
@@ -4374,6 +4347,19 @@ def audit_dimension_compiled_profile(root, profile, candidate, sources, base_com
         # catalogue cannot supply a surrogate dimension action.
         native = audit_linux_compiled_profile(root,profile["linux"],request["linux"],report["linux"],candidate,
             sources,base_commit,rows,by_image,producer,runtime,dimension_context=context)
+    def retained_stdin_image(image):
+        exported = by_image[(image["sha256"], image["size"])]
+        raw = read_bytes(root/relative_path(exported["path"]))
+        require(len(raw) == image["size"] <= 16*1024**2
+                and hashlib.sha256(raw).hexdigest() == image["sha256"], "compiled_host_metadata")
+        return raw
+    audit_compiler_stdin_inputs(rows, request["namespace"], retained_stdin_image,
+                                publication.get("unit_publications"))
+    if profile["mode"] == "host-trusted-fresh":
+        def portable_host_tooling(image):
+            require((image["sha256"], image["size"]) in by_image, "compiled_host_tool_image")
+        audit_ordinary_host_metadata(rows, repository, Path(request["namespace"]), runtime["source_binding"],
+                                     retained_stdin_image, portable_host_tooling)
     graph = audit_compiler_unit_graph(rows,inputs,roots,compiler_immutable_externs(rows,inputs,native))
     require(graph == observed["unit_graph"],"compiled_profile_graph")
     require(all(compiler_graph_image(image) in {compiler_graph_image(root) for root in roots}
@@ -4541,16 +4527,18 @@ def audit_compiled_profile(root, profile, candidate, sources, base_commit, image
                     if image["role"] == "campaign-produced" else not Path(name).is_relative_to(repository)), "compiled_profile_inputs")
     roots = profile["roots"]
     require(type(roots) is list and bool(roots) and roots == request["roots"], "compiled_profile_roots")
+    def retained_host_image(image):
+        exported = by_image[(image["sha256"], image["size"])]
+        raw = read_bytes(root/relative_path(exported["path"]))
+        require(len(raw) == image["size"] <= 16*1024**2 and hashlib.sha256(raw).hexdigest() == image["sha256"], "compiled_host_metadata")
+        return raw
+    audit_compiler_stdin_inputs(rows, namespace, retained_host_image,
+                                observed["publication"]["unit_publications"])
     if profile["mode"] == "host-trusted-fresh":
         require(profile["linux"] is None and request["linux"] is None and report["linux"] is None,
                 "compiled_profile_mode")
         require(report["host"].get("system") != "Linux", "compiled_profile_mode")
         verified_native_inputs = None
-        def retained_host_image(image):
-            exported = by_image[(image["sha256"], image["size"])]
-            raw = read_bytes(root/relative_path(exported["path"]))
-            require(len(raw) == image["size"] <= 16*1024**2 and hashlib.sha256(raw).hexdigest() == image["sha256"], "compiled_host_metadata")
-            return raw
         def portable_host_tooling(image):
             require((image["sha256"], image["size"]) in by_image, "compiled_host_tool_image")
         audit_ordinary_host_metadata(rows, repository, namespace, runtime["source_binding"], retained_host_image, portable_host_tooling)
@@ -4646,6 +4634,10 @@ def inspect_compiler_profile_request(request_path):
                 and request["source_binding"] == inventory.get("source_binding"), "compiled_profile_source")
         extra = request["additional_inputs"]
         require(type(extra) is list and len(extra) <= 200000, "compiled_profile_inputs")
+        require(type(request["roots"]) is list, "compiled_profile_roots")
+        root_images = [compiler_graph_image(image) for image in request["roots"]]
+        require(all(not secret_source(name.lstrip("/")) for name, digest, size in root_images),
+                "compiled_profile_input_policy")
         retained_originals = []
         producer_sha = None
         if dimension_request:
@@ -4743,6 +4735,7 @@ def inspect_compiler_profile_request(request_path):
                     path,digest,size = compiler_graph_image(image)
                     require(Path(path).is_relative_to(repository/"target") and not Path(path).is_relative_to(namespace),
                             "compiled_dimension_subjects")
+                    require(not secret_source(path.lstrip("/")), "compiled_profile_input_policy")
                     held = originals.enter_context(regular_input(Path(path)))
                     identity = compiler_metadata_identity(os.fstat(held.fileno()))
                     require(identity[3] == size and identity[-1] == 1 and identity[2] & 0o111,"compiled_dimension_subjects")
@@ -4755,9 +4748,7 @@ def inspect_compiler_profile_request(request_path):
                     path = receipt[key]["path"]
                     require(compiler_metadata_identity(os.stat(path,follow_symlinks=False)) == tuple(receipt[key+"_identity"]),
                             "compiled_dimension_copy")
-        for image in request["roots"]:
-            name, digest, size = compiler_graph_image(image)
-            require(not secret_source(name.lstrip("/")), "compiled_profile_input_policy")
+        for name, digest, size in root_images:
             require(Path(name).is_relative_to(repository/"target")
                     and not Path(name).is_relative_to(namespace), "compiled_profile_roots")
             observed = originals.enter_context(regular_input(Path(name)))
@@ -4848,8 +4839,51 @@ def audit_record(root, record, expected_seal=None, source_root=None):
             "scope":"Source-bound records only. Dimension evidence must be independently reviewed; no complete-system theorem."}
 
 
+def historical_binding_v1(rows):
+    """Retained P5/P6 source binding serialization in its own versioned helper.
+
+    This is the exact historical json.dumps shape (sorted keys, tight
+    separators, default ASCII escaping) both retained inventory modules used.
+    It is deliberately isolated from the current binding envelope and never
+    imports or executes archived modules."""
+    return hashlib.sha256(json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def historical_source_rows(verification):
+    """Select retained joined source rows; malformed or duplicate rows refuse."""
+    rows = verification.get("joined_sources")
+    require(isinstance(rows, list) and rows, "historical_source_inventory")
+    paths = []
+    for row in rows:
+        require(isinstance(row, dict) and set(row) == {"path", "sha256"}
+                and isinstance(row["path"], str) and isinstance(row["sha256"], str)
+                and re.fullmatch(r"[a-f0-9]{64}", row["sha256"]), "historical_source_inventory")
+        relative_path(row["path"])
+        paths.append(row["path"])
+    require(paths == sorted(paths) and len({portable_path_key(path) for path in paths}) == len(paths),
+            "historical_source_inventory")
+    return rows
+
+
+def historical_declared_bindings(schema, verification, sources):
+    """Recompute every declared binding of one exact supported historical schema."""
+    require(schema in HISTORICAL_INVENTORY_ALGORITHMS, "historical_verification_schema")
+    if schema == HISTORICAL_P5_VERIFICATION_SCHEMA:
+        declared = verification.get("source_binding")
+        require(isinstance(declared, str), "historical_declared_binding")
+        require(historical_binding_v1(sources) == declared, "historical_source_binding")
+        return {"source_binding": declared}
+    qualification = verification.get("qualification_source_binding")
+    runtime = verification.get("runtime_source_binding")
+    require(isinstance(qualification, str) and isinstance(runtime, str), "historical_declared_binding")
+    runtime_rows = [row for row in sources if not row["path"].startswith(HISTORICAL_P6_SOURCE_PREFIX)]
+    require(historical_binding_v1(sources) == qualification, "historical_source_binding")
+    require(historical_binding_v1(runtime_rows) == runtime, "historical_source_binding")
+    return {"qualification_source_binding": qualification, "runtime_source_binding": runtime}
+
+
 def audit_historical_package(root, expected_integrity=None, source_root=None):
-    """Check frozen package bytes without loading any historical executable code."""
+    """Check frozen package bytes and recompute retained bindings without loading any historical executable code."""
     integrity_path = root / "package-integrity.json"
     raw = read_bytes(integrity_path)
     if expected_integrity is not None:
@@ -4865,8 +4899,17 @@ def audit_historical_package(root, expected_integrity=None, source_root=None):
     for artifact in artifacts:
         require(sha(root / relative_path(artifact["path"])) == artifact["sha256"], "historical_artifact_hash")
     verification = read_json(root / "verification.json")
-    sources = verification.get("joined_sources", verification.get("sources", []))
-    require(isinstance(sources, list) and sources, "historical_source_inventory")
+    schema = verification.get("schema")
+    expected_inventory = HISTORICAL_INVENTORY_ALGORITHMS.get(schema)
+    require(expected_inventory is not None, "historical_verification_schema")
+    # Retained algorithm identity is content-addressed: the sealed artifact
+    # bytes of evidence/inventory.py must match the digest pinned for the
+    # exact supported schema. Missing or substituted algorithm bytes refuse.
+    inventory = next((row for row in artifacts if row.get("path") == "evidence/inventory.py"), None)
+    require(inventory is not None and inventory["sha256"] == expected_inventory,
+            "historical_inventory_algorithm")
+    sources = historical_source_rows(verification)
+    recomputed = historical_declared_bindings(schema, verification, sources)
     drift = []
     if source_root is not None:
         source_root = source_root.resolve(strict=True)
@@ -4880,9 +4923,11 @@ def audit_historical_package(root, expected_integrity=None, source_root=None):
                 drift.append({"path":row["path"], "sealed_sha256":row["sha256"], "current_sha256":observed})
     return {"schema":"chio.historical-qualification-integrity.v1", "artifacts_verified":len(artifacts),
             "sealed_source_count":len(sources), "integrity_sha256":hashlib.sha256(raw).hexdigest(),
+            "verification_schema":schema, "historical_binding_version":HISTORICAL_BINDING_VERSION,
+            "recomputed_bindings":recomputed,
             "current_source_drift":drift if source_root is not None else None,
             "current_qualified":False,
-            "scope":"Historical byte integrity only; mutable-tree auditors are not executed and no current acceptance is inferred."}
+            "scope":"Historical byte integrity and retained binding recomputation only; mutable-tree auditors are not executed and no current acceptance is inferred."}
 
 
 def main():

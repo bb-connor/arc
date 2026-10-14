@@ -1,10 +1,13 @@
 use super::*;
 
-fn physical_fixture() -> Result<(tempfile::TempDir, Connection), Box<dyn std::error::Error>> {
+fn physical_fixture(
+    encoding: &str,
+) -> Result<(tempfile::TempDir, Connection), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     let connection = Connection::open(directory.path().join("physical-liability.sqlite"))?;
+    connection.pragma_update(None, "encoding", encoding)?;
     connection.execute_batch(
-        "PRAGMA page_size=4096; PRAGMA journal_mode=WAL;
+        "PRAGMA page_size=4096; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
          PRAGMA cache_spill=OFF; PRAGMA wal_autocheckpoint=0;",
     )?;
     let model = crate::admission_operation_store::schema::current_command_catalog_model_for_test()?;
@@ -27,7 +30,7 @@ fn physical_fixture() -> Result<(tempfile::TempDir, Connection), Box<dyn std::er
 #[test]
 fn protected_command_price_covers_actual_sqlite_wal_frames(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (_directory, mut connection) = physical_fixture()?;
+    let (_directory, mut connection) = physical_fixture("UTF-8")?;
     let scope = "d".repeat(64);
     let key = format!("native-influence-phase:{scope}:physical-output");
     let mut plan = ProtectedCommandLiabilityPlan::new();
@@ -82,9 +85,36 @@ fn protected_command_price_covers_actual_sqlite_wal_frames(
 }
 
 #[test]
+fn protected_command_price_refuses_unsupported_connection_geometry(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (_directory, connection) = physical_fixture("UTF-8")?;
+    let mut plan = ProtectedCommandLiabilityPlan::new();
+    plan.add_new_command(
+        &connection,
+        "physical-command:geometry",
+        &"c".repeat(64),
+        1024,
+    )?;
+    assert!(price_protected_command_liability(&connection, &plan)?.wal_bytes() > 0);
+    connection.pragma_update(None, "synchronous", "NORMAL")?;
+    assert!(price_protected_command_liability(&connection, &plan).is_err());
+    connection.pragma_update(None, "synchronous", "FULL")?;
+    connection.pragma_update(None, "cache_spill", "ON")?;
+    assert!(price_protected_command_liability(&connection, &plan).is_err());
+    connection.pragma_update(None, "cache_spill", "OFF")?;
+    assert!(price_protected_command_liability(&connection, &plan).is_ok());
+
+    let (_utf16_directory, utf16) = physical_fixture("UTF-16le")?;
+    let encoding: String = utf16.query_row("PRAGMA encoding", [], |row| row.get(0))?;
+    assert_eq!(encoding, "UTF-16le");
+    assert!(price_protected_command_liability(&utf16, &plan).is_err());
+    Ok(())
+}
+
+#[test]
 fn protected_command_price_refuses_quoted_catalog_changes() -> Result<(), Box<dyn std::error::Error>>
 {
-    let (_directory, connection) = physical_fixture()?;
+    let (_directory, connection) = physical_fixture("UTF-8")?;
     let scope = "c".repeat(64);
     let mut plan = ProtectedCommandLiabilityPlan::new();
     plan.add_new_command(&connection, "physical-command:catalog", &scope, 16384)?;
@@ -112,7 +142,7 @@ fn protected_command_price_refuses_quoted_catalog_changes() -> Result<(), Box<dy
 #[test]
 fn current_command_index_families_refuse_unpriced_writes() -> Result<(), Box<dyn std::error::Error>>
 {
-    let (_directory, connection) = physical_fixture()?;
+    let (_directory, connection) = physical_fixture("UTF-8")?;
     let scope = "b".repeat(64);
     let mut supported = ProtectedCommandLiabilityPlan::new();
     supported.add_new_command(
@@ -139,6 +169,10 @@ fn current_command_index_families_refuse_unpriced_writes() -> Result<(), Box<dyn
             "idx_recovery_knowledge_journal_chunk_authority",
             format!("knowledge-encoding-chunk:{scope}:{}:0000", "c".repeat(64)),
         ),
+        (
+            "idx_recovery_knowledge_join_release",
+            format!("knowledge-join:{}:0000000000000001", "d".repeat(64)),
+        ),
     ] {
         let present: bool = connection.query_row(
             "SELECT EXISTS(SELECT 1 FROM main.sqlite_schema WHERE type='index' AND name=?1)",
@@ -161,7 +195,7 @@ fn current_command_index_families_refuse_unpriced_writes() -> Result<(), Box<dyn
 #[test]
 fn protected_command_price_refuses_unpriced_temporary_triggers(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (_directory, connection) = physical_fixture()?;
+    let (_directory, connection) = physical_fixture("UTF-8")?;
     let scope = "a".repeat(64);
     let mut plan = ProtectedCommandLiabilityPlan::new();
     plan.add_new_command(
@@ -206,7 +240,7 @@ fn protected_command_price_refuses_unpriced_temporary_triggers(
 #[test]
 fn progress_preservation_refuses_temporary_global_head_shadow(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (_directory, connection) = physical_fixture()?;
+    let (_directory, connection) = physical_fixture("UTF-8")?;
     connection.execute(
         "UPDATE main.authority_global_commit_meta SET head_sequence=?1 WHERE singleton=1",
         [9007199254740990_i64],
@@ -305,7 +339,7 @@ fn physical_amounts_refuse_invalid_operands_before_balancing_totals() {
 #[test]
 fn funded_progress_cannot_spend_other_owed_event_sequences(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (_directory, connection) = physical_fixture()?;
+    let (_directory, connection) = physical_fixture("UTF-8")?;
     let scope = "e".repeat(64);
     connection.execute(
         "INSERT INTO admission_operation_recovery_records

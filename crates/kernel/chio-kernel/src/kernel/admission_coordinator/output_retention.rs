@@ -28,6 +28,14 @@ impl ChioKernel {
 }
 
 impl ChioKernel {
+    /// Whether this serving instance selected the bounded native output
+    /// program. A Process host prepares its concrete finishing source only then.
+    pub fn native_output_retention_is_selected(&self) -> bool {
+        self.native_output_retention.is_some()
+    }
+}
+
+impl ChioKernel {
     /// A fresh capture must use the exact profile selected by original admission.
     /// This local check is not loan verification: the physical native store
     /// independently authenticates and funds its complete retained phase plan.

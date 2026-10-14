@@ -206,6 +206,8 @@ pub trait ArtifactBlobPort: Send + Sync {
             "retained storage read unavailable".into(),
         ))
     }
+    /// Resolves an orphan only by its exact previously staged logical object.
+    /// Matching raw content does not establish object ownership.
     fn resolve_retained_private(
         &self,
         _object: &ArtifactObjectId,
@@ -215,18 +217,6 @@ pub trait ArtifactBlobPort: Send + Sync {
     ) -> Result<ArtifactBlobSealV1, crate::KernelError> {
         Err(crate::KernelError::DurableAdmission(
             "retained storage identity unavailable".into(),
-        ))
-    }
-    /// Staging retained archives requires independently rechecked fresh Admin.
-    fn stage_retained_archive(
-        &self,
-        _actor: &crate::recovery::AuthenticatedRecoveryActor,
-        _context: &crate::SecurityInvocationContext,
-        _object: &ArtifactObjectId,
-        _bytes: &[u8],
-    ) -> Result<ArtifactBlobSealV1, crate::KernelError> {
-        Err(crate::KernelError::DurableAdmission(
-            "retained archive staging unavailable".into(),
         ))
     }
     /// Reserve fixed return capacity before any child-derived value is known.

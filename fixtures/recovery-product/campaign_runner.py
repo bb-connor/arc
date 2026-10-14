@@ -212,8 +212,9 @@ def crew_trial(session, model, task):
         value = json.loads(result.raw, object_pairs_hook=_closed)
     except ValueError:
         raise RuntimeError("campaign.parser_error") from None
-    if not isinstance(value, dict) or set(value) - {"category", "command_id", "workflow_id"}:
-        raise RuntimeError("campaign.parser_error")
-    if value != observed.outcome.as_dict():
+    # The answer must be exactly the observed native outcome. A full product
+    # projection (effect/control/release, or a fixed error_code) is legitimate
+    # observed content; invented, altered or missing fields refuse.
+    if not isinstance(value, dict) or value != observed.outcome.as_dict():
         raise RuntimeError("campaign.parser_error")
     return value

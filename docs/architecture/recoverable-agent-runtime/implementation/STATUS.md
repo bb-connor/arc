@@ -1,605 +1,230 @@
 # Recovery runtime execution status
 
-The recoverable agent runtime implementation is present and remediation is in progress. The
-working tree is **not qualified**. Focused local passes and scoped independent
-reviews apply to their exact recorded subjects. Later source changes need their
-owning validation and review. Complete current resource-reserve, historical
-authority and qualification-source custody acceptance remains pending.
-
-The architecture cleanup establishes an explicit [storage support boundary](storage-support.md)
-and separates the [immutable historical packages](history/README.md) from maintained source.
-Unsupported experimental-format readers and duplicate command plumbing are being removed.
-These changes require current-source acceptance; the historical packages remain historical.
-
-The 2026-10-10 cleanup removes experimental admission upgrades, old checkpoint,
-restore, publication, label and flat-pin readers, modeled semantic and quota
-switches, the unused reference-overflow rebuild and cold-account adoption
-pipelines, and unreleased Python recovery aliases. Command selection, HTTP job
-ownership and Process reservation data use their shared implementations. The
-unreachable format-41 original-owner implementation and harnesses that expected
-formats 35, 36 or 40 to serve are removed. Same-format restart and historical
-signing custody remain required. Setup serves its current process-qualified
-selection with an explicit command binding; unsupported tenant-wide selection
-custody refuses without migration or reset.
-
-A supervised Hermes GLM 5.3 wave used four isolated worktrees from local
-checkpoint `75ccf4ec0`. Reviewed changes are integrated locally. The wave exposed
-and repaired a current multi-process defect: knowledge installation rewrote one
-runtime-wide enforcement marker using a second process scope, leaving the row
-and its authenticated event inconsistent. Installation now retains the original marker,
-including on repeated configuration. The shared protected writer also rejects
-scope or kind rebinding before mutation. Collection reuses its already verified
-reference inventory; duplicate obsolete collection expectations are removed.
-
-Current owning verification and scoped source reviews are recorded in
-`target/hermes-recovery-wave/`. The affected test binaries compile. All 37 owning
-Store regressions and 13 public knowledge tests pass, including the reproduced
-account failure, ownership-rebinding refusal, checkpoint retirement, independent
-collection and damaged-readiness refusal. These compiled tests bind code commit
-`3ebd52471`; the subsequent retention-test edit is formatting only. Local SDK
-checks pass: 398 Python client tests, 71 CrewAI/LangGraph adapter tests, 366
-node-http tests, 62 TypeScript conformance tests and the node-http type check.
-The egress contract, schema registry, recovery boundaries and regression-file
-deletion guards pass. These tests do not establish a live-provider campaign.
-The historical archive was reconstructed and compared against all 5,924 original
-files before their expanded copies were removed; its results remain historical.
-
-The broader Store diagnostic run recorded 1,924 passes, 41 failures and four
-ignored tests while follow-up source edits were still in progress; it is not a
-frozen-source qualification. Eleven failures passed on rerun with canonical
-`TMPDIR=/private/tmp`, preserving the production symlink rejection. Twenty-nine
-failed because their separate-filesystem rollback anchor requires `/dev/shm`,
-which is unavailable on this Mac. The remaining obsolete setup expectation was
-replaced by the current pre-mutation refusal test and passes in the owning run.
-Those reruns do not turn the earlier failed suite into a passing full suite.
-
-Acceptance remains incomplete. The ordinary unknown and delivered-denial
-original tests observed zero effects before their required native cutpoints.
-The native finishing/Process return bank remains uninstalled, and the parked
-Capture workflow-identity/cumulative-roster dependency remains excluded. C1-05
-successor ownership and setup replacement remain open. Strict Clippy still fails:
-208 Store unused-code/import diagnostics and 18 Process diagnostics, including
-unused integration code, private-interface visibility and structural lints.
-Four Store large-enum diagnostics were repaired without changing serialized
-types or proof ownership. Whole-runtime strict Clippy, Linux, live-provider,
-formal and hosted-CI qualification are not claimed. No register finding
-is closed by deletion size, source review or a refusal before its required
-cutpoint. No wave changes have been pushed.
-
-The authoritative original inventory is
-`target/recovery-safety-remediation/all-findings/ledger/findings-ledger.json`
-(`recovery-findings-inventory.v1`, 158 original IDs). It preserves original,
-merged and predecessor IDs and their distinct obligations. Later independent
-findings are tracked separately. The original reviews remain at
-`target/recovery-review/REPORT.md` and `target/recovery-review-2/REPORT.md`.
-The second review's three P1 findings and its P2/P3 findings remain historical
-review results. The first review's four P1 repair results do not establish
-completion of later reviews or findings introduced during remediation.
-
-The [tracked review register](review-register.md) reconciles current per-ID
-status, historical scoped dispositions, later findings and candidate-only
-defects. The [execution procedure](remediation-execution.md) governs integration
-and closure. Original independent dispositions remain in
-`target/recovery-pr/current-review-followup/current-reviewed-dispositions.json`.
-The register retains their exact immutable catalog paths and JSON pointers,
-source/evidence references, accepted local dimensions and remaining obligations.
-The original canonical catalog and earlier progress captures remain immutable.
-Source-only finding closure and scoped native passes do not establish whole-tree
-qualification or release readiness.
-
-The original canonical remaining matrix is
-`target/recovery-safety-remediation/all-findings/report/proof-catalog/20261006T232459.739266Z/canonical-all-findings-remaining-matrix.json`.
-Its historical null dispositions are superseded only by explicit current per-ID
-review dispositions. It is not a current source freeze. Later introduced findings
-and their independent reports remain separate until the owning catalog joins
-those exact IDs.
-
-The retained P5/P6 completion flags describe their archived source bytes and
-supported profiles. They do not establish qualification for naming changes,
-runtime repairs, tooling changes or documentation edits. Historical records,
-failed attempts, missing outcomes, archives and seals remain as retained. The
-published P6 package has two explicitly documented metadata redactions; their
-original and published hashes remain in [the redaction note](history/README.md).
-The original seal is not rewritten to accept those published bytes.
-
-At the cumulative review snapshot, 113 of the 735 P6-qualified source paths
-differed: 79 changed in place and 34 were renamed, including eight renames with
-identical bytes. The review attributed that snapshot's drift to the naming
-cleanup. Subsequent repairs add further drift; 113 is a historical count, not a
-current inventory. The retained P5 and P6 read-only package auditors refuse the
-working tree. P6 refuses at `qualification.live_runtime_sources`. Updating
-metadata to reuse old runs would not qualify the changed implementation.
-
-## Source drift at the recorded commit
-
-At source commit `c5f53a96dbfc836bfc42805c2fee2d393dd78821`, 581 of the 735
-original paths in the retained [P6 verification inventory](history/README.md)
-do not match. This compares Git commit objects with the historical
-`chio.recovery-p6-verification.v1` record created at
-`2026-10-05T16:05:08.880789+00:00`, with runtime source binding `b1bcd48c` and
-qualification source binding `3a13a9bc`. The inventory file SHA-256 is
-`a9d5b2517f194f10105d9d1889161948987fe9f14add9f6f7218378b49cb6e1b`.
-
-| Original inventory path at that commit | Count |
-|---|---:|
-| Present with identical bytes | 154 |
-| Present with changed bytes | 547 |
-| Absent at its original path | 34 |
-| Total original paths | 735 |
-
-All 34 absent original paths have existing successors explicitly declared in
-`target/source-naming-review/renames.json` (SHA-256
-`072ae142ca4a921511399633e45352d960c2e0aac814f7e277640470d1158e7c`).
-Four successor files retain the historical bytes; 30 have different bytes.
-These are declared path correspondences, not inferred semantic equivalence.
-The 34 missing original paths remain counted separately above.
-
-Reproduce the original-path counts from the checkout root. This reads the named
-commit's inventory and source objects, independent of working-tree edits:
-
-```sh
-python3 -I -B - <<'PY'
-import hashlib
-import json
-import subprocess
-
-revision = "c5f53a96dbfc836bfc42805c2fee2d393dd78821"
-inventory_path = "docs/architecture/recoverable-agent-runtime/implementation/p6/verification.json"
-def git(*args):
-    return subprocess.check_output(["git", *args])
-inventory_bytes = git("show", f"{revision}:{inventory_path}")
-inventory = json.loads(inventory_bytes)
-paths = set(git("ls-tree", "-r", "--name-only", revision).decode().splitlines())
-counts = {"unchanged": 0, "changed_at_original_path": 0, "missing_original_path": 0}
-for entry in inventory["joined_sources"]:
-    path = entry["path"]
-    if path not in paths:
-        counts["missing_original_path"] += 1
-    else:
-        actual = hashlib.sha256(git("show", f"{revision}:{path}")).hexdigest()
-        counts["unchanged" if actual == entry["sha256"] else "changed_at_original_path"] += 1
-print(json.dumps({"revision": revision,
-                  "inventory_sha256": hashlib.sha256(inventory_bytes).hexdigest(),
-                  "original_paths": len(inventory["joined_sources"]), **counts}, indent=2))
-PY
-```
-
-The additive [path drift record](../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/measured/source-drift.json)
-lists every original path and declared successor. The [current anchor overlay](../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/measured/current-anchor-overlay.json)
-resolves all 243 retained P1/P4/P6 coverage references on this commit, with
-current source hashes and declaration or literal locations. Its [source manifest](../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/measured/current-source-manifest.json)
-binds the inspected Git objects. The [measurement command](../../../../target/recovery-pr/current-review-followup/runtime-integration-successor-20261009/evidence-documentation-continuity/measurement-command.json)
-records the local reader, arguments and output hash. These are source and
-documentation observations. They preserve the original coverage records, seals,
-execution results and behavior-review uncertainties; they do not qualify the
-current source or turn missing historical paths into passing package checks.
-
-Current guided setup uses the [source-bound operator procedure](protected-setup-operations.md), including its original-denial prerequisite, quiet source window, retained legacy disposition and logical call accounting. Historical phase contracts and acceptance records keep their original source scope.
-
-## Current remediation evidence
-
-The [current source correspondence and reproduction guidance](current-reproduction.md)
-links the additive coverage overlay and current command declarations. The overlay
-resolves historical locators and checks source hashes; it does not rerun their
-historical tests or convert archived completion flags into current acceptance.
-Changed containing-source bytes require their own behavior review.
-
-Captured Source39 Linux behavior is independently indexed at
-`target/recovery-safety-remediation/linux-acceptance/behavior-source-capture.ddff5266e101/source39-owning-baseline-completion.json`
-and its separate completion readback. That subject completed the 16-row
-preparation, Store's 1,908 passes with five declared ignored cases, and the strict
-72-case challenge including 27 probes and ten helper mutations. Its native
-18-case recovery run retained five passes and thirteen failures. The earlier
-900-second transfer failure, prerequisite failures and image-permission failure
-remain preserved. These Source39 observations do not qualify later source bytes
-or replace later source/profile-bound Linux acceptance.
-
-### Current callback ownership and constructor repair
-
-The maintained workspace now selects an unpublished rusqlite 0.39.0 path
-package. It preserves the published source and MIT license, and converts scalar,
-aggregate and window function names before transferring callback ownership to
-SQLite. Conversion errors and panics therefore drop the Rust captures. An
-independent Source review approved this narrow ownership repair. Real GNU/Linux
-controls recorded nine conversion-cleanup failures in the original code, then
-31 passes with window functions and 20 with the workspace feature set in the
-repair. These runs used the real library and bundled SQLite 3.51.3 with an
-isolated control manifest. They do not qualify every upstream feature or target.
-
-The unused retained-request profile constructor is now test-only. Independent
-Source review confirmed its actual callers. The current maintained code
-composition compiled all five owning library test targets on GNU/Linux with
-Rust 1.95 and PQ enabled for the kernel, store and control plane. Its manifest is
-`de67c1ddfd12b9a6883fed15c3751d5afc0b9242be9f5fa31b1f99d4f82e061c`.
-Ten exact kernel request, authority-profile and caller-custody controls passed.
-The default kernel library also passed strict Clippy with warnings denied.
-The unchanged five executable images were separately preserved and hashed.
-
-The first metadata attempt refused an uncached Android dependency before
-compilation. A separately recorded GNU-targeted resolution passed with the same
-source and lockfile. After successful compilation, the initial image-preservation
-attempt exceeded its existing evidence directory's bound. Its refusal and
-partial images remain retained; the separate owned preservation passed within
-the unchanged limits. The first owning-test selector inventory also refused
-before execution; its successor matched and executed all ten exact source names.
-These records are under
-`target/recovery-pr/current-review-followup/rusqlite-current-workspace-composition/`.
-The earlier hosted constructor failures still require checks on the resulting
-commit. The Process read-source failure and Kani compiler failure remain open.
-No full owning-suite, funded Native, current historical-authority or P5/P6
-qualification follows from these scoped results.
-
-The maintained callback implementation also handles SQLite's zero-argument
-null pointer without constructing an invalid Rust slice. Its exact reviewed
-helper and three callback conversions preserve every other production byte.
-Six new argument controls and all 216 owning library tests passed on macOS,
-with zero failures or ignored cases, followed by strict library Clippy. The
-separate uninstalled authorizer composition passed the actual STAT4 trigger
-and all 231 owning library tests on macOS. These are scoped local results;
-GNU/Linux acceptance of these changed callback bytes and whole-runtime
-qualification remain pending. Exact sources and logs are retained under
-`target/recovery-pr/current-review-followup/maintained-empty-callback-repair-20261009T0612/`
-and `target/recovery-pr/current-review-followup/local-callback-empty-boundary-20261009T0600/`.
-
-### Formal result accounting
-
-The public Kani gate now requires exactly one matching harness and exactly one
-successful completion record after a successful compiler process. Empty output,
-ambiguous selections, compiler errors and failed verification refuse. Six new
-Python controls passed in normal and optimized modes; the retained lifecycle,
-enrollment and workflow source checks also passed. The public-core shell source
-controls passed on GNU/Linux. The Mac attempt refused its older Bash without
-`mapfile`; that result remains retained. These checks use source inspection and
-test doubles. They are not Kani proofs.
-
-The hosted Kani 0.68.0 compiler expects an integer return from `catch_unwind`,
-while its selected nightly Rust intrinsic returns a boolean. That intrinsic is
-also unimplemented in the selected verifier. Correcting the diagnostic alone
-would not establish callback or unwind semantics. A supported compiler solution
-and all 49 original PR proof obligations remain open. The static TLS explanation
-is supported by pinned primary source; the specific first compiler traversal
-still needs an actual trace. The source investigation is retained under
-`target/recovery-pr/current-review-followup/api-kani-public-intrinsic-repair/`.
-
-### Current payment validation and strict FIPS check
-
-The disputed-payment match now uses a guarded refusal arm and retains a separate
-successful disputed arm. This preserves accepted recovery states and avoids the
-Clippy nested-match diagnostic. Its exact payment-source composition, manifest
-`40985a9df6918a777c587451a741eff2c6374a2daf4c6d73b55e8cfb37dd4cd4`,
-ran all 53 owning commerce tests on GNU/Linux with zero failures or ignored
-cases. The owning package then passed strict Clippy for all targets.
-
-The full strict FIPS dependency check progressed past that diagnostic and failed
-with 257 SQLite store errors. The original compiler log, exact diagnostic
-inventory and separate owning Clippy acceptance are retained under
-`target/recovery-pr/current-review-followup/linux-current/commerce-payment-lint-20261008T2350/`.
-Unused finishing implementations and the remaining structural lint findings are
-open. The lint gate and the original failure remain intact. This narrow payment
-repair does not qualify the FIPS dependency graph or recovery runtime.
-
-### Current Linux compilation and targeted controls
-
-The October 8 native GNU/Linux build compiled the five library test targets for
-the kernel, Process, control plane, SQLite store and SQLite file identity on
-Rust 1.95. The kernel, control plane and store included PQ support. Its frozen
-source manifest is
-`d03e9412fe671ddc53fdebb5db7aaf8d5aef218ebf35dfad5714cd935c40321f`.
-This is compilation evidence for that subject, not a passing execution of its
-registered test inventories or a Clippy result. The five executables were
-hashed and copied before another cache writer was authorized. The older PQ
-producer was separately protected before the current compiler ran.
-
-Its full kernel library subsequently executed all 1,502 registered cases:
-1,499 passed, three failed and none were ignored. Two failed because a modeled
-input fixture had not implemented the new mandatory classified acknowledgment
-port. That fixture repair preserves the owning assertions, passed both exact
-owning cases on Linux and received an independent Source-only review. Its
-acceptance is limited to the modeled Kernel unit fixture. The third failed the bounded
-raw canonical-output contract because early byte-budget exhaustion returned the
-wrong error category. The repaired mapping passed that original assertion and
-all four retained-envelope controls on Linux, with independent Source review.
-The original full-suite failure remains retained. A subsequent isolated
-composition ran the full Kernel library with 1,502 passes, zero failures and no
-ignored cases. That composition includes the fixture and encoding repairs plus
-test-only numeric SQLite-read diagnostics. Its exact subject and original logs
-are retained under
-`target/recovery-pr/current-review-followup/linux-current/connection-authorizer-denial-diagnostic-20261008T1610/`.
-The corrected Native producer composition still requires execution.
-
-The independent Source review approved an isolated, feature-gated reconciliation
-observer. Its source manifest is
-`a9f141e0e70877b7791716303d37b7d8dab274eebfb2f34a89bd6b13d0ad95d9`.
-That subject compiled and passed four observer unit tests and five pressure
-controls. Three exercise actual SQLite files and WAL; two check observation or
-headroom predicates. The file controls include an unreleased reader, recovery
-after reader release, checkpointed WAL high-water allocation and writes against
-a valid sparse database larger than 2 GiB. The first control driver misparsed the
-expected-panic test's split libtest output. Its failure is retained; the original
-test exited zero with exactly one pass, and the successor executed the remaining
-seven cases. These controls do not establish funded native capture, settlement
-or release at capacity.
-
-Two independently created old-build captures retain failed current-signer
-regressions at the unchanged 90-second deadline. The first used the frozen
-baseline. The second used the observer subject. Both producers reached the
-genuine return-recorded crash point, both original roots remain retained, and
-both timed-out consumers were reaped. Each test reached its initial terminal
-custody assertion and a genuine current denied call before the later custody
-reconciliation timed out. Neither case is a passing key-rotation gate. The
-observer recorded repeated imported-source and native-history verification;
-Source reuse repairs still require their own review and runtime acceptance.
-
-A separate 29-path reader and fixture composition compiled and passed the two
-Kernel fixture cases and 21 authored reader tests. Independent review blocked
-the reader: authorizer ownership allowed nested cleanup to invalidate an outer
-snapshot, absence helpers skipped Source binding and rehashed middle-event
-tests could mask their named validator. Those are one P1 and two P2s in an
-uninstalled candidate. Passing its current tests does not satisfy the missing
-regressions. The original review, compiler and tests remain retained under
-`target/recovery-pr/current-review-followup/linux-current/snapshot-history-reader-20261008T1512/`.
-The reader remains isolated while actual connection-owned hook leases and the
-other findings are repaired and reviewed.
-
-The expanded connection-owned composition compiled all five owning library
-targets. Nine lease controls and two attached-state controls passed. Its genuine
-history fixture failed during store initialization, before its intended
-corruption assertions. Independent review also identified a copy-fixture
-incompatibility with the production ATTACH refusal and a generic FFI destructor
-panic crossing the C ABI. A two-leaf successor preserves that refusal, copies
-through a separate read-only fixture handle and contains unwinding at the FFI
-boundary. Independent Source review approved those corrections. Their actual
-affected execution and the store-initialization failure remain under diagnosis;
-the reader has not been installed in the working tree.
-
-The subsequent isolated composition compiled all five libraries and passed 29
-history-reader controls, 11 connection-authorizer controls, three attached-state
-controls, the original raw canonical-output contract and four retained-envelope
-controls. The attached-state parent test also executed its otherwise ignored
-subprocess helper. These 48 scoped passes retain their exact source manifest
-`366fc5d02d2837a29c367f0c785f9adf4e2228f300f1d0a6be8cd9d730204bb4`.
-Independent Source review approved the bounded sentinel and its exact-query
-coverage. Its full owning store-library run reached the fixed 1,080-second limit
-without completing: the retained output records 615 passes and 17 failures.
-Three exact follow-ups also failed. They exposed a deliberate-corruption fixture
-blocked by foreign-key enforcement, fault fixtures blocked by the managed TEMP
-authorization boundary, and a restore fixture blocked by the serving handle's
-ATTACH refusal. The original failures remain retained; the scoped passes do not
-establish a passing owning-library result.
-
-Two later isolated inventory compositions compiled all five libraries. The first
-recorded 56 scoped passes and one failure caused by a removed SQLite builtin
-override leaving an unusable function registration. Its successor closes and
-reopens the fixture handle and recorded 63 scoped passes with no failures. An
-otherwise ignored attached-state subprocess helper was executed by its owning
-parent. Their exact subjects and original exports are retained under
-`target/recovery-pr/current-review-followup/linux-current/history-inventory-cost-20261008T1817/`
-and `history-inventory-proof-controls-20261008T1855/` in the same directory.
-Neither composition is installed in the working tree. Independent dependency
-review still blocks read-role acceptance on raw SQLite authorizer displacement
-and execution through overridden builtin function names. Complete caller and
-dependency closure also remains open. The task host completed its fixed stop
-at 19:11 UTC; the protected binaries, all five original capture roots and original
-exports remain retained.
-
-A third genuine old-build capture exposed a missing `zeroblob(0)` builtin in the
-bounded retained-output projection. Its startup failure remains retained. After
-that repair, a fourth independently created capture still timed out at the
-unchanged 90-second consumer limit. A fifth fresh diagnostic capture reached
-private terminal custody under the changed signer, completed a genuine current
-denied call and then timed out during repeated reconciliation. Both processes
-were reaped. The diagnostic run does not establish the uninstrumented gate.
-Every original root remains retained without replay. Current evidence and logs
-are under
-`target/recovery-pr/current-review-followup/linux-current/connection-authorizer-sentinel-20261008T1718/`.
-Historical-authority acceptance remains open.
-
-Commit `491bd01b5683315b8c6d347f132ee71fb64428f5` was pushed to the draft recovery
-PR. Hosted CI on its merge subject reported failures in the owned JavaScript
-source gate, strict file-identity Clippy and the actual Process admitted-return
-Source test. The JavaScript failure exposed nine reviewed browser distribution
-files excluded by the SDK's `dist/` ignore rule; their bytes match the existing
-review manifest and all 22 local security controls passed. The file-identity
-Clippy repair passed strict Clippy and its four owning tests. Their successor
-hosted results remain pending. The Process Source failure is an open integration
-obligation, not a fixture assertion to remove. Workspace formatting was also
-repaired; none of these checks qualifies the complete recovery runtime.
-
-Commit `8343749a211997b0def8b57308b06a28d41ba1b7` published those reviewed browser
-bundles and strict-check repairs. Its hosted dependency audit then identified
-two newly published Next.js advisories against 15.5.26. The current SDK manifest
-and lock select the upstream 15.5.27 security patch without waiving those
-advisories. Nine local adapter controls and eight advisory-wrapper controls
-passed. The local installed Next.js package was not replaced by the lock-only
-update, so those controls do not establish patched Next.js runtime behavior.
-A fresh hosted scan of the successor bytes remains required.
-
-The current bounded-sequence decoder rejects an excess element before entering
-that element's deserializer. Its regression failed on the original decoder and
-passed after repair; all 62 owning security-types tests, strict Clippy and the
-Rust 1.93 `no_std` library check passed. Independent Source review found no
-concrete P0/P1/P2 in that narrow repair. These results do not qualify the recovery
-reader, native funding or the complete runtime.
-
-The original build and first capture export is retained under
-`target/recovery-pr/current-review-followup/linux-current/current-baseline-source-package-20261008T1253/`.
-The observer build, all nine control records, original parser failure and second
-capture trace are retained under
-`target/recovery-pr/current-review-followup/linux-current/reconciliation-observer-20261008T1422/`.
-Their separately verified exports contain 33 and 77 original members,
-respectively. The protected executables and databases remain on the task host.
-Neither export qualifies the whole working tree.
-
-`NATIVE-FUNDING-AVAILABILITY-01` is a current open P1 integration blocker:
-`finishing_funding.rs` refuses fresh authenticated native external authorization
-because the complete initial finishing bank has not been installed. The refusal
-preserves the authority boundary, but it disables useful fresh native delivery.
-Partial Source constructors, conservative price calculations and negative
-controls do not satisfy this obligation. Its additive record is
-`target/recovery-pr/current-review-followup/current-native-funding-integration-blocker-20261008T1433.json`.
-The original per-ID dispositions remain unchanged by these targeted controls.
-
-### Earlier selected local subject
-
-The protected local executable with SHA-256
-`31f5d1da430571df1e4cbb0ba2def01ab3cb2ca32b08ae407e66e386d62649bf`
-contains 1,510 registered tests. Registration is not execution of that inventory.
-Its completed selected queues are
-`target/recovery-safety-remediation/all-findings/native-delivery-admin-scoped-successor-queue-1.json.results.json`
-and `native-delivery-admin-scoped-successor-queue-2.json.results.json` in the same
-directory. Narrow passes include the legacy-annotation replay refusal, two
-completed-delivery controls, two operator-retirement controls and three mandatory
-setup policy cases. The historicalTop preview case is explicitly modeled.
-
-Those queues also retain real status-floor, native policy-witness, native
-submission-capacity, stale setup replacement, coverage and denial-mediation
-failures. The checkpoint group passed 16 of 19 cases; its other outcomes retain
-their target or prerequisite classification. A private-finality case failed
-before its intended owning boundary. Complete current finding dispositions
-remain pending. Source successors after these tests are not validated by the
-earlier executable.
-
-Genuine historical compatibility has a separate narrow positive: an isolated
-schema-35 executable captured 17 approvals, and a current consumer preserved
-those bytes and settled the captured operation once. The independent review is
-`target/recovery-safety-remediation/authority-review/all-findings/genuine-seventeen-campaign-review-20261006T224221Z/REVIEW.md`.
-It supports retained approval cardinality and positive upgrade/finalization
-compatibility. HistoricalTop acceptance, key or policy rotation, downgrade
-refusal, near-capacity recovery and full compiler/source closure require their
-own evidence. Disclosed SHM and empty-WAL changes remain explicit.
-
-Earlier local repairs remain at `target/recovery-remediation/REPORT.md`. Their
-130-test recovery and 100-test process results, focused checks and scoped reviews
-describe that earlier repair subject. Subsequent reviews, repairs and introduced
-findings require separate evidence. Normal Cargo builds and stable source
-vectors protect a local regression subject; complete per-unit compiled-source
-and dependency authority is still pending.
-
-## Retained historical qualification
-
-The [P5 verification](history/README.md), [review](history/README.md),
-[review manifest](history/README.md) and
-[operating contract](history/README.md) record local and real Linux acceptance for
-the bounded Boolean-only, model-disabled, no-provider GNU/musl profile.
-Its 643-source binding is
-`562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4`.
-The [final source archive](history/README.md) has SHA-256
-`85c9c7f4903c3a3c8a9e89c89141ade9a23caf3b1ad3120b0a4d42284d801085`.
-At that binding, the record retains 46 local gates, ten real recovery cases,
-72 cage tests, 27 required runtime probes, ten actual helper mutants and eleven
-measured images. The fresh review and the author's fix pass retain their separate
-source scopes; final fixes did not receive a second fresh-context review.
-
-The [P6 verification](history/README.md), [review](history/README.md),
-[review manifest](history/README.md),
-[supported matrix](history/README.md) and
-[read-only reproduction instructions](history/README.md) record the bounded native
-Rust/SQLite product composition, guided CLI setup, classified policy maintenance,
-reserved settlement, pinned LangGraph/CrewAI integration and finite comparative
-workloads. The recorded bindings are:
-
-- Runtime:
-  `b1bcd48cadb7b9c7f1ff5dd4ad8d9910056590e22058527756114e21239c1063`.
-- Final 735-source qualification:
-  `3a13a9bc599e426b281f50a1fae03b37ca2fd673cfe08e5db5c7a0112d17199e`.
-- Original 733-source fresh-review scope:
-  `0ae9c64641df39623275e33f3dc0ff48a917eb036605c17b1a06007b9492317f`.
-
-The [P6 final source archive](history/README.md) has SHA-256
-`2cfee4369eb9ff0b0afa75f5a2b8213cba9e00a403221f654b85149bb28b092a`;
-the [original reviewed archive](history/README.md) has SHA-256
-`88d4f34b6cbc8f27519ce9d8102f531928d2c63961db1a22df5d6ac38aa14036`.
-The original review's two P1 findings and the author's single test-first fix pass
-remain explicit. Final fix bytes were not assigned a second fresh-context review.
-Recorded closure concerns that scope and those findings, not the later cumulative
-review or current repair bytes.
-
-At the recorded bindings, P6 retains 33 local gates and four complete Linux
-suites. The top-level Store summary in
-[evidence/final-linux-postfix/store-full.log](history/README.md)
-records 1,831 passed and four ignored; its nested invocation remains separately
-recorded. Recovery, kernel and CLI summaries retain 122, 1,460 and three passes
-respectively, with zero failures. The immutable archival parser's 1,832 Store
-count remains preserved in its original records.
-Its package records retain nineteen package tests, fourteen pinned framework
-harness tests, eight actual provider-free native preflights, thirteen rejected
-package corruptions and fourteen restored positive audits. These are historical
-results; renamed commands and stale source bindings prevent treating them as
-current passing gates.
-
-The historical final live cohort retains 46 complete, 44 refused and six
-skipped-tool outcomes across 96 trials, with all sixteen positive strata passing
-the predeclared threshold. All five attempts retain 480 planned slots,
-435 measurements and 45 unknown slots. Earlier failed cohorts and the
-25 unavailable request-content gaps remain nonqualifying. Unknown outcomes do
-not count as measured zero or establish safety for all planned trials.
-
-The retained E6 performance summaries report P0 p95 128,652,683 ns and P6 p95
-142,600,820 ns against the matched ceiling of 155,383,219 ns and original absolute
-ceiling of 220,683,049 ns. The four pure budgets passed at their recorded sources.
-Failed E4 and Mac measurements remain failed for their profiles. The cumulative
-review also records missing raw latency samples; percentile summaries do not
-fulfill that missing evidence requirement.
-
-## Current evidence boundaries
-
-| Dimension | Current qualification state |
-|---|---|
-| Code review | Independent reviews bind exact source, control or executable scopes. Every original and later finding needs its complete source-bound disposition. Historical or focused reviews do not establish a clean review of the current tree. |
-| Local verification | Selected native, Store, pure, SDK and tooling cases have recorded passes and mixed failures. Current successors still need their owning tests and complete affected suites. Failed compilers, prerequisite fixtures, ignored cases and commands selecting zero tests remain explicit. Complete compiled-source authority is pending. |
-| Linux acceptance | Historical P5/P6 results apply to their archived bindings and profiles. Captured Source39 preparation, Store and strict challenge completed; its native 18-case run retained five passes and thirteen failures. Earlier failed and unexecuted attempts remain separately recorded. Later Linux results require their own source/image joins; complete qualification of the final current profile is pending. |
-| Live providers and host comparisons | The finite P6 campaign is historical. Current model-free and mocked-delivery framework controls have explicit limits. Current live-provider cohort and host comparison qualification remain pending. |
-| Formal assurance | The captured primary Lean command passed on 265 held formal/script/claim inputs; its broader runner exited 86 for concurrent source drift. That bounded subject is historical. Rust refinement, complete SQL/two-store/provider proofs and final whole-source formal qualification remain pending. |
-| Performance and adoption | Retained measurements bind their source/profile inventories. Current performance, raw samples and adoption applicability remain pending. |
-| Hosted CI | No current-candidate hosted CI qualification is recorded. Required hosted checks remain separate from local verification. |
-| Production | No deployment, production migration or operational acceptance is recorded. The current tree has no production qualification. |
-
-## Remaining work
-
-1. Resolve, explicitly refute or deduplicate every original finding and all later
-   independent findings, preserving each original ID and its distinct
-   obligations. Bind each disposition to actual proof or appropriate source-only
-   evidence and independent final-source review.
-2. Freeze the new source inventory, executable/dependency closure and supported
-   profiles after repairs. Supply runnable current commands, per-ID proof maps
-   and recorded source successors. Retain old commands, hashes, original
-   reviews, failed runs and missing outcomes as historical evidence.
-3. Run owning regressions, complete affected suites and declared local/Linux
-   qualification gates on the new candidate. Preserve every failure, skip,
-   prerequisite problem, unavailable check and zero-test selection. Source-only
-   and modeled checks do not fulfill native enforcement gates.
-4. Establish new source/profile-bound provider, performance, raw-sample,
-   framework and formal/refinement evidence for each dimension claimed. Any
-   reused measurement needs an explicit applicability argument.
-5. Audit the new candidate without modifying the P5/P6 seals or archives.
-   Hosted CI, release integration and production acceptance remain separate
-   gates after candidate qualification.
-
-The architecture roadmap ends at P6. The current work is remediation and
-requalification. Release integration follows a qualified candidate with positive
-current P5 Linux acceptance. Expanded providers, platforms or confined channels
-require their own specified acceptance scope. There is no roadmap P7.
-
-[Cloud cleanup evidence](history/README.md) records the task-owned resources and their
-observed terminal/restored states when captured. It is retained historical
-evidence, not a fresh inspection of current cloud state.
-
-### Local Store idiom repairs
-
-Nine independently reviewed Store replacements preserve wire names, SQL,
-checked arithmetic, short-circuit order and history iteration behavior. Their
-exact GNU/Linux composition
-`dd4bddc0073f6488e716a489249c66ef4ba485a0339e41494261f1867482bc46`
-compiled all five owning library test targets. The retained original assertions
-passed in 38 cases, including the corrected six-case codec selector. The earlier
-empty selector was refused and remains recorded.
-
-The exact strict FIPS diagnostic comparison removes only the nine targeted
-path/message pairs, introduces none, and leaves 248 errors. Strict Store
-all-target Clippy still reports 401 errors. Neither command passes. Seven
-additional recovery controls failed before their declared capture cutpoint or
-because their measured reader was missing. Those actual failures remain open
-and receive no acceptance credit. These observations are retained under
-`target/recovery-pr/current-review-followup/linux-current/store-local-idioms-composition-20261009T0050/`.
-This narrow change does not complete the review, establish funded Native
-availability, or qualify the current runtime.
+The implementation is **not qualified and not ready to merge**. The current
+uncommitted candidate is based on `75bb56bb96f1e53795bafc577bdcaa1c6557e4ef`.
+The branch has not been committed or pushed in this continuation. Unpublished
+local checkpoints preserve the complete candidate and original index state;
+hosted CI does not cover these working-tree changes.
+
+The [review register](review-register.json) is the authoritative inventory and
+working queue: **11 P1, 74 P2 and 89 P3 remain open**. It separately records
+141 currently applicable scoped closures, 38 historical scopes requiring
+revalidation, two superseded support obligations and 44 candidate-only records.
+Original findings and historical dispositions remain preserved.
+
+## Supported implementation
+
+The [storage boundary](storage-support.md) supports admission format 44 and
+pre-recovery upgrades through format 34. Intermediate experimental formats 35
+through 43 refuse without mutation. Their removed readers and harnesses are not
+compatibility commitments. Same-format restart, retained signed custody and
+supported pre-recovery data remain required.
+
+Kernel owns authority and signed decisions, Store owns fenced durable state,
+and Process owns execution and physical custody. A native effect requires its
+original admission lifecycle and a genuine before-effect finishing account.
+Planners, logical capacity counters and setup records cannot provide that authority.
+
+## Current integration stage
+
+`C1-02` is accepted at `55dcab8c` after its original four-action stale-owner
+control passed 1/1 and its setup/output fresh-owner progress complements passed
+2/2, on the same current binary and source pins. Independent review confirms
+the original scope; completed-native-output delivery is not claimed. This brings
+the continuation to one P1 and 36 P2 scoped closures.
+
+The current production source checkpoint is `a4443a0b`. Current owning
+compilation passed, followed by Kernel authority 13/13, Process custody 3/3,
+checkpoint/audience 3/3 and the actual-clock checkpoint observer 1/1. The repaired
+Store compaction controls passed 4/4 on their freshly compiled `fe160500` source.
+The earlier Knowledge 4097 run also completed. These results do not establish
+the original native-positive P1 obligations or a whole-runtime pass. Strict
+Clippy remains failed with retained missing-integration diagnostics; financing
+is permitted source work, not a blanket parked contract. Exact executed source,
+commands, results and limits remain in `target/recovery-execution-status.json`.
+
+The original `263703e` contracts Cargo command exited 0, but export exited 1:
+three `stdin_crate_name` refusals never dispatched the compiler. The reconstructed
+rustix argv matches all three invocation hashes
+`be37c8bc53eb6968f2701af562fe1749ffaf18f42c3730c3e5c7a36469e0f362`;
+it does not restore missing historical stdin or argv capture. The recorder repair
+subsequently passed its focused actual compiler control. A later original
+producer stopped at automatic disk protection before Cargo, inspector and export
+completion. Required downstream acceptance remains open. Broad qualification is
+suspended until the central production lifecycle works. C1-01's private
+diagnostic established missing original output retention; selecting a genuine
+profile then requires the unimplemented SQLite preparation. Neither P1 closes
+from generic passing controls.
+
+The native lifecycle owner is implementing SQLite account preparation,
+enrollment, confirmation, restoration and funded writes together with the real
+Process provider and production caller. The earlier assertion that this entire
+contract depends on parked Capture work was not established and is withdrawn.
+The complete post-effect writer and payer inventory must come from actual
+owners and reservations. Compatible exact-catalog format-44 transitions are
+implementation work and must preserve signed data and crash recovery. Capture
+workflow-identity/cumulative-roster work and its rejected review, controller
+work and excluded provider campaigns remain restricted. The live queue records
+those boundaries separately from missing implementation and pending execution.
+
+Earlier milestones below retain their original candidate and execution limits.
+
+The earlier accepted source candidate `6d312a1920bebcb3fd53479b37a385deaf398e70`
+adds 23 original scoped P2 closures after actual execution and independent review:
+`NS-01` through `NS-05`, `CR-04`, `CR-R1-01`, `SO01` through `SO08`, `QF-01`,
+`QF-08`, `V3-I01`, `V3-I05`, `V3-I09`, and `SPI-01` through `SPI-03`.
+That stage had closed one P1 and 35 P2s. The affected verifier controls
+passed 36/36 in normal and optimized Python; the publication consumer passed
+four in each mode. Original recorder, builder and retained unqualified-package
+controls remain bound through unchanged dependencies and independent continuity
+review. These are the original host publication and parser scopes, not native
+or release qualification. The register's additive `current_review` fields bind
+the sealed reviews and execution results. `NS-06`, `QF-10`, `CP-F01` and
+`I-evidence-qualification-02` remain unchanged by this batch.
+
+`CP-F02` closes after eight current host/inspector controls and independent review of its complete original scoped defect. Its actual compiled-producer and Linux qualification obligations remain separate. Before the latest host/parser batch, this continuation had closed one P1 and twelve P2s. The three reviewed Store integrity, native capacity fixture and historical auditor repairs are integrated at `418d8170`; owning execution is active. The original `CP-F01` campaign was interrupted by controlled SIGTERM before its inspector and retains that failed result.
+
+The earlier owning batch at `4181c367` passed all three Knowledge restart and retained-reply privacy controls. Together with their preserved earlier executed facets, independent review closes `E-knowledge-02` and `C2-08-retained-absence-coarsening`. The subsequent `R2-R-checkpoint-01` closure brings this continuation to twelve formerly open P2s closed: actual 4097 retired-pin collection, 4096 active-reference capacity/reclaim and both readiness-refusal controls passed with independent review. `E-knowledge-01` also restores its existing supported scoped closure. That stage recorded 168 distinct native producer/custody lint diagnostics. All31 corrected Store fixture failures passed at `96ac7e2d`; the separate native capacity batch remains active. The four corrected quota consumers still fail before their required native-finishing effects. Required current Kernel and Process execution continues in one build queue; the original `CP-F01` recorded producer chain remains queued. These current observations supersede earlier execution-pending statements below without relabeling historical failures.
+
+The operational record is `target/recovery-execution-status.json`. Exact ownership,
+checkpoints and handoffs remain under
+`target/hermes-recovery-remediation/integration-swarm/`; the register contains the
+single working queue. Each open P1 contract has one accountable owner.
+
+Integrated production repairs cover retained Store integrity, reply authorization,
+tenant Knowledge custody and typed intake, handle indexes, publication/import
+admission, native history segments and per-tenant live state, bounded native
+journal reads, and semantic first-return controls. Native append accounting keeps
+exact transaction, global-head and journal checks. The generic Knowledge pool
+counts only its explicit remaining families. Current lifecycle and replay
+requirements remain open until the owning acceptance runs.
+
+Checkpoint `ca96f18f` contains the integrated original Input fate repair and
+its complete review corrections. New Input records retain their actual fate and
+canonical origin. Classified replay and caller resumption cannot re-admit a
+retained Refused or prior-v2 Unproved Input. Full retained validation runs after
+the real global append and before commit, so a clock mismatch rolls back instead
+of leaving unreadable history. Supported prior bytes remain unchanged.
+
+Warm native port readers authenticate requested state and exact commit custody
+under the current serving owner and rollback anchor. They no longer sweep all
+retained native history. Their direct egress, output and nonce callers use the
+same bounded contract; full cold verification remains. Independent Opus review
+found no remaining P1/P2 in the integrated corrections and their inspected seams.
+Both compiler views passed with zero errors. Owning binaries have since executed
+and exposed concrete fixture and native-positive failures. Hermes and Claude
+owners supplied corrections; the root integrated them without weakening production
+authorization, persistence checks or positive assertions. Actual diagnostics
+continue to return to the accountable contract owners.
+
+The C2-02 declaration now records bounded live command custody and permanent,
+principal-stable replay subject to current authorization. Inspect writes nothing;
+same-value aliases spend physical intake only. No expiry or identity deletion was
+introduced, and C2-02 remains open pending its original owning acceptance.
+
+The runtime correction candidate is `8184805b`. Its production source is unchanged
+from the compiled Control Plane candidate `f54d2500`; its newer semantic,
+hidden-reply and Knowledge restart fixture corrections still require compilation
+and execution. Independent review accepted the bounded corrections, with a
+documentation clarification preserving an overfull supported prior handle census.
+Formatting passes on `8184805b`. A designated build owner ran the single Cargo
+queue and unchanged, bounded tests from the retained binary. No compiler, test
+or future gate remains active after the final resource boundary.
+
+Four existing P2 scoped closures have been revalidated: `KN-ENCODING-CHUNK-01`
+and the three `COMPILER-STDIN-*-01` findings.
+Independent review confirmed the authentic original owning passes and their
+compiled-source continuity. Requiring retention of every historical executable
+was an added condition; its unnecessary rerun requirement is withdrawn. Those four were revalidations, not new open-finding closures. Three independent P3 test-fidelity notes are retained
+without optional expansion before compiler feedback. The four additional source-pin
+revalidation flags correct older undocumented drift, not demonstrated regressions.
+
+Five open P2s are now closed for their original scopes: duplicate-subject shared command headroom, WAL headroom recovery (`R2-R-quota-02`), exact current source heads, retained projection absence and compiler linker dispatch validation (`MP-C03`). Their exact owning controls passed, source/caller continuity is verified and independent disposition is recorded. The `MP-C03` current-consumer fixture repair passed both owning controls and the full 167-test verifier suite in normal and optimized modes on `1de2ce53`. The broader native-finishing capacity obligations remain open.
+
+## Current local results
+
+Results apply to their recorded inputs and profiles. Store and Control Plane
+owning binaries have compiled and run. Completed rows from interrupted selections
+are observations, not successful whole-suite results. Failed attempts remain in
+`target/hermes-recovery-remediation/` and the original evidence paths. The register's
+`continuation.working_queue.latest_local_stage` links the latest coherent stage.
+
+| Scope | Observed result | Remaining limit |
+| --- | --- | --- |
+| Four-package test-source check, `ca96f18f` | Passed, zero errors | 168 unique unused-code diagnostics remain; later owning builds are recorded separately |
+| Production Store library check, `ca96f18f` | Passed without test-support features, zero errors | Current strict owning Clippy remains required |
+| Store initial owning selection, `2c2af170` | 554 observed passes, 63 failures, one ignored before interruption | No complete 2,010-test result; failed observations preserved |
+| Store diagnostic corrections through `c4c8664` | All 63 initial failing selectors subsequently passed across corrective runs; final selection 15 passed | Does not make the full Store suite green; later shared Store changes still require a current Store test build |
+| Control Plane owning build, `f54d2500` | Passed; retained executed binary and hash | Later fixture corrections in `8184805b` remain uncompiled |
+| Command executor, `983286c` | Eight passed, including immediate cleanup assertions | Does not establish native finishing or settlement capacity |
+| Input fate and original denial selection, `f54d2500` | 14 passed, seven failed; all seven input-fate tests passed | Native-positive original-denial cases failed before their required effects |
+| Semantic selection, `f54d2500` | 26 passed, 55 failed, three ignored across the complete 84-test selection | Four ordinary fixture failures have integrated source corrections awaiting execution; native-positive acceptance remains unmet |
+| Knowledge lifecycle and account controls, `983286c` | 27 passed, one failed before interruption; three additional account controls passed | Same-tenant capacity later passed in the pinned-binary run below; native recipient-audience positive failed at capture |
+| Remaining Knowledge selections, `f54d2500` | Ten passed in the first partial run; 37 passed and three failed in the resumed partial run | Interrupted journal stress and other unexecuted selectors remain; no whole-suite pass |
+| Knowledge handle and collection selection, `f54d2500` | Five passed, three failed | Three failures correctly rejected a reopened recovery-only fixture token; source now preserves the original Knowledge token and requires rerun |
+| Knowledge capacity and retirement, pinned `f54d2500` | Four passed: shared tenant capacity, returned collection capacity, exactly-once slot refund under high WAL, and zero-write historical retirement replay | Typed-history isolation was interrupted; both checkpoint reruns stopped before their first assertion result; independent review subsequently accepted the existing original passes and withdrew the added rerun requirement |
+| History and quota selection, `f54d2500` | 21 passed, 23 failed before interruption | Command-quota selectors were not reached; hidden-reply permission ordering corrected and awaits execution |
+| SDK owning acceptance | Python 1,369; installed wheels 733; TypeScript 366; conformance 427; packed npm 8 export and 212 state controls passed | Initial interceptor failure and blocked DNS attempts preserved; final installed run recorded zero remote-I/O attempts; native/provider facets remain open |
+| Compiler and offline tooling controls | Two corrected actual-compiler controls passed; three other actual-compiler controls previously passed; optimized recorder 290 with six skips, verifier 165 and compiled gate 24 in both modes passed; normal recorder pass is worker-reported because its retained final tail is missing | Independent review restores only the three compiler-stdin scopes; these controls do not discharge the original `CP-F01` contracts producer, inspector and exported/aggregate consumers |
+| Strict owning Clippy | Not run on current correction candidate | Earlier 168 unused-code diagnostics remain an unresolved integration result; no suppressions or removed integration |
+
+An earlier recorded wave also exercised 513 publication/collection cycles, reference
+capacity retirement and the genuine 4,097-retired-pin collection control.
+Earlier broad runs remain recorded as Store 1,935 passed/45 failed/four ignored,
+Knowledge 140 passed/34 failed/three ignored, and semantic 15 passed/31 failed/three
+ignored. They are historical observations, not fresh diagnoses or current passes.
+Earlier scoped SDK, Kernel, portability, formal, transport and verifier results
+retain their original manifests in the register. They do not turn the failed
+broader runtime runs into passes or qualify changed source.
+
+## Concrete blockers
+
+- An earlier diagnostic exposed the actual inner refusal:
+  `native capture requires an original output retention profile`. An explicit
+  profile additionally requires genuine original finishing preparation. SQLite
+  still inherits the unsupported default; completing the required producer roster
+  depends on the parked Capture workflow-identity/cumulative-roster work.
+  Current tests observe the sanitized capture-callback reconciliation failure;
+  they do not expose the inner string. No fabricated account, partial roster or
+  permissive default replaces the producer.
+- Original-operation capture, historical settlement, retained output/receipts,
+  capacity guarantees and terminal retirement therefore remain unaccepted.
+  Polling, helper tests and earlier-prerequisite refusals do not discharge them.
+- The former 16/21 GiB starting estimates were superseded by measured stage costs,
+  authorized inactive-cache reclamation and automatic resource monitoring. They
+  are not acceptance requirements or prohibitions. The protected floor remains
+  10 GiB. Cleanup enabled actual builds and execution; current finite cleanup
+  inventory preserves the exact remaining test dependencies and retained evidence.
+  The last finite cache exchange reclaimed 1.43 GiB, but both subsequent
+  checkpoint attempts stopped before completion. Final measured free space was
+  10.124 GiB at 22:33:12 UTC on 2026-10-12. The owning scratch stores were only
+  about 12 MiB each; no GiB fixture leak was demonstrated. Current corrected
+  binaries, strict Clippy and the full `CP-F01`
+  compiler production/inspection/consumption still require completion. Source,
+  evidence, unrelated workloads, services and VMs remain preserved.
+- The native performance gate remains failed: p95 301,279,292 ns exceeds the
+  unchanged 220,683,049 ns ceiling. Earlier lower samples are not substituted.
+- Current GNU/musl confinement, native-controller/isolation and matched 96-trial
+  provider qualification remain excluded. Missing compiler generator/writer
+  authority cannot be supplied by a rustc wrapper or synthetic provenance.
+- Current owning execution, remaining Store/Process producer-integration lints,
+  required human documentation review and exact
+  final-head hosted CI remain open. The enterprise
+  workflow's complete reviewed caller/definition configuration is not established.
+
+[Remediation execution](remediation-execution.md) defines the implementation,
+local acceptance, review, push and hosted-CI sequence. Push waits for the mandatory
+local gate. No merge is authorized. Previously parked work remains stopped.
+
+## Evidence and provenance
+
+The [historical package index](history/README.md) preserves archived phase evidence
+and documents the two published metadata redactions. Original seals, pins and
+failed observations are unchanged. Historical completion flags cover their original
+bytes; changing metadata cannot qualify the current implementation.
+
+The [current reproduction guide](current-reproduction.md) and
+[protected setup operations](protected-setup-operations.md) describe maintained
+commands and real prerequisites. Source maps aid navigation; they confer no new
+execution or qualification. The canonical register retains exact source, review
+and acceptance references, including the current failures above.

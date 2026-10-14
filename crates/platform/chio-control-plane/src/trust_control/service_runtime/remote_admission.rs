@@ -5,9 +5,9 @@ use chio_core::crypto::Keypair;
 use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
 use chio_kernel::admission_operation::{
     AdmissionBeginResult, AdmissionCaptureError, AdmissionCommandResult, AdmissionOperationCommand,
-    AdmissionOperationState, AdmissionOperationStore, AdmissionOperationStoreError,
-    AdmissionOperationV1, AdmissionProjectionCapabilities, AdmissionRecoveryLease,
-    AdmissionReplayKey, AdmissionTerminal, AdmissionTerminalProjection,
+    AdmissionOperationId, AdmissionOperationState, AdmissionOperationStore,
+    AdmissionOperationStoreError, AdmissionOperationV1, AdmissionProjectionCapabilities,
+    AdmissionRecoveryLease, AdmissionReplayKey, AdmissionTerminal, AdmissionTerminalProjection,
     QualifiedAdmissionOperationStore, SignedAdmissionTerminalProjectionV1, StoreMutationFence,
     UntrustedAdmissionRecoveryClaim,
 };
@@ -290,6 +290,7 @@ impl AdmissionOperationStore for RemoteAdmissionAuthority {
     fn list_recoverable(
         &self,
         not_after_unix_ms: u64,
+        after_operation_id: Option<&AdmissionOperationId>,
         limit: usize,
     ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
         let operations: Vec<chio_kernel::admission_operation::PersistedAdmissionOperationV1> = self
@@ -297,6 +298,7 @@ impl AdmissionOperationStore for RemoteAdmissionAuthority {
                 AdmissionAuthorityAction::ListRecoverable,
                 &ListRecoverableWire {
                     not_after_unix_ms,
+                    after_operation_id: after_operation_id.cloned(),
                     limit,
                 },
             )

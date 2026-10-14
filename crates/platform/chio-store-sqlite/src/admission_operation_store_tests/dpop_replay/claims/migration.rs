@@ -8,7 +8,7 @@ fn v25_upgrade_preserves_activated_dpop_and_existing_admission_without_adopting_
         Some("CREATE TABLE dpop_replay_claim_unqualified(value TEXT)"),
         Some("DROP TRIGGER dpop_replay_authority_activations_immutable"),
     ] {
-        let fixture = fixture();
+        let fixture = pre_recovery_fixture();
         let source = Source::new(&fixture, false)?;
         let domain = activate(&fixture, &source)?;
         let (operation, _, credential) = setup(
@@ -19,7 +19,7 @@ fn v25_upgrade_preserves_activated_dpop_and_existing_admission_without_adopting_
             DpopReplayClaimPhase::Dispatch,
         )?;
         let expected = load(&fixture)?.ok_or("source absent")?;
-        let before = global_count(&fixture);
+        let predecessor = global_commit_rows(&*fixture.store.connection()?)?;
         drop(source);
         let Fixture {
             _temp,
@@ -56,7 +56,11 @@ fn v25_upgrade_preserves_activated_dpop_and_existing_admission_without_adopting_
             lock_root,
         };
         assert_eq!(load(&fixture)?, Some(expected));
-        assert_eq!(global_count(&fixture), before);
+        assert_predecessor_history_then_startup_baselines(
+            &*fixture.store.connection()?,
+            &predecessor,
+            &fixture.fence,
+        )?;
         assert_eq!(
             fixture
                 .store

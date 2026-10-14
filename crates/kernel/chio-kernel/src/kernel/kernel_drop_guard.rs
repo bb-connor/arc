@@ -172,13 +172,31 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// Terminalize the durable operation as outcome unknown after a transport
     /// failure that followed the dispatch commit, before the response that
     /// reports the ambiguity is built. The caller disarms the guard afterwards.
-    pub(crate) fn terminalize_after_transport_failure(&mut self) -> Result<(), KernelError> {
+    pub(crate) fn terminalize_after_transport_failure(
+        &mut self,
+        mut metadata: Option<serde_json::Value>,
+    ) -> Result<Option<serde_json::Value>, KernelError> {
         if let Some(operation) = self.durable_operation {
-            self.kernel
+            let projection = self
+                .kernel
                 .terminalize_dispatch_committed_admission(operation, current_unix_timestamp_ms())?;
             self.mark_durable_operation_terminalized();
+            // The immediate error response must carry the same authenticated
+            // unknown outcome as replay. Replace the reserved metadata object
+            // completely so no stale fields can change its interpretation.
+            metadata
+                .get_or_insert_with(|| serde_json::json!({}))
+                .as_object_mut()
+                .ok_or_else(|| {
+                    KernelError::Internal("terminal receipt metadata is not an object".into())
+                })?
+                .insert(
+                    crate::admission_operation::ADMISSION_RECEIPT_METADATA_KEY.to_owned(),
+                    serde_json::to_value(projection)
+                        .map_err(|error| KernelError::Internal(error.to_string()))?,
+                );
         }
-        Ok(())
+        Ok(metadata)
     }
 
     pub(crate) fn mark_durable_operation_terminalized(&mut self) {

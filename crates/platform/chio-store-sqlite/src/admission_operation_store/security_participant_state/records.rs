@@ -19,6 +19,40 @@ fn digest(
     Ok(sha256_hex(&bytes))
 }
 
+/// Whether an initialization's historical catalog digest is retained under
+/// the active native catalog. A catalog never holds a successor's
+/// initialization, and no successor rewrites a predecessor's digest.
+fn retained_catalog_digest(
+    active_version: i32,
+    digest: &str,
+) -> Result<bool, AdmissionOperationStoreError> {
+    for version in 28..=active_version {
+        if digest == schema::digest_version(version)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+impl SecurityParticipantStateInitialization {
+    /// Whether this initialization predates the imported scope index. Only the
+    /// exact historical v28 and v29 catalogs qualify; the startup owner
+    /// publishes their protected root once. A current initialization commits
+    /// its root with its own hydration and never qualifies.
+    pub(in crate::admission_operation_store) fn requires_imported_influence_upgrade(
+        &self,
+    ) -> Result<bool, AdmissionOperationStoreError> {
+        if self.schema == schema::digest_version(schema::CURRENT_VERSION)? {
+            return Ok(false);
+        }
+        if self.schema == schema::digest_version(28)? || self.schema == schema::digest_version(29)?
+        {
+            return Ok(true);
+        }
+        Err(invalid("native initialization catalog digest is unknown"))
+    }
+}
+
 pub(super) fn new(
     source: &SecurityParticipantMigrationRecord,
     initialized_at: u64,
@@ -116,14 +150,19 @@ pub(super) fn load(
     Ok(record)
 }
 
+/// Cold initialization read. The bounded record loader also verifies the
+/// complete sealed imported source in the caller's transaction; it omits
+/// only the later native mutation history. Warm reads use
+/// `load_current_metadata` instead.
 pub(super) fn load_metadata(
     connection: &Connection,
     authority: &str,
 ) -> Result<Option<SecurityParticipantStateInitialization>, AdmissionOperationStoreError> {
-    if !validate_bounds(connection, schema::recorded_version(connection)?)? {
+    let version = schema::recorded_version(connection)?;
+    if !validate_bounds(connection, version)? {
         return Ok(None);
     }
-    load_bounded(connection, authority)
+    load_bounded(connection, authority, version)
 }
 
 /// An owning warm read already authenticated the full store at startup and
@@ -133,12 +172,74 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_cur
     connection: &Connection,
     binding: &chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1,
 ) -> Result<SecurityParticipantStateInitialization, AdmissionOperationStoreError> {
-    if !validate_bounds(connection, schema::recorded_version(connection)?)? {
-        return Err(invalid("current native initialization catalog is absent"));
+    let record = load_current(connection, binding.security_authority_id().as_str())?
+        .ok_or_else(|| invalid("current native initialization is absent"))?;
+    if record.admission_binding()? != *binding {
+        return Err(invalid("current native initialization binding differs"));
     }
-    let authority = binding.security_authority_id().as_str();
+    Ok(record)
+}
+
+/// The current initialization a retained native record names.
+pub(in crate::admission_operation_store::security_participant_state) fn load_current_named(
+    connection: &Connection,
+    authority: &str,
+    initialization: &str,
+) -> Result<SecurityParticipantStateInitialization, AdmissionOperationStoreError> {
+    let record = load_current(connection, authority)?
+        .ok_or_else(|| invalid("native history names an absent initialization"))?;
+    if record.digest != initialization {
+        return Err(invalid("native history names another initialization"));
+    }
+    Ok(record)
+}
+
+/// Whether any native global commit names this authority. Only an authority
+/// no commit names is genuinely uninitialized.
+fn authority_committed(
+    connection: &Connection,
+    authority: &str,
+) -> Result<bool, AdmissionOperationStoreError> {
+    let global: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema
+             WHERE type = 'table' AND name = 'authority_global_commits')",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if !global {
+        return Ok(false);
+    }
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM authority_global_commits
+             WHERE projection_kind = 'security_participant_state' AND projection_key = ?1)",
+            [authority],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)
+}
+
+/// The current initialization of one authority for a warm read. The read
+/// transaction verified the serving owner, its fence and the rollback anchor;
+/// open authenticated full history. This checks the immutable framing, digest,
+/// catalog, exact own initialization commit and imported source of the one
+/// requested row. An absent row is genuine only when no native commit names
+/// the authority; otherwise the previously existing initialization refuses.
+pub(in crate::admission_operation_store::security_participant_state) fn load_current(
+    connection: &Connection,
+    authority: &str,
+) -> Result<Option<SecurityParticipantStateInitialization>, AdmissionOperationStoreError> {
+    let version = schema::recorded_version(connection)?;
+    if !validate_bounds(connection, version)? {
+        if authority_committed(connection, authority)? {
+            return Err(invalid("current native initialization catalog is absent"));
+        }
+        return Ok(None);
+    }
     type Stored = (String, String, String, i64, String, String, i64, String);
-    let stored: Stored = connection
+    let stored: Option<Stored> = connection
         .query_row(
             "SELECT expectation_id, fingerprint_digest, schema_digest, initialized_at,
              store_uuid, store_lease_id, store_owner_epoch, initialization_digest
@@ -158,8 +259,15 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_cur
             },
         )
         .optional()
-        .map_err(sqlite_error)?
-        .ok_or_else(|| invalid("current native initialization is absent"))?;
+        .map_err(sqlite_error)?;
+    let Some(stored) = stored else {
+        if authority_committed(connection, authority)? {
+            return Err(invalid(
+                "current native initialization lost its committed row",
+            ));
+        }
+        return Ok(None);
+    };
     let record = SecurityParticipantStateInitialization {
         authority: AdmissionIdentifier::try_new("security_authority_id", authority)?,
         expectation: AdmissionIdentifier::try_new("expectation_id", stored.0)?,
@@ -173,11 +281,8 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_cur
         },
         digest: stored.7,
     };
-    if record.admission_binding()? != *binding
-        || digest(&record)? != record.digest
-        || (record.schema != schema::digest_version(28)?
-            && record.schema != schema::digest_version(29)?)
-    {
+    record.admission_binding()?;
+    if digest(&record)? != record.digest || !retained_catalog_digest(version, &record.schema)? {
         return Err(invalid("current native initialization binding differs"));
     }
     let references: i64 = connection
@@ -219,12 +324,13 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_cur
             "current native initialization lost its immutable source",
         ));
     }
-    Ok(record)
+    Ok(Some(record))
 }
 
 fn load_bounded(
     connection: &Connection,
     authority: &str,
+    version: i32,
 ) -> Result<Option<SecurityParticipantStateInitialization>, AdmissionOperationStoreError> {
     type Stored = (String, String, String, i64, String, String, i64, String);
     let stored: Option<Stored> = connection.query_row("SELECT expectation_id, fingerprint_digest,
@@ -256,8 +362,8 @@ fn load_bounded(
         },
     )?;
     // The initialization catalog is historical evidence, not the current
-    // schema. A v29 migration must not rewrite a v28 initialization digest.
-    if schema != schema::digest_version(28)? && schema != schema::digest_version(29)? {
+    // schema. No successor migration rewrites a predecessor digest.
+    if !retained_catalog_digest(version, &schema)? {
         return Err(invalid("native initialization catalog digest is unknown"));
     }
     record.schema.clone_from(&schema);
@@ -300,7 +406,10 @@ fn load_bounded(
 pub(in crate::admission_operation_store) fn verify_all(
     connection: &Connection,
 ) -> Result<Vec<SecurityParticipantStateInitialization>, AdmissionOperationStoreError> {
-    verify_all_version(connection, 29)
+    if !schema::verify(connection)? {
+        return Ok(Vec::new());
+    }
+    verify_all_version(connection, schema::recorded_version(connection)?)
 }
 
 pub(super) fn verify_all_version(
@@ -310,7 +419,7 @@ pub(super) fn verify_all_version(
     if !validate_bounds(connection, version)? {
         return Ok(Vec::new());
     }
-    storage::verify_no_orphans(connection)?;
+    storage::verify_native_inventory_cold(connection)?;
     let mut statement = connection.prepare("SELECT security_authority_id FROM security_participant_state_initializations ORDER BY security_authority_id").map_err(sqlite_error)?;
     let keys = statement
         .query_map([], |row| row.get::<_, String>(0))
@@ -319,7 +428,7 @@ pub(super) fn verify_all_version(
         .map_err(sqlite_error)?;
     keys.into_iter()
         .map(|key| {
-            let record = load_bounded(connection, &key)?
+            let record = load_bounded(connection, &key, version)?
                 .ok_or_else(|| invalid("native initialization disappeared"))?;
             let source = security_participant_migration::load_imported_source(connection, &key)?;
             if version == 28 {
@@ -331,6 +440,38 @@ pub(super) fn verify_all_version(
                 super::history::verify_rows(connection, &source, &record)?;
             }
             Ok(record)
+        })
+        .collect()
+}
+
+/// Enumerate at most sixteen initialized authorities without decoding knowledge
+/// joins. Full-chain coverage has already authenticated their native history.
+pub(in crate::admission_operation_store) fn initialized_authority_bindings(
+    connection: &Connection,
+) -> Result<
+    Vec<chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1>,
+    AdmissionOperationStoreError,
+> {
+    let version = schema::recorded_version(connection)?;
+    if !validate_bounds(connection, version)? {
+        return Ok(Vec::new());
+    }
+    let mut statement = connection
+        .prepare(
+            "SELECT security_authority_id FROM security_participant_state_initializations
+             ORDER BY security_authority_id",
+        )
+        .map_err(sqlite_error)?;
+    let keys = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(sqlite_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(sqlite_error)?;
+    keys.into_iter()
+        .map(|key| {
+            let record = load_bounded(connection, &key, version)?
+                .ok_or_else(|| invalid("native initialization disappeared"))?;
+            record.admission_binding()
         })
         .collect()
 }

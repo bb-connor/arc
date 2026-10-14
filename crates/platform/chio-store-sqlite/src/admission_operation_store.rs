@@ -103,13 +103,17 @@ pub(crate) use security_dispatch::verify_dispatch_capture_owner_tx;
 pub(crate) use security_dispatch::verify_native_dispatch_capture_owner_tx;
 mod security_participant_migration;
 mod security_participant_state;
+pub(crate) use knowledge::census_handle_indices_at_startup;
+pub(crate) use knowledge::publish_import_manifest_baseline_at_startup;
 pub(crate) use security_participant_state::dispatch_ledger::projection_reference as native_dispatch_ledger_projection_reference;
 pub(crate) use security_participant_state::dispatch_ledger::{
     NativeCaptureBinding, VerifiedNativeCapture,
 };
 pub(crate) use security_participant_state::egress::projection_reference as security_participant_egress_projection_reference;
+pub(crate) use security_participant_state::knowledge::publish_imported_influence_roots_at_startup;
 #[cfg(feature = "admission-test-support")]
 pub use security_participant_state::knowledge::read_work_test_support::NativeInfluenceReadWorkFixture;
+pub(crate) use security_participant_state::knowledge::verify_initialized_scope_projections;
 pub(crate) use security_participant_state::nonce_preflight::projection_reference as security_participant_nonce_preflight_projection_reference;
 pub(crate) use security_participant_state::output::projection_reference as security_participant_output_projection_reference;
 pub(crate) use security_participant_state::projection_reference as security_participant_state_projection_reference;
@@ -121,6 +125,62 @@ pub use security_participant_state::{
     SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
     SecurityParticipantStateInitialization,
 };
+
+/// A native post-effect write made by a producer outside this module.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum NativeFinishingWrite {
+    RawCustody,
+    EvaluationBegin,
+    Finalization,
+    SecurityRelease,
+}
+
+/// Spend exactly this write's prepaid purpose inside the producer's own
+/// transaction. An ordinary original owes nothing; a native original cannot
+/// write without its Confirmed account and the purpose still outstanding.
+pub(crate) fn spend_native_finishing_write(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    operation: &AdmissionOperationV1,
+    write: NativeFinishingWrite,
+) -> Result<(), AdmissionOperationStoreError> {
+    security_participant_state::spend_native_finishing_purpose(
+        transaction,
+        owner,
+        operation,
+        write.purpose(),
+    )
+    .map(|_| ())
+}
+
+/// Before this write's first statement, admit only the page growth its
+/// prepaid purpose authenticated on the operation's own account.
+pub(crate) fn authorize_native_finishing_write(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    operation: &AdmissionOperationV1,
+    write: NativeFinishingWrite,
+) -> Result<(), AdmissionOperationStoreError> {
+    security_participant_state::authorize_native_finishing_growth(
+        transaction,
+        owner,
+        operation,
+        &[write.purpose()],
+    )
+}
+
+impl NativeFinishingWrite {
+    fn purpose(self) -> recovery::storage::NativeFinishingPurposeV1 {
+        use recovery::storage::NativeFinishingPurposeV1 as Purpose;
+        match self {
+            Self::RawCustody => Purpose::RawCustody,
+            Self::EvaluationBegin => Purpose::EvaluationBegin,
+            // The account priced its single finalization; the slot is matched.
+            Self::Finalization => Purpose::Finalization { pure_prefix: 0 },
+            Self::SecurityRelease => Purpose::SecurityRelease,
+        }
+    }
+}
 mod product;
 mod recovery;
 pub use product::{StoredDecisionReportV1, StoredPolicyMaintenanceProposalV1};
@@ -132,17 +192,15 @@ pub use recovery::command_quota_test_support::{
     grow_recovery_quota_fixture_retained_history,
     grow_recovery_quota_fixture_uncheckpointed_history, observe_recovery_quota_fixture_clock_work,
     observe_recovery_quota_fixture_errors, recovery_quota_fixture_finalized_shape,
-    retain_recovery_quota_fixture_records, RecoveryClockWorkFixtureObservation,
-    RecoveryQuotaFixtureDiagnostic, RecoveryQuotaFixtureDiagnosticScope,
-    RecoveryQuotaFixtureRecord,
+    recovery_quota_fixture_knowledge_pool, retain_recovery_quota_fixture_records,
+    RecoveryClockWorkFixtureObservation, RecoveryQuotaFixtureDiagnostic,
+    RecoveryQuotaFixtureDiagnosticScope, RecoveryQuotaFixtureRecord,
 };
 
 #[cfg(feature = "admission-test-support")]
 pub use recovery::legacy_audience_test_support::{
     retain_knowledge_fixture_legacy_top_recipient, retain_recovery_fixture_legacy_top_actor,
 };
-#[cfg(feature = "admission-test-support")]
-pub use recovery::legacy_history_test_support::retain_unadmitted_legacy_recovery_fixture;
 mod semantic;
 mod setup;
 pub use semantic::{
@@ -151,12 +209,23 @@ pub use semantic::{
 };
 pub use setup::{
     NativeSetupCreationHost, NativeSetupPreparationError, NativeSetupPreparationV1,
-    NativeSetupProbeEvidenceV1, NativeSetupRetirementAuthorizationV1, NativeSetupRetirementBodyV1,
+    NativeSetupProbeEvidenceV1,
 };
 mod store;
 pub(crate) use recovery::projection_reference as recovery_projection_reference;
+pub(crate) use recovery::resources::observed_wal_pressure;
+pub(crate) use recovery::storage::{
+    authority_current_write_price, authority_current_write_profile, native_authority_debt,
+    native_authority_file_page_debt, native_authority_table_row_debt, native_finishing_generation,
+    native_receipt_is_owed, native_registered_file_debt, AuthorityCurrentWritePrice,
+    NativeAuthorityDebtData, NativeRegisteredFileDebtData,
+};
 pub(crate) use recovery::terminal_custody::repair_completed_at_startup;
 pub(crate) use recovery::verify_all as verify_recovery_records;
+
+/// The exact bundled SQLite build every physical write price was derived for.
+pub(crate) const BUNDLED_SQLITE_SOURCE_ID: &str =
+    "2026-03-13 10:38:09 737ae4a34738ffa0c3ff7f9bb18df914dd1cad163f28fd6b6e114a344fe6d618";
 pub(crate) use store::claim_lease_tx;
 
 /// How a joint transaction proves its recovery authority: a lease the
@@ -264,7 +333,7 @@ pub use security_participant_migration::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 42;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 44;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -1014,6 +1083,12 @@ impl SqliteAdmissionOperationStore {
         let context = projection.context();
         context.validate()?;
         verify_trusted_time(transaction, context.trusted_time_unix_ms)?;
+        security_participant_state::authorize_native_finishing_growth(
+            transaction,
+            &self.serving_owner,
+            &stored.operation,
+            &[recovery::storage::NativeFinishingPurposeV1::TerminalProjection],
+        )?;
         crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
         verify_payment_terminal_source(
             transaction,
@@ -1151,6 +1226,11 @@ impl SqliteAdmissionOperationStore {
                 append,
             )?;
         }
+        security_participant_state::native_finishing_at_terminal(
+            transaction,
+            &self.serving_owner,
+            &updated,
+        )?;
         execution_nonce::verify_reservation(transaction, &updated)?;
         recovery::terminal_custody::publish_completed(transaction, &self.serving_owner, &updated)?;
         terminal_from_operation(&updated).map(|terminal| (terminal, true))
@@ -1716,3 +1796,8 @@ mod knowledge;
 pub use knowledge::*;
 
 pub(crate) use security_participant_state::NativeKnowledgeJoinAuthority;
+
+// Prepared only under the actual owned transaction, before native SQL scoping.
+pub(crate) use recovery::storage::native_finishing_bank::{
+    prepare_native_finishing_generation, NativeGenerationReservation,
+};

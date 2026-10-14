@@ -408,16 +408,12 @@ fn immutable_tool_admission_request_hash(
     matching_grants: &[MatchingGrant<'_>],
     post_return_plan: &DurablePostReturnPlan,
     security_binding: Option<&crate::admission_operation::AdmissionSecurityBindingV1>,
-    authority_profile: Option<&crate::admission_operation::AdmissionAuthorityProfileV1>,
-    native_output_retention: Option<&crate::admission_operation::NativeOutputRetentionProfileV1>,
 ) -> Result<AdmissionDigest, KernelError> {
-    crate::admission_operation::immutable_tool_request_hash_with_output_retention(
+    crate::admission_operation::immutable_tool_request_hash(
         request,
         matching_grants,
         &post_return_plan.frozen_steps,
         security_binding,
-        authority_profile,
-        native_output_retention,
     )
     .map_err(durable_store_error)
 }
@@ -453,6 +449,7 @@ impl ChioKernel {
                 .list_admission_receipts_after(after_receipt_id.as_deref(), PAGE_LIMIT)
                 .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
             if page.is_empty() {
+                self.settle_native_finishing_at_startup()?;
                 return Ok(reconciled);
             }
             if page.len() > PAGE_LIMIT {
@@ -469,7 +466,8 @@ impl ChioKernel {
                 }
                 previous = Some(receipt.id.as_str());
             }
-            self.materialize_durable_admission_receipts(&page)?;
+            let ordinary = self.reconcile_native_finishing_receipts(&page)?;
+            self.materialize_durable_admission_receipts(&ordinary)?;
             reconciled = reconciled.checked_add(page.len()).ok_or_else(|| {
                 KernelError::DurableAdmission("admission receipt count overflow".to_owned())
             })?;

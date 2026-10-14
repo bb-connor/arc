@@ -274,6 +274,9 @@ enum PrerequisiteFailure {
     DelayedRevokedProof,
     ExpiredHeldProof,
     ExplicitReinstatement,
+    RevokedHistoricalProof,
+    ReissuedHistoricalProof,
+    SemanticExpiryAtFinalGate,
 }
 
 fn chain_phase<T, E: std::fmt::Debug>(result: Result<T, E>, phase: &str) -> TestResult<T> {
@@ -300,8 +303,11 @@ async fn chain_with_failure(
 ) -> TestResult {
     let stale = !matches!(
         failure,
-        PrerequisiteFailure::None | PrerequisiteFailure::ExplicitReinstatement
+        PrerequisiteFailure::None
+            | PrerequisiteFailure::ExplicitReinstatement
+            | PrerequisiteFailure::ReissuedHistoricalProof
     );
+    let changed_version = failure == PrerequisiteFailure::Stale && mode == "historical";
     let withheld_source = mode == "withheld-transform";
     let mode = if withheld_source { "transform" } else { mode };
     let scope = f.runtime.scope.clone();
@@ -328,7 +334,7 @@ async fn chain_with_failure(
     let mut primary_step = p.plan.steps.as_slice()[0].clone();
     primary_step.step = StepId::new("dependent-a")?;
     primary_step.dependencies = BoundedList::new(vec![source_step.step.clone()])?;
-    if stale && mode == "historical" {
+    if changed_version {
         // The review producer reads the original version. The dependent action
         // separately materializes and pins changed bytes at the same resource.
         let mut fields = p.payload.fields.as_slice().to_vec();
@@ -394,7 +400,13 @@ async fn chain_with_failure(
             .await,
         "execute_source",
     )?;
-    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(
+        response.verdict,
+        Verdict::Allow,
+        "source-a mode={mode} reason={:?} effects={}",
+        response.reason,
+        f.effects.load(Ordering::SeqCst)
+    );
     let operation = response
         .receipt
         .metadata
@@ -678,6 +690,35 @@ async fn chain_with_failure(
             assert!(store.install_semantic_prerequisite(&original).is_err());
             assert_eq!(constraints::protected_counts(f)?, before);
         }
+        if matches!(
+            failure,
+            PrerequisiteFailure::RevokedHistoricalProof
+                | PrerequisiteFailure::ReissuedHistoricalProof
+        ) {
+            let store = f.authority.admission_operation_store();
+            chain_phase(
+                store.revoke_semantic_prerequisite(
+                    &p.plan.scope,
+                    &proof.body().fact,
+                    &proof.body().resource,
+                ),
+                "revoke_historical_prerequisite",
+            )?;
+            if failure == PrerequisiteFailure::ReissuedHistoricalProof {
+                let after_revocation = now_ms()?;
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
+                while now_ms()? <= after_revocation {
+                    if std::time::Instant::now() >= deadline {
+                        return Err("authority clock did not advance after revocation".into());
+                    }
+                    tokio::task::yield_now().await;
+                }
+                let mut newer = proof.body().clone();
+                newer.evidence = EvidenceRef::new("reissued-historical-prerequisite")?;
+                newer.issued_at_unix_ms = SafeInteger::new(now_ms()?)?;
+                proof = SignedSemanticPrerequisiteV1::sign(newer, &p.prerequisite)?;
+            }
+        }
         if stale && mode == "current" {
             f.authority
                 .admission_operation_store()
@@ -706,7 +747,7 @@ async fn chain_with_failure(
             Some(SignedSemanticTransformationV1::sign(body, &p.transformer)?);
     }
     request.arguments = serde_json::to_value(&p.invocation)?;
-    let historical_deadline = if stale && mode == "historical" {
+    let historical_deadline = if changed_version {
         Some(
             p.invocation
                 .action
@@ -730,9 +771,52 @@ async fn chain_with_failure(
         .valid_until_unix_ms
         .get()
         .min(p.invocation.audience.body().valid_until_unix_ms.get());
+    let semantic_expiry = if failure == PrerequisiteFailure::SemanticExpiryAtFinalGate {
+        let observed = f.path.join("semantic-expiry-observed");
+        assert!(!observed.exists());
+        assert!(
+            now_ms()? < dependent_deadline,
+            "the dependent must still be live when final verification starts"
+        );
+        let counts = semantic_custody_counts(f)?;
+        assert_eq!(counts.0, 1, "only the verified source may be captured");
+        f.authority
+            .admission_operation_store()
+            .inject_native_capture_semantic_expiry_for_test(&observed)?;
+        Some((observed, counts))
+    } else {
+        None
+    };
     let result = runtime
         .execute_step(&f.process, "root", "dependent-a", &request)
         .await;
+    if let Some((observed, counts)) = semantic_expiry {
+        f.authority
+            .admission_operation_store()
+            .clear_native_capture_semantic_expiry_for_test()?;
+        let rejection = std::fs::read_to_string(&observed)
+            .map_err(|_| "the final native capture gate never rejected semantic expiry")?;
+        assert!(
+            rejection.contains("native capture rejected after semantic expiry cutpoint:")
+                && rejection.contains("native semantic authority expired before commit"),
+            "wrong final-gate rejection: {rejection}"
+        );
+        assert_eq!(semantic_custody_counts(f)?, counts);
+        let (operation, _) = f
+            .authority
+            .admission_operation_store()
+            .load_unambiguous_retained_tool_request(
+                &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                    "request_id",
+                    &request.request_id,
+                )?,
+                &f.authority.mutation_fence(),
+                now_ms()?,
+            )?
+            .ok_or("final-gate refusal lost the dependent original")?;
+        assert!(operation.dispatch_commit().is_none());
+        assert!(operation.native_dispatch_ledger_digest().is_none());
+    }
     if let Some(deadline) = historical_deadline {
         assert!(
             now_ms()? < deadline,
@@ -808,6 +892,35 @@ async fn chain_with_failure(
     }
     Ok(())
 }
+fn semantic_custody_counts(f: &RecoveryFixture) -> TestResult<(i64, i64, i64)> {
+    let connection = rusqlite::Connection::open(f.path.join("admission.db"))?;
+    Ok(connection.query_row(
+        "SELECT
+         (SELECT count(*) FROM admission_operation_recovery_records
+          WHERE record_key GLOB 'semantic-capture:*'),
+         (SELECT count(*) FROM admission_operation_recovery_records
+          WHERE record_key GLOB 'semantic-spent:*'),
+         (SELECT count(*) FROM admission_operation_recovery_records
+          WHERE record_key GLOB 'semantic-lease-spent:*')",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )?)
+}
+
+// Positive setup is a real Allow producer plus a live held reservation. The
+// final native transaction boundary then meets real-clock semantic expiry after
+// all state verification, before any physical capture or provider submission.
+#[tokio::test]
+async fn native_semantic_authority_is_rechecked_at_the_final_capture_boundary() -> TestResult {
+    let f = native_fixture("held")?;
+    chain_with_failure(&f, "held", PrerequisiteFailure::SemanticExpiryAtFinalGate).await?;
+    assert_eq!(f.effects.load(Ordering::SeqCst), 1);
+    let (captures, _, leases) = semantic_custody_counts(&f)?;
+    assert_eq!(captures, 1);
+    assert_eq!(leases, 0, "a refused capture must leave the lease unspent");
+    Ok(())
+}
+
 #[tokio::test]
 async fn native_derived_bytes_have_a_separate_producer_and_fresh_dependent_authority() -> TestResult
 {
@@ -838,6 +951,24 @@ async fn native_changed_reviewed_resource_version_refuses_before_dependent_effec
     chain(&matching, "historical", false).await?;
     let f = native_fixture("historical")?;
     chain(&f, "historical", true).await
+}
+
+#[tokio::test]
+async fn native_revoked_historical_proof_refuses_and_a_newer_review_is_accepted() -> TestResult {
+    let f = native_fixture("historical")?;
+    chain_with_failure(
+        &f,
+        "historical",
+        PrerequisiteFailure::RevokedHistoricalProof,
+    )
+    .await?;
+    let f = native_fixture("historical")?;
+    chain_with_failure(
+        &f,
+        "historical",
+        PrerequisiteFailure::ReissuedHistoricalProof,
+    )
+    .await
 }
 
 #[tokio::test]

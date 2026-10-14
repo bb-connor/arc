@@ -1,25 +1,45 @@
 //! Read custody and observation commit share the physical serving writer.
 use super::*;
 
+mod archive;
+pub(in crate::admission_operation_store::knowledge) mod encoding;
+pub(in crate::admission_operation_store::knowledge) mod encoding_source;
 mod reference_source;
 pub(in crate::admission_operation_store::knowledge) use reference_source::artifact_reference_source;
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct HandleRecord {
-    handle: ArtifactHandleV1,
-    artifact: ArtifactVersionRefV1,
-    recipient: ArtifactRecipientV1,
-    principal: chio_security_types::PrincipalId,
+pub(super) struct HandleRecord {
+    pub(super) handle: ArtifactHandleV1,
+    pub(super) artifact: ArtifactVersionRefV1,
+    pub(super) recipient: ArtifactRecipientV1,
+    pub(super) principal: chio_security_types::PrincipalId,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ReleaseRecord {
+pub(super) struct ReleaseRecord {
     intent: ArtifactReleaseIntentV1,
     handle: ArtifactHandleV1,
     capability: ReleaseAuthorizationDigest,
+    purpose: ReleasePurpose,
 }
-fn handle_key(
+
+/// Typed admission purpose of one release record. An ordinary release
+/// exports an existing artifact; a retained-archive release additionally
+/// commits the exact ephemeral archive frame (content digest and byte
+/// count) it delivered plus the bounded originally signed manifest, so a
+/// replay must reproduce the same frame without a second signing call.
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum ReleasePurpose {
+    Artifact,
+    RetainedArchiveFrame {
+        content: CanonicalPayloadDigest,
+        bytes: SafeInteger,
+        manifest: Box<SignedArtifactArchiveManifestV1>,
+    },
+}
+pub(super) fn handle_key(
     scope: &RecoveryScopeV1,
     handle: &ArtifactHandleId,
 ) -> Result<String, AdmissionOperationStoreError> {
@@ -46,21 +66,65 @@ fn release_for_actor(
     actor: &AuthenticatedRecoveryActor,
     request: &RequestId,
 ) -> Result<Option<(String, ReleaseRecord)>, AdmissionOperationStoreError> {
+    Ok(release_root_for_actor(tx, actor, request)?.map(|(key, _, record)| (key, record)))
+}
+
+/// The one typed release load. A row is the exact inline record or a strict
+/// chunked root over the complete canonical record; either way the record with
+/// state Admitted must equal the actual original admission bytes.
+fn load_release_record(
+    tx: &Connection,
+    key: &str,
+) -> Result<
+    Option<(protected::ProtectedSourceReference, ReleaseRecord)>,
+    AdmissionOperationStoreError,
+> {
+    let Some(row) = protected::raw_checked(tx, key)? else {
+        return Ok(None);
+    };
+    let current = protected::source_reference(tx, key)?;
+    let record = encoding::decode_release(tx, key, row.version, &row.payload)?;
+    let scope = scope_key(&record.intent.artifact.scope)?;
+    let mut original = record.clone();
+    original.intent.state = ArtifactDeliveryStateV1::Admitted;
+    if row.kind != "command"
+        || row.scope != scope
+        || current.kind() != "command"
+        || current.scope_key() != scope
+        || !protected::matches_historical_source_command_payload(
+            tx,
+            &current,
+            encoding::ORIGINAL_RELEASE_VERSION,
+            &protected::encode(&original)?,
+        )?
+    {
+        return Err(refused("release changed its original admission"));
+    }
+    Ok(Some((current, record)))
+}
+
+fn release_root_for_actor(
+    tx: &Connection,
+    actor: &AuthenticatedRecoveryActor,
+    request: &RequestId,
+) -> Result<
+    Option<(String, protected::ProtectedSourceReference, ReleaseRecord)>,
+    AdmissionOperationStoreError,
+> {
     let key = release_key(actor, request)?;
-    if let Some(record) = load::<ReleaseRecord>(tx, &key)? {
-        let handle: HandleRecord = load(tx, &handle_key(actor.scope(), &record.handle.handle)?)?
-            .ok_or_else(|| refused("release original handle absent"))?;
+    if let Some((root, record)) = load_release_record(tx, &key)? {
+        let handle = load_handle(tx, actor.scope(), &record.handle.handle)?;
         if handle.principal != *actor.principal()
             || handle.handle != record.handle
             || record.intent.artifact.scope != *actor.scope()
         {
             return Err(refused("release original actor changed"));
         }
-        return Ok(Some((key, record)));
+        return Ok(Some((key, root, record)));
     }
     Ok(None)
 }
-fn selected<'a>(
+pub(super) fn selected<'a>(
     profile: &'a NativeKnowledgeInstallationV1,
     id: &ArtifactRecipientId,
 ) -> Result<&'a NativeKnowledgeRecipientV1, AdmissionOperationStoreError> {
@@ -85,8 +149,7 @@ pub(super) fn retained_archive_root(
     {
         return Err(refused("retained archive root authority"));
     }
-    let retained: HandleRecord = load(tx, &handle_key(actor.scope(), &handle.handle)?)?
-        .ok_or_else(|| refused("retained archive root handle"))?;
+    let retained = load_handle(tx, actor.scope(), &handle.handle)?;
     if retained.handle != *handle
         || retained.principal != *actor.principal()
         || retained.artifact.scope != *actor.scope()
@@ -108,6 +171,159 @@ pub(super) fn authority_digest(
         .map_err(refused)?,
     ))
 }
+
+/// Retrieve the original manifest after checking the exact release binding.
+/// The caller still verifies its signature and freshly reconstructed body.
+pub(super) fn prior_retained_archive_manifest(
+    tx: &Connection,
+    actor: &AuthenticatedRecoveryActor,
+    request: &super::retained_archive::NativeRetainedArchiveRequest<'_>,
+    root: &ArtifactVersionRefV1,
+    policy: &PolicyDigest,
+    authorization: &ReleaseAuthorizationDigest,
+) -> Result<Option<SignedArtifactArchiveManifestV1>, AdmissionOperationStoreError> {
+    match release_for_actor(tx, actor, request.request)? {
+        None => Ok(None),
+        Some((_, prior)) => {
+            let ReleasePurpose::RetainedArchiveFrame { manifest, .. } = prior.purpose else {
+                return Err(refused("retained archive release purpose"));
+            };
+            if prior.handle != *request.root
+                || prior.intent.artifact != *root
+                || prior.intent.recipient != *request.recipient
+                || prior.intent.policy != *policy
+                || prior.capability != *authorization
+            {
+                return Err(refused("retained archive release identity changed"));
+            }
+            Ok(Some(*manifest))
+        }
+    }
+}
+/// The exact handle a current actor may hold for one Available version and
+/// one selected finite recipient under the given profile generation.
+pub(super) fn derive_handle(
+    tx: &Transaction<'_>,
+    actor: &AuthenticatedRecoveryActor,
+    profile: &NativeKnowledgeInstallationV1,
+    reference: &ArtifactVersionRefV1,
+    recipient: &ArtifactRecipientId,
+) -> Result<(HandleRecord, NativeArtifactRecordV1), AdmissionOperationStoreError> {
+    if reference.scope != *actor.scope()
+        || !matches!(
+            actor.permission(),
+            RecoveryPermission::KnowledgeRead
+                | RecoveryPermission::KnowledgeWrite
+                | RecoveryPermission::KnowledgeAdopt
+        )
+    {
+        return Err(refused("handle authority"));
+    }
+    let entry = selected(profile, recipient)?;
+    require_finite_recipient(&entry.recipient)?;
+    let version = artifact(tx, reference)?;
+    traversal::ensure_audience(tx, actor, &version.metadata.label)?;
+    if !version.metadata.label.flows_to(&entry.recipient.clearance) {
+        return Err(refused("recipient clearance"));
+    }
+    let handle = ArtifactHandleV1 {
+        handle: ArtifactHandleId::new(&hex::encode(
+            knowledge_digest(
+                RecoveryDigestDomain::KnowledgeHandleIdentity,
+                &(
+                    actor.principal(),
+                    reference,
+                    &entry.recipient,
+                    profile.generation,
+                ),
+            )
+            .map_err(refused)?,
+        ))
+        .map_err(refused)?,
+        recipient: recipient.clone(),
+    };
+    Ok((
+        HandleRecord {
+            handle,
+            artifact: reference.clone(),
+            recipient: entry.recipient.clone(),
+            principal: actor.principal().clone(),
+        },
+        version,
+    ))
+}
+
+/// The original admission row of one new release by the actor's own indexed
+/// handle, with that handle and its version as bound heads. The purpose
+/// selects the only permission that may admit it.
+pub(super) fn derive_admission(
+    tx: &Connection,
+    actor: &AuthenticatedRecoveryActor,
+    request: &RequestId,
+    record: &ReleaseRecord,
+) -> Result<(DerivedWrite, Vec<protected::ProtectedSourceReference>), AdmissionOperationStoreError>
+{
+    let key = release_key(actor, request)?;
+    if protected::raw_checked(tx, &key)?.is_some() {
+        return Err(refused("release already admitted"));
+    }
+    let handle = load_handle(tx, actor.scope(), &record.handle.handle)?;
+    let admitted = matches!(
+        &record.intent.kind,
+        ArtifactReleaseKindV1::IndependentlyAdmitted { request: admitted } if admitted == request
+    );
+    if !matches!(
+        (&record.purpose, actor.permission()),
+        (ReleasePurpose::Artifact, RecoveryPermission::KnowledgeRead)
+            | (
+                ReleasePurpose::RetainedArchiveFrame { .. },
+                RecoveryPermission::KnowledgeAdmin
+            )
+    ) || !admitted
+        || !matches!(record.intent.state, ArtifactDeliveryStateV1::Admitted)
+        || record.capability != authority_digest(actor)?
+        || record.intent.authorization != record.capability
+        || record.intent.artifact.scope != *actor.scope()
+        || handle.handle != record.handle
+        || handle.principal != *actor.principal()
+        || handle.artifact != record.intent.artifact
+        || handle.recipient != record.intent.recipient
+    {
+        return Err(refused("release admission changed its handle or authority"));
+    }
+    let witnesses = vec![
+        protected::source_reference(tx, &handle_key(actor.scope(), &record.handle.handle)?)?,
+        protected::source_reference(tx, &version_key(&record.intent.artifact)?)?,
+    ];
+    Ok((
+        DerivedWrite {
+            scope_key: scope_key(actor.scope())?,
+            payload: protected::encode(record)?,
+            key,
+            expected: None,
+        },
+        witnesses,
+    ))
+}
+
+/// One retained handle admitted by its version index, by exact listing or by
+/// the baseline census of a supported prior-44 row. It does not require the
+/// version to be readable, so admitted outcomes settle after collection.
+fn load_handle(
+    tx: &Connection,
+    scope: &RecoveryScopeV1,
+    handle: &ArtifactHandleId,
+) -> Result<HandleRecord, AdmissionOperationStoreError> {
+    let record: HandleRecord =
+        load(tx, &handle_key(scope, handle)?)?.ok_or_else(|| refused("handle"))?;
+    if record.handle.handle != *handle
+        || record.artifact.scope != *scope
+        || !super::handle_index::current(tx, &record.artifact)?.admits(tx, &record)?
+    {
+        return Err(refused("handle index"));
+    }
+    Ok(record)
+}
 impl SqliteAdmissionOperationStore {
     pub fn issue_artifact_handle(
         &self,
@@ -127,44 +343,13 @@ impl SqliteAdmissionOperationStore {
         {
             return Err(refused("handle authority"));
         }
-        mutate(self, actor, fence, now, |tx, profile, _| {
-            let entry = selected(profile, recipient)?;
-            require_finite_recipient(&entry.recipient)?;
-            let record = artifact(&tx, reference)?;
-            traversal::ensure_audience(&tx, actor, &record.metadata.label)?;
-            if !record.metadata.label.flows_to(&entry.recipient.clearance) {
-                return Err(refused("recipient clearance"));
+        mutate(self, actor, fence, now, |tx, profile, now| {
+            let (handle, intake) = super::intake::AuthenticatedKnowledgeIntakeSource::handle_issue(
+                &tx, actor, profile, now, reference, recipient,
+            )?;
+            if let Some(intake) = intake {
+                protected::persist_knowledge_intake(&tx, &self.serving_owner, intake)?;
             }
-            let handle = ArtifactHandleV1 {
-                handle: ArtifactHandleId::new(&hex::encode(
-                    knowledge_digest(
-                        RecoveryDigestDomain::KnowledgeHandleIdentity,
-                        &(
-                            actor.principal(),
-                            reference,
-                            &entry.recipient,
-                            profile.generation,
-                        ),
-                    )
-                    .map_err(refused)?,
-                ))
-                .map_err(refused)?,
-                recipient: recipient.clone(),
-            };
-            let record = HandleRecord {
-                handle: handle.clone(),
-                artifact: reference.clone(),
-                recipient: entry.recipient.clone(),
-                principal: actor.principal().clone(),
-            };
-            let key = handle_key(actor.scope(), &handle.handle)?;
-            if let Some(existing) = load::<HandleRecord>(&tx, &key)? {
-                if existing != record {
-                    return Err(refused("handle identity changed"));
-                }
-                return Ok((tx, handle));
-            }
-            save(&tx, &self.serving_owner, actor.scope(), &key, &record)?;
             Ok((tx, handle))
         })
     }
@@ -181,8 +366,7 @@ impl SqliteAdmissionOperationStore {
             return Err(refused("read authority"));
         }
         mutate(self, actor, fence, now, |tx, profile, _| {
-            let retained: HandleRecord = load(&tx, &handle_key(actor.scope(), &handle.handle)?)?
-                .ok_or_else(|| refused("handle"))?;
+            let retained = load_handle(&tx, actor.scope(), &handle.handle)?;
             let selection = selected(profile, &handle.recipient)?;
             require_finite_recipient(&selection.recipient)?;
             if retained.handle != *handle
@@ -191,21 +375,31 @@ impl SqliteAdmissionOperationStore {
             {
                 return Err(refused("handle audience"));
             }
-            let artifact = artifact(&tx, &retained.artifact)?;
-            require_current_artifact(&artifact, profile)?;
-            traversal::dependencies(
-                &tx,
-                actor.scope(),
-                artifact.metadata.dependencies.as_slice(),
-            )?;
-            traversal::ensure_audience(&tx, actor, &artifact.metadata.label)?;
-            if !artifact
-                .metadata
-                .label
-                .flows_to(&selection.recipient.clearance)
-            {
-                return Err(refused("clearance"));
-            }
+            let artifact = require_readable(&tx, actor, profile, &retained.artifact, selection)?;
+            Ok((tx, (artifact, selection.clone())))
+        })
+    }
+    /// Host-internal reads that deliver one composite body (checkpoint restore,
+    /// archive export) need the same admission as a handle read but no durable
+    /// custody: nothing is saved, so the read consumes no recovery record or
+    /// event from the shared knowledge pool.
+    pub fn prepare_artifact_read_for_recipient(
+        &self,
+        actor: &AuthenticatedRecoveryActor,
+        reference: &ArtifactVersionRefV1,
+        recipient: &ArtifactRecipientId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<(NativeArtifactRecordV1, NativeKnowledgeRecipientV1), AdmissionOperationStoreError>
+    {
+        if actor.permission() != RecoveryPermission::KnowledgeRead
+            || reference.scope != *actor.scope()
+        {
+            return Err(refused("read authority"));
+        }
+        mutate(self, actor, fence, now, |tx, profile, _| {
+            let selection = selected(profile, recipient)?;
+            let artifact = require_readable(&tx, actor, profile, reference, selection)?;
             Ok((tx, (artifact, selection.clone())))
         })
     }
@@ -224,8 +418,7 @@ impl SqliteAdmissionOperationStore {
             return Err(refused("release authority"));
         }
         mutate(self, actor, fence, now, |tx, profile, now| {
-            let retained: HandleRecord = load(&tx, &handle_key(actor.scope(), &handle.handle)?)?
-                .ok_or_else(|| refused("handle"))?;
+            let retained = load_handle(&tx, actor.scope(), &handle.handle)?;
             let selection = selected(profile, &handle.recipient)?;
             require_finite_recipient(&selection.recipient)?;
             if retained.handle != *handle
@@ -268,7 +461,8 @@ impl SqliteAdmissionOperationStore {
             }
             let digest = authority_digest(actor)?;
             if let Some((_, prior)) = release_for_actor(&tx, actor, request)? {
-                if prior.handle != *handle
+                if prior.purpose != ReleasePurpose::Artifact
+                    || prior.handle != *handle
                     || prior.intent.artifact != retained.artifact
                     || prior.intent.recipient != selection.recipient
                     || prior.intent.policy != profile.policy
@@ -324,9 +518,13 @@ impl SqliteAdmissionOperationStore {
                 intent: intent.clone(),
                 handle: handle.clone(),
                 capability: digest,
+                purpose: ReleasePurpose::Artifact,
             };
             let key = release_key(actor, request)?;
-            save(&tx, &self.serving_owner, actor.scope(), &key, &retained)?;
+            let admission = super::intake::AuthenticatedKnowledgeIntakeSource::release_admission(
+                &tx, actor, profile, now, request, &retained,
+            )?;
+            protected::persist_knowledge_intake(&tx, &self.serving_owner, admission)?;
             super::reference_custody::retain_release_references(&tx, &self.serving_owner, &key)?;
             Ok((tx, intent))
         })
@@ -343,43 +541,86 @@ impl SqliteAdmissionOperationStore {
         if actor.permission() != RecoveryPermission::KnowledgeRead {
             return Err(refused("ack authority"));
         }
-        mutate(self, actor, fence, now, |tx, profile, _| {
-            let (key, mut record) =
-                release_for_actor(&tx, actor, request)?.ok_or_else(|| refused("release absent"))?;
-            let handle: HandleRecord =
-                load(&tx, &handle_key(actor.scope(), &record.handle.handle)?)?
-                    .ok_or_else(|| refused("release handle absent"))?;
-            let mut admitted = record.intent.clone();
-            admitted.state = intent.state;
-            if record.capability != authority_digest(actor)?
-                || handle.principal != *actor.principal()
-                || admitted != *intent
-                || record.intent.recipient
-                    != selected(profile, &intent.recipient.recipient)?.recipient
-            {
-                return Err(refused("release ack changed"));
-            }
-            let next = if delivered {
-                ArtifactDeliveryStateV1::Delivered
-            } else {
-                ArtifactDeliveryStateV1::Uncertain
-            };
-            if record.intent.state != ArtifactDeliveryStateV1::Delivered
-                && record.intent.state != next
-            {
-                record.intent.state = next;
-                save(&tx, &self.serving_owner, actor.scope(), &key, &record)?;
-                if next == ArtifactDeliveryStateV1::Delivered {
-                    super::reference_retirement::retire_release_references(
-                        &tx,
-                        &self.serving_owner,
-                        &key,
-                    )?;
-                }
-            }
+        mutate(self, actor, fence, now, |tx, profile, now| {
+            transition_delivery_state(
+                &tx,
+                &self.serving_owner,
+                profile,
+                actor,
+                fence,
+                request,
+                intent,
+                delivered,
+                now,
+            )?;
             Ok((tx, ()))
         })
     }
+}
+
+/// Shared monotone delivery transition over one admitted release record. Each
+/// finite forward step (Admitted to Uncertain or Delivered, Uncertain to
+/// Delivered) settles through the one encoded writer from its authenticated
+/// outcome source; a repeat writes nothing. Uncertain retains the exact
+/// release identity and its source pins; Delivered is sticky and retires the
+/// pins, bound to the exact new root.
+#[allow(clippy::too_many_arguments)]
+fn transition_delivery_state(
+    tx: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    profile: &NativeKnowledgeInstallationV1,
+    actor: &AuthenticatedRecoveryActor,
+    fence: &StoreMutationFence,
+    request: &RequestId,
+    intent: &ArtifactReleaseIntentV1,
+    delivered: bool,
+    now: u64,
+) -> Result<(), AdmissionOperationStoreError> {
+    let Some(source) = encoding_source::prepare_release_outcome(
+        tx, actor, profile, fence, now, request, intent, delivered,
+    )?
+    else {
+        return Ok(());
+    };
+    let refund = source.delivers();
+    let key = source.key().to_owned();
+    let body = source.body()?;
+    let prepared = super::encoding::write::VerifiedKnowledgeEncodingWrite::release(source, body)?;
+    let (root, _) = protected::persist_knowledge_encoding(tx, owner, prepared)?;
+    if refund {
+        let proof =
+            super::reference_retirement::VerifiedKnowledgeReferenceRetirement::artifact_release(
+                tx, &key,
+            )?
+            .ok_or_else(|| refused("delivered release has no genuine terminal source"))?;
+        super::closure::require_terminal_head(proof.source(), &root)?;
+        protected::persist_knowledge_reference_retirement(tx, owner, proof)?;
+    }
+    Ok(())
+}
+
+/// Current availability, dependency closure, requester audience and recipient
+/// clearance for one selected recipient.
+fn require_readable(
+    tx: &Transaction<'_>,
+    actor: &AuthenticatedRecoveryActor,
+    profile: &NativeKnowledgeInstallationV1,
+    reference: &ArtifactVersionRefV1,
+    selection: &NativeKnowledgeRecipientV1,
+) -> Result<NativeArtifactRecordV1, AdmissionOperationStoreError> {
+    require_finite_recipient(&selection.recipient)?;
+    let artifact = artifact(tx, reference)?;
+    require_current_artifact(&artifact, profile)?;
+    traversal::dependencies(tx, actor.scope(), artifact.metadata.dependencies.as_slice())?;
+    traversal::ensure_audience(tx, actor, &artifact.metadata.label)?;
+    if !artifact
+        .metadata
+        .label
+        .flows_to(&selection.recipient.clearance)
+    {
+        return Err(refused("clearance"));
+    }
+    Ok(artifact)
 }
 
 fn require_current_artifact(

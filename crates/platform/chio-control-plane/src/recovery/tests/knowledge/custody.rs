@@ -61,6 +61,12 @@ fn memory_restore_replay_records_delivery_and_reuses_read_custody() -> TestResul
     let first = f
         .runtime
         .restore_into(&f.f.control, &checkpoint.checkpoint, 1, &request, &sink)?;
+    let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
+    let events: i64 = connection.query_row(
+        "SELECT count(*) FROM admission_operation_recovery_events",
+        [],
+        |row| row.get(0),
+    )?;
     for _ in 0..4 {
         assert_eq!(
             f.runtime
@@ -69,7 +75,15 @@ fn memory_restore_replay_records_delivery_and_reuses_read_custody() -> TestResul
             first.release,
         );
     }
-    let connection = rusqlite::Connection::open(f.f.path.join("admission.db"))?;
+    let after: i64 = connection.query_row(
+        "SELECT count(*) FROM admission_operation_recovery_events",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        after, events,
+        "restore replay must not allocate new custody"
+    );
     let state: String = connection.query_row(
         "SELECT json_extract(payload,'$.intent.state') FROM admission_operation_recovery_records
          WHERE record_key GLOB 'knowledge-restore:*'",
@@ -77,7 +91,76 @@ fn memory_restore_replay_records_delivery_and_reuses_read_custody() -> TestResul
         |row| row.get(0),
     )?;
     assert_eq!(state, "delivered");
-    assert_eq!(retained_count(&f, "knowledge-handle:")?, 1);
+    // Restore reads its material through the internal recipient read, so no
+    // restore attempt or replay persists handle custody.
+    assert_eq!(retained_count(&f, "knowledge-handle:")?, 0);
+    assert_eq!(retained_count(&f, "knowledge-join:")?, 1);
+    Ok(())
+}
+
+#[test]
+fn memory_restore_refuses_material_above_current_recipient_clearance() -> TestResult {
+    let f = KnowledgeFixture::new()?;
+    let reference = publish_label(
+        &f,
+        "restore-clearance",
+        b"restricted-checkpoint-content",
+        restricted_label(),
+    )?;
+    let checkpoint = f.runtime.checkpoint(
+        &f.f.control,
+        &CheckpointId::new("restore-clearance")?,
+        0,
+        &[reference],
+        &[],
+    )?;
+    let mut profile = f.profile.clone();
+    let mut recipients = profile.recipients.as_slice().to_vec();
+    recipients[0].recipient.clearance = InformationLabel::bottom();
+    profile.recipients = NonEmptyBoundedList::new(recipients)?;
+    profile.generation = SafeInteger::new(2)?;
+    let store = f.f.authority.admission_operation_store();
+    store.configure_knowledge(&profile)?;
+    // The caller can still read the checkpoint; only its selected recipient
+    // lacks clearance for the material read inside restore.
+    assert_eq!(
+        store.read_labeled_checkpoint(
+            &f.actor(RecoveryPermission::KnowledgeRead)?,
+            &checkpoint.checkpoint,
+            1,
+            &f.f.authority.mutation_fence(),
+            now_ms()?,
+        )?,
+        checkpoint,
+    );
+    let mut sink = f.sink();
+    sink.recipient = profile.recipients.as_slice()[0].recipient.clone();
+    let request = RequestId::new("restore-clearance")?;
+    let error = f
+        .runtime
+        .restore_into(&f.f.control, &checkpoint.checkpoint, 1, &request, &sink)
+        .err()
+        .ok_or("restore delivered material above recipient clearance")?;
+    assert!(matches!(
+        error,
+        KernelError::DurableAdmission(message) if message == "durable knowledge unavailable"
+    ));
+    assert!(sink.delivered.lock().map_err(|_| "sink")?.is_empty());
+    assert_eq!(retained_count(&f, "knowledge-restore:")?, 0);
+    assert_eq!(retained_count(&f, "knowledge-handle:")?, 0);
+    assert_eq!(retained_count(&f, "knowledge-join:")?, 0);
+
+    // The same request succeeds once fresh recipient authority admits the
+    // material. The refused attempt neither spent its identity nor held custody.
+    profile.recipients = f.profile.recipients.clone();
+    profile.generation = SafeInteger::new(3)?;
+    store.configure_knowledge(&profile)?;
+    let sink = f.sink();
+    f.runtime
+        .restore_into(&f.f.control, &checkpoint.checkpoint, 1, &request, &sink)?;
+    assert_eq!(sink.delivered.lock().map_err(|_| "sink")?.len(), 1);
+    assert_eq!(retained_count(&f, "knowledge-restore:")?, 1);
+    assert_eq!(retained_count(&f, "knowledge-handle:")?, 0);
     assert_eq!(retained_count(&f, "knowledge-join:")?, 1);
     Ok(())
 }
@@ -272,6 +355,10 @@ fn artifacts_public_reservation_omits_private_blob_custody() -> TestResult {
                 &f.f.authority.mutation_fence(),
                 now_ms()?,
             )?;
+    assert!(
+        !inventory.is_empty(),
+        "published artifact inventory is absent"
+    );
     for entry in inventory {
         let encoded = serde_json::to_value(entry)?;
         let object = encoded.as_object().ok_or("public transfer view")?;

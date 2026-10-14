@@ -56,9 +56,13 @@ pub(in crate::admission_operation_store) fn observe_authority_time(
         .map_err(sqlite_error)?;
     let recovery_table:bool=transaction.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='admission_operation_recovery_events')",[],|row|row.get(0)).map_err(sqlite_error)?;
     let recovery_high_water: i64 = if recovery_table {
+        // The protected writer rejects clock regression before every append,
+        // and reopen verifies timestamp ordering throughout the event chain.
+        // Its final event therefore carries the high water without a history scan.
         transaction
             .query_row(
-                "SELECT coalesce(max(observed_at),0) FROM admission_operation_recovery_events",
+                "SELECT coalesce((SELECT observed_at FROM main.admission_operation_recovery_events
+                 ORDER BY sequence DESC LIMIT 1), 0)",
                 [],
                 |row| row.get(0),
             )

@@ -32,8 +32,14 @@ pub(super) fn price_future_finishing_transactions(
     tx: &Transaction<'_>,
     source: &PreparedProcessReturnSource,
 ) -> Result<Vec<ProcessFinishingTransactionPriceData>, ProcessError> {
-    require_complete_process_return_bank(tx)?;
     source::verify_prepared_pricing_cut(tx, source)?;
+    // Authenticate the actual pre-enrollment state. A first account must
+    // fund the family activation as part of Enrollment; requiring that bank
+    // to exist before pricing would prevent its only owning installer from
+    // ever receiving funding. An existing family still requires its complete
+    // catalog, rows and retained history, with no repair or absence fallback.
+    cohort::verify_before_open(tx)?;
+    let activation_required = !cohort::family_present(tx)?;
     let profile = SqliteFramePriceProfileData::checked(
         source.profile().page_size(),
         source.profile().reserved_bytes(),
@@ -51,16 +57,20 @@ pub(super) fn price_future_finishing_transactions(
     let mut prices = Vec::new();
     let mut total_frames = 0_u64;
     for purpose in purposes {
-        let rows = rows::describe_finishing_transaction(purpose)?;
+        let mut rows = rows::describe_finishing_transaction(tx, purpose)?;
+        if activation_required && purpose == ProcessReturnTransactionData::Enrollment {
+            rows.extend(rows::describe_return_bank_activation(tx)?);
+        }
         let mut trees = Vec::new();
         for row in rows {
-            let tree = if row.table() == ProcessReturnTableData::Meta {
+            let tree = if row.table() == ProcessReturnTableData::Meta
+                && row.before_record_bytes().is_some()
+            {
                 // The compiled future singleton has one INTEGER PRIMARY KEY
-                // and no secondary indexes. Its actual presence must be part
-                // of the new cohort before this can become spendable funding.
-                if row.before_record_bytes().is_none()
-                    || !row.mutable_index_record_bytes().is_empty()
-                {
+                // and no secondary indexes. First enrollment separately
+                // prices its root creation and initial insert before this
+                // same transaction updates the frontier for its new account.
+                if !row.mutable_index_record_bytes().is_empty() {
                     return Err(unavailable());
                 }
                 SqliteTreeWriteShapeData::singleton_root(
@@ -112,13 +122,112 @@ pub(super) fn price_future_finishing_transactions(
     Ok(prices)
 }
 
-fn require_complete_process_return_bank(_tx: &Connection) -> Result<(), ProcessError> {
-    // The new bank has no authenticated full cold inverse yet. In particular
-    // an absent meta table cannot be priced as an existing singleton root or
-    // treated as zero retained liability. This gate remains an owning RED seam.
-    Err(ProcessError::Configuration(
-        "Process complete original return bank has not been installed",
-    ))
+/// Price one actual current write from its described rows and this file's
+/// active profile. The result is a debt amount for the capacity equation,
+/// never an allowance or a zero estimate.
+pub(super) fn price_current_write(
+    tx: &Connection,
+    store_path: &Path,
+    namespace: &str,
+    authority: &str,
+    kernel_key: &str,
+    rows: &[ProcessReturnRowEnvelopeData],
+) -> Result<SqlitePhysicalDebtAmountData, ProcessError> {
+    let profile =
+        catalog::prepare_active_profile(tx, store_path, namespace, authority, kernel_key)?;
+    price_rows(&profile, rows)
+}
+
+/// Price one startup write of a provably empty or pre-layout journal as the
+/// smaller of the generic shape bound and the enforced page ceiling of this
+/// file. The ceiling is the file's actual page count plus the shape's
+/// maximum_page_growth from the shared calculator, so it stays valid under
+/// the locked authenticated layout delta and never caps owned history for
+/// later progress. The caller installs the ceiling on the writing connection
+/// inside the startup transaction, reads it back, and restores the original
+/// connection settings on every exit path; this grants no funding.
+pub(super) fn price_startup_rows(
+    tx: &Connection,
+    profile: &catalog::ProcessWriteProfileData,
+    rows: &[ProcessReturnRowEnvelopeData],
+) -> Result<(SqlitePhysicalDebtAmountData, u64), ProcessError> {
+    let frame_profile =
+        SqliteFramePriceProfileData::checked(profile.page_size(), profile.reserved_bytes())
+            .map_err(|_| unavailable())?;
+    let mut trees = Vec::new();
+    for row in rows {
+        trees.push(
+            SqliteTreeWriteShapeData::record(
+                row.before_record_bytes(),
+                row.maximum_after_record_bytes(),
+                row.mutations(),
+            )
+            .map_err(|_| unavailable())?,
+        );
+        for maximum_index in row.mutable_index_record_bytes() {
+            trees.push(
+                SqliteTreeWriteShapeData::record(
+                    row.before_record_bytes().map(|_| *maximum_index),
+                    *maximum_index,
+                    row.mutations(),
+                )
+                .map_err(|_| unavailable())?,
+            );
+        }
+    }
+    let transaction = SqliteTransactionWriteShapeData::checked(trees).map_err(|_| unavailable())?;
+    let pages =
+        u64::try_from(tx.query_row("PRAGMA main.page_count", [], |row| row.get::<_, i64>(0))?)
+            .map_err(|_| unavailable())?;
+    let growth = transaction
+        .maximum_page_growth(&frame_profile)
+        .map_err(|_| unavailable())?;
+    let ceiling = pages
+        .checked_add(growth)
+        .filter(|ceiling| *ceiling <= i32::MAX as u64)
+        .ok_or_else(unavailable)?;
+    let price = transaction
+        .price_within_pages(&frame_profile, ceiling)
+        .map_err(|_| unavailable())?;
+    let priced = SqlitePhysicalDebtAmountData::checked(price.wal_bytes(), price.disk_bytes())
+        .map_err(|_| unavailable())?;
+    Ok((priced, ceiling))
+}
+
+/// Price described rows under an already authenticated write profile.
+pub(super) fn price_rows(
+    profile: &catalog::ProcessWriteProfileData,
+    rows: &[ProcessReturnRowEnvelopeData],
+) -> Result<SqlitePhysicalDebtAmountData, ProcessError> {
+    let frame_profile =
+        SqliteFramePriceProfileData::checked(profile.page_size(), profile.reserved_bytes())
+            .map_err(|_| unavailable())?;
+    let mut trees = Vec::new();
+    for row in rows {
+        trees.push(
+            SqliteTreeWriteShapeData::record(
+                row.before_record_bytes(),
+                row.maximum_after_record_bytes(),
+                row.mutations(),
+            )
+            .map_err(|_| unavailable())?,
+        );
+        for maximum_index in row.mutable_index_record_bytes() {
+            trees.push(
+                SqliteTreeWriteShapeData::record(
+                    row.before_record_bytes().map(|_| *maximum_index),
+                    *maximum_index,
+                    row.mutations(),
+                )
+                .map_err(|_| unavailable())?,
+            );
+        }
+    }
+    let transaction = SqliteTransactionWriteShapeData::checked(trees).map_err(|_| unavailable())?;
+    let price =
+        price_transaction_write_shape(&frame_profile, &transaction).map_err(|_| unavailable())?;
+    SqlitePhysicalDebtAmountData::checked(price.wal_bytes(), price.disk_bytes())
+        .map_err(|_| unavailable())
 }
 
 fn unavailable() -> ProcessError {

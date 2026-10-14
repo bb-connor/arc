@@ -33,8 +33,9 @@ pub(in crate::admission_operation_store) const MAX_CHUNK_COUNT: usize =
 pub(in crate::admission_operation_store) const MAX_ENCODED_SET_BYTES: usize =
     2 * MAX_ATOM_BODY_BYTES + MAX_CHUNK_COUNT * MAX_CHUNK_HEADER_BYTES + MAX_PRIVATE_ROW_BYTES;
 
-/// Evidence data. Only an opaque native Journal or checkpoint Restore source
-/// can select an owner when constructing the affine write proof.
+/// Evidence data. Only an opaque native Journal, checkpoint Restore or
+/// admitted release outcome source can select an owner when constructing the
+/// affine write proof.
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub(in crate::admission_operation_store) enum EncodingOwner {
@@ -49,12 +50,19 @@ pub(in crate::admission_operation_store) enum EncodingOwner {
         record_key: String,
         release: ReleaseId,
     },
+    Release {
+        scope: RecoveryScopeV1,
+        record_key: String,
+        release: ReleaseId,
+    },
 }
 
 impl EncodingOwner {
     pub(in crate::admission_operation_store) fn scope(&self) -> &RecoveryScopeV1 {
         match self {
-            Self::Journal { scope, .. } | Self::Restore { scope, .. } => scope,
+            Self::Journal { scope, .. }
+            | Self::Restore { scope, .. }
+            | Self::Release { scope, .. } => scope,
         }
     }
     pub(in crate::admission_operation_store) fn root_key(
@@ -79,8 +87,18 @@ impl EncodingOwner {
             } => {
                 let scope = protected::scope_key(scope)?;
                 if record_key.len() > 512
-                    || !(record_key.starts_with(&format!("knowledge-restore:{scope}:"))
-                        || record_key.starts_with(&format!("knowledge-restore:v2:{scope}:")))
+                    || !record_key.starts_with(&format!("knowledge-restore:v2:{scope}:"))
+                {
+                    return Err(invalid());
+                }
+                Ok(record_key.clone())
+            }
+            Self::Release {
+                scope, record_key, ..
+            } => {
+                let scope = protected::scope_key(scope)?;
+                if record_key.len() > 512
+                    || !record_key.starts_with(&format!("knowledge-release:v2:{scope}:"))
                 {
                     return Err(invalid());
                 }

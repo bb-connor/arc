@@ -52,15 +52,15 @@ impl NativeKnowledgeRuntime {
         let mut records = Vec::with_capacity(references.len());
         let mut total = 0_u64;
         for reference in references {
-            let handle = self.handle(capability, &reference, &sink.recipient().recipient)?;
-            let prepared = self.prepare_read(capability, &handle)?;
+            let (record, bytes) =
+                self.read_for_recipient(&actor, &profile, &reference, &sink.recipient().recipient)?;
             total = total
-                .checked_add(prepared.record.metadata.size_bytes.get())
+                .checked_add(record.metadata.size_bytes.get())
                 .ok_or_else(|| unavailable("archive overflow"))?;
             if total > MAX_ARTIFACT_BYTES as u64 {
                 return Err(unavailable("archive bytes"));
             }
-            records.push(prepared);
+            records.push((record, bytes));
         }
         let manifest = SignedArtifactArchiveManifestV1::sign_with_backend(
             ArtifactArchiveManifestV1 {
@@ -70,7 +70,7 @@ impl NativeKnowledgeRuntime {
                 versions: NonEmptyBoundedList::new(
                     records
                         .iter()
-                        .map(|prepared| prepared.record.metadata.clone())
+                        .map(|(record, _)| record.metadata.clone())
                         .collect(),
                 )
                 .map_err(unavailable)?,
@@ -97,10 +97,9 @@ impl NativeKnowledgeRuntime {
         );
         bytes.extend_from_slice(&encoded);
         let mut dependencies = Vec::new();
-        for prepared in records {
-            let reference =
-                artifact_version_reference(&prepared.record.metadata).map_err(unavailable)?;
-            bytes.extend_from_slice(&prepared.bytes);
+        for (record, content) in records {
+            let reference = artifact_version_reference(&record.metadata).map_err(unavailable)?;
+            bytes.extend_from_slice(&content);
             dependencies.push(reference);
         }
         // The bounded single-buffer backend includes manifest overhead in its
@@ -150,10 +149,7 @@ impl NativeKnowledgeRuntime {
         {
             return Err(unavailable("archive authority"));
         }
-        let digest = self
-            .store
-            .retain_import_manifest(&actor, &archive.manifest, &self.fence, now()?)
-            .map_err(unavailable)?;
+        let digest = artifact_archive_digest(archive.manifest.body()).map_err(unavailable)?;
         let mut mapping = Vec::<(ArtifactVersionRefV1, ArtifactVersionRefV1)>::new();
         for (index, (original, raw)) in archive
             .manifest
@@ -194,10 +190,15 @@ impl NativeKnowledgeRuntime {
                 dependencies: BoundedList::new(dependencies).map_err(unavailable)?,
                 retention: original.retention,
             };
-            let imported = self.publish(capability, &input, raw, None)?;
-            self.store
-                .retain_import_mapping(&actor, digest, &origin, &imported, &self.fence, now()?)
-                .map_err(unavailable)?;
+            let imported = self.publish_with_source(
+                capability,
+                &input,
+                raw,
+                None,
+                ArtifactReservationSource::Import {
+                    manifest: &archive.manifest,
+                },
+            )?;
             mapping.push((origin, imported));
         }
         mapping

@@ -1,5 +1,6 @@
 //! Independent blob and authority commits are explicit recoverable cutpoints.
 use super::*;
+pub(in crate::admission_operation_store::knowledge) mod intake;
 
 pub(super) fn ensure_publication_audience(
     tx: &Transaction<'_>,
@@ -41,26 +42,21 @@ fn publication(
     super::publication_capacity::validate_retained_allocation(tx, &record)?;
     Ok(record)
 }
+/// Nonterminal publication progress only. Retirement is a terminal that settles
+/// through the prepared closure with its own CAS, witnesses and refund.
 fn write_record(
     tx: &Transaction<'_>,
     owner: &SqliteServingOwner,
+    actor: &AuthenticatedRecoveryActor,
+    profile: &NativeKnowledgeInstallationV1,
+    now: u64,
     record: &NativeArtifactRecordV1,
 ) -> Result<(), AdmissionOperationStoreError> {
-    let key = record_publication_key(record)?;
-    let previous = protected::source_reference(tx, &key)?;
-    let progress = super::publication_source::VerifiedKnowledgePublicationProgress::new(
-        tx,
-        previous,
-        record.clone(),
+    let progress = super::intake::AuthenticatedKnowledgeIntakeSource::publication_progress(
+        tx, actor, profile, now, record,
     )?;
-    progress.verify(tx)?;
-    super::publication_capacity::validate_existing_allocation(tx, record)?;
-    save(tx, owner, &record.metadata.scope, &key, record)?;
-    if record.state == ArtifactPublicationStateV1::Retired {
-        super::reference_retirement::retire_publication_references(tx, owner, record)
-    } else {
-        super::reference_custody::retain_publication_references(tx, owner, record)
-    }
+    protected::persist_knowledge_intake(tx, owner, progress)?;
+    super::reference_custody::retain_publication_references(tx, owner, record)
 }
 fn validate_certificate(
     tx: &Transaction<'_>,
@@ -173,11 +169,36 @@ fn validate_native_projection(
     }
     Ok(())
 }
+/// What a reservation is accountable to. An Import producer is reserved only
+/// against the signed manifest it cites; every other producer against none.
+#[derive(Clone, Copy)]
+pub enum ArtifactReservationSource<'a> {
+    Publication,
+    Import {
+        manifest: &'a SignedArtifactArchiveManifestV1,
+    },
+}
 impl SqliteAdmissionOperationStore {
     pub fn reserve_artifact(
         &self,
         actor: &AuthenticatedRecoveryActor,
         input: &ArtifactPublicationInputV1,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<NativeArtifactRecordV1, AdmissionOperationStoreError> {
+        self.reserve_artifact_from(
+            actor,
+            input,
+            ArtifactReservationSource::Publication,
+            fence,
+            now,
+        )
+    }
+    pub fn reserve_artifact_from(
+        &self,
+        actor: &AuthenticatedRecoveryActor,
+        input: &ArtifactPublicationInputV1,
+        reservation_source: ArtifactReservationSource<'_>,
         fence: &StoreMutationFence,
         now: u64,
     ) -> Result<NativeArtifactRecordV1, AdmissionOperationStoreError> {
@@ -189,6 +210,7 @@ impl SqliteAdmissionOperationStore {
             return Err(refused("publication authority"));
         }
         mutate(self, actor, fence, now, |tx, profile, now| {
+            super::transfer::require_matching_source(input, reservation_source)?;
             let key = publication_key(actor.scope(), actor.principal(), &input.publication)?;
             if let Some(existing) = load::<NativeArtifactRecordV1>(&tx, &key)? {
                 if existing.input != *input
@@ -199,6 +221,9 @@ impl SqliteAdmissionOperationStore {
                 {
                     return Err(refused("publication identity"));
                 }
+                if matches!(input.producer, ArtifactProducerV1::Import { .. }) {
+                    super::transfer::verify_import_replay(&tx, profile, input, reservation_source)?;
+                }
                 ensure_publication_audience(&tx, actor, &existing)?;
                 super::publication_capacity::validate_existing_allocation(&tx, &existing)?;
                 return Ok((tx, existing));
@@ -208,6 +233,7 @@ impl SqliteAdmissionOperationStore {
                 traversal::dependencies(&tx, actor.scope(), input.dependencies.as_slice())?;
             let mut label = source(&tx, &profile.native_authority, &profile.producer_context)?;
             let mut imported = None;
+            let mut cited_manifest = None;
             let adoption = matches!(input.producer, ArtifactProducerV1::Adoption { .. });
             match &input.producer {
                 ArtifactProducerV1::NativeOperation { operation } => {
@@ -256,9 +282,13 @@ impl SqliteAdmissionOperationStore {
                     if actor.permission() != RecoveryPermission::KnowledgeWrite {
                         return Err(refused("import write"));
                     }
-                    let source = super::transfer::import_source(&tx, profile, input)?;
+                    let manifest =
+                        super::transfer::cited_manifest(&tx, profile, input, reservation_source)?;
+                    let source =
+                        super::transfer::import_source(&tx, profile, input, Some(manifest))?;
                     label = label.join_restrictions(&source.label).map_err(refused)?;
                     imported = Some(source);
+                    cited_manifest = Some(manifest);
                 }
             }
             label = traversal::join_metadata(label, &dependencies)?;
@@ -339,8 +369,20 @@ impl SqliteAdmissionOperationStore {
                 profile,
                 now,
                 record.clone(),
+                cited_manifest,
             )?;
             super::publication_capacity::admit_publication(&tx, &self.serving_owner, intake)?;
+            if let Some(manifest) = cited_manifest {
+                super::transfer::persist_import_manifest(
+                    &tx,
+                    &self.serving_owner,
+                    actor,
+                    profile,
+                    now,
+                    &input.publication,
+                    manifest,
+                )?;
+            }
             Ok((tx, record))
         })
     }
@@ -358,7 +400,7 @@ impl SqliteAdmissionOperationStore {
         ) {
             return Err(refused("stage authority"));
         }
-        mutate(self, actor, fence, now, |tx, profile, _| {
+        mutate(self, actor, fence, now, |tx, profile, now| {
             let mut record = publication(&tx, actor, input)?;
             ensure_publication_audience(&tx, actor, &record)?;
             if seal.object != record.object
@@ -383,7 +425,7 @@ impl SqliteAdmissionOperationStore {
             }
             record.seal = Some(seal.clone());
             record.state = ArtifactPublicationStateV1::Staged;
-            write_record(&tx, &self.serving_owner, &record)?;
+            write_record(&tx, &self.serving_owner, actor, profile, now, &record)?;
             Ok((tx, record))
         })
     }
@@ -441,31 +483,7 @@ impl SqliteAdmissionOperationStore {
             }
             traversal::ensure_audience(&tx, actor, &record.metadata.label)?;
             record.state = ArtifactPublicationStateV1::MetadataCommitted;
-            let reference = artifact_version_reference(&record.metadata).map_err(refused)?;
-            if load::<String>(&tx, &version_key(&reference)?)?.is_some() {
-                return Err(refused("version collision"));
-            }
-            save(
-                &tx,
-                &self.serving_owner,
-                actor.scope(),
-                &version_key(&reference)?,
-                &record_publication_key(&record)?,
-            )?;
-            if let Some(certificate) = &record.certificate {
-                save(
-                    &tx,
-                    &self.serving_owner,
-                    actor.scope(),
-                    &format!(
-                        "knowledge-certificate:{}:{}",
-                        scope_key(actor.scope())?,
-                        certificate.body().evidence.as_str()
-                    ),
-                    &reference,
-                )?;
-            }
-            write_record(&tx, &self.serving_owner, &record)?;
+            write_record(&tx, &self.serving_owner, actor, profile, now, &record)?;
             let _reference_delta = reference_activation::initialize_committed_artifact_references(
                 &tx,
                 &self.serving_owner,
@@ -489,13 +507,21 @@ impl SqliteAdmissionOperationStore {
         ) {
             return Err(refused("finalize authority"));
         }
-        let outcome = mutate(self, actor, fence, now, |tx, profile, _| {
+        let outcome = mutate(self, actor, fence, now, |tx, profile, now| {
             let mut record = publication(&tx, actor, input)?;
             traversal::ensure_audience(&tx, actor, &record.metadata.label)?;
             if record.seal.as_ref() != Some(verified_seal) {
                 return Err(refused("final object changed"));
             }
             if record.state == ArtifactPublicationStateV1::Available {
+                super::transfer::retain_import_map(
+                    &tx,
+                    &self.serving_owner,
+                    actor,
+                    profile,
+                    now,
+                    &record,
+                )?;
                 let reference = artifact_version_reference(&record.metadata).map_err(refused)?;
                 return Ok((tx, Some(reference)));
             }
@@ -510,11 +536,19 @@ impl SqliteAdmissionOperationStore {
                     .flows_to(&record.metadata.label)
             {
                 record.state = ArtifactPublicationStateV1::Quarantined;
-                write_record(&tx, &self.serving_owner, &record)?;
+                write_record(&tx, &self.serving_owner, actor, profile, now, &record)?;
                 return Ok((tx, None));
             }
             record.state = ArtifactPublicationStateV1::Available;
-            write_record(&tx, &self.serving_owner, &record)?;
+            write_record(&tx, &self.serving_owner, actor, profile, now, &record)?;
+            super::transfer::retain_import_map(
+                &tx,
+                &self.serving_owner,
+                actor,
+                profile,
+                now,
+                &record,
+            )?;
             let reference = artifact_version_reference(&record.metadata).map_err(refused)?;
             Ok((tx, Some(reference)))
         })?;
@@ -536,11 +570,11 @@ impl SqliteAdmissionOperationStore {
         ) {
             return Err(refused("quarantine authority"));
         }
-        mutate(self, actor, fence, now, |tx, _, _| {
+        mutate(self, actor, fence, now, |tx, profile, now| {
             let mut record = publication(&tx, actor, input)?;
             if record.state != ArtifactPublicationStateV1::Retired {
                 record.state = ArtifactPublicationStateV1::Quarantined;
-                write_record(&tx, &self.serving_owner, &record)?;
+                write_record(&tx, &self.serving_owner, actor, profile, now, &record)?;
             }
             Ok((tx, ()))
         })
@@ -562,11 +596,11 @@ impl SqliteAdmissionOperationStore {
         {
             return Err(refused("quarantine authority"));
         }
-        mutate(self, actor, fence, now, |tx, _, _| {
+        mutate(self, actor, fence, now, |tx, profile, now| {
             let mut record = artifact(&tx, reference)?;
             traversal::ensure_audience(&tx, actor, &record.metadata.label)?;
             record.state = ArtifactPublicationStateV1::Quarantined;
-            write_record(&tx, &self.serving_owner, &record)?;
+            write_record(&tx, &self.serving_owner, actor, profile, now, &record)?;
             Ok((tx, ()))
         })
     }

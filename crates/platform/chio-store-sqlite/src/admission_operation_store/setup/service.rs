@@ -28,6 +28,7 @@ impl SqliteAdmissionOperationStore {
             receipt_key,
             operator,
             process,
+            unused_closure,
         } = host;
         let seed: ToolCallRequest =
             chio_core::recovery::decode_contract(request_seed.as_str().as_bytes())
@@ -89,9 +90,12 @@ impl SqliteAdmissionOperationStore {
                     retire_for_replacement(
                         tx,
                         (&self.serving_owner, &original_cut),
-                        &existing,
-                        recovery,
-                        &workflow,
+                        unused_closure,
+                        SetupReplacement {
+                            selected: &existing,
+                            deployment: recovery,
+                            workflow: &workflow,
+                        },
                         fence,
                         now,
                     )?;
@@ -456,23 +460,33 @@ impl SqliteAdmissionOperationStore {
     }
 }
 
-// The native closure consumer independently checks original-operation and
-// process custody. Selection replacement and closure share this transaction.
+struct SetupReplacement<'a> {
+    selected: &'a Selection,
+    deployment: &'a RecoveryDeploymentV1,
+    workflow: &'a WorkflowId,
+}
+
+// Selection replacement uses this transaction. The idempotent Process closure
+// commits first, so it still fences dispatch if this transaction rolls back.
 fn retire_for_replacement(
     tx: &Transaction<'_>,
     writer: (&SqliteServingOwner, &NativeSourceTransactionOrigin<'_>),
-    selected: &Selection,
-    deployment: &RecoveryDeploymentV1,
-    replacement: &WorkflowId,
+    unused_closure: &dyn RecoveryUnusedReservationClosurePort,
+    replacement: SetupReplacement<'_>,
     fence: &StoreMutationFence,
     now: u64,
 ) -> Result<(), AdmissionOperationStoreError> {
     let (owner, origin) = writer;
-    let reason = unused_replacement_reason(tx, selected, deployment, fence, now)?
+    let SetupReplacement {
+        selected,
+        deployment,
+        workflow,
+    } = replacement;
+    unused_replacement_reason(tx, selected, deployment, fence, now)?
         .ok_or_else(|| refused("active self-test cannot change"))?;
     if protected::raw_checked(
         tx,
-        &protected::workflow_key(&selected.probe.scope, replacement)?,
+        &protected::workflow_key(&selected.probe.scope, workflow)?,
     )?
     .is_some()
     {
@@ -480,27 +494,33 @@ fn retire_for_replacement(
     }
     let record =
         protected::workflow_tx(tx, &selected.probe.scope, &selected.probe.benign_workflow)?;
-    if selected.evidence.is_none()
-        && selected.report.is_none()
-        && record.control == WorkflowControlV1::Active
-        && record.action.is_none()
-        && record.process_reservation.is_none()
+    let unprobed = selected.evidence.is_none() && selected.report.is_none();
+    let never_acquired = record.control == WorkflowControlV1::Active
         && !record.captured
-        && record.native_link.is_none()
+        && record.native_link.is_none();
+    if unprobed && never_acquired && record.action.is_none() && record.process_reservation.is_none()
     {
         let proof = super::unused_generation::verify_unused_generation(
             tx, selected, deployment, fence, now,
         )?;
-        protected::retire_unused_setup_generation_with_origin(tx, owner, proof, now, origin)?;
-    } else if !matches!(
-        reason,
-        UnusedSetupReplacementReason::ProfileChanged
-            | UnusedSetupReplacementReason::InitialWindowExpired
-    ) {
-        return Err(refused("unprobed setup custody is not replaceable"));
+        protected::retire_unused_setup_generation_with_origin(tx, owner, proof, origin)?;
+    } else if unprobed && never_acquired {
+        // Active materialized custody that was never captured or linked. The
+        // Process closure proves its reservation was never finalized or
+        // dispatched, then the workflow retires through the cancellation writer.
+        protected::retire_unused_materialized_setup_generation_with_origin(
+            tx,
+            owner,
+            unused_closure,
+            &record,
+            fence,
+            origin,
+        )?;
     }
-    // Other retained workflows keep their allocation, original claim and every
-    // charge. Profile or expiry selection rotation releases no capacity.
+    // Any other workflow keeps its state, allocation, original claim and every
+    // charge; only the selection is replaced. A retained probe or report
+    // implies a captured and linked workflow, and the classification above
+    // only reaches it through a changed profile or an expired initial window.
     Ok(())
 }
 

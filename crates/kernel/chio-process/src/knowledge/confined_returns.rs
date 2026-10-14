@@ -23,7 +23,8 @@ impl ProcessArtifactBroker {
         self.validate_confined_attachment(boundary)?;
         let generation = self
             .runtime
-            .with_store(|store| store.fill_verified_confined_return_slot(verified, boundary, bytes))
+            .writer
+            .fill_confined_return_slot(verified, boundary, bytes)
             .map_err(refused)?;
         Ok(ArtifactBlobSealV1 {
             object: ArtifactObjectId::new(boundary.boundary.as_str()).map_err(refused)?,

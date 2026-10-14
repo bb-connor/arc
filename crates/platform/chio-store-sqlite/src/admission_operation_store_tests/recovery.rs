@@ -2,6 +2,8 @@ use super::*;
 
 #[path = "recovery/fused_security.rs"]
 mod fused_security;
+#[path = "recovery/retained_absence.rs"]
+mod retained_absence;
 
 #[test]
 fn recovery_claims_are_bounded_fenced_and_time_monotonic() {
@@ -41,19 +43,19 @@ fn recovery_claims_are_bounded_fenced_and_time_monotonic() {
         .expect("claim");
     let recoverable = fixture
         .store
-        .list_recoverable(now, 10)
+        .list_recoverable(now, None, 10)
         .expect("recoverable");
     assert_eq!(recoverable, vec![second.clone()]);
     assert_eq!(
         fixture
             .store
-            .list_recoverable(now + 1_000, 10)
+            .list_recoverable(now + 1_000, None, 10)
             .expect("expired claim scan")
             .len(),
         2
     );
     assert!(matches!(
-        fixture.store.list_recoverable(now, 257),
+        fixture.store.list_recoverable(now, None, 257),
         Err(AdmissionOperationStoreError::Invariant(_))
     ));
 
@@ -106,9 +108,19 @@ fn recovery_claims_advance_a_full_batch_without_hiding_later_operations() {
     let trusted_now = begun_at + 1;
     let first = fixture
         .store
-        .list_recoverable(trusted_now, 256)
+        .list_recoverable(trusted_now, None, 256)
         .expect("first recovery page");
     assert_eq!(first.len(), 256);
+    assert!(first
+        .windows(2)
+        .all(|pair| { pair[0].binding().operation_id() < pair[1].binding().operation_id() }));
+    let cursor = first.last().expect("full page").binding().operation_id();
+    let tail = fixture
+        .store
+        .list_recoverable(trusted_now, Some(cursor), 256)
+        .expect("cursor passes an unchanged full page");
+    assert_eq!(tail.len(), 1);
+    assert!(tail[0].binding().operation_id() > cursor);
     for operation in &first {
         fixture
             .store
@@ -124,9 +136,10 @@ fn recovery_claims_advance_a_full_batch_without_hiding_later_operations() {
     }
     let second = fixture
         .store
-        .list_recoverable(trusted_now, 256)
+        .list_recoverable(trusted_now, None, 256)
         .expect("second recovery page");
     assert_eq!(second.len(), 1);
+    assert_eq!(second, tail);
     assert!(first.iter().all(|operation| {
         operation.binding().operation_id() != second[0].binding().operation_id()
     }));
@@ -492,7 +505,7 @@ fn scoped_runtime_clock_qualifies_deterministic_admission_time() {
         "request-fixed-runtime-time",
         "capability-fixed-runtime-time",
     );
-    let fixed_now_unix_ms = 1_700_000_001_000;
+    let fixed_now_unix_ms = clock_origin_ms(&fixture).expect("trusted clock origin") + 1_000;
     let _scope = chio_kernel::scope_fixed_runtime_for_current_thread(
         fixed_now_unix_ms / 1_000,
         std::iter::empty(),

@@ -239,6 +239,13 @@ impl SqliteToolOutcomeStore {
         let operation = load_operation_for_participant_tx(&transaction, record.operation_id())
             .map_err(admission_error)?
             .ok_or(ToolOutcomeStoreError::NotFound)?;
+        crate::admission_operation_store::authorize_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &operation,
+            crate::admission_operation_store::NativeFinishingWrite::SecurityRelease,
+        )
+        .map_err(admission_error)?;
         crate::admission_operation_store::verify_participant_recovery_lease_tx(
             &transaction,
             &self.serving_owner,
@@ -286,6 +293,13 @@ impl SqliteToolOutcomeStore {
             lease,
             &digest,
             now,
+        )
+        .map_err(admission_error)?;
+        crate::admission_operation_store::spend_native_finishing_write(
+            &transaction,
+            &self.serving_owner,
+            &operation,
+            crate::admission_operation_store::NativeFinishingWrite::SecurityRelease,
         )
         .map_err(admission_error)?;
         verify_outcome_projection(&transaction, record.operation_id().as_str())?;

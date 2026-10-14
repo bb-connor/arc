@@ -4,9 +4,9 @@ use chio_kernel::admission_operation::NativeSecurityEgressContext;
 
 impl SqliteAdmissionOperationStore {
     /// This boundary precedes an external authorization. Borrowed context and
-    /// retained envelope data cannot provide prepaid finishing authority.
-    /// The complete native purpose factory has not been installed, so an
-    /// authenticated fresh native operation is refused before the first write.
+    /// retained envelope data cannot provide prepaid finishing authority; only
+    /// the exact Confirmed account of this original can, and only when its
+    /// roster prices the payment settlement the authorization would owe.
     pub(in crate::admission_operation_store) fn require_native_pre_authorization_finishing_funding_from_port(
         &self,
         context: &NativeSecurityEgressContext<'_>,
@@ -52,8 +52,19 @@ impl SqliteAdmissionOperationStore {
         // transaction cut; no caller-selected initialization is accepted.
         records::load_current_metadata(&tx, context.binding)?;
         origin.verify(&tx).map_err(map_owner_error)?;
+        super::finishing_account::require_confirmed_native_finishing(
+            &tx,
+            operation,
+            &original,
+            context.binding,
+        )
+        .map_err(|_| {
+            invalid("native external authorization lacks authenticated finishing funding")
+        })?;
+        // The payment participant's terminal and journal settlement writes
+        // have no priced native shape, so no account ever prepays them.
         Err(invalid(
-            "native external authorization lacks authenticated finishing funding",
+            "native external authorization has no priced payment settlement purpose",
         ))
     }
 }

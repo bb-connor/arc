@@ -54,10 +54,6 @@ impl ClosedUnusedRecoveryReservation<'_> {
     pub fn historical_data(&self) -> &UnusedRecoveryReservationClosureData {
         &self.data
     }
-
-    pub fn into_historical_data(self) -> UnusedRecoveryReservationClosureData {
-        self.data
-    }
 }
 
 impl core::fmt::Debug for ClosedUnusedRecoveryReservation<'_> {
@@ -81,9 +77,9 @@ impl ProcessRuntime {
                     "unused recovery closure lacks its native authority",
                 ))?;
         let key = self.kernel.public_key().to_hex();
-        let data = self.with_store(|store| {
-            store.close_unused_recovery_reservation((authority, &key), reservation)
-        })?;
+        let data = self
+            .writer
+            .close_unused_recovery_reservation((authority, &key), reservation)?;
         let role = ClosedUnusedRecoveryReservation {
             runtime: self,
             data,
@@ -108,5 +104,47 @@ impl ProcessRuntime {
             return Err(ProcessError::Conflict);
         }
         Ok(())
+    }
+}
+
+impl chio_kernel::recovery::RecoveryUnusedReservationClosureRole
+    for ClosedUnusedRecoveryReservation<'_>
+{
+    fn verify_for(
+        &self,
+        expected: &chio_kernel::recovery::RecoveryProcessReservationV1,
+        authority_domain: &str,
+    ) -> Result<(), chio_kernel::admission_operation::AdmissionOperationStoreError> {
+        let reservation = RecoveryCallReservation {
+            data: expected.clone(),
+        };
+        self.verify_for(&reservation, authority_domain)
+            .map_err(|_| {
+                chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(
+                    "unused recovery reservation closure verification refused".into(),
+                )
+            })
+    }
+}
+
+impl chio_kernel::recovery::RecoveryUnusedReservationClosurePort for ProcessRuntime {
+    fn close_unused_recovery_reservation(
+        &self,
+        reservation: &chio_kernel::recovery::RecoveryProcessReservationV1,
+    ) -> Result<
+        Box<dyn chio_kernel::recovery::RecoveryUnusedReservationClosureRole + '_>,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        let reservation = RecoveryCallReservation {
+            data: reservation.clone(),
+        };
+        let role = self
+            .close_unused_recovery_reservation(&reservation)
+            .map_err(|_| {
+                chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(
+                    "unused recovery reservation closure refused".into(),
+                )
+            })?;
+        Ok(Box::new(role))
     }
 }

@@ -10,6 +10,7 @@ import base64
 import ctypes
 import fcntl
 import hashlib
+import itertools
 import json
 import os
 from pathlib import Path
@@ -28,6 +29,8 @@ import uuid
 
 SCHEMA = "chio.rust-compilation.v4"
 COMPLETION_SCHEMA = "chio.rust-compilation-completion.v3"
+DEP_INFO_INSTRUMENTATION_V1_SCHEMA = "chio.rust-compilation-dep-info-instrumentation.v1"
+DEP_INFO_INSTRUMENTATION_V2_SCHEMA = "chio.rust-compilation-dep-info-instrumentation.v2"
 MAX_INPUT = 512 * 1024 * 1024
 MAX_CONTENT = 16 * 1024 * 1024 * 1024
 MAX_JSON = 16 * 1024 * 1024
@@ -72,6 +75,36 @@ def require(condition, code):
         raise Refusal(code)
 
 
+# rustc metadata v10 has an eight-byte magic, a little-endian u64 root
+# position, then a varint-length version string. rustc validates the body.
+RUSTC_METADATA_MAGIC = b"rust\x00\x00\x00\x0a"
+RUSTC_METADATA_HEADER_PREFACE = 512
+
+
+def supported_metadata_header(handle):
+    preface = os.pread(handle.fd, RUSTC_METADATA_HEADER_PREFACE, 0)
+    require(len(preface) >= 17 and preface[:8] == RUSTC_METADATA_MAGIC, "extern_image_format")
+    root_position = struct.unpack_from("<Q", preface, 8)[0]
+    version_length = 0
+    offset = 16
+    for shift in range(0, 35, 7):
+        require(offset < len(preface), "extern_image_format")
+        byte = preface[offset]
+        version_length |= (byte & 0x7F) << shift
+        offset += 1
+        if byte < 0x80:
+            break
+    else:
+        raise Refusal("extern_image_format")
+    version_end = offset + version_length
+    require(version_length > 6 and version_end <= len(preface)
+            and version_end <= root_position < os.fstat(handle.fd).st_size, "extern_image_format")
+    banner = preface[offset:version_end]
+    require(banner.startswith(b"rustc ") and all(32 <= byte < 127 for byte in banner),
+            "extern_image_format")
+    return True
+
+
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
 
@@ -85,7 +118,7 @@ def secret_path(path):
         part = unicodedata.normalize("NFKC", part).casefold()
         if (part in SECRET_NAMES or part == ".env" or part.startswith(".env.")
                 or part == "secrets" or part.startswith("secrets.") or part.startswith("private-key")
-                or Path(part).suffix in SECRET_SUFFIXES):
+                or ("." in part and Path(part).suffix in SECRET_SUFFIXES)):
             return True
     return False
 
@@ -110,31 +143,51 @@ def identity(value):
 
 
 class HeldPath:
-    """Hold every parent descriptor and refuse alias components before opening."""
-    def __init__(self, path, directory=False, create=False, publication_link=False, metadata_only=False):
+    """Bind the full path; a read-only child may borrow a live held directory.
+
+    Borrowed ancestors stay owned by the parent and are reverified on every read.
+    """
+    def __init__(self, path, directory=False, create=False, publication_link=False,
+                 metadata_only=False, held_parent=None):
         self.path = absolute(path)
         self.fds = []
         self.links = []
+        self.held = None
+        self.closed = False
         try:
-            parent = os.open("/", PARENT_OPEN)
-            self.fds.append(parent)
-            for name in self.path.parts[1:-1]:
-                before = os.stat(name, dir_fd=parent, follow_symlinks=False)
-                require(stat.S_ISDIR(before.st_mode), "unsafe_parent")
-                child = os.open(name, PARENT_OPEN, dir_fd=parent)
-                require((before.st_dev, before.st_ino) == (os.fstat(child).st_dev, os.fstat(child).st_ino), "parent_race")
-                self.links.append((parent, name, child))
-                self.fds.append(child)
-                parent = child
+            if held_parent is not None:
+                require(not directory and not create and not metadata_only and not publication_link, "held_child_read_only")
+                require(not held_parent.closed, "held_parent_closed")
+                require(stat.S_ISDIR(held_parent.initial[2]), "unsafe_parent")
+                require(self.path.parent == held_parent.path, "held_parent_mismatch")
+                held_parent.verify(content=False)
+                self.held = held_parent
+                self.links = [*held_parent.links,
+                              (held_parent.parent, held_parent.name, held_parent.fd)]
+                parent = held_parent.fd
+            else:
+                parent = os.open("/", PARENT_OPEN)
+                self.fds.append(parent)
+                for name in self.path.parts[1:-1]:
+                    before = os.stat(name, dir_fd=parent, follow_symlinks=False)
+                    require(stat.S_ISDIR(before.st_mode), "unsafe_parent")
+                    child = os.open(name, PARENT_OPEN, dir_fd=parent)
+                    self.fds.append(child)
+                    opened = os.fstat(child)
+                    require((before.st_dev, before.st_ino) == (opened.st_dev, opened.st_ino), "parent_race")
+                    self.links.append((parent, name, child))
+                    parent = child
             name = self.path.name
             if create:
                 flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | NOFOLLOW
                 self.fd = os.open(name, flags, 0o600, dir_fd=parent)
+                self.fds.append(self.fd)
             else:
                 before = os.stat(name, dir_fd=parent, follow_symlinks=False)
                 require(stat.S_ISDIR(before.st_mode) if directory else stat.S_ISREG(before.st_mode), "not_regular")
                 self.fd = os.open(name, (PARENT_OPEN if metadata_only and directory else
                                         os.O_RDONLY | NOFOLLOW | (os.O_DIRECTORY if directory else 0)), dir_fd=parent)
+                self.fds.append(self.fd)
                 opened = os.fstat(self.fd)
                 # Cooperating writers may change directory membership before
                 # flock acquisition. Bind the directory inode/type/mode here;
@@ -142,11 +195,12 @@ class HeldPath:
                 opened_identity = lambda value: (value.st_dev, value.st_ino, value.st_mode)
                 require(opened_identity(before) == opened_identity(opened) if directory
                         else identity(before) == identity(opened), "file_race")
-            self.fds.append(self.fd)
             self.parent = parent
             self.name = name
             self.initial = identity(os.fstat(self.fd))
-            self.parents = tuple(identity(os.fstat(fd)) for fd in self.fds[:-1])
+            # Directory membership may have changed since the parent was opened.
+            self.parents = tuple(identity(os.fstat(fd)) for fd in
+                                 [*(link[0] for link in self.links), parent])
             require(stat.S_ISDIR(self.initial[2]) if directory else stat.S_ISREG(self.initial[2]), "not_regular")
             require(directory or self.initial[-1] == 1 or (publication_link and self.initial[-1] == 2), "hardlink_alias")
         except Exception:
@@ -154,6 +208,10 @@ class HeldPath:
             raise
 
     def verify(self, content=True):
+        if self.held is not None:
+            # Fail closed before touching borrowed descriptors that the
+            # owning scope may already have released.
+            require(not self.held.closed, "held_parent_closed")
         for parent, name, child in self.links:
             observed = os.stat(name, dir_fd=parent, follow_symlinks=False)
             held = os.fstat(child)
@@ -168,12 +226,12 @@ class HeldPath:
         if content:
             require(identity(held) == self.initial, "file_changed")
 
-    def read(self, limit=MAX_INPUT):
+    def _read_fresh(self, limit, consume):
+        """Consume bounded chunks, verifying custody and size around the full read."""
         self.verify()
         size = os.fstat(self.fd).st_size
         require(size <= limit, "input_limit")
         os.lseek(self.fd, 0, os.SEEK_SET)
-        chunks = []
         total = 0
         while True:
             part = os.read(self.fd, min(1024 * 1024, limit + 1 - total))
@@ -181,10 +239,39 @@ class HeldPath:
                 break
             total += len(part)
             require(total <= limit, "input_limit")
-            chunks.append(part)
+            consume(part, total)
         self.verify()
         require(total == size, "file_changed")
+        return total
+
+    def read(self, limit=MAX_INPUT):
+        chunks = []
+        self._read_fresh(limit, lambda part, _: chunks.append(part))
         return b"".join(chunks)
+
+    def read_digest(self, limit=MAX_INPUT):
+        """Hash fresh held bytes in bounded chunks; never retain the whole body."""
+        hasher = hashlib.sha256()
+        total = self._read_fresh(limit, lambda part, _: hasher.update(part))
+        return hasher.hexdigest(), total
+
+    def read_matches(self, payload, mismatch, limit=MAX_INPUT):
+        """Exactly compare fresh held bytes with payload, one bounded chunk at a time.
+
+        Returns the fresh-body sha256 hexdigest and raises Refusal(mismatch)
+        when either the length or any fresh byte differs. Additional comparison
+        storage is bounded by one read chunk; read() custody checks still apply.
+        """
+        view = memoryview(payload)
+        hasher = hashlib.sha256()
+
+        def consume(part, total):
+            hasher.update(part)
+            require(bytes(view[total - len(part):total]) == part, mismatch)
+
+        total = self._read_fresh(limit, consume)
+        require(total == len(payload), mismatch)
+        return hasher.hexdigest()
 
     def binding(self):
         return (self.initial, self.parents)
@@ -193,6 +280,7 @@ class HeldPath:
         for descriptor in reversed(self.fds):
             os.close(descriptor)
         self.fds = []
+        self.closed = True
 
     def __enter__(self):
         return self
@@ -227,7 +315,7 @@ def verify_publication(staged, directory, name, payload, publication_link=False)
         source_info = os.fstat(staged.fd)
         final_info = os.fstat(final.fd)
         require((source_info.st_dev, source_info.st_ino) == (final_info.st_dev, final_info.st_ino), "publication_inode")
-        require(final.read() == payload, "publication_bytes")
+        final.read_matches(payload, "publication_bytes")
         final.verify()
         directory.verify(content=False)
 
@@ -283,6 +371,11 @@ class Campaign:
         self._unit_durability_unconfirmed = False
         self.publication_recovery = "fresh"
         self.retention_recovery = "fresh"
+        # One memo of prior fully validated retention batches per Campaign
+        # object: per-batch digests over their exact observed references
+        # plus the member union. Nothing persists and nothing crosses
+        # processes or Campaign objects.
+        self._validated_journal = None
         try:
             # Refuse old writer formats before the first mutation, including
             # creating a missing lock in a historical namespace. The actual
@@ -413,11 +506,11 @@ class Campaign:
         require(len(names) <= MAX_ARTIFACTS and all(DIGEST.fullmatch(name) for name in names), "artifact_namespace")
         members = []
         for name in names:
-            with HeldPath(self.artifacts.path / name) as handle:
-                payload = handle.read()
-                require(hashlib.sha256(payload).hexdigest() == name, "artifact_changed")
+            with HeldPath(self.artifacts.path / name, held_parent=self.artifacts) as handle:
+                sha, size = handle.read_digest()
+                require(sha == name, "artifact_changed")
                 members.append({"artifact": "artifacts/" + name, "sha256": name,
-                                "size": len(payload), "identity": list(handle.initial)})
+                                "size": size, "identity": list(handle.initial)})
         require(sum(item["size"] for item in members) <= MAX_CONTENT, "content_limit")
         return members
 
@@ -428,13 +521,54 @@ class Campaign:
             re.fullmatch(r"[0-9a-f]{32}\.(?:start|complete)\.json", name) for name in names),
             "retention_batch_incomplete")
         ids = sorted({name.split(".")[0] for name in names})
-        references = []
+        # Every current start/complete body is still read and hashed fresh
+        # through held handles and every pair presence is checked fresh. Only
+        # the parsed declarations and the member union are reused, and only
+        # while every previously validated pair's fresh reference digest is
+        # unchanged, so a replaced, changed or removed pair falls back to
+        # the full parse of the whole journal.
+        observed = {}
+        current_digests = {}
+        journal = self._validated_journal
+        if journal is not None:
+            try:
+                for batch_id in ids:
+                    start_name, complete_name = batch_id + ".start.json", batch_id + ".complete.json"
+                    require(start_name in names and complete_name in names, "retention_batch_incomplete")
+                    with HeldPath(self.batches.path / start_name, held_parent=self.batches) as start_handle, HeldPath(self.batches.path / complete_name, held_parent=self.batches) as complete_handle:
+                        start_bytes, complete_bytes = start_handle.read(MAX_JSON), complete_handle.read(MAX_JSON)
+                        entry = {"batch_id": batch_id, "source_binding": self.binding,
+                                 "start": self.batch_file_reference(start_name, start_bytes, start_handle),
+                                 "complete": self.batch_file_reference(complete_name, complete_bytes, complete_handle)}
+                        observed[batch_id] = entry
+                        current_digests[batch_id] = digest(entry)
+            except (KeyError, TypeError, ValueError, OSError, Refusal) as error:
+                raise Refusal("retention_batch_incomplete") from error
+        # Reuse only when the prior validated digests are an unchanged subset
+        # of the freshly observed ones: every prior pair still present with
+        # the same bytes. The union must be a copy before new pairs add to
+        # it, or a pair failing part-way would leave unvalidated members
+        # inside the stored memo.
+        reused = set()
         artifact_members = {}
+        if journal is not None:
+            prior_digests, prior_union = journal
+            if all(current_digests.get(batch_id) == entry_digest
+                   for batch_id, entry_digest in prior_digests.items()):
+                reused = set(prior_digests)
+                artifact_members = dict(prior_union)
+        references = []
+        # The skip below is only valid while every check in the validation
+        # body is per-pair; union agreement and the artifact limit are the
+        # only cross-pair checks and both rebuild from the copied union.
         for batch_id in ids:
             start_name, complete_name = batch_id + ".start.json", batch_id + ".complete.json"
             require(start_name in names and complete_name in names, "retention_batch_incomplete")
+            if batch_id in reused:
+                references.append(observed[batch_id])
+                continue
             try:
-                with HeldPath(self.batches.path / start_name) as start_handle, HeldPath(self.batches.path / complete_name) as complete_handle:
+                with HeldPath(self.batches.path / start_name, held_parent=self.batches) as start_handle, HeldPath(self.batches.path / complete_name, held_parent=self.batches) as complete_handle:
                     start_bytes, complete_bytes = start_handle.read(MAX_JSON), complete_handle.read(MAX_JSON)
                     start, complete = json.loads(start_bytes), json.loads(complete_bytes)
                     start_reference = self.batch_file_reference(start_name, start_bytes, start_handle)
@@ -483,13 +617,22 @@ class Campaign:
         # caller's held campaign lock instead of once for every prior batch.
         try:
             for member in artifact_members.values():
-                with HeldPath(self.directory.path / member["artifact"]) as handle:
+                with HeldPath(self.artifacts.path / member["sha256"], held_parent=self.artifacts) as handle:
                     require(list(handle.initial) == member["identity"] and handle.initial[3] == member["size"],
                             "retention_batch_incomplete")
                     if verify_artifacts:
-                        require(hashlib.sha256(handle.read()).hexdigest() == member["sha256"], "retention_batch_incomplete")
+                        require(handle.read_digest()[0] == member["sha256"], "retention_batch_incomplete")
         except (KeyError, TypeError, ValueError, OSError, Refusal) as error:
             raise Refusal("retention_batch_incomplete") from error
+        # The memo anchor is per-pair digests over the references this
+        # validation actually returned once every physical check succeeded.
+        # The first-pass observation is never the anchor for a newly parsed
+        # pair: mapped bytes can change between the two reads, so only the
+        # validated second read can authorize a later reuse. Store the
+        # per-pair digests and the bounded member union, never a shared
+        # reference list.
+        self._validated_journal = ({reference["batch_id"]: digest(reference)
+                                    for reference in references}, artifact_members)
         return references
 
     def batch_file_reference(self, name, payload, handle):
@@ -591,9 +734,8 @@ class Campaign:
         def retain_locked():
             path = self.artifacts.path / sha
             try:
-                with HeldPath(path) as handle:
-                    observed = handle.read()
-                    require(hashlib.sha256(observed).hexdigest() == sha and observed == payload, "artifact_changed")
+                with HeldPath(path, held_parent=self.artifacts) as handle:
+                    require(handle.read_matches(payload, "artifact_changed") == sha, "artifact_changed")
                     member = {"artifact": "artifacts/" + sha, "sha256": sha, "size": len(payload), "identity": list(handle.initial)}
             except FileNotFoundError:
                 require((len(self._batch["expected"]) if self._batch is not None else len(os.listdir(self.artifacts.fd))) < MAX_ARTIFACTS, "artifact_limit")
@@ -738,33 +880,89 @@ def tree_files(path, exclude=()):
     return found
 
 
+def observe_held_siblings(keys, observe):
+    """Visit every key once, holding one parent directory per sibling group.
+
+    Keys pass through unchanged so caller lookups stay exact; a key whose
+    textual parent is not the held directory is refused, never rehomed.
+    """
+    for parent, members in itertools.groupby(sorted(keys, key=lambda key: Path(key).parent),
+                                              key=lambda key: Path(key).parent):
+        directory_scope = (HeldPath(parent, directory=True, metadata_only=True)
+                           if parent != Path("/") else contextlib.nullcontext())
+        with directory_scope as directory:
+            for key in members:
+                with HeldPath(key, held_parent=directory) as handle:
+                    observe(key, handle)
+
+
 def snapshot(paths):
     result = {}
-    for path in paths:
-        with HeldPath(path) as handle:
-            handle.verify()
-            result[str(handle.path)] = handle.binding()
+
+    def observe(path, handle):
+        handle.verify()
+        result[str(handle.path)] = handle.binding()
+
+    observe_held_siblings(paths, observe)
     return result
+
+
+def require_binding_unchanged(handle, original, mutable_directory, directory_input):
+    require((handle.binding()[0][:3] == original[0][:3] if directory_input
+             else handle.binding()[0] == original[0]), "input_changed_during_compilation")
+    for index, (before, after) in enumerate(zip(original[1], handle.binding()[1])):
+        # The mutable-directory exception affects only the immediate parent;
+        # earlier ancestors already compare identity and mode alone.
+        if directory_input or index != len(original[1]) - 1 or (
+                mutable_directory is not None and handle.path.parent == mutable_directory):
+            require(before[:3] == after[:3], "input_parent_changed")
+        else:
+            require(before == after, "input_parent_changed")
 
 
 def verify_unchanged(path, original, mutable_directory=None):
     directory_input = stat.S_ISDIR(original[0][2])
     with HeldPath(path, directory=directory_input, metadata_only=directory_input) as handle:
-        require((handle.binding()[0][:3] == original[0][:3] if directory_input
-                 else handle.binding()[0] == original[0]), "input_changed_during_compilation")
-        for index, (before, after) in enumerate(zip(original[1], handle.binding()[1])):
-            directory = Path("/").joinpath(*handle.path.parts[1:index + 1])
-            if directory_input or (mutable_directory is not None and directory == mutable_directory) or index != len(original[1]) - 1:
-                require(before[:3] == after[:3], "input_parent_changed")
-            else:
-                require(before == after, "input_parent_changed")
+        require_binding_unchanged(handle, original, mutable_directory, directory_input)
+
+
+def verify_all_unchanged(originals, mutable_directory=None):
+    """Recheck captured regular-file bindings through one held parent per group.
+
+    A directory binding here is refused as not_regular, never accepted.
+    """
+    def observe(path, handle):
+        require_binding_unchanged(handle, originals[path], mutable_directory, False)
+
+    observe_held_siblings(originals, observe)
+
+
+def manifest_check_cfg(body):
+    """Read exact Cargo lint declarations from the retained package manifest."""
+    lints = body.get("lints", {})
+    require(type(lints) is dict, "host_manifest_check_cfg")
+    rust = lints.get("rust", {})
+    require(type(rust) is dict and not (lints.get("workspace") is True and rust), "host_manifest_check_cfg")
+    lint = rust.get("unexpected_cfgs")
+    if lint is None or type(lint) is str:
+        return set()
+    require(type(lint) is dict, "host_manifest_check_cfg")
+    entries = lint.get("check-cfg", [])
+    require(type(entries) is list and len(entries) <= MAX_RECORDS
+            and all(type(entry) is str and 0 < len(entry) <= 4096 and not SECRET_WORD.search(entry)
+                    for entry in entries), "host_manifest_check_cfg")
+    # Cargo and rustc own the grammar. Equality with retained declarations
+    # grants no undeclared values or whitespace-normalization exception.
+    return set(entries)
 
 
 def host_cfg_value(value, host, check=False):
-    """Only manifest features or exact retained Cargo build-script declarations."""
+    """Manifest features and exact retained manifest or build declarations."""
     if host is None:
         return False
     if value in host["build_check_cfg" if check else "build_cfg"]:
+        return True
+    if check and value in host.get("manifest_check_cfg", ()):
         return True
     if not check:
         match = re.fullmatch(r'feature="([A-Za-z0-9_.+-]+)"', value)
@@ -856,6 +1054,7 @@ def load_host_execution(environment, campaign, compiler):
     host["inputs"].append(item)
     host["identities"][item["path"]] = observed
     host["features"] = set()
+    host["manifest_check_cfg"] = set()
     host["build_cfg"], host["build_check_cfg"], host["native_libraries"] = set(), set(), []
     host["loaders"] = loaders
     manifest_text = environment.get("CARGO_MANIFEST_PATH")
@@ -869,6 +1068,7 @@ def load_host_execution(environment, campaign, compiler):
             body = tomllib.loads(handle.read(MAX_JSON).decode("utf-8"))
         require(body.get("package", {}).get("name") == environment.get("CARGO_PKG_NAME"), "host_manifest_package")
         host["features"] = set(body.get("features", {}))
+        host["manifest_check_cfg"] = manifest_check_cfg(body)
         for table in [body, *body.get("target", {}).values()]:
             for key in ["dependencies", "build-dependencies", "dev-dependencies"]:
                 host["features"].update(name for name, value in table.get(key, {}).items()
@@ -931,8 +1131,8 @@ def ordinary_candidate_files(host):
     return result
 
 
-def host_execution_inputs(host, campaign):
-    """Retain selected tooling bytes and recheck every declared alias object."""
+def host_execution_inputs(host):
+    """Validate the declared tooling images and recheck every declared alias object."""
     inputs, originals = list(host["inputs"]), dict(host["identities"])
     aliases = []
     for alias in host["aliases"]:
@@ -943,22 +1143,25 @@ def host_execution_inputs(host, campaign):
             info = os.stat(path.name, dir_fd=parent.fd, follow_symlinks=False)
             require(stat.S_ISLNK(info.st_mode) and os.readlink(path.name, dir_fd=parent.fd) == alias["text"], "host_tool_alias")
             aliases.append((str(path), identity(info), alias["text"]))
-    with campaign.retention_batch():
-        names = set()
-        for image in host["images"]:
-            require(type(image) is dict and set(image) == {"path", "sha256", "size", "purpose"}
-                    and image["purpose"] in {"cargo", "linker", "linker-support", "sdk", "loader"}, "host_tool_image")
-            path = absolute(image["path"])
-            require(str(path) not in names and not path.is_relative_to(Path(host["repository"])), "host_tool_image")
-            names.add(str(path))
-            item, observed = capture(path, "host-tool", campaign)
-            require((item["sha256"], item["size"]) == (image["sha256"], image["size"]), "host_tool_image_changed")
-            item["coverage"] = "declared-ordinary-host-tooling-bytes"
-            item["purpose"] = image["purpose"]
-            originals[str(path)] = observed
+    tools, names = [], set()
+    for image in host["images"]:
+        require(type(image) is dict and set(image) == {"path", "sha256", "size", "purpose"}
+                and image["purpose"] in {"cargo", "linker", "linker-support", "sdk", "loader"}, "host_tool_image")
+        path = absolute(image["path"])
+        require(str(path) not in names and not path.is_relative_to(Path(host["repository"])), "host_tool_image")
+        names.add(str(path))
+        tools.append((path, image))
     require(host["cargo"] in names and host["linker"] in names and "/usr/lib/dyld" in names
             and any(item["purpose"] == "sdk" for item in host["images"]), "host_tool_image")
-    return inputs, originals, aliases
+    return inputs, originals, aliases, tools
+
+
+def capture_host_tools(tools, campaign, originals):
+    """Retain the validated tooling bytes and record each observed identity in originals."""
+    for path, image in tools:
+        item, observed = capture(path, "host-tool", campaign)
+        require((item["sha256"], item["size"]) == (image["sha256"], image["size"]), "host_tool_image_changed")
+        originals[str(path)] = observed
 
 
 def observe_host_tools(host, campaign, originals):
@@ -981,7 +1184,38 @@ def verify_host_aliases(aliases):
                     and os.readlink(path.name, dir_fd=parent.fd) == target, "host_tool_alias_changed")
 
 
-def parse(arguments, cwd, native=None, host=None):
+def bind_sysroot_proc_macro(toolchain, host):
+    """Annotate the already retained sysroot candidates, not a consumed-file claim."""
+    root = absolute(host["toolchain"])
+    library = root / "lib/rustlib" / host["target"] / "lib"
+    require(toolchain and all(Path(item["path"]).is_relative_to(root) for item in toolchain),
+            "sysroot_extern_unowned")
+    stems = {}
+    for item in toolchain:
+        path = Path(item["path"])
+        if not path.name.startswith("libproc_macro"):
+            continue
+        match = re.fullmatch(r"libproc_macro-([0-9a-f]{8,16})\.(rlib|rmeta)", path.name)
+        require(path.parent == library and match is not None, "sysroot_extern_ambiguous")
+        forms = stems.setdefault(match[1], {})
+        require(match[2] not in forms, "sysroot_extern_ambiguous")
+        forms[match[2]] = item
+    require(stems, "sysroot_extern_missing")
+    require(len(stems) == 1, "sysroot_extern_ambiguous")
+    forms = next(iter(stems.values()))
+    require("rlib" in forms, "sysroot_extern_missing")
+    for kind, item in forms.items():
+        with HeldPath(item["path"]) as handle:
+            require(os.read(handle.fd, 8) == b"!<arch>\n" if kind == "rlib"
+                    else supported_metadata_header(handle), "extern_image_format")
+            handle.verify()
+        # Preserve the existing tooling role, bytes and custody identity. Both
+        # formats remain conservative inputs; neither is an observed selection.
+        item["sysroot_binding"] = {"extern_name": "proc_macro", "coverage": "conservative-candidates",
+                                   "sysroot": str(root), "candidate_kind": kind}
+
+
+def parse(arguments, cwd, native=None, host=None, executor=None):
     require(native is None or host is None, "ambiguous_execution_contract")
     require(arguments, "missing_compiler_arguments")
     require(not any(value.startswith("@") for value in arguments), "response_file")
@@ -989,7 +1223,7 @@ def parse(arguments, cwd, native=None, host=None):
         require(not any(SECRET_WORD.search(value) for value in arguments), "credential_argument")
     else:
         check_public_argument_positions(arguments, cwd, native)
-    if arguments in [["-vV"], ["-V"], ["--version"], ["--verbose", "--version"]]:
+    if arguments in [["-vV"], ["-V"], ["--version"], ["--verbose", "--version"], ["--version", "--verbose"]]:
         return {"kind": "probe", "probe": "version"}
     if all(value.startswith("--print=") for value in arguments):
         require(all(value.split("=", 1)[1] in {"sysroot", "target-list", "target-libdir", "cfg", "file-names"} for value in arguments), "unsupported_probe")
@@ -1000,7 +1234,7 @@ def parse(arguments, cwd, native=None, host=None):
     result = {"kind": "compilation", "cwd": str(cwd), "source": None, "crate_name": None,
               "crate_types": [], "target": None, "profile": {"optimization": "0", "debug_info": "0"},
               "flags": [], "externs": [], "search": [], "out_dir": None, "output": None,
-              "emit": {}, "sysroot": None, "probe": None}
+              "emit": {}, "stdin": False, "sysroot": None, "probe": None}
     valued = {"--crate-name", "--crate-type", "--edition", "--emit", "--out-dir", "--extern", "--cfg",
               "--check-cfg", "--target", "--sysroot", "--error-format", "--json", "--cap-lints",
               "--diagnostic-width", "--remap-path-prefix", "--print", "-o", "-C", "-L", "-l", "-A", "-D", "-W", "-F"}
@@ -1014,7 +1248,15 @@ def parse(arguments, cwd, native=None, host=None):
     while index < len(arguments):
         arg = arguments[index]
         index += 1
-        if arg == "-" and has_print:
+        if arg == "-":
+            if has_print:
+                continue
+            # Ordinary host stdin compilation only: the '-' positional is
+            # source-bearing and fd 0 carries the actual bytes, so no source
+            # path exists to resolve.
+            require(native is None and host is not None and executor is None, "unsupported_positional")
+            require(not result["stdin"], "unsupported_positional")
+            result["stdin"] = True
             continue
         if not arg.startswith("-"):
             require(result["source"] is None and arg.endswith(".rs"), "unsupported_positional")
@@ -1031,14 +1273,22 @@ def parse(arguments, cwd, native=None, host=None):
             continue
         if "=" in arg and arg.split("=", 1)[0] in valued:
             key, value = arg.split("=", 1)
+            inline = True
         elif arg[:2] in {"-C", "-L", "-l", "-A", "-D", "-W", "-F"} and len(arg) > 2:
             key, value = arg[:2], arg[2:]
+            inline = True
         else:
             key = arg
             require(key in valued and index < len(arguments), "unsupported_option")
             value = arguments[index]
             index += 1
+            inline = False
         require(value and not value.startswith("@"), "response_file")
+        if key in {"-o", "--emit", "--out-dir"}:
+            # Exact selector token positions, replayed by the explicit
+            # metadata lane and independently by the verifier.
+            result.setdefault("selector_positions", {}).setdefault(key, []).append(
+                (index - 1, index - 1) if inline else (index - 2, index - 1))
         flag = {"name": key, "value_sha256": digest(value)}
         if key == "--crate-name":
             require(NAME.fullmatch(value), "crate_name")
@@ -1062,17 +1312,26 @@ def parse(arguments, cwd, native=None, host=None):
             require(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]*(?:::[A-Za-z_][A-Za-z0-9_-]*)*", value),
                     "unsupported_lint_selector")
         elif key == "--extern":
-            require("=" in value, "implicit_extern")
-            name, path = value.split("=", 1)
-            name = name.removeprefix("priv:").removeprefix("noprelude:")
-            require(NAME.fullmatch(name), "extern_name")
-            extension = Path(path).suffix
-            require(extension in {".rlib", ".rmeta"} or (native is not None and extension == ".so")
-                    or (host is not None and extension == ".dylib"), "dynamic_extern_hidden_inputs")
-            external = {"name": name, "path": str(absolute(path, cwd))}
-            if extension in {".so", ".dylib"}:
-                external["kind"] = "dynamic-image"
-            result["externs"].append(external)
+            if "=" not in value:
+                # A name-only extern is accepted only for the compiler-owned
+                # proc_macro crate under a declared ordinary host execution.
+                # Its pinned sysroot candidates are already retained as tooling.
+                require(value == "proc_macro" and host is not None, "implicit_extern")
+                require(not any(entry["name"] == "proc_macro" for entry in result["externs"]), "implicit_extern")
+                result["externs"].append({"name": "proc_macro", "path": None, "kind": "sysroot-implicit"})
+            else:
+                name, path = value.split("=", 1)
+                name = name.removeprefix("priv:").removeprefix("noprelude:")
+                require(NAME.fullmatch(name), "extern_name")
+                require(name != "proc_macro" or not any(entry.get("kind") == "sysroot-implicit"
+                        for entry in result["externs"]), "implicit_extern")
+                extension = Path(path).suffix
+                require(extension in {".rlib", ".rmeta"} or (native is not None and extension == ".so")
+                        or (host is not None and extension == ".dylib"), "dynamic_extern_hidden_inputs")
+                external = {"name": name, "path": str(absolute(path, cwd))}
+                if extension in {".so", ".dylib"}:
+                    external["kind"] = "dynamic-image"
+                result["externs"].append(external)
         elif key == "-L":
             scope, path = value.split("=", 1) if "=" in value else ("all", value)
             require(scope in {"dependency", "native", "all", "crate", "framework"}, "search_kind")
@@ -1122,8 +1381,36 @@ def parse(arguments, cwd, native=None, host=None):
     if result["probe"] is not None:
         result["kind"] = "probe"
         return result
-    require(result["source"] is not None, "missing_source")
-    require("dep-info" in result["emit"], "missing_dep_info")
+    if result["stdin"]:
+        require(result["source"] is None, "unsupported_positional")
+        require("link" not in result["emit"], "stdin_link_emission")
+        if result["output"] is not None:
+            # Closed host-only explicit-metadata lane: exactly one explicit
+            # -o, no --out-dir, one rlib crate type and one bare metadata
+            # emission. An explicit crate name keeps its compiler meaning
+            # when present; none is ever guessed, injected or derived from
+            # the output filename, and native or executor dispatch stays
+            # refused for stdin sources.
+            require(native is None and host is not None and executor is None,
+                    "stdin_explicit_output_lane")
+            require(result["out_dir"] is None, "stdin_output_directory")
+            require(result["crate_types"] == ["rlib"], "stdin_explicit_crate_type")
+            require(set(result["emit"]) == {"metadata"} and result["emit"]["metadata"] is None,
+                    "stdin_explicit_emission")
+            result["stdin_explicit_metadata"] = True
+            result["stdin_instrumentation"] = False
+        else:
+            require(result["crate_name"] is not None, "stdin_crate_name")
+            require(result["out_dir"] is not None and result["output"] is None, "stdin_output_directory")
+            require(set(result["emit"]) - {"dep-info"}, "missing_unit_output")
+            result["stdin_instrumentation"] = "dep-info" not in result["emit"]
+            if result["stdin_instrumentation"]:
+                # One explicit addition makes output_paths yield
+                # out_dir/<crate><suffix>.d.
+                result["emit"]["dep-info"] = None
+    else:
+        require(result["source"] is not None, "missing_source")
+        require("dep-info" in result["emit"], "missing_dep_info")
     require(result["output"] is not None or result["out_dir"] is not None, "missing_output_directory")
     if not result["crate_types"]:
         result["crate_types"] = ["bin"]
@@ -1177,7 +1464,9 @@ def words(text):
     return result
 
 
-def parse_depfile(payload, cwd, environment, native=None, host=None):
+def parse_depfile(payload, cwd, environment, native=None, host=None, anonymous_targets=None):
+    require(anonymous_targets is None or (host is not None and native is None
+            and type(anonymous_targets) is set and anonymous_targets), "depfile_anonymous_source")
     try:
         text = payload.decode("utf-8", errors="strict")
     except UnicodeError:
@@ -1241,19 +1530,35 @@ def parse_depfile(payload, cwd, environment, native=None, host=None):
         require(split is not None, "depfile_syntax")
         left, right = words(line[:split]), words(line[split + 1:])
         require(left, "depfile_targets")
-        absolute_targets = [resolved(name, not right) for name in left]
+        absolute_targets = [resolved(name, not right and (anonymous_targets is None
+                            or str(absolute(name, cwd)) not in anonymous_targets)) for name in left]
         dependencies = [resolved(name, True) for name in right]
         require(len(dependencies) == len(set(dependencies)), "depfile_duplicate_dependency")
         for target in absolute_targets:
             require(target not in targets, "depfile_ambiguous_target")
             targets[target] = dependencies
-        rules.append((absolute_targets, dependencies))
-    producing = [(left, right) for left, right in rules if right]
-    require(producing, "depfile_no_dependencies")
+        rules.append((left, absolute_targets, dependencies))
+    producing = [(rule_targets, rule_dependencies) for _, rule_targets, rule_dependencies in rules if rule_dependencies]
+    if not producing:
+        # Narrow typed exception: an anonymous stdin source with no included
+        # paths emits one empty single-target rule per requested output, and
+        # only the typed stdin caller may accept those rules.
+        require(anonymous_targets is not None, "depfile_no_dependencies")
+        observed_targets = []
+        for raw, rule_targets, rule_dependencies in rules:
+            require(not rule_dependencies and len(raw) == 1 and len(rule_targets) == 1, "depfile_unbound_phony")
+            require(resolved(raw[0], False) == rule_targets[0], "depfile_ambiguous_target")
+            observed_targets.append(rule_targets[0])
+        require(set(observed_targets) == anonymous_targets, "depfile_output_binding")
+        result = {"targets": sorted(observed_targets), "dependencies": [],
+                  "environment_requirements": list(requirements.values())}
+        if native is not None or host is not None:
+            result["path_resolution"] = sorted({canonical(value): value for value in resolutions}.values(), key=lambda value: value["lexical_sha256"])
+        return result
     dependencies = sorted(set(path for _, right in producing for path in right))
     # Rustc repeats identical dependency vectors for its unit and depfile targets.
     require(all(sorted(right) == dependencies for _, right in producing), "depfile_ambiguous_dependencies")
-    for left, right in rules:
+    for _raw, left, right in rules:
         if not right:
             require(all(name in dependencies for name in left), "depfile_unbound_phony")
     result = {"targets": sorted(name for left, _ in producing for name in left),
@@ -1261,6 +1566,29 @@ def parse_depfile(payload, cwd, environment, native=None, host=None):
     if native is not None or host is not None:
         result["path_resolution"] = sorted({canonical(value): value for value in resolutions}.values(), key=lambda value: value["lexical_sha256"])
     return result
+
+
+def read_stdin_source():
+    """Read actual fd 0 bytes once, before any retained disclosure."""
+    mode = os.fstat(0).st_mode
+    require(stat.S_ISFIFO(mode) or stat.S_ISREG(mode), "stdin_input_kind")
+    chunks = []
+    total = 0
+    while True:
+        block = os.read(0, min(1024 * 1024, MAX_JSON + 1 - total))
+        if not block:
+            break
+        total += len(block)
+        require(total <= MAX_JSON, "input_limit")
+        chunks.append(block)
+    payload = b"".join(chunks)
+    try:
+        text = payload.decode("utf-8", errors="strict")
+    except UnicodeError:
+        raise Refusal("stdin_encoding") from None
+    # The existing disclosure policy refuses before any CAS retention.
+    require(not SECRET_WORD.search(text), "unsafe_stdin_source")
+    return payload
 
 
 def compiler_probe(compiler, args, name, campaign, original):
@@ -1281,12 +1609,14 @@ def compiler_probe(compiler, args, name, campaign, original):
     return result.stdout.decode("utf-8", errors="strict").strip()
 
 
-def dispatch_compiler(campaign, argv, probe=False):
+def dispatch_compiler(campaign, argv, probe=False, stdin=None):
     executor = getattr(campaign, "executor", None)
     if executor is not None:
+        require(stdin is None, "native_stdin_unsupported")
         return executor(argv, campaign.environment, campaign.cwd, probe)
     return subprocess.run(argv, env=getattr(campaign, "environment", None),
                           cwd=getattr(campaign, "cwd", None),
+                          stdin=stdin,
                           stdout=subprocess.PIPE if probe else subprocess.DEVNULL,
                           stderr=subprocess.DEVNULL, check=False)
 
@@ -1332,18 +1662,72 @@ def compiler_inputs(compiler, parsed, campaign, native=None):
     backends = sysroot / "lib/rustlib" / target / "codegen-backends"
     if backends.exists():
         files.extend(tree_files(backends))
+    return captured, files, {str(compiler): compiler_identity}
+
+
+def capture_toolchain(files, campaign, identities):
     inputs = []
-    identities = {str(compiler): compiler_identity}
-    with campaign.retention_batch() if getattr(campaign, "host_execution", None) is not None else contextlib.nullcontext():
-        for path in files:
-            item, original = capture(path, "toolchain", campaign)
-            item["coverage"] = "conservative-toolchain-scope"
-            inputs.append(item)
-            identities[str(path)] = original
-    return captured, inputs, identities
+    for path in files:
+        item, original = capture(path, "toolchain", campaign)
+        item["coverage"] = "conservative-toolchain-scope"
+        inputs.append(item)
+        identities[str(path)] = original
+    return inputs
 
 
-def output_paths(parsed):
+def retention_scope(campaign, host):
+    """One explicit retention batch in ordinary host mode, per-file retains otherwise."""
+    return campaign.retention_batch() if host is not None else contextlib.nullcontext()
+
+
+def explicit_metadata_paths(parsed, invocation_id):
+    """P and its invocation-specific same-directory dep-info sibling."""
+    require(type(invocation_id) is str and re.fullmatch(r"[0-9a-f]{32}", invocation_id),
+            "explicit_metadata_invocation")
+    primary = Path(parsed["output"])
+    # A comma would be ambiguous inside the single emission value syntax.
+    require("," not in str(primary), "unrepresentable_emission_path")
+    depfile = primary.parent / (primary.name + ".chio-" + invocation_id + ".d")
+    return primary, depfile
+
+
+def explicit_metadata_effective_argv(argv, parsed, cwd, invocation_id):
+    """Closed v2 transformation: the sole bare metadata emission value is
+    replaced by metadata=P,dep-info=D; every other token, including the
+    original -o tokens, is preserved exactly."""
+    positions = parsed.get("selector_positions") or {}
+    require(len(positions.get("-o", [])) == 1, "ambiguous_output_selector")
+    require(len(positions.get("--emit", [])) == 1, "ambiguous_emission_selector")
+    require(not positions.get("--out-dir"), "stdin_output_directory")
+    _output_key, output_value = positions["-o"][0]
+    emit_key, emit_value = positions["--emit"][0]
+    primary, depfile = explicit_metadata_paths(parsed, invocation_id)
+    # parse() indexes the argv[1:] argument slice; this helper receives the
+    # full wrapper argv with the compiler at index 0, so shift by one.
+    output_text = argv[output_value + 1]
+    require(_output_key != output_value and argv[_output_key + 1] == "-o",
+            "stdin_explicit_output_spelling")
+    output_path = Path(output_text)
+    require(output_text not in {"-", ".", ".."} and not output_text.startswith(("@", "//"))
+            and output_path.as_posix() == output_text and ".." not in output_path.parts
+            and output_path.name not in {"", ".", ".."}, "stdin_explicit_output_spelling")
+    require(absolute(output_text, cwd) == primary, "ambiguous_output_name")
+    inline_emission = emit_value == emit_key
+    require(argv[emit_value + 1] == ("--emit=metadata" if inline_emission else "metadata"),
+            "stdin_explicit_emission")
+    effective = list(argv)
+    replacement = "metadata=" + str(primary) + ",dep-info=" + str(depfile)
+    effective[emit_value + 1] = ("--emit=" + replacement) if inline_emission else replacement
+    return effective, str(primary), str(depfile)
+
+
+def output_paths(parsed, invocation_id=None):
+    if parsed.get("stdin_explicit_metadata"):
+        # P is the exact resolved caller output; its name is never canonicalized.
+        primary, depfile = explicit_metadata_paths(parsed, invocation_id)
+        require(depfile.parent == primary.parent and depfile.name != primary.name,
+                "overlapping_emission_paths")
+        return depfile, {"metadata": str(primary), "dep-info": str(depfile)}
     name = parsed["crate_name"] or Path(parsed["source"]).stem
     suffix = parsed.get("suffix", "")
     directory = Path(parsed["out_dir"] or Path(parsed["output"]).parent)
@@ -1390,18 +1774,63 @@ def output_paths(parsed):
 
 
 class OutputLease:
-    """Cooperating wrappers own fresh output paths under one held directory lock."""
-    def __init__(self, directory, emissions):
+    """Cooperating wrappers own fresh output paths under one held directory lock.
+
+    The explicit-metadata lane may retire preexisting leaves that one
+    authenticated callback proves to be sealed predecessor outputs of this
+    same campaign; every unauthenticated preexisting path and every unrelated
+    baseline entry still refuses, before any mutation."""
+    def __init__(self, directory, emissions, retirement=None, initialize=None):
         self.directory = HeldPath(directory, directory=True)
         self.expected = {Path(path).name for path in emissions.values()}
+        self.retirements = {}
+        self.candidates = {}
         try:
             require(len(self.expected) == len(emissions), "overlapping_emission_paths")
             fcntl.flock(self.directory.fd, fcntl.LOCK_EX)
             self.baseline = self.entries()
-            require(not self.expected.intersection(self.baseline), "preexisting_output")
+            if initialize is not None:
+                initialize(self.directory, self.baseline)
+            preexisting = self.expected.intersection(self.baseline)
+            require(not preexisting or retirement is not None, "preexisting_output")
+            # Each candidate leaf is held open through validation and unlink;
+            # its complete identity must equal the captured baseline entry, so
+            # a substituted same-byte inode never authorizes retirement.
+            for name in sorted(preexisting):
+                handle = HeldPath(self.directory.path / name)
+                self.candidates[name] = handle
+                require(handle.initial == self.baseline[name], "preexisting_output_changed")
+            # Every candidate retirement is fully validated before any
+            # mutation; validation runs while the candidate stays held.
+            for name in sorted(preexisting):
+                edge = retirement(name, self.baseline[name], self.candidates[name]) if retirement is not None else None
+                require(edge is not None, "preexisting_output")
+                self.retirements[name] = edge
+            if self.retirements:
+                require(self.entries() == self.baseline, "preexisting_output_changed")
+                for name in sorted(self.retirements):
+                    # The held leaf and the directory entry must both still
+                    # match immediately before the unlink.
+                    self.candidates[name].verify()
+                    require(identity(os.stat(name, dir_fd=self.directory.fd, follow_symlinks=False))
+                            == self.baseline[name], "preexisting_output_changed")
+                    os.unlink(name, dir_fd=self.directory.fd)
+                os.fsync(self.directory.fd)
+                # Never replace the baseline blindly: membership and identity
+                # of every unrelated preexisting entry must be unchanged.
+                after = self.entries()
+                require(set(after) == set(self.baseline) - set(self.retirements),
+                        "output_namespace_changed")
+                for name, value in after.items():
+                    require(value == self.baseline[name], "preexisting_output_changed")
+                self.baseline = after
+                require(not self.expected.intersection(self.baseline), "preexisting_output")
         except Exception:
             self.close()
             raise
+        finally:
+            for handle in self.candidates.values():
+                handle.close()
 
     def entries(self):
         self.directory.verify(content=False)
@@ -1416,18 +1845,22 @@ class OutputLease:
         self.directory.verify(content=False)
         return entries
 
-    def produced(self):
+    def produced(self, *, complete=True):
         current = self.entries()
-        require(set(current) == set(self.baseline) | self.expected, "unexpected_compiler_output")
+        require(set(self.baseline) <= set(current) <= set(self.baseline) | self.expected,
+                "unexpected_compiler_output")
+        if complete:
+            require(set(current) == set(self.baseline) | self.expected, "unexpected_compiler_output")
         for name, old in self.baseline.items():
             fresh = current[name]
             require(old[:3] == fresh[:3] if stat.S_ISDIR(old[2]) else old == fresh, "preexisting_output_changed")
-        for name in self.expected:
+        emitted = set(current) - set(self.baseline)
+        for name in emitted:
             require(stat.S_ISREG(current[name][2]) and current[name][-1] == 1, "produced_output_not_regular")
-        return {name: current[name] for name in self.expected}
+        return {name: current[name] for name in emitted}
 
-    def verify(self, observed):
-        require(self.produced() == observed, "produced_output_changed")
+    def verify(self, observed, *, complete=True):
+        require(self.produced(complete=complete) == observed, "produced_output_changed")
 
     def verify_host_search(self, directory, original):
         # Cargo also searches its output directory. Only this lease's exact,
@@ -1872,6 +2305,7 @@ def _collect_linux_scope_members(config, campaign):
         root = Path(scope["root"])
         members = []
         directories = []
+        walked = {}
 
         def member(path):
             relative = str(path.relative_to(root))
@@ -1910,8 +2344,11 @@ def _collect_linux_scope_members(config, campaign):
             require(len(members) <= MAX_RECORDS, "linux_scope_count")
 
         def walk(path):
+            require(len(walked) < MAX_RECORDS, "linux_scope_count")
             with HeldPath(path, directory=True) as directory:
                 names = sorted(os.listdir(directory.fd))
+                walked[path] = (list(directory.initial[:3]), tuple(names))
+                originals[str(path)] = directory.binding()
                 normalized = [unicodedata.normalize("NFC", name).casefold() for name in names]
                 require(len(normalized) == len(set(normalized)), "linux_scope_name_collision")
                 require(all(unicodedata.normalize("NFC", name) == name for name in names), "linux_scope_noncanonical_name")
@@ -1924,27 +2361,46 @@ def _collect_linux_scope_members(config, campaign):
                 require(names == sorted(os.listdir(directory.fd)), "linux_scope_directory_changed")
                 directory.verify(content=False)
 
-        if scope["selection"] == "complete-tree":
-            walk(root)
-        else:
-            for name in sorted(scope["members"]):
-                member(root/name)
-        directory_metadata = []
-        if scope["selection"] == "explicit-members":
-            # Import discovery needs READ_DIR on containing directories. Derive
-            # this finite metadata set only from approved regular byte leaves.
-            # READ_DIR supplies no regular-file read or execute authority.
-            directories = sorted({str(Path(entry["path"]).parent) for entry in members if entry["kind"] == "regular"})
-            require(len(directories) + len(members) <= MAX_RECORDS, "linux_scope_count")
-            for name in directories:
-                path = root/name
-                with HeldPath(path, directory=True, metadata_only=True) as held:
-                    directory_metadata.append({"path": name, "identity": list(held.initial[:3])})
-                    originals[str(path)] = held.binding()
-                    held.verify(content=False)
+        # The terminal inventory root is held across the original traversal.
+        # The collected inventory binds to this descriptor, so a late
+        # original-name or parent substitution of the root (including an
+        # otherwise empty root with no members) cannot certify an unchanged
+        # scope.
+        with HeldPath(root, directory=True) as held_scope_root:
+            root_identity = list(held_scope_root.initial[:3])
+            if scope["selection"] == "complete-tree":
+                walk(root)
+            else:
+                for name in sorted(scope["members"]):
+                    member(root/name)
+            directory_metadata = []
+            if scope["selection"] == "explicit-members":
+                # Import discovery needs READ_DIR on containing directories. Derive
+                # this finite metadata set only from approved regular byte leaves.
+                # READ_DIR supplies no regular-file read or execute authority.
+                directories = sorted({str(Path(entry["path"]).parent) for entry in members if entry["kind"] == "regular"})
+                require(len(directories) + len(members) <= MAX_RECORDS, "linux_scope_count")
+                for name in directories:
+                    path = root/name
+                    with HeldPath(path, directory=True, metadata_only=True) as held:
+                        directory_metadata.append({"path": name, "identity": list(held.initial[:3])})
+                        originals[str(path)] = held.binding()
+                        held.verify(content=False)
+            # A public input added to a walked scope directory after that
+            # directory's own iteration cannot escape the inventory. Every
+            # walked directory is reopened at collection completion and its
+            # original identity and complete listing are reverified.
+            for path, (identity, names) in walked.items():
+                with HeldPath(path, directory=True) as directory:
+                    require(list(directory.initial[:3]) == identity
+                            and sorted(os.listdir(directory.fd)) == list(names), "linux_scope_directory_changed")
+                    directory.verify(content=False)
+            held_scope_root.verify(content=False)
+        originals[str(root)] = held_scope_root.binding()
         inventory = {"schema": "chio.compilation-read-scope.v2" if directory_metadata else "chio.compilation-read-scope.v1",
                      "role": scope["role"], "root": str(root),
-                     "selection": scope["selection"], "directories": sorted(directories), "members": sorted(members, key=lambda value: value["path"])}
+                     "selection": scope["selection"], "root_identity": root_identity,
+                     "directories": sorted(directories), "members": sorted(members, key=lambda value: value["path"])}
         if directory_metadata:
             inventory["directory_metadata"] = directory_metadata
         payload = canonical(inventory) + b"\n"
@@ -2094,21 +2550,74 @@ def enforce_linux_scope(config, declaration, originals, campaign, machine, unit_
             inventory = json.loads(payload)
             root = Path(inventory["root"])
             directory_metadata = {entry["path"]: entry["identity"] for entry in inventory.get("directory_metadata", [])}
-            for name in inventory["directories"]:
-                with HeldPath(root/name, directory=True, metadata_only=True) as directory:
-                    if inventory["schema"] == "chio.compilation-read-scope.v2":
-                        require(list(directory.initial[:3]) == directory_metadata.get(name)
-                                and directory.initial[:3] == originals[str(root/name)][0][:3], "linux_scope_changed")
-                    rule(directory.fd, 1 << 3)
-            for member in inventory["members"]:
-                if member["kind"] != "regular":
-                    continue
-                path = root/member["path"]
-                with HeldPath(path) as held:
-                    require(held.binding()[0] == originals[str(path)][0], "linux_scope_changed")
-                    image = held.read()
-                    require(hashlib.sha256(image).hexdigest() == member["sha256"] and len(image) == member["size"], "linux_scope_changed")
-                    rule(held.fd, (1 << 2) | (1 if member["mode"] & 0o111 else 0))
+            # The identity-checked scope root stays open across the entire
+            # grant sequence. Every directory and member is resolved through
+            # a no-follow component chain anchored at this exact descriptor,
+            # and each granted rule fd must match the identity captured at
+            # collection for both inventory schemas.
+            with HeldPath(root, directory=True, metadata_only=True) as scope_root:
+                require(list(scope_root.initial[:3]) == inventory["root_identity"], "linux_scope_changed")
+
+                @contextlib.contextmanager
+                def resolve(relative, leaf_flags):
+                    # One no-follow chain per rule, anchored at the checked
+                    # root and closed as soon as that rule is granted or its
+                    # identity check refuses. Each descriptor is owned
+                    # immediately after it is opened, before any check that
+                    # can fail, so a refused identity leaks nothing.
+                    descriptors = []
+                    try:
+                        descriptor = scope_root.fd
+                        require(not Path(relative).is_absolute(), "linux_scope_changed")
+                        for component in Path(relative).parts:
+                            require(component not in {"", ".", ".."}, "linux_scope_changed")
+                            child = os.open(component, leaf_flags, dir_fd=descriptor)
+                            descriptors.append(child)
+                            before = os.stat(component, dir_fd=descriptor, follow_symlinks=False)
+                            opened = os.fstat(child)
+                            require((before.st_dev, before.st_ino, before.st_mode)
+                                    == (opened.st_dev, opened.st_ino, opened.st_mode), "linux_scope_changed")
+                            descriptor = child
+                        yield descriptor
+                    finally:
+                        for opened_descriptor in reversed(descriptors):
+                            os.close(opened_descriptor)
+                for name in inventory["directories"]:
+                    with resolve(name, PARENT_OPEN) as descriptor:
+                        opened = os.fstat(descriptor)
+                        captured = originals[str(root/name)]
+                        require(stat.S_ISDIR(opened.st_mode)
+                                and (opened.st_dev, opened.st_ino, opened.st_mode) == tuple(captured[0][:3]),
+                                "linux_scope_changed")
+                        if inventory["schema"] == "chio.compilation-read-scope.v2":
+                            require([opened.st_dev, opened.st_ino, opened.st_mode] == directory_metadata.get(name),
+                                    "linux_scope_changed")
+                        rule(descriptor, 1 << 3)
+                for member in inventory["members"]:
+                    if member["kind"] != "regular":
+                        continue
+                    with resolve(member["path"], os.O_RDONLY | NOFOLLOW) as descriptor:
+                        captured = originals[str(root/member["path"])]
+                        opened = os.fstat(descriptor)
+                        require(stat.S_ISREG(opened.st_mode) and identity(opened) == captured[0],
+                                "linux_scope_changed")
+                        digest = hashlib.sha256()
+                        total = 0
+                        os.lseek(descriptor, 0, os.SEEK_SET)
+                        while True:
+                            chunk = os.read(descriptor, 1024*1024)
+                            if not chunk:
+                                break
+                            total += len(chunk)
+                            require(total <= member["size"], "linux_scope_changed")
+                            digest.update(chunk)
+                        require(total == member["size"] and digest.hexdigest() == member["sha256"],
+                                "linux_scope_changed")
+                        require(identity(os.fstat(descriptor)) == captured[0], "linux_scope_changed")
+                        rule(descriptor, (1 << 2) | (1 if member["mode"] & 0o111 else 0))
+                # The checked root is reattached to its declared path at the
+                # successful end of this scope's grant sequence.
+                scope_root.verify(content=False)
         # Writable bytes have separate campaign attribution, not readonly input
         # authority. Device, socket and block-node creation remain denied.
         writable = sum(1 << bit for bit in [0, 1, 2, 3, 4, 5, 7, 8, 10, 12, 13, 14])
@@ -2220,7 +2729,7 @@ def validate_native_child_environment(environment, config, declaration):
         require(environment["RUSTC_LINKER"] in linkers, "native_linker_environment")
 
 
-def producing_unit(campaign, image, required_crate=None, source_reference=None):
+def producing_unit(campaign, image, required_crate=None, source_reference=None, excluded_crate=None):
     """Join an already completed original-namespace unit, not its filename."""
     require(required_crate != "chio_credentials" or source_reference is not None, "producer_public_source_binding")
     for name in sorted(os.listdir(campaign.records.fd)):
@@ -2230,7 +2739,8 @@ def producing_unit(campaign, image, required_crate=None, source_reference=None):
             record_identity = descriptor_identity(record)
         row = json.loads(payload)
         if (row.get("schema") != SCHEMA or row.get("source_binding") != campaign.binding or row.get("kind") != "compilation"
-                or row.get("status") != "success" or row.get("compiler_exit") != 0):
+                or row.get("status") != "success" or type(row.get("compiler_exit")) is not int or row["compiler_exit"] != 0
+                or row.get("semantics", {}).get("source") is None):
             continue
         if required_crate is not None and row.get("semantics", {}).get("crate_name") != required_crate:
             continue
@@ -2240,18 +2750,22 @@ def producing_unit(campaign, image, required_crate=None, source_reference=None):
                                and item["sha256"] == source_reference["sha256"] for item in row["inputs"])):
                 continue
         outputs = [item for item in row["outputs"] if item["role"] == "unit" and
-                   all(item.get(key) == image.get(key) for key in ["path", "sha256", "size", "artifact"])]
+                   all(canonical(item.get(key)) == canonical(image.get(key)) for key in ["path", "sha256", "size", "artifact"])]
         if not outputs:
             continue
+        if excluded_crate is not None:
+            crate = row.get("semantics", {}).get("crate_name")
+            require(type(crate) is str and NAME.fullmatch(crate) and crate != excluded_crate,
+                    "sysroot_extern_shadowed")
         marker_name = "completions/" + name
         with HeldPath(campaign.completions.path/name) as completion:
             marker_bytes = completion.read(MAX_JSON)
             marker_identity = descriptor_identity(completion)
         marker = json.loads(marker_bytes)
         require(row["invocation_id"] + ".json" == name
-                and row["publication"] == {"completion": marker_name, "marker_identity": marker_identity}
-                and marker == {"schema": COMPLETION_SCHEMA, "invocation_id": row["invocation_id"], "source_binding": campaign.binding,
-                               "record_sha256": hashlib.sha256(payload).hexdigest(), "size": len(payload), "record_identity": record_identity}, "producer_completion_binding")
+                and canonical(row["publication"]) == canonical({"completion": marker_name, "marker_identity": marker_identity})
+                and canonical(marker) == canonical({"schema": COMPLETION_SCHEMA, "invocation_id": row["invocation_id"], "source_binding": campaign.binding,
+                               "record_sha256": hashlib.sha256(payload).hexdigest(), "size": len(payload), "record_identity": record_identity}), "producer_completion_binding")
         edge = {"invocation_id": row["invocation_id"],
                 "record": {"path": "records/" + name, "sha256": hashlib.sha256(payload).hexdigest(), "size": len(payload)},
                 "completion": {"path": marker_name, "sha256": hashlib.sha256(marker_bytes).hexdigest(), "size": len(marker_bytes)}}
@@ -2259,6 +2773,147 @@ def producing_unit(campaign, image, required_crate=None, source_reference=None):
             edge["source"] = source_reference
         return edge
     raise Refusal("extern_producing_unit_not_completed")
+
+
+def explicit_metadata_produced_identity(produced):
+    """Physical identity of each verified produced leaf, for later retirement."""
+    return {name: {"device": value[0], "inode": value[1], "size": value[3]}
+            for name, value in produced.items()}
+
+
+def explicit_metadata_record(campaign, name):
+    require(re.fullmatch(r"[0-9a-f]{32}\.json", name), "producer_record_namespace")
+    with HeldPath(campaign.records.path / name) as record:
+        payload = record.read(MAX_JSON)
+        record_identity = descriptor_identity(record)
+    row = json.loads(payload)
+    require(type(row) is dict and row.get("invocation_id") + ".json" == name,
+            "predecessor_record_binding")
+    return row, payload, record_identity
+
+
+def explicit_metadata_directory_binding(directory):
+    """Stable held directory and ancestor identities, excluding membership changes."""
+    own, parents = directory.binding()
+    paths = [*reversed(directory.path.parents), directory.path]
+    values = [*parents, own]
+    require(len(paths) == len(values), "predecessor_directory_binding")
+    return [{"path": str(path), "device": value[0], "inode": value[1], "mode": value[2]}
+            for path, value in zip(paths, values)]
+
+
+def authenticate_explicit_metadata_predecessor(campaign, parsed, primary, name, observed, handle,
+                                              directory_binding):
+    """Authenticate one unconsumed terminal version, including genuine absent output.
+
+    The caller holds the directory lock throughout history validation, retirement,
+    compilation and publication. Every same-P row must belong to a single completed
+    lineage. Absence never erases history or authorizes a new disconnected root.
+    """
+    require(parsed.get("stdin_explicit_metadata") and name == Path(primary).name,
+            "preexisting_output")
+    if observed is not None:
+        require(stat.S_ISREG(observed[2]) and observed[-1] == 1 and handle.initial == observed,
+                "preexisting_output")
+    history = {}
+    names = sorted(os.listdir(campaign.records.fd))
+    require(len(names) <= MAX_RECORDS, "record_limit")
+    for record_name in names:
+        row, payload, record_identity = explicit_metadata_record(campaign, record_name)
+        semantics = row.get("semantics") or {}
+        instrumentation = semantics.get("dep_info_instrumentation") or {}
+        if (instrumentation.get("schema") != DEP_INFO_INSTRUMENTATION_V2_SCHEMA
+                or instrumentation.get("primary_output") != str(primary)):
+            continue
+        ownership = semantics.get("output_ownership") or {}
+        require(row.get("schema") == SCHEMA and row.get("source_binding") == campaign.binding
+                and row.get("kind") == "compilation" and row.get("refusal") is None
+                and row.get("status") in {"success", "compiler_failed"}
+                and type(row.get("compiler_exit")) is int
+                and (row["compiler_exit"] == 0) == (row["status"] == "success")
+                and instrumentation.get("mode") == "explicit-metadata-output"
+                and semantics.get("source") is None and semantics.get("native_scope") is None
+                and type(semantics.get("host_execution")) is dict
+                and semantics.get("target") == parsed.get("target"), "predecessor_not_sealed")
+        require(ownership.get("directory") == str(primary.parent)
+                and ownership.get("directory_binding") == directory_binding,
+                "predecessor_directory_binding")
+        marker_name = "completions/" + record_name
+        with HeldPath(campaign.completions.path / record_name) as completion:
+            marker_bytes = completion.read(MAX_JSON)
+            marker_identity = descriptor_identity(completion)
+        require(canonical(row.get("publication")) == canonical(
+                    {"completion": marker_name, "marker_identity": marker_identity})
+                and canonical(json.loads(marker_bytes)) == canonical(
+                    {"schema": COMPLETION_SCHEMA, "invocation_id": row["invocation_id"],
+                     "source_binding": campaign.binding, "record_sha256": hashlib.sha256(payload).hexdigest(),
+                     "size": len(payload), "record_identity": record_identity}), "predecessor_completion_binding")
+        produced = ownership.get("produced")
+        require(type(produced) is dict, "predecessor_output_not_sealed")
+        images = [item for item in row.get("outputs", []) if item.get("path") == str(primary)]
+        physical = produced.get(name)
+        if physical is None:
+            require(row["status"] == "compiler_failed" and not images, "predecessor_output_not_sealed")
+            image = {"path": str(primary), "state": "absent"}
+        else:
+            require(len(images) == 1 and images[0].get("role") == "unit", "predecessor_output_not_sealed")
+            sealed = images[0]
+            require((sealed.get("partial") is True) == (row["status"] == "compiler_failed")
+                    and type(sealed.get("sha256")) is str and DIGEST.fullmatch(sealed["sha256"])
+                    and type(physical) is dict and set(physical) == {"device", "inode", "size"}
+                    and all(type(value) is int and value >= 0 for value in physical.values())
+                    and type(sealed.get("size")) is int and sealed["size"] == physical["size"],
+                    "predecessor_output_not_sealed")
+            with HeldPath(campaign.artifacts.path / sealed["sha256"], held_parent=campaign.artifacts) as retained:
+                retained_sha, retained_size = retained.read_digest()
+            require((retained_sha, retained_size) == (sealed["sha256"], sealed["size"]),
+                    "predecessor_retained_bytes")
+            image = {key: sealed[key] for key in ["path", "sha256", "size"]}
+        reference = {"invocation_id": row["invocation_id"],
+            "record": {"path": "records/" + record_name, "sha256": hashlib.sha256(payload).hexdigest(), "size": len(payload)},
+            "completion": {"path": marker_name, "sha256": hashlib.sha256(marker_bytes).hexdigest(), "size": len(marker_bytes)},
+            "output": image, "physical": physical}
+        history[row["invocation_id"]] = (row, reference)
+    if not history:
+        require(observed is None, "predecessor_not_sealed")
+        return None
+    consumed, roots = set(), []
+    for identifier, (row, _) in history.items():
+        ownership = row["semantics"]["output_ownership"]
+        edge = ownership.get("predecessor")
+        if edge is None:
+            require(ownership.get("policy") == "explicit-metadata-fresh-lease", "predecessor_record_binding")
+            roots.append(identifier)
+            continue
+        require(type(edge) is dict and edge.get("invocation_id") in history, "predecessor_record_binding")
+        prior = edge["invocation_id"]
+        expected = history[prior][1]
+        require(canonical(edge) == canonical(expected), "predecessor_record_binding")
+        require(ownership.get("policy") == ("explicit-metadata-predecessor-absence"
+                if expected["physical"] is None else "explicit-metadata-predecessor-retirement"),
+                "predecessor_record_binding")
+        require(prior not in consumed, "predecessor_already_retired")
+        consumed.add(prior)
+    terminal = set(history) - consumed
+    require(len(roots) == 1 and len(terminal) == 1, "predecessor_ambiguous")
+    current = next(iter(terminal))
+    visited = set()
+    while current is not None:
+        require(current not in visited, "predecessor_cycle")
+        visited.add(current)
+        edge = history[current][0]["semantics"]["output_ownership"]["predecessor"]
+        current = edge["invocation_id"] if edge is not None else None
+    require(visited == set(history), "predecessor_cycle")
+    reference = history[next(iter(terminal))][1]
+    if observed is None:
+        require(reference["physical"] is None, "predecessor_output_missing")
+    else:
+        physical = {"device": observed[0], "inode": observed[1], "size": observed[3]}
+        require(reference["physical"] == physical, "predecessor_not_sealed")
+        current_sha, current_size = handle.read_digest()
+        require((current_sha, current_size) == (reference["output"]["sha256"], reference["output"]["size"]),
+                "predecessor_bytes_changed")
+    return reference
 
 
 def load_native_scope(environment, campaign):
@@ -2956,7 +3611,7 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
             require(compiler == declared_path(native["images"]["rustc"]["path"], native), "native_compiler_binding")
         if any(arg == "--print" or arg.startswith("--print=") for arg in argv[1:]):
             row["kind"] = "probe"
-        parsed = parse(argv[1:], cwd, native, host)
+        parsed = parse(argv[1:], cwd, native, host, executor)
         require_native_linker_selection(parsed, native)
         row["kind"] = parsed["kind"]
         if parsed["kind"] == "probe":
@@ -2997,7 +3652,9 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
             return actual_exit if actual_exit >= 0 else 128 - actual_exit
         row["semantics"] = {key: parsed[key] for key in ["cwd", "source", "crate_name", "crate_types", "target", "profile", "flags"]}
         if host is not None:
-            require("manifest" in host and Path(parsed["source"]).is_relative_to(Path(host["manifest"]).parent), "host_manifest_source")
+            require("manifest" in host, "host_manifest_source")
+            if not parsed["stdin"]:
+                require(Path(parsed["source"]).is_relative_to(Path(host["manifest"]).parent), "host_manifest_source")
             row["semantics"]["host_execution"] = {"schema": "chio.ordinary-host-invocation.v1",
                 "declaration": host["reference"], "loader_paths": host["loaders"], "tooling_checks": None}
         if native_reference is not None:
@@ -3006,27 +3663,90 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
         if dispatch_selection is not None:
             require(dispatch_selection["effective_argv"] == argv, "compiler_dispatch_binding")
             row["semantics"]["compiler_dispatch"] = retain_compiler_dispatch(campaign, dispatch_selection)
-        depfile, emissions = output_paths(parsed)
+        stdin_item = None
+        effective_argv = argv
+        explicit_metadata = bool(parsed.get("stdin_explicit_metadata"))
+        depfile, emissions = output_paths(parsed, row["invocation_id"] if explicit_metadata else None)
         output_directory = depfile.parent
         require(output_directory.is_relative_to(root / "target"), "output_not_controlled_target")
+        if parsed["stdin"]:
+            require(output_directory.is_relative_to(Path(host["target_directory"])), "host_stdin_output_scope")
+            require("UNSTABLE_RUSTDOC_TEST_PATH" not in environment, "hidden_environment_input")
+            # Bound fd 0 bytes are read once, before any retained disclosure.
+            stdin_payload = read_stdin_source()
+            if explicit_metadata:
+                effective_argv, primary_output, depfile_output = explicit_metadata_effective_argv(
+                    argv, parsed, cwd, row["invocation_id"])
+                require(primary_output == emissions["metadata"] and depfile_output == str(depfile),
+                        "explicit_metadata_emission_binding")
+            elif parsed["stdin_instrumentation"]:
+                effective_argv = [*argv, "--emit=dep-info"]
+            with campaign.retention_batch():
+                retained = campaign.retain(stdin_payload)
+                stdin_item = {"role": "stdin", "path": str(campaign.directory.path / retained["artifact"]), **retained}
+                row["inputs"].append(stdin_item)
+                arguments = {}
+                for name, values in [("original_argv", argv), ("effective_argv", effective_argv)]:
+                    retained = campaign.retain(canonical(values) + b"\n")
+                    arguments[name] = {"role": "compiler-arguments",
+                        "path": str(campaign.directory.path / retained["artifact"]), **retained}
+                    row["inputs"].append(arguments[name])
+            if explicit_metadata:
+                row["semantics"]["dep_info_instrumentation"] = {
+                    "schema": DEP_INFO_INSTRUMENTATION_V2_SCHEMA, "mode": "explicit-metadata-output",
+                    "original_argv": arguments["original_argv"], "effective_argv": arguments["effective_argv"],
+                    "effective_invocation_sha256": digest(effective_argv),
+                    "primary_output": emissions["metadata"], "depfile_output": str(depfile)}
+            else:
+                row["semantics"]["dep_info_instrumentation"] = {
+                    "schema": DEP_INFO_INSTRUMENTATION_V1_SCHEMA, **arguments,
+                    "added": ["--emit=dep-info"] if parsed["stdin_instrumentation"] else [],
+                    "effective_invocation_sha256": digest(effective_argv)}
         if native is not None:
             require(any(output_directory.is_relative_to(Path(path)) for path in native["write_roots"]), "native_output_scope")
         row["semantics"]["emits"] = emissions
-        row["semantics"]["output_ownership"] = {"policy": "fresh-path-directory-lock", "directory": str(output_directory)}
+        if explicit_metadata:
+            row["semantics"]["output_ownership"] = {"policy": "explicit-metadata-fresh-lease",
+                "directory": str(output_directory), "directory_binding": None, "predecessor": None, "produced": None}
+        else:
+            row["semantics"]["output_ownership"] = {"policy": "fresh-path-directory-lock", "directory": str(output_directory)}
         expected_outputs = set(emissions.values()) - {str(depfile)}
-        output_lease = OutputLease(output_directory, emissions)
-        row["compiler"], toolchain, identities = compiler_inputs(compiler, parsed, campaign, native)
+
+        def authorize_predecessor(name, observed, handle):
+            # Fail-closed authentication happens inside the lease's held
+            # directory lock with the candidate leaf held open, before any
+            # unlink or dispatch.
+            return authenticate_explicit_metadata_predecessor(campaign, parsed, Path(emissions["metadata"]),
+                                                              name, observed, handle,
+                row["semantics"]["output_ownership"]["directory_binding"])
+
+        def initialize_explicit_metadata(directory, baseline):
+            ownership = row["semantics"]["output_ownership"]
+            ownership["directory_binding"] = explicit_metadata_directory_binding(directory)
+            primary_name = Path(emissions["metadata"]).name
+            if primary_name not in baseline:
+                edge = authorize_predecessor(primary_name, None, None)
+                if edge is not None:
+                    ownership["policy"] = "explicit-metadata-predecessor-absence"
+                    ownership["predecessor"] = edge
+            directory.verify(content=False)
+
+        output_lease = OutputLease(output_directory, emissions, authorize_predecessor if explicit_metadata else None,
+                                   initialize_explicit_metadata if explicit_metadata else None)
+        if explicit_metadata and output_lease.retirements:
+            primary_name = Path(emissions["metadata"]).name
+            require(set(output_lease.retirements) == {primary_name}, "preexisting_output")
+            row["semantics"]["output_ownership"]["policy"] = "explicit-metadata-predecessor-retirement"
+            row["semantics"]["output_ownership"]["predecessor"] = output_lease.retirements[primary_name]
+        row["compiler"], toolchain_files, identities = compiler_inputs(compiler, parsed, campaign, native)
         if native is not None:
             require(row["compiler"]["sha256"] == native["images"]["rustc"]["sha256"]
                     and row["compiler"]["version"]["fields"]["host"] == "x86_64-unknown-linux-gnu", "native_compiler_binding")
-        row["inputs"].extend(toolchain)
         host_aliases = []
         if host is not None:
             require(row["compiler"]["version"]["fields"]["host"] == host["target"], "host_compiler_binding")
-            host_inputs, host_identities, host_aliases = host_execution_inputs(host, campaign)
-            row["inputs"].extend(host_inputs)
-            identities.update(host_identities)
-        source = Path(parsed["source"])
+            host_inputs, host_identities, host_aliases, host_tools = host_execution_inputs(host)
+        source = None if parsed["stdin"] else Path(parsed["source"])
         public_files = ([Path(path) for path in readonly_members] if native is not None else
                         ordinary_candidate_files(host) if host is not None else
                         tree_files(root, exclude={"target", ".git", "node_modules", ".venv", "__pycache__"}))
@@ -3040,27 +3760,47 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
                 identities[linker["path"]] = original
             if str(source) not in readonly_members:
                 public_files.extend(tree_files(source.parent))
+        elif parsed["stdin"]:
+            # The declared snapshot covers candidate package files plus the
+            # manifest package tree and generated OUT_DIR, never fd 0 bytes.
+            package_parent = Path(host["manifest"]).parent
+            if not package_parent.is_relative_to(root):
+                public_files.extend(tree_files(package_parent))
         elif not source.is_relative_to(root):
             public_files.extend(tree_files(Path(host["manifest"]).parent if host is not None else source.parent))
-        public_files.append(source)
+        if not parsed["stdin"]:
+            public_files.append(source)
         # Generated include inputs must be visible before dispatch as well.
         if environment.get("OUT_DIR"):
             out_dir = absolute(environment["OUT_DIR"])
             require(native is None or any(out_dir.is_relative_to(Path(path)) for path in native["write_roots"]), "native_generated_scope")
             public_files.extend(tree_files(out_dir))
         source_identities = snapshot(set(public_files))
-        source_item, source_identity = capture(source, "source", campaign)
-        if host is not None and str(source) in host["candidate_sources"]:
-            require(source_item["sha256"] == host["candidate_sources"][str(source)], "host_source_binding")
-        if native is not None:
-            if str(source) in readonly_members:
-                require(source_item["sha256"] == readonly_members[str(source)]["sha256"], "native_source_binding")
-            else:
-                source_item["origin"] = "campaign-produced"
-        row["inputs"].append(source_item)
-        identities[str(source)] = source_identity
-        with campaign.retention_batch() if host is not None and parsed["externs"] else contextlib.nullcontext():
+        if source is not None:
+            source_item, source_identity = capture(source, "source", campaign)
+            if host is not None and str(source) in host["candidate_sources"]:
+                require(source_item["sha256"] == host["candidate_sources"][str(source)], "host_source_binding")
+            if native is not None:
+                if str(source) in readonly_members:
+                    require(source_item["sha256"] == readonly_members[str(source)]["sha256"], "native_source_binding")
+                else:
+                    source_item["origin"] = "campaign-produced"
+            identities[str(source)] = source_identity
+        implicit_proc_macro = host is not None and any(
+            external.get("kind") == "sysroot-implicit" for external in parsed["externs"])
+        search_snapshots = {}
+        with retention_scope(campaign, host):
+            toolchain = capture_toolchain(toolchain_files, campaign, identities)
+            row["inputs"].extend(toolchain)
+            if host is not None:
+                capture_host_tools(host_tools, campaign, host_identities)
+                row["inputs"].extend(host_inputs)
+                identities.update(host_identities)
+            if source is not None:
+                row["inputs"].append(source_item)
             for external in parsed["externs"]:
+                if external.get("kind") == "sysroot-implicit":
+                    continue
                 if native is None and host is None:
                     with HeldPath(Path(external["path"]).parent, directory=True) as directory:
                         require(not any(Path(name).suffix in {".so", ".dylib", ".dll"}
@@ -3069,10 +3809,20 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
                 elif native is not None:
                     require(external["path"] in readonly_members or any(Path(external["path"]).is_relative_to(Path(path)) for path in native["write_roots"]), "native_extern_scope")
                 with HeldPath(external["path"]) as handle:
-                    header = os.read(handle.fd, 8)
-                    require(header.startswith(b"!<arch>\n") if external["path"].endswith(".rlib") else
-                            header[:4] in {b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xca\xfe\xba\xbe"} if external["path"].endswith(".dylib") else
-                            header.startswith(b"\x7fELF") if external["path"].endswith(".so") else header.startswith(b"rmeta"), "extern_image_format")
+                    header = os.read(handle.fd, 16)
+                    # A standalone metadata extern is the exact output of a
+                    # supported rustc metadata emission: its fixed 8-byte
+                    # magic with the pinned metadata version, a u64 little-
+                    # endian root position, then the length-varint prefixed
+                    # rustc version banner. Only bounded header framing is
+                    # checked here; actual rustc owns full metadata decoding.
+                    # Metadata is consumed by later rustc invocations and
+                    # never counts as a link image or machine code.
+                    require(header[:4] in {b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xca\xfe\xba\xbe"} if external["path"].endswith(".dylib") else
+                            header.startswith(b"\x7fELF") if external["path"].endswith(".so") else
+                            header.startswith(b"!<arch>\n") if external["path"].endswith(".rlib") else
+                            supported_metadata_header(handle),
+                            "extern_image_format")
                     handle.verify()
                 item, observed = capture(external["path"], "extern", campaign)
                 item["extern_name"] = external["name"]
@@ -3098,8 +3848,6 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
                         item["extern_kind"] = "proc-macro-or-dynamic-image"
                 row["inputs"].append(item)
                 identities[external["path"]] = observed
-        search_snapshots = {}
-        with campaign.retention_batch() if host is not None and parsed["search"] else contextlib.nullcontext():
             for search in parsed["search"]:
                 search_root = Path(search["path"])
                 if native is not None:
@@ -3115,29 +3863,100 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
                     item, observed = capture(path, "search", campaign)
                     item["search_kind"] = search["kind"]
                     item["coverage"] = "conservative-search-scope"
+                    if (implicit_proc_macro and search["kind"] in {"crate", "all"}
+                            and path.name.startswith("libproc_macro")
+                            and path.suffix in {".rlib", ".rmeta", ".so", ".dylib", ".dll", ".rs"}):
+                        # Direct extern lookup searches crate/all paths. A
+                        # prefix match may be proc_macro2, or a renamed shadow.
+                        # Only an actual completed producer establishes which.
+                        item["producer"] = producing_unit(campaign, item, excluded_crate="proc_macro")
+                        item["origin"] = "recorded-producing-unit"
                     if host is not None and path.suffix in {".so", ".dylib", ".dll"}:
                         require(path.suffix == ".dylib" and path.is_relative_to(Path(host["target_directory"])), "host_dynamic_search_scope")
-                        item["producer"] = producing_unit(campaign, item)
+                        if "producer" not in item:
+                            item["producer"] = producing_unit(campaign, item)
                         item["origin"] = "recorded-producing-unit"
                     row["inputs"].append(item)
                     identities[str(path)] = observed
-        for path, original in identities.items():
-            verify_unchanged(path, original, output_directory)
+        if implicit_proc_macro:
+            bind_sysroot_proc_macro(toolchain, host)
+        verify_all_unchanged(identities, output_directory)
         verify_host_aliases(host_aliases)
         if host is not None:
             before_tools = observe_host_tools(host, campaign, host_identities)
             row["inputs"].append(before_tools)
             row["semantics"]["host_execution"]["tooling_checks"] = {"before": before_tools, "after": None}
-        dispatched = True
-        actual_exit = dispatch_compiler(campaign, argv).returncode
+        def retain_dependencies():
+            with HeldPath(depfile) as handle:
+                payload = handle.read()
+                dep = parse_depfile(payload, cwd, environment, native, host,
+                                    anonymous_targets=set(emissions.values()) if stdin_item is not None else None)
+                require(stdin_item is not None or str(source) in dep["dependencies"], "source_not_in_depfile")
+                for path in dep["dependencies"]:
+                    require(path in source_identities or path in identities, "input_not_observed_before_dispatch")
+                # Membership is settled for every dependency first, then one
+                # batched recheck runs; each capture below still re-verifies alone.
+                verify_all_unchanged({path: source_identities.get(path, identities.get(path))
+                                      for path in dep["dependencies"]}, output_directory)
+                for path in dep["dependencies"]:
+                    if not any(item["path"] == path and item["role"] == "source" for item in row["inputs"]):
+                        item, observed = capture(path, "source", campaign)
+                        if host is not None and path in host["candidate_sources"]:
+                            require(item["sha256"] == host["candidate_sources"][path], "host_source_binding")
+                        if native is not None:
+                            if path in readonly_members:
+                                require(item["sha256"] == readonly_members[path]["sha256"], "native_source_binding")
+                            else:
+                                item["origin"] = "campaign-produced"
+                        verify_unchanged(path, source_identities.get(path, identities.get(path)), output_directory)
+                        row["inputs"].append(item)
+                retained = campaign.retain(payload)
+                handle.verify()
+                dep.update({"path": str(depfile), "sha256": retained["sha256"]})
+                row["depfiles"].append(dep)
+                row["outputs"].append({"role": "depfile", "path": str(depfile), **retained})
+            return dep
+
+        if stdin_item is None:
+            dispatched = True
+            actual_exit = dispatch_compiler(campaign, argv).returncode
+        else:
+            with HeldPath(stdin_item["path"], held_parent=campaign.artifacts) as handle:
+                require(handle.read_digest(MAX_JSON)[0] == stdin_item["sha256"], "stdin_source_changed")
+                os.lseek(handle.fd, 0, os.SEEK_SET)
+                dispatched = True
+                actual_exit = dispatch_compiler(campaign, effective_argv, stdin=handle.fd).returncode
+                handle.verify()
         row["compiler_exit"] = actual_exit
         if actual_exit != 0:
+            if stdin_item is not None:
+                partial = output_lease.produced(complete=False)
+                if explicit_metadata:
+                    # Every admitted produced partial output is retained and
+                    # bound with the real compiler status before publication;
+                    # sealed partial custody never becomes a successful
+                    # producer, and predecessor evidence is preserved.
+                    with retention_scope(campaign, host):
+                        if depfile.name in partial:
+                            retain_dependencies()
+                        for name in sorted(partial):
+                            if name == depfile.name:
+                                continue
+                            item, _ = capture(output_directory / name, "unit", campaign)
+                            item["partial"] = True
+                            row["outputs"].append(item)
+                    row["semantics"]["output_ownership"]["produced"] = explicit_metadata_produced_identity(partial)
+                elif depfile.name in partial:
+                    with retention_scope(campaign, host):
+                        retain_dependencies()
+                output_lease.verify(partial, complete=False)
             row["status"] = "compiler_failed"
             campaign.publish(row)
             return actual_exit if actual_exit >= 0 else 128 - actual_exit
         produced = output_lease.produced()
-        for path, original in identities.items():
-            verify_unchanged(path, original, output_directory)
+        if explicit_metadata:
+            row["semantics"]["output_ownership"]["produced"] = explicit_metadata_produced_identity(produced)
+        verify_all_unchanged(identities, output_directory)
         verify_host_aliases(host_aliases)
         if host is not None:
             after_tools = observe_host_tools(host, campaign, host_identities)
@@ -3148,29 +3967,15 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
                 output_lease.verify_host_search(directory, original)
             elif native is None or any(Path(directory).is_relative_to(Path(path)) for path in native["write_roots"]):
                 require(sorted(str(p) for p in tree_files(directory)) == original, "search_changed_during_compilation")
-        with (campaign.retention_batch() if host is not None else contextlib.nullcontext()), HeldPath(depfile) as handle:
-            payload = handle.read()
-            dep = parse_depfile(payload, cwd, environment, native, host)
-            require(str(source) in dep["dependencies"], "source_not_in_depfile")
-            for path in dep["dependencies"]:
-                require(path in source_identities or path in identities, "input_not_observed_before_dispatch")
-                verify_unchanged(path, source_identities.get(path, identities.get(path)), output_directory)
-                if not any(item["path"] == path and item["role"] == "source" for item in row["inputs"]):
-                    item, observed = capture(path, "source", campaign)
-                    if host is not None and path in host["candidate_sources"]:
-                        require(item["sha256"] == host["candidate_sources"][path], "host_source_binding")
-                    if native is not None:
-                        if path in readonly_members:
-                            require(item["sha256"] == readonly_members[path]["sha256"], "native_source_binding")
-                        else:
-                            item["origin"] = "campaign-produced"
-                    verify_unchanged(path, source_identities.get(path, identities.get(path)), output_directory)
-                    row["inputs"].append(item)
-            retained = campaign.retain(payload)
-            handle.verify()
-            dep.update({"path": str(depfile), "sha256": retained["sha256"]})
-            row["depfiles"].append(dep)
-            row["outputs"].append({"role": "depfile", "path": str(depfile), **retained})
+        with retention_scope(campaign, host):
+            dep = retain_dependencies()
+            for path in sorted(expected_outputs):
+                item, _ = capture(path, "unit", campaign)
+                if native is not None and path.endswith(".so"):
+                    item["unit_kind"] = "linux-dynamic-image"
+                if host is not None and path.endswith(".dylib"):
+                    item["unit_kind"] = "darwin-dynamic-image"
+                row["outputs"].append(item)
         require(expected_outputs, "missing_unit_output")
         nominal = set(dep["targets"]) - {str(depfile)}
         require(nominal, "depfile_output_binding")
@@ -3190,14 +3995,6 @@ def main(argv, supplied_environment=None, supplied_cwd=None, executor=None, prob
                 mappings.append({"target": target, "output": path})
         require(set(item["output"] for item in mappings) == expected_outputs, "depfile_output_binding")
         dep["unit_targets"] = mappings
-        with campaign.retention_batch() if host is not None else contextlib.nullcontext():
-            for path in sorted(expected_outputs):
-                item, _ = capture(path, "unit", campaign)
-                if native is not None and path.endswith(".so"):
-                    item["unit_kind"] = "linux-dynamic-image"
-                if host is not None and path.endswith(".dylib"):
-                    item["unit_kind"] = "darwin-dynamic-image"
-                row["outputs"].append(item)
         output_lease.verify(produced)
         row["status"] = "success"
         campaign.publish(row)

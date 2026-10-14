@@ -433,7 +433,7 @@ fn durable_nonce_issuance_rolls_back_each_sql_cutpoint() -> TestResult {
 
 #[test]
 fn durable_nonce_issuance_reopens_with_current_fences_and_migrates_absence() -> TestResult {
-    let mut fixture = unowned_prepared_nonce_fixture(None)?;
+    let mut fixture = pre_recovery_unowned_prepared_nonce_fixture(None)?;
     let original = fixture.original.canonical_bytes().to_vec();
     crate::admission_operation_store::tests::runtime_replay::remove_empty_v19_runtime_tables(
         &*fixture.fixture.store.connection()?,

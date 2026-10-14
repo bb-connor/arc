@@ -4,7 +4,7 @@ use super::*;
 #[cfg(feature = "admission-test-support")]
 mod test_support;
 
-#[derive(Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "owner", rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum PinOwner {
     Operator {
@@ -148,13 +148,33 @@ enum PinSchema {
 
 /// Only the owning native pin operation calls this after it has authenticated
 /// the operator, captured operation or actual pending approval in this writer.
+/// The pin row goes through the typed intake; its one reference owner is
+/// charged to the tenant account by the existing custody writer.
 pub(super) fn retain(
     tx: &Transaction<'_>,
     serving_owner: &SqliteServingOwner,
-    scope: &RecoveryScopeV1,
+    actor: &AuthenticatedRecoveryActor,
+    profile: &NativeKnowledgeInstallationV1,
+    now: u64,
     owner: PinOwner,
     reference: &ArtifactVersionRefV1,
 ) -> Result<(), AdmissionOperationStoreError> {
+    if let Some(intake) = super::intake::AuthenticatedKnowledgeIntakeSource::pin_retain(
+        tx, actor, profile, now, &owner, reference,
+    )? {
+        protected::persist_knowledge_intake(tx, serving_owner, intake)?;
+    }
+    super::reference_custody::retain_pin_references(tx, serving_owner, &owner.key(actor.scope())?)
+}
+
+/// The new pin row of an owner, or none when that exact pin is retained. A
+/// retained pin bound to anything else refuses.
+pub(super) fn derive_retain(
+    tx: &Connection,
+    scope: &RecoveryScopeV1,
+    owner: &PinOwner,
+    reference: &ArtifactVersionRefV1,
+) -> Result<Option<DerivedWrite>, AdmissionOperationStoreError> {
     if reference.scope != *scope {
         return Err(refused("pin source changed its scope"));
     }
@@ -162,28 +182,26 @@ pub(super) fn retain(
     if let Some(existing) = load::<PinRecord>(tx, &key)? {
         if self::reference(tx, &key)?.as_ref() != Some(reference)
             || existing.scope != *scope
-            || existing.owner != owner
+            || existing.owner != *owner
             || existing.reference != *reference
         {
             return Err(refused("pin owner was rebound"));
         }
-        return super::reference_custody::retain_pin_references(tx, serving_owner, &key);
+        return Ok(None);
     }
-    save(
-        tx,
-        serving_owner,
-        scope,
-        &key,
-        &PinRecord {
+    Ok(Some(DerivedWrite {
+        payload: protected::encode(&PinRecord {
             schema: PinSchema::V1,
             scope: scope.clone(),
-            owner,
+            owner: owner.clone(),
             reference: reference.clone(),
             state: PinState::Active,
             retirement: None,
-        },
-    )?;
-    super::reference_custody::retain_pin_references(tx, serving_owner, &key)
+        })?,
+        key,
+        scope_key: scope_key(scope)?,
+        expected: None,
+    }))
 }
 
 /// Resolve active custody through the authenticated typed pin reader.
@@ -209,27 +227,33 @@ fn validate_state(pin: &PinRecord) -> Result<(), AdmissionOperationStoreError> {
     }
 }
 
-/// The caller has authenticated a current KnowledgeAdmin in this same fenced
-/// writer. Only its own exact operator pin can enter a terminal state.
-pub(super) fn retire_operator(
-    tx: &Transaction<'_>,
-    serving_owner: &SqliteServingOwner,
+/// The actor's own exact Active operator pin and its one canonical terminal
+/// successor, derived from the current authenticated record. An already
+/// retired pin has no pending closure.
+pub(super) struct PendingOperatorRetirement {
+    pub(super) key: String,
+    pub(super) head: protected::ProtectedSourceReference,
+    pub(super) successor: Vec<u8>,
+}
+
+pub(super) fn pending_operator_retirement(
+    tx: &Connection,
     actor: &AuthenticatedRecoveryActor,
     profile: &NativeKnowledgeInstallationV1,
     reference: &ArtifactVersionRefV1,
     evidence: &EvidenceRef,
     now: u64,
-) -> Result<(), AdmissionOperationStoreError> {
+) -> Result<Option<PendingOperatorRetirement>, AdmissionOperationStoreError> {
     let owner = PinOwner::Operator {
         principal: actor.principal().clone(),
         evidence: evidence.clone(),
     };
     let key = owner.key(actor.scope())?;
-    let previous = protected::source_reference(tx, &key)?;
+    let head = protected::source_reference(tx, &key)?;
     let row = protected::raw_checked(tx, &key)?.ok_or_else(|| refused("operator pin absent"))?;
     let mut pin: PinRecord = protected::decode(&row.payload)?;
-    if previous.kind() != "command"
-        || previous.scope_key() != scope_key(actor.scope())?
+    if head.kind() != "command"
+        || head.scope_key() != scope_key(actor.scope())?
         || pin.owner != owner
         || pin.scope != *actor.scope()
         || pin.reference != *reference
@@ -239,7 +263,7 @@ pub(super) fn retire_operator(
     }
     validate_state(&pin)?;
     if pin.state == PinState::Retired {
-        return Ok(());
+        return Ok(None);
     }
     pin.state = PinState::Retired;
     pin.retirement = Some(PinRetirement {
@@ -248,7 +272,30 @@ pub(super) fn retire_operator(
         policy: profile.policy,
         retired_at: SafeInteger::new(now).map_err(refused)?,
     });
-    protected::verify_source_reference(tx, &previous)?;
-    save(tx, serving_owner, actor.scope(), &key, &pin)?;
-    super::reference_retirement::retire_pin_references(tx, serving_owner, &key)
+    validate_state(&pin)?;
+    Ok(Some(PendingOperatorRetirement {
+        key,
+        head,
+        successor: protected::encode(&pin)?,
+    }))
+}
+
+/// The caller has authenticated a current KnowledgeAdmin in this same fenced
+/// writer. Only its own exact operator pin can enter a terminal state, through
+/// the prepared closure. An already retired pin writes and refunds nothing.
+pub(super) fn retire_operator(
+    tx: &Transaction<'_>,
+    serving_owner: &SqliteServingOwner,
+    actor: &AuthenticatedRecoveryActor,
+    profile: &NativeKnowledgeInstallationV1,
+    reference: &ArtifactVersionRefV1,
+    evidence: &EvidenceRef,
+    now: u64,
+) -> Result<(), AdmissionOperationStoreError> {
+    match super::closure::PreparedKnowledgeClosure::operator_pin_retirement(
+        tx, actor, profile, reference, evidence, now,
+    )? {
+        Some(closure) => closure.settle(tx, serving_owner),
+        None => Ok(()),
+    }
 }

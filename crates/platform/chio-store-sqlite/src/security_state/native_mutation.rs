@@ -27,6 +27,13 @@ const AUTHORIZE: &str = "chio_native_security_authorize";
 const MAX_CHANGES: usize = 4096;
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 
+impl NativeRowChange {
+    /// Most row changes one native join may capture.
+    pub(crate) const MAX_JOIN_CHANGES: usize = MAX_CHANGES;
+    /// Most bytes of before and after images one native join may capture.
+    pub(crate) const MAX_JOIN_IMAGE_BYTES: usize = MAX_BYTES;
+}
+
 /// The complete table vocabulary for the monotone join journal format.
 pub(crate) fn is_native_flow_join_table(table: &str) -> bool {
     matches!(
@@ -196,6 +203,7 @@ pub(super) struct NativeFlowOwner<'connection> {
     transaction: Transaction<'connection>,
     authorization: JoinAuthorization,
     capture: Arc<Capture>,
+    generation_reservation: crate::admission_operation_store::NativeGenerationReservation,
 }
 
 enum JoinAuthorization {
@@ -231,6 +239,12 @@ impl NativeFlowOwner<'_> {
 
     pub(super) fn authority(&self) -> &str {
         self.authorization.authority()
+    }
+
+    pub(super) fn generation(&self, tenant: &str, proposed: u64) -> PortResult<u64> {
+        self.generation_reservation
+            .generation(self.authority(), tenant, proposed)
+            .map_err(|_| PortError::integrity_failure())
     }
 }
 
@@ -335,10 +349,26 @@ fn join_native<'connection>(
         enabled: AtomicBool::new(true),
         changes: Mutex::new(Changes::default()),
     });
+    // Bank readback can inspect catalog pragmas. Perform it before installing
+    // the mutation authorizer, which deliberately denies every pragma. The
+    // authorizer then forbids bank changes until this owned join returns.
+    let output_operation = match &authorization {
+        JoinAuthorization::Output(output) => Some(output.operation_id()),
+        _ => None,
+    };
+    let generation_reservation =
+        crate::admission_operation_store::prepare_native_finishing_generation(
+            &transaction,
+            authorization.authority(),
+            authorization.request().key.tenant_id.as_str(),
+            output_operation,
+        )
+        .map_err(|_| PortError::integrity_failure())?;
     let owner = NativeFlowOwner {
         transaction,
         authorization,
         capture,
+        generation_reservation,
     };
     let disable = DisableCapture(owner.capture.clone());
     install_capture(&owner.transaction, &owner.capture)?;

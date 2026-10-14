@@ -86,7 +86,7 @@ impl SqliteAdmissionOperationStore {
         if actor.permission() != RecoveryPermission::KnowledgeAdmin || revision == 0 {
             return Err(refused("checkpoint custody migration authority"));
         }
-        mutate_retained_admin(self, actor, fence, now, |tx, _, _| {
+        mutate_retained_admin(self, actor, fence, now, |tx, profile, now| {
             let latest = load_checkpoint(&tx, actor.scope(), id, 0)?;
             let checkpoint =
                 if let Some(latest) = latest.filter(|latest| latest.revision.get() == revision) {
@@ -96,7 +96,7 @@ impl SqliteAdmissionOperationStore {
                         .ok_or_else(|| refused("checkpoint custody migration absent"))?
                 };
             traversal::ensure_audience(&tx, actor, &checkpoint.label)?;
-            retain_checkpoint_revision(&tx, &self.serving_owner, &checkpoint)?;
+            retain_checkpoint_revision(&tx, &self.serving_owner, actor, profile, now, &checkpoint)?;
             if !revision_is_retired(&tx, &checkpoint)? {
                 super::super::reference_custody::retain_checkpoint_references(
                     &tx,
@@ -121,52 +121,68 @@ impl SqliteAdmissionOperationStore {
         if actor.permission() != RecoveryPermission::KnowledgeAdmin || revision == 0 {
             return Err(refused("checkpoint retirement authority"));
         }
-        mutate_retained_admin(self, actor, fence, now, |tx, _, now| {
-            let latest = head::load_checkpoint_with_key(&tx, actor.scope(), id, 0)?;
-            let (checkpoint, source_key) = if let Some(latest) =
-                latest.filter(|(latest, _)| latest.revision.get() == revision)
+        mutate_retained_admin(self, actor, fence, now, |tx, profile, now| {
+            if let Some(closure) =
+                super::super::closure::PreparedKnowledgeClosure::checkpoint_revision_retirement(
+                    &tx, actor, profile, id, revision, now,
+                )?
             {
-                latest
-            } else {
-                // This administrative ownership change grants no read.
-                // Authentic pre-reset history above visible latest can be
-                // retired without making that history restorable.
-                head::load_checkpoint_with_key(&tx, actor.scope(), id, revision)?
-                    .ok_or_else(|| refused("checkpoint retirement absent"))?
-            };
-            traversal::ensure_audience(&tx, actor, &checkpoint.label)?;
-            if revision_is_retired(&tx, &checkpoint)? {
-                return Ok((tx, ()));
+                closure.settle(&tx, &self.serving_owner)?;
             }
-            let source = checkpoint_reference_source(&tx, &source_key)?
-                .ok_or_else(|| refused("checkpoint retirement source absent"))?;
-            if source.canonical_envelope()? != protected::encode(&checkpoint)? {
-                return Err(refused("checkpoint retirement selected envelope changed"));
-            }
-            let key = retirement_key(actor.scope(), id, revision)?;
-            save(
-                &tx,
-                &self.serving_owner,
-                actor.scope(),
-                &key,
-                &CheckpointRevisionRetirement {
-                    domain_version: VersionV1,
-                    scope: actor.scope().clone(),
-                    checkpoint: id.clone(),
-                    revision: checkpoint.revision,
-                    envelope: envelope_digest(&checkpoint)?,
-                    principal: actor.principal().clone(),
-                    authority_scope: protected::deployment_tx(&tx, actor.scope())?.authority_scope,
-                    retired_at: SafeInteger::new(now).map_err(refused)?,
-                },
-            )?;
-            protected::verify_source_reference(&tx, source.source())?;
-            super::super::reference_retirement::retire_checkpoint_references(
-                &tx,
-                &self.serving_owner,
-                source.source().record_key(),
-            )?;
             Ok((tx, ()))
         })
     }
+}
+
+/// One pending revision source and its exact canonical retirement record.
+pub(in crate::admission_operation_store::knowledge) struct PendingRevisionRetirement {
+    pub(in crate::admission_operation_store::knowledge) key: String,
+    pub(in crate::admission_operation_store::knowledge) source: CheckpointReferenceSource,
+    pub(in crate::admission_operation_store::knowledge) record: Vec<u8>,
+}
+
+/// Select the retained revision this actor may retire and derive its one
+/// retirement record. An already retired revision has no pending closure.
+pub(in crate::admission_operation_store::knowledge) fn pending_revision_retirement(
+    tx: &Transaction<'_>,
+    actor: &AuthenticatedRecoveryActor,
+    id: &CheckpointId,
+    revision: u64,
+    now: u64,
+) -> Result<Option<PendingRevisionRetirement>, AdmissionOperationStoreError> {
+    let latest = head::load_checkpoint_with_key(tx, actor.scope(), id, 0)?;
+    let (checkpoint, source_key) =
+        if let Some(latest) = latest.filter(|(latest, _)| latest.revision.get() == revision) {
+            latest
+        } else {
+            // This administrative ownership change grants no read.
+            // Authentic pre-reset history above visible latest can be
+            // retired without making that history restorable.
+            head::load_checkpoint_with_key(tx, actor.scope(), id, revision)?
+                .ok_or_else(|| refused("checkpoint retirement absent"))?
+        };
+    traversal::ensure_audience(tx, actor, &checkpoint.label)?;
+    if revision_is_retired(tx, &checkpoint)? {
+        return Ok(None);
+    }
+    let source = checkpoint_reference_source(tx, &source_key)?
+        .ok_or_else(|| refused("checkpoint retirement source absent"))?;
+    if !source.active() || source.canonical_envelope()? != protected::encode(&checkpoint)? {
+        return Err(refused("checkpoint retirement selected envelope changed"));
+    }
+    let record = protected::encode(&CheckpointRevisionRetirement {
+        domain_version: VersionV1,
+        scope: actor.scope().clone(),
+        checkpoint: id.clone(),
+        revision: checkpoint.revision,
+        envelope: envelope_digest(&checkpoint)?,
+        principal: actor.principal().clone(),
+        authority_scope: protected::deployment_tx(tx, actor.scope())?.authority_scope,
+        retired_at: SafeInteger::new(now).map_err(refused)?,
+    })?;
+    Ok(Some(PendingRevisionRetirement {
+        key: retirement_key(actor.scope(), id, revision)?,
+        source,
+        record,
+    }))
 }

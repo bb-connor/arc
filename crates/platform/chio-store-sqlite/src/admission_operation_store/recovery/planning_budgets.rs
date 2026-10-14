@@ -1,4 +1,4 @@
-//! Protected intake allocations with immutable compatible-history baselines.
+//! Protected intake allocations start empty and account for every planning write.
 use super::*;
 use std::collections::BTreeMap;
 
@@ -153,9 +153,18 @@ fn any_metadata(tx: &Connection) -> Result<bool, AdmissionOperationStoreError> {
         return Ok(false);
     }
     tx.query_row(
-        "SELECT EXISTS(SELECT 1 FROM admission_operation_recovery_records WHERE record_key GLOB 'recovery-planning-quota:*')
-            OR EXISTS(SELECT 1 FROM admission_operation_recovery_events WHERE record_key GLOB 'recovery-planning-quota:*')
-            OR EXISTS(SELECT 1 FROM authority_global_commits WHERE projection_kind='recovery' AND projection_key GLOB 'recovery-planning-quota:*')",
+        "SELECT EXISTS(SELECT 1 FROM admission_operation_recovery_records
+                WHERE record_key GLOB 'recovery-planning-quota:*' OR record_key GLOB 'deployment:*'
+                   OR record_key GLOB 'deployment-history:*' OR record_key GLOB 'recovery-origin:*'
+                   OR record_key GLOB 'recovery-successor:*' OR record_key GLOB 'recovery-owner:*')
+            OR EXISTS(SELECT 1 FROM admission_operation_recovery_events
+                WHERE record_key GLOB 'recovery-planning-quota:*' OR record_key GLOB 'deployment:*'
+                   OR record_key GLOB 'deployment-history:*' OR record_key GLOB 'recovery-origin:*'
+                   OR record_key GLOB 'recovery-successor:*' OR record_key GLOB 'recovery-owner:*')
+            OR EXISTS(SELECT 1 FROM authority_global_commits WHERE projection_kind='recovery'
+                AND (projection_key GLOB 'recovery-planning-quota:*' OR projection_key GLOB 'deployment:*'
+                   OR projection_key GLOB 'deployment-history:*' OR projection_key GLOB 'recovery-origin:*'
+                   OR projection_key GLOB 'recovery-successor:*' OR projection_key GLOB 'recovery-owner:*'))",
         [], |row| row.get(0),
     ).map_err(sqlite_error)
 }
@@ -217,6 +226,16 @@ fn data_scope(
             return Err(invariant("recovery planning origin binding changed"));
         }
         claim.scope
+    } else if key.starts_with("recovery-successor:") {
+        if kind != "command" {
+            return Err(invariant("recovery planning successor kind changed"));
+        }
+        super::successor_binding::planning_binding_scope(key, payload)?
+    } else if key.starts_with("recovery-owner:") {
+        if kind != "command" {
+            return Err(invariant("recovery planning owner head kind changed"));
+        }
+        super::successor_binding::planning_head_scope(key, payload)?
     } else {
         return Err(invariant("recovery planning namespace refused"));
     };
@@ -236,7 +255,7 @@ fn inventory(
     verify_native_archive_allocations(tx)?;
     let mut keys = tx.prepare(
         "SELECT r.record_key FROM admission_operation_recovery_records r
-         WHERE (r.record_key GLOB 'deployment:*' OR r.record_key GLOB 'deployment-history:*' OR r.record_key GLOB 'recovery-origin:*')
+         WHERE (r.record_key GLOB 'deployment:*' OR r.record_key GLOB 'deployment-history:*' OR r.record_key GLOB 'recovery-origin:*' OR r.record_key GLOB 'recovery-successor:*' OR r.record_key GLOB 'recovery-owner:*')
            AND NOT EXISTS(SELECT 1 FROM admission_operation_recovery_records q
                WHERE q.kind='command' AND q.record_key GLOB 'workflow-quota:*'
                  AND json_extract(q.payload,'$.native_archive.record_key')=r.record_key)
@@ -258,10 +277,17 @@ fn inventory(
         let row =
             raw(tx, &key)?.ok_or_else(|| invariant("recovery planning projection disappeared"))?;
         let scope = data_scope(&key, &row.scope, &row.kind, &row.payload, domain)?;
-        if (key.starts_with("deployment-history:") || key.starts_with("recovery-origin:"))
+        if (key.starts_with("deployment-history:")
+            || key.starts_with("recovery-origin:")
+            || key.starts_with("recovery-successor:"))
             && row.version != 1
         {
             return Err(invariant("recovery immutable planning record changed"));
+        }
+        if key.starts_with("recovery-owner:")
+            && row.version != super::successor_binding::planning_head_generation(&row.payload)?
+        {
+            return Err(invariant("recovery planning owner head generation changed"));
         }
         let (events, before): (i64, i64) = tx.query_row(
             "SELECT count(*),coalesce(sum(sequence<=?2),0) FROM admission_operation_recovery_events WHERE record_key=?1",
@@ -312,15 +338,13 @@ fn load(
     };
     if budget.authority_domain != *domain
         || budget.tenant_id.as_ref() != tenant
+        || budget.baseline_bytes != SafeInteger::ZERO
+        || budget.baseline_events != SafeInteger::ZERO
         || budget.writes.get() == 0
         || budget.writes.get() != row.version
-        || usage.events.checked_sub(budget.baseline_events.get()) != Some(budget.writes.get())
-        || usage.before_cutoff != budget.baseline_events.get()
-        || budget
-            .baseline_bytes
-            .get()
-            .checked_add(byte_ceiling)
-            .is_none_or(|ceiling| usage.bytes > ceiling)
+        || usage.events != budget.writes.get()
+        || usage.before_cutoff != 0
+        || usage.bytes > byte_ceiling
         || budget.writes.get()
             > if tenant.is_some() {
                 TENANT_EVENTS
@@ -381,7 +405,7 @@ fn new_budget(
     cutoff: u64,
     usage: &Usage,
 ) -> Result<PlanningBudget, AdmissionOperationStoreError> {
-    if usage.events != usage.before_cutoff {
+    if usage.bytes != 0 || usage.events != 0 || usage.before_cutoff != 0 {
         return Err(invariant("recovery planning tenant lost its allocation"));
     }
     Ok(PlanningBudget {
@@ -390,10 +414,8 @@ fn new_budget(
         tenant_id: tenant.cloned(),
         legacy_cutoff_sequence: SafeInteger::new(cutoff)
             .map_err(|_| invariant("recovery planning cutoff refused"))?,
-        baseline_bytes: SafeInteger::new(usage.bytes)
-            .map_err(|_| invariant("recovery planning baseline bytes refused"))?,
-        baseline_events: SafeInteger::new(usage.before_cutoff)
-            .map_err(|_| invariant("recovery planning baseline events refused"))?,
+        baseline_bytes: SafeInteger::ZERO,
+        baseline_events: SafeInteger::ZERO,
         writes: SafeInteger::ZERO,
     })
 }
@@ -418,17 +440,7 @@ fn next_budget(
     } else {
         (GLOBAL_BYTES, GLOBAL_EVENTS)
     };
-    if budget
-        .baseline_bytes
-        .get()
-        .checked_add(byte_ceiling)
-        .is_none_or(|ceiling| next_bytes > ceiling)
-        || budget
-            .baseline_events
-            .get()
-            .checked_add(event_ceiling)
-            .is_none_or(|ceiling| next_events > ceiling)
-    {
+    if next_bytes > byte_ceiling || next_events > event_ceiling {
         return Err(invariant(if budget.tenant_id.is_some() {
             "recovery tenant planning resource exhausted"
         } else {
@@ -480,16 +492,17 @@ pub(super) fn save(
         return Err(invariant("recovery planning writer owner changed"));
     }
     let selected = data_scope(key, scope, kind, payload, &domain)?;
-    let existing = raw(tx, key)?;
+    let existing = raw_checked(tx, key)?;
     if let Some(row) = &existing {
-        if row.scope != scope || row.kind != kind || !key.starts_with("deployment:") {
+        if row.scope != scope
+            || row.kind != kind
+            || !(key.starts_with("deployment:") || key.starts_with("recovery-owner:"))
+        {
             return Err(invariant("recovery planning immutable identity changed"));
         }
         data_scope(key, &row.scope, &row.kind, &row.payload, &domain)?;
     }
 
-    // The default-off old-format constructor admits only its fresh fixed path,
-    // same owner and bounded real writes. It suppresses new metadata only.
     let retained_global = peek(tx, &domain, None)?;
     let cutoff = match &retained_global {
         Some(global) => global.legacy_cutoff_sequence.get(),
@@ -509,7 +522,7 @@ pub(super) fn save(
                     |row| row.get(0),
                 )
                 .map_err(sqlite_error)?;
-            stored_u64(sequence, "recovery planning legacy cutoff")?
+            stored_u64(sequence, "recovery planning cutoff")?
         }
     };
     let before = inventory(tx, &domain, cutoff)?;
@@ -533,8 +546,8 @@ pub(super) fn save(
     let old_bytes = existing.as_ref().map_or(0, |row| row.payload.len() as u64);
     next_budget(&mut global, &before.global, old_bytes, payload.len() as u64)?;
     next_budget(&mut tenant, tenant_usage, old_bytes, payload.len() as u64)?;
-    // Both baselines were fixed from BEFORE the data change. Normal protected
-    // events and global commits retain each of these three writes atomically.
+    // Charge the before-write usage, then retain the data and both counters
+    // atomically through protected events and global commits.
     persist_record(tx, owner, key, scope, kind, payload, None)?;
     persist_budget(tx, owner, &global)?;
     persist_budget(tx, owner, &tenant)?;
@@ -603,8 +616,8 @@ pub(super) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
         load(tx, &domain, Some(&tenant), usage)?
             .ok_or_else(|| invariant("recovery planning tenant allocation disappeared"))?;
     }
-    for (tenant, usage) in &inventory.tenants {
-        if usage.events > usage.before_cutoff && !tenants.contains(tenant) {
+    for tenant in inventory.tenants.keys() {
+        if !tenants.contains(tenant) {
             return Err(invariant("recovery planning tenant allocation disappeared"));
         }
     }

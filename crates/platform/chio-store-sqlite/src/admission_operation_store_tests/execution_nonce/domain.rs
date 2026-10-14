@@ -39,7 +39,7 @@ pub(super) fn historical_ready(
     legacy_profile: bool,
 ) -> TestResult<NonceFixture> {
     historical_ready_from(
-        unowned_prepared_nonce_fixture(None)?,
+        pre_recovery_unowned_prepared_nonce_fixture(None)?,
         real_budget,
         legacy_profile,
     )

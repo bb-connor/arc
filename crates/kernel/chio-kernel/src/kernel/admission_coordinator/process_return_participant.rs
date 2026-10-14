@@ -1,10 +1,10 @@
 //! The issuing port is the Kernel's actual qualified durable store.
 use super::*;
 use crate::process_return_custody::{
-    FundedProcessNativeReturn, FundedProcessOriginalNonce, FundedProcessReturnEnrollment,
-    NativeProcessReturnCustodyPort, ProcessNativeReturnCaptureDataV1,
-    ProcessOriginalNonceCustodyDataV1, ProcessReturnFundingDataV1,
-    ProcessReturnReconciliationDataV1, ProcessReturnSourceDataV1, ReconciledProcessNativeReturn,
+    FundedProcessNativeReturn, FundedProcessOriginalNonce, NativeProcessReturnCustodyPort,
+    ProcessNativeReturnCaptureDataV1, ProcessOriginalNonceCustodyDataV1,
+    ProcessReturnFundingDataV1, ProcessReturnReconciliationDataV1, ProcessReturnSourceDataV1,
+    ReconciledProcessNativeReturn,
 };
 
 struct OriginalStorePort<'a> {
@@ -64,23 +64,6 @@ impl NativeProcessReturnCustodyPort for OriginalStorePort<'_> {
 }
 
 impl ChioKernel {
-    pub fn original_funded_process_return_enrollment(
-        &self,
-        source: &ProcessReturnSourceDataV1,
-    ) -> Result<FundedProcessReturnEnrollment, KernelError> {
-        let runtime = self.durable_runtime()?;
-        let _guard = runtime.lock_mutations()?;
-        let now = runtime.refresh_trusted_time(current_unix_timestamp_ms());
-        FundedProcessReturnEnrollment::from_original_native_source(
-            &OriginalStorePort {
-                store: runtime.store.as_ref(),
-            },
-            source,
-            &runtime.fence,
-            now,
-        )
-        .map_err(unavailable)
-    }
     pub fn original_funded_process_nonce_custody(
         &self,
         source: &ProcessReturnSourceDataV1,

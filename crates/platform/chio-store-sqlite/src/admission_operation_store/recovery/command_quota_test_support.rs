@@ -396,7 +396,16 @@ pub fn grow_recovery_quota_fixture_uncheckpointed_history(
     Ok(pressure)
 }
 
+/// The generic Knowledge pool predicate over `column`, so fixture counters
+/// measure exactly what the quota charges.
+pub fn recovery_quota_fixture_knowledge_pool(column: &str) -> String {
+    super::storage::generic_knowledge_predicate(column)
+}
+
 /// Retain a bounded batch in the actual foreign protected-record namespaces.
+/// A prior-format `knowledge-checkpoint:v2:` row is retained with the bytes and
+/// footprint of the prior-44 generic writer; every other row goes through the
+/// generic writer and its quota.
 pub fn retain_recovery_quota_fixture_records(
     store: &SqliteAdmissionOperationStore,
     fence: &StoreMutationFence,
@@ -414,8 +423,7 @@ pub fn retain_recovery_quota_fixture_records(
         if record.scope.authority_domain.as_str() != fence.store_uuid
             || ![
                 "semantic-capture:",
-                "knowledge-checkpoint:",
-                "knowledge-join:",
+                "knowledge-checkpoint:v2:",
                 "knowledge-pin:",
                 "confined-boundary:",
                 "product-report:",
@@ -427,15 +435,26 @@ pub fn retain_recovery_quota_fixture_records(
         {
             return Err(invariant("recovery quota fixture identity refused"));
         }
-        save(
-            &tx,
-            &store.serving_owner,
-            &record.key,
-            &scope_key(&record.scope)?,
-            "command",
-            &record.payload,
-            None,
-        )?;
+        let scope = scope_key(&record.scope)?;
+        if record.key.starts_with("knowledge-checkpoint:v2:") {
+            super::storage::retain_prior_format_checkpoint_fixture(
+                &tx,
+                &store.serving_owner,
+                &record.key,
+                &scope,
+                &record.payload,
+            )?;
+        } else {
+            save(
+                &tx,
+                &store.serving_owner,
+                &record.key,
+                &scope,
+                "command",
+                &record.payload,
+                None,
+            )?;
+        }
     }
     store.commit_write(tx)?;
     store.sync_after_write(&connection)
@@ -486,14 +505,33 @@ pub fn apply_recovery_quota_fixture_resumptions(
         return Err(invariant("recovery resumption fixture command refused").into());
     }
     store.recovery_mutation_with_headroom(actor, fence, now, true, |tx, profile, now| {
+        let install_started = std::time::Instant::now();
         install_fixture_observed_time_index(tx)?;
+        let install_ms = install_started.elapsed().as_millis();
+        let apply_started = std::time::Instant::now();
+        let mut command_ms = Vec::with_capacity(commands.len());
         let result = commands
             .iter()
             .map(|command| {
-                commands::apply(tx, &store.serving_owner, actor, command, profile, now, None)
+                let command_started = std::time::Instant::now();
+                let applied =
+                    commands::apply(tx, &store.serving_owner, actor, command, profile, now, None);
+                command_ms.push(command_started.elapsed().as_millis());
+                applied
             })
             .collect::<Result<Vec<_>, _>>()?;
+        let apply_ms = apply_started.elapsed().as_millis();
+        let restore_started = std::time::Instant::now();
         restore_fixture_canonical_schema(tx)?;
+        let restore_ms = restore_started.elapsed().as_millis();
+        eprintln!(
+            "RECOVERY_QUOTA_FLOOD_APPLY commands={} install_ms={} apply_ms={} restore_ms={} command_ms={:?}",
+            commands.len(),
+            install_ms,
+            apply_ms,
+            restore_ms,
+            command_ms
+        );
         Ok(result)
     })
 }
@@ -523,7 +561,11 @@ pub fn fill_recovery_quota_fixture_intake_bytes(
     install_fixture_observed_time_index(&tx)?;
     let current: i64 = tx
         .query_row(
-            "SELECT COALESCE(sum(length(payload)),0) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-*'",
+            &format!(
+                "SELECT COALESCE(sum(length(payload)),0) FROM admission_operation_recovery_records
+                 WHERE {}",
+                super::storage::generic_knowledge_predicate("record_key")
+            ),
             [],
             |row| row.get(0),
         )

@@ -5,19 +5,6 @@ use crate::admission_operation_store::raw_custody_liability::{
 };
 use crate::serving_owner::{NativeSourceTransactionOrigin, SqliteServingOwner};
 
-const CURSOR_LEVELS: u64 = 20;
-const BALANCE_PAGES_PER_LEVEL: u64 = 6;
-const NEW_BALANCE_WALKS: u64 = 1;
-const EXISTING_BALANCE_WALKS: u64 = 3;
-const ALLOCATION_OR_FREE_FRAME_MULTIPLIER: u64 = 2;
-const FRAME_HEADER_BYTES: u64 = 24;
-const WAL_HEADER_BYTES: u64 = 32;
-// sqlite3SectorSize clamps the actual WAL sector size to this compiled bound.
-// Always price padding, including when a previously opened WAL cached a device
-// property different from the current main file's powersafe-overwrite flag.
-const MAX_WAL_SECTOR_BYTES: u64 = 65_536;
-const ANCHOR_FILE_BYTES: u64 = 2 * 1_024;
-
 pub(in crate::admission_operation_store) fn raw_custody_price_algorithm_fingerprint(
 ) -> Result<String, AdmissionOperationStoreError> {
     let bytes = canonical_json_bytes(&(
@@ -33,7 +20,7 @@ pub(in crate::admission_operation_store) fn raw_custody_price_algorithm_fingerpr
             FRAME_HEADER_BYTES,
             WAL_HEADER_BYTES,
             MAX_WAL_SECTOR_BYTES,
-            ANCHOR_FILE_BYTES,
+            SERVING_ANCHOR_FILE_BYTES,
         ),
         "old and maximum intermediate overflow plus one freelist frame per allocation or free",
         "one whole Raw transaction including at most two admission and two global appends",
@@ -140,7 +127,7 @@ pub(in crate::admission_operation_store) fn price_raw_custody_liability(
         // Appended WAL and later main-file allocation coexist. The serving
         // anchor overwrites its existing fixed slots without extending them;
         // retaining its whole fixed file adds a separate conservative margin.
-        disk_bytes: add(mul(wal_bytes, 2)?, ANCHOR_FILE_BYTES)?,
+        disk_bytes: add(mul(wal_bytes, 2)?, SERVING_ANCHOR_FILE_BYTES)?,
         recovery_appends: 0,
         global_appends: 2,
     };

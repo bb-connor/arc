@@ -141,14 +141,6 @@ async fn rejected_principal_work_cannot_reserve_other_principal_capacity() -> Te
         "rejected duplicates reserved capacity needed by another principal"
     );
     tokio::time::timeout(Duration::from_secs(2), other?).await???;
-    // Reply publication precedes the worker's affine permit drop. Wait for
-    // that real cleanup before asserting the final allocator state.
-    tokio::time::timeout(Duration::from_secs(2), async {
-        while executor.capacity.available_permits() != WORKERS {
-            tokio::task::yield_now().await;
-        }
-    })
-    .await?;
     assert!(executor
         .principals
         .lock()
@@ -238,12 +230,6 @@ async fn large_owned_future_completes_on_default_worker_stack() -> TestResult {
     let result = tokio::time::timeout(Duration::from_secs(2), response).await???;
     assert_eq!(result, 14);
     assert_eq!(completions.load(Ordering::SeqCst), 1);
-    tokio::time::timeout(Duration::from_secs(2), async {
-        while executor.capacity.available_permits() != WORKERS {
-            tokio::task::yield_now().await;
-        }
-    })
-    .await?;
     assert!(executor
         .principals
         .lock()

@@ -54,7 +54,7 @@ pub(super) fn describe_original_tool_outcome_global(
     })
 }
 
-fn canonical_uuid_bytes(value: &str) -> Result<u64, AdmissionOperationStoreError> {
+pub(super) fn canonical_uuid_bytes(value: &str) -> Result<u64, AdmissionOperationStoreError> {
     let parsed = uuid::Uuid::parse_str(value).map_err(invalid)?;
     let canonical = parsed.hyphenated().to_string();
     if canonical != value {
@@ -65,7 +65,7 @@ fn canonical_uuid_bytes(value: &str) -> Result<u64, AdmissionOperationStoreError
     u64::try_from(canonical.len()).map_err(invalid)
 }
 
-fn record_bytes(cells: &[u64]) -> Result<u64, AdmissionOperationStoreError> {
+pub(super) fn record_bytes(cells: &[u64]) -> Result<u64, AdmissionOperationStoreError> {
     // Nine bytes cover each serial-type varint and the record-header length.
     // Integer payloads are charged at eight bytes regardless of present width.
     let header = u64::try_from(cells.len())

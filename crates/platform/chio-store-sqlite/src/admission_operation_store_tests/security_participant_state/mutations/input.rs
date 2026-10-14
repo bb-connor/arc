@@ -73,7 +73,12 @@ fn input_join_records_original_intent_and_one_complete_resolved_command() -> Tes
         |row| row.get(0),
     )?;
     let record: serde_json::Value = serde_json::from_slice(&bytes)?;
-    assert_eq!(record["schema"], "chio.native-security-flow-join.v2");
+    assert_eq!(record["schema"], "chio.native-security-flow-join.v3");
+    // An unselected semantic scope is a positive eligible classification.
+    assert_eq!(
+        record["input_fate"],
+        serde_json::json!({"fate": "eligible"})
+    );
     assert_eq!(record["input"], serde_json::to_value(&input)?);
     assert_eq!(canonical_json_bytes(&record)?, bytes);
     native::verify_coverage(&*fixture.store.connection()?)?;
@@ -404,7 +409,8 @@ fn input_intent_schema_and_resolution_tampering_fail_recovery_with_recomputed_lo
         "v1-with-input",
         "v2-without-input",
         "null",
-        "unknown",
+        // A v3 Input join without its retained fate never reads as eligible.
+        "missing-fate",
         "input",
         "resolution",
     ] {
@@ -451,7 +457,12 @@ fn input_intent_schema_and_resolution_tampering_fail_recovery_with_recomputed_lo
                     .remove("input");
             }
             "null" => record["input"] = serde_json::Value::Null,
-            "unknown" => record["schema"] = "chio.native-security-flow-join.v3".into(),
+            "missing-fate" => {
+                record
+                    .as_object_mut()
+                    .ok_or("record object")?
+                    .remove("input_fate");
+            }
             "input" => {
                 record["input"]["input_label"] = serde_json::to_value(InformationLabel::bottom())?
             }

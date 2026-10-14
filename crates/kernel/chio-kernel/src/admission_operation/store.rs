@@ -237,6 +237,96 @@ pub trait AdmissionOperationStore: Send + Sync {
         ))
     }
 
+    /// Settle an account whose Process member committed its reconciliation.
+    /// The physical owner reads the Process journal back through the concrete
+    /// source and the retained receipt through the registered sink.
+    fn settle_original_native_finishing_process(
+        &self,
+        _provider: &dyn crate::native_finishing::NativeProcessFinishingSourceProvider,
+        _receipts: Option<&crate::receipt_store::NativeReceiptStoreRegistration>,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "original native finishing settlement is unsupported".into(),
+        ))
+    }
+
+    /// Settle a native-only account after its authentic terminal projection
+    /// and retained receipt. A store that never prepares an account owes
+    /// nothing; an account with a Process member waits for reconciliation.
+    fn settle_native_finishing_after_terminal(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _receipts: Option<&crate::receipt_store::NativeReceiptStoreRegistration>,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Ok(())
+    }
+
+    /// Attach this store's native finishing bank to the registered receipt
+    /// sink before serving. A store without a bank owes no sink any debt.
+    fn attach_native_receipt_sink(
+        &self,
+        _registration: &crate::receipt_store::NativeReceiptStoreRegistration,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Ok(())
+    }
+
+    /// Retain a native original's one receipt under its prepaid ReceiptSink
+    /// purpose and spend that purpose after the sink commits.
+    fn materialize_native_finishing_receipt(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _receipt: &chio_core::receipt::body::ChioReceipt,
+        _pending_visible_at_ms: Option<u64>,
+        _receipts: Option<&crate::receipt_store::NativeReceiptStoreRegistration>,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "native finishing receipt sink is unsupported".into(),
+        ))
+    }
+
+    /// Startup sweep: settle every native-only account whose authentic
+    /// terminal and receipt are retained. Stores without accounts owe none.
+    fn settle_native_finishing_at_startup(
+        &self,
+        _receipts: Option<&crate::receipt_store::NativeReceiptStoreRegistration>,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Ok(())
+    }
+
+    /// A native original's freshly signed receipt id is named by no receipt
+    /// lineage statement before its terminal publishes it as owed.
+    fn require_native_receipt_unnamed(
+        &self,
+        _receipt_id: &str,
+        _receipts: Option<&crate::receipt_store::NativeReceiptStoreRegistration>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "native finishing receipt sink is unsupported".into(),
+        ))
+    }
+
+    /// Startup reconciliation of one missing admission receipt. A receipt
+    /// whose terminal belongs to a native account is retained under its
+    /// prepaid purpose and reports `true`; any other receipt reports `false`.
+    fn reconcile_native_finishing_receipt(
+        &self,
+        _receipt: &chio_core::receipt::body::ChioReceipt,
+        _pending_visible_at_ms: Option<u64>,
+        _receipts: &crate::receipt_store::NativeReceiptStoreRegistration,
+        _fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<bool, AdmissionOperationStoreError> {
+        Ok(false)
+    }
+
     // Target-only additive methods for the existing AdmissionOperationStore trait.
     // They use the actual Kernel-configured qualified store and default refuse.
     fn verify_original_process_return_enrollment(
@@ -1090,6 +1180,11 @@ pub trait AdmissionOperationStore: Send + Sync {
 
     /// Lists non-terminal operations that require startup recovery work.
     ///
+    /// Return at most `limit` rows in strictly ascending operation-id order,
+    /// excluding ids at or before `after_operation_id`. Apply all eligibility
+    /// filters before the limit. The immutable cursor lets a sweep pass failed
+    /// or live-owned operations without skipping later eligible work.
+    ///
     /// A quiescent `ApprovalRequired` operation waits for external approval
     /// rather than recovery. While its proposal deadline has not elapsed at
     /// `not_after_unix_ms` it must be excluded before applying `limit`, so it
@@ -1100,6 +1195,7 @@ pub trait AdmissionOperationStore: Send + Sync {
     fn list_recoverable(
         &self,
         not_after_unix_ms: u64,
+        after_operation_id: Option<&AdmissionOperationId>,
         limit: usize,
     ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError>;
 

@@ -375,7 +375,7 @@ impl SqliteDeadLetterStore {
 
     fn connection(
         &self,
-    ) -> Result<r2d2::PooledConnection<SqliteConnectionManager>, DeadLetterStoreError> {
+    ) -> Result<crate::receipt_store::SqliteStoreConnection, DeadLetterStoreError> {
         let connection =
             receipt_pool_connection(&self.pool, self.receipt_sink_qualification.as_deref())
                 .map_err(dead_letter_error_from_receipt_store)?;
@@ -782,10 +782,10 @@ mod tests {
     #[test]
     fn qualified_alongside_store_rejects_dead_letter_rollback() {
         let dir = tempdir().test_expect("temporary directory creates");
-        let anchor_dir = tempfile::Builder::new()
-            .prefix("chio-dead-letter-anchor")
-            .tempdir_in("/dev/shm")
-            .test_expect("anchor directory creates");
+        let anchor_dir = crate::store_connection::test_support::rollback_anchor_tempdir(
+            "chio-dead-letter-anchor",
+        )
+        .test_expect("anchor directory creates");
         #[cfg(unix)]
         for root in [dir.path(), anchor_dir.path()] {
             use std::os::unix::fs::PermissionsExt as _;

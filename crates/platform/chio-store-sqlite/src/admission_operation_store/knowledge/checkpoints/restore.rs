@@ -399,7 +399,7 @@ impl SqliteAdmissionOperationStore {
                 actor_binding,
                 installation_generation,
             };
-            let source = AuthenticatedCheckpointRestoreEncodingSource::admission(
+            let source = AuthenticatedCheckpointRestoreEncodingSource::for_admission(
                 &tx, actor, profile, now, &key, &record,
             )?;
             let prepared = super::super::encoding::write::VerifiedKnowledgeEncodingWrite::restore(
@@ -476,6 +476,7 @@ impl SqliteAdmissionOperationStore {
                     &tx,
                     actor,
                     profile,
+                    fence,
                     trusted_now,
                     &key,
                     &record,
@@ -485,13 +486,18 @@ impl SqliteAdmissionOperationStore {
                         source,
                         encoding::logical_body(&record)?,
                     )?;
-                let (_root_source, _encoded_delta) =
+                let (root, _encoded_delta) =
                     protected::persist_knowledge_encoding(&tx, &self.serving_owner, prepared)?;
                 if next == ArtifactDeliveryStateV1::Delivered {
-                    super::super::reference_retirement::retire_restore_references(
+                    let proof = super::super::reference_retirement::VerifiedKnowledgeReferenceRetirement::restore(
+                        &tx, &key,
+                    )?
+                    .ok_or_else(|| refused("delivered restore has no genuine terminal source"))?;
+                    super::super::closure::require_terminal_head(proof.source(), &root)?;
+                    protected::persist_knowledge_reference_retirement(
                         &tx,
                         &self.serving_owner,
-                        &key,
+                        proof,
                     )?;
                 }
             }

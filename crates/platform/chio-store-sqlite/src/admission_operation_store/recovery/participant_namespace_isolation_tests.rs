@@ -127,6 +127,35 @@ fn participant_writer_refuses_recovery_owned_record_namespaces() -> TestResult {
 }
 
 #[test]
+fn participant_writer_refuses_knowledge_namespaces_outside_the_generic_families() -> TestResult {
+    let fixture = Fixture::new()?;
+    let scope = scope_key(&fixture.scope)?;
+    let payload = encode(&serde_json::json!({"fixture": "participant isolation"}))?;
+    for key in [
+        format!("knowledge-join:{scope}:participant"),
+        format!("knowledge-encoding-chunk:{scope}:participant"),
+        format!("knowledge-reference-owner:{scope}:participant"),
+        format!("knowledge-sweep:{scope}:participant"),
+        format!("knowledge-unlisted:{scope}:participant"),
+        format!("knowledge-profile:{scope}:participant"),
+    ] {
+        fixture.refuse(
+            &key,
+            "command",
+            &payload,
+            "protected record namespace or kind refused",
+        )?;
+    }
+    fixture.refuse(
+        &format!("knowledge-pin:operator:v2:{scope}:participant"),
+        "command",
+        &payload,
+        "protected record family has a typed writer",
+    )?;
+    Ok(())
+}
+
+#[test]
 fn participant_writer_refuses_foreign_scoped_deployment_custody() -> TestResult {
     let fixture = Fixture::new()?;
     let foreign = scope_key(&fixture.foreign_scope)?;

@@ -897,13 +897,21 @@ setter or import API silently enables it.
 
 #### Original Authority Selection For Retained Admission
 
-New retained tool admissions use `chio.retained-tool-admission-request.v4` to
-commit to an explicit `chio.admission-authority-profile.v1`. The profile records
+Retained tool admissions without a selected native output retention profile use
+`chio.retained-tool-admission-request.v4` to commit to an explicit
+`chio.admission-authority-profile.v1`. The profile records
 runtime hook presence and declarations, the required-swarm policy, runtime and
 approval authority identifiers and migration expectations, and the DPoP replay
 domain including its immutable freshness policy. Each optional authority field
 MUST be present, including an explicit `null` for an absent selection. These
 records are configuration data, not activation credentials or execution permits.
+
+Admissions with a selected native output retention profile use
+`chio.retained-tool-admission-request.v6`. They additionally retain the original
+output plan and a commitment to the full semantic request, computed before
+transient credentials are omitted from storage. The intermediate retained v5
+format is unsupported. Pre-recovery v1 through v4 records remain readable
+without acquiring a new output profile or semantic commitment.
 
 Authenticated external callers use `chio.admission-authority-profile.v2`, with
 an additional `caller_executor` containing the independently selected executor

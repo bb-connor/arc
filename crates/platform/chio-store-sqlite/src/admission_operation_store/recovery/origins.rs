@@ -11,16 +11,36 @@ pub(super) struct OriginClaim {
     pub(super) origin: RecoveryOriginV1,
 }
 
+pub(super) fn origin_hash(
+    origin: &RecoveryOriginV1,
+) -> Result<String, AdmissionOperationStoreError> {
+    Ok(hex(&hash(
+        chio_core_types::recovery::RecoveryDigestDomain::OriginClaim,
+        origin.operation.operation_id(),
+    )?))
+}
+
+/// Canonical claim key and bytes, built by the production encoder for writer-level regressions.
+#[cfg(test)]
+pub(in crate::admission_operation_store) fn claim_record_for_test(
+    scope: &RecoveryScopeV1,
+    workflow_id: &WorkflowId,
+    continuation_id: &ContinuationId,
+    origin: &RecoveryOriginV1,
+) -> Result<(String, Vec<u8>), AdmissionOperationStoreError> {
+    let claim = OriginClaim {
+        scope: scope.clone(),
+        workflow_id: workflow_id.clone(),
+        continuation_id: continuation_id.clone(),
+        origin: origin.clone(),
+    };
+    Ok((claim_key(origin)?, encode(&claim)?))
+}
+
 pub(super) fn claim_key(origin: &RecoveryOriginV1) -> Result<String, AdmissionOperationStoreError> {
     // The native operation is exclusive across every tenant/process scope in
     // this authority. A different creation key cannot mint another owner.
-    Ok(format!(
-        "recovery-origin:{}",
-        hex(&hash(
-            chio_core_types::recovery::RecoveryDigestDomain::OriginClaim,
-            origin.operation.operation_id()
-        )?)
-    ))
+    Ok(format!("recovery-origin:{}", origin_hash(origin)?))
 }
 
 pub(super) fn load_claim_by_key(
@@ -101,11 +121,20 @@ fn verify_history_workflow(tx: &Connection, key: &str) -> Result<(), AdmissionOp
             || retained.version != 1
             || retained.scope != scope_key(&record.scope)?
             || claim.scope != record.scope
-            || claim.workflow_id != record.workflow_id
-            || claim.continuation_id != record.continuation_id
             || claim.origin != *origin
         {
             return Err(invariant("recovery history original owner changed"));
+        }
+        if claim.workflow_id == record.workflow_id {
+            if claim.continuation_id != record.continuation_id {
+                return Err(invariant("recovery history original owner changed"));
+            }
+        } else if !super::storage::successor_binding::verify_bound_generation(tx, &record, &claim)?
+        {
+            // A workflow that is not the claim's own generation is history
+            // only as a bound successor generation of the verified
+            // effect-free closed predecessor chain.
+            return Err(invariant("recovery history successor binding changed"));
         }
     }
     Ok(())
@@ -150,13 +179,23 @@ pub(super) fn claim(
         continuation_id: record.continuation_id.clone(),
         origin: origin.clone(),
     };
-    if let Some(existing) = raw(tx, &key)? {
-        let retained: OriginClaim = decode(&existing.payload)?;
-        return if existing.version == 1 && retained == claim {
-            Ok(())
-        } else {
-            Err(RecoveryCommandPortError::Conflict)
-        };
+    if raw_checked(tx, &key)?.is_some() {
+        let (retained, _) = load_claim_by_key(tx, &key)?;
+        if retained == claim {
+            // The exact first generation re-claims its identity only while
+            // it is still the claim's current owner. No head projection is
+            // written at creation or before the first transfer.
+            return super::storage::successor_binding::verify_first_generation_current(
+                tx, &retained,
+            );
+        }
+        // The original is already claimed. It transfers serially to a fresh
+        // creation only as the next generation of its verified effect-free
+        // closed current owner; every other prospective owner conflicts. The
+        // retained immutable claim row itself never changes.
+        return super::storage::successor_binding::transfer_to_successor(
+            tx, owner, &retained, record,
+        );
     }
     require_linked_history(tx)?;
     save(

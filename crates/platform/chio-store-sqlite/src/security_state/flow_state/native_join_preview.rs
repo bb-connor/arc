@@ -7,8 +7,8 @@ use rusqlite::types::{Value, ValueRef};
 use rusqlite::{params_from_iter, ToSql};
 use std::collections::BTreeMap;
 
-const MAX_CHANGES: usize = 4096;
-const MAX_IMAGE_BYTES: usize = 8 * 1024 * 1024;
+const MAX_CHANGES: usize = NativeRowChange::MAX_JOIN_CHANGES;
+const MAX_IMAGE_BYTES: usize = NativeRowChange::MAX_JOIN_IMAGE_BYTES;
 
 /// Proposed row images are data. The source owner separately authenticates its
 /// actual transaction, initialization, binding and original join before pricing.

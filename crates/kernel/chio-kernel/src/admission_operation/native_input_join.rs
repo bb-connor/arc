@@ -31,12 +31,29 @@ pub struct NativeSecurityInputJoinRequestV1 {
     transition_id: RecordId,
 }
 
-/// The original input intent and its resolved monotone join. Neither this
-/// historical result nor a deserialized input request grants mutation authority.
+/// What authenticated retained history proves about a classified Input's fate.
+/// It is derived from retained bytes by the owning store, never decoded from
+/// request data, and has no default: a reader that cannot name the fate cannot
+/// construct a record.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeSecurityInputFateV1 {
+    /// The retained assessment admitted the Input.
+    Eligible,
+    /// The retained assessment refused the Input with its origin.
+    Refused,
+    /// Written before fates were retained. It is neither re-verified against
+    /// later sources nor treated as Eligible.
+    Unproved,
+}
+
+/// The original input intent, its resolved monotone join and its retained
+/// fate. Neither this historical result nor a deserialized input request
+/// grants mutation authority.
 #[derive(Clone, Eq, PartialEq)]
 pub struct NativeSecurityInputJoinRecordV1 {
     pub input: NativeSecurityInputJoinRequestV1,
     pub join: NativeSecurityFlowJoinRecordV1,
+    pub fate: NativeSecurityInputFateV1,
 }
 
 impl NativeSecurityInputJoinRequestV1 {

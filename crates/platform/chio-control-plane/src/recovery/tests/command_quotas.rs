@@ -4,8 +4,9 @@ use chio_store_sqlite::admission_operation_store::{
     apply_recovery_quota_fixture_resumptions, fill_recovery_quota_fixture_intake_bytes,
     fill_recovery_quota_fixture_intake_events, grow_recovery_quota_fixture_retained_history,
     grow_recovery_quota_fixture_uncheckpointed_history, observe_recovery_quota_fixture_errors,
-    recovery_quota_fixture_finalized_shape, retain_recovery_quota_fixture_records,
-    RecoveryQuotaFixtureDiagnosticScope, RecoveryQuotaFixtureRecord,
+    recovery_quota_fixture_finalized_shape, recovery_quota_fixture_knowledge_pool,
+    retain_recovery_quota_fixture_records, RecoveryQuotaFixtureDiagnosticScope,
+    RecoveryQuotaFixtureRecord,
 };
 
 pub(super) struct QuotaTestDiagnostics {
@@ -179,10 +180,26 @@ fn recovery_commands(fixture: &RecoveryFixture) -> TestResult<usize> {
     )?)?)
 }
 
+/// Genuine `command:*` rows retained for one exact workflow. Same-value aliases
+/// are retained under `command-alias:*` keys and never appear here, so this is
+/// the workflow's actual charged command inventory.
+fn workflow_commands(fixture: &RecoveryFixture, workflow: &WorkflowId) -> TestResult<usize> {
+    Ok(usize::try_from(connection(fixture)?.query_row(
+        "SELECT count(*) FROM admission_operation_recovery_records
+         WHERE kind='command' AND record_key GLOB 'command:*'
+           AND json_extract(payload,'$.response.workflow_id')=?1",
+        [workflow.as_str()],
+        |row| row.get::<_, i64>(0),
+    )?)?)
+}
+
 fn foreign_retained_bytes(fixture: &RecoveryFixture) -> TestResult<u64> {
     Ok(u64::try_from(connection(fixture)?.query_row(
-        "SELECT COALESCE(sum(length(payload)),0) FROM admission_operation_recovery_records
-         WHERE record_key GLOB 'knowledge-*'",
+        &format!(
+            "SELECT COALESCE(sum(length(payload)),0) FROM admission_operation_recovery_records
+             WHERE {}",
+            recovery_quota_fixture_knowledge_pool("record_key")
+        ),
         [],
         |row| row.get::<_, i64>(0),
     )?)?)
@@ -190,8 +207,12 @@ fn foreign_retained_bytes(fixture: &RecoveryFixture) -> TestResult<u64> {
 
 fn foreign_events(fixture: &RecoveryFixture) -> TestResult<u64> {
     Ok(u64::try_from(connection(fixture)?.query_row(
-        "SELECT count(*) FROM admission_operation_recovery_events WHERE record_key GLOB 'knowledge-*'",
-        [], |row| row.get::<_, i64>(0),
+        &format!(
+            "SELECT count(*) FROM admission_operation_recovery_events WHERE {}",
+            recovery_quota_fixture_knowledge_pool("record_key")
+        ),
+        [],
+        |row| row.get::<_, i64>(0),
     )?)?)
 }
 
@@ -218,8 +239,7 @@ fn foreign_snapshot(fixture: &RecoveryFixture) -> TestResult<Vec<(String, i64, S
 fn fill_foreign(fixture: &RecoveryFixture, scope: &RecoveryScopeV1, count: usize) -> TestResult {
     let namespaces = [
         "semantic-capture",
-        "knowledge-checkpoint",
-        "knowledge-join",
+        "knowledge-pin",
         "confined-boundary",
         "product-report",
         "protected-setup",
@@ -392,6 +412,10 @@ async fn recovery_mutation_identity_partitions_preserve_native_and_control_allow
     let diagnostics = QuotaTestDiagnostics::new();
     let fixture = diagnostics.finish(None, RecoveryFixture::new(false))?;
     let result: TestResult = Box::pin(async {
+        // Establish the other workflow's native source before approving this
+        // one. Saturation below still happens after acceptance, but quota
+        // pressure must not also inject an unrelated source-generation change.
+        let pressure = cancelled_pressure_workflow(&fixture, "cancelled-resume-pressure").await?;
         let workflow = fixture.ready().await?;
         let record = fixture.record(&workflow)?;
         let action = record.action.as_ref().ok_or("action is absent")?;
@@ -439,10 +463,13 @@ async fn recovery_mutation_identity_partitions_preserve_native_and_control_allow
                 &fixture.control,
                 permission,
             )?;
+            // Settled per-workflow custody counts exactly one genuine mutation per
+            // command kind; ready() already made each planning kind's charge.
+            let charged = command_units(&fixture, &workflow, slot)?;
+            assert_eq!(charged, 1);
             let mut replay = None;
-            diagnostics
-                .phase("same-valued planning identities reach their exact purpose allocation");
-            for index in command_units(&fixture, &workflow, slot)?..8 {
+            diagnostics.phase("same-valued planning identities retain control-only aliases");
+            for index in 0..8 {
                 let command =
                     fixture.command(&format!("planning-identity-{slot}-{index}"), body.clone())?;
                 require_live_quota_capability("control capability", &fixture.control)?;
@@ -452,29 +479,19 @@ async fn recovery_mutation_identity_partitions_preserve_native_and_control_allow
                     &fixture.process,
                 )?;
                 assert_eq!(fixture.record(&workflow)?.revision, record.revision);
+                assert_eq!(
+                    command_units(&fixture, &workflow, slot)?,
+                    charged,
+                    "a same-value alias spent the {} mutation slot",
+                    permission.wire_name()
+                );
                 replay = Some((command, response));
             }
-            assert_eq!(command_units(&fixture, &workflow, slot)?, 8);
-            let overflow = fixture.command(&format!("planning-overflow-{slot}"), body)?;
-            diagnostics
-                .phase("planning identity refuses without using native or control allocation");
-            require_live_quota_capability("control capability", &fixture.control)?;
-            if permission == RecoveryPermission::Create {
-                require_live_creation_authority(&actor, &overflow)?;
-            }
-            let before = protected_usage(&fixture)?;
-            expect_quota_refusal(
-                &fixture,
-                &diagnostics,
-                fixture.kernel.execute_recovery_command_with_origin(
-                    &actor,
-                    &overflow,
-                    &fixture.process,
-                ),
-                "recovery command quota exhausted",
-            )?;
-            assert_eq!(protected_usage(&fixture)?, before);
             let (command, response) = replay.ok_or("planning replay is absent")?;
+            // The alias writes above retained their own cold custody rows;
+            // capture the persisted totals immediately before the replay so
+            // the slot count alone does not stand in for a no-write proof.
+            let before = protected_usage(&fixture)?;
             let replayed = fixture.kernel.execute_recovery_command_with_origin(
                 &actor,
                 &command,
@@ -484,8 +501,21 @@ async fn recovery_mutation_identity_partitions_preserve_native_and_control_allow
                 chio_core::canonical_json_bytes(&replayed)?,
                 chio_core::canonical_json_bytes(&response)?
             );
+            // The retained-identity replay is exactly read-only.
             assert_eq!(protected_usage(&fixture)?, before);
+            assert_eq!(command_units(&fixture, &workflow, slot)?, charged);
         }
+        // MOVED ASSERTION: this fixture previously filled each planning kind's
+        // slot with eight same-valued identities and refused the ninth. Under
+        // the settled command-capacity contract a same-value identity is a
+        // control-only alias and can no longer reach a mutation-slot ceiling, so
+        // the exhaustion refusal is conserved on genuinely charged Resume
+        // mutations of a cancelled-before-admission workflow: the same no-write
+        // refusal at the same explicit per-kind ceiling (Resume 24), through
+        // real charges instead of repeated alias counts. The per-kind ceilings
+        // [8, 8, 8, 24, 8, 8] stay enforced by the owning store quota
+        // validation in chio-store-sqlite's workflow reservation controls.
+        let pressure = saturate_pressure_resume_quota(&diagnostics, &fixture, pressure)?;
         let resume =
             fill_resumptions(&fixture, &workflow, 24)?.ok_or("retained resumption is absent")?;
         require_live_workflow_seed(&fixture, &workflow)?;
@@ -503,14 +533,22 @@ async fn recovery_mutation_identity_partitions_preserve_native_and_control_allow
         ));
         assert_eq!(external_count(&fixture.path)?, 1);
         for (slot, permission) in [
-            (4, RecoveryPermission::Cancel),
-            (5, RecoveryPermission::Report),
+            (4_usize, RecoveryPermission::Cancel),
+            (5_usize, RecoveryPermission::Report),
         ] {
             let actor = fixture.kernel.authenticate_recovery_actor(
                 fixture.runtime.scope(),
                 &fixture.control,
                 permission,
             )?;
+            // The captured workflow's Cancel identities are control-only aliases
+            // that never charge slot 4; the first Report on the settled workflow
+            // is that kind's one genuine charge. Both kinds stay inside their
+            // explicit per-kind ceilings, whose actual exhaustion boundary the
+            // saturation above exercises on genuinely charged operations.
+            let charged = command_units(&fixture, &workflow, slot)?;
+            let expected = if slot == 4 { charged } else { charged + 1 };
+            diagnostics.phase("same-valued controls spend no second mutation slot");
             for index in 0..8 {
                 let revision = fixture.record(&workflow)?.revision;
                 let body = if slot == 4 {
@@ -530,33 +568,20 @@ async fn recovery_mutation_identity_partitions_preserve_native_and_control_allow
                 if index > 0 {
                     assert_eq!(fixture.record(&workflow)?.revision, revision);
                 }
+                assert_eq!(command_units(&fixture, &workflow, slot)?, expected);
             }
-            assert_eq!(command_units(&fixture, &workflow, slot)?, 8);
-            let body = if slot == 4 {
-                RecoveryCommandBodyV1::CancelWorkflow {
-                    workflow_id: workflow.clone(),
-                    expected_revision: fixture.record(&workflow)?.revision,
-                }
-            } else {
-                RecoveryCommandBodyV1::ReportDecision {
-                    workflow_id: workflow.clone(),
-                    expected_revision: fixture.record(&workflow)?.revision,
-                    decision: RecoveryReportedDecision::Accepted,
-                }
-            };
-            let overflow = fixture.command(&format!("control-overflow-{slot}"), body)?;
-            diagnostics.phase("control identity refuses at its own exact allocation");
-            require_live_quota_capability("control capability", &fixture.control)?;
-            let before = protected_usage(&fixture)?;
-            expect_quota_refusal(
-                &fixture,
-                &diagnostics,
-                fixture.kernel.execute_recovery_command(&actor, &overflow),
-                "recovery command quota exhausted",
-            )?;
-            assert_eq!(protected_usage(&fixture)?, before);
         }
-        assert_eq!(recovery_commands(&fixture)?, 64);
+        // The aggregate follows the actual per-workflow dispositions above,
+        // not a guessed constant: this workflow owns one genuine create, one
+        // select, one approval, one genuine resume and one report row; the
+        // cancelled pressure workflow owns one create, one cancel and
+        // twenty-four genuinely charged Resume rows. Every same-value alias
+        // above was retained under a `command-alias:*` key and added none.
+        let owned = workflow_commands(&fixture, &workflow)?;
+        let pressured = workflow_commands(&fixture, &pressure)?;
+        assert_eq!(owned, 5);
+        assert_eq!(pressured, 26);
+        assert_eq!(recovery_commands(&fixture)?, owned + pressured);
         let before = protected_usage(&fixture)?;
         let settled = fixture.runtime.settle(&fixture.control, &workflow)?;
         assert!(settled.effect.is_settled());
@@ -867,17 +892,25 @@ async fn recovery_native_capture_survives_large_retained_database_history() -> T
     diagnostics.finish(Some(&fixture), result)
 }
 
+/// Retain `identities` fresh Resume identities through the owning store writer.
+/// A workflow that still owes its native execution charges slot 3 exactly once,
+/// with its first fresh identity; every later same-value identity (and every
+/// identity of an already resumed or captured workflow) is retained as a
+/// control-only alias that spends no mutation slot. Returns the genuine identity
+/// when this workflow still owes its native execution.
 fn fill_resumptions(
     fixture: &RecoveryFixture,
     workflow: &WorkflowId,
-    target: usize,
+    identities: usize,
 ) -> TestResult<Option<RecoveryCommandV1>> {
-    let revision = fixture.record(workflow)?.revision;
-    let current = command_units(fixture, workflow, 3)?;
-    if target > 24 || current > target {
+    if identities == 0 || identities > 24 {
         return Err("resumption fixture exceeds its allocation".into());
     }
-    let commands = (current..target)
+    let record = fixture.record(workflow)?;
+    let revision = record.revision;
+    let charged = command_units(fixture, workflow, 3)?;
+    let genuine = record.admission.is_none() && !record.captured && charged == 0;
+    let commands = (0..identities)
         .map(|index| {
             fixture.command(
                 &format!("retained-resumption-{index}"),
@@ -900,9 +933,110 @@ fn fill_resumptions(
         &fixture.authority.mutation_fence(),
         now_ms()?,
     )?;
-    assert_eq!(command_units(fixture, workflow, 3)?, target);
+    let expected = if genuine { charged + 1 } else { charged };
+    assert_eq!(command_units(fixture, workflow, 3)?, expected);
     assert_eq!(fixture.record(workflow)?.revision, revision);
-    Ok(commands.last().cloned())
+    Ok(if genuine {
+        commands.first().cloned()
+    } else {
+        None
+    })
+}
+
+/// A workflow cancelled before admission never owes native execution, so each
+/// fresh Resume identity of that workflow remains a genuinely charged mutation
+/// for as long as its slot ceiling allows.
+async fn cancelled_pressure_workflow(
+    fixture: &RecoveryFixture,
+    key: &str,
+) -> TestResult<WorkflowId> {
+    let create = unused_creation(fixture, key).await?;
+    let actor = fixture.kernel.authenticate_recovery_actor(
+        fixture.runtime.scope(),
+        &fixture.control,
+        RecoveryPermission::Create,
+    )?;
+    require_live_creation_authority(&actor, &create)?;
+    let created =
+        fixture
+            .kernel
+            .execute_recovery_command_with_origin(&actor, &create, &fixture.process)?;
+    let workflow = created.workflow_id;
+    let revision = fixture.record(&workflow)?.revision;
+    fixture
+        .execute(
+            "cancel-before-pressure-admission",
+            RecoveryCommandBodyV1::CancelWorkflow {
+                workflow_id: workflow.clone(),
+                expected_revision: revision,
+            },
+        )
+        .await?;
+    Ok(workflow)
+}
+
+/// Genuinely charged Resume mutations are the only constructible command-slot
+/// saturation: a workflow cancelled before admission keeps every fresh Resume
+/// identity a real mutation, so slot 3 reaches its explicit ceiling of 24 and
+/// the next fresh identity refuses without any write. Same-value aliases can
+/// never reach a mutation-slot ceiling, so the quota fixtures conserve their
+/// exhaustion refusals here. The per-kind ceilings [8, 8, 8, 24, 8, 8] stay
+/// enforced by the owning store quota validation in chio-store-sqlite's
+/// workflow reservation controls. No native execution, parked capture
+/// workflow or synthetic production path is involved.
+fn saturate_pressure_resume_quota(
+    diagnostics: &QuotaTestDiagnostics,
+    fixture: &RecoveryFixture,
+    workflow: WorkflowId,
+) -> TestResult<WorkflowId> {
+    diagnostics.phase("genuinely charged Resume mutations saturate the explicit live ceiling");
+    let actor = fixture.kernel.authenticate_recovery_actor(
+        fixture.runtime.scope(),
+        &fixture.control,
+        RecoveryPermission::Resume,
+    )?;
+    let revision = fixture.record(&workflow)?.revision;
+    if command_units(fixture, &workflow, 3)? != 0 {
+        return Err("pressure workflow already owes a Resume charge".into());
+    }
+    let commands = (0..24)
+        .map(|index| {
+            fixture.command(
+                &format!("genuine-resume-pressure-{index}"),
+                RecoveryCommandBodyV1::ResumeWorkflow {
+                    workflow_id: workflow.clone(),
+                    expected_revision: revision,
+                },
+            )
+        })
+        .collect::<TestResult<Vec<_>>>()?;
+    apply_recovery_quota_fixture_resumptions(
+        &fixture.authority.admission_operation_store(),
+        &actor,
+        &commands,
+        &fixture.authority.mutation_fence(),
+        now_ms()?,
+    )?;
+    assert_eq!(command_units(fixture, &workflow, 3)?, 24);
+    assert_eq!(fixture.record(&workflow)?.revision, revision);
+    let overflow = fixture.command(
+        "genuine-resume-pressure-overflow",
+        RecoveryCommandBodyV1::ResumeWorkflow {
+            workflow_id: workflow.clone(),
+            expected_revision: revision,
+        },
+    )?;
+    require_live_quota_capability("control capability", &fixture.control)?;
+    let before = protected_usage(fixture)?;
+    expect_quota_refusal(
+        fixture,
+        diagnostics,
+        fixture.kernel.execute_recovery_command(&actor, &overflow),
+        "recovery command quota exhausted",
+    )?;
+    assert_eq!(protected_usage(fixture)?, before);
+    assert_eq!(fixture.record(&workflow)?.revision, revision);
+    Ok(workflow)
 }
 
 #[tokio::test]
@@ -910,34 +1044,54 @@ async fn recovery_mutating_command_pressure_preserves_owned_native_progress() ->
     let diagnostics = QuotaTestDiagnostics::new();
     let fixture = diagnostics.finish(None, RecoveryFixture::new(false))?;
     let result: TestResult = Box::pin(async {
+        // Establish the other workflow's native source before approving this
+        // one. Saturation below still happens after acceptance, but quota
+        // pressure must not also inject an unrelated source-generation change.
+        let pressure = cancelled_pressure_workflow(&fixture, "cancelled-resume-pressure").await?;
         let workflow = fixture.ready().await?;
-        diagnostics.phase("real Resume identities fill the owning workflow allocation");
+        diagnostics
+            .phase("the first fresh Resume identity is the owning workflow's one genuine charge");
+        // Under the settled command-capacity contract a same-value Resume identity
+        // is a control-only alias: only the first fresh identity of a workflow
+        // that still owes its native execution charges slot 3, exactly once.
         let resume =
             fill_resumptions(&fixture, &workflow, 24)?.ok_or("retained resumption is absent")?;
+        assert_eq!(command_units(&fixture, &workflow, 3)?, 1);
         assert_eq!(external_count(&fixture.path)?, 0);
+        // MOVED ASSERTION: this fixture previously filled slot 3 with twenty-four
+        // same-valued identities and refused the twenty-fifth. Same-value aliases
+        // can no longer reach a mutation-slot ceiling, so the exhaustion refusal
+        // is conserved on genuinely charged Resume mutations of a workflow
+        // cancelled before admission: the same no-write refusal at the same
+        // explicit Resume ceiling of 24, through twenty-four real charges. The
+        // per-kind ceilings stay enforced by the owning store quota validation
+        // in chio-store-sqlite's workflow reservation controls.
+        let pressure = saturate_pressure_resume_quota(&diagnostics, &fixture, pressure)?;
+        // The pressure workflow owns one create, one cancel and twenty-four
+        // genuinely charged Resume rows; aliases retained none of them.
+        assert_eq!(workflow_commands(&fixture, &pressure)?, 26);
         let actor = fixture.kernel.authenticate_recovery_actor(
             fixture.runtime.scope(),
             &fixture.control,
             RecoveryPermission::Resume,
         )?;
-        let overflow = fixture.command(
-            "resumption-over-the-owned-command-ceiling",
+        diagnostics.phase("a same-value Resume alias neither charges nor refuses fresh intake");
+        let alias = fixture.command(
+            "same-valued-resumption-alias-after-the-genuine-charge",
             RecoveryCommandBodyV1::ResumeWorkflow {
                 workflow_id: workflow.clone(),
                 expected_revision: fixture.record(&workflow)?.revision,
             },
         )?;
         require_live_quota_capability("control capability", &fixture.control)?;
-        let before = protected_usage(&fixture)?;
-        diagnostics.phase("fresh mutation identity refuses at the exact command ceiling");
-        expect_quota_refusal(
-            &fixture,
-            &diagnostics,
-            fixture.kernel.execute_recovery_command(&actor, &overflow),
-            "recovery command quota exhausted",
-        )?;
-        assert_eq!(protected_usage(&fixture)?, before);
-        diagnostics.phase("retained mutation drives actual native progress after saturation");
+        let revision = fixture.record(&workflow)?.revision;
+        fixture.kernel.execute_recovery_command(&actor, &alias)?;
+        // The retained alias adds its own cold custody row but never a second
+        // slot charge or any workflow mutation.
+        assert_eq!(command_units(&fixture, &workflow, 3)?, 1);
+        assert_eq!(fixture.record(&workflow)?.revision, revision);
+        diagnostics
+            .phase("the retained genuine mutation drives actual native progress after saturation");
         require_live_workflow_seed(&fixture, &workflow)?;
         let result = fixture
             .runtime
@@ -950,7 +1104,10 @@ async fn recovery_mutating_command_pressure_preserves_owned_native_progress() ->
             &current.release,
             ReleaseDispositionV1::Released { .. }
         ));
-        assert_eq!(command_units(&fixture, &workflow, 3)?, 24);
+        // Native completion never charges or refunds the one genuine slot.
+        assert_eq!(command_units(&fixture, &workflow, 3)?, 1);
+        // One create, one select, one approve and the one genuine resume row.
+        assert_eq!(workflow_commands(&fixture, &workflow)?, 4);
         assert_eq!(external_count(&fixture.path)?, 1);
         let replay = fixture
             .runtime
@@ -960,6 +1117,7 @@ async fn recovery_mutating_command_pressure_preserves_owned_native_progress() ->
             chio_core::canonical_json_bytes(&result.original_response)?,
             chio_core::canonical_json_bytes(&replay.original_response)?,
         );
+        assert_eq!(command_units(&fixture, &workflow, 3)?, 1);
         assert_eq!(external_count(&fixture.path)?, 1);
         Ok(())
     })
@@ -1299,6 +1457,10 @@ async fn recovery_command_flood_cannot_steal_another_workflows_resume() -> TestR
             RecoveryPermission::Resume,
         )?;
         let revision = fixture.record(&attacker)?.revision;
+        eprintln!(
+            "RECOVERY_QUOTA_FLOOD_PHASE phase=setup_complete elapsed_ms={}",
+            diagnostics.started.elapsed().as_millis()
+        );
         let make = |index| {
             fixture.command(
                 &format!("fresh-noop-on-completed-work-{index}"),
@@ -1308,70 +1470,88 @@ async fn recovery_command_flood_cannot_steal_another_workflows_resume() -> TestR
                 },
             )
         };
-        diagnostics.phase("real mutating command flood on a different completed workflow");
-        let mut accepted = 0;
-        let mut rejected_batch = false;
-        for batch in 0..512 {
+        // MOVED ASSERTION: this fixture previously filled the attacker's Resume
+        // slot with the flood and refused the next fresh identity. Under the
+        // settled command-capacity contract every fresh same-value Resume
+        // identity on completed work is retained as a control-only alias that
+        // charges no mutation slot, so a flood can no longer reach a slot
+        // ceiling. The no-write exhaustion refusal is conserved at the same
+        // explicit Resume ceiling of 24 on genuinely charged mutations in
+        // saturate_pressure_resume_quota; the per-kind ceilings stay enforced
+        // by the owning store quota validation in chio-store-sqlite's workflow
+        // reservation controls. What remains here is the fixture's own claim:
+        // a bounded flood of fresh same-value identities cannot steal another
+        // workflow's genuine Resume capacity or disturb completed work.
+        diagnostics.phase("a bounded same-value Resume flood on completed work charges nothing");
+        let charged = command_units(&fixture, &attacker, 3)?;
+        assert_eq!(charged, 1);
+        let mut aliases = 0;
+        // Retain the exact reply of one actually retained identity (the first
+        // of batch zero) so the replay below exercises a genuine retained
+        // identity, not a fresh alias mislabeled as a replay.
+        let mut retained = None;
+        let flood_started = std::time::Instant::now();
+        for batch in 0..64 {
+            let batch_started = std::time::Instant::now();
             let commands = (batch * 8..batch * 8 + 8)
                 .map(&make)
                 .collect::<TestResult<Vec<_>>>()?;
-            let before = protected_usage(&fixture)?;
-            match apply_recovery_quota_fixture_resumptions(
+            let responses = apply_recovery_quota_fixture_resumptions(
                 &fixture.authority.admission_operation_store(),
                 &actor,
                 &commands,
                 &fixture.authority.mutation_fence(),
                 now_ms()?,
-            ) {
-                Ok(_) => accepted += commands.len(),
-                Err(RecoveryCommandPortError::Store(
-                    chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(
-                        reason,
-                    ),
-                )) if reason == "recovery command quota exhausted" => {
-                    assert_eq!(protected_usage(&fixture)?, before);
-                    rejected_batch = true;
-                    break;
-                }
-                Err(error) => {
-                    return Err(format!("command flood failed outside quota: {error}").into())
-                }
+            )?;
+            assert_eq!(responses.len(), 8);
+            if batch == 0 {
+                retained = Some((commands[0].clone(), responses[0].clone()));
             }
+            aliases += responses.len();
+            eprintln!(
+                "RECOVERY_QUOTA_FLOOD_BATCH batch={} aliases={} batch_ms={} flood_ms={} test_ms={}",
+                batch,
+                aliases,
+                batch_started.elapsed().as_millis(),
+                flood_started.elapsed().as_millis(),
+                diagnostics.started.elapsed().as_millis()
+            );
         }
-        assert!(
-            rejected_batch,
-            "bounded mutation flood never reached an owning quota"
+        assert_eq!(aliases, 512);
+        eprintln!(
+            "RECOVERY_QUOTA_FLOOD_PHASE phase=flood_complete elapsed_ms={}",
+            diagnostics.started.elapsed().as_millis()
         );
-        assert!(accepted > 0);
-        let mut saturated = false;
-        for index in accepted..accepted + 8 {
-            diagnostics.phase("exact last command allocation on completed work");
-            require_live_quota_capability("control capability", &fixture.control)?;
-            let before = protected_usage(&fixture)?;
-            let result = fixture
-                .kernel
-                .execute_recovery_command(&actor, &make(index)?);
-            if result.is_err() {
-                expect_quota_refusal(
-                    &fixture,
-                    &diagnostics,
-                    result,
-                    "recovery command quota exhausted",
-                )?;
-                assert_eq!(protected_usage(&fixture)?, before);
-                saturated = true;
-                break;
-            }
-        }
-        assert!(
-            saturated,
-            "last partial batch did not reach the exact command allocation"
-        );
+        // Five hundred twelve fresh identities later the completed workflow
+        // keeps its one genuine Resume charge, its exact revision and every
+        // retained alias reply.
+        assert_eq!(command_units(&fixture, &attacker, 3)?, charged);
         assert_eq!(fixture.record(&attacker)?.revision, revision);
+        let (retained_command, retained_response) =
+            retained.ok_or("retained flood identity is absent")?;
+        let before = protected_usage(&fixture)?;
+        eprintln!(
+            "RECOVERY_QUOTA_FLOOD_PHASE phase=retained_replay elapsed_ms={}",
+            diagnostics.started.elapsed().as_millis()
+        );
+        let replay = fixture
+            .kernel
+            .execute_recovery_command(&actor, &retained_command)?;
+        assert_eq!(
+            chio_core::canonical_json_bytes(&replay)?,
+            chio_core::canonical_json_bytes(&retained_response)?
+        );
+        // The retained-identity replay is exactly read-only.
+        assert_eq!(protected_usage(&fixture)?, before);
+        assert_eq!(replay.revision, revision);
         diagnostics
             .phase("fresh Resume for an already-ready workflow with no prior Resume identity");
         require_live_quota_capability("control capability", &fixture.control)?;
         require_live_workflow_seed(&fixture, &victim)?;
+        eprintln!(
+            "RECOVERY_QUOTA_FLOOD_PHASE phase=victim_resume elapsed_ms={}",
+            diagnostics.started.elapsed().as_millis()
+        );
         fixture
             .execute(
                 "victim-fresh-resume-after-other-work-saturated",
@@ -1381,6 +1561,10 @@ async fn recovery_command_flood_cannot_steal_another_workflows_resume() -> TestR
                 },
             )
             .await?;
+        eprintln!(
+            "RECOVERY_QUOTA_FLOOD_PHASE phase=victim_effect_complete elapsed_ms={}",
+            diagnostics.started.elapsed().as_millis()
+        );
         let record = fixture.record(&victim)?;
         assert!(record.captured);
         assert!(record.effect.is_settled());
@@ -1485,6 +1669,31 @@ async fn recovery_mutation_replay_and_status_survive_uncheckpointed_intake_press
             EffectObservationV1::Unknown { .. }
         ));
         assert_eq!(external_count(&fixture.path)?, 1);
+        // Unknown external effect remains a workflow obligation, while the
+        // immutable native terminal proves this invocation accepts no future
+        // raw return. Its completed finishing account must not leak loans.
+        let unknown = fixture.record(&workflow)?;
+        let operation = unknown.admission.as_ref().ok_or("native original absent")?
+            .native_operation_id.as_str();
+        let account = super::native_lifecycle::native_account(&fixture.path, operation)?;
+        assert_eq!(account["state"], "settled");
+        assert!(account["liabilities"].as_array().ok_or("finishing liabilities absent")?
+            .iter().all(|purpose| purpose["disposition"] != "outstanding"));
+        let native = connection(&fixture)?;
+        let (state, terminal_digest, raw_count): (String, String, i64) = native.query_row(
+            "SELECT terminal_state,projection_digest,(SELECT count(*) FROM tool_outcomes WHERE operation_id=?1) FROM admission_operation_terminal_projections WHERE operation_id=?1",
+            [operation], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
+        assert_eq!(state, "outcome_unknown_after_dispatch");
+        assert_eq!(raw_count, 0);
+        drop(native);
+        let process = rusqlite::Connection::open_with_flags(fixture.path.join("process.db"), rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        let fate: Vec<u8> = process.query_row(
+            "SELECT f.fate_json FROM process_native_return_fates f JOIN process_native_return_accounts a USING(account_digest) WHERE a.native_operation_id=?1",
+            [operation], |row| row.get(0))?;
+        let fate: serde_json::Value = serde_json::from_slice(&fate)?;
+        assert_eq!(fate["fate"]["kind"], "no_future_return");
+        assert_eq!(fate["fate"]["original_no_future_return_digest"], terminal_digest);
+        drop(process);
         let actor = fixture.kernel.authenticate_recovery_actor(
             fixture.runtime.scope(),
             &fixture.control,
@@ -2472,7 +2681,9 @@ async fn native_dense_ready(fixture: &RecoveryFixture) -> TestResult<WorkflowId>
             &request.capability.signing_body(),
         )?),
         semantic_request: SemanticRequestDigest::from_bytes(
-            *chio_core::sha256(semantics.as_bytes()).as_bytes(),
+            *chio_core_types::recovery::RecoveryDigestDomain::SemanticNativeRequestSemantics
+                .digest(&semantics)
+                .as_bytes(),
         ),
         authorization_requirements: requirements,
         policy_digest: profile.policy_digest,

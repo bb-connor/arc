@@ -303,7 +303,12 @@ impl RecoveryRuntime {
                     let custody = self
                         .kernel
                         .load_recovery_request_custody(&actor, workflow_id)
-                        .map_err(|_| RecoveryRuntimeError::Unavailable)?;
+                        .map_err(|error| {
+                            #[cfg(test)]
+                            eprintln!("recovery original request custody refusal: {error:?}");
+                            let _ = error;
+                            RecoveryRuntimeError::Unavailable
+                        })?;
                     self.process
                         .finalize_recovery_call(&reservation, &custody)
                         .map_err(|_| RecoveryRuntimeError::Conflict)?;
@@ -315,7 +320,23 @@ impl RecoveryRuntime {
                         custody.request(),
                     ))
                     .await
-                    .map_err(|_| RecoveryRuntimeError::Unavailable)?;
+                    .map_err(|error| {
+                        #[cfg(test)]
+                        eprintln!("recovery original Process refusal: {error:?}");
+                        let _ = error;
+                        RecoveryRuntimeError::Unavailable
+                    })?;
+                    // Test-only diagnostic: the native continuation verdict is
+                    // deliberately not projected, so an admission refusal that
+                    // hides the exact denial reason would otherwise be
+                    // indistinguishable from an effect observation failure.
+                    #[cfg(test)]
+                    if _response.verdict != chio_kernel::Verdict::Allow {
+                        eprintln!(
+                            "RECOVERY_CONTINUATION_NATIVE_REFUSED verdict={:?} reason={:?}",
+                            _response.verdict, _response.reason
+                        );
+                    }
                     #[cfg(test)]
                     {
                         super::test_cutpoint("returned-response");

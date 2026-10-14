@@ -17,6 +17,10 @@ pub(super) fn verify_global_projection_coverage(
     )?;
     crate::admission_operation_store::verify_dpop_replay_projection_coverage(connection)?;
     crate::admission_operation_store::verify_security_participant_migration_coverage(connection)?;
+    // Projection folds belong to full-chain verification, after their native
+    // sources, rather than the initialization checks used by ordinary writes.
+    crate::admission_operation_store::verify_initialized_scope_projections(connection)
+        .map_err(|error| invalid(error.to_string()))?;
     verify_channel_release_projection_coverage(connection)?;
     verify_finding_challenge_projection_coverage(connection)?;
     verify_finding_status_projection_coverage(connection)?;

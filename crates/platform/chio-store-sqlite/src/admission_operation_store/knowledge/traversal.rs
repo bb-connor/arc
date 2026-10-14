@@ -47,10 +47,9 @@ pub(super) fn influence(
     records: &[NativeArtifactRecordV1],
     unknown: bool,
 ) -> Result<ArtifactInfluenceV1, AdmissionOperationStoreError> {
-    // Every per-flow influence read charges the complete retained history
-    // before any authenticated body is decoded. The enclosing mutation holds
-    // the same fenced transaction, so the counted history cannot grow while
-    // this projection is loaded.
+    // This reader pays the same shared budgeted charge as the semantic
+    // materialization and warm observation callers, so the sealed pre-recovery
+    // source contributes its conservative imported history here as well.
     let mut budget = chio_semantic_contracts::VerificationBudget::new(
         chio_security_types::recovery::MAX_RECOVERY_VERIFICATION_WORK,
     )
@@ -58,7 +57,7 @@ pub(super) fn influence(
     let observed =
         super::super::security_participant_state::knowledge::budgeted_observed_influence(
             tx,
-            binding.security_authority_id().as_str(),
+            binding,
             &recovery_flow_key(context),
             &mut budget,
         )?;

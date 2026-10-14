@@ -27,9 +27,15 @@ fn open() -> (TempDir, SqliteEnterpriseMigrationStateStore) {
         Vec::new(),
     )
     .expect("open policy");
-    let store =
-        SqliteEnterpriseMigrationStateStore::open(directory.path().join("migration.db"), policy)
-            .expect("open");
+    let store = SqliteEnterpriseMigrationStateStore::open(
+        directory
+            .path()
+            .canonicalize()
+            .expect("canonical fixture root")
+            .join("migration.db"),
+        policy,
+    )
+    .expect("open");
     (directory, store)
 }
 

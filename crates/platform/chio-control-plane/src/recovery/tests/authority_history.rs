@@ -390,7 +390,7 @@ fn set_output_floor(path: &Path, label: &InformationLabel) -> TestResult {
 }
 
 #[cfg(unix)]
-async fn crash_after_capture(point: &str) -> TestResult<tempfile::TempDir> {
+pub(super) async fn crash_after_capture(point: &str) -> TestResult<tempfile::TempDir> {
     Box::pin(crash_after_capture_with_output_floor(point, None)).await
 }
 
@@ -484,11 +484,15 @@ async fn crash_after_capture_with_profile(
         log.contains(&format!("recovery crash cutpoint: {point}")),
         "captured-operation child missed {point}: {log}"
     );
-    assert_eq!(external_count(directory.path())?, 1);
+    let expected_effects = match point {
+        "finishing-prepared" | "finishing-enrolled" => 0,
+        _ => 1,
+    };
+    assert_eq!(external_count(directory.path())?, expected_effects);
     Ok(directory)
 }
 
-fn retained_workflow(path: &Path) -> TestResult<RecoveryWorkflowRecordV1> {
+pub(super) fn retained_workflow(path: &Path) -> TestResult<RecoveryWorkflowRecordV1> {
     let db = rusqlite::Connection::open_with_flags(
         path.join("admission.db"),
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,

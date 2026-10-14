@@ -63,7 +63,9 @@ impl SqliteAdmissionOperationStore {
                 "native nonce preflight transition belongs to other history",
             ));
         }
-        let nonce_preflight_head = head(&tx, actual.authority.as_str())?;
+        let mut segment = super::super::history::segments::SegmentSnapshot::capture(&tx, &actual)?;
+        let nonce_preflight_head =
+            segment.head(&tx, super::super::history::segments::Family::NoncePreflight)?;
         let previous = if nonce_preflight_head == 0 {
             actual.digest.clone()
         } else {
@@ -72,7 +74,7 @@ impl SqliteAdmissionOperationStore {
                 .digest()?
         };
         let (mut current_rows, mut current_bytes) =
-            super::super::history::ordered::latest_totals(&tx, &actual)?;
+            super::super::history::ordered::latest_totals(&tx, &segment)?;
         // Read all inherited labels in this same write transaction. A current
         // lineage or principal may be more restrictive than the classified label.
         let request = crate::security_state::resolve_native_label_join(
@@ -83,7 +85,6 @@ impl SqliteAdmissionOperationStore {
             intent.transition_id(),
         )
         .map_err(invalid)?;
-        let before = footprint(&tx)?;
         let observed_at = observed_time(&tx, decision_at)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
         let authorization = NativeNoncePreflightJoinAuthority {
@@ -95,7 +96,7 @@ impl SqliteAdmissionOperationStore {
                 .map_err(invalid)?;
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
         checkpoint(&tx, 22)?;
-        if footprint(&tx)? != before {
+        if !segment.unchanged(&tx)? {
             return Err(invalid(
                 "native nonce preflight mutation escaped its journal boundary",
             ));
@@ -140,18 +141,16 @@ impl SqliteAdmissionOperationStore {
             current_bytes,
         };
         record.validate(&tx)?;
+        super::super::storage::require_tenant_live(
+            &tx,
+            actual.authority.as_str(),
+            intent.key().tenant_id.as_str(),
+        )?;
+        crate::admission_operation_store::recovery::resources::check_intake_committing(&tx)?;
+        let append = super::super::history::segments::Append::nonce_preflight(&record)?;
+        segment.prepare_pre_effect_append(&tx, &self.serving_owner, &append)?;
         record.insert(&tx)?;
-        let mut expected = before;
-        expected[4] = expected[4]
-            .checked_add(1)
-            .ok_or_else(|| invalid("native nonce preflight count overflow"))?;
-        if head(&tx, actual.authority.as_str())? != record.sequence || footprint(&tx)? != expected {
-            return Err(invalid(
-                "native nonce preflight append introduced other history",
-            ));
-        }
-        super::super::history::ordered::validate_history_bounds(&tx, actual.authority.as_str())?;
-        super::super::storage::verify_no_orphans(&tx)?;
+        segment.appended(&tx, append.entry())?;
         checkpoint(&tx, 23)?;
         self.serving_owner
             .append_global_commit(
@@ -162,14 +161,7 @@ impl SqliteAdmissionOperationStore {
                 record.sequence,
             )
             .map_err(map_owner_error)?;
-        expected[5] = expected[5]
-            .checked_add(1)
-            .ok_or_else(|| invalid("native global count overflow"))?;
-        if footprint(&tx)? != expected {
-            return Err(invalid(
-                "native nonce preflight global append introduced other history",
-            ));
-        }
+        segment.committed(&tx, append.entry())?;
         // Expiry is checked again at the physical commit boundary, not renewed
         // merely because policy evaluation or the monotone join succeeded.
         verify_participant_recovery_tx(&tx, &self.serving_owner, operation, lease, decision_at)?;
@@ -220,28 +212,22 @@ impl SqliteAdmissionOperationStore {
         let tx = self.begin_read(&mut connection)?;
         verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
         observed_time(&tx, now)?;
-        super::super::verify_coverage(&tx).map_err(map_owner_error)?;
+        super::super::verify_current_catalogs(&tx)?;
         let Some(stored) = load_by_operation_id_tx(&tx, operation)? else {
             return Ok(None);
         };
         stored.verify_decision_time(now)?;
         let history = load_operation(&tx, operation)?
             .map(|record| {
-                let initialized =
-                    super::super::records::load_metadata(&tx, record.authority.as_str())?
-                        .ok_or_else(|| {
-                            invalid("native nonce preflight readback lost initialization")
-                        })?;
+                record.require_own_commit(&tx)?;
+                let initialized = super::super::records::load_current_named(
+                    &tx,
+                    record.authority.as_str(),
+                    &record.initialization,
+                )?;
                 record.evidence(&initialized)
             })
             .transpose()?;
         Ok(Some((stored.operation, history)))
     }
-}
-
-fn footprint(connection: &Connection) -> Result<[i64; 6], AdmissionOperationStoreError> {
-    connection.query_row("SELECT (SELECT COUNT(*) FROM security_participant_state_initializations),
-        (SELECT COUNT(*) FROM security_participant_state_mutations), (SELECT COUNT(*) FROM security_participant_egress_events),
-        (SELECT COUNT(*) FROM security_participant_output_events), (SELECT COUNT(*) FROM security_participant_nonce_preflight_events), (SELECT COUNT(*) FROM authority_global_commits)", [],
-        |row| Ok([row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?])).map_err(sqlite_error)
 }

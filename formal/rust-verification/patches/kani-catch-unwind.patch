@@ -1,0 +1,83 @@
+--- a/kani-compiler/src/codegen_cprover_gotoc/codegen/intrinsic.rs
++++ b/kani-compiler/src/codegen_cprover_gotoc/codegen/intrinsic.rs
+@@ -14,6 +14,7 @@
+ use rustc_public::mir::{BasicBlockIdx, Operand, Place};
+ use rustc_public::rustc_internal;
+ use rustc_public::ty::{GenericArgs, RigidTy, Span, Ty, TyKind, UintTy};
++use rustc_target::spec::PanicStrategy;
+ use tracing::debug;
+ 
+ pub struct SizeAlign {
+@@ -316,6 +317,7 @@
+             Intrinsic::Bswap => {
+                 self.codegen_expr_to_place_stable(place, fargs.remove(0).bswap(), loc)
+             }
++            Intrinsic::CatchUnwind => self.codegen_catch_unwind(fargs, place, span),
+             Intrinsic::CeilF32 => codegen_simple_intrinsic!(Ceilf),
+             Intrinsic::CeilF64 => codegen_simple_intrinsic!(Ceil),
+             Intrinsic::CompareBytes => self.codegen_compare_bytes(fargs, place, loc),
+@@ -675,6 +677,40 @@
+                 self.codegen_unimplemented_stmt(&name, loc, &issue_link)
+             }
+         }
++    }
++
++    /// Lower the non-unwinding case exactly as rustc's LLVM backend does.
++    ///
++    /// The callback has Rust ABI `unsafe fn(*mut Data) -> ()`. Call it with its
++    /// original typed data pointer, then store Rust's ABI boolean for no unwind.
++    /// Panics and assertions in the callback retain their ordinary failing checks.
++    /// This does not model exception recovery or execute the catch callback.
++    fn codegen_catch_unwind(&mut self, fargs: Vec<Expr>, place: &Place, span: Span) -> Stmt {
++        // compiler_interface::check_options owns the panic=abort requirement;
++        // the driver always appends -Cpanic=abort. This guard is defensive and
++        // is not expected to run under the supported compiler entry point.
++        let unsupported = if self.tcx.sess.panic_strategy() != PanicStrategy::Abort {
++            Some("catch_unwind requires panic=abort; panic recovery is unsupported")
++        } else if self.queries.args().prove_safety_only {
++            Some("catch_unwind requires panic assertions; --prove-safety-only is unsupported")
++        } else if self.queries.args().unstable_features.iter().any(|feature| feature == "c-ffi") {
++            Some("catch_unwind with experimental C-FFI is unsupported")
++        } else {
++            None
++        };
++        if let Some(message) = unsupported {
++            utils::span_err(self.tcx, span, message.to_owned());
++            self.tcx.dcx().abort_if_errors();
++            unreachable!("Rustc should have aborted after rejecting catch_unwind")
++        }
++
++        let Ok([try_fn, data, _catch_fn]) = <[Expr; 3]>::try_from(fargs) else {
++            unreachable!("catch_unwind must have exactly three arguments")
++        };
++        let loc = self.codegen_span_stable(span);
++        let call = Stmt::function_call(None, try_fn.dereference(), vec![data], loc);
++        let result = self.codegen_expr_to_place_stable(place, Expr::c_false(), loc);
++        Stmt::block(vec![call, result], loc)
+     }
+ 
+     /// Perform type checking and code generation for the `ctpop` rust intrinsic.
+--- a/kani-compiler/src/intrinsics.rs
++++ b/kani-compiler/src/intrinsics.rs
+@@ -42,6 +42,7 @@
+     BlackBox,
+     Breakpoint,
+     Bswap,
++    CatchUnwind,
+     CeilF32,
+     CeilF64,
+     CompareBytes,
+@@ -240,11 +241,8 @@
+                 }
+             }
+             "catch_unwind" => {
+-                assert_sig_matches!(sig, RigidTy::FnPtr(_), RigidTy::RawPtr(_, Mutability::Mut), RigidTy::FnPtr(_) => RigidTy::Int(IntTy::I32));
+-                Self::Unimplemented {
+-                    name: intrinsic_str,
+-                    issue_link: "https://github.com/model-checking/kani/issues/267".into(),
+-                }
++                assert_sig_matches!(sig, RigidTy::FnPtr(_), RigidTy::RawPtr(_, Mutability::Mut), RigidTy::FnPtr(_) => RigidTy::Bool);
++                Self::CatchUnwind
+             }
+             "compare_bytes" => {
+                 assert_sig_matches!(sig, RigidTy::RawPtr(_, Mutability::Not), RigidTy::RawPtr(_, Mutability::Not), RigidTy::Uint(UintTy::Usize) => RigidTy::Int(IntTy::I32));

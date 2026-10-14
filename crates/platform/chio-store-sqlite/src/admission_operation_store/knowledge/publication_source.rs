@@ -2,17 +2,6 @@
 use super::*;
 use std::ops::Deref;
 
-/// A source identity includes its process and original principal; the allocator
-/// account is separately derived from only its serving domain and tenant.
-#[derive(Serialize)]
-pub(in crate::admission_operation_store) struct KnowledgePublicationIdentity<'a> {
-    scope: &'a RecoveryScopeV1,
-    principal: &'a chio_security_types::PrincipalId,
-    publication: &'a CommandId,
-    artifact: &'a ArtifactId,
-    version: &'a ArtifactRevisionId,
-}
-
 /// Fresh data is bound to the actual writer, original actor and exact current
 /// installation. No deserialized payload can construct this intake witness.
 pub(in crate::admission_operation_store) struct VerifiedKnowledgePublicationIntake<'tx, 'conn> {
@@ -23,17 +12,21 @@ pub(in crate::admission_operation_store) struct VerifiedKnowledgePublicationInta
     record: NativeArtifactRecordV1,
     source_key: String,
     canonical_payload: Vec<u8>,
+    import_manifest: Option<&'tx SignedArtifactArchiveManifestV1>,
 }
 
 impl<'tx, 'conn> VerifiedKnowledgePublicationIntake<'tx, 'conn> {
     /// Called only after reserve_artifact has resolved native producer custody,
     /// copied/imported provenance, dependencies and finite adopting audience.
+    /// An Import reservation carries the borrowed manifest it cites, which is
+    /// retained only after this intake has been admitted and charged.
     pub(super) fn new(
         transaction: &'tx Transaction<'conn>,
         actor: &'tx AuthenticatedRecoveryActor,
         profile: &'tx NativeKnowledgeInstallationV1,
         now: u64,
         record: NativeArtifactRecordV1,
+        import_manifest: Option<&'tx SignedArtifactArchiveManifestV1>,
     ) -> Result<Self, AdmissionOperationStoreError> {
         let source_key = record_publication_key(&record)?;
         let canonical_payload = protected::encode(&record)?;
@@ -45,6 +38,7 @@ impl<'tx, 'conn> VerifiedKnowledgePublicationIntake<'tx, 'conn> {
             record,
             source_key,
             canonical_payload,
+            import_manifest,
         };
         witness.verify(transaction)?;
         Ok(witness)
@@ -99,7 +93,13 @@ impl<'tx, 'conn> VerifiedKnowledgePublicationIntake<'tx, 'conn> {
         }
         self.record.metadata.validate().map_err(refused)?;
         publication::ensure_publication_audience(transaction, self.actor, &self.record)?;
-        verify_producer_custody(transaction, self.actor, &current, &self.record)?;
+        verify_producer_custody(
+            transaction,
+            self.actor,
+            &current,
+            &self.record,
+            self.import_manifest,
+        )?;
         for dependency in self.record.input.dependencies.as_slice() {
             let dependency = artifact(transaction, dependency)?;
             if dependency.metadata.scope != *self.actor.scope() {
@@ -109,36 +109,14 @@ impl<'tx, 'conn> VerifiedKnowledgePublicationIntake<'tx, 'conn> {
         Ok(())
     }
 
-    pub(in crate::admission_operation_store) fn transaction(&self) -> &'tx Transaction<'conn> {
-        self.transaction
-    }
     pub(in crate::admission_operation_store) fn scope(&self) -> &RecoveryScopeV1 {
         &self.record.metadata.scope
     }
     pub(in crate::admission_operation_store) fn source_key(&self) -> &str {
         &self.source_key
     }
-    pub(in crate::admission_operation_store) fn canonical_payload(&self) -> &[u8] {
-        &self.canonical_payload
-    }
     pub(in crate::admission_operation_store) fn record(&self) -> &NativeArtifactRecordV1 {
         &self.record
-    }
-    pub(in crate::admission_operation_store) fn publication_identity(
-        &self,
-    ) -> KnowledgePublicationIdentity<'_> {
-        KnowledgePublicationIdentity {
-            scope: &self.record.metadata.scope,
-            principal: self.actor.principal(),
-            publication: &self.record.input.publication,
-            artifact: &self.record.metadata.artifact,
-            version: &self.record.metadata.version,
-        }
-    }
-    pub(in crate::admission_operation_store) fn dependency_references(
-        &self,
-    ) -> &[ArtifactVersionRefV1] {
-        self.record.input.dependencies.as_slice()
     }
 }
 
@@ -149,6 +127,7 @@ fn verify_producer_custody(
     actor: &AuthenticatedRecoveryActor,
     profile: &NativeKnowledgeInstallationV1,
     record: &NativeArtifactRecordV1,
+    import_manifest: Option<&SignedArtifactArchiveManifestV1>,
 ) -> Result<(), AdmissionOperationStoreError> {
     let input = &record.input;
     let mut floor = source(tx, &profile.native_authority, &profile.producer_context)?;
@@ -196,7 +175,7 @@ fn verify_producer_custody(
             if actor.permission() != RecoveryPermission::KnowledgeWrite {
                 return Err(refused("publication import source"));
             }
-            let imported = transfer::import_source(tx, profile, input)?;
+            let imported = transfer::import_source(tx, profile, input, import_manifest)?;
             floor = floor.join_restrictions(&imported.label).map_err(refused)?;
             if (imported.influence.unknown && !record.metadata.influence.unknown)
                 || !imported
@@ -272,24 +251,6 @@ impl<'tx, 'conn> VerifiedKnowledgePublicationProgress<'tx, 'conn> {
         validate_publication_transition(&before, &self.record)?;
         self.record.metadata.validate().map_err(refused)?;
         Ok(())
-    }
-
-    pub(in crate::admission_operation_store) fn transaction(&self) -> &'tx Transaction<'conn> {
-        self.transaction
-    }
-    pub(in crate::admission_operation_store) fn scope(&self) -> &RecoveryScopeV1 {
-        &self.record.metadata.scope
-    }
-    pub(in crate::admission_operation_store) fn previous(
-        &self,
-    ) -> &protected::ProtectedSourceReference {
-        &self.previous
-    }
-    pub(in crate::admission_operation_store) fn record(&self) -> &NativeArtifactRecordV1 {
-        &self.record
-    }
-    pub(in crate::admission_operation_store) fn canonical_payload(&self) -> &[u8] {
-        &self.canonical_payload
     }
 }
 

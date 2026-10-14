@@ -389,7 +389,9 @@ fn migration_authority_clock_regression_rejects_reads_imports_and_new_namespaces
 ) -> AnchoredTestResult {
     let fixture = fixture();
     let source = Source::new(&fixture, false);
-    let now = now_ms() / 1_000;
+    // One second above the startup baselines, so the one-second rollback below
+    // reaches the migration high water and not the startup observation.
+    let now = (clock_origin_ms(&fixture)? + 1_000) / 1_000;
     let expected = {
         let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(now, std::iter::empty());
         pin(&fixture, &source)?
@@ -424,6 +426,9 @@ fn migration_authority_clock_regression_rejects_reads_imports_and_new_namespaces
     }
     assert!(source.calls().is_empty());
     assert_eq!(global_count(&fixture.store), before);
+    // Recovery is the pinned second again. The wall clock is behind it, because
+    // the pin was observed up to a second past the startup baselines.
+    let _recovered = chio_kernel::scope_fixed_runtime_for_current_thread(now, std::iter::empty());
     assert_record_equal(
         &load(&fixture)?.expect("same pinned generation after clock recovers"),
         &expected,

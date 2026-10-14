@@ -1,5 +1,5 @@
 //! Only the actual native knowledge join owns its encoding append.
-use super::super::{head, load_with_digest, record_key, records, Record};
+use super::super::{last_join_sequence, load_with_digest, record_key, records, Record};
 use crate::admission_operation_store::knowledge::encoding::chunks::EncodingOwner;
 use crate::admission_operation_store::recovery::storage as protected;
 use crate::admission_operation_store::{invariant, AdmissionOperationStoreError};
@@ -57,7 +57,8 @@ impl<'tx, 'conn> AuthenticatedNativeKnowledgeEncodingSource<'tx, 'conn> {
             records::load_metadata(tx, &self.record.authority)?.ok_or_else(invalid)?;
         if initialized.digest != self.record.initialization
             || initialized.authority.as_str() != self.record.authority
-            || head(tx, &self.record.authority)?.checked_add(1) != Some(self.record.sequence)
+            || last_join_sequence(tx, &self.record.authority)?.checked_add(1)
+                != Some(self.record.sequence)
             || protected::raw_checked(
                 tx,
                 &record_key(&self.record.authority, self.record.sequence),

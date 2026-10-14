@@ -26,7 +26,7 @@ class CampaignReportTest(unittest.TestCase):
         manifest, rows = specimen()
         manifest["schema"] = "chio.recovery-live-corpus.v2"
         provenance = {"provider_endpoint":"https://api.openai.com/v1", "base_commit":"1"*40,
-                      "source_inventory_version":"chio.source-inventory.v3"}
+                      "source_inventory_version":"chio.source-inventory.v4"}
         manifest.update(provenance)
         for row in rows:
             row.update(provenance)
@@ -47,7 +47,7 @@ class CampaignReportTest(unittest.TestCase):
     def test_provider_endpoint_base_commit_and_inventory_version_are_exact(self):
         manifest, rows = specimen()
         provenance = {"provider_endpoint":"https://api.openai.com/v1", "base_commit":"1"*40,
-                      "source_inventory_version":"chio.source-inventory.v3"}
+                      "source_inventory_version":"chio.source-inventory.v4"}
         manifest.update(provenance)
         for row in rows:
             row.update(provenance)

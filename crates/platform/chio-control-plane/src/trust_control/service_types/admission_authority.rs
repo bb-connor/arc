@@ -372,6 +372,7 @@ pub(crate) struct RevalidateRecoveryClaimWire {
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListRecoverableWire {
     pub(crate) not_after_unix_ms: u64,
+    pub(crate) after_operation_id: Option<AdmissionOperationId>,
     pub(crate) limit: usize,
 }
 

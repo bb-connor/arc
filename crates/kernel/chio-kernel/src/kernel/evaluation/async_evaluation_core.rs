@@ -1815,13 +1815,14 @@ impl ChioKernel {
                 return Err(error);
             }
             Err(KernelError::RequestCancelled { reason, .. }) => {
-                post_admission_drop_guard.terminalize_after_transport_failure()?;
+                let terminal_metadata = post_admission_drop_guard
+                    .terminalize_after_transport_failure(extra_metadata.clone())?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let metadata = self.ambiguous_dispatch_receipt_metadata(
                     &budget_mutation,
                     payment_authorization.as_ref(),
-                    extra_metadata.clone(),
+                    terminal_metadata,
                 );
                 let retained = metadata.is_some() || payment_authorization.is_some();
                 self.note_retained_ambiguous_hold(retained);
@@ -1846,14 +1847,15 @@ impl ChioKernel {
                 );
             }
             Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
-                post_admission_drop_guard.terminalize_after_transport_failure()?;
+                let terminal_metadata = post_admission_drop_guard
+                    .terminalize_after_transport_failure(extra_metadata.clone())?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let reason = format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms");
                 let metadata = self.ambiguous_dispatch_receipt_metadata(
                     &budget_mutation,
                     payment_authorization.as_ref(),
-                    extra_metadata.clone(),
+                    terminal_metadata,
                 );
                 let retained = metadata.is_some() || payment_authorization.is_some();
                 self.note_retained_ambiguous_hold(retained);
@@ -1880,13 +1882,14 @@ impl ChioKernel {
                 );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
-                post_admission_drop_guard.terminalize_after_transport_failure()?;
+                let terminal_metadata = post_admission_drop_guard
+                    .terminalize_after_transport_failure(extra_metadata.clone())?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let metadata = self.ambiguous_dispatch_receipt_metadata(
                     &budget_mutation,
                     payment_authorization.as_ref(),
-                    extra_metadata.clone(),
+                    terminal_metadata,
                 );
                 let retained = metadata.is_some() || payment_authorization.is_some();
                 self.note_retained_ambiguous_hold(retained);
@@ -1912,14 +1915,15 @@ impl ChioKernel {
                 );
             }
             Err(e) => {
-                post_admission_drop_guard.terminalize_after_transport_failure()?;
+                let terminal_metadata = post_admission_drop_guard
+                    .terminalize_after_transport_failure(extra_metadata.clone())?;
                 post_admission_drop_guard.disarm();
                 drop(post_admission_drop_guard);
                 let msg = e.to_string();
                 let deny_metadata = self.ambiguous_dispatch_receipt_metadata(
                     &budget_mutation,
                     payment_authorization.as_ref(),
-                    extra_metadata.clone(),
+                    terminal_metadata,
                 );
                 let retained = deny_metadata.is_some() || payment_authorization.is_some();
                 self.note_retained_ambiguous_hold(retained);

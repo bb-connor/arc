@@ -47,19 +47,25 @@ establish current-source qualification or absence of open review findings.
 
 | Historical phase record | Retained scope |
 |---|---|
-| [P0 plan](implementation/p0/PLAN.md), [review](implementation/p0/REVIEW.md), [verification](implementation/p0/verification.json) | Contracts, pure dependency boundaries, resource ceilings and local assurance baseline. |
-| [P1 plan](implementation/p1/PLAN.md), [review](implementation/p1/REVIEW.md), [verification](implementation/p1/verification.json), [operations](implementation/p1/OPERATIONS.md) | Sequential native support disclosure, exact durable recovery and its recorded local acceptance. |
-| [P2 plan](implementation/p2/PLAN.md), [review](implementation/p2/REVIEW.md), [verification](implementation/p2/verification.json), [operations](implementation/p2/OPERATIONS.md) | Bounded advisory explanations, audience projection and fresh native refusal. |
-| [P3 plan](implementation/p3/PLAN.md), [review](implementation/p3/REVIEW.md), [verification](implementation/p3/verification.json), [operations](implementation/p3/OPERATIONS.md) | Bounded native support reads, issue creation and field projection. |
-| [P4 plan](implementation/p4/PLAN.md), [review](implementation/p4/REVIEW.md), [verification](implementation/p4/verification.json), [operations](implementation/p4/OPERATIONS.md) | Host-private Unix SQLite artifacts, labeled checkpoints, restore, adoption and collection. |
-| [P5 plan](implementation/p5/PLAN.md), [review](implementation/p5/REVIEW.md), [verification](implementation/p5/verification.json), [operations](implementation/p5/OPERATIONS.md) | Sealed Boolean-only, model-disabled GNU/musl Linux acceptance at source binding `562a3c35`. |
-| [P6 plan](implementation/p6/P6-PRODUCT-PLAN.md), [review](implementation/p6/REVIEW.md), [verification](implementation/p6/verification.json), [supported matrix](implementation/p6/supported-matrix.json) | Archived local, Linux and finite live qualification at runtime binding `b1bcd48c` and qualification binding `3a13a9bc`. |
+| P0 | Contracts, pure dependency boundaries, resource ceilings and local assurance baseline. |
+| P1 | Sequential native support disclosure, exact durable recovery and its recorded local acceptance. |
+| P2 | Bounded advisory explanations, audience projection and fresh native refusal. |
+| P3 | Bounded native support reads, issue creation and field projection. |
+| P4 | Host-private Unix SQLite artifacts, labeled checkpoints, restore, adoption and collection. |
+| P5 | Sealed Boolean-only, model-disabled GNU/musl Linux acceptance at source binding `562a3c35`. |
+| P6 | Archived local, Linux and finite live qualification at runtime binding `b1bcd48c` and qualification binding `3a13a9bc`. |
 
-Full bindings, archive hashes, review scopes, retained failures and unknown
-outcomes are stated in [execution status](implementation/STATUS.md). At source
+The [historical package index](implementation/history/README.md#package-paths)
+locates the original plans, reviews, verification records and operating contracts.
+Its extraction instructions restore their exact original paths for inspection;
+the archived records are not maintained runtime inputs.
+
+Full bindings, archive hashes and review scopes remain in the
+[historical packages](implementation/history/README.md). Current failures and
+unknown outcomes are stated in [execution status](implementation/STATUS.md). At source
 commit `c5f53a96dbfc836bfc42805c2fee2d393dd78821`, 581 of the 735 historical P6
 source paths do not match: 547 have different bytes and 34 are absent at their
-original paths. The [reproducible drift snapshot](implementation/STATUS.md#source-drift-at-the-recorded-commit)
+original paths. The [recorded source comparison](implementation/reviews/source-map-and-fixture-environment.md)
 records the unchanged paths, explicit rename declarations and current anchor map.
 The retained package auditors refuse the current working tree. Fresh repair review, owning regressions and
 source/profile-bound requalification are required before a qualified candidate

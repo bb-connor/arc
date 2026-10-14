@@ -1,13 +1,63 @@
 //! Live publication capacity follows authenticated tenant ownership.
 use super::*;
 
-struct ScopedKnowledgeHost {
-    runtime: NativeKnowledgeRuntime,
-    broker: Arc<chio_process::ProcessArtifactBroker>,
-    profile: NativeKnowledgeInstallationV1,
+pub(super) struct ScopedKnowledgeHost {
+    pub(super) kernel: Arc<ChioKernel>,
+    pub(super) runtime: NativeKnowledgeRuntime,
+    pub(super) broker: Arc<chio_process::ProcessArtifactBroker>,
+    pub(super) profile: NativeKnowledgeInstallationV1,
+    pub(super) deployment: RecoveryDeploymentV1,
 }
 
-fn scoped_host(
+/// The one native kernel construction shared by the initial and the reopened
+/// scoped host: identical kernel seed, effect server, durable admission mode,
+/// retained authority/purpose/issuer flow wiring, Enforce and startup
+/// reconcile. Only its callers differ: the initial host imports its source and
+/// configures the deployment first; a reopen passes the retained deployment
+/// and must not import, configure or rewrite anything.
+fn scoped_native_kernel(
+    path: &std::path::Path,
+    authority: &SqliteAuthorityStore,
+    effects: &Arc<AtomicUsize>,
+    behavior: &Arc<AtomicUsize>,
+    started: &Arc<tokio::sync::Notify>,
+    release: &Arc<tokio::sync::Notify>,
+    deployment: &RecoveryDeploymentV1,
+) -> TestResult<Arc<ChioKernel>> {
+    let (mut kernel, _) = open_kernel(path, authority, &Keypair::from_seed(&[140; 32]))?;
+    kernel.register_tool_server(Box::new(PersistentEffectServer::new(
+        path.join("effects.db"),
+        effects.clone(),
+        behavior.clone(),
+        started.clone(),
+        release.clone(),
+    )?));
+    kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
+    let flow = Arc::new(
+        NativeFlowResolver::new(
+            deployment.native_authority.clone(),
+            declassification_registry(&deployment.purpose),
+            Arc::new(CountingEmptyClassifier::new()),
+            Arc::new(Clock::default()),
+            FlowResolverConfig::new(
+                restricted_label(),
+                category_labels(),
+                BTreeMap::from([(
+                    RecordId::new("aggregate")?,
+                    deployment.aggregate_issuer.clone(),
+                )]),
+                60_000,
+            )?,
+        )?
+        .with_captured_lifecycle(),
+    );
+    kernel.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
+    kernel.set_security_pre_dispatch_hook(flow);
+    kernel.reconcile_durable_admission_startup()?;
+    Ok(Arc::new(kernel))
+}
+
+pub(super) fn scoped_host(
     f: &KnowledgeFixture,
     tenant: &str,
     process_id: &str,
@@ -72,37 +122,15 @@ fn scoped_host(
     // Each imported authority is selected by a real kernel with the same
     // serving store. Reusing kernelA would fail its native binding check before
     // these tests could exercise tenant publication accounting.
-    let (mut kernel, _) = open_kernel(&f.f.path, &f.f.authority, &Keypair::from_seed(&[140; 32]))?;
-    kernel.register_tool_server(Box::new(PersistentEffectServer::new(
-        f.f.path.join("effects.db"),
-        f.f.effects.clone(),
-        f.f.behavior.clone(),
-        f.f.started.clone(),
-        f.f.release.clone(),
-    )?));
-    kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
-    let flow = Arc::new(
-        NativeFlowResolver::new(
-            deployment.native_authority.clone(),
-            declassification_registry(&deployment.purpose),
-            Arc::new(CountingEmptyClassifier::new()),
-            Arc::new(Clock::default()),
-            FlowResolverConfig::new(
-                restricted_label(),
-                category_labels(),
-                BTreeMap::from([(
-                    RecordId::new("aggregate")?,
-                    deployment.aggregate_issuer.clone(),
-                )]),
-                60_000,
-            )?,
-        )?
-        .with_captured_lifecycle(),
-    );
-    kernel.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
-    kernel.set_security_pre_dispatch_hook(flow);
-    kernel.reconcile_durable_admission_startup()?;
-    let kernel = Arc::new(kernel);
+    let kernel = scoped_native_kernel(
+        &f.f.path,
+        &f.f.authority,
+        &f.f.effects,
+        &f.f.behavior,
+        &f.f.started,
+        &f.f.release,
+        &deployment,
+    )?;
     let process = ProcessRuntime::open(f.f.path.join("process.db"), kernel.clone())?
         .with_security_profile(ProcessSecurityProfile {
             tenant_id: tenant.into(),
@@ -117,7 +145,7 @@ fn scoped_host(
     );
     let mut profile = f.profile.clone();
     profile.scope = deployment.scope.clone();
-    profile.native_authority = deployment.native_authority;
+    profile.native_authority = deployment.native_authority.clone();
     profile.producer_context = context.clone();
     let mut entry = profile.recipients.as_slice()[0].clone();
     entry.recipient.scope = profile.scope.clone();
@@ -153,14 +181,87 @@ fn scoped_host(
     assert_eq!(current.scope, profile.scope);
     broker.validate_process(&profile.scope.process_id, &profile.producer_context)?;
     Ok(ScopedKnowledgeHost {
+        kernel,
         runtime,
         broker,
         profile,
+        deployment,
+    })
+}
+
+/// Reopen a scoped tenant host after a process restart of the serving store.
+/// The retained deployment and installation profile are data persisted by the
+/// prior fixture: the reopened kernel rebinds to their exact native authority
+/// instead of reimporting or rewriting any retained source, and the caller
+/// supplies the current control capability the reopened store still assigns
+/// to the same principal. Nothing here reconfigures the deployment, the
+/// knowledge account or the imported participant source.
+pub(super) fn reopen_scoped_host(
+    f: &RecoveryFixture,
+    control: &CapabilityToken,
+    deployment: &RecoveryDeploymentV1,
+    profile: &NativeKnowledgeInstallationV1,
+) -> TestResult<ScopedKnowledgeHost> {
+    let tenant = deployment.scope.tenant_id.as_str();
+    // Each imported authority is selected by a real kernel with the same
+    // serving store, exactly as the initial scoped host wired it.
+    let kernel = scoped_native_kernel(
+        &f.path,
+        &f.authority,
+        &f.effects,
+        &f.behavior,
+        &f.started,
+        &f.release,
+        deployment,
+    )?;
+    let process = ProcessRuntime::open(f.path.join("process.db"), kernel.clone())?
+        .with_security_profile(ProcessSecurityProfile {
+            tenant_id: tenant.into(),
+            isolation_epoch_id: "native-epoch".into(),
+            generation: 1,
+        })?;
+    // The reopened kernel must restore, not replace, the retained foreign
+    // authority through the actual native binding check.
+    assert_eq!(
+        kernel
+            .recovery_deployment(&deployment.scope)?
+            .native_authority,
+        deployment.native_authority
+    );
+    let store = Arc::new(f.authority.admission_operation_store());
+    let fence = f.authority.mutation_fence();
+    let broker = Arc::new(process.enable_durable_knowledge()?);
+    let runtime = NativeKnowledgeRuntime::new(
+        kernel.clone(),
+        store.clone(),
+        broker.clone(),
+        profile.clone(),
+        fence,
+    )?;
+    let actor = kernel.authenticate_recovery_actor(
+        &profile.scope,
+        control,
+        RecoveryPermission::KnowledgeRead,
+    )?;
+    assert_eq!(
+        store
+            .knowledge_installation(&actor, &f.authority.mutation_fence(), now_ms()?)?
+            .scope,
+        profile.scope
+    );
+    broker.validate_process(&profile.scope.process_id, &profile.producer_context)?;
+    Ok(ScopedKnowledgeHost {
+        kernel,
+        runtime,
+        broker,
+        profile: profile.clone(),
+        deployment: deployment.clone(),
     })
 }
 
 #[test]
 fn artifacts_live_capacity_is_shared_by_native_processes_of_one_tenant() -> TestResult {
+    let _clock = scope_synchronous_fixture_clock(now_ms()? / 1_000);
     let f = KnowledgeFixture::new()?;
     let other = scoped_host(
         &f,
@@ -230,6 +331,7 @@ fn artifacts_live_capacity_is_shared_by_native_processes_of_one_tenant() -> Test
 
 #[test]
 fn artifacts_foreign_tenant_live_capacity_does_not_close_native_intake() -> TestResult {
+    let _clock = scope_synchronous_fixture_clock(now_ms()? / 1_000);
     let f = KnowledgeFixture::new()?;
     let other = scoped_host(&f, "independent-knowledge-tenant", "foreign-tenant-root")?;
     let observed =
@@ -303,6 +405,21 @@ fn knowledge_account_initialization_rolls_back_and_reconfiguration_preserves_cus
                 |row| row.get(0),
             )?;
             let store = host.authority.admission_operation_store();
+            // Native hydration imports authenticated knowledge-* custody before
+            // configure_knowledge runs, so rollback is proven by snapshotting
+            // the exact protected records and requiring them to survive intact.
+            let protected_knowledge_records = |connection: &rusqlite::Connection| -> rusqlite::Result<
+                Vec<(String, i64, rusqlite::types::Value)>,
+            > {
+                let mut statement = connection.prepare(
+                    "SELECT record_key, version, payload FROM admission_operation_recovery_records
+                     WHERE record_key GLOB 'knowledge-*' ORDER BY record_key",
+                )?;
+                let rows =
+                    statement.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
+                rows.collect()
+            };
+            let intact_records = protected_knowledge_records(&connection)?;
             store.set_knowledge_account_completion_failure_for_test(true)?;
             let failure = store.configure_knowledge(profile);
             store.set_knowledge_account_completion_failure_for_test(false)?;
@@ -322,10 +439,11 @@ fn knowledge_account_initialization_rolls_back_and_reconfiguration_preserves_cus
                 after, before,
                 "partial account initialization committed custody"
             );
-            let remaining: i64 = connection.query_row(
-                "SELECT count(*) FROM admission_operation_recovery_records WHERE record_key GLOB 'knowledge-*'", [], |row| row.get(0),
-            )?;
-            assert_eq!(remaining, 0);
+            let remaining = protected_knowledge_records(&connection)?;
+            assert_eq!(
+                remaining, intact_records,
+                "partial account initialization disturbed protected knowledge custody"
+            );
             Ok(())
         },
     )?;

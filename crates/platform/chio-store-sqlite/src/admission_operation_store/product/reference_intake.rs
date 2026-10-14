@@ -137,9 +137,6 @@ impl<'tx, 'conn> VerifiedProductReferenceIntake<'tx, 'conn> {
     pub(in crate::admission_operation_store) fn source_scope_key(&self) -> &str {
         &self.source_scope_key
     }
-    pub(in crate::admission_operation_store) fn source_payload(&self) -> &[u8] {
-        &self.source_payload
-    }
     pub(in crate::admission_operation_store) fn references(&self) -> &[ArtifactVersionRefV1] {
         &self.references
     }

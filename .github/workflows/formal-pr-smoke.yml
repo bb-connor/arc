@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/formal-pr-smoke.yml"
+      - ".github/actions/setup-kani/action.yml"
       - ".github/workflows/fuzz.yml"
       - ".kani/harnesses.toml"
       - "scripts/check-kani-toolchain.sh"
@@ -113,7 +114,7 @@ jobs:
           }
 
           workflow='^\.github/workflows/formal-pr-smoke\.yml$'
-          rust_common="${workflow}|^(Cargo\.lock|Cargo\.toml|rust-toolchain\.toml|scripts/check-kani-toolchain\.sh|scripts/tests/check-kani-toolchain\.test\.sh|scripts/tests/check-kani-probe-lifecycle\.test\.py)$"
+          rust_common="${workflow}|^(Cargo\.lock|Cargo\.toml|rust-toolchain\.toml|scripts/check-kani-toolchain\.sh|scripts/tests/check-kani-toolchain\.test\.sh|scripts/tests/check-kani-probe-lifecycle\.test\.py|\.github/actions/setup-kani/action\.yml|formal/rust-verification/patches/kani-catch-unwind\.patch)$"
           set_output lean "${workflow}|^(formal/lean4/|formal/(proof-manifest\.toml|theorem-inventory\.json|assumptions\.toml)$|docs/reference/CLAIM_REGISTRY\.md$|scripts/(check-formal-proofs\.sh|lean-assumption-audit\.lean|generate-lean-json-fixtures\.py)$|scripts/tests/lean-assumption-audit\.test\.sh$|tests/bindings/vectors/canonical/v1\.json$)"
           set_output kani_core "${rust_common}|^(\.kani/harnesses\.toml$|formal/rust-verification/kani-public-harnesses\.toml$|scripts/check-kani-public-core\.sh$|scripts/check-kani-harness-result\.py$|scripts/tests/check-kani-public-result\.test\.py$|crates/(kernel/chio-kernel-core|core/chio-core-types|trust/chio-revocation-oracle)/(src/|Cargo\.toml$))"
           set_output kani_manifest "${rust_common}|^(\.kani/harnesses\.toml$|scripts/run-kani-manifest\.sh$|crates/(economy/chio-anchor|economy/chio-credit|economy/chio-open-market|economy/chio-web3|trust/chio-attest-verify|trust/chio-weights)/(src/|Cargo\.toml$))"
@@ -231,7 +232,7 @@ jobs:
     name: kani-public-pr (lanes.pr sweep)
     needs: scope
     if: needs.scope.outputs.kani_core == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -253,23 +254,8 @@ jobs:
       - name: Check public Kani result handling without a compiler
         run: python3 -B scripts/tests/check-kani-public-result.test.py
 
-      - name: Restore Kani tool cache
-        id: kani-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ~/.cargo/bin/cargo-kani
-            ~/.cargo/bin/kani
-            ~/.kani
-          key: ${{ runner.os }}-${{ runner.arch }}-kani-${{ env.CHIO_KANI_VERSION }}-${{ hashFiles('scripts/check-kani-toolchain.sh') }}
-
-      - name: Install Kani
-        env:
-          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-kani-tool-target
-        run: |
-          set -euo pipefail
-          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}" --force
-          cargo kani setup
+      - name: Install Kani (patched source build)
+        uses: ./.github/actions/setup-kani
 
       - name: Verify Kani version
         run: bash scripts/check-kani-toolchain.sh
@@ -293,7 +279,7 @@ jobs:
     name: kani-manifest-pr (non-core lanes.pr sweep)
     needs: scope
     if: needs.scope.outputs.kani_manifest == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -312,23 +298,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Restore Kani tool cache
-        id: kani-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ~/.cargo/bin/cargo-kani
-            ~/.cargo/bin/kani
-            ~/.kani
-          key: ${{ runner.os }}-${{ runner.arch }}-kani-${{ env.CHIO_KANI_VERSION }}-${{ hashFiles('scripts/check-kani-toolchain.sh') }}
-
-      - name: Install Kani
-        env:
-          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-kani-tool-target
-        run: |
-          set -euo pipefail
-          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}" --force
-          cargo kani setup
+      - name: Install Kani (patched source build)
+        uses: ./.github/actions/setup-kani
 
       - name: Verify Kani version
         run: bash scripts/check-kani-toolchain.sh

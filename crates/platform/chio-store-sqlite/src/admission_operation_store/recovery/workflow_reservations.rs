@@ -330,16 +330,29 @@ fn workflow_quota(
     workflow_quota_with_count(tx, scope, workflow, None)
 }
 
+/// The authenticated purpose allocation of an unmaterialized setup, read
+/// before its closing writer. Consuming it proves that writer's exact charge.
+pub(super) struct UnusedSetupQuota {
+    source: ProtectedSourceReference,
+    quota: WorkflowQuota,
+}
+
 /// A pristine native purpose is proven from the actual FIRST allocation, never
 /// inferred from absent workflow fields or a legacy zero baseline.
-pub(super) fn require_unmaterialized_no_native_accounting(
+pub(super) fn unused_setup_quota(
     tx: &Connection,
     record: &RecoveryWorkflowRecordV1,
-) -> Result<(), AdmissionOperationStoreError> {
+) -> Result<UnusedSetupQuota, AdmissionOperationStoreError> {
     let key = quota_key(&record.scope, &record.workflow_id)?;
-    let source = source_reference(tx, &key)?;
+    let source = source_reference(tx, &key).map_err(|error| match error {
+        AdmissionOperationStoreError::NotFound => {
+            invariant("unused original lacks its authentic purpose allocation")
+        }
+        error => error,
+    })?;
     let quota = workflow_quota(tx, &record.scope, &record.workflow_id)?;
     if source.kind() != "command"
+        || !quota_matches_source(&source, &quota)?
         || quota.baseline_revision != SafeInteger::ZERO
         || quota.baseline_commands != SafeInteger::ZERO
         || quota.native != SafeInteger::ZERO
@@ -354,41 +367,56 @@ pub(super) fn require_unmaterialized_no_native_accounting(
             "unused original lacks its authentic zero native-purpose allocation",
         ));
     }
-    Ok(())
+    Ok(UnusedSetupQuota { source, quota })
 }
 
-pub(super) fn verify_unused_setup_control_quota(
-    tx: &Connection,
-    record: &RecoveryWorkflowRecordV1,
-    previous_version: u64,
-    previous_digest: &ProjectionDigest,
-) -> Result<(), AdmissionOperationStoreError> {
-    let key = quota_key(&record.scope, &record.workflow_id)?;
-    let source = source_reference(tx, &key)?;
-    let mut before = workflow_quota(tx, &record.scope, &record.workflow_id)?;
-    if previous_version.checked_add(1) != Some(source.version()) || before.control.get() == 0 {
-        return Err(invariant(
-            "unused setup closure lost its single reserved control purpose",
-        ));
+impl UnusedSetupQuota {
+    /// The closing writer advanced the allocation by exactly one Control
+    /// purpose and changed no other counter, baseline or native allocation.
+    pub(super) fn require_one_control_charge(
+        self,
+        tx: &Connection,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let Self {
+            source: before,
+            mut quota,
+        } = self;
+        quota.control = quota
+            .control
+            .get()
+            .checked_add(1)
+            .and_then(|count| SafeInteger::new(count).ok())
+            .ok_or_else(|| invariant("unused setup control purpose exhausted"))?;
+        let after = source_reference(tx, before.record_key())?;
+        let current = workflow_quota(tx, &quota.scope, &quota.workflow_id)?;
+        if before.version().checked_add(1) != Some(after.version())
+            || after.kind() != "command"
+            || after.scope_key() != before.scope_key()
+            || encode(&current)? != encode(&quota)?
+            || !quota_matches_source(&after, &quota)?
+        {
+            return Err(invariant(
+                "unused setup closure did not spend exactly one control purpose",
+            ));
+        }
+        Ok(())
     }
-    before.control = SafeInteger::new(before.control.get() - 1)
-        .map_err(|_| invariant("unused setup prior control count refused"))?;
-    if before.units()? != previous_version
-        || record_digest(
-            &key,
-            &scope_key(&record.scope)?,
+}
+
+fn quota_matches_source(
+    source: &ProtectedSourceReference,
+    quota: &WorkflowQuota,
+) -> Result<bool, AdmissionOperationStoreError> {
+    Ok(hex(source.digest().as_bytes())
+        == record_digest(
+            source.record_key(),
+            source.scope_key(),
             "command",
-            previous_version,
-            &encode(&before)?,
+            source.version(),
+            &encode(quota)?,
             None,
             None,
-        )? != hex(previous_digest.as_bytes())
-    {
-        return Err(invariant(
-            "unused setup closure changed its retained purpose preimage",
-        ));
-    }
-    Ok(())
+        )?)
 }
 
 /// The first durable Resume request belongs to this exact physical generation.
@@ -573,7 +601,7 @@ pub(in crate::admission_operation_store) fn save_workflow(
     class: WorkflowWriteClass,
 ) -> Result<(), AdmissionOperationStoreError> {
     let key = workflow_key(&record.scope, &record.workflow_id)?;
-    let existing = raw(tx, &key)?;
+    let existing = raw_checked(tx, &key)?;
     if let Some(row) = &existing {
         let physical: RecoveryWorkflowRecordV1 = decode(&row.payload)?;
         if !physical.captured
@@ -682,7 +710,7 @@ pub(in crate::admission_operation_store) fn save_command(
     let (_, response) = commands::decode_record(payload)?;
     if response.workflow_id != record.workflow_id
         || response.revision != record.revision
-        || raw(tx, key)?.is_some()
+        || raw_checked(tx, key)?.is_some()
     {
         return Err(invariant("recovery command owner changed"));
     }
@@ -734,7 +762,7 @@ pub(in crate::admission_operation_store) fn save_captured_deployment_history(
         hex(digest.as_bytes())
     );
     let payload = encode(profile)?;
-    if let Some(existing) = raw(tx, &key)? {
+    if let Some(existing) = raw_checked(tx, &key)? {
         if existing.version != 1
             || existing.kind != "deployment"
             || existing.scope != scope_key(&record.scope)?

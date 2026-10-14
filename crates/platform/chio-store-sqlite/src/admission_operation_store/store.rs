@@ -312,6 +312,194 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         self.require_native_pre_authorization_finishing_funding_from_port(context)
     }
 
+    fn prepare_original_native_finishing(
+        &self,
+        original: &chio_kernel::native_finishing::NativeInitialFinishingAuthority<'_>,
+        provider: Option<&dyn chio_kernel::native_finishing::NativeProcessFinishingSourceProvider>,
+    ) -> Result<
+        chio_kernel::native_finishing::OriginalNativeFinishingPreparationData,
+        AdmissionOperationStoreError,
+    > {
+        self.prepare_original_native_finishing_from_port(original, provider)
+    }
+
+    fn enroll_original_native_finishing_process(
+        &self,
+        provider: &dyn chio_kernel::native_finishing::NativeProcessFinishingSourceProvider,
+        authority: &chio_kernel::native_finishing::NativeInitialFinishingAuthority<'_>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.enroll_original_native_finishing_process_from_port(provider, authority)
+    }
+
+    fn restore_original_native_finishing_process(
+        &self,
+        provider: &dyn chio_kernel::native_finishing::NativeProcessFinishingSourceProvider,
+        original_account_digest: &str,
+        authority: &chio_kernel::native_finishing::NativeInitialFinishingAuthority<'_>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.restore_original_native_finishing_process_from_port(
+            provider,
+            original_account_digest,
+            authority,
+        )
+    }
+
+    fn confirm_original_native_finishing(
+        &self,
+        original: &chio_kernel::native_finishing::NativeInitialFinishingAuthority<'_>,
+        provider: Option<&dyn chio_kernel::native_finishing::NativeProcessFinishingSourceProvider>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.confirm_original_native_finishing_from_port(original, provider)
+    }
+
+    fn settle_original_native_finishing_process(
+        &self,
+        provider: &dyn chio_kernel::native_finishing::NativeProcessFinishingSourceProvider,
+        receipts: Option<&chio_kernel::receipt_store::NativeReceiptStoreRegistration>,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.settle_original_native_finishing_process_from_port(provider, receipts, fence, now)
+    }
+
+    fn settle_native_finishing_after_terminal(
+        &self,
+        operation_id: &AdmissionOperationId,
+        receipts: Option<&chio_kernel::receipt_store::NativeReceiptStoreRegistration>,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.settle_native_finishing_after_terminal_from_port(operation_id, receipts, fence, now)
+    }
+
+    fn attach_native_receipt_sink(
+        &self,
+        registration: &chio_kernel::receipt_store::NativeReceiptStoreRegistration,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.attach_native_receipt_sink_from_port(registration)
+    }
+
+    fn materialize_native_finishing_receipt(
+        &self,
+        operation_id: &AdmissionOperationId,
+        receipt: &chio_core::receipt::body::ChioReceipt,
+        pending_visible_at_ms: Option<u64>,
+        receipts: Option<&chio_kernel::receipt_store::NativeReceiptStoreRegistration>,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.materialize_native_finishing_receipt_from_port(
+            operation_id,
+            receipt,
+            pending_visible_at_ms,
+            receipts,
+            fence,
+            now,
+        )
+    }
+
+    fn commit_original_process_current_write(
+        &self,
+        provider: &dyn chio_kernel::native_finishing::NativeProcessCurrentWriteProvider,
+        issuer: &chio_kernel::native_finishing::NativeProcessBankProofIssuer<'_>,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.commit_original_process_current_write_from_port(provider, issuer, fence, now)
+    }
+
+    fn settle_native_finishing_at_startup(
+        &self,
+        receipts: Option<&chio_kernel::receipt_store::NativeReceiptStoreRegistration>,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.settle_native_finishing_at_startup_from_port(receipts, fence, now)
+    }
+
+    fn require_native_receipt_unnamed(
+        &self,
+        receipt_id: &str,
+        receipts: Option<&chio_kernel::receipt_store::NativeReceiptStoreRegistration>,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.require_native_receipt_unnamed_from_port(receipt_id, receipts)
+    }
+
+    fn reconcile_native_finishing_receipt(
+        &self,
+        receipt: &chio_core::receipt::body::ChioReceipt,
+        pending_visible_at_ms: Option<u64>,
+        receipts: &chio_kernel::receipt_store::NativeReceiptStoreRegistration,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<bool, AdmissionOperationStoreError> {
+        self.reconcile_native_finishing_receipt_from_port(
+            receipt,
+            pending_visible_at_ms,
+            receipts,
+            fence,
+            now,
+        )
+    }
+
+    fn verify_original_process_return_enrollment(
+        &self,
+        source: &chio_kernel::process_return_custody::ProcessReturnSourceDataV1,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        chio_kernel::process_return_custody::ProcessReturnFundingDataV1,
+        AdmissionOperationStoreError,
+    > {
+        self.verify_original_process_return_enrollment_from_port(source, fence, now)
+    }
+
+    fn verify_original_process_nonce_custody(
+        &self,
+        source: &chio_kernel::process_return_custody::ProcessReturnSourceDataV1,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        chio_kernel::process_return_custody::ProcessOriginalNonceCustodyDataV1,
+        AdmissionOperationStoreError,
+    > {
+        self.verify_original_process_nonce_custody_from_port(source, fence, now)
+    }
+
+    fn verify_original_process_return_capture(
+        &self,
+        source: &chio_kernel::process_return_custody::ProcessReturnSourceDataV1,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        chio_kernel::process_return_custody::ProcessNativeReturnCaptureDataV1,
+        AdmissionOperationStoreError,
+    > {
+        self.verify_original_process_return_capture_from_port(source, fence, now)
+    }
+
+    fn verify_original_process_return_reconciliation(
+        &self,
+        source: &chio_kernel::process_return_custody::ProcessReturnSourceDataV1,
+        final_receipt_digest: &str,
+        final_sequence: u64,
+        final_event_digest: &str,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        chio_kernel::process_return_custody::ProcessReturnReconciliationDataV1,
+        AdmissionOperationStoreError,
+    > {
+        self.verify_original_process_return_reconciliation_from_port(
+            source,
+            final_receipt_digest,
+            final_sequence,
+            final_event_digest,
+            fence,
+            now,
+        )
+    }
+
     fn acquire_native_security_egress(
         &self,
         context: &chio_kernel::admission_operation::NativeSecurityEgressContext<'_>,
@@ -801,7 +989,10 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
             .ok_or(AdmissionOperationStoreError::NotFound)?;
         match self.claim_in_transaction(&transaction, &stored, request, trusted_now_unix_ms)? {
             ClaimWrite::Active(active) => {
-                transaction.commit().map_err(sqlite_error)?;
+                // Reusing the verified claim writes nothing. End the IMMEDIATE
+                // transaction without entering the physical writer's COMMIT
+                // gate or charging a new write against outstanding funding.
+                transaction.rollback().map_err(sqlite_error)?;
                 Ok(active)
             }
             ClaimWrite::Written(claim) => {
@@ -834,7 +1025,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         let command = command(&stored.operation, claim.into_claim())?;
         let result = self.apply_in_transaction(&transaction, &command, trusted_now_unix_ms)?;
         if !claim_written && matches!(result, AdmissionCommandResult::Idempotent(_)) {
-            transaction.commit().map_err(sqlite_error)?;
+            transaction.rollback().map_err(sqlite_error)?;
             return Ok(result);
         }
         self.commit_write(transaction)?;
@@ -865,12 +1056,13 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
             trusted_now_unix_ms,
             current_store_fence,
         )?;
-        transaction.commit().map_err(sqlite_error)
+        transaction.rollback().map_err(sqlite_error)
     }
 
     fn list_recoverable(
         &self,
         not_after_unix_ms: u64,
+        after_operation_id: Option<&AdmissionOperationId>,
         limit: usize,
     ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
         if limit > MAX_RECOVERY_BATCH {
@@ -878,26 +1070,13 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         }
         let mut connection = self.connection()?;
         let transaction = self.begin_read(&mut connection)?;
-        let mut operations = recoverable_page(
+        let operations = recoverable_page(
             &transaction,
             &self.serving_owner.fence,
-            RecoverableRows::Active,
             not_after_unix_ms,
+            after_operation_id,
             limit,
         )?;
-        // A parked operation joins the page only once its proposal deadline has
-        // elapsed, and only after every active operation had its turn, so live
-        // parked operations can neither occupy nor starve a page.
-        let remaining = limit.saturating_sub(operations.len());
-        if remaining != 0 {
-            operations.extend(recoverable_page(
-                &transaction,
-                &self.serving_owner.fence,
-                RecoverableRows::ExpiredParked,
-                not_after_unix_ms,
-                remaining,
-            )?);
-        }
         transaction.commit().map_err(sqlite_error)?;
         Ok(operations)
     }
@@ -1257,30 +1436,23 @@ impl SqliteAdmissionOperationStore {
     }
 }
 
-/// Which non-terminal rows a recovery page draws from.
-#[derive(Clone, Copy)]
-enum RecoverableRows {
-    /// Every state except a parked approval.
-    Active,
-    /// Parked approvals whose proposal deadline has elapsed.
-    ExpiredParked,
-}
-
+/// One keyset page of recoverable rows in strictly ascending operation id
+/// order. The cursor excludes every row at or before it in SQL, before the
+/// limit applies. The immutable operation id is the only ordering key, so a
+/// concurrent state change can neither reorder nor repeat a row in a sweep.
 fn recoverable_page(
     transaction: &rusqlite::Transaction<'_>,
     fence: &StoreMutationFence,
-    rows: RecoverableRows,
     not_after_unix_ms: u64,
+    after_operation_id: Option<&AdmissionOperationId>,
     limit: usize,
 ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
-    let state_predicate = match rows {
-        // A committed caller waits for authenticated external evidence. It has
-        // no timer-driven recovery action and must not occupy an active page.
-        RecoverableRows::Active => "state NOT IN ('approval_required', 'awaiting_caller_report')",
-        RecoverableRows::ExpiredParked => "state = 'approval_required'",
-    };
-    let sql = format!(
-        r#"
+    // A committed caller waits for authenticated external evidence. It has no
+    // timer-driven recovery action and must not occupy a page. A parked
+    // approval is filtered below by its authenticated proposal deadline.
+    let mut statement = transaction
+        .prepare(
+            r#"
         SELECT operation_id, request_namespace_digest, request_id,
                operation_json, state, terminal, coordinator_lease_epoch,
                version, created_at_unix_ms, updated_at_unix_ms,
@@ -1290,22 +1462,26 @@ fn recoverable_page(
                recovery_store_lease_id, recovery_store_owner_epoch
         FROM admission_operations
         WHERE terminal = 0
-          AND {state_predicate}
+          AND state <> 'awaiting_caller_report'
           AND (recovery_expires_at_unix_ms IS NULL
                OR recovery_expires_at_unix_ms <= ?1
                OR recovery_store_uuid <> ?2
                OR recovery_store_lease_id <> ?3
                OR recovery_store_owner_epoch <> ?4)
-        ORDER BY updated_at_unix_ms, operation_id
-        "#
-    );
-    let mut statement = transaction.prepare(&sql).map_err(sqlite_error)?;
+          AND operation_id > ?5
+        ORDER BY operation_id
+        "#,
+        )
+        .map_err(sqlite_error)?;
     let mut rows_iter = statement
         .query(params![
             sqlite_i64(not_after_unix_ms, "not_after_unix_ms")?,
             &fence.store_uuid,
             &fence.lease_id,
             sqlite_i64(fence.owner_epoch, "store_owner_epoch")?,
+            after_operation_id
+                .map(AdmissionOperationId::as_str)
+                .unwrap_or(""),
         ])
         .map_err(sqlite_error)?;
     let mut operations = Vec::with_capacity(limit);
@@ -1314,7 +1490,7 @@ fn recoverable_page(
             break;
         };
         let stored = decode_row(read_raw_row(row).map_err(sqlite_error)?)?;
-        if matches!(rows, RecoverableRows::ExpiredParked)
+        if stored.operation.state() == AdmissionOperationState::ApprovalRequired
             && stored
                 .operation
                 .parked_approval_deadline_unix_ms()?

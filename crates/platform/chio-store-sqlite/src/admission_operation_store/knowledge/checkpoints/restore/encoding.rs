@@ -334,3 +334,157 @@ pub(super) fn canonical(value: &impl Serialize) -> Result<Vec<u8>, AdmissionOper
 fn invalid() -> AdmissionOperationStoreError {
     invariant("checkpoint restore encoding is invalid")
 }
+
+/// Delivery outcomes advance an admitted restore through the existing codec at
+/// the exact inline row boundary, using valid typed labels and identifiers.
+#[cfg(test)]
+mod delivery_boundary_tests {
+    use super::*;
+    use chio_security_types::{InformationLabel, PrincipalId};
+    use std::collections::{BTreeMap, BTreeSet};
+
+    type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+    /// A valid label with `full` padded readers spread over owners within the
+    /// default limits, plus one final reader of `tail` bytes for exact sizing.
+    fn label(full: usize, tail: usize) -> TestResult<InformationLabel> {
+        let mut owners: BTreeMap<PrincipalId, BTreeSet<PrincipalId>> = BTreeMap::new();
+        for index in 0..=full {
+            let owner = PrincipalId::new(format!("owner-{:02}", index / 200))?;
+            let reader = if index == full {
+                format!("t{}", "t".repeat(tail))
+            } else {
+                format!("reader-{index:05}-{}", "r".repeat(120))
+            };
+            owners
+                .entry(owner.clone())
+                .or_insert_with(|| BTreeSet::from([owner]))
+                .insert(PrincipalId::new(reader)?);
+        }
+        Ok(InformationLabel::try_known(owners, BTreeSet::new())?)
+    }
+
+    fn record(source_label: InformationLabel) -> TestResult<RestoreRecord> {
+        let scope = RecoveryScopeV1 {
+            authority_domain: AuthorityDomainId::new("authority")?,
+            tenant_id: RecoveryTenantId::new("tenant")?,
+            process_id: ProcessId::new("process")?,
+        };
+        let artifact = ArtifactVersionRefV1 {
+            scope: scope.clone(),
+            artifact: ArtifactId::new("artifact")?,
+            version: ArtifactRevisionId::new("revision")?,
+            provenance: ProvenanceDigest::from_bytes([1; 32]),
+        };
+        let influence = ArtifactInfluenceV1 {
+            commitment: CanonicalPayloadDigest::from_bytes([2; 32]),
+            externally_influenced: true,
+            unknown: false,
+        };
+        let checkpoint = LabeledCheckpointV1 {
+            domain_version: VersionV1,
+            checkpoint: CheckpointId::new("job:1")?,
+            revision: SafeInteger::new(7)?,
+            scope: scope.clone(),
+            runtime: ProtectedText::new("runtime")?,
+            artifacts: NonEmptyBoundedList::new(vec![artifact.clone()])?,
+            model_contexts: BoundedList::new(vec![])?,
+            label: InformationLabel::bottom(),
+            influence: influence.clone(),
+            lineage: IsolationLineageId::new("lineage")?,
+            isolation_epoch: ProtectedText::new("epoch")?,
+            native_evidence_sequence: SafeInteger::new(11)?,
+            policy: PolicyDigest::from_bytes([3; 32]),
+        };
+        let recipient = ArtifactRecipientV1 {
+            recipient: ArtifactRecipientId::new("recipient")?,
+            scope,
+            runtime: checkpoint.runtime.clone(),
+            principal: PrincipalId::new("agent")?,
+            lineage: checkpoint.lineage.clone(),
+            isolation_epoch: checkpoint.isolation_epoch.clone(),
+            context_generation: SafeInteger::new(9)?,
+            clearance: InformationLabel::bottom(),
+            sink: ArtifactSinkV1::Agent,
+        };
+        let intent = ArtifactReleaseIntentV1 {
+            domain_version: VersionV1,
+            release: ReleaseId::new("release")?,
+            kind: ArtifactReleaseKindV1::IndependentlyAdmitted {
+                request: RequestId::new("restore")?,
+            },
+            artifact,
+            source_label,
+            admitted_label: InformationLabel::bottom(),
+            influence,
+            recipient: recipient.clone(),
+            policy: checkpoint.policy,
+            authorization: ReleaseAuthorizationDigest::from_bytes([4; 32]),
+            observation_transition: EvidenceRef::new("knowledge:release")?,
+            observation_generation: SafeInteger::new(9)?,
+            state: ArtifactDeliveryStateV1::Admitted,
+        };
+        Ok(RestoreRecord {
+            checkpoint,
+            recipient,
+            intent,
+            actor_binding: RestoreActorBinding {
+                principal: PrincipalId::new("reviewer")?,
+                authority_scope: AuthorityScopeDigest::from_bytes([5; 32]),
+            },
+            installation_generation: SafeInteger::new(3)?,
+        })
+    }
+
+    /// An Admitted restore whose inline canonical form is exactly `target`.
+    fn admitted_at(target: usize) -> TestResult<RestoreRecord> {
+        // Each full reader adds at most 136 bytes, plus about 30 at an owner
+        // boundary, so one tail reader of up to 200 bytes closes any gap.
+        for full in 0..3_000 {
+            let base = canonical(&record(label(full, 0)?)?)?.len();
+            if base > target {
+                break;
+            }
+            if target - base <= 200 {
+                let exact = record(label(full, target - base)?)?;
+                assert_eq!(canonical(&exact)?.len(), target);
+                return Ok(exact);
+            }
+        }
+        Err("no valid label reaches the exact inline boundary".into())
+    }
+
+    /// The exact codec read used for a compact body, inline or chunked.
+    fn compact_roundtrip(body: &[u8], expected: &RestoreRecord) -> TestResult {
+        assert!(body.len() <= MAX_RESTORE_ATOM_BODY_BYTES);
+        let compact: CompactRestoreRecord = serde_json::from_slice(body)?;
+        assert_eq!(canonical(&compact)?, body);
+        assert_eq!(canonical(&compact.expand()?)?, canonical(expected)?);
+        Ok(())
+    }
+
+    #[test]
+    fn restore_delivery_outcomes_cross_the_inline_boundary_through_the_existing_codec() -> TestResult
+    {
+        for target in [MAX_PRIVATE_ROW_BYTES - 1, MAX_PRIVATE_ROW_BYTES] {
+            let mut restore = admitted_at(target)?;
+            assert_eq!(logical_body(&restore)?, canonical(&restore)?);
+            for state in [
+                ArtifactDeliveryStateV1::Uncertain,
+                ArtifactDeliveryStateV1::Delivered,
+            ] {
+                restore.intent.state = state;
+                let wire = canonical(&restore)?;
+                assert_eq!(wire.len(), target + 1, "the state token grows one byte");
+                let body = logical_body(&restore)?;
+                if wire.len() <= MAX_PRIVATE_ROW_BYTES {
+                    assert_eq!(body, wire, "a fitting outcome keeps its inline bytes");
+                } else {
+                    assert_ne!(body, wire, "an outcome past the row uses the compact body");
+                    compact_roundtrip(&body, &restore)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}

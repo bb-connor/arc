@@ -3,6 +3,7 @@ use super::chunks::{
     ChunkedBody, EncodingOwner, StagedKnowledgeEncodingChunk, MAX_ATOM_BODY_BYTES, MAX_CHUNK_COUNT,
     MAX_ENCODED_SET_BYTES, MAX_PRIVATE_ROW_BYTES,
 };
+use crate::admission_operation_store::knowledge::release::encoding_source::AuthenticatedReleaseOutcomeEncodingSource;
 use crate::admission_operation_store::knowledge::AuthenticatedCheckpointRestoreEncodingSource;
 use crate::admission_operation_store::recovery::storage as protected;
 use crate::admission_operation_store::security_participant_state::knowledge::encoding::source::AuthenticatedNativeKnowledgeEncodingSource;
@@ -16,6 +17,7 @@ use std::ops::Deref;
 enum Source<'tx, 'conn> {
     Journal(AuthenticatedNativeKnowledgeEncodingSource<'tx, 'conn>),
     Restore(Box<AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn>>),
+    Release(Box<AuthenticatedReleaseOutcomeEncodingSource<'tx, 'conn>>),
 }
 
 impl<'tx, 'conn> Source<'tx, 'conn> {
@@ -23,32 +25,45 @@ impl<'tx, 'conn> Source<'tx, 'conn> {
         match self {
             Self::Journal(source) => source.transaction(),
             Self::Restore(source) => source.transaction(),
+            Self::Release(source) => source.transaction(),
         }
     }
     fn owner(&self) -> EncodingOwner {
         match self {
             Self::Journal(source) => source.owner(),
             Self::Restore(source) => source.owner(),
+            Self::Release(source) => source.owner(),
         }
     }
     fn expected_root(&self) -> Option<&protected::ProtectedSourceReference> {
         match self {
             Self::Journal(source) => source.expected_root(),
             Self::Restore(source) => source.expected_root(),
+            Self::Release(source) => source.expected_root(),
         }
     }
     fn verify(&self, tx: &Transaction<'conn>) -> Result<(), AdmissionOperationStoreError> {
         match self {
             Self::Journal(source) => source.verify(tx),
             Self::Restore(source) => source.verify(tx),
+            Self::Release(source) => source.verify(tx),
         }
     }
     fn verify_stored_body(&self, body: &[u8]) -> Result<(), AdmissionOperationStoreError> {
         match self {
             Self::Journal(source) => source.verify_stored_body(body),
             Self::Restore(source) => source.verify_stored_body(body),
+            Self::Release(source) => source.verify_stored_body(body),
         }
     }
+}
+
+/// Physical admission class proven by the authenticated source variant. No
+/// caller supplies it: Journal and restore admission are new intake, while a
+/// restore acknowledgement advances an already admitted record.
+pub(in crate::admission_operation_store) enum EncodingAdmission {
+    Intake,
+    AdmittedOutcome,
 }
 
 #[derive(Serialize)]
@@ -114,13 +129,20 @@ impl<'tx, 'conn> VerifiedKnowledgeEncodingWrite<'tx, 'conn> {
     ) -> Result<Self, AdmissionOperationStoreError> {
         Self::prepare(Source::Restore(Box::new(source)), stored_body)
     }
+    pub(in crate::admission_operation_store) fn release(
+        source: AuthenticatedReleaseOutcomeEncodingSource<'tx, 'conn>,
+        stored_body: Vec<u8>,
+    ) -> Result<Self, AdmissionOperationStoreError> {
+        Self::prepare(Source::Release(Box::new(source)), stored_body)
+    }
 
     fn prepare(
         source: Source<'tx, 'conn>,
         body: Vec<u8>,
     ) -> Result<Self, AdmissionOperationStoreError> {
         let tx = source.transaction();
-        source.verify(tx)?;
+        // Both source constructors verify on creation. The complete proof
+        // rechecks the source below, after staging and before any append.
         source.verify_stored_body(&body)?;
         if body.is_empty() || body.len() > MAX_ATOM_BODY_BYTES {
             return Err(invalid());
@@ -161,6 +183,16 @@ impl<'tx, 'conn> VerifiedKnowledgeEncodingWrite<'tx, 'conn> {
                     },
                     body: &root,
                 })?,
+                EncodingOwner::Release { .. } => {
+                    let Source::Release(release) = &source else {
+                        return Err(invalid());
+                    };
+                    crate::admission_operation_store::knowledge::release::encoding::chunked_release_root(
+                        &owner,
+                        release.original_version(),
+                        &root,
+                    )?
+                }
             };
             (payload, chunks, Some(root))
         };
@@ -213,6 +245,13 @@ impl<'tx, 'conn> VerifiedKnowledgeEncodingWrite<'tx, 'conn> {
     }
     pub(in crate::admission_operation_store) fn encoded_bytes(&self) -> u64 {
         self.encoded_bytes
+    }
+    pub(in crate::admission_operation_store) fn admission(&self) -> EncodingAdmission {
+        match &self.source {
+            Source::Journal(_) => EncodingAdmission::Intake,
+            Source::Restore(source) => source.admission(),
+            Source::Release(source) => source.admission(),
+        }
     }
 
     /// Recheck the complete actual owner/body prefix in the original writer

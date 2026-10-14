@@ -78,6 +78,7 @@ pub(in crate::admission_operation_store) fn product_evidence_source(
     Ok((source, references))
 }
 
+#[cfg(feature = "admission-test-support")]
 pub(in crate::admission_operation_store) fn verify_product_evidence_source(
     tx: &Connection,
     owner: &ProductEvidenceOwner,

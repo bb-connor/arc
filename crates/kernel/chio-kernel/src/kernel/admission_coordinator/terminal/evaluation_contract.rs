@@ -76,8 +76,6 @@ impl ChioKernel {
                 &matching_grants,
                 &plan,
                 security_binding.as_ref(),
-                None,
-                None,
             )?,
         };
         if &recovered_request_hash != admission.operation.binding().immutable_request_hash() {

@@ -5,6 +5,7 @@ mod caller_wait;
 #[path = "schema/recovery.rs"]
 mod recovery;
 pub(super) use caller_wait::remove_caller_wait_state;
+pub(super) use recovery::remove_empty_imported_scope_index;
 
 struct SqlObligationHead {
     obligation_id: String,
@@ -20,11 +21,14 @@ struct SqlAssignmentParticipant {
     committed_at_unix_ms: u64,
 }
 
-fn seed_sql_obligation_head(
+/// The real, production-owned source operation is begun before any partial
+/// SQL row exists, so later artificial seeding never needs a store begin or
+/// claim over invalid state.
+fn begin_assignment_source_operation(
     fixture: &Fixture,
     suffix: &str,
     committed_at_unix_ms: u64,
-) -> AnchoredTestResult<SqlObligationHead> {
+) -> AnchoredTestResult<AdmissionOperationV1> {
     let operation = prepared_operation(
         &fixture.fence,
         AdmissionOperationKind::ToolDispatch,
@@ -34,16 +38,26 @@ fn seed_sql_obligation_head(
     fixture
         .store
         .begin(&operation, &fixture.fence, committed_at_unix_ms)?;
-    let operation_id = operation.binding().operation_id().as_str();
+    Ok(operation)
+}
+
+/// Seeds the artificial obligation head rows inside one caller-owned original
+/// transaction. The rows are never committed by this helper: every caller
+/// rolls the transaction back so no partial SQL state is ever rebased into
+/// the trusted change watermark as a valid committed store.
+fn seed_sql_obligation_head_tx(
+    transaction: &rusqlite::Transaction<'_>,
+    fixture: &Fixture,
+    source_operation: &AdmissionOperationV1,
+    suffix: &str,
+    committed_at_unix_ms: u64,
+) -> AnchoredTestResult<SqlObligationHead> {
+    let operation_id = source_operation.binding().operation_id().as_str();
     let obligation_id = economic_digest(&format!("assignment-obligation-{suffix}"));
     let atom_digest = economic_digest(&format!("assignment-atom-{suffix}"));
     let disposition_digest = economic_digest(&format!("assignment-disposition-{suffix}-1"));
     let settlement_digest = economic_digest(&format!("assignment-settlement-{suffix}-1"));
     let head_digest = economic_digest(&format!("assignment-head-{suffix}-1"));
-    let mut connection = fixture.store.connection()?;
-    let transaction = fixture
-        .store
-        .begin_write(&mut connection, Some(&fixture.fence))?;
     transaction.execute(
         r#"
         INSERT INTO admission_operation_terminal_projections (
@@ -170,8 +184,6 @@ fn seed_sql_obligation_head(
             i64::try_from(fixture.fence.owner_epoch)?,
         ],
     )?;
-    fixture.store.commit_write(transaction)?;
-    fixture.store.sync_after_write(&connection)?;
     Ok(SqlObligationHead {
         obligation_id,
         atom_digest,
@@ -238,7 +250,12 @@ fn seed_sql_assignment_participant(
     })
 }
 
-fn advance_sql_obligation_head(
+/// Advances the artificial obligation head inside the caller's original
+/// transaction. Rejected advances fail at their owning SQL trigger; the
+/// caller rolls back to a savepoint so the original error is preserved
+/// without aborting the outer fixture transaction.
+fn advance_sql_obligation_head_tx(
+    transaction: &rusqlite::Transaction<'_>,
     fixture: &Fixture,
     head: &SqlObligationHead,
     participant: &SqlAssignmentParticipant,
@@ -246,10 +263,6 @@ fn advance_sql_obligation_head(
     let resulting_disposition_digest =
         economic_digest(&format!("{}-disposition-2", participant.operation_id));
     let resulting_head_digest = economic_digest(&format!("{}-head-2", participant.operation_id));
-    let mut connection = fixture.store.connection()?;
-    let transaction = fixture
-        .store
-        .begin_write(&mut connection, Some(&fixture.fence))?;
     transaction.execute(
         r#"
         INSERT INTO obligation_disposition_records (
@@ -319,8 +332,6 @@ fn advance_sql_obligation_head(
             &head.obligation_id,
         ],
     )?;
-    fixture.store.commit_write(transaction)?;
-    fixture.store.sync_after_write(&connection)?;
     Ok(resulting_head_digest)
 }
 
@@ -590,7 +601,7 @@ fn current_schema_reopen_rejects_assignment_results_without_evidence_columns() -
 
 #[test]
 fn provision_migrates_v8_threshold_token_ids_to_proposal_scope() -> AnchoredTestResult {
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let Fixture {
         _temp,
         database,
@@ -661,7 +672,7 @@ fn provision_migrates_v8_threshold_token_ids_to_proposal_scope() -> AnchoredTest
 #[test]
 fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
     let _legacy = legacy_clock::LegacyClock::enter();
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let operation = prepared_operation(
         &fixture.fence,
         AdmissionOperationKind::ToolDispatch,
@@ -730,7 +741,7 @@ fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
 #[test]
 fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
     let _legacy = legacy_clock::LegacyClock::enter();
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let operation = prepared_operation(
         &fixture.fence,
         AdmissionOperationKind::ToolDispatch,
@@ -753,7 +764,7 @@ fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
     drop(authority);
 
     let replacement =
-        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("rotate serving owner");
+        pre_recovery_open_serving(&database, &lock_root).expect("rotate serving owner");
     drop(replacement);
 
     let connection = Connection::open(&database).expect("open offline database");
@@ -907,7 +918,7 @@ fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> Ancho
     let _legacy = legacy_clock::LegacyClock::enter();
     let _clock =
         chio_kernel::scope_fixed_runtime_for_current_thread(now_ms() / 1_000, std::iter::empty());
-    let fixture = fixture();
+    let fixture = pre_recovery_fixture();
     let operation = prepared_operation(
         &fixture.fence,
         AdmissionOperationKind::ToolDispatch,
@@ -1226,13 +1237,23 @@ fn persisted_operations_use_rfc_8785_bytes() {
 fn not_applied_assignment_result_retains_exact_artifacts_and_head() -> AnchoredTestResult {
     let fixture = fixture();
     let at = now_ms();
-    let head = seed_sql_obligation_head(&fixture, "not-applied", at)?;
+    // Every real operation and participant claim is created before any
+    // partial SQL row exists, so no store begin or claim runs over the
+    // artificial fixture state.
+    let source_operation = begin_assignment_source_operation(&fixture, "not-applied", at)?;
     let participant = seed_sql_assignment_participant(&fixture, "not-applied", at + 10)?;
-    let connection = fixture.store.connection()?;
+    let contender = seed_sql_assignment_participant(&fixture, "wrong-head", at + 20)?;
+    let fenced = seed_sql_assignment_participant(&fixture, "closed-lease", at + 30)?;
+    let mut connection = fixture.store.connection()?;
+    let transaction = fixture
+        .store
+        .begin_write(&mut connection, Some(&fixture.fence))?;
+    let head =
+        seed_sql_obligation_head_tx(&transaction, &fixture, &source_operation, "not-applied", at)?;
 
     assert_eq!(
         insert_sql_assignment_result(
-            &connection,
+            &transaction,
             &fixture,
             &head,
             &participant,
@@ -1252,7 +1273,7 @@ fn not_applied_assignment_result_retains_exact_artifacts_and_head() -> AnchoredT
         Vec<u8>,
         Vec<u8>,
         Vec<u8>,
-    ) = connection.query_row(
+    ) = transaction.query_row(
         r#"
         SELECT normalized_request_json, claim_json, receipt_json, iou_json, offer_json,
                bind_authorization_json, agreement_json, status_proof_json,
@@ -1289,30 +1310,30 @@ fn not_applied_assignment_result_retains_exact_artifacts_and_head() -> AnchoredT
             vec![7],
         )
     );
-    assert!(connection
+    assert!(transaction
         .execute(
             "UPDATE obligation_assignment_results SET result_json = X'08' WHERE operation_id = ?1",
             [&participant.operation_id],
         )
         .is_err());
-    assert!(connection
+    assert!(transaction
         .execute(
             "DELETE FROM obligation_assignment_results WHERE operation_id = ?1",
             [&participant.operation_id],
         )
         .is_err());
-    drop(connection);
 
-    let error = advance_sql_obligation_head(&fixture, &head, &participant)
+    transaction.execute_batch("SAVEPOINT not_applied_head_advance;")?;
+    let error = advance_sql_obligation_head_tx(&transaction, &fixture, &head, &participant)
         .expect_err("not-applied operation must not advance an obligation head");
     assert!(error
         .to_string()
         .contains("not-applied assignment operation"));
+    transaction
+        .execute_batch("ROLLBACK TO not_applied_head_advance; RELEASE not_applied_head_advance;")?;
 
-    let contender = seed_sql_assignment_participant(&fixture, "wrong-head", at + 20)?;
-    let connection = fixture.store.connection()?;
     assert!(insert_sql_assignment_result(
-        &connection,
+        &transaction,
         &fixture,
         &head,
         &contender,
@@ -1328,7 +1349,7 @@ fn not_applied_assignment_result_retains_exact_artifacts_and_head() -> AnchoredT
         committed_at_unix_ms: contender.committed_at_unix_ms,
     };
     assert!(insert_sql_assignment_result(
-        &connection,
+        &transaction,
         &fixture,
         &head,
         &wrong_participant,
@@ -1337,11 +1358,8 @@ fn not_applied_assignment_result_retains_exact_artifacts_and_head() -> AnchoredT
         &head.head_digest,
     )
     .is_err());
-    drop(connection);
 
-    let fenced = seed_sql_assignment_participant(&fixture, "closed-lease", at + 30)?;
-    let connection = fixture.store.connection()?;
-    connection.execute(
+    transaction.execute(
         r#"
         UPDATE chio_serving_leases
         SET end_head_index = start_head_index
@@ -1353,7 +1371,7 @@ fn not_applied_assignment_result_retains_exact_artifacts_and_head() -> AnchoredT
         ],
     )?;
     let error = insert_sql_assignment_result(
-        &connection,
+        &transaction,
         &fixture,
         &head,
         &fenced,
@@ -1363,6 +1381,9 @@ fn not_applied_assignment_result_retains_exact_artifacts_and_head() -> AnchoredT
     )
     .expect_err("closed serving lease must fence assignment result");
     assert!(error.to_string().contains("exact serving lease"));
+    // The artificial fixture never commits, so no partial SQL state is ever
+    // accepted as a valid committed store.
+    transaction.rollback()?;
     Ok(())
 }
 
@@ -1370,14 +1391,24 @@ fn not_applied_assignment_result_retains_exact_artifacts_and_head() -> AnchoredT
 fn applied_assignment_result_requires_the_exact_participant_head() -> AnchoredTestResult {
     let fixture = fixture();
     let at = now_ms();
-    let head = seed_sql_obligation_head(&fixture, "applied", at)?;
+    // Real operations and participant claims are created before any partial
+    // SQL row exists; the artificial head, advance, and result rows all live
+    // inside one original store-owned transaction that is rolled back.
+    let source_operation = begin_assignment_source_operation(&fixture, "applied", at)?;
     let participant = seed_sql_assignment_participant(&fixture, "applied", at + 10)?;
-    let resulting_head_digest = advance_sql_obligation_head(&fixture, &head, &participant)?;
-    let connection = fixture.store.connection()?;
+    let contender = seed_sql_assignment_participant(&fixture, "applied-contender", at + 20)?;
+    let mut connection = fixture.store.connection()?;
+    let transaction = fixture
+        .store
+        .begin_write(&mut connection, Some(&fixture.fence))?;
+    let head =
+        seed_sql_obligation_head_tx(&transaction, &fixture, &source_operation, "applied", at)?;
+    let resulting_head_digest =
+        advance_sql_obligation_head_tx(&transaction, &fixture, &head, &participant)?;
 
     assert_eq!(
         insert_sql_assignment_result(
-            &connection,
+            &transaction,
             &fixture,
             &head,
             &participant,
@@ -1387,7 +1418,7 @@ fn applied_assignment_result_requires_the_exact_participant_head() -> AnchoredTe
         )?,
         1
     );
-    let stored: (String, i64, String, i64) = connection.query_row(
+    let stored: (String, i64, String, i64) = transaction.query_row(
         r#"
         SELECT outcome, resulting_head_sequence, resulting_head_digest,
                participant_commit_sequence
@@ -1406,12 +1437,9 @@ fn applied_assignment_result_requires_the_exact_participant_head() -> AnchoredTe
             participant.commit_sequence,
         )
     );
-    drop(connection);
 
-    let contender = seed_sql_assignment_participant(&fixture, "applied-contender", at + 20)?;
-    let connection = fixture.store.connection()?;
     assert!(insert_sql_assignment_result(
-        &connection,
+        &transaction,
         &fixture,
         &head,
         &contender,
@@ -1420,5 +1448,6 @@ fn applied_assignment_result_requires_the_exact_participant_head() -> AnchoredTe
         &resulting_head_digest,
     )
     .is_err());
+    transaction.rollback()?;
     Ok(())
 }

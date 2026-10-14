@@ -12,6 +12,7 @@ pub(super) fn install(connection: &Connection) -> Result<(), AdmissionOperationS
         include_str!("../../recovery_knowledge_encoding_atoms.sql"),
         include_str!("../../recovery_reference_capacity.sql"),
         include_str!("../../recovery_knowledge_journal_chunk_accounting.sql"),
+        include_str!("../../recovery_knowledge_join_release_index.sql"),
     ] {
         connection.execute_batch(sql).map_err(sqlite_error)?;
     }

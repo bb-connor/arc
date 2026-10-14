@@ -102,26 +102,46 @@ At runtime:
 * The researcher can call `search` but any attempt to call `write` is
   denied by the Chio kernel (even if the LLM hallucinates the call).
 * The writer can call `write` but not `search`.
-* Delegation between agents mints attenuated child tokens that are a
-  strict subset of the delegator's scope.
 
 ## Delegation attenuation
 
-```python
-child = await crew.attenuate_for_delegation(
-    delegator_role="writer",
-    delegate_role="editor",
-    new_scope=ChioScope(grants=[write_grant()]),
-)
-```
+`attenuate_for_delegation` requests a child capability that may only
+narrow the delegator's scope. The current SDK denies the request
+fail-closed with `ChioDeniedError` (reason code
+`chio_attenuation_requires_subject_signer`): minting a child token
+requires the parent subject signer, which the sidecar does not hold. On
+refusal no child token is minted, and the crew's issued capabilities and
+tool bindings are left unchanged.
 
-The child capability is always `child ⊆ parent`; the SDK raises
-`ChioValidationError` if you try to broaden scope.
+```python
+from chio_sdk.errors import ChioDeniedError, ChioValidationError
+
+try:
+    await crew.attenuate_for_delegation(
+        delegator_role="writer",
+        delegate_role="editor",
+        new_scope=ChioScope(grants=[write_grant()]),
+    )
+except ChioValidationError:
+    # Delegation may only narrow: new_scope must be a subset of the
+    # delegator's scope.
+    ...
+except ChioDeniedError:
+    # The SDK refused to mint the child token because that requires
+    # the parent subject signer. No child capability was created; the
+    # crew's capabilities and tool bindings are unchanged.
+    ...
+```
 
 ## Error types
 
 * `ChioToolError` -- raised when the Chio kernel denies an invocation.
   Carries `tool_name`, `server_id`, `guard`, `reason`, `receipt_id`.
+* `ChioDeniedError` -- raised when Chio refuses a request, including the
+  SDK's fail-closed refusal to mint a delegation child token without the
+  parent subject signer. Carries `reason` and `reason_code`.
+* `ChioValidationError` -- raised on invalid request input, such as a
+  delegation `new_scope` that is broader than the delegator's scope.
 * `ChioCrewConfigError` -- raised on invalid crew configuration (missing
   scope for a role, empty scope map, delegator without a minted token).
 

@@ -8,6 +8,8 @@ mod listing;
 mod open;
 #[path = "bootstrap/qualification.rs"]
 mod qualification;
+#[path = "bootstrap/receipt_write_schema.rs"]
+pub(in crate::receipt_store) mod receipt_write_schema;
 
 pub(super) use qualification::{
     receipt_actor_saturated_error, receipt_actor_unavailable_error, ReceiptWriterQualification,

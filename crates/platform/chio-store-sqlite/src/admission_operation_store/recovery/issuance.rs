@@ -94,7 +94,9 @@ pub(super) fn materialize(
                 &record.seed.capability.signing_body(),
             )?)
         || action.semantic_request.as_bytes()
-            != chio_core_types::sha256(semantics.as_bytes()).as_bytes()
+            != RecoveryDigestDomain::SemanticNativeRequestSemantics
+                .digest(&semantics)
+                .as_bytes()
         || action.source_generation.get() != original.context_generation
         || action.isolation_epoch.get() == 0
         || action.basis

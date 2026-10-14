@@ -22,6 +22,30 @@ pub(in crate::admission_operation_store) use schema::{exists, sql, verify_catalo
 const PROJECTION: &str = "security_participant_output";
 const MUTATION: &str = "join_security_participant_output";
 
+/// The actual Output global producer, distinct from admission participant rows.
+pub(in crate::admission_operation_store) fn finishing_global_row_bounds(
+    owner: &SqliteServingOwner,
+    authority: &str,
+) -> Result<(u64, u64), AdmissionOperationStoreError> {
+    for value in [&owner.fence.store_uuid, &owner.fence.lease_id] {
+        if uuid::Uuid::parse_str(value)
+            .map_err(invalid)?
+            .hyphenated()
+            .to_string()
+            != *value
+        {
+            return Err(invalid("Output global owner identifier is not canonical"));
+        }
+    }
+    let authority = u64::try_from(authority.len()).map_err(invalid)?;
+    let projection = u64::try_from(PROJECTION.len()).map_err(invalid)?;
+    let mutation = u64::try_from(MUTATION.len()).map_err(invalid)?;
+    Ok((
+        13 * 9 + 8 + mutation + projection + authority + 8 + 4 * 64 + 2 * 36 + 8,
+        5 * 9 + projection + authority + 2 * 8,
+    ))
+}
+
 /// Read authenticated captured output taint inside an existing fenced
 /// transaction. No current classification or new output join is selected.
 pub(in crate::admission_operation_store) fn captured_output(
@@ -40,12 +64,16 @@ pub(in crate::admission_operation_store) fn captured_output(
 /// transaction. It enables the closed monotone row policy and, when selected,
 /// the original use outcome. It cannot mutate the input journal or admit work.
 pub(crate) struct NativeOutputJoinAuthority {
+    operation_id: String,
     authority: AdmissionIdentifier,
     request: FlowJoinRequest,
     declassification: Option<Box<crate::security_state::NativeDeclassificationOutcome>>,
 }
 
 impl NativeOutputJoinAuthority {
+    pub(crate) fn operation_id(&self) -> &str {
+        &self.operation_id
+    }
     pub(crate) fn authority(&self) -> &str {
         self.authority.as_str()
     }

@@ -359,8 +359,24 @@ fn quoted_identifier(identifier: &str) -> String {
     format!("\"{}\"", identifier.replace('"', "\"\""))
 }
 
+/// Per-value envelope. The pressure fixture's grow helper writes a dedicated
+/// table of 16 MiB zeroblob rows, so one legitimate frame reaches 16 MiB;
+/// four times that row size bounds each individual value while every byte of
+/// the value still reaches the digest.
+const MAX_FRAME_BYTES: usize = 64 * 1024 * 1024;
+
+/// Total envelope per database. The same grow helper inserts at most six
+/// 16 MiB rows (96 MiB of logical pressure) and asserts its pressure below
+/// 128 MiB, so twice that 96 MiB logical ceiling bounds total hashed work
+/// with finite headroom for the ordinary recovery records hashed alongside.
+const MAX_SNAPSHOT_BYTES: u64 = 192 * 1024 * 1024;
+
+/// Frame one logical value as its tag, big-endian length then bytes, so
+/// adjacent frames cannot be confused and the digest stays exact.
 fn hash_frame(hasher: &mut Sha256, total: &mut u64, tag: u8, bytes: &[u8]) -> TestResult {
-    const MAX_SNAPSHOT_BYTES: u64 = 64 * 1024 * 1024;
+    if bytes.len() > MAX_FRAME_BYTES {
+        return Err("host replay fixture exceeds snapshot value bound".into());
+    }
     let length = u64::try_from(bytes.len())?;
     *total = total
         .checked_add(length)
@@ -375,6 +391,9 @@ fn hash_frame(hasher: &mut Sha256, total: &mut u64, tag: u8, bytes: &[u8]) -> Te
 }
 
 fn database_snapshot(path: &Path) -> TestResult<DatabaseSnapshot> {
+    // The pressure fixture adds one dedicated two-column table holding at
+    // most six 16 MiB rows, so these schema-wide bounds still cover it; the
+    // pressure itself stays inside the per-value and total byte envelopes.
     const MAX_TABLES: usize = 512;
     const MAX_COLUMNS: usize = 128;
     const MAX_ROWS: u64 = 100_000;
@@ -1893,19 +1912,288 @@ async fn retained_review_coarsens_genuine_absence_and_hidden_workflow() -> TestR
         assert!(
             matches!(
                 *corrupt_reader,
-                Err(AdmissionOperationStoreError::Invariant(_))
+                Err(AdmissionOperationStoreError::OutcomeUnknown(ref reason))
+                    if reason == "authority database changed outside its serving-owner connection"
             ),
-            "canonical reader coarsened actual damaged custody"
+            "canonical reader did not retain the owning tamper refusal"
         );
         assert!(
             matches!(
                 *corrupt_reply,
-                Err(AdmissionOperationStoreError::Invariant(_))
+                Err(AdmissionOperationStoreError::OutcomeUnknown(ref reason))
+                    if reason == "sqlite authority owner is poisoned after an outcome-unknown anchor sync"
             ),
-            "retained review coarsened actual damaged custody into hidden or pristine absence"
+            "retained review did not preserve the poisoned owner refusal"
         );
         assert_eq!(external_count(&fixture.path)?, 0);
-        assert_eq!(fixture.process.process("root")?.tree_calls, 2);
+        // The poisoned native owner correctly refuses runtime observation.
+        // Read the independent journal directly to prove no Process mutation.
+        assert_eq!(
+            database_snapshot(&fixture.path.join("process.db"))?,
+            before.process,
+        );
+        let path = fixture.path.clone();
+        drop(store);
+        drop(fixture);
+        assert!(
+            RecoveryFixture::open(path, None, false).is_err(),
+            "reopen accepted damaged retained custody"
+        );
     }
+    Ok(())
+}
+
+async fn create_no_action_workflow(
+    fixture: &RecoveryFixture,
+    creator: &AuthenticatedRecoveryActor,
+    key: &str,
+) -> TestResult<WorkflowId> {
+    let seed = fixture.denied_seed_named(key).await?;
+    let command = fixture.command(
+        &format!("create-{key}"),
+        RecoveryCommandBodyV1::CreateWorkflow {
+            creation_key: CreationKey::new(key)?,
+            template: RecoveryTemplateV1::SupportTicketPublicIssue,
+            request_seed: text(&seed)?,
+        },
+    )?;
+    let response =
+        fixture
+            .kernel
+            .execute_recovery_command_with_origin(creator, &command, &fixture.process)?;
+    Ok(response.workflow_id)
+}
+
+fn add_same_scope_peer(fixture: &RecoveryFixture) -> TestResult<CapabilityToken> {
+    let key = Keypair::from_seed(&[175; 32]);
+    let permissions = [
+        RecoveryPermission::Create,
+        RecoveryPermission::Select,
+        RecoveryPermission::Approve,
+        RecoveryPermission::Resume,
+    ];
+    let mut profile = fixture
+        .kernel
+        .recovery_deployment(fixture.runtime.scope())?;
+    let mut actors = profile.actors.as_slice().to_vec();
+    actors.push(RecoveryActorAssignment {
+        subject: key.public_key(),
+        principal: PrincipalId::new("no-action-peer")?,
+        permissions: BoundedList::new(permissions.to_vec())?,
+        preview_clearance: restricted_label(),
+    });
+    profile.actors = NonEmptyBoundedList::new(actors)?;
+    profile.authority_scope = recovery_authority_scope_digest(&profile)?;
+    fixture
+        .authority
+        .admission_operation_store()
+        .configure_recovery_deployment(&profile)?;
+    Ok(fixture.kernel.issue_capability(
+        &key.public_key(),
+        ChioScope {
+            grants: permissions
+                .into_iter()
+                .map(|permission| ToolGrant {
+                    server_id: "chio.recovery".into(),
+                    tool_name: permission.wire_name().into(),
+                    operations: vec![Operation::Invoke],
+                    constraints: vec![],
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                })
+                .collect(),
+            ..Default::default()
+        },
+        1200,
+    )?)
+}
+
+fn replay_through_store(
+    fixture: &RecoveryFixture,
+    actor: &AuthenticatedRecoveryActor,
+    retained: &RetainedHostInput,
+    port: HostPort,
+    workflow: &WorkflowId,
+) -> Result<(), chio_kernel::admission_operation::AdmissionOperationStoreError> {
+    use chio_kernel::admission_operation::AdmissionOperationStoreError;
+    use chio_kernel::recovery::RecoveryAuthorityPort;
+    let store = fixture.authority.admission_operation_store();
+    let fence = fixture.authority.mutation_fence();
+    let now = now_ms().map_err(|_| AdmissionOperationStoreError::Fenced)?;
+    let missing = || AdmissionOperationStoreError::Fenced;
+    match port {
+        HostPort::Review => store
+            .reserve_review(
+                actor,
+                workflow,
+                retained.workflow.review.as_ref().ok_or_else(missing)?,
+                &fence,
+                now,
+            )
+            .map(|_| ()),
+        HostPort::Reservation => {
+            store.acknowledge_reservation(actor, workflow, &retained.reservation, &fence, now)
+        }
+        HostPort::Materialization => {
+            let observation = fixture
+                .kernel
+                .observe_recovery_source(fixture.runtime.scope())
+                .map_err(|_| missing())?;
+            store
+                .materialize(
+                    actor,
+                    workflow,
+                    retained.workflow.action.as_ref().ok_or_else(missing)?,
+                    &observation,
+                    &fence,
+                    now,
+                )
+                .map(|_| ())
+        }
+        HostPort::Issuance => store
+            .reserve_issuance(
+                actor,
+                workflow,
+                retained.workflow.issuance.as_ref().ok_or_else(missing)?,
+                &fence,
+                now,
+            )
+            .map(|_| ()),
+        HostPort::Signature => store.attach_signature(
+            actor,
+            workflow,
+            retained
+                .workflow
+                .signed_grant
+                .as_ref()
+                .ok_or_else(missing)?,
+            &fence,
+            now,
+        ),
+        HostPort::Envelope => store.finalize_envelope(
+            actor,
+            workflow,
+            retained.workflow.envelope.as_ref().ok_or_else(missing)?,
+            &retained.identity,
+            &fence,
+            now,
+        ),
+    }
+}
+
+#[tokio::test]
+async fn retained_host_replies_coarsen_a_hidden_no_action_workflow_under_pressure() -> TestResult {
+    use chio_kernel::admission_operation::AdmissionOperationStoreError;
+    use chio_store_sqlite::admission_operation_store::grow_recovery_quota_fixture_uncheckpointed_history;
+    let directory = tempfile::tempdir()?;
+    let (fixture, retained) = Box::pin(prepared_fixture(directory.path())).await?;
+    let creator = authenticated_actor(&fixture, RecoveryPermission::Create)?;
+    let hidden = create_no_action_workflow(&fixture, &creator, "no-action-hidden").await?;
+    let hidden_record = fixture.record(&hidden)?;
+    assert!(hidden_record.action.is_none());
+    assert!(hidden_record.review.is_none());
+
+    // Legitimate creator work on a workflow without an Action still proceeds
+    // through the public runtime path while the headroom is intact.
+    let control_seed = fixture
+        .denied_seed_named("no-action-creator-control")
+        .await?;
+    let control = fixture
+        .execute(
+            "create-no-action-creator-control",
+            RecoveryCommandBodyV1::CreateWorkflow {
+                creation_key: CreationKey::new("no-action-creator-control")?,
+                template: RecoveryTemplateV1::SupportTicketPublicIssue,
+                request_seed: text(&control_seed)?,
+            },
+        )
+        .await?
+        .status
+        .workflow_id;
+    let control_record = fixture.record(&control)?;
+    assert!(control_record.action.is_some());
+    assert_eq!(control_record.created_by, hidden_record.created_by);
+
+    let capability = add_same_scope_peer(&fixture)?;
+    let absent = WorkflowId::new("workflow:absent-no-action-control")?;
+    require_genuinely_absent_review_workflow(&fixture, &retained, &absent)?;
+
+    let reader = Connection::open_with_flags(
+        fixture.path.join("admission.db"),
+        OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    reader.execute_batch("BEGIN")?;
+    let _: i64 = reader.query_row(
+        "SELECT count(*) FROM admission_operation_recovery_events",
+        [],
+        |row| row.get(0),
+    )?;
+    let pressure = grow_recovery_quota_fixture_uncheckpointed_history(
+        &fixture.authority.admission_operation_store(),
+        &fixture.authority.mutation_fence(),
+        80 * 1024 * 1024,
+    )?;
+    assert!((80 * 1024 * 1024..128 * 1024 * 1024).contains(&pressure));
+
+    // The creator's own fresh work is correctly refused for headroom, so the
+    // pressure is real and the creator remains outside the coarsened path.
+    let before = host_snapshot(&fixture)?;
+    let creator_review = authenticated_actor(&fixture, RecoveryPermission::Approve)?;
+    let refused = replay_through_store(
+        &fixture,
+        &creator_review,
+        &retained,
+        HostPort::Review,
+        &hidden,
+    );
+    assert!(
+        matches!(
+            refused,
+            Err(AdmissionOperationStoreError::Invariant(ref reason))
+                if reason == "recovery disk headroom exhausted"
+        ),
+        "creator fresh work did not meet the exhausted headroom"
+    );
+    assert_eq!(host_snapshot(&fixture)?, before);
+
+    for port in HostPort::ALL {
+        let peer = fixture.kernel.authenticate_recovery_actor(
+            fixture.runtime.scope(),
+            &capability,
+            port.permission(),
+        )?;
+        assert!(peer.principal() != creator.principal());
+        let before = host_snapshot(&fixture)?;
+        let signing = ObserveSigning::new();
+        let hidden_result = replay_through_store(&fixture, &peer, &retained, port, &hidden);
+        let absent_result = replay_through_store(&fixture, &peer, &retained, port, &absent);
+        let signed = signing.count()?;
+        drop(signing);
+        assert_eq!(
+            host_snapshot(&fixture)?,
+            before,
+            "{port:?}: hidden no-action reply changed durable facts or effects"
+        );
+        assert_eq!(signed, 0, "{port:?}: hidden no-action reply signed a grant");
+        assert!(
+            matches!(
+                hidden_result,
+                Err(AdmissionOperationStoreError::RecoveryAuthorityDenied)
+            ),
+            "{port:?}: hidden no-action workflow leaked class {}",
+            retained_store_refusal_class(&hidden_result),
+        );
+        assert!(
+            matches!(
+                absent_result,
+                Err(AdmissionOperationStoreError::RecoveryAuthorityDenied)
+            ),
+            "{port:?}: genuine absence has class {}",
+            retained_store_refusal_class(&absent_result),
+        );
+    }
+    reader.execute_batch("COMMIT")?;
     Ok(())
 }

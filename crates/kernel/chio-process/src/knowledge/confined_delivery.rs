@@ -20,7 +20,8 @@ impl ProcessArtifactBroker {
             },
         )?;
         self.runtime
-            .with_store(|store| store.begin_verified_confined_delivery(proof, seal, admission))
+            .writer
+            .begin_confined_delivery(proof, seal, admission)
             .map_err(refused)
     }
 }

@@ -6,6 +6,7 @@ use chio_kernel::budget_store::{
     BudgetEventAuthority, BudgetGuaranteeLevel, RevocationCommitMetadata,
 };
 use chio_kernel::{RevocationObservation, RevocationRecord, RevocationStore, RevocationStoreError};
+use chio_sqlite_file_identity::{SqliteTransactionWriteShapeData, SqliteTreeWriteShapeData};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 
 use crate::store_connection::StoreConnection;
@@ -181,6 +182,13 @@ impl SqliteRevocationStore {
             return Ok(false);
         }
         let joint = self.serving_owner.is_some();
+        // Under the serving owner the whole transaction is priced and its
+        // COMMIT authorized before this first mutation, so the capacity hook
+        // checks exactly these rows instead of the whole capped file. The
+        // exists check above proved this is a source-fresh insertion.
+        if let Some(owner) = self.serving_owner.as_ref() {
+            authorize_joint_revocation_write(transaction, owner, capability_id, false)?;
+        }
         let revocation_index = allocate_revocation_index(transaction, joint)?;
         let index_column = if joint {
             "admission_authority_commit_index"
@@ -408,6 +416,19 @@ impl SqliteRevocationStore {
             return Ok(false);
         }
         let joint = self.serving_owner.is_some();
+        // Under the serving owner the whole transaction is priced and its
+        // COMMIT authorized before this first mutation, so the capacity hook
+        // checks exactly these rows instead of the whole capped file. A
+        // retained projection row prices its ambiguous rewrite; a missing
+        // row prices the source-proved fresh insertion.
+        if let Some(owner) = self.serving_owner.as_ref() {
+            authorize_joint_revocation_write(
+                &transaction,
+                owner,
+                &record.capability_id,
+                existing.is_some(),
+            )?;
+        }
         let revocation_index = allocate_revocation_index(&transaction, joint)?;
         if joint {
             transaction.execute(
@@ -1190,6 +1211,167 @@ fn append_admission_revocation_commit(
     Ok(())
 }
 
+/// Conservative encoded overhead of one revocation row or index entry beyond
+/// its actual capability ID length: serial-type headers, integer varints and
+/// row slack.
+const REVOCATION_ROW_OVERHEAD_BYTES: u64 = 96;
+/// Bound of one sequence or head singleton row (its digest column included).
+const REVOCATION_META_ROW_BYTES: u64 = 128;
+/// Fixed digest, identity and sequence columns of one authority global commit
+/// row beyond its projection key.
+const GLOBAL_COMMIT_FIXED_BYTES: u64 = 512;
+
+fn revocation_text_bytes(value: &str) -> Result<u64, RevocationStoreError> {
+    u64::try_from(value.len())
+        .map_err(|_| RevocationStoreError::Sync("revocation text exceeds SQLite range".to_string()))
+}
+
+fn revocation_shape_add(left: u64, right: u64) -> Result<u64, RevocationStoreError> {
+    left.checked_add(right)
+        .ok_or_else(|| RevocationStoreError::Sync("revocation shape bytes exhausted".to_string()))
+}
+
+/// One priced index tree per index the held transaction's actual compiled
+/// catalog holds on the revoked_capabilities projection, enumerated from that
+/// catalog itself: a fresh insertion writes every index (the primary-key
+/// autoindex, revoked_at, both UNIQUE revocation_index and admission commit
+/// index layouts, and the duplicate named admission index the current schema
+/// creates), while an existing-row rewrite writes exactly the indexes whose
+/// key columns it changes (revoked_at and the admission authority commit
+/// index, including its duplicate named index) and leaves every
+/// unchanged-key index unwritten.
+fn projection_index_trees(
+    transaction: &Transaction<'_>,
+    rewrite: bool,
+    entry_bytes: u64,
+) -> Result<Vec<SqliteTreeWriteShapeData>, RevocationStoreError> {
+    let tree = |result: Result<SqliteTreeWriteShapeData, String>| {
+        result.map_err(RevocationStoreError::Sync)
+    };
+    let mut names = Vec::new();
+    {
+        let mut statement =
+            transaction.prepare("PRAGMA main.index_list('revoked_capabilities')")?;
+        let rows = statement.query_map([], |row| row.get::<_, String>(1))?;
+        for name in rows {
+            names.push(name?);
+        }
+    }
+    let mut trees = Vec::new();
+    for name in names {
+        let mut columns = Vec::new();
+        {
+            let quoted = name.replace('"', "\"\"");
+            let mut statement =
+                transaction.prepare(&format!("PRAGMA main.index_info(\"{quoted}\")"))?;
+            let rows = statement.query_map([], |row| row.get::<_, String>(2))?;
+            for column in rows {
+                columns.push(column?);
+            }
+        }
+        if rewrite
+            && !columns.iter().any(|column| {
+                column == "revoked_at" || column == "admission_authority_commit_index"
+            })
+        {
+            continue;
+        }
+        trees.push(if rewrite {
+            tree(SqliteTreeWriteShapeData::record(
+                Some(entry_bytes),
+                entry_bytes,
+                1,
+            ))?
+        } else {
+            tree(SqliteTreeWriteShapeData::fresh_insertions(entry_bytes, 1))?
+        });
+    }
+    Ok(trees)
+}
+
+/// The complete write shape of one joint revocation record under the serving
+/// owner: the projection row and its index trees, the dense delta log row and
+/// its projection-history index, both sequence meta heads, the admission
+/// commit row, and the authority global commit envelope with its projection
+/// index and its head singleton. Nothing in this shape reads the file's size,
+/// so the price stays this record's own rows whatever retained history the
+/// authority holds. `rewrite_existing_row` prices an upsert of a retained
+/// projection row (its ambiguous existing-row rewrite and the three changed
+/// index trees) instead of a source-proved fresh insertion.
+fn joint_revocation_write_shape(
+    transaction: &Transaction<'_>,
+    capability_id: &str,
+    rewrite_existing_row: bool,
+) -> Result<SqliteTransactionWriteShapeData, RevocationStoreError> {
+    let text = revocation_text_bytes(capability_id)?;
+    let row = revocation_shape_add(REVOCATION_ROW_OVERHEAD_BYTES, text)?;
+    let global_row = revocation_shape_add(GLOBAL_COMMIT_FIXED_BYTES, text)?;
+    let tree = |result: Result<SqliteTreeWriteShapeData, String>| {
+        result.map_err(RevocationStoreError::Sync)
+    };
+    let mut trees = vec![
+        // The revoked_capabilities projection row.
+        if rewrite_existing_row {
+            tree(SqliteTreeWriteShapeData::record(Some(row), row, 1))?
+        } else {
+            tree(SqliteTreeWriteShapeData::fresh_insertions(row, 1))?
+        },
+    ];
+    trees.extend(projection_index_trees(
+        transaction,
+        rewrite_existing_row,
+        row,
+    )?);
+    // The dense delta log row.
+    trees.push(tree(SqliteTreeWriteShapeData::fresh_insertions(row, 1))?);
+    // The delta projection-history index entry.
+    trees.push(tree(SqliteTreeWriteShapeData::fresh_insertions(row, 1))?);
+    // The delta and admission sequence heads advance by singleton rewrites.
+    trees.push(tree(SqliteTreeWriteShapeData::singleton_root(
+        REVOCATION_META_ROW_BYTES,
+        1,
+    ))?);
+    trees.push(tree(SqliteTreeWriteShapeData::singleton_root(
+        REVOCATION_META_ROW_BYTES,
+        1,
+    ))?);
+    // The admission commit row.
+    trees.push(tree(SqliteTreeWriteShapeData::fresh_insertions(row, 1))?);
+    // The authority global commit envelope, its projection index entry and
+    // its head singleton rewrite.
+    trees.push(tree(SqliteTreeWriteShapeData::fresh_insertions(
+        global_row, 1,
+    ))?);
+    trees.push(tree(SqliteTreeWriteShapeData::fresh_insertions(
+        global_row, 1,
+    ))?);
+    trees.push(tree(SqliteTreeWriteShapeData::singleton_root(
+        REVOCATION_META_ROW_BYTES,
+        1,
+    ))?);
+    SqliteTransactionWriteShapeData::checked(trees).map_err(RevocationStoreError::Sync)
+}
+
+/// Price the joint revocation write on its held transaction and authorize
+/// the transaction's COMMIT by that exact price before its first mutation.
+/// A large retained history the whole-file ordinary cap cannot frame still
+/// records revocations, and a price that cannot fit the finishing reserve
+/// refuses before any byte of the write lands.
+fn authorize_joint_revocation_write(
+    transaction: &Transaction<'_>,
+    owner: &crate::serving_owner::SqliteServingOwner,
+    capability_id: &str,
+    rewrite_existing_row: bool,
+) -> Result<(), RevocationStoreError> {
+    let shape = joint_revocation_write_shape(transaction, capability_id, rewrite_existing_row)?;
+    let price =
+        crate::admission_operation_store::authority_current_write_price(transaction, &shape)
+            .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
+    owner
+        .authorize_current_write(transaction, &price)
+        .map_err(map_serving_owner_error)
+}
+
 fn stored_index(value: i64) -> Result<u64, RevocationStoreError> {
     u64::try_from(value)
         .map_err(|_| RevocationStoreError::Sync("negative revocation index".to_string()))
@@ -1639,5 +1821,120 @@ mod tests {
         assert_eq!(filtered[0].capability_id, "cap-1");
 
         let _ = fs::remove_file(path);
+    }
+
+    /// The joint revocation shape prices only the record's own rows, whatever
+    /// retained history the authority holds, and keeps the existing-row cost
+    /// of an upsert's projection rewrite. The conservative 20-level balance
+    /// formulas price one fresh record at several MiB of WAL headroom, so the
+    /// asserted contract is the original fixed 64MiB per-file intake limit,
+    /// not an invented tighter target.
+    #[test]
+    fn joint_revocation_shape_prices_its_own_rows() -> Result<(), Box<dyn std::error::Error>> {
+        const INTAKE_WAL_LIMIT_BYTES: u64 = 64 * 1024 * 1024;
+        let path = unique_db_path("chio-rev-joint-shape");
+        let mut connection = Connection::open(&path)?;
+        initialize_revocation_schema(&mut connection, true)?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let profile = chio_sqlite_file_identity::SqliteFramePriceProfileData::checked(4096, 0)?;
+        let price = |rewrite: bool| -> Result<u64, String> {
+            let shape = joint_revocation_write_shape(&transaction, "capability-normal", rewrite)
+                .map_err(|error| format!("joint revocation shape failed: {error}"))?;
+            chio_sqlite_file_identity::price_transaction_write_shape(&profile, &shape)
+                .map(|priced| priced.wal_bytes())
+        };
+        let fresh = price(false)?;
+        let rewrite = price(true)?;
+        assert!(
+            fresh < INTAKE_WAL_LIMIT_BYTES,
+            "one fresh revocation must stay inside the intake contract, priced {fresh}"
+        );
+        assert!(
+            rewrite < INTAKE_WAL_LIMIT_BYTES,
+            "one rewritten revocation must stay inside the intake contract, priced {rewrite}"
+        );
+        assert!(
+            rewrite > fresh,
+            "an upsert of a retained row must retain the existing-row rewrite cost"
+        );
+        drop(transaction);
+        let _ = fs::remove_file(path);
+        Ok(())
+    }
+
+    /// A revocation whose priced write cannot fit the finishing intake
+    /// reserve refuses before its first mutation: the authority file and its
+    /// WAL keep their exact bytes (compared by digest, not length), the
+    /// serving owner stays healthy, a later ordinary revocation still commits
+    /// within the executed real WAL measurement, and the store reopens in the
+    /// same format with the refused record absent and the later one durable.
+    #[cfg(all(test, unix))]
+    #[test]
+    fn a_refused_joint_revocation_writes_no_byte_and_keeps_the_owner_healthy(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let file_digest = |path: &std::path::Path| -> Option<String> {
+            fs::read(path)
+                .ok()
+                .map(|bytes| chio_core::sha256_hex(&bytes))
+        };
+        let file_bytes = |path: &std::path::Path| -> Option<u64> {
+            fs::metadata(path).ok().map(|data| data.len())
+        };
+        let fixture = crate::serving_owner::ProvisionedAuthority::open();
+        let revocations = fixture.authority.revocation_store();
+        let wal = {
+            let mut wal = fixture.database.as_os_str().to_owned();
+            wal.push("-wal");
+            std::path::PathBuf::from(wal)
+        };
+        let before = (file_digest(&fixture.database), file_digest(&wal));
+
+        // The payload is real and bounded, but its priced write exceeds the
+        // per-file intake WAL reserve, so authorization refuses it.
+        let unpriceable = format!("capability-pressure-{}", "x".repeat(8 * 1024 * 1024));
+        let refused = revocations.revoke(&unpriceable);
+        assert!(
+            matches!(refused, Err(RevocationStoreError::Sync(_))),
+            "an unpriceable joint revocation must refuse, got {refused:?}"
+        );
+        assert_eq!(
+            (file_digest(&fixture.database), file_digest(&wal)),
+            before,
+            "a refusal before the first mutation must preserve every byte"
+        );
+        assert!(
+            !revocations.is_revoked(&unpriceable)?,
+            "the refused revocation never landed"
+        );
+
+        // The owner is not poisoned: an ordinary priced revocation commits,
+        // and its executed real WAL growth stays a small measured amount.
+        let wal_before_commit = file_bytes(&wal).unwrap_or(0);
+        assert!(revocations.revoke("capability-after-refusal")?);
+        let committed_growth = file_bytes(&wal)
+            .unwrap_or(0)
+            .saturating_sub(wal_before_commit);
+        assert!(
+            committed_growth < 1024 * 1024,
+            "one committed revocation grew the real WAL by {committed_growth} bytes"
+        );
+
+        drop(revocations);
+        let reopened = fixture.reopen();
+        let reopened_revocations = reopened.authority.revocation_store();
+        assert!(
+            !reopened_revocations.is_revoked(&unpriceable)?,
+            "the refused revocation stays absent after the same-format reopen"
+        );
+        assert!(
+            reopened_revocations.is_revoked("capability-after-refusal")?,
+            "the committed revocation is durable after the same-format reopen"
+        );
+        assert!(
+            reopened_revocations.revoke("capability-after-reopen")?
+                && reopened_revocations.is_revoked("capability-after-reopen")?,
+            "the reopened owner keeps recording revocations through the interface"
+        );
+        Ok(())
     }
 }

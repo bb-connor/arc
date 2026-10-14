@@ -4,6 +4,7 @@ from contextlib import ExitStack, redirect_stderr
 import hashlib
 import importlib.util
 import io
+import itertools
 import json
 from pathlib import Path
 import tempfile
@@ -12,10 +13,21 @@ import subprocess
 import sys
 import tarfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / "scripts/verify-recovery-qualification.py"
+# Authoritative retained history archive, read-only bytes. Extracted copies
+# live only in per-test temporary directories; archived modules are never
+# imported or executed.
+HISTORY_ARCHIVE = ROOT / "docs/architecture/recoverable-agent-runtime/implementation/history/a6ac2b0a3a28ff27cfee3647037cc35db423a74ed781ed40569a2b1c1b493d6d.tar.gz"
+HISTORY_ARCHIVE_SHA256 = "a6ac2b0a3a28ff27cfee3647037cc35db423a74ed781ed40569a2b1c1b493d6d"
+HISTORY_PREFIX = "docs/architecture/recoverable-agent-runtime/implementation/"
+P5_SOURCE_BINDING = "562a3c3556f31e5afedbd7c7a426e542cc5e8cd51c28a7a43d8e9704ba4e9bc4"
+P6_QUALIFICATION_BINDING = "3a13a9bc599e426b281f50a1fae03b37ca2fd673cfe08e5db5c7a0112d17199e"
+P6_RUNTIME_BINDING = "b1bcd48cadb7b9c7f1ff5dd4ad8d9910056590e22058527756114e21239c1063"
+P6_PACKAGE_INTEGRITY_SHA256 = "3130ce6c7f29e9ab4294617ce32aa66afe8aec8e4741693c1a47086c7603d173"
 FIXTURE_SPEC = importlib.util.spec_from_file_location(
     "primary_compiler_probe_fixture", Path(__file__).with_name("primary_compiler_probe_fixture.py"))
 PRIMARY_FIXTURE = importlib.util.module_from_spec(FIXTURE_SPEC)
@@ -50,6 +62,41 @@ class QualificationAuditTest(unittest.TestCase):
                      ["linux","formal","live_provider","hosted_ci","complete_review"]}):
                 with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_required$"):
                     self.audit.audit_record(root,record,expected_seal=seal)
+
+    def test_hosted_ci_run_must_execute_the_candidate_commit(self):
+        sources = [{"path":"Cargo.toml","sha256":"0"*64}]
+        candidate_commit, other_commit = "1"*40, "2"*40
+        repository = "backbay-labs/chio"
+        names = ["Build, lint, test","MSRV build and test","cargo-vet (locked supply-chain audit)",
+                 "cargo-deny (supply-chain bans/advisories/licenses)"]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            def reference(name, value):
+                data = json.dumps(value).encode()
+                (root/name).write_bytes(data)
+                return {"path":name,"sha256":hashlib.sha256(data).hexdigest()}
+            def hosted_ci(commit):
+                check_runs = reference(f"check-runs-{commit[0]}.json",{"total_count":4,"check_runs":[
+                    {"id":number,"name":name,"head_sha":commit,"status":"completed","conclusion":"success",
+                     "url":f"https://api.github.com/repos/{repository}/check-runs/{number}",
+                     "details_url":f"https://github.com/{repository}/actions/runs/7/job/{number}",
+                     "app":{"slug":"github-actions"}} for number, name in enumerate(names,1)]})
+                inventory = reference(f"inventory-{commit[0]}.json",{
+                    "source_inventory_version":self.audit.INVENTORY_VERSION,"base_commit":commit,
+                    "sources":sources,"source_binding":self.audit.binding(sources,commit)})
+                receipt = reference(f"receipt-{commit[0]}.json",{
+                    "schema":"chio.hosted-workflow-artifact.v1","repository":repository,"commit":commit,
+                    "run_id":7,"source_inventory":inventory})
+                return reference(f"hosted-ci-{commit[0]}.json",{
+                    "schema":"chio.recovery-hosted-ci.v2","source_binding":self.audit.binding(sources,candidate_commit),
+                    "repository":repository,"commit":commit,"check_runs":check_runs,
+                    "executed_source_inventory":inventory,"workflow_artifact":receipt})
+            candidate = self.audit.binding(sources,candidate_commit)
+            self.assertIs(self.audit.audit_dimensions(root,{"hosted_ci":hosted_ci(candidate_commit)},
+                                                      candidate,sources,candidate_commit)["hosted_ci"],True)
+            with self.assertRaisesRegex(ValueError,"^qualification.hosted_ci_commit$"):
+                self.audit.audit_dimensions(root,{"hosted_ci":hosted_ci(other_commit)},
+                                            candidate,sources,candidate_commit)
 
     def test_raw_percentiles_are_recomputed_and_noninteger_samples_refuse(self):
         sample = {"samples":4, "samples_ns":[40,10,30,20], "p50_ns":20,
@@ -227,20 +274,29 @@ class QualificationAuditTest(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "^qualification.source_alias_boundary$"):
                         self.audit.current_source_inventory(root)
 
-    def test_materialization_exclusions_bind_exact_metadata_without_link_text(self):
+    def test_materialization_exclusions_refuse_symlink_states_and_bind_representable_metadata(self):
         for name, reason in [("fixtures/credentials.toml", "secret-path-policy"),
                              ("fixtures/retained.zip", "archive-file-policy"),
                              ("docs/integrations/acceptance/retained-source.rs", "artifact-tree-policy")]:
             with self.subTest(path=name), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory).resolve()
-                excluded = {"path": name, "content_coverage": "metadata-only", "exclusion_reason": reason,
-                            "state": "symlink", "mode": 0o777}
-                fixture = self.source_origin_bundle(root, extra_inputs=[excluded])
-                self.assertEqual(self.check_source_origin(root, fixture), fixture["receipt"])
-                excluded["link_text"] = "synthetic-omitted-target"
-                fixture = self.source_origin_bundle(root, extra_inputs=[excluded])
-                with self.assertRaisesRegex(ValueError, "^qualification.materialization_source_inventory$"):
-                    self.check_source_origin(root, fixture)
+                for state, mode in [("file", 0o644), ("directory", 0o755), ("missing", None)]:
+                    with self.subTest(state=state):
+                        excluded = {"path": name, "content_coverage": "metadata-only",
+                                    "exclusion_reason": reason, "state": state}
+                        if mode is not None:
+                            excluded["mode"] = mode
+                        fixture = self.source_origin_bundle(root, extra_inputs=[excluded])
+                        self.assertEqual(self.check_source_origin(root, fixture), fixture["receipt"])
+                for link_text in [None, "synthetic-omitted-target"]:
+                    with self.subTest(link_text=link_text):
+                        excluded = {"path": name, "content_coverage": "metadata-only", "exclusion_reason": reason,
+                                    "state": "symlink", "mode": 0o777}
+                        if link_text is not None:
+                            excluded["link_text"] = link_text
+                        fixture = self.source_origin_bundle(root, extra_inputs=[excluded])
+                        with self.assertRaisesRegex(ValueError, "^qualification.materialization_source_policy$"):
+                            self.check_source_origin(root, fixture)
 
     def test_historical_transfer_policy_cannot_acquire_current_source_projection(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -462,6 +518,175 @@ class QualificationAuditTest(unittest.TestCase):
                 "artifacts":[actual],"qualified":False}
             with self.assertRaisesRegex(ValueError,"^qualification.auditor_binding$"):
                 self.audit.audit_record(root,record)
+
+    # Historical package recomputation contract: exact supported schema,
+    # content-addressed retained inventory algorithm identity, and recomputed
+    # declared bindings, all isolated from mutable current-tree modules.
+
+    def extract_retained_package(self, root, phase):
+        """Copy one retained package into a temporary directory, never executing it."""
+        self.assertTrue(HISTORY_ARCHIVE.is_file(), "retained history archive is absent from the worktree")
+        self.assertEqual(hashlib.sha256(HISTORY_ARCHIVE.read_bytes()).hexdigest(), HISTORY_ARCHIVE_SHA256)
+        prefix = HISTORY_PREFIX + phase + "/"
+        target = root / phase
+        with tarfile.open(HISTORY_ARCHIVE, "r:gz") as archive:
+            for member in archive.getmembers():
+                if not member.name.startswith(prefix):
+                    continue
+                member.name = member.name[len(prefix):]
+                if not member.name:
+                    continue
+                archive.extract(member, target, filter="data")
+        return target
+
+    def reseal_historical_package(self, package):
+        """Rebuild artifact digests of a temporary package copy after a mutation."""
+        integrity_path = package / "package-integrity.json"
+        integrity = json.loads(integrity_path.read_bytes())
+        for row in integrity["artifacts"]:
+            row["sha256"] = hashlib.sha256((package / row["path"]).read_bytes()).hexdigest()
+        integrity_path.write_bytes(json.dumps(integrity, sort_keys=True).encode())
+        return integrity_path
+
+    def test_retained_p5_package_recomputes_its_declared_source_binding(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            package = self.extract_retained_package(Path(temporary).resolve(), "p5")
+            report = self.audit.audit_historical_package(package)
+            self.assertEqual(report["artifacts_verified"], 264)
+            self.assertEqual(report["sealed_source_count"], 643)
+            self.assertEqual(report["verification_schema"], "chio.recovery-p5-verification.v1")
+            self.assertEqual(report["historical_binding_version"], "chio.historical-source-binding.v1")
+            self.assertEqual(report["recomputed_bindings"], {"source_binding": P5_SOURCE_BINDING})
+            self.assertFalse(report["current_qualified"])
+
+    def test_retained_p6_bindings_recompute_while_the_full_package_still_refuses_redactions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            package = self.extract_retained_package(Path(temporary).resolve(), "p6")
+            self.assertEqual(hashlib.sha256((package / "package-integrity.json").read_bytes()).hexdigest(),
+                             P6_PACKAGE_INTEGRITY_SHA256)
+            verification = json.loads((package / "verification.json").read_bytes())
+            rows = verification["joined_sources"]
+            # The versioned binding helper reproduces the actual retained P6
+            # values without resealing or claiming full package acceptance.
+            self.assertEqual(self.audit.historical_binding_v1(rows), P6_QUALIFICATION_BINDING)
+            runtime_rows = [row for row in rows if not row["path"].startswith(
+                HISTORY_PREFIX + "p6/")]
+            self.assertEqual(len(runtime_rows), 712)
+            self.assertEqual(self.audit.historical_binding_v1(runtime_rows), P6_RUNTIME_BINDING)
+            # The already-published redactions keep refusing the full package audit.
+            with self.assertRaisesRegex(ValueError, "^qualification.historical_artifact_inventory$"):
+                self.audit.audit_historical_package(package)
+
+    def test_unknown_or_missing_historical_verification_schemas_refuse(self):
+        for schema in ["chio.recovery-p5-verification.v2", "chio.recovery-p7-verification.v1", None]:
+            with self.subTest(schema=schema), tempfile.TemporaryDirectory() as temporary:
+                package = self.extract_retained_package(Path(temporary).resolve(), "p5")
+                verification = json.loads((package / "verification.json").read_bytes())
+                if schema is None:
+                    verification.pop("schema")
+                else:
+                    verification["schema"] = schema
+                (package / "verification.json").write_bytes(json.dumps(verification, sort_keys=True).encode())
+                self.reseal_historical_package(package)
+                with self.assertRaisesRegex(ValueError, "^qualification.historical_verification_schema$"):
+                    self.audit.audit_historical_package(package)
+
+    def test_changed_or_missing_retained_inventory_algorithm_bytes_refuse(self):
+        for change in ["changed", "missing"]:
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temporary:
+                package = self.extract_retained_package(Path(temporary).resolve(), "p5")
+                if change == "changed":
+                    (package / "evidence/inventory.py").write_bytes(b"# substituted algorithm bytes\n")
+                    self.reseal_historical_package(package)
+                else:
+                    (package / "evidence/inventory.py").unlink()
+                    integrity_path = package / "package-integrity.json"
+                    integrity = json.loads(integrity_path.read_bytes())
+                    integrity["artifacts"] = [row for row in integrity["artifacts"]
+                                              if row["path"] != "evidence/inventory.py"]
+                    integrity_path.write_bytes(json.dumps(integrity, sort_keys=True).encode())
+                with self.assertRaisesRegex(ValueError, "^qualification.historical_inventory_algorithm$"):
+                    self.audit.audit_historical_package(package)
+
+    def test_tampered_or_missing_declared_historical_bindings_refuse(self):
+        for change, reason in [("tampered", "historical_source_binding"),
+                               ("missing", "historical_declared_binding")]:
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temporary:
+                package = self.extract_retained_package(Path(temporary).resolve(), "p5")
+                verification = json.loads((package / "verification.json").read_bytes())
+                if change == "tampered":
+                    verification["source_binding"] = "0" * 64
+                else:
+                    verification.pop("source_binding")
+                (package / "verification.json").write_bytes(json.dumps(verification, sort_keys=True).encode())
+                self.reseal_historical_package(package)
+                with self.assertRaisesRegex(ValueError, "^qualification\\." + reason + "$"):
+                    self.audit.audit_historical_package(package)
+
+    def test_tampered_p6_declared_bindings_refuse_without_claiming_full_package_acceptance(self):
+        # P6 full packages refuse at the redaction artifact inventory first, so
+        # exercise the declared-binding refusals through the helper's exact row
+        # selection; no full P6 acceptance is claimed or implied.
+        with tempfile.TemporaryDirectory() as temporary:
+            package = self.extract_retained_package(Path(temporary).resolve(), "p6")
+            verification = json.loads((package / "verification.json").read_bytes())
+            rows = verification["joined_sources"]
+            self.assertEqual(self.audit.historical_declared_bindings(
+                "chio.recovery-p6-verification.v1", verification, rows)["qualification_source_binding"],
+                P6_QUALIFICATION_BINDING)
+            for key in ["qualification_source_binding", "runtime_source_binding"]:
+                with self.subTest(binding=key):
+                    mutated = deepcopy(verification)
+                    mutated[key] = "0" * 64
+                    with self.assertRaisesRegex(ValueError, "^qualification.historical_source_binding$"):
+                        self.audit.historical_declared_bindings(
+                            "chio.recovery-p6-verification.v1", mutated, rows)
+            mutated = deepcopy(verification)
+            mutated.pop("runtime_source_binding")
+            with self.assertRaisesRegex(ValueError, "^qualification.historical_declared_binding$"):
+                self.audit.historical_declared_bindings("chio.recovery-p6-verification.v1", mutated, rows)
+
+    def test_malformed_or_duplicate_historical_source_rows_refuse(self):
+        for change in ["duplicate", "extra-field", "bad-hash", "unsorted", "missing"]:
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temporary:
+                package = self.extract_retained_package(Path(temporary).resolve(), "p5")
+                verification = json.loads((package / "verification.json").read_bytes())
+                rows = verification["joined_sources"]
+                if change == "duplicate":
+                    rows.append(dict(rows[0]))
+                elif change == "extra-field":
+                    rows[0]["state"] = "file"
+                elif change == "bad-hash":
+                    rows[0]["sha256"] = "z" * 64
+                elif change == "unsorted":
+                    verification["joined_sources"] = list(reversed(rows))
+                else:
+                    verification.pop("joined_sources")
+                (package / "verification.json").write_bytes(json.dumps(verification, sort_keys=True).encode())
+                self.reseal_historical_package(package)
+                with self.assertRaisesRegex(ValueError, "^qualification.historical_source_inventory$"):
+                    self.audit.audit_historical_package(package)
+
+    def test_mutable_current_tree_modules_cannot_alter_historical_recomputation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            package = self.extract_retained_package(Path(temporary).resolve(), "p5")
+            with patch.object(self.audit, "binding", side_effect=AssertionError("current binding used")), \
+                 patch.object(self.audit, "canonical", side_effect=AssertionError("current canonical used")), \
+                 patch.object(self.audit, "current_source_inventory",
+                              side_effect=AssertionError("current inventory used")):
+                report = self.audit.audit_historical_package(package)
+            self.assertEqual(report["recomputed_bindings"], {"source_binding": P5_SOURCE_BINDING})
+
+    def test_current_binding_envelope_is_unchanged_by_the_historical_helper(self):
+        sources = [{"path": "Cargo.toml", "sha256": "0" * 64}]
+        base_commit = "1" * 40
+        current = hashlib.sha256(json.dumps({"base_commit": base_commit,
+            "source_inventory_version": self.audit.INVENTORY_VERSION, "sources": sources},
+            sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+        self.assertEqual(self.audit.binding(sources, base_commit), current)
+        retained = hashlib.sha256(json.dumps(sources, sort_keys=True,
+                                             separators=(",", ":")).encode()).hexdigest()
+        self.assertEqual(self.audit.historical_binding_v1(sources), retained)
 
     def test_failed_materialization_transport_cannot_be_replaced_by_a_late_receipt(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -940,6 +1165,434 @@ class QualificationAuditTest(unittest.TestCase):
         roots = [{"path":"/candidate/target/consumer","sha256":"4"*64,"size":7}]
         return [first,second],sources,roots
 
+    def stdin_compilation_bundle(self, *, already_instrumented=False, source=b"pub fn probe() {}"):
+        namespace = Path("/candidate/target/records")
+        payloads = {}
+        def image(raw, role):
+            digest = hashlib.sha256(raw).hexdigest()
+            payloads[digest] = raw
+            return {"role": role, "artifact": "artifacts/"+digest, "path": str(namespace/"artifacts"/digest),
+                    "sha256": digest, "size": len(raw)}
+        original = ["/public/rustc", "--crate-name", "probe", "--crate-type=lib", "--out-dir",
+                    "/candidate/target/probe", "--emit=llvm-ir", "-"]
+        if already_instrumented:
+            original.append("--emit=dep-info")
+        added = [] if already_instrumented else ["--emit=dep-info"]
+        vectors = [image(self.audit.compilation_canonical(values)+b"\n", "compiler-arguments")
+                   for values in [original, original+added]]
+        row = {"kind": "compilation", "status": "success", "compiler_exit": 0, "invocation_id": "c"*32,
+               "compiler": {"path": original[0]}, "invocation_sha256": hashlib.sha256(self.audit.compilation_canonical(original)).hexdigest(),
+               "semantics": {"source": None, "host_execution": {}, "dep_info_instrumentation": {
+                   "schema": "chio.rust-compilation-dep-info-instrumentation.v1", "original_argv": vectors[0],
+                   "effective_argv": vectors[1], "added": added,
+                   "effective_invocation_sha256": hashlib.sha256(self.audit.compilation_canonical(original+added)).hexdigest()}},
+               "inputs": [image(source, "stdin"), *vectors],
+               "outputs": [{"role": role, "path": "/candidate/target/probe/probe."+extension, "size": 7, "sha256": digest*64}
+                           for role,extension,digest in [("depfile", "d", "5"), ("unit", "ll", "6")]]}
+        return row, namespace, payloads
+
+    def test_stdin_evidence_recomputes_bytes_and_append_only_arguments(self):
+        for already in [False, True]:
+            row, namespace, payloads = self.stdin_compilation_bundle(already_instrumented=already)
+            self.audit.audit_compiler_stdin_inputs([row], namespace, lambda image: payloads[image["sha256"]])
+        for change in ["stdin_digest", "argv_digest", "rewrite", "source", "native", "missing", "artifact", "secret", "encoding", "refusal", "compiler"]:
+            with self.subTest(change=change):
+                row, namespace, payloads = self.stdin_compilation_bundle(
+                    source=b'const API_KEY: &str = "synthetic";' if change == "secret" else b"\xff" if change == "encoding" else b"pub fn probe() {}")
+                contract = row["semantics"]["dep_info_instrumentation"]
+                if change == "stdin_digest":
+                    payloads[row["inputs"][0]["sha256"]] = b"changed bytes"
+                elif change == "argv_digest":
+                    row["invocation_sha256"] = "0"*64
+                elif change == "rewrite":
+                    contract["added"] = ["--emit=metadata"]
+                elif change == "source":
+                    row["semantics"]["source"] = "/candidate/invented.rs"
+                elif change == "native":
+                    row["semantics"]["native_scope"] = {}
+                elif change == "missing":
+                    del row["semantics"]["dep_info_instrumentation"]
+                elif change == "artifact":
+                    row["inputs"][0]["path"] = "/candidate/arbitrary.rs"
+                elif change == "refusal":
+                    row.update(status="compiler_failed", compiler_exit=1, refusal="unexpected_compiler_output")
+                elif change == "compiler":
+                    row["compiler"] = None
+                with self.assertRaises(ValueError):
+                    self.audit.audit_compiler_stdin_inputs([row], namespace, lambda image: payloads[image["sha256"]])
+
+    def test_stdin_probe_cannot_replace_qualification_root_or_unbound_source(self):
+        rows, sources, roots = self.compiler_unit_graph_bundle()
+        stdin, _namespace, _payloads = self.stdin_compilation_bundle()
+        self.audit.audit_compiler_unit_graph([*rows, stdin], sources, roots)
+        with self.assertRaisesRegex(ValueError, "compiler_root_source"):
+            self.audit.audit_compiler_unit_graph([*rows, stdin], sources, [stdin["outputs"][1]])
+        rows[0]["inputs"].append({**stdin["outputs"][1], "role": "extern"})
+        with self.assertRaisesRegex(ValueError, "compiler_extern_source"):
+            self.audit.audit_compiler_unit_graph([*rows, stdin], sources, roots)
+        rows[0]["inputs"].pop()
+        stdin["inputs"].append({"role": "source", "path": "/unobserved/include.rs", "sha256": "7"*64, "size": 7})
+        with self.assertRaisesRegex(ValueError, "compiler_unit_source"):
+            self.audit.audit_compiler_unit_graph([*rows, stdin], sources, roots)
+
+    def explicit_metadata_row(self, identifier, *, predecessor=None, status="success",
+                              exit_code=None, target="aarch64-apple-darwin",
+                              primary="/candidate/target/probe/rustix_test_can_compile",
+                              source=b"pub fn probe() {}", absent=False):
+        """One closed v2 anonymous host row with retained bytes, not a claim."""
+        namespace = Path("/candidate/target/records")
+        payloads = {}
+
+        def image(raw, role):
+            digest = hashlib.sha256(raw).hexdigest()
+            payloads[digest] = raw
+            return {"role": role, "artifact": "artifacts/" + digest,
+                    "path": str(namespace/"artifacts"/digest), "sha256": digest, "size": len(raw)}
+
+        exit_code = 0 if status == "success" else (23 if exit_code is None else exit_code)
+        original = ["/public/rustc", "-", "--crate-type=rlib", "--emit=metadata"]
+        if target is not None:
+            original.append("--target=" + target)
+        original += ["-o", primary, "-Csplit-debuginfo=off"]
+        name = primary.rsplit("/", 1)[1]
+        depfile = primary.rsplit("/", 1)[0] + "/" + name + ".chio-" + identifier + ".d"
+        effective = list(original)
+        replacement = "metadata=" + primary + ",dep-info=" + depfile
+        effective[original.index("--emit=metadata")] = "--emit=" + replacement
+        vectors = [image(self.audit.compilation_canonical(values)+b"\n", "compiler-arguments")
+                   for values in [original, effective]]
+        unit_raw = b"identical metadata image"
+        unit = {"role": "unit", "path": primary, "sha256": hashlib.sha256(unit_raw).hexdigest(),
+                "size": len(unit_raw)}
+        if status == "compiler_failed":
+            unit["partial"] = True
+        payloads[unit["sha256"]] = unit_raw
+        produced = {name: {"device": 1, "inode": 100, "size": len(unit_raw)}}
+        if status == "success":
+            depfile_name = depfile.rsplit("/", 1)[1]
+            produced[depfile_name] = {"device": 1, "inode": 101, "size": 7}
+        outputs = ([{"role": "depfile", "path": depfile, "sha256": "5"*64, "size": 7}] if status == "success" else []) + [unit]
+        if absent:
+            self.assertEqual(status, "compiler_failed")
+            produced, outputs = {}, []
+        row = {"kind": "compilation", "status": status, "compiler_exit": exit_code,
+               "invocation_id": identifier, "source_binding": "e"*64,
+               "compiler": {"path": original[0]},
+               "invocation_sha256": hashlib.sha256(self.audit.compilation_canonical(original)).hexdigest(),
+               "publication": {"completion": "completions/" + identifier + ".json",
+                               "marker_identity": {"device": 1, "inode": 2}},
+               "semantics": {"source": None, "crate_name": None, "crate_types": ["rlib"],
+                             "target": target, "cwd": "/candidate", "host_execution": {},
+                             "emits": {"metadata": primary, "dep-info": depfile},
+                             "output_ownership": {"policy": "explicit-metadata-fresh-lease" if predecessor is None
+                                                  else "explicit-metadata-predecessor-absence" if predecessor["physical"] is None
+                                                  else "explicit-metadata-predecessor-retirement",
+                                                  "directory": primary.rsplit("/", 1)[0],
+                                                  "directory_binding": [{"path": str(path), "device": 1,
+                                                      "inode": index+1, "mode": 0o40755}
+                                                      for index, path in enumerate([*reversed(Path(primary).parent.parents), Path(primary).parent])],
+                                                  "predecessor": predecessor, "produced": produced},
+                             "dep_info_instrumentation": {
+                                 "schema": "chio.rust-compilation-dep-info-instrumentation.v2",
+                                 "mode": "explicit-metadata-output",
+                                 "original_argv": vectors[0], "effective_argv": vectors[1],
+                                 "effective_invocation_sha256": hashlib.sha256(
+                                     self.audit.compilation_canonical(effective)).hexdigest(),
+                                 "primary_output": primary, "depfile_output": depfile}},
+               "inputs": [image(source, "stdin"), *vectors],
+               "outputs": outputs}
+        return row, payloads
+
+    def explicit_metadata_publication(self, row):
+        payload = self.audit.compilation_canonical(row)+b"\n"
+        marker = self.audit.compilation_canonical({"schema": "chio.rust-compilation-completion.v3",
+            "invocation_id": row["invocation_id"], "source_binding": row["source_binding"],
+            "record_sha256": hashlib.sha256(payload).hexdigest(), "size": len(payload),
+            "record_identity": {"device": 9, "inode": 9}})+b"\n"
+        return {"schema": "chio.rust-unit-publication-outcome.v1", "source_binding": row["source_binding"],
+                "invocation_id": row["invocation_id"], "kind": row["kind"],
+                "record_status": row["status"], "compiler_exit": row["compiler_exit"],
+                "record": {"path": "records/" + row["invocation_id"] + ".json",
+                           "sha256": hashlib.sha256(payload).hexdigest(), "size": len(payload),
+                           "identity": [1]*7},
+                "completion": {"path": "completions/" + row["invocation_id"] + ".json",
+                               "sha256": hashlib.sha256(marker).hexdigest(), "size": len(marker),
+                               "identity": [1]*7},
+                "unit_images_sha256": "0"*64, "physical_status": "complete"}
+
+    def explicit_metadata_edge(self, predecessor, publication):
+        primary = predecessor["semantics"]["dep_info_instrumentation"]["primary_output"]
+        image = next((item for item in predecessor["outputs"] if item["role"] == "unit"), None)
+        name = primary.rsplit("/", 1)[1]
+        return {"invocation_id": predecessor["invocation_id"],
+                "record": {key: publication["record"][key] for key in ["path", "sha256", "size"]},
+                "completion": {key: publication["completion"][key] for key in ["path", "sha256", "size"]},
+                "output": {"path": primary, "state": "absent"} if image is None else
+                          {"path": primary, "sha256": image["sha256"], "size": image["size"]},
+                "physical": None if image is None else dict(predecessor["semantics"]["output_ownership"]["produced"][name])}
+
+    def explicit_metadata_chain(self, count=3):
+        rows, publications, payloads = [], {}, {}
+        predecessor = None
+        for index in range(count):
+            identifier = str(index+1)*32
+            row, row_payloads = self.explicit_metadata_row(identifier, predecessor=predecessor)
+            payloads.update(row_payloads)
+            publications[identifier] = self.explicit_metadata_publication(row)
+            rows.append(row)
+            predecessor = self.explicit_metadata_edge(row, publications[identifier])
+        return rows, publications, payloads
+
+    def test_explicit_metadata_stdin_replays_closed_lane_arguments(self):
+        rows, publications, payloads = self.explicit_metadata_chain(1)
+        self.audit.audit_compiler_stdin_inputs(rows, Path("/candidate/target/records"),
+                                               lambda image: payloads[image["sha256"]], publications)
+        for change in ["wrong_crate_type", "duplicate_crate_type", "out_dir", "dep_info_emission",
+                       "target_disagreement", "duplicate_output", "untransformed_effective",
+                       "wrong_primary", "wrong_depfile", "wrong_mode", "extra_field", "wrong_hash",
+                       "second_positional", "inline_output", "stdout_output", "trailing_slash", "noncanonical_output"]:
+            with self.subTest(change=change):
+                chain_rows, chain_publications, chain_payloads = self.explicit_metadata_chain(2)
+                row, successor = chain_rows
+                contract = row["semantics"]["dep_info_instrumentation"]
+                original = json.loads(chain_payloads[contract["original_argv"]["sha256"]])
+                if change == "wrong_crate_type":
+                    original[2] = "--crate-type=bin"
+                elif change == "duplicate_crate_type":
+                    original.insert(3, "--crate-type=rlib")
+                elif change == "out_dir":
+                    original.append("--out-dir=/candidate/target/other")
+                elif change == "dep_info_emission":
+                    original[original.index("--emit=metadata")] = "--emit=dep-info,metadata"
+                elif change == "target_disagreement":
+                    row["semantics"]["target"] = None
+                elif change == "duplicate_output":
+                    original.insert(len(original)-1, "-o")
+                    original.insert(len(original)-1, "/candidate/target/probe/other")
+                elif change == "second_positional":
+                    original.append("-")
+                elif change == "inline_output":
+                    index = original.index("-o")
+                    original[index:index+2] = ["-o=" + original[index+1]]
+                elif change in {"stdout_output", "trailing_slash", "noncanonical_output"}:
+                    index = original.index("-o") + 1
+                    original[index] = ("-" if change == "stdout_output" else original[index] + "/"
+                        if change == "trailing_slash" else original[index].replace("/probe/", "/probe/./"))
+                if change in ["wrong_crate_type", "duplicate_crate_type", "out_dir", "dep_info_emission",
+                              "duplicate_output", "second_positional", "inline_output", "stdout_output", "trailing_slash", "noncanonical_output"]:
+                    vector = self.audit.compilation_canonical(original)+b"\n"
+                    contract["original_argv"].update({
+                        "sha256": hashlib.sha256(vector).hexdigest(), "size": len(vector),
+                        "artifact": "artifacts/" + hashlib.sha256(vector).hexdigest(),
+                        "path": str(Path("/candidate/target/records")/"artifacts"
+                                    / hashlib.sha256(vector).hexdigest())})
+                    chain_payloads[contract["original_argv"]["sha256"]] = vector
+                    row["invocation_sha256"] = hashlib.sha256(
+                        self.audit.compilation_canonical(original)).hexdigest()
+                elif change == "untransformed_effective":
+                    contract["effective_argv"] = contract["original_argv"]
+                elif change == "wrong_primary":
+                    contract["primary_output"] = "/candidate/target/probe/other"
+                elif change == "wrong_depfile":
+                    contract["depfile_output"] += ".other"
+                elif change == "wrong_mode":
+                    contract["mode"] = "append-only"
+                elif change == "extra_field":
+                    contract["added"] = []
+                elif change == "wrong_hash":
+                    contract["effective_invocation_sha256"] = "0"*64
+                with self.assertRaises(ValueError):
+                    self.audit.audit_compiler_stdin_inputs(chain_rows, Path("/candidate/target/records"),
+                                                           lambda image: chain_payloads[image["sha256"]],
+                                                           chain_publications)
+
+    def test_explicit_metadata_retirement_edges_match_checked_publications(self):
+        rows, publications, payloads = self.explicit_metadata_chain(3)
+        self.audit.audit_compiler_stdin_inputs(rows, Path("/candidate/target/records"),
+                                               lambda image: payloads[image["sha256"]], publications)
+        for change in ["record_digest", "record_size_type", "completion_path", "physical",
+                       "wrong_primary", "missing_predecessor", "refused_predecessor",
+                       "cross_target", "double_retirement", "cycle", "no_publications",
+                       "unpublished_predecessor"]:
+            with self.subTest(change=change):
+                chain_rows, chain_publications, chain_payloads = self.explicit_metadata_chain(3)
+                first, second, third = chain_rows
+                edge = third["semantics"]["output_ownership"]["predecessor"]
+                if change == "record_digest":
+                    edge["record"]["sha256"] = "0"*64
+                elif change == "record_size_type":
+                    edge["record"]["size"] = str(edge["record"]["size"])
+                elif change == "completion_path":
+                    edge["completion"]["path"] = "completions/other.json"
+                elif change == "physical":
+                    edge["physical"]["inode"] += 1
+                elif change == "wrong_primary":
+                    successor, successor_payloads = self.explicit_metadata_row(
+                        "4"*32, predecessor=edge, primary="/candidate/target/probe/other_output")
+                    chain_payloads.update(successor_payloads)
+                    chain_rows = [first, second, successor]
+                elif change == "missing_predecessor":
+                    chain_rows = chain_rows[1:]
+                elif change == "refused_predecessor":
+                    first["status"] = "refused"
+                    first["compiler_exit"] = None
+                    first["refusal"] = "predecessor_not_sealed"
+                elif change == "cross_target":
+                    other, other_payloads = self.explicit_metadata_row("4"*32, predecessor=edge,
+                        target="x86_64-apple-darwin")
+                    chain_payloads.update(other_payloads)
+                    chain_rows = [first, second, other]
+                elif change == "double_retirement":
+                    fourth, fourth_payloads = self.explicit_metadata_row("4"*32, predecessor=edge)
+                    chain_payloads.update(fourth_payloads)
+                    chain_rows = [*chain_rows, fourth]
+                elif change == "cycle":
+                    first_edge = self.explicit_metadata_edge(second, chain_publications[second["invocation_id"]])
+                    first["semantics"]["output_ownership"]["predecessor"] = first_edge
+                    first["semantics"]["output_ownership"]["policy"] = "explicit-metadata-predecessor-retirement"
+                elif change == "no_publications":
+                    chain_publications = None
+                elif change == "unpublished_predecessor":
+                    del chain_publications[first["invocation_id"]]
+                with self.assertRaises(ValueError):
+                    self.audit.audit_compiler_stdin_inputs(chain_rows, Path("/candidate/target/records"),
+                                                           lambda image: chain_payloads[image["sha256"]],
+                                                           chain_publications)
+
+    def test_explicit_metadata_absence_edges_preserve_unique_history(self):
+        ordinary, sources, roots = self.compiler_unit_graph_bundle()
+        namespace = Path("/candidate/target/records")
+        def chain():
+            rows, publications, payloads = self.explicit_metadata_chain(1)
+            first = rows[0]
+            failed, raw = self.explicit_metadata_row("2"*32, status="compiler_failed", absent=True,
+                predecessor=self.explicit_metadata_edge(first, publications[first["invocation_id"]]))
+            payloads.update(raw)
+            publications[failed["invocation_id"]] = self.explicit_metadata_publication(failed)
+            last, raw = self.explicit_metadata_row("3"*32,
+                predecessor=self.explicit_metadata_edge(failed, publications[failed["invocation_id"]]))
+            payloads.update(raw)
+            publications[last["invocation_id"]] = self.explicit_metadata_publication(last)
+            return [first, failed, last], publications, payloads
+        rows, publications, payloads = chain()
+        for order in itertools.permutations(rows):
+            self.audit.audit_compiler_stdin_inputs(list(order), namespace, lambda image: payloads[image["sha256"]], publications)
+            report = self.audit.audit_compiler_unit_graph([*ordinary, *order], sources, roots)
+            self.assertEqual(report["reachable_units"], 2)
+        for change in ["fresh_reset", "physical", "claimed_bytes", "wrong_path", "consumed", "directory", "ancestor", "path_chain", "refused", "cross_target", "cross_binding", "cycle"]:
+            with self.subTest(change=change):
+                rows, publications, payloads = chain()
+                first, failed, last = rows
+                ownership = last["semantics"]["output_ownership"]
+                edge = ownership["predecessor"]
+                if change == "fresh_reset":
+                    ownership.update(policy="explicit-metadata-fresh-lease", predecessor=None)
+                elif change == "physical": edge["physical"] = {"device": 1, "inode": 100, "size": 0}
+                elif change == "claimed_bytes": edge["output"] = {"path": edge["output"]["path"], "sha256": "0"*64, "size": 0}
+                elif change == "wrong_path": edge["output"]["path"] += "-other"
+                elif change == "consumed":
+                    other, raw = self.explicit_metadata_row("4"*32, predecessor=deepcopy(edge))
+                    rows.append(other); payloads.update(raw)
+                elif change in {"directory", "ancestor"}:
+                    ownership["directory_binding"][-1 if change == "directory" else 0]["inode"] += 1
+                elif change == "path_chain": ownership["directory_binding"][0]["path"] = "/wrong"
+                elif change == "refused": failed["refusal"] = "actual_recorder_refusal"
+                elif change == "cross_binding": failed["source_binding"] = "0"*64
+                elif change == "cross_target": last["semantics"]["target"] = None
+                elif change == "cycle":
+                    first["semantics"]["output_ownership"].update(policy="explicit-metadata-predecessor-retirement",
+                        predecessor=self.explicit_metadata_edge(last, publications[last["invocation_id"]]))
+                with self.assertRaises(ValueError):
+                    self.audit.audit_compiler_stdin_inputs(rows, namespace, lambda image: payloads[image["sha256"]], publications)
+
+    def test_explicit_metadata_host_scope_joins_retained_declaration(self):
+        namespace, repository = Path("/candidate/target/records"), Path("/candidate")
+        for status in ["success", "compiler_failed"]:
+            for target, primary, accepted in [
+                    ("aarch64-apple-darwin", "/candidate/target/probe/output", True),
+                    (None, "/candidate/target/probe/output", True),
+                    ("x86_64-apple-darwin", "/candidate/target/probe/output", False),
+                    ("aarch64-apple-darwin", "/candidate/target/elsewhere/output", False),
+                    ("aarch64-apple-darwin", "/outside/output", False)]:
+                with self.subTest(status=status, target=target, primary=primary):
+                    row, payloads = self.explicit_metadata_row("1"*32, status=status, target=target, primary=primary)
+                    sources = [{"path": "root.rs", "sha256": "9"*64}]
+                    source_binding = self.audit.binding(sources, None)
+                    row["source_binding"] = source_binding
+                    def retained(raw, role, path):
+                        digest = hashlib.sha256(raw).hexdigest()
+                        payloads[digest] = raw
+                        image = {"role": role, "path": path, "sha256": digest, "size": len(raw)}
+                        row["inputs"].append(image)
+                        return image
+                    runtime = {"source_inventory_version": self.audit.INVENTORY_VERSION, "sources": sources,
+                               "base_commit": None, "source_binding": source_binding}
+                    runtime_image = retained(self.audit.compilation_canonical(runtime), "host-source-inventory", "/public/runtime.json")
+                    tool_raw = b"actual retained tool bytes"
+                    tool = {"path": "/public/cargo", "sha256": hashlib.sha256(tool_raw).hexdigest(), "size": len(tool_raw)}
+                    payloads[tool["sha256"]] = tool_raw
+                    host = {"schema": "chio.ordinary-host-execution.v1", "repository": str(repository),
+                            "namespace": str(namespace), "source_binding": source_binding,
+                            "target_directory": "/candidate/target/probe", "target": "aarch64-apple-darwin", "machine": "arm64",
+                            "compiler": "/public/rustc", "cargo": "/public/cargo", "linker": "/public/linker",
+                            "sdk": "/public/sdk", "toolchain": "/public/toolchain", "vendor_roots": [],
+                            "images": [{**tool, "purpose": "cargo"}], "aliases": [],
+                            "runtime_inventory": {key: runtime_image[key] for key in ["path", "sha256", "size"]},
+                            "runtime_metadata": {"coverage": "ordinary-host-observation-no-retained-os-image-coverage",
+                                "system": "Darwin", "release": "fixture", "version": "fixture", "macos_version": "fixture",
+                                "shared_cache_file_metadata": []}}
+                    declaration = retained(self.audit.compilation_canonical(host), "host-execution-declaration", "/public/host.json")
+                    state = {"schema": "chio.ordinary-host-tool-observation.v1", "declaration_sha256": declaration["sha256"],
+                             "images": [{**tool, "identity": [1, 2, 0o100755, len(tool_raw), 0, 0, 1]}]}
+                    check = retained(self.audit.compilation_canonical(state), "host-tool-observation", "/public/observation.json")
+                    row["semantics"]["host_execution"] = {"schema": "chio.ordinary-host-invocation.v1",
+                        "declaration": declaration, "loader_paths": {}, "tooling_checks": {"before": check, "after": check}}
+                    row["compiler"]["version"] = {"fields": {"host": host["target"]}}
+                    publications = {row["invocation_id"]: self.explicit_metadata_publication(row)}
+                    read = lambda image: payloads[image["sha256"]]
+                    # Wrong subjects are consistently resealed and pass the actual
+                    # argument/ownership decoder before reaching the host join.
+                    self.audit.audit_compiler_stdin_inputs([row], namespace, read, publications)
+                    seen = []
+                    def tooling(image):
+                        self.assertEqual(hashlib.sha256(read(image)).hexdigest(), image["sha256"])
+                        seen.append(image)
+                    if accepted:
+                        self.audit.audit_ordinary_host_metadata([row], repository, namespace, source_binding, read, tooling)
+                        self.assertEqual(len(seen), 1 if status == "success" else 0)
+                    else:
+                        with self.assertRaisesRegex(ValueError, "compiler_stdin_host_scope"):
+                            self.audit.audit_ordinary_host_metadata([row], repository, namespace, source_binding, read, tooling)
+
+    def test_explicit_metadata_chain_repeats_are_not_ordinary_producers(self):
+        ordinary, sources, roots = self.compiler_unit_graph_bundle()
+        rows, publications, payloads = self.explicit_metadata_chain(3)
+        # The chain validates first, then its repeated identical auxiliary
+        # images join the graph without colliding with the producer map.
+        self.audit.audit_compiler_stdin_inputs(rows, Path("/candidate/target/records"),
+                                               lambda image: payloads[image["sha256"]], publications)
+        for order in itertools.permutations(rows):
+            report = self.audit.audit_compiler_unit_graph([*ordinary, *order], sources, roots)
+            self.assertEqual(report["reachable_units"], 2)
+        # An anonymous output never becomes a root or an extern producer.
+        auxiliary = rows[-1]["outputs"][1]
+        with self.assertRaisesRegex(ValueError, "compiler_root_source"):
+            self.audit.audit_compiler_unit_graph([*ordinary, *rows], sources, [auxiliary])
+        ordinary[0]["inputs"].append({**auxiliary, "role": "extern"})
+        with self.assertRaisesRegex(ValueError, "compiler_extern_source"):
+            self.audit.audit_compiler_unit_graph([*ordinary, *rows], sources, roots)
+        # A v1 anonymous repeat keeps the old ordinary unique producer refusal.
+        stdin_a, _namespace, _payloads = self.stdin_compilation_bundle()
+        stdin_b = deepcopy(stdin_a)
+        stdin_b["invocation_id"] = "9"*32
+        with self.assertRaisesRegex(ValueError, "compiler_unit_producer"):
+            self.audit.audit_compiler_unit_graph([stdin_a, stdin_b], sources, roots)
+        # A v2 repeat outside a validated same-output retirement chain refuses.
+        fresh_a, _payloads_a = self.explicit_metadata_row("7"*32)
+        fresh_b, _payloads_b = self.explicit_metadata_row("8"*32)
+        with self.assertRaisesRegex(ValueError, "compiler_unit_producer"):
+            self.audit.audit_compiler_unit_graph([*ordinary, fresh_a, fresh_b], sources, roots)
+
     def test_source_bound_unit_and_extern_edges_do_not_claim_native_closure(self):
         rows,sources,roots = self.compiler_unit_graph_bundle()
         report = self.audit.audit_compiler_unit_graph(rows,sources,roots)
@@ -976,32 +1629,18 @@ class QualificationAuditTest(unittest.TestCase):
             inspector.parent.mkdir()
             inspector.write_bytes(TOOL.read_bytes())
             (root/"scripts/record-rust-compilation.py").write_bytes((ROOT/"scripts/record-rust-compilation.py").read_bytes())
-        fixture = self.compiler_publication_bundle(root/"target")
-        namespace = fixture["namespace"]
-        output = root/"target/output/parser-image"
-        output.parent.mkdir()
-        output.write_bytes(b"synthetic output, never executed\n")
-        def image(path, role):
-            raw = path.read_bytes()
-            digest = hashlib.sha256(raw).hexdigest()
-            (namespace/"artifacts"/digest).write_bytes(raw)
-            return {"path":str(path),"sha256":digest,"size":len(raw),
-                    "role":role,"artifact":"artifacts/"+digest}
         sources = self.audit.current_source_inventory(root)
         runtime = {"source_inventory_version":self.audit.INVENTORY_VERSION,"base_commit":None,
                    "sources":sources,"source_binding":self.audit.binding(sources,None)}
+        output = root/"target/output/parser-image"
+        output.parent.mkdir(parents=True)
+        output.write_bytes(b"synthetic output, never executed\n")
         inventory_path = root/"target/runtime.json"
         inventory_path.write_bytes(self.audit.compilation_canonical(runtime)+b"\n")
+        fixture = self.compiler_publication_bundle(root/"target",binding=runtime["source_binding"],
+            source_paths=[source],unit_paths=[output],semantics={"source":str(source),"cwd":str(root)})
+        namespace = fixture["namespace"]
         row = fixture["row"]
-        row.update(source_binding=runtime["source_binding"],
-                   inputs=[image(source,"source")],outputs=[image(output,"unit")],
-                   semantics={"source":str(source),"cwd":str(root)})
-        raw = self.audit.compilation_canonical(row)+b"\n"
-        fixture["record"].write_bytes(raw)
-        completion = json.loads(fixture["marker"].read_bytes())
-        completion.update(source_binding=runtime["source_binding"],size=len(raw),
-                          record_sha256=hashlib.sha256(raw).hexdigest())
-        fixture["marker"].write_bytes(self.audit.compilation_canonical(completion)+b"\n")
         request = {"schema":"chio.compiler-profile-custody-request.v1","namespace":str(namespace),
             "repository":str(root),"runtime_inventory":{"path":str(inventory_path),
                 "sha256":self.audit.sha(inventory_path)},"source_binding":runtime["source_binding"],
@@ -1165,12 +1804,18 @@ class QualificationAuditTest(unittest.TestCase):
             root = Path(temporary).resolve()
             bundle = self.compiled_profile_archive_bundle(root)
             runtime = bundle["fixture"]["runtime"]
+            report = bundle["report"]
+            report["profile"]["publication"]["schema"] = "chio.compiler-publication-verification.v1"
+            bundle["profile"]["custody_report"] = bundle["reference"]("report.json",report)
+            log = root/"custody.log"
+            log.write_text("COMPILER_PROFILE_CUSTODY "+json.dumps(report,sort_keys=True)+"\n")
+            bundle["profile"]["custody_execution"]["log"]["sha256"] = self.audit.sha(log)
             # Process checks are isolated here; actual process evidence is a separate gate.
             with patch.object(self.audit,"audit_gate"),patch.object(self.audit,"audit_execution_provenance"):
                 with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_current_publication$"):
                     self.audit.audit_compiled_profile(root,bundle["profile"],runtime["source_binding"],runtime["sources"],None)
-            # The historical decoded graph remains inspectable as a primitive.
-            # It cannot substitute for the current physical and process proof.
+            # The row is current v4; only the publication schema above is mutated.
+            # The graph alone cannot replace the physical and process proof.
             result = self.audit.audit_compiler_unit_graph([bundle["fixture"]["row"]],
                 bundle["profile"]["inputs"],bundle["profile"]["roots"])
             self.assertEqual(result["verified_roots"],1)
@@ -1458,9 +2103,10 @@ with tempfile.TemporaryDirectory() as temporary:
         names = ["bin","lib/python3.12","lib/python3.12/encodings"]
         inventory = {"schema":"chio.compilation-read-scope.v2",**{key:configured[key] for key in ["role","root","selection"]},
             "members":[{"path":name,"kind":"regular"} for name in selected],"directories":names,
+            "root_identity":[1,9,0o40755],
             "directory_metadata":[{"path":name,"identity":[1,index+1,0o40755]} for index,name in enumerate(names)]}
         self.audit.audit_compilation_directory_inventory(configured,inventory)
-        mutations = ["parent","missing","metadata","mode","boolean","version","selected","payload"]
+        mutations = ["parent","missing","metadata","mode","boolean","version","selected","payload","root"]
         for change in mutations:
             value = deepcopy(inventory)
             if change == "parent":
@@ -1472,6 +2118,7 @@ with tempfile.TemporaryDirectory() as temporary:
             elif change == "boolean":value["directory_metadata"][0]["identity"][0] = True
             elif change == "version":value["schema"] = []
             elif change == "selected":value["members"].pop()
+            elif change == "root":del value["root_identity"]
             else:value["directory_metadata"][0]["contents"] = "SYNTHETIC-UNLISTED-CONTENT"
             with self.subTest(change=change):
                 with self.assertRaisesRegex(ValueError,"^qualification.compilation_scope_directories$"):
@@ -1484,8 +2131,11 @@ with tempfile.TemporaryDirectory() as temporary:
             child.mkdir()
             (child/"credentials.toml").write_bytes(b"SYNTHETIC-UNLISTED-CONTENT")
             info = child.stat()
+            root_info = root.stat()
             metadata = {"path":"encodings","identity":[info.st_dev,info.st_ino,info.st_mode]}
-            inventory = {"schema":"chio.compilation-read-scope.v2","root":str(root),"directory_metadata":[metadata]}
+            inventory = {"schema":"chio.compilation-read-scope.v2","root":str(root),
+                "root_identity":[root_info.st_dev,root_info.st_ino,root_info.st_mode],
+                "directory_metadata":[metadata]}
             with patch.object(self.audit,"regular_input",side_effect=AssertionError("directory metadata opened file contents")):
                 with ExitStack() as held:
                     self.audit.hold_compilation_directory_metadata([inventory],held,{})
@@ -1494,6 +2144,11 @@ with tempfile.TemporaryDirectory() as temporary:
                 with self.assertRaisesRegex(ValueError,"^qualification.compilation_scope_directories_physical$"):
                     with ExitStack() as held:
                         self.audit.hold_compilation_directory_metadata([changed],held,{})
+                replaced = deepcopy(inventory)
+                replaced["root_identity"][1] += 1
+                with self.assertRaisesRegex(ValueError,"^qualification.compilation_scope_directories_physical$"):
+                    with ExitStack() as held:
+                        self.audit.hold_compilation_directory_metadata([replaced],held,{})
                 with self.assertRaisesRegex(ValueError,"^qualification.compiler_namespace_changed$"):
                     with ExitStack() as held:
                         self.audit.hold_compilation_directory_metadata([inventory],held,{})
@@ -1596,25 +2251,6 @@ with tempfile.TemporaryDirectory() as temporary:
                 self.audit.audit_compiler_launch(root,ref("changed-launch.json",launch),argv,repository,
                                                 expected,sources,"2"*64)
 
-    def test_primary_probe_tools_are_reviewed_images_and_not_arbitrary_reports(self):
-        candidate = "/public-candidate"
-        tools = {"consumer/verify_public_compilation_probes.py":"c2c218095e11f6abbd862a08a2e9a0f493fd9704fec0079f2d8c5abc09c4707b",
-            "consumer/scope-record-functions.py":"fba31e53940e6d37f0170e89fce687a58f7b4fb4a5adf40b8f8b2f06743f3e38",
-            "inventory-collector.py":"6004b9a4aa2b2acbb7aaee8c5cbfb56e597b54c94e9e2c6716baf11b26601359",
-            "run-public-compiler-campaign-current.py":"bf4b1085c5c5f246fff3130d66b8b26f2417c3b30376ac4ef2b93ca928b0374b"}
-        plan = {"candidate":candidate,"tools":[{"path":candidate+"/target/metadata/"+path,"sha256":digest}
-                for path,digest in tools.items()]}
-        accepted = self.audit.audit_primary_compiler_tools(plan)
-        self.assertEqual(len(accepted),4)
-        for mutation in ["changed","missing","duplicate"]:
-            with self.subTest(mutation=mutation):
-                changed = deepcopy(plan)
-                if mutation == "changed": changed["tools"][0]["sha256"] = "0"*64
-                if mutation == "missing": changed["tools"].pop()
-                if mutation == "duplicate": changed["tools"].append(deepcopy(changed["tools"][0]))
-                with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_primary_tool$"):
-                    self.audit.audit_primary_compiler_tools(changed)
-
     def test_current_probe_roster_requires_all_six_pinned_images(self):
         candidate = "/var/tmp/public-primary-contract"
         tools = {
@@ -1630,15 +2266,12 @@ with tempfile.TemporaryDirectory() as temporary:
                          for path,digest in tools.items()]}
         self.assertEqual(self.audit.audit_primary_compiler_tools(plan),
                          {row["path"]:row["sha256"] for row in plan["tools"]})
-        for mutation in ["changed","missing","duplicate","legacy"]:
+        for mutation in ["changed","missing","duplicate"]:
             with self.subTest(mutation=mutation):
                 changed = deepcopy(plan)
                 if mutation == "changed": changed["tools"][0]["sha256"] = "0"*64
                 elif mutation == "missing": changed["tools"].pop()
                 elif mutation == "duplicate": changed["tools"].append(deepcopy(changed["tools"][0]))
-                else:
-                    changed["tools"] = [{"path":candidate+"/target/metadata/"+path,"sha256":digest}
-                                         for path,digest in self.audit.PRIMARY_COMPILER_TOOLS.items()]
                 with self.assertRaisesRegex(ValueError,"^qualification.compiled_profile_primary_tool$"):
                     self.audit.audit_primary_compiler_tools(changed)
 
@@ -1787,13 +2420,12 @@ with tempfile.TemporaryDirectory() as temporary:
             finally:campaign.close()
 
     def test_native_compiler_dispatch_output_version_is_closed(self):
-        base={"schema":"chio.compilation-supervisor-events.v1","events":[]}
+        base={"schema":"chio.compilation-supervisor-events.v2","events":[]}
         configuration={"candidate":"/candidate","aliases":[],"records":"/candidate/target/records",
                        "evidence":"/candidate/target/evidence"}
-        for version in ["chio.compilation-supervisor-events.v1","chio.compilation-supervisor-events.v2"]:
-            self.assertEqual(self.audit.audit_compilation_dispatches(Path(configuration["records"]),configuration,{},
-                {**base,"schema":version},{"records":[]},None,None),0)
-        for version in [None,[],"chio.compilation-supervisor-events.v3"]:
+        self.assertEqual(self.audit.audit_compilation_dispatches(Path(configuration["records"]),configuration,{},
+            base,{"records":[]},None,None),0)
+        for version in [None,[],"chio.compilation-supervisor-events.v1","chio.compilation-supervisor-events.v3"]:
             with self.subTest(version=version),self.assertRaisesRegex(ValueError,"^qualification.micro_supervisor_events$"):
                 self.audit.audit_compilation_dispatches(Path(configuration["records"]),configuration,{},
                     {**base,"schema":version},{"records":[]},None,None)
@@ -1801,13 +2433,295 @@ with tempfile.TemporaryDirectory() as temporary:
                   "cwd":"/candidate","compiler_exit":1}
         event={"request_sha256":"3"*64,"id":"4"*32,"exit":1,"recorder_exit":1,"response":"encoded",
                "refusal":None,"dispatches":[dispatch],"records":[]}
-        for version,changed in [("chio.compilation-supervisor-events.v1",{
-                **dispatch,"schema":"chio.native-compiler-dispatch.v2","output":{}}),
-                ("chio.compilation-supervisor-events.v2",dispatch)]:
-            with self.subTest(mixed_version=version),self.assertRaisesRegex(ValueError,"^qualification.micro_dispatch$"):
-                self.audit.audit_compilation_dispatches(Path(configuration["records"]),configuration,{},
-                    {"schema":version,"events":[{**event,"dispatches":[changed]}]},
-                    {"records":[]},None,None)
+        with self.assertRaisesRegex(ValueError,"^qualification.micro_dispatch$"):
+            self.audit.audit_compilation_dispatches(Path(configuration["records"]),configuration,{},
+                {**base,"events":[event]},{"records":[]},None,None)
+
+    def bounded_output(self, artifacts, payloads):
+        """Complete bounded native output observation; no real stream is run."""
+        outputs = {}
+        for name,payload in payloads:
+            reference = {"sha256":hashlib.sha256(payload).hexdigest(),"size":len(payload)}
+            reference["artifact"] = "artifacts/"+reference["sha256"]
+            artifacts[reference["artifact"]] = payload
+            outputs[name] = reference
+        return {"schema":"chio.native-compiler-output.v1","status":"complete","refusal":None,
+            "observed_bytes":{name:reference["size"] for name,reference in outputs.items()},
+            "eof":{name:True for name in outputs},"elapsed_seconds":1.0,"cleanup":None,
+            "policy":{"maximum_bytes_per_stream":16*1024**2,"execution_and_cleanup_seconds":180,
+                "cleanup_reserve_seconds":1,"raw_diagnostics_forwarded":False},**outputs}
+
+    def linker_dispatch_bundle(self, namespace, unit=True):
+        """Valid current v2 supervisor/dispatch publication; no compiler run."""
+        # Target microconsumer conservation is preserved by its unchanged AST
+        # and existing historical evidence; this maintained control exercises
+        # the maintained production consumer over modeled compiler records.
+        namespace = Path(namespace).resolve()
+        (namespace/"records").mkdir()
+        configuration = {"candidate":"/candidate","aliases":[],
+            "records":"/candidate/target/records","evidence":"/candidate/target/evidence"}
+        linker = {"path":"/toolchain/bin/rustld","sha256":"6"*64,"size":9}
+        declaration = {"schema":"chio.linux-compilation-scope-declaration.v2","scope_id":"5"*64,
+            "images":{"recorder":{"path":"/toolchain/record-rust-compilation.py","sha256":"7"*64,"size":9},
+                "rustc":{"path":"/toolchain/bin/rustc","sha256":"8"*64,"size":9},"linker":linker},
+            "targets":[],"retention_batch":{"batch_id":"b"*32,"source_binding":"a"*64},
+            "retention_outcome_sha256":"9"*64}
+        bodies = {}
+        def image(value):
+            reference = self.audit.compilation_json_image(value)
+            bodies[reference["artifact"]] = value
+            return reference
+        raw = [declaration["images"]["recorder"]["path"],declaration["images"]["rustc"]["path"],
+            "--crate-name","public","public.rs","--emit","link","-C","linker="+linker["path"]] if unit else \
+            [declaration["images"]["recorder"]["path"],declaration["images"]["rustc"]["path"],
+             "--print","cfg"]
+        digest = lambda value: hashlib.sha256(self.audit.compilation_canonical(value)).hexdigest()
+        native = {"scope_id":declaration["scope_id"],"scope_record":image(declaration),
+            "coverage":"conservative-read-scope","platform":"linux-gnu","linker":linker,
+            "input_attribution":"direct-source-and-extern-plus-conservative-allowed-scope",
+            "generated_attribution":"campaign-produced",
+            "retention_batch":declaration["retention_batch"],
+            "retention_outcome_sha256":declaration["retention_outcome_sha256"]}
+        selection = {"raw_wrapper_argv":image(raw),"effective_argv":image(raw[1:]),
+            "raw_wrapper_sha256":digest(raw),"raw_compiler_sha256":digest(raw[1:]),
+            "effective_invocation_sha256":digest(raw[1:]),
+            "reason":"matching-explicit-linker" if unit else "probe-unchanged",
+            "target":"x86_64-unknown-linux-gnu","driver":linker if unit else None,"profile":None}
+        semantics = {"target":None,"native_scope":native,"compiler_dispatch":selection}
+        if unit:
+            semantics["cwd"] = "/candidate"
+        row = {"status":"success","kind":"compilation" if unit else "probe","compiler_exit":0,
+            "invocation_sha256":digest(raw[1:]),"environment_sha256":"4"*64,"semantics":semantics}
+        artifacts = {}
+        output = self.bounded_output(artifacts,[("stdout",b"linker accepted\n"),
+            ("stderr",b"diagnostic\n")])
+        dispatch = {"kind":"compiler-unit" if unit else "compiler-probe",
+            "invocation_sha256":row["invocation_sha256"],
+            "environment_sha256":row["environment_sha256"],"cwd":"/candidate","compiler_exit":0,
+            "schema":"chio.native-compiler-dispatch.v2","output":output}
+        event = {"request_sha256":"2"*64,"id":"3"*32,"exit":0,"recorder_exit":0,
+            "response":"encoded","refusal":None,"records":[],"dispatches":[dispatch]}
+        return [namespace,configuration,declaration,row,event,bodies,artifacts]
+
+    def reseal_linker_argv(self, parts, raw):
+        namespace,configuration,declaration,row,event,bodies,artifacts = parts
+        selection = row["semantics"]["compiler_dispatch"]
+        for key,value in [("raw_wrapper_argv",raw),("effective_argv",raw[1:])]:
+            reference = self.audit.compilation_json_image(value)
+            bodies[reference["artifact"]] = value
+            selection[key] = reference
+        digest = lambda value: hashlib.sha256(self.audit.compilation_canonical(value)).hexdigest()
+        selection.update(raw_wrapper_sha256=digest(raw),raw_compiler_sha256=digest(raw[1:]),
+            effective_invocation_sha256=digest(raw[1:]))
+        row["invocation_sha256"] = digest(raw[1:])
+        event["dispatches"][0]["invocation_sha256"] = row["invocation_sha256"]
+
+    def observe_linker_dispatch(self, parts, size_delta=0):
+        namespace,configuration,declaration,row,event,bodies,artifacts = parts
+        identifier = row.get("invocation_id","1"*32)
+        path = namespace/"records"/(identifier+".json")
+        path.write_bytes(self.audit.compilation_canonical(row)+b"\n")
+        raw = path.read_bytes()
+        event["records"] = [{"invocation_id":identifier,"path":"records/"+path.name,
+            "sha256":hashlib.sha256(raw).hexdigest(),"size":len(raw)+size_delta}]
+        publications = {"records":[{"invocation_id":identifier,
+            "record_sha256":hashlib.sha256(raw).hexdigest()}]}
+        events = {"schema":"chio.compilation-supervisor-events.v2","events":[event]}
+        return self.audit.audit_compilation_dispatches(namespace,configuration,declaration,events,
+            publications,lambda selected:json.loads(selected.read_bytes()),
+            lambda _namespace,reference:bodies[reference["artifact"]],
+            lambda selected:selected.read_bytes(),
+            lambda reference:artifacts[reference["artifact"]])
+
+    def test_matching_explicit_linker_uses_actual_consumed_pinned_driver(self):
+        # Independently resealed negatives must fail at the consumed codegen
+        # linker grammar, never at an earlier schema/output/publication join.
+        for style,reason in [("separate","micro_compiler_driver"),
+                             ("compact","micro_compiler_driver"),
+                             ("duplicate","micro_compiler_driver"),
+                             ("option-value","micro_compiler_dispatch")]:
+            with self.subTest(style=style),tempfile.TemporaryDirectory() as temporary:
+                parts = self.linker_dispatch_bundle(Path(temporary).resolve())
+                self.assertEqual(self.observe_linker_dispatch(parts),1)
+                _namespace,_configuration,declaration,row,_event,bodies,_artifacts = parts
+                selection = row["semantics"]["compiler_dispatch"]
+                raw = deepcopy(bodies[selection["raw_wrapper_argv"]["artifact"]])
+                if style == "separate":
+                    raw[-1] = "linker=/outside/unapproved-linker"
+                elif style == "compact":
+                    raw[-2:] = ["-Clinker=/outside/unapproved-linker"]
+                elif style == "duplicate":
+                    raw += ["-C","linker="+declaration["images"]["linker"]["path"]]
+                else:
+                    # An option value that merely looks like a codegen flag is
+                    # never a consumed linker, so the declared matched driver
+                    # and unchanged effective argv cannot both remain true.
+                    raw[-2:] = ["--cfg","-Clinker="+declaration["images"]["linker"]["path"]]
+                self.reseal_linker_argv(parts,raw)
+                with self.assertRaisesRegex(ValueError,"^qualification\\."+reason+"$"):
+                    self.observe_linker_dispatch(parts)
+
+    def test_compact_declared_driver_and_exact_alias_remain_valid(self):
+        for style in ["compact","alias"]:
+            with self.subTest(style=style),tempfile.TemporaryDirectory() as temporary:
+                parts = self.linker_dispatch_bundle(Path(temporary).resolve())
+                self.assertEqual(self.observe_linker_dispatch(parts),1)
+                _namespace,configuration,declaration,row,_event,bodies,_artifacts = parts
+                selection = row["semantics"]["compiler_dispatch"]
+                raw = deepcopy(bodies[selection["raw_wrapper_argv"]["artifact"]])
+                if style == "compact":
+                    raw[-2:] = ["-Clinker="+declaration["images"]["linker"]["path"]]
+                else:
+                    configuration["aliases"] = [{"path":"/runtime/declared-linker","text":"linker",
+                        "target":declaration["images"]["linker"]["path"]}]
+                    raw[-1] = "linker=/runtime/declared-linker"
+                self.reseal_linker_argv(parts,raw)
+                self.assertEqual(self.observe_linker_dispatch(parts),1)
+
+    def test_published_environment_kind_and_compilation_cwd_join_actual_context(self):
+        # Each mutation keeps schema, output, publication and target joins
+        # intact, so only the actually dispatched context can refuse here.
+        for mutation in ["environment","kind","exit","cwd"]:
+            with self.subTest(mutation=mutation),tempfile.TemporaryDirectory() as temporary:
+                parts = self.linker_dispatch_bundle(Path(temporary).resolve(),unit=mutation != "kind")
+                self.assertEqual(self.observe_linker_dispatch(parts),1)
+                dispatch = parts[4]["dispatches"][0]
+                if mutation == "environment":
+                    dispatch["environment_sha256"] = "0"*64
+                elif mutation == "kind":
+                    # A valid probe record keeps its probe dispatch kind; a
+                    # unit-kind dispatch cannot join that published probe row.
+                    dispatch["kind"] = "compiler-unit"
+                elif mutation == "exit":
+                    dispatch["compiler_exit"] = 1
+                else:
+                    # A cwd still under the candidate but contradicting the
+                    # published compilation semantics must not join either.
+                    dispatch["cwd"] = "/candidate/other"
+                with self.assertRaisesRegex(ValueError,"^qualification\\.micro_actual_dispatch$"):
+                    self.observe_linker_dispatch(parts)
+
+    def test_actual_dispatch_cwd_must_stay_under_the_candidate_outside_protected_roots(self):
+        for cwd in ["/elsewhere","/candidate/target/records","/candidate/target/evidence"]:
+            with self.subTest(cwd=cwd),tempfile.TemporaryDirectory() as temporary:
+                parts = self.linker_dispatch_bundle(Path(temporary).resolve())
+                self.assertEqual(self.observe_linker_dispatch(parts),1)
+                parts[4]["dispatches"][0]["cwd"] = cwd
+                with self.assertRaisesRegex(ValueError,"^qualification\\.micro_dispatch$"):
+                    self.observe_linker_dispatch(parts)
+
+    def test_unjoined_or_duplicate_actual_dispatch_cannot_be_counted_as_a_verified_join(self):
+        for style in ["unjoined","duplicate"]:
+            with self.subTest(style=style),tempfile.TemporaryDirectory() as temporary:
+                parts = self.linker_dispatch_bundle(Path(temporary).resolve())
+                self.assertEqual(self.observe_linker_dispatch(parts),1)
+                dispatch = parts[4]["dispatches"][0]
+                parts[4]["dispatches"].append({**dispatch,
+                    "invocation_sha256":"9"*64 if style == "unjoined" else dispatch["invocation_sha256"]})
+                with self.assertRaisesRegex(ValueError,"^qualification\\.micro_actual_dispatch$"):
+                    self.observe_linker_dispatch(parts)
+
+    def test_actual_publication_reference_size_must_equal_held_record_bytes(self):
+        # The reference sha256 stays joined; only the declared size drifts
+        # from the physical held record bytes.
+        with tempfile.TemporaryDirectory() as temporary:
+            parts = self.linker_dispatch_bundle(Path(temporary).resolve())
+            self.assertEqual(self.observe_linker_dispatch(parts),1)
+            with self.assertRaisesRegex(ValueError,"^qualification\\.micro_dispatch_publication$"):
+                self.observe_linker_dispatch(parts,size_delta=1)
+
+    def test_failed_dispatch_is_diagnostic_and_does_not_increase_verified_count(self):
+        # A coherent failed row/event/dispatch is accepted diagnostically:
+        # every physical publication and schema join stays valid, the count
+        # of successfully verified joins stays zero, and nothing is discarded.
+        with tempfile.TemporaryDirectory() as temporary:
+            parts = self.linker_dispatch_bundle(Path(temporary).resolve())
+            self.assertEqual(self.observe_linker_dispatch(parts),1)
+            row,event = parts[3],parts[4]
+            row.update(status="failed",compiler_exit=1)
+            event.update(exit=1,recorder_exit=1)
+            event["dispatches"][0]["compiler_exit"] = 1
+            self.assertEqual(self.observe_linker_dispatch(parts),0)
+
+    def internal_probe_bundle(self, namespace, name):
+        """Actual current producer probe row in current v2 transport; no compiler run."""
+        parts = self.linker_dispatch_bundle(Path(namespace).resolve(),unit=False)
+        namespace,configuration,declaration,_row,event,bodies,artifacts = parts
+        spec = importlib.util.spec_from_file_location("qualification_internal_probe_producer",
+            ROOT/"scripts/record-rust-compilation.py")
+        producer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(producer)
+        native = _row["semantics"]["native_scope"]
+        environment = {"PATH":"/public"}
+        rows = []
+        output = self.bounded_output(artifacts,[("stdout",b"PUBLIC SYNTHETIC COMPILER RESPONSE"),
+            ("stderr",b"")])
+        def executor(arguments, actual_environment, cwd, probe):
+            # The synthetic executor observes the exact probe dispatch; the
+            # bounded v2 output is the modeled transport observation.
+            self.assertTrue(probe)
+            event["dispatches"] = [{"kind":"compiler-probe",
+                "invocation_sha256":producer.digest(arguments),
+                "environment_sha256":producer.digest(actual_environment),"cwd":cwd,
+                "compiler_exit":0,"schema":"chio.native-compiler-dispatch.v2","output":output}]
+            return SimpleNamespace(returncode=0,stdout=b"PUBLIC SYNTHETIC COMPILER RESPONSE")
+        campaign = SimpleNamespace(environment=environment,cwd="/candidate",binding="a"*64,
+            native_reference=native,executor=executor,publish=lambda published:rows.append(deepcopy(published)))
+        arguments = ["-vV"] if name == "version" else ["--print","sysroot"]
+        rustc = declaration["images"]["rustc"]
+        result = producer.compiler_probe(Path(rustc["path"]),arguments,name,campaign,rustc)
+        self.assertEqual(result,"PUBLIC SYNTHETIC COMPILER RESPONSE")
+        self.assertEqual(len(rows),1)
+        # The emitted producer row is retained unchanged; no wrapper compiler
+        # dispatch selection is invented for an internal metadata probe.
+        self.assertEqual(set(rows[0]["semantics"]),{"probe","native_scope"})
+        self.assertNotIn("compiler_dispatch",rows[0]["semantics"])
+        parts[3] = rows[0]
+        return parts
+
+    def test_actual_internal_probes_join_the_current_dispatch_consumer(self):
+        for name in ["version","sysroot"]:
+            with self.subTest(probe=name),tempfile.TemporaryDirectory() as temporary:
+                parts = self.internal_probe_bundle(Path(temporary).resolve(),name)
+                self.assertEqual(self.observe_linker_dispatch(parts),1)
+
+    def test_internal_name_compiler_context_schema_and_payload_cannot_be_resealed(self):
+        # Each reseal starts from a passing actual producer row and mutates
+        # one joined fact; the refusal must come from that semantic join,
+        # never from an earlier schema, hash, output or publication error.
+        for mutation,reason in [("name","micro_internal_probe"),
+                                ("compiler","micro_internal_probe"),
+                                ("environment","micro_actual_dispatch"),
+                                ("invocation","micro_internal_probe"),
+                                ("schema","micro_internal_probe"),
+                                ("input","micro_internal_probe"),
+                                ("scope","micro_unit_native_scope"),
+                                ("selection","micro_compiler_dispatch")]:
+            with self.subTest(mutation=mutation),tempfile.TemporaryDirectory() as temporary:
+                parts = self.internal_probe_bundle(Path(temporary).resolve(),"version")
+                self.assertEqual(self.observe_linker_dispatch(parts),1)
+                row,event = parts[3],parts[4]
+                if mutation == "name":
+                    row["semantics"]["probe"] = "arbitrary"
+                elif mutation == "compiler":
+                    row["compiler"] = {**row["compiler"],"sha256":"0"*64}
+                elif mutation == "environment":
+                    row["environment_sha256"] = "0"*64
+                elif mutation == "invocation":
+                    row["invocation_sha256"] = "0"*64
+                    event["dispatches"][0]["invocation_sha256"] = "0"*64
+                elif mutation == "schema":
+                    row["schema"] = "chio.rust-compilation.v3"
+                elif mutation == "input":
+                    row["inputs"] = [{"path":"/arbitrary","sha256":"0"*64}]
+                elif mutation == "scope":
+                    row["semantics"]["native_scope"]["retention_outcome_sha256"] = "0"*64
+                else:
+                    # An invented wrapper compiler_dispatch selection cannot
+                    # reclassify an internal metadata probe as a unit dispatch.
+                    row["semantics"]["compiler_dispatch"] = None
+                with self.assertRaisesRegex(ValueError,"^qualification\\."+reason+"$"):
+                    self.observe_linker_dispatch(parts)
 
     def test_actual_recorder_publications_join_the_current_archive_decoder(self):
         """Real public publisher/parser composition; no compiler was executed."""
@@ -1849,6 +2763,93 @@ with tempfile.TemporaryDirectory() as temporary:
                     with self.assertRaisesRegex(ValueError,"^qualification.micro_primary_compilations$"):
                         self.audit.checked_public_compilation_count(changed,"gnu-native")
 
+    def unreferenced_cas_namespace(self, root):
+        # The added CAS file is synthetic parser data outside any retention batch;
+        # no compiler or native qualification is claimed here.
+        fixture = self.compiler_publication_bundle(root)
+        payload = b"PUBLIC-UNREFERENCED-CAS-IMAGE"
+        member = fixture["namespace"]/"artifacts"/hashlib.sha256(payload).hexdigest()
+        member.write_bytes(payload)
+        return {**fixture,"member":member,"retained":fixture["artifact"]}
+
+    def test_unreferenced_cas_members_are_held_counted_and_hash_checked(self):
+        """Live CAS custody covers unreferenced members, not only referenced ones."""
+        for change in [None,"wrong-body","symlink","late-mutation"]:
+            with self.subTest(change=change),tempfile.TemporaryDirectory() as temporary:
+                fixture = self.unreferenced_cas_namespace(Path(temporary).resolve())
+                namespace,member = fixture["namespace"],fixture["member"]
+                if change == "wrong-body":
+                    (namespace/"artifacts"/("c"*64)).write_bytes(b"unreferenced wrong CAS body\n")
+                elif change == "symlink":
+                    (namespace/"artifacts"/("d"*64)).symlink_to(member.name)
+                if change is None:
+                    publication = self.audit.audit_compiler_publications(namespace,fixture["binding"])
+                    self.assertEqual(publication["verified_records"],1)
+                    self.assertEqual(publication["verified_artifacts"],2)
+                    self.assertEqual(publication["verified_artifact_bytes"],
+                                     fixture["member"].stat().st_size+fixture["retained"].stat().st_size)
+                    self.assertEqual(publication["compiled_closure_status"],"not-established")
+                elif change == "late-mutation":
+                    # The third artifacts listing is the final re-read, after every
+                    # member was already held, hashed and identity-checked.
+                    listdir = os.listdir
+                    artifacts_inode = (namespace/"artifacts").stat().st_ino
+                    checks = 0
+                    def observed_listdir(descriptor):
+                        nonlocal checks
+                        if isinstance(descriptor,int) and os.fstat(descriptor).st_ino == artifacts_inode:
+                            checks += 1
+                            if checks == 3:
+                                member.write_bytes(b"changed after the unreferenced member was held\n")
+                        return listdir(descriptor)
+                    with patch.object(self.audit.os,"listdir",side_effect=observed_listdir):
+                        with self.assertRaisesRegex(ValueError,"^qualification.compiler_namespace_changed$"):
+                            self.audit.audit_compiler_publications(namespace,fixture["binding"])
+                    self.assertEqual(checks,3)
+                else:
+                    reason = "compiler_descriptor_namespace" if change == "symlink" else "compiler_artifact_binding"
+                    with self.assertRaisesRegex(ValueError,"^qualification\\."+reason+"$"):
+                        self.audit.audit_compiler_publications(namespace,fixture["binding"])
+
+    def test_numeric_publication_joins_refuse_boolean_and_float_aliases(self):
+        """The physical marker join and the outside sync join keep exact numeric types."""
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self.unreferenced_cas_namespace(Path(temporary).resolve())
+            marker = fixture["marker"]
+            # Rewrite the completion marker in place so the recorded record
+            # hash and inode references keep joining; only the size type changes.
+            completion = json.loads(marker.read_bytes())
+            completion["size"] = float(completion["size"])
+            inode = marker.stat().st_ino
+            marker.write_bytes(self.audit.compilation_canonical(completion)+b"\n")
+            self.assertEqual(marker.stat().st_ino,inode)
+            with self.assertRaisesRegex(ValueError,"^qualification.compiler_publication_binding$"):
+                self.audit.audit_compiler_publications(fixture["namespace"],fixture["binding"])
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self.unreferenced_cas_namespace(Path(temporary).resolve())
+            publication = self.audit.audit_compiler_publications(fixture["namespace"],fixture["binding"])
+            observed = self.audit.current_required_sync_observations(publication,fixture["stderr"])
+            self.assertEqual(set(observed["unit_outcomes"]),set(publication["unit_publications"]))
+            self.assertEqual(set(observed["batch_outcomes"]),
+                             {batch["batch_id"] for batch in publication["retention_batches"]})
+            aliases = [("compiler_exit",lambda value:value.update(compiler_exit=False)),
+                       ("record_size",lambda value:value["record"].update(size=float(value["record"]["size"]))),
+                       ("completion_size_float",
+                        lambda value:value["completion"].update(size=float(value["completion"]["size"])))]
+            for name,alias in aliases:
+                with self.subTest(join="required-sync",alias=name):
+                    prefix = b"compilation_recorder.unit_publication_outcome="
+                    lines = []
+                    for line in fixture["stderr"].splitlines():
+                        if line.startswith(prefix):
+                            value = json.loads(line[len(prefix):])
+                            alias(value)
+                            line = prefix+self.audit.compilation_canonical(value)
+                        lines.append(line)
+                    stream = b"\n".join(lines)+b"\n"
+                    with self.assertRaisesRegex(ValueError,"^qualification.compiler_required_sync_observation$"):
+                        self.audit.current_required_sync_observations(publication,stream)
+
     def test_current_source_hash_and_cycles_are_independently_checked(self):
         rows,sources,roots = self.compiler_unit_graph_bundle()
         sources[0]["sha256"]="5"*64
@@ -1869,35 +2870,39 @@ with tempfile.TemporaryDirectory() as temporary:
         with self.assertRaisesRegex(ValueError,"^qualification.compiler_extern_producer$"):
             self.audit.audit_compiler_unit_graph(rows,sources,roots,immutable_images=[declared])
 
-    def compiler_publication_bundle(self, root):
-        # The image is a synthetic parser artifact, never an executed compiler.
+    def compiler_publication_bundle(self, root, binding="1"*64, *,
+                                    source_paths=None, unit_paths=None, semantics=None):
+        # Publish parser artifacts through the real recorder; no compiler executes.
+        spec = importlib.util.spec_from_file_location(
+            "qualification_recorder_publication_bundle", ROOT/"scripts/record-rust-compilation.py")
+        recorder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(recorder)
         namespace = root/"compiler"
-        for name in ["records","completions","artifacts"]:
-            (namespace/name).mkdir(parents=True,exist_ok=True)
+        namespace.mkdir(parents=True)
         payload = b"synthetic retained image\n"
-        digest = hashlib.sha256(payload).hexdigest()
-        (namespace/"artifacts"/digest).write_bytes(payload)
-        image = {"path":"/synthetic/image","artifact":"artifacts/"+digest,
-                 "sha256":digest,"size":len(payload)}
-        identifier = "a"*32
-        record = namespace/"records"/(identifier+".json")
-        marker = namespace/"completions"/(identifier+".json")
-        record.touch()
-        marker.touch()
-        file_identity = lambda path:{"device":path.stat().st_dev,"inode":path.stat().st_ino}
-        row = {"schema":"chio.rust-compilation.v3","source_binding":"1"*64,
-            "invocation_id":identifier,"kind":"compilation","status":"success","compiler_exit":0,
-            "compiler":image,"inputs":[{**image,"role":"source"}],"outputs":[{**image,"role":"unit"}],
-            "depfiles":[],"refusal":None,"publication":{"completion":"completions/"+identifier+".json",
-                "marker_identity":file_identity(marker)}}
-        raw = json.dumps(row,sort_keys=True).encode()+b"\n"
-        record.write_bytes(raw)
-        completion = {"schema":"chio.rust-compilation-completion.v2","invocation_id":identifier,
-            "source_binding":row["source_binding"],"record_sha256":hashlib.sha256(raw).hexdigest(),
-            "size":len(raw),"record_identity":file_identity(record)}
-        marker.write_text(json.dumps(completion))
-        return {"namespace":namespace,"record":record,"marker":marker,"row":row,
-                "artifact":namespace/"artifacts"/digest,"binding":row["source_binding"]}
+        campaign = recorder.Campaign(namespace,binding)
+        outside = io.StringIO()
+        try:
+            with redirect_stderr(outside):
+                with campaign.retention_batch():
+                    image = {"path":"/synthetic/image",**campaign.retain(payload)}
+                    def images(paths, role):
+                        if paths is None:
+                            return [{**image,"role":role}]
+                        return [{"path":str(path),"role":role,**campaign.retain(path.read_bytes())}
+                                for path in paths]
+                    row = recorder.row_for([],{},binding)
+                    row.update(kind="compilation",status="success",compiler_exit=0,compiler=image,
+                               inputs=images(source_paths,"source"),outputs=images(unit_paths,"unit"),
+                               semantics=semantics)
+                campaign.publish(row)
+        finally:
+            campaign.close()
+        identifier = row["invocation_id"]
+        return {"namespace":namespace,"record":namespace/"records"/(identifier+".json"),
+                "marker":namespace/"completions"/(identifier+".json"),
+                "artifact":namespace/"artifacts"/hashlib.sha256(payload).hexdigest(),
+                "row":row,"binding":binding,"stderr":outside.getvalue().encode()}
 
     def test_original_compiler_namespace_publication_verification_is_not_native_qualification(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -1925,6 +2930,7 @@ with tempfile.TemporaryDirectory() as temporary:
                     self.assertEqual(refused.stdout,"")
 
     def test_copied_compiler_record_or_marker_cannot_preserve_original_physical_publication(self):
+        reasons = {"record":"compiler_publication_binding","marker":"compiler_publication_identity"}
         for name in ["record","marker"]:
             with self.subTest(name=name),tempfile.TemporaryDirectory() as temporary:
                 fixture = self.compiler_publication_bundle(Path(temporary).resolve())
@@ -1932,7 +2938,7 @@ with tempfile.TemporaryDirectory() as temporary:
                 replacement = original.with_suffix(".replacement")
                 replacement.write_bytes(original.read_bytes())
                 replacement.replace(original)
-                with self.assertRaisesRegex(ValueError,"^qualification.compiler_publication_identity$"):
+                with self.assertRaisesRegex(ValueError,"^qualification."+reasons[name]+"$"):
                     self.audit.audit_compiler_publications(fixture["namespace"],fixture["binding"])
 
     def test_retained_compiler_artifact_hash_is_checked_independently(self):
@@ -1952,12 +2958,23 @@ with tempfile.TemporaryDirectory() as temporary:
                 nonlocal checks
                 if isinstance(descriptor,int) and os.fstat(descriptor).st_ino == artifacts_inode:
                     checks += 1
-                    if checks == 2:
+                    if checks == 3:
                         fixture["artifact"].write_bytes(b"changed after original verification\n")
                 return listdir(descriptor)
             with patch.object(self.audit.os,"listdir",side_effect=observed_listdir):
                 with self.assertRaisesRegex(ValueError,"^qualification.compiler_namespace_changed$"):
                     self.audit.audit_compiler_publications(fixture["namespace"],fixture["binding"])
+
+    def test_a_namespace_without_retained_batches_fails_closed_instead_of_downgrading(self):
+        """Historical v3 publication shapes are refused, never re-audited."""
+        with tempfile.TemporaryDirectory() as temporary:
+            namespace = Path(temporary).resolve()/"compiler"
+            for name in ["records","completions","artifacts"]:
+                (namespace/name).mkdir(parents=True)
+            (namespace/"records"/("b"*32+".json")).write_text(
+                json.dumps({"schema":"chio.rust-compilation.v3"}))
+            with self.assertRaisesRegex(ValueError,"^qualification.compiler_retention_batch$"):
+                self.audit.audit_compiler_publications(namespace,"1"*64)
 
     def test_guest_execution_joins_original_origin_without_manufacturing_discovery_head(self):
         # These are parser controls with a captured synthetic receipt, never a live guest execution.
@@ -2239,6 +3256,12 @@ timeout_secs = 60
                     "runtime_sources_before":runtime,"runtime_sources_after":runtime}.items()}
             proofs(snapshot, snapshot)
             self.audit.audit_execution_provenance(root,row,sources,base)
+            for field in ["actual_command_exit","runner_exit"]:
+                result[field] = False
+                proofs(snapshot,snapshot)
+                with self.assertRaisesRegex(ValueError,"^qualification.gate_execution_provenance$"):
+                    self.audit.audit_execution_provenance(root,row,sources,base)
+                result[field] = 0
             changed = deepcopy(snapshot)
             changed["entries"]["fixtures/source.py"]["sha256"] = "3"*64
             proofs(snapshot,changed)
@@ -2251,6 +3274,83 @@ timeout_secs = 60
             proofs(changed,changed)
             with self.assertRaisesRegex(ValueError,"^qualification.gate_source_bracket$"):
                 self.audit.audit_execution_provenance(root,row,sources,base)
+
+    def test_python_sdk_provenance_joins_retained_interpreter_and_in_tree_module_origin(self):
+        expected = self.audit.gate_catalog()["python-sdk"]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            def reference(name, value):
+                raw = json.dumps(value).encode()
+                (root / name).write_bytes(raw)
+                return {"path":name, "sha256":hashlib.sha256(raw).hexdigest()}
+            base = "1"*40
+            module = "sdks/python/chio-sdk-python/src/chio_sdk/__init__.py"
+            sources = [{"path":module, "sha256":"0"*64}]
+            repository = Path("/candidate")
+            prefix = repository / "target/recovery-qualification-venv"
+            real_executable = str(prefix / "bin/python3.12")
+            # Synthetic parser fixtures only: no SDK or interpreter is executed.
+            interpreter_bytes = b"\xcf\xfa\xed\xfe" + b"synthetic retained interpreter bytes, never executed\n"
+            interpreter = {"path":"python-interpreter.bin",
+                           "sha256":hashlib.sha256(interpreter_bytes).hexdigest()}
+            origin = {"chio_sdk":module, "repository":str(repository), "prefix":str(prefix),
+                      "executable":str(prefix / "bin/python"), "real_executable":real_executable}
+            default_entries = {module:{"membership":"tracked", "state":"file",
+                "content_coverage":"sha256-bytes", "mode":420, "size_bytes":32, "sha256":"0"*64}}
+            default_pins = [{"purpose":"interpreter", "path":real_executable,
+                             "observed":{"sha256":interpreter["sha256"]}}]
+            def snapshots(entries, pins):
+                snapshot = {"format":"chio.local-command-provenance.v1",
+                    "git":{"head":base, "branch":"candidate"}, "entries":entries, "explicit_file_pins":pins}
+                snapshot["content_manifest_sha256"] = hashlib.sha256(json.dumps(
+                    {key:snapshot[key] for key in ["git","entries","explicit_file_pins"]},
+                    sort_keys=True, ensure_ascii=True, separators=(",",":"), allow_nan=False).encode()).hexdigest()
+                return snapshot
+            def observe(*, origin_row=None, entries=None, pins=None, retained=None):
+                (root / "python-interpreter.bin").write_bytes(
+                    interpreter_bytes if retained is None else retained)
+                log_raw = ("QUALIFICATION_PYTHON_IMPORTS " + json.dumps(
+                    origin if origin_row is None else origin_row)
+                    + "\nsynthetic provenance log, no SDK execution claimed\n").encode()
+                (root / "sdk-python.log").write_bytes(log_raw)
+                log = {"path":"sdk-python.log", "sha256":hashlib.sha256(log_raw).hexdigest()}
+                before = after = snapshots(entries if entries is not None else default_entries,
+                                           pins if pins is not None else default_pins)
+                start = {"repository":str(repository), "cwd":str(repository), "command":expected["command"],
+                         "environment":dict(expected["environment"])}
+                result = {"format":"chio.local-command-provenance.v1", "actual_command_exit":0, "runner_exit":0,
+                    "inventories_complete":True, "output_pipe_completed":True, "provenance_error":None,
+                    "source_drift":{"detected":False},
+                    "before_manifest_sha256":before["content_manifest_sha256"],
+                    "after_manifest_sha256":after["content_manifest_sha256"], "log":{"sha256":log["sha256"]}}
+                runtime = {"source_inventory_version":self.audit.INVENTORY_VERSION, "base_commit":base,
+                           "sources":sources, "source_binding":self.audit.binding(sources,base)}
+                row = {"id":"python-sdk", "command":expected["command"], "cwd":expected["cwd"], "log":log,
+                       "interpreter":interpreter, "provenance":{key:reference(key+".json", value) for key,value in {
+                           "before":before, "after":after, "start":start, "result":result,
+                           "runtime_sources_before":runtime, "runtime_sources_after":runtime}.items()}}
+                return self.audit.audit_execution_provenance(root,row,sources,base)
+            self.assertIsNone(observe())
+            for field, value in [("repository","/unrelated-repository"),
+                                 ("prefix","/unrelated-prefix/target/recovery-qualification-venv"),
+                                 ("executable",str(prefix / "bin/python3")),
+                                 ("chio_sdk","sdks/python/chio-unrelated/src/chio_sdk/__init__.py")]:
+                with self.subTest(field=field):
+                    with self.assertRaisesRegex(ValueError,"^qualification.python_sdk_origin$"):
+                        observe(origin_row={**origin, field:value})
+            with self.subTest(change="retained-interpreter-bytes"):
+                with self.assertRaisesRegex(ValueError,"^qualification.dimension_executable$"):
+                    observe(retained=b"\xcf\xfa\xed\xfe" + b"tampered retained interpreter bytes\n")
+            with self.subTest(change="mismatched-interpreter-pin"):
+                with self.assertRaisesRegex(ValueError,"^qualification.python_interpreter_binding$"):
+                    observe(pins=[{"purpose":"interpreter", "path":real_executable,
+                                   "observed":{"sha256":"0"*64}}])
+            with self.subTest(change="missing-interpreter-pin"):
+                with self.assertRaisesRegex(ValueError,"^qualification.python_interpreter_binding$"):
+                    observe(pins=[])
+            with self.subTest(change="imported-module-source-bytes"):
+                with self.assertRaisesRegex(ValueError,"^qualification.gate_source_bracket$"):
+                    observe(entries={module:{**default_entries[module], "sha256":"3"*64}})
 
     def test_unrelated_runs_and_self_declared_dimensions_are_refused(self):
         with tempfile.TemporaryDirectory() as temporary:

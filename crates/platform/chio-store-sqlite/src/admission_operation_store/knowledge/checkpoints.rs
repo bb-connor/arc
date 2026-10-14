@@ -13,11 +13,13 @@ mod retirement;
 mod retirement_test_support;
 #[cfg(all(test, unix))]
 use head::checkpoint_revision_key;
-use head::{checkpoint_key, load_checkpoint, load_visible_checkpoint, retain_checkpoint_revision};
-pub(super) use reference_source::checkpoint_reference_source;
+pub(super) use head::{derive_current, derive_revision};
+use head::{load_checkpoint, load_visible_checkpoint, retain_checkpoint_revision};
+pub(super) use reference_source::{checkpoint_reference_source, CheckpointReferenceSource};
 pub(super) use restore::restore_reference_source;
 pub(in crate::admission_operation_store) use restore::AuthenticatedCheckpointRestoreEncodingSource;
 pub use restore::NativeCheckpointRestore;
+pub(super) use retirement::pending_revision_retirement;
 #[cfg(all(test, unix))]
 mod tests;
 
@@ -39,7 +41,6 @@ impl SqliteAdmissionOperationStore {
             return Err(refused("checkpoint authority"));
         }
         mutate(self, actor, fence, now, |tx, profile, trusted_now| {
-            let key = checkpoint_key(actor.scope(), id)?;
             let old = load_checkpoint(&tx, actor.scope(), id, 0)?;
             if old.as_ref().map_or(0, |old| old.revision.get()) != expected {
                 return Err(refused("checkpoint CAS"));
@@ -117,7 +118,14 @@ impl SqliteAdmissionOperationStore {
             // discard references required by an older retained checkpoint. On
             // update, preserve the previous valid current envelope.
             if let Some(old) = &old {
-                retain_checkpoint_revision(&tx, &self.serving_owner, old)?;
+                retain_checkpoint_revision(
+                    &tx,
+                    &self.serving_owner,
+                    actor,
+                    profile,
+                    trusted_now,
+                    old,
+                )?;
                 if !retirement::revision_is_retired(&tx, old)? {
                     super::reference_custody::retain_checkpoint_references(
                         &tx,
@@ -130,13 +138,30 @@ impl SqliteAdmissionOperationStore {
                     )?;
                 }
             }
-            retain_checkpoint_revision(&tx, &self.serving_owner, &checkpoint)?;
+            retain_checkpoint_revision(
+                &tx,
+                &self.serving_owner,
+                actor,
+                profile,
+                trusted_now,
+                &checkpoint,
+            )?;
             super::reference_custody::retain_checkpoint_references(
                 &tx,
                 &self.serving_owner,
                 &head::checkpoint_revision_key(actor.scope(), id, checkpoint.revision.get())?,
             )?;
-            save(&tx, &self.serving_owner, actor.scope(), &key, &checkpoint)?;
+            if let Some(current) =
+                super::intake::AuthenticatedKnowledgeIntakeSource::checkpoint_current(
+                    &tx,
+                    actor,
+                    profile,
+                    trusted_now,
+                    &checkpoint,
+                )?
+            {
+                protected::persist_knowledge_intake(&tx, &self.serving_owner, current)?;
+            }
             let head = VerifiedCheckpointHeadWrite::new(
                 &tx,
                 actor,

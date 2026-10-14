@@ -25,8 +25,12 @@ pub(super) mod empty_import;
 mod finalization_history;
 #[path = "semantic/grant_sources.rs"]
 mod grant_sources;
+#[path = "semantic/input_fate_replay.rs"]
+mod input_fate_replay;
 #[path = "semantic/input_generation.rs"]
 mod input_generation;
+#[path = "semantic/legacy_annotation_history.rs"]
+mod legacy_annotation_history;
 #[path = "semantic/native_input_compatibility.rs"]
 mod native_input_compatibility;
 #[path = "semantic/retained_ordinary_capture.rs"]

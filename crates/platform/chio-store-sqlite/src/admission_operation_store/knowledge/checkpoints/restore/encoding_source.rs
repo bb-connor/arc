@@ -1,6 +1,7 @@
 //! A restore owner proves its exact lawful admission or outcome update.
 use super::*;
 use crate::admission_operation_store::knowledge::encoding::chunks::EncodingOwner;
+use crate::admission_operation_store::knowledge::encoding::write::EncodingAdmission;
 use std::ops::Deref;
 
 enum RestoreTransition {
@@ -20,13 +21,14 @@ pub(in crate::admission_operation_store) struct AuthenticatedCheckpointRestoreEn
     now: u64,
     key: String,
     record: &'tx RestoreRecord,
+    fence: Option<&'tx StoreMutationFence>,
     transition: RestoreTransition,
     previous: Option<protected::ProtectedSourceReference>,
     observation: protected::ProtectedSourceReference,
 }
 
 impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
-    pub(super) fn admission(
+    pub(super) fn for_admission(
         transaction: &'tx Transaction<'conn>,
         actor: &'tx AuthenticatedRecoveryActor,
         profile: &'tx NativeKnowledgeInstallationV1,
@@ -45,6 +47,7 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
             now,
             key: key.to_owned(),
             record,
+            fence: None,
             transition: RestoreTransition::Admission,
             previous: None,
             observation,
@@ -53,10 +56,14 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
         Ok(source)
     }
 
+    /// One finite forward delivery outcome of an existing admitted restore,
+    /// under its original read authority and current execution readiness.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn acknowledgement(
         transaction: &'tx Transaction<'conn>,
         actor: &'tx AuthenticatedRecoveryActor,
         profile: &'tx NativeKnowledgeInstallationV1,
+        fence: &'tx StoreMutationFence,
         now: u64,
         key: &str,
         record: &'tx RestoreRecord,
@@ -73,6 +80,7 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
             now,
             key: key.to_owned(),
             record,
+            fence: Some(fence),
             transition: RestoreTransition::Acknowledgement,
             previous: Some(previous),
             observation,
@@ -168,6 +176,14 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
                     .previous
                     .as_ref()
                     .ok_or_else(|| refused("restore outcome lost its original root"))?;
+                let fence = self
+                    .fence
+                    .ok_or_else(|| refused("restore outcome lost its writer fence"))?;
+                super::super::super::super::setup::require_ready(
+                    transaction,
+                    self.actor.scope(),
+                    fence,
+                )?;
                 protected::verify_source_reference(transaction, previous)?;
                 let (key, mut original) =
                     retained_restore(transaction, self.actor, request, authorization)?
@@ -176,11 +192,15 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
                 if key != self.key
                     || previous.record_key() != self.key
                     || !matches!(
-                        target,
-                        ArtifactDeliveryStateV1::Uncertain | ArtifactDeliveryStateV1::Delivered
+                        (original.intent.state, target),
+                        (
+                            ArtifactDeliveryStateV1::Admitted,
+                            ArtifactDeliveryStateV1::Uncertain | ArtifactDeliveryStateV1::Delivered
+                        ) | (
+                            ArtifactDeliveryStateV1::Uncertain,
+                            ArtifactDeliveryStateV1::Delivered
+                        )
                     )
-                    || (original.intent.state == ArtifactDeliveryStateV1::Delivered
-                        && target != ArtifactDeliveryStateV1::Delivered)
                 {
                     return Err(refused("restore outcome changed its monotone custody"));
                 }
@@ -287,6 +307,14 @@ impl<'tx, 'conn> AuthenticatedCheckpointRestoreEncodingSource<'tx, 'conn> {
     }
     pub(in crate::admission_operation_store) fn transaction(&self) -> &'tx Transaction<'conn> {
         self.transaction
+    }
+    /// Only an authenticated forward outcome of an already admitted restore is
+    /// owed settlement capacity; a new admission remains ordinary intake.
+    pub(in crate::admission_operation_store) fn admission(&self) -> EncodingAdmission {
+        match self.transition {
+            RestoreTransition::Admission => EncodingAdmission::Intake,
+            RestoreTransition::Acknowledgement => EncodingAdmission::AdmittedOutcome,
+        }
     }
     pub(in crate::admission_operation_store) fn owner(&self) -> EncodingOwner {
         EncodingOwner::Restore {

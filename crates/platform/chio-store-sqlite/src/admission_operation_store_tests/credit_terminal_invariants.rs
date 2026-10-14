@@ -58,6 +58,14 @@ fn assert_invariant(error: AdmissionOperationStoreError, expected: &str) {
     );
 }
 
+// Data corruption fixtures mutate rows under a temporarily dropped catalog
+// trigger. The exact canonical catalog object is restored afterwards so the
+// schema comparison passes and the intended credit data invariant is what
+// fails closed instead of a schema mismatch.
+fn restore_credit_exposure_catalog(connection: &rusqlite::Connection) -> rusqlite::Result<()> {
+    connection.execute_batch(include_str!("../admission_operation_store.sql"))
+}
+
 #[test]
 fn startup_rejects_credit_account_without_reservation_history() -> CreditAuthorizationTestResult {
     let fixture = fixture();
@@ -166,6 +174,7 @@ fn credit_operation_rejects_missing_reservation_row() -> CreditAuthorizationTest
         )?,
         1
     );
+    restore_credit_exposure_catalog(&connection)?;
     drop(connection);
 
     let error = fixture
@@ -216,6 +225,7 @@ fn credit_operation_rejects_mismatched_reservation_row() -> CreditAuthorizationT
         )?,
         1
     );
+    restore_credit_exposure_catalog(&connection)?;
     drop(connection);
 
     let error = fixture
@@ -422,6 +432,7 @@ fn outcome_unknown_credit_transition_is_exactly_bound_to_projection(
         )?,
         1
     );
+    restore_credit_exposure_catalog(&connection)?;
     drop(connection);
     let error = fixture
         .store

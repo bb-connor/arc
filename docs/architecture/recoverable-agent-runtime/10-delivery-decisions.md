@@ -16,36 +16,30 @@ Phases are dependency boundaries, not calendar estimates. Each must produce revi
 
 The current implementation state is [remediation and pending requalification](implementation/STATUS.md).
 P0-P6 implementation exists, but historical phase completion flags and scoped
-review closure do not qualify the changed working tree. The retained
-[P0](implementation/p0/verification.json),
-[P1](implementation/p1/verification.json),
-[P2](implementation/p2/verification.json),
-[P3](implementation/p3/verification.json) and
-[P4](implementation/p4/verification.json) records preserve their exact source
+review closure do not qualify the changed working tree. The retained P0-P4
+verification records in the [historical packages](implementation/history/README.md#package-paths)
+preserve their exact source
 inventories, local acceptance, operating limits, broader failures and unavailable
 checks. Their original reviews remain historical evidence.
 
-The [P5 review](implementation/p5/REVIEW.md),
-[operating contract](implementation/p5/OPERATIONS.md) and
-[verification](implementation/p5/verification.json) retain real GNU/musl Linux
+The archived P5 review, operating contract and verification retain real GNU/musl Linux
 acceptance for the Boolean-only, model-disabled, no-provider profile at source
 binding `562a3c35`. Its ten recovery cases, 72 cage tests, 27 runtime probes,
 ten helper mutants and eleven measured images describe that archived campaign.
 The original review findings and author fix evidence retain separate scopes.
 
-The [P6 review](implementation/p6/REVIEW.md),
-[verification](implementation/p6/verification.json) and
-[supported matrix](implementation/p6/supported-matrix.json) retain local, Linux
+The archived P6 review, verification and supported matrix retain local, Linux
 and finite live qualification at runtime binding `b1bcd48c` and qualification
 binding `3a13a9bc`. Those records preserve all five live attempts, failed
 performance profiles, unknown measurements and the limits of the original fresh
 review and subsequent author fix pass. Full binding values and archived-source
-hashes are in [execution status](implementation/STATUS.md).
+hashes remain in the [historical packages](implementation/history/README.md).
 
-The cumulative review found 113 of 735 P6-qualified source paths changed after
-the seal through naming cleanup. That is a review-snapshot count; current runtime
-repairs cause additional drift. Both retained package auditors refuse the current
-tree. The next work is to complete and review remediation, supply current runnable
+The [recorded source comparison](implementation/reviews/source-map-and-fixture-environment.md)
+at commit `c5f53a96dbfc836bfc42805c2fee2d393dd78821` found 581 of the 735 historical
+P6 source paths changed: 547 had different bytes and 34 were absent at their
+original paths. Later runtime repairs cause additional drift. Both retained
+package auditors refuse the current tree. The next work is to complete and review remediation, supply current runnable
 gates and requalify a new source/profile-bound candidate while preserving all
 historical records. Hosted CI, release integration and production acceptance
 remain separate gates. The architecture roadmap ends at P6.
@@ -113,7 +107,7 @@ The serving authority validates the active continuation at native capture rather
 | Numeric performance thresholds | Declare during P0 against a measured native baseline | Preapproved workload/hardware profile change, not post-result threshold adjustment |
 | Historical schema retirement | Keep read/reconcile support until references drain | Signed inventory proves no retained operation/reference requires the version |
 
-These questions do not reopen the core invariants. The package is ready for architectural review and phase planning. Execution readiness for a phase requires its explicit contracts, schema choices, migration treatment and fixtures to be checked against the then-current source.
+These questions do not reopen the core invariants. At revision 3, architectural review and phase planning were the next steps. Execution readiness for a phase requires its explicit contracts, schema choices, migration treatment and fixtures to be checked against the then-current source.
 
 ## Scope and closure
 

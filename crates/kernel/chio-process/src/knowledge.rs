@@ -1,7 +1,6 @@
 //! Host-only immutable blob broker. Activation disables legacy release routes.
 use crate::{ProcessError, ProcessRuntime};
 use chio_core_types::recovery::knowledge_content_digest;
-use chio_kernel::recovery::RecoveryPermission;
 use chio_kernel::{knowledge::*, KernelError, SecurityInvocationContext};
 use chio_security_types::{knowledge::MAX_ARTIFACT_BYTES, recovery::*};
 
@@ -86,7 +85,7 @@ impl ProcessRuntime {
                 "native information flow is required",
             ));
         }
-        self.with_store(|store| store.enable_knowledge())?;
+        self.writer.activate_knowledge()?;
         Ok(ProcessArtifactBroker {
             runtime: self.clone(),
         })
@@ -249,14 +248,13 @@ impl ArtifactBlobPort for ProcessArtifactBroker {
         }
         self.validate_confined_attachment(boundary)?;
         self.runtime
-            .with_store(|store| {
-                store.reserve_confined_return_slot(
-                    boundary.child.as_str(),
-                    boundary.scope.process_id.as_str(),
-                    boundary.boundary.as_str(),
-                    &digest,
-                )
-            })
+            .writer
+            .reserve_confined_return_slot(
+                boundary.child.as_str(),
+                boundary.scope.process_id.as_str(),
+                boundary.boundary.as_str(),
+                &digest,
+            )
             .map_err(refused)
     }
 
@@ -320,50 +318,6 @@ impl ArtifactBlobPort for ProcessArtifactBroker {
         self.begin_verified_confined_delivery(actor, request, seal, admission)
     }
 
-    fn stage_retained_archive(
-        &self,
-        actor: &chio_kernel::recovery::AuthenticatedRecoveryActor,
-        context: &SecurityInvocationContext,
-        object: &ArtifactObjectId,
-        bytes: &[u8],
-    ) -> Result<ArtifactBlobSealV1, KernelError> {
-        if actor.permission() != RecoveryPermission::KnowledgeAdmin
-            || bytes.len() > MAX_ARTIFACT_BYTES
-        {
-            return Err(refused("retained archive authority"));
-        }
-        let fresh = self
-            .runtime
-            .kernel
-            .authenticate_recovery_actor(
-                actor.scope(),
-                actor.capability(),
-                RecoveryPermission::KnowledgeAdmin,
-            )
-            .map_err(refused)?;
-        if fresh.principal() != actor.principal() || fresh.scope() != actor.scope() {
-            return Err(refused("retained archive actor"));
-        }
-        self.validate_retained_owner(&actor.scope().process_id, context)?;
-        let generation = self
-            .runtime
-            .with_store(|store| {
-                store.stage_retained_archive_object(
-                    actor.scope().process_id.as_str(),
-                    object.as_str(),
-                    bytes,
-                )
-            })
-            .map_err(refused)?;
-        Ok(ArtifactBlobSealV1 {
-            object: object.clone(),
-            runtime: ProtectedText::new(self.runtime_id()).map_err(refused)?,
-            process: actor.scope().process_id.clone(),
-            content: knowledge_content_digest(bytes),
-            bytes: SafeInteger::new(bytes.len() as u64).map_err(refused)?,
-            generation: ProtectedText::new(&format!("object:{generation}")).map_err(refused)?,
-        })
-    }
     fn stage(
         &self,
         object: &ArtifactObjectId,
@@ -397,9 +351,8 @@ impl ArtifactBlobPort for ProcessArtifactBroker {
         }
         let generation = self
             .runtime
-            .with_store(|store| {
-                store.stage_knowledge_object(process.as_str(), object.as_str(), bytes)
-            })
+            .writer
+            .stage_knowledge_object(process.as_str(), object.as_str(), bytes)
             .map_err(refused)?;
         Ok(ArtifactBlobSealV1 {
             object: object.clone(),
@@ -490,15 +443,14 @@ impl ArtifactBlobPort for ProcessArtifactBroker {
         let generation = self
             .runtime
             .with_store(|store| {
-                match store.retained_object_generation(
-                    process.as_str(),
-                    object.as_str(),
-                    &hex(content.as_bytes()),
-                )? {
-                    Some(generation) => Ok(format!("object:{generation}")),
-                    None => store
-                        .retained_knowledge_generation(process.as_str(), &hex(content.as_bytes())),
-                }
+                store
+                    .retained_object_generation(
+                        process.as_str(),
+                        object.as_str(),
+                        &hex(content.as_bytes()),
+                    )?
+                    .map(|generation| format!("object:{generation}"))
+                    .ok_or(ProcessError::BlobMissing)
             })
             .map_err(refused)?;
         let seal = ArtifactBlobSealV1 {
@@ -525,22 +477,14 @@ impl ArtifactBlobPort for ProcessArtifactBroker {
         let bytes = self
             .runtime
             .with_store(|store| {
-                match store.read_retained_knowledge_object(
-                    seal.process.as_str(),
-                    seal.object.as_str(),
-                    &hex(seal.content.as_bytes()),
-                    seal.generation.as_str(),
-                )? {
-                    Some(bytes) => Ok(bytes),
-                    None if seal.generation.as_str().starts_with("object:") => {
-                        Err(ProcessError::BlobMissing)
-                    }
-                    None => store.read_retained_knowledge_blob(
+                store
+                    .read_retained_knowledge_object(
                         seal.process.as_str(),
+                        seal.object.as_str(),
                         &hex(seal.content.as_bytes()),
                         seal.generation.as_str(),
-                    ),
-                }
+                    )?
+                    .ok_or(ProcessError::BlobMissing)
             })
             .map_err(refused)?;
         if bytes.len() as u64 != seal.bytes.get()
@@ -559,23 +503,20 @@ impl ArtifactBlobPort for ProcessArtifactBroker {
                 "confined slot custody cannot use generic collection",
             ));
         }
-        self.runtime
-            .with_store(|store| {
-                if store.collect_knowledge_object(
-                    seal.process.as_str(),
-                    seal.object.as_str(),
-                    &hex(seal.content.as_bytes()),
-                    seal.generation.as_str(),
-                )? {
-                    Ok(())
-                } else {
-                    store.collect_blob(
-                        seal.process.as_str(),
-                        &hex(seal.content.as_bytes()),
-                        seal.generation.as_str(),
-                    )
-                }
-            })
-            .map_err(refused)
+        let collected = self
+            .runtime
+            .writer
+            .collect_knowledge_object(
+                seal.process.as_str(),
+                seal.object.as_str(),
+                &hex(seal.content.as_bytes()),
+                seal.generation.as_str(),
+            )
+            .map_err(refused)?;
+        if collected {
+            Ok(())
+        } else {
+            Err(refused(ProcessError::BlobMissing))
+        }
     }
 }

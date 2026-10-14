@@ -248,32 +248,18 @@ fn checked_row<T: Serialize + serde::de::DeserializeOwned>(
     Ok((protected::decode(&row.payload)?, source))
 }
 
-fn persist<T: Serialize>(
-    tx: &Transaction<'_>,
-    owner: &SqliteServingOwner,
-    account: &ReferenceAccount,
-    key: &str,
+/// The canonical bytes of one allocation row within its closed envelope.
+fn bounded<T: Serialize>(
     value: &T,
     maximum: usize,
-) -> Result<protected::ProtectedSourceReference, AdmissionOperationStoreError> {
+) -> Result<Vec<u8>, AdmissionOperationStoreError> {
     let bytes = protected::encode(value)?;
     if bytes.len() > maximum {
         return Err(refused(
             "publication allocation exceeds its closed envelope",
         ));
     }
-    // This remains ordinary Knowledge intake. Logical live slots supply no
-    // physical reserve class, debt reduction, or terminal financing allowance.
-    protected::save(
-        tx,
-        owner,
-        key,
-        &account.scope_key()?,
-        "command",
-        &bytes,
-        None,
-    )?;
-    protected::source_reference(tx, key)
+    Ok(bytes)
 }
 
 fn current_capacity(
@@ -396,27 +382,61 @@ pub(super) fn validate_existing_allocation(
     Ok(())
 }
 
+/// The reservation, its live slot and its reference owners are admitted in
+/// the one reserve transaction through the typed reservation sink. A full
+/// account refuses before any write.
 pub(super) fn admit_publication<'tx, 'conn>(
     tx: &'tx Transaction<'conn>,
     owner: &SqliteServingOwner,
     intake: super::publication_source::VerifiedKnowledgePublicationIntake<'tx, 'conn>,
 ) -> Result<(), AdmissionOperationStoreError> {
-    intake.verify(tx)?;
     require_intake_capacity(tx, intake.scope())?;
-    let (mut capacity, previous) = current_capacity(tx, intake.scope())?;
-    let publication = intake.source_key();
+    protected::persist_knowledge_publication_reservation(tx, owner, &intake)?;
+    super::reference_custody::retain_publication_references(tx, owner, intake.record())
+}
+
+/// The new publication record of a verified reservation intake.
+pub(in crate::admission_operation_store) fn reservation_write(
+    intake: &super::publication_source::VerifiedKnowledgePublicationIntake<'_, '_>,
+) -> Result<DerivedWrite, AdmissionOperationStoreError> {
+    Ok(DerivedWrite {
+        key: intake.source_key().to_owned(),
+        scope_key: scope_key(intake.scope())?,
+        expected: None,
+        payload: protected::encode(intake.record())?,
+    })
+}
+
+/// The live slot of the publication this transaction just admitted: its new
+/// lease and object custody anchored to the written record, and the account
+/// counter advanced by one under CAS of its exact current head.
+pub(in crate::admission_operation_store) fn derive_allocation(
+    tx: &Connection,
+    scope: &RecoveryScopeV1,
+    publication: &str,
+) -> Result<Vec<DerivedWrite>, AdmissionOperationStoreError> {
+    let record: NativeArtifactRecordV1 =
+        load(tx, publication)?.ok_or_else(|| refused("publication allocation source absent"))?;
+    let source = protected::source_reference(tx, publication)?;
+    if record_publication_key(&record)? != publication
+        || record.metadata.scope != *scope
+        || record.state != ArtifactPublicationStateV1::Reserved
+        || source.version() != 1
+    {
+        return Err(refused("publication allocation source changed"));
+    }
+    require_intake_capacity(tx, scope)?;
+    let (mut capacity, previous) = current_capacity(tx, scope)?;
     let key = lease_key(&capacity.account, publication)?;
-    let object = object_key(intake.scope(), &intake.record().object)?;
+    let object = object_key(scope, &record.object)?;
     if protected::raw_checked(tx, &key)?.is_some() || protected::raw_checked(tx, &object)?.is_some()
     {
         return Err(refused(
             "publication intake cannot reuse a retained allocation",
         ));
     }
-    save(tx, owner, intake.scope(), publication, intake.record())?;
-    super::reference_custody::retain_publication_references(tx, owner, intake.record())?;
-    let original = SourceAnchor::capture(&protected::source_reference(tx, publication)?);
-    let identity = PublicationIdentity::from_record(intake.record())?;
+    let original = SourceAnchor::capture(&source);
+    let identity = PublicationIdentity::from_record(&record)?;
     let lease = LeaseRecord {
         schema: LeaseSchema::V1,
         account: capacity.account.clone(),
@@ -425,21 +445,12 @@ pub(super) fn admit_publication<'tx, 'conn>(
         collection: None,
         changes: 0,
     };
-    persist(tx, owner, &capacity.account, &key, &lease, LEASE_BYTES)?;
-    persist(
-        tx,
-        owner,
-        &capacity.account,
-        &object,
-        &ObjectRecord {
-            schema: ObjectSchema::V1,
-            identity,
-            publication: publication.to_owned(),
-            original,
-        },
-        LEASE_BYTES,
-    )?;
-    protected::verify_source_reference(tx, &previous)?;
+    let object_record = ObjectRecord {
+        schema: ObjectSchema::V1,
+        identity,
+        publication: publication.to_owned(),
+        original,
+    };
     capacity.admitted = capacity
         .admitted
         .checked_add(1)
@@ -454,26 +465,47 @@ pub(super) fn admit_publication<'tx, 'conn>(
             .checked_add(1)
             .ok_or_else(|| refused("publication counter revision exhausted"))?,
     )?;
-    persist(
-        tx,
-        owner,
-        &capacity.account,
-        &capacity_key(&capacity.account)?,
-        &capacity,
-        ACCOUNT_BYTES,
-    )?;
-    Ok(())
+    let account_scope = capacity.account.scope_key()?;
+    Ok(vec![
+        DerivedWrite {
+            payload: bounded(&lease, LEASE_BYTES)?,
+            key,
+            scope_key: account_scope.clone(),
+            expected: None,
+        },
+        DerivedWrite {
+            payload: bounded(&object_record, LEASE_BYTES)?,
+            key: object,
+            scope_key: account_scope.clone(),
+            expected: None,
+        },
+        DerivedWrite {
+            payload: bounded(&capacity, ACCOUNT_BYTES)?,
+            key: capacity_key(&capacity.account)?,
+            scope_key: account_scope,
+            expected: Some(previous),
+        },
+    ])
 }
 
 pub(super) fn validate_retained_allocation(
     tx: &Connection,
     record: &NativeArtifactRecordV1,
 ) -> Result<(), AdmissionOperationStoreError> {
-    current_lease(tx, record).map(|_| ())
+    retained_allocation_source(tx, record).map(|_| ())
+}
+
+/// The current head of the validated original lease a terminal depends on.
+pub(super) fn retained_allocation_source(
+    tx: &Connection,
+    record: &NativeArtifactRecordV1,
+) -> Result<protected::ProtectedSourceReference, AdmissionOperationStoreError> {
+    current_lease(tx, record).map(|(_, source)| source)
 }
 
 pub(super) use catalog::verify_account;
 pub(in crate::admission_operation_store) use catalog::verify_catalog;
+pub(in crate::admission_operation_store) use initialization::bootstrap_write;
 pub(super) use initialization::initialize_account;
 
 #[cfg(feature = "admission-test-support")]

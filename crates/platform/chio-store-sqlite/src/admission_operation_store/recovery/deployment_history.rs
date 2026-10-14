@@ -27,7 +27,7 @@ pub(super) fn retain(
     let digest = DeploymentDigest::from_bytes(hash(RecoveryDigestDomain::Deployment, profile)?);
     let key = key(&profile.scope, digest)?;
     let bytes = encode(profile)?;
-    if let Some(existing) = raw(tx, &key)? {
+    if let Some(existing) = raw_checked(tx, &key)? {
         if existing.version != 1
             || existing.kind != "deployment"
             || existing.scope != scope_key(&profile.scope)?
@@ -57,7 +57,7 @@ pub(super) fn preserve_installation(
     profile: &RecoveryDeploymentV1,
 ) -> Result<bool, AdmissionOperationStoreError> {
     let mut changed = false;
-    if raw(tx, &format!("deployment:{}", scope_key(&profile.scope)?))?.is_some() {
+    if raw_checked(tx, &format!("deployment:{}", scope_key(&profile.scope)?))?.is_some() {
         changed |= retain(tx, owner, &deployment_tx(tx, &profile.scope)?)?;
     }
     changed |= retain(tx, owner, profile)?;

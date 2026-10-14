@@ -24,7 +24,7 @@ fn current_format_header(path: &std::path::Path) -> TestResult<Value> {
         |row| row.get(0),
     )?;
     assert_eq!(
-        version, 40,
+        version, 43,
         "compatibility requires the actual same current database stamp"
     );
     let (bytes, digest, sequence, authority): (Vec<u8>, String, i64, String) = connection
@@ -236,7 +236,7 @@ async fn native_input_compatibility_reopens_its_genuine_current_format_owner() -
     };
     let before = current_format_header(&path)?;
     eprintln!(
-        "native Input compatibility: same current stamp40, retained format {}",
+        "native Input compatibility: same current stamp42, retained format {}",
         before["native_format"]
     );
     // This public open and observation remain real fallible operations. A

@@ -9,80 +9,50 @@ struct ObjectIdentity {
     size: u64,
     retired: bool,
 }
-enum StagingPurpose {
-    Execution,
-    RetainedArchive,
-}
-
 impl Store {
-    pub(crate) fn stage_knowledge_object(
-        &mut self,
+    /// Read-only probe of a stage request: the generation of the exact
+    /// retained object when this is an idempotent replay, `None` when the
+    /// object must be written. A conflicting or corrupt retained object
+    /// refuses. Nothing is written here.
+    pub(crate) fn staged_object_replay(
+        &self,
         process: &str,
         object: &str,
         bytes: &[u8],
-    ) -> Result<String, ProcessError> {
-        self.stage_object(process, object, bytes, StagingPurpose::Execution)
-    }
-
-    pub(crate) fn stage_retained_archive_object(
-        &mut self,
-        process: &str,
-        object: &str,
-        bytes: &[u8],
-    ) -> Result<String, ProcessError> {
-        self.stage_object(process, object, bytes, StagingPurpose::RetainedArchive)
-    }
-
-    fn stage_object(
-        &mut self,
-        process: &str,
-        object: &str,
-        bytes: &[u8],
-        purpose: StagingPurpose,
-    ) -> Result<String, ProcessError> {
+    ) -> Result<Option<String>, ProcessError> {
         self.require_enforced_knowledge()?;
         if bytes.len() > MAX_STATE_BLOB_BYTES {
             return Err(ProcessError::Invalid("artifact object is too large"));
         }
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let snapshot = read_process(&tx, process)?
+        let snapshot = read_process(&self.connection, process)?
             .ok_or_else(|| ProcessError::NotFound(process.to_owned()))?;
-        if matches!(purpose, StagingPurpose::Execution) {
-            require_running(&snapshot)?;
+        require_running(&snapshot)?;
+        replay_generation(&self.connection, process, object, bytes)
+    }
+
+    /// Read-only probe of a collection request. Unknown identities and
+    /// already retired objects need no write; a retained one is collected by
+    /// the routed writer.
+    pub(crate) fn object_collection(
+        &self,
+        process: &str,
+        object: &str,
+        digest: &str,
+        generation: &str,
+    ) -> Result<Collection, ProcessError> {
+        self.require_enforced_knowledge()?;
+        let Some(retained) = object_identity(&self.connection, process, object)? else {
+            return Ok(Collection::Absent);
+        };
+        let generation = generation.strip_prefix("object:").unwrap_or(generation);
+        if retained.generation != generation || retained.content != digest {
+            return Err(ProcessError::Conflict);
         }
-        let content = sha256_hex(bytes);
-        if let Some(retained) = object_identity(&tx, process, object)? {
-            if retained.retired
-                || retained.content != content
-                || retained.size != bytes.len() as u64
-            {
-                return Err(ProcessError::Conflict);
-            }
-            if object_bytes(&tx, process, object, &content, &retained.generation)? != bytes {
-                return Err(ProcessError::BlobCorrupt);
-            }
-            tx.commit()?;
-            return Ok(retained.generation);
-        }
-        let usage = blobs::usage(&tx, &snapshot)?;
-        if usage
-            .tree_bytes
-            .checked_add(bytes.len() as u64)
-            .is_none_or(|total| total > u64::from(usage.limits.max_bytes))
-            || usage.tree_blobs >= u64::from(usage.limits.max_blobs)
-        {
-            return Err(ProcessError::Limit("immutable process state"));
-        }
-        let generation = uuid::Uuid::new_v4().to_string();
-        tx.execute(
-            "INSERT INTO process_artifact_objects(process_id,object_id,generation,sha256,size_bytes,data)
-             VALUES(?1,?2,?3,?4,?5,?6)",
-            params![process,object,generation,content,bytes.len() as i64,bytes],
-        )?;
-        tx.commit()?;
-        Ok(generation)
+        Ok(if retained.retired {
+            Collection::Retired
+        } else {
+            Collection::Pending
+        })
     }
 
     pub(crate) fn object_generation(
@@ -145,36 +115,96 @@ impl Store {
         }
         Ok(Some(retained.generation))
     }
+}
 
-    pub(crate) fn collect_knowledge_object(
-        &mut self,
-        process: &str,
-        object: &str,
-        digest: &str,
-        generation: &str,
-    ) -> Result<bool, ProcessError> {
-        self.require_enforced_knowledge()?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let Some(retained) = object_identity(&tx, process, object)? else {
-            tx.commit()?;
-            return Ok(false);
-        };
-        let generation = generation.strip_prefix("object:").unwrap_or(generation);
-        if retained.generation != generation || retained.content != digest {
-            return Err(ProcessError::Conflict);
-        }
-        if !retained.retired {
-            tx.execute(
-                "UPDATE process_artifact_objects SET data=NULL
-                 WHERE process_id=?1 AND object_id=?2 AND generation=?3 AND sha256=?4 AND data IS NOT NULL",
-                params![process,object,generation,digest],
-            )?;
-        }
-        tx.commit()?;
-        Ok(true)
+/// What a collection request still needs from the journal.
+pub(crate) enum Collection {
+    Absent,
+    Retired,
+    Pending,
+}
+
+fn replay_generation(
+    connection: &Connection,
+    process: &str,
+    object: &str,
+    bytes: &[u8],
+) -> Result<Option<String>, ProcessError> {
+    let content = sha256_hex(bytes);
+    let Some(retained) = object_identity(connection, process, object)? else {
+        return Ok(None);
+    };
+    if retained.retired || retained.content != content || retained.size != bytes.len() as u64 {
+        return Err(ProcessError::Conflict);
     }
+    if object_bytes(connection, process, object, &content, &retained.generation)? != bytes {
+        return Err(ProcessError::BlobCorrupt);
+    }
+    Ok(Some(retained.generation))
+}
+
+/// The complete stage body inside one writer transaction: the enforced
+/// level, running identity, idempotent replay, the tree quota and the
+/// immutable insert. Executed only by the bank-proven routed writer.
+pub(crate) fn stage_knowledge_object_call(
+    tx: &Connection,
+    process: &str,
+    object: &str,
+    bytes: &[u8],
+) -> Result<String, ProcessError> {
+    super::knowledge::require_enforced_level(tx)?;
+    if bytes.len() > MAX_STATE_BLOB_BYTES {
+        return Err(ProcessError::Invalid("artifact object is too large"));
+    }
+    let snapshot =
+        read_process(tx, process)?.ok_or_else(|| ProcessError::NotFound(process.to_owned()))?;
+    require_running(&snapshot)?;
+    if let Some(generation) = replay_generation(tx, process, object, bytes)? {
+        return Ok(generation);
+    }
+    let usage = blobs::usage(tx, &snapshot)?;
+    if usage
+        .tree_bytes
+        .checked_add(bytes.len() as u64)
+        .is_none_or(|total| total > u64::from(usage.limits.max_bytes))
+        || usage.tree_blobs >= u64::from(usage.limits.max_blobs)
+    {
+        return Err(ProcessError::Limit("immutable process state"));
+    }
+    let generation = uuid::Uuid::new_v4().to_string();
+    tx.execute(
+        "INSERT INTO process_artifact_objects(process_id,object_id,generation,sha256,size_bytes,data)
+         VALUES(?1,?2,?3,?4,?5,?6)",
+        params![process, object, generation, sha256_hex(bytes), bytes.len() as i64, bytes],
+    )?;
+    Ok(generation)
+}
+
+/// The complete collection body inside one writer transaction. Returns
+/// whether the identity exists. Executed only by the routed writer.
+pub(crate) fn collect_knowledge_object_call(
+    tx: &Connection,
+    process: &str,
+    object: &str,
+    digest: &str,
+    generation: &str,
+) -> Result<bool, ProcessError> {
+    super::knowledge::require_enforced_level(tx)?;
+    let Some(retained) = object_identity(tx, process, object)? else {
+        return Ok(false);
+    };
+    let generation = generation.strip_prefix("object:").unwrap_or(generation);
+    if retained.generation != generation || retained.content != digest {
+        return Err(ProcessError::Conflict);
+    }
+    if !retained.retired {
+        tx.execute(
+            "UPDATE process_artifact_objects SET data=NULL
+             WHERE process_id=?1 AND object_id=?2 AND generation=?3 AND sha256=?4 AND data IS NOT NULL",
+            params![process, object, generation, digest],
+        )?;
+    }
+    Ok(true)
 }
 
 fn object_identity(

@@ -3495,6 +3495,11 @@ files = ["crates/platform/chio-control-plane/src/security/adapters/native_flow/p
 first_seen = "252b259d44"
 
 [[schema]]
+value = "chio.native-journal-seal.v1"
+files = ["crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/segments.rs"]
+first_seen = "f2dff98f6f"
+
+[[schema]]
 value = "chio.native-mcp-demo-provision-report.v1"
 files = ["crates/products/chio-cli/src/cli/mcp/provision.rs"]
 first_seen = "6a12a69155"
@@ -3521,6 +3526,11 @@ first_seen = "7e54c14a60"
 
 [[schema]]
 value = "chio.native-security-flow-join.v2"
+files = ["crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs"]
+first_seen = "7e54c14a60"
+
+[[schema]]
+value = "chio.native-security-flow-join.v3"
 files = ["crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs"]
 first_seen = "7e54c14a60"
 
@@ -4330,6 +4340,46 @@ files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.process-native-return-capture.v1"
+files = ["crates/kernel/chio-kernel/src/process_return_custody.rs"]
+first_seen = "491bd01b56"
+
+[[schema]]
+value = "chio.process-native-return-funding.v1"
+files = ["crates/kernel/chio-kernel/src/process_return_custody.rs"]
+first_seen = "491bd01b56"
+
+[[schema]]
+value = "chio.process-native-return-reconciliation.v1"
+files = ["crates/kernel/chio-kernel/src/process_return_custody.rs"]
+first_seen = "491bd01b56"
+
+[[schema]]
+value = "chio.process-native-return-source.v1"
+files = ["crates/kernel/chio-kernel/src/process_return_custody.rs"]
+first_seen = "491bd01b56"
+
+[[schema]]
+value = "chio.process-native-return-unavailable.v1"
+files = ["crates/kernel/chio-kernel/src/process_return_custody.rs"]
+first_seen = "491bd01b56"
+
+[[schema]]
+value = "chio.process-original-nonce-custody.v1"
+files = ["crates/kernel/chio-kernel/src/process_return_custody.rs"]
+first_seen = "491bd01b56"
+
+[[schema]]
+value = "chio.process-return-bank-readback.v1"
+files = ["crates/kernel/chio-kernel/src/process_return_custody/bank.rs"]
+first_seen = "b7d71059cc"
+
+[[schema]]
+value = "chio.process-return-inventory.v1"
+files = ["crates/kernel/chio-kernel/src/process_return_custody/bank.rs"]
+first_seen = "b7d71059cc"
+
+[[schema]]
 value = "chio.process.abi.v3"
 files = ["crates/kernel/chio-process/src/lib.rs"]
 first_seen = "de84fc306e"
@@ -4735,11 +4785,6 @@ files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
 first_seen = "de84fc306e"
 
 [[schema]]
-value = "chio.recovery.setup.creation.v1"
-files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
-first_seen = "de84fc306e"
-
-[[schema]]
 value = "chio.recovery.setup.creation.v2"
 files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
 first_seen = "de84fc306e"
@@ -4756,16 +4801,6 @@ first_seen = "de84fc306e"
 
 [[schema]]
 value = "chio.recovery.setup.required-coverage.v1"
-files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
-first_seen = "de84fc306e"
-
-[[schema]]
-value = "chio.recovery.setup.retirement.v1"
-files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
-first_seen = "de84fc306e"
-
-[[schema]]
-value = "chio.recovery.setup.source-profile.v1"
 files = ["crates/core/chio-core-types/src/recovery/domains.rs"]
 first_seen = "de84fc306e"
 
@@ -4913,6 +4948,11 @@ first_seen = "7e54c14a60"
 value = "chio.retained-tool-admission-request.v4"
 files = ["crates/kernel/chio-kernel/src/admission_operation/retained_request.rs"]
 first_seen = "7e54c14a60"
+
+[[schema]]
+value = "chio.retained-tool-admission-request.v6"
+files = ["crates/kernel/chio-kernel/src/admission_operation/retained_request.rs"]
+first_seen = "b7d71059cc"
 
 [[schema]]
 value = "chio.risk.adjudication-jurisdiction-receipt.v1"

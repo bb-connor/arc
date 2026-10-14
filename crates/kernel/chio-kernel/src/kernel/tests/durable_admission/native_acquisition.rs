@@ -36,6 +36,9 @@ struct State {
     mode: Mode,
     history: Option<NativeSecurityFlowJoinRecordV1>,
     input: Option<crate::admission_operation::NativeSecurityInputJoinRequestV1>,
+    /// `None` keeps the genuine Eligible fixture; a test names a Refused or
+    /// Unproved retained fate to exercise the Kernel's fate checks.
+    retained_fate: Option<crate::admission_operation::NativeSecurityInputFateV1>,
     reads: u64,
 }
 

@@ -10,18 +10,18 @@ provider, formal, hosted, or release qualification.
 
 The live inventory and effective scoped dispositions are:
 
-| Inventory | Records | Effective scoped dispositions | Currently open |
-| --- | ---: | ---: | ---: |
-| Canonical original findings | 328 | 105 | 223 |
-| Additional maintained or actually executed support findings | 21 | 21 | 0 |
-| Supplemental PR obligations | 1 | 0 | 1 |
-| Current or executed-support total | 350 | 126 | 224 |
-| Prevented candidate issues, counted separately | 31 | Not combined | Not combined |
-| Follow-up findings first observed in uninstalled candidates | 13 | Not combined | Not combined |
-| Provenance prerequisite, excluded from implementation findings | 1 | Not applicable | Not applicable |
+| Inventory | Records | Effective scoped dispositions | Superseded by support decision | Currently open |
+| --- | ---: | ---: | ---: | ---: |
+| Canonical original findings | 328 | 155 | 2 | 171 |
+| Additional maintained or actually executed support findings | 26 | 26 | 0 | 0 |
+| Supplemental PR obligations | 1 | 0 | 0 | 1 |
+| Current or executed-support total | 355 | 181 | 2 | 172 |
+| Prevented candidate issues, counted separately | 31 | Not combined | Not combined | Not combined |
+| Follow-up findings first observed in uninstalled candidates | 13 | Not combined | Not combined | Not combined |
+| Provenance prerequisite, excluded from implementation findings | 1 | Not applicable | Not applicable | Not applicable |
 
-The 126 scoped dispositions include 37 historical closures whose current source
-applicability still needs review. They are not 126 current-source approvals.
+The 181 scoped dispositions include 38 historical closures whose current source
+applicability still needs review. They are not 181 current-source approvals.
 `counts.current_acceptance` separates these dispositions from current applicability.
 
 The explicitly historical **394-record baseline** retains 99 canonical closures
@@ -31,27 +31,66 @@ scoped closures and every `recorded_*` counter remain unchanged. New canonical
 and additional closures are recorded through additive successors and counted in
 `current_acceptance`. The earlier 117-closure snapshot also remains preserved.
 
-There are **394 findings or candidate issues**, plus the excluded provenance
-prerequisite, for **395 live records**. The original prevented inventory retains
+There are **399 findings or candidate issues**, plus the excluded provenance
+prerequisite, for **400 live records**. The original prevented inventory retains
 23 assigned IDs and eight unassigned records. Thirteen candidate follow-ups and
-two additional findings have null finding IDs. There are still 371 assigned
-finding IDs, or 372 including the prerequisite, and twenty-three null IDs.
+two additional findings have null finding IDs. There are 376 assigned
+finding IDs, or 377 including the prerequisite, and twenty-three null IDs.
 Every original ID and exact unassigned reviewer label remains preserved.
 
 The current status counts are:
 
 | Status | Records | Meaning |
 | --- | ---: | --- |
-| `open` | 224 | No complete independent disposition is recorded. |
-| `needs_revalidation` | 37 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
-| `recorded_scoped_closed` | 89 | Historical or additive accepted scoped disposition currently applies, with the limits stated per record. |
+| `open` | 172 | No complete independent disposition is recorded. |
+| `superseded_by_support_boundary` | 2 | The user removed intermediate-format migration support; these are not counted as verified fixes. |
+| `needs_revalidation` | 38 | Historical closure remains, but cited source or document pins differ without an accepted current continuity review. |
+| `recorded_scoped_closed` | 143 | Historical or additive accepted scoped disposition currently applies, with the limits stated per record. |
 | `candidate_only` | 44 | The defective candidate was uninstalled when found; corrected successors may have separate evidence. |
 | `prerequisite_only` | 1 | Provenance work, not a proved implementation defect. |
 
-The 37 remaining revalidation flags are part of the original 117 historical scoped
-closures. They are not added to the 224 currently open findings. No finding is declared
+`C1-02` now closes its original stale-owner scope at `55dcab8c`: the actual
+four-action takeover control passed 1/1 and the setup/output fresh-owner progress
+complements passed 2/2 on the same compiled binary and source pins. Independent
+original-scope acceptance is linked from its additive `current_review` with
+result and review hashes. Earlier failures remain preserved. This closure does
+not claim completed native output, original finishing or runtime qualification.
+
+`OrdinaryRecordedReturnCapturedOwnerRestoration` and
+`UnknownSelectedAnnotationFirstPublicReturnDisclosure` now close their original
+scopes at `7ab7e08`. The two actual ordinary captured-return restart/Stop controls
+and all three first-return/replay annotation controls passed with `pq`. The
+independent reviewer traced the complete native lifecycle, funded capture,
+receipt append and public delivery. The same candidate also passed the real
+effect/capture/abort/restart/settlement/replay lifecycle, two interruption
+windows and 14 original-call binding controls. The separate sealed predecessor
+fixture was not executed. Exact results, independent reviews and exclusions
+are in the additive `current_review` records. Remaining original obligations,
+strict Clippy and release gates stay open; readiness remains false.
+
+The preceding accepted batch closed 23 original P2 scopes: `NS-01` through
+`NS-05`, `CR-04`, `CR-R1-01`, `SO01` through `SO08`, `QF-01`, `QF-08`,
+`V3-I01`, `V3-I05`, `V3-I09`, and `SPI-01` through `SPI-03`. The current open
+inventory is **9 P1, 74 P2 and 89 P3**, with 143 currently applicable scoped
+closures. Earlier historical counts below retain their original stage boundaries.
+
+These dispositions bind actual owning execution and independent review to the
+combined source candidate `6d312a1920bebcb3fd53479b37a385deaf398e70`.
+The affected source-origin and Python provenance controls passed 36/36 in each
+Python mode; the publication consumer passed four controls in each mode.
+Unchanged recorder and builder inputs retain their exact executed controls.
+The missing QF-01 interpreter/origin branch was executed before closure; an early
+environment refusal was not substituted. The invalid materialized excluded-link
+positive was replaced by the producer-compatible SO05 refusal.
+`current_updates` and each additive `current_review` retain the exact sealed
+reviews, results, source pins and original limits. `NS-06`, `QF-10`, `CP-F01`
+and `I-evidence-qualification-02` are unchanged by this batch. Original owner
+obligations, final source sealing, real producer execution and qualification
+remain separate. No original or historical disposition is overwritten.
+
+The 38 remaining revalidation flags include `D-semantic-06` and `I-evidence-qualification-03`. The `E-knowledge-01` supported scope is revalidated by the current acceptance below. Historical closures and independent reviews remain preserved. They are not added to the 172 currently open findings. No finding is declared
 regressed merely because its bytes changed, and no matching pin constitutes a
-new behavioral test. The initial audit flagged 48 closures. An independent
+new behavioral test. The current reconciliation also flags `A-planner-06`, `B-contracts-02`, `G-product-11` and `R2-R-setup-03`: their older cited pins differed despite empty changed-path entries. Historical evidence is preserved. The initial audit flagged 48 closures. An independent
 [explanation evidence continuity review](reviews/explanation-evidence-continuity.md)
 subsequently confirmed that the README change for `A-planner-07` adds navigation
 only and preserves its original source-only obligation. Its historical pin
@@ -114,10 +153,22 @@ dispositions, changed pins and prior reasons remain preserved.
 The [compiler causal remediation](reviews/compiler-causal-remediation.md) closes
 `CR-01`, `CR-02`, `CR-03` and `QP-SECRET-01` against their original current-source
 acceptance. Final disposition includes root review after sub-agent execution was
-stopped; the earlier independent reviews keep their exact scope. There are now
+stopped; the earlier independent reviews keep their exact scope. That compiler-causal update left
 12 P1, 123 P2 and 89 P3 open records. The actual contracts producer remains
 unaccepted, and native tests expose the unsupported finishing-account prerequisite.
 These four closures grant no whole-runtime or release qualification.
+
+The current retained-custody and compiler cleanup adds seven finite scoped
+closures and restores five historical scopes after independent source review and
+owning checks. With the bounded checkpoint and neighboring-route closures below,
+that earlier stage had **12 P1, 110 P2 and 89 P3 open records**, plus
+32 historical scopes requiring revalidation and 44 separately tracked candidate
+issues. Each additive `current_review` preserves the previous status, reason,
+source pins, execution and review limits. The documentation finding remains open
+because its original obligation explicitly requires human review; independent AI
+review and applied corrections are recorded separately. Strict Process Clippy
+still fails, native prerequisites remain unresolved, and no push or qualification
+is credited. Exact current results are summarized in [execution status](STATUS.md).
 
 ## Candidate follow-ups
 
@@ -484,11 +535,229 @@ and validation are retained in the fixture-environment accounting packet.
 The 2026-10-10 proposed checkpoint was rejected by monitoring review. Blanket
 `existing_repair_retained_validation_pending` assessments have been retracted.
 The working queue's contract summaries are inspection leads pending reconciliation
-against original findings and maintained corrections. The checkpoint is not
-approved; broader stabilization and push remain suspended.
+against original findings and maintained corrections. That checkpoint was not
+approved. Subsequent source reconciliation and local stabilization are recorded
+in the canonical working queue; push remains gated.
 
 Current open counts are 12 P1 and 124 P2. Original obligations, historical
 observations and dispositions are preserved. No new closure or qualification is
-claimed. The owned-worker legacy fixture diagnostic passes, but the public legacy
-terminal intake test still fails its captured/closed/settled assertion. Both
-results are retained under the existing sole-owner stabilization evidence path.
+claimed. At that checkpoint, the owned-worker experimental-format fixture passed while
+its terminal-intake test failed the captured/closed/settled assertion. Both
+observations remain retained. Subsequent cleanup removes those unsupported
+intermediate-format fixtures; genuine native terminal acceptance remains open.
+
+
+## Scoped archive delivery and setup cleanup
+
+`KNOWLEDGE-RETAINED-ARCHIVE-DELIVERY-01` has a scoped local closure after
+independent review and actual public-entry-point acceptance: terminal admission
+replay sends no second delivery, sink I/O follows durable uncertainty, and retries
+reuse the exact original signed manifest without another signing call. All 27
+owning archive/setup/cancellation/storage controls pass on the captured source.
+The reviewed obsolete setup exceptions and three unused digest domains are removed;
+current native original-owner checks and supported pre-recovery upgrades remain.
+Formatting and strict ControlPlane owning Clippy pass. Aggregate strict Clippy
+still has the same 176 Store/14 Process unused diagnostics. The previous 396 record
+bodies and historical counters are unchanged. This adds no whole-runtime,
+FIPS, Linux, provider, hosted-CI or production qualification.
+
+The original Creusot core command now proves all 32 files after the exact locked
+public dependency was fetched. The reviewed recorder descriptor/discovery repairs
+have 269 passing full-suite cases and six platform skips in each Python mode,
+followed by 38 passing focused cases in each mode on the final discovery delta.
+Source captures are equal and owned groups quiescent. The ordinary contracts
+producer still needs full acceptance after its preserved 1800-second timeout.
+All 397 finding records retain their existing dispositions; these observations
+are recorded once in the canonical working queue's current validation section.
+
+The checked warm initialization repair has scoped independent approval and 27
+passing Store controls, followed by nine passing integrity and supported-upgrade
+controls after exact-refusal assertion corrections. The full Control Plane
+knowledge module finishes with 165 passes, 31 failures and three ignored cases;
+both unchanged 512-publication capacity cases pass. Owning Control Plane Clippy
+passes while strict dependency lint remains unresolved. Kani workflow wiring
+and the separate compiler semantics review pass within their stated scope.
+[Current status](STATUS.md) summarizes these results; all 397 finding records
+and their acceptance obligations remain unchanged.
+
+## Current transport acceptance
+
+`D-semantic-01` now has a scoped closure against its original transport obligation.
+Current integrated execution passed eight semantic HTTP tests, two connector tests,
+five recovery egress tests and 40 shared egress-contract tests, including the real
+production deadline and isolated proxy control. The maintained egress gate, strict
+owning lint and formatting passed. Independent final review found no P0/P1/P2 in
+this contract. The register retains the exact source pins, the wrong-filename
+command failure and its corrected gate result, and all scope limits. That checkpoint recorded
+224 open records: 12 P1, 123 P2 and 89 P3. Runtime qualification remains false.
+
+## Current compiler input and allocator acceptance
+
+The ordinary-host compiler repair accepts exact retained manifest check-cfg
+declarations and bounded stdin feature probes. Failed and successful stdin
+depfiles share the same checks; refusal-bearing outcomes and anonymous
+qualification dependencies are rejected. Independent review found three P2s in
+the initial candidate; all three have reviewed corrections and scoped closures
+in the canonical register. Both Python modes and five actual Rust cases passed
+on unchanged captured source. Three subsequent original contracts campaigns
+stopped at the unchanged 10 GiB disk floor. One Cargo job was already enforced;
+the retries included approved inactive-cache cleanup and a start near 19 GiB
+free. Final source captures match and all owned process groups are quiescent.
+The producer, original inspector and exported/aggregate acceptance remain
+incomplete. Every attempt is preserved in the canonical record's capacity summary.
+
+Unsupported allocation adoption baselines were removed. The existing public
+create/cancel/replay test passed 139 cycles and the corrected Store controls
+passed 29 tests. Captured terminal retirement and Store strict lint remain open.
+`C2-04` and `CP-F01` retain their full acceptance obligations.
+
+Independent review classifies `R2-X-wire-compat-01` and `R2-X-wire-compat-02` as
+superseded by the explicit unsupported-format decision, not verified native
+migrations. Formats 35 through 42 refuse before recovery migration and preserve
+data. The existing refusal test passed, and all eight relevant source/test hashes
+still match that run. Nineteen inspected predecessor schema inputs and constructor
+sections are byte-identical to the actual pre-recovery base. No old-binary
+execution is claimed. Supported upgrades and same-format setup, restart, rotation
+and native lifecycle keep their separate obligations.
+
+That update left 213 open records: 12 P1, 112 P2 and 89 P3, separately from
+108 current scoped closures and two superseded obligations. The current totals
+are in the reconciliation table above; runtime qualification remains false.
+
+## Integrated sweep and current compiler evidence
+
+The current code wave makes startup recovery advance by immutable operation ID
+and continue past per-operation failures. Its public Kernel/SQLite regression
+proves a healthy operation beyond a full failed page finishes without repeating
+effects or charges. Historical rotation and funded native finishing remain open.
+Compiler evidence now has one current publication reader and one current scope
+reader; obsolete experimental decoders and forwarding indirection are removed.
+The recorder hashes large held inputs in bounded chunks, and the CrewAI fixture
+compares the complete Rust-owned outcome. Hermes and Opus reviews, corrections,
+failed attempts and owning results are retained in
+`target/hermes-recovery-remediation/current-code-wave/validation-summary.json`.
+
+Independent source and evidence review closes `D-semantic-06` after its exact
+native integrity test passed, and `I-evidence-qualification-03` after the exact
+SDK gate passed 1,369 tests with current origins and an actual stale-import
+refusal. Original findings, historical dispositions and seals remain unchanged.
+The final fixture consolidation passes all 164 auditor tests in each Python mode.
+Store/Process strict lint and native lifecycle acceptance remain failed or pending.
+The complete `CP-F01` compiler pipeline remains the next permitted acceptance.
+
+## Integrated knowledge and transport acceptance
+
+The remaining-contracts wave closes `KN-ENCODING-CHUNK-01` and
+`neighbor-route-preauthentication-native-admission` within their original bounded
+obligations. Four real checkpoint controls passed after a fresh rebuild. The
+reviewer required the exact linked Store dependency readback; its fingerprint,
+dep-info, owning source hashes and newer library satisfy that condition. Four
+setup/maintenance route controls also passed before occupied native capacity.
+Their production paths and owning tests remain unchanged. Historical records
+and the separate large-envelope diagnostic obligation remain intact.
+
+That wave left **12 P1, 110 P2 and 89 P3** open, with 110 then-current scoped
+closures, 32 historical scopes requiring revalidation and 44 candidate-only
+records. Later pin reconciliation is reflected in the live tables above. Source
+repairs are not counted as complete acceptance by themselves.
+
+The same run passed all three executor controls. Independent review then removed
+two redundant post-reply waits while preserving immediate cleanup assertions.
+Both subsequent rebuilds stopped at the fixed 10 GiB disk floor before testing,
+including the retry after 1.23 GiB of inactive library-cache reclamation. The
+executor finding remains open pending its final owning run. Those failed attempts
+are preserved; they are not converted into passing acceptance.
+
+Eight corrected Store fixture controls and two knowledge custody/rollback controls
+pass. The broader Store run still records 1,935 passed, 45 failed and four ignored;
+the broader knowledge run records 140 passed, 34 failed and three ignored. Focused
+corrections do not turn either full run into a pass. Strict owning Control Plane
+Clippy passed before the final test-only wait deletion. Store still fails with
+165 library and 86 library-test diagnostics; Process retains 14 missing-integration
+diagnostics. No allowances hide them.
+
+The actual native positive failure was observed inside the capture callback:
+`native capture requires an original output retention profile`. Selecting a profile
+also requires genuine original finishing preparation, which remains unsupported.
+The earlier blanket dependency on parked Capture producer enrollment was not
+established and is withdrawn. SQLite account persistence, funded write consumption
+and production Process provider wiring are missing permitted implementation.
+The owner must establish the complete purpose and payer inventory from actual
+post-effect writers and existing reservations. Only the named Capture
+workflow-identity/cumulative-roster work and its rejected review remain parked.
+Diagnostic printing was removed. No default profile, zero-debt account or fake
+producer was installed. No original native lifecycle acceptance is credited.
+
+Exact commands, source pins, independent reviews, failed attempts and the coherent
+stage summary are linked from `continuation.working_queue.latest_local_stage` in
+the canonical register. No push, current-source hosted acceptance or qualification
+is credited.
+
+## Owning execution after the integration checkpoint
+
+The continuation from `2c2af170` compiled Store and Control Plane owning binaries
+and executed runtime tests. The [current status](STATUS.md) and the canonical
+queue retain exact completed selections, failures and interrupted runs. They
+supersede the earlier statement that current owning tests had not run.
+
+All 63 failures observed in the initial interrupted Store run subsequently passed
+their corrective selectors. The complete Store suite is still unaccepted.
+Command-executor controls passed eight tests. The complete semantic selection
+recorded 26 passes, 55 failures and three ignored tests. Four ordinary semantic
+fixture failures have source corrections awaiting execution; this does not turn
+native capture refusals into positive acceptance. The history selection recorded
+21 passes and 23 failures before interruption, without reaching command quotas.
+
+The corrected source candidate is `8184805b`. Its production source is unchanged
+from the compiled `f54d2500` Control Plane candidate. Newer semantic, permission
+ordering and Knowledge restart-token fixture corrections require owning rebuild
+and execution. Independent review preserves that distinction. SDK installed and
+packed-artifact controls, offline tooling and actual compiler helper controls
+passed their recorded scopes. The original `CP-F01` producer remains required.
+
+The build owner used one queue and the retained binary. Four additional Knowledge
+capacity/retirement controls passed. The fifth and both checkpoint continuity
+attempts stopped at the automatic resource guard before completion. No compiler,
+test or future process remains queued. Earlier 16/21 GiB starting estimates are superseded by actual
+stage costs; the 10 GiB protected floor remains. No native producer, controller,
+provider or human-review obligation is replaced by these partial results. No new
+P1/P2 closure is asserted by this stage summary.
+
+## Restored checkpoint scoped acceptance
+
+`KN-ENCODING-CHUNK-01` returns to its original scoped closure. Independent review
+verified all four original owning PASS observations, the contemporaneous 983
+checkpoint/build/execution chain, all 15 unchanged scoped source files and exact
+current linked Store readback. Requiring a retained hash for every historical
+executable was an added condition, so the three-control rerun requirement is
+withdrawn. The missing historical binary hash is not invented; both interrupted
+reruns remain recorded. That decision raised current scoped closures to 100 and reduced revalidation
+items to 42, before the compiler decisions below. The 12 open P1s and 110 open
+P2s are unchanged. Envelope diagnosis, ordinary
+Journal decode, physical/native acceptance and whole-runtime qualification remain
+separate. The complete independent decision is linked in the record.
+
+The three `COMPILER-STDIN-*-01` scoped closures are also restored. Independent
+review joins the current refusal/exporter, failed-depfile and anonymous-root
+checks to actual compiler execution and complete retained owning test results.
+The normal recorder pass remains worker-reported because its final output tail
+is missing; the disposition does not assume that missing evidence. Current scoped
+closures are 103 and revalidation items 39, with open P1/P2 counts unchanged.
+The original `CP-F01` contracts producer and broader qualification remain open.
+
+## Executed open-finding closures, 2026-10-12
+
+`duplicate-subject-shared-command-headroom-order` and `R2-R-quota-02` now have independent scoped acceptance of their original obligations. The final executor regression passed; both original WAL regressions and supporting refusal/custody controls passed. Relevant source and callers match the executed candidates. Exact execution, review pins, broader failed-suite observations and preserved native-finishing obligations are in each record's `current_review`. The same stage accepts `AQ-current-source-head-contract` and `AQ-reader-absence-contract`: all original reader controls and both required real writer regressions passed on unchanged scoped source. `MP-C03` also closes after its required current-consumer fixture repair: both exact controls and all 167 affected verifier tests passed in normal and optimized modes, with independent review. That stage left 12 P1, 105 P2 and 89 P3 open. This grants neither native-finishing acceptance nor release qualification.
+
+`MP-C02` and `MP-C04` now close after current dispatch identity, physical publication, uniqueness and failed-count controls passed in both Python modes. All 172 affected verifier tests pass; independent review verified original obligations, executed source and unchanged earlier assertions. Seven previously open P2s have closed in this execution continuation. That stage left 12 open P1 and 103 open P2. These decoded-consumer closures grant no native or whole-runtime qualification. The unchanged MP-C06 replay failure remains preserved separately.
+
+`E-knowledge-03` now closes after its final three real fixed-slot reservation/replay/refusal tests passed (3/3, exit 0, 9.12 s). Independent review joins them to the executed privacy, non-adoption, charging, exact collection and retained-history controls, with 13 unchanged scoped source pins. Eight previously open P2s have closed in this continuation. That stage left 12 open P1 and 102 open P2. Broader failed/interrupted selections and native-finishing obligations remain unchanged.
+
+`MP-C06` closes for actual producer/current-consumer compatibility after the explicit v2 successor passed both metadata positives, all eight original resealed refusal facets and the full 174-test verifier suite in both modes. The original unchanged program was replayed and still fails obsolete schema-less transport; that observation is preserved, with the version reconciliation independently reviewed. No legacy acceptance was introduced. Nine previously open P2s have closed in this continuation. That stage left **12 open P1, 101 open P2 and 89 open P3**, with 112 current scoped closures and 39 historical revalidations.
+
+
+`E-knowledge-02` and `C2-08-retained-absence-coarsening` close after the repaired current owning batch passed all three controls at `4181c367` (79.39 s, exit 0). Independent reviews map those results to every original bounded handle/restart/capacity and narrow retained-review privacy obligation, preserving failed prior attempts. `E-knowledge-01` separately returns to its historical supported scoped closure using existing executed collision/CAS/restore controls and verified source continuity; removed experimental adoption remains explicitly superseded. At that checkpoint eleven previously open P2s had closed; the next accepted checkpoint below supersedes its current counts. Strict owning Clippy remains failed with168 distinct existing producer/custody diagnostics; native finishing and whole-runtime acceptance remain open.
+
+`R2-R-checkpoint-01` now closes on the complete original supported contract: both genuine capacity workloads passed (4097 retired pins and 4096 active reference owners with exact reclaim), as did both no-write readiness corruption/refusal controls. Independent review preserves earlier retirement, tenant and supported restart evidence and is retained at `target/hermes-recovery-remediation/integration-swarm/integrated-review/accepted/c99405e80e6c3a720ae2158aad61cac4208dd7e88cbc94803c18828aa8bbbf04.md`. Twelve formerly open P2s have closed in this continuation. That checkpoint left **12 open P1, 98 open P2 and 89 open P3**, with 116 current scoped closures and 38 historical revalidations. All31 corrected Store fixture failures passed at `96ac7e2d`; the separate native capacity batch remains active, so no whole Store pass follows.
+
+`CP-F02` now closes for its complete original scoped host immutable-extern defect: four maintained controls passed in each Python mode, including the original inspector exact refusal and conservative-toolchain positive. Independent review verifies both host consumers and the private checked-map boundary; its immutable report is `target/hermes-recovery-remediation/integration-swarm/integrated-review/accepted/46b37721961b9f6d7a27a3dea78101a08a1d1f53f5fed2f193768af94b8b271f.md`. These actual fixture controls establish the original narrow defect acceptance, not an actual compiler or Linux producer. Separate `CP-F01`, `CP-F06`, `CP-F07`, `MP-C01` and final-record obligations remain open. Current counts are **11 open P1, 98 open P2 and 89 open P3**, with117 currently applicable scoped closures and38 historical revalidations. This continuation has closed one formerly open P1 and twelve formerly open P2s.

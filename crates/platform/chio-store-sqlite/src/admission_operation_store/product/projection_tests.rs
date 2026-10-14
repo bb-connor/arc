@@ -255,6 +255,35 @@ fn product_public_views_fit_whenever_native_record_encoding_succeeds() -> TestRe
     Ok(())
 }
 
+type RecoveryAccounting = (Vec<(String, String, String, i64, Vec<u8>)>, i64, i64);
+
+/// Every retained recovery record, with the event and global-commit counts
+/// that custody them.
+fn recovery_accounting(connection: &rusqlite::Connection) -> TestResult<RecoveryAccounting> {
+    let mut statement = connection.prepare(
+        "SELECT record_key, scope_key, kind, version, payload
+         FROM admission_operation_recovery_records ORDER BY record_key",
+    )?;
+    let records = statement
+        .query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    let (events, commits) = connection.query_row(
+        "SELECT (SELECT count(*) FROM admission_operation_recovery_events),
+                (SELECT count(*) FROM authority_global_commits WHERE projection_kind = 'recovery')",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    Ok((records, events, commits))
+}
+
 #[test]
 fn product_oversized_record_rolls_back_its_intake_reservation() -> TestResult {
     let (_directory, authority) = authority_fixture()?;
@@ -262,6 +291,13 @@ fn product_oversized_record_rolls_back_its_intake_reservation() -> TestResult {
     let value = report(label(4)?)?;
     assert!(canonical_json_bytes(&value)?.len() > 262_144);
     let mut connection = store.connection()?;
+    let baseline = recovery_accounting(&connection)?;
+    let (quota_key, _) =
+        lifecycle::quota_key(&value.report.scope, lifecycle::ProductWorkKind::Report)?;
+    assert!(
+        !baseline.0.iter().any(|record| record.0 == quota_key),
+        "the quota counter starts absent"
+    );
     let tx = store.begin_write(&mut connection, None)?;
     reserve_quota(
         &tx,
@@ -269,6 +305,15 @@ fn product_oversized_record_rolls_back_its_intake_reservation() -> TestResult {
         &value.report.scope,
         lifecycle::ProductWorkKind::Report,
     )?;
+    let reserved: i64 = tx.query_row(
+        "SELECT count(*) FROM admission_operation_recovery_records WHERE record_key = ?1",
+        [&quota_key],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        reserved, 1,
+        "the intake reservation is held before the refusal"
+    );
     assert!(save(
         &tx,
         &store.serving_owner,
@@ -278,14 +323,10 @@ fn product_oversized_record_rolls_back_its_intake_reservation() -> TestResult {
     )
     .is_err());
     drop(tx);
-    let count: i64 = connection.query_row(
-        "SELECT count(*) FROM admission_operation_recovery_records",
-        [],
-        |row: &rusqlite::Row<'_>| row.get::<_, i64>(0),
-    )?;
     assert_eq!(
-        count, 0,
-        "oversized feedback cannot commit a report or quota row"
+        recovery_accounting(&connection)?,
+        baseline,
+        "oversized feedback cannot commit a report, quota row, event or global commit"
     );
     Ok(())
 }

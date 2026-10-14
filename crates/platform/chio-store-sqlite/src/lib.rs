@@ -78,6 +78,7 @@ pub mod security_admission_operation_store;
 pub mod security_state;
 pub mod serving_owner;
 pub mod settle_attempts;
+mod native_authority_capacity;
 mod store_connection;
 pub mod tool_outcome_store;
 

@@ -28,7 +28,8 @@ class SourceProjectionTest(unittest.TestCase):
         names = ["fixtures/retained/archive" + suffix for suffix in (
             ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz", ".tbz2", ".tar.xz",
             ".txz", ".tar.zst", ".tzst", ".zip", ".7z")]
-        prefixes = ["docs/integrations/acceptance", *(
+        prefixes = ["docs/integrations/acceptance",
+            "docs/architecture/recoverable-agent-runtime/implementation/history", *(
             f"docs/architecture/recoverable-agent-runtime/implementation/p{number}/evidence"
             for number in range(7)), "sdks/python/chio-hermes/evidence", "audits/evidence",
             "docs/integrations/session-credentials/evidence", "docs/evidence",

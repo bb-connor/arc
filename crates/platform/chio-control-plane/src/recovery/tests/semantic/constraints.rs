@@ -200,7 +200,12 @@ async fn modeled_historical_top_clearance_cannot_read_semantic_constraints() -> 
             &request,
         )
         .await?;
-    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(
+        response.verdict,
+        Verdict::Allow,
+        "constraint source must reach native completion: {:?}",
+        response.reason
+    );
     let operation = OperationId::new(
         response
             .receipt
