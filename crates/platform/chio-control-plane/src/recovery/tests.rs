@@ -48,6 +48,8 @@ mod linked_generations;
 mod native_lifecycle;
 #[path = "tests/native_lineage_bootstrap.rs"]
 mod native_lineage_bootstrap;
+#[path = "tests/native_payment_finishing.rs"]
+mod native_payment_finishing;
 #[path = "tests/original_action_semantics.rs"]
 mod original_action_semantics;
 #[path = "tests/original_denials.rs"]
@@ -242,6 +244,19 @@ impl RecoveryFixture {
                     chio_core::sha256_hex(b"an output the provider will never return"),
                 ),
             );
+        }
+        if path.join("payment-effect").exists() {
+            // A payment-effect original exercises the funded payment journal
+            // through the plain workflow tool, not only the semantic route.
+            scope.grants[0].max_cost_per_invocation =
+                Some(chio_core::capability::scope::MonetaryAmount {
+                    units: 10,
+                    currency: "USD".into(),
+                });
+            scope.grants[0].max_total_cost = Some(chio_core::capability::scope::MonetaryAmount {
+                units: 80,
+                currency: "USD".into(),
+            });
         }
         if path.join("semantic-kind").exists() {
             for server in ["semantic-a", "semantic-source"] {
@@ -1075,7 +1090,18 @@ async fn recovery_crash_child() -> TestResult {
     let path =
         std::path::PathBuf::from(std::env::var_os("CHIO_RECOVERY_CRASH_ROOT").ok_or("child root")?);
     let nonce = std::env::var_os("CHIO_RECOVERY_CRASH_NONCE").is_some();
-    let f = RecoveryFixture::open(path, None, nonce)?;
+    // A payment-capable child drives the same real continuation under a local
+    // reversible-hold rail so interruption lands inside the funded settlement.
+    let f = if std::env::var_os("CHIO_RECOVERY_CRASH_PAYMENT").is_some() {
+        RecoveryFixture::open_with_payment_adapter(
+            path,
+            None,
+            nonce,
+            native_payment_finishing::reversible_hold_payment_adapter(),
+        )?
+    } else {
+        RecoveryFixture::open(path, None, nonce)?
+    };
     let id = f.ready().await?;
     let record = f.record(&id)?;
     let resume = f.command(

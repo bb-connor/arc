@@ -1038,6 +1038,24 @@ pub struct AdmissionPaymentSettlement {
     pub budget_already_reconciled: bool,
 }
 
+/// The pre-dispatch reversal of every live budget hold of one payment
+/// operation after its external authorization was released.
+#[derive(Debug, Clone)]
+pub struct AdmissionPaymentHoldReversal<'a> {
+    pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+    pub recovery_lease: &'a crate::admission_operation::AdmissionRecoveryLease,
+    pub expected: &'a crate::payment::PaymentJournalRecord,
+    pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+    pub trusted_now_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmissionPaymentHoldReversed {
+    /// The executable hold's reversal, replayed when it was already reversed
+    /// by the same deterministic event.
+    pub executable: Option<crate::budget_store::BudgetReverseHoldDecision>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum AdmissionBudgetAuthorizationError {
     #[error("combined admission budget authorization is unavailable: {0}")]
@@ -1226,6 +1244,17 @@ pub trait QualifiedAdmissionProjectionStore:
         &self,
         begin: AdmissionPaymentSettlementBegin<'_>,
     ) -> Result<AdmissionPaymentSettlement, AdmissionPaymentJournalError>;
+
+    /// Reverse every live budget hold of a pre-dispatch payment operation in
+    /// the store transaction that funds it from the operation's own prepaid
+    /// account. `None` means this store prepaid nothing for the operation and
+    /// the caller keeps the established budget authority reversal.
+    fn reverse_funded_payment_holds(
+        &self,
+        _reversal: AdmissionPaymentHoldReversal<'_>,
+    ) -> Result<Option<AdmissionPaymentHoldReversed>, AdmissionPaymentJournalError> {
+        Ok(None)
+    }
 
     #[allow(clippy::too_many_arguments)]
     fn authorize_budget_and_commit_admission(

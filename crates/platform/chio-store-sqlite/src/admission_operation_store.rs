@@ -882,6 +882,18 @@ impl SqliteAdmissionOperationStore {
             active_fence,
             trusted_now_unix_ms,
         )?;
+        // This journal advance is a post-effect payment write of a native
+        // original: admit only the growth its own prepaid purpose funded.
+        let write = security_participant_state::native_payment_journal_write(transition);
+        if let Some(purpose) = write.funded_purpose() {
+            security_participant_state::authorize_native_finishing_growth(
+                &transaction,
+                &self.serving_owner,
+                operation,
+                &[purpose],
+            )
+            .map_err(map_payment_operation_error)?;
+        }
         let (updated, changed) = crate::budget_store::advance_payment_journal(
             &transaction,
             expected,
@@ -891,6 +903,21 @@ impl SqliteAdmissionOperationStore {
         )
         .map_err(map_payment_budget_error)?;
         if changed {
+            if write == security_participant_state::NativePaymentJournalWrite::Unpriced {
+                security_participant_state::refuse_unpriced_native_payment_write(
+                    &transaction,
+                    operation,
+                )
+                .map_err(map_payment_operation_error)?;
+            } else {
+                security_participant_state::spend_native_payment_purpose(
+                    &transaction,
+                    &self.serving_owner,
+                    operation,
+                    write,
+                )
+                .map_err(map_payment_operation_error)?;
+            }
             self.serving_owner
                 .append_global_commit(
                     &transaction,
@@ -943,6 +970,16 @@ impl SqliteAdmissionOperationStore {
             active_fence,
             trusted_now_unix_ms,
         )?;
+        // The settlement begin writes the composite budget reconcile and the
+        // journal's settlement intent: one prepaid purpose owns this whole
+        // transaction on a native original's funded account.
+        security_participant_state::authorize_native_finishing_growth(
+            &transaction,
+            &self.serving_owner,
+            operation,
+            &[recovery::storage::NativeFinishingPurposeV1::PaymentSettlement],
+        )
+        .map_err(map_payment_operation_error)?;
         let budget = crate::budget_store::SqliteBudgetStore::open_alongside(
             self.connection.clone(),
             self.serving_owner.clone(),
@@ -994,6 +1031,17 @@ impl SqliteAdmissionOperationStore {
                 )
                 .map_err(map_payment_owner_error)?;
         }
+        if budget_changed || payment_changed {
+            security_participant_state::spend_native_payment_purpose(
+                &transaction,
+                &self.serving_owner,
+                operation,
+                security_participant_state::NativePaymentJournalWrite::PostEffect(
+                    recovery::storage::NativeFinishingPurposeV1::PaymentSettlement,
+                ),
+            )
+            .map_err(map_payment_operation_error)?;
+        }
         self.commit_write(transaction)
             .map_err(map_payment_operation_error)?;
         if budget_changed || payment_changed {
@@ -1005,6 +1053,153 @@ impl SqliteAdmissionOperationStore {
             budget,
             budget_already_reconciled: !budget_changed,
         })
+    }
+
+    /// Reverse every live budget hold of a pre-dispatch native payment original
+    /// whose external authorization was released, in one transaction funded by
+    /// the account's PaymentSettlement purpose. That purpose is still owed here
+    /// and can never be spent by a settlement: the operation has no dispatch
+    /// commit. Each request is derived from the operation's own retained holds,
+    /// so a caller names no hold, amount or event. An ordinary original returns
+    /// `None` and keeps the established budget authority reversal.
+    pub fn reverse_funded_payment_holds(
+        &self,
+        reversal: chio_kernel::receipt_store::AdmissionPaymentHoldReversal<'_>,
+    ) -> Result<
+        Option<chio_kernel::receipt_store::AdmissionPaymentHoldReversed>,
+        AdmissionPaymentJournalError,
+    > {
+        let chio_kernel::receipt_store::AdmissionPaymentHoldReversal {
+            operation,
+            recovery_lease,
+            expected,
+            active_fence,
+            trusted_now_unix_ms,
+        } = reversal;
+        if active_fence != &self.serving_owner.fence
+            || recovery_lease.store_fence() != active_fence
+            || expected.operation_id != operation.binding().operation_id().as_str()
+        {
+            return Err(AdmissionPaymentJournalError::Fenced);
+        }
+        if operation.dispatch_commit().is_some() || operation.state().is_terminal() {
+            return Err(AdmissionPaymentJournalError::Invariant(
+                "funded payment hold reversal requires a pre-dispatch operation".to_owned(),
+            ));
+        }
+        let mut connection = self.connection().map_err(map_payment_operation_error)?;
+        let transaction = self
+            .begin_write(&mut connection, Some(active_fence))
+            .map_err(map_payment_operation_error)?;
+        verify_payment_write_context(
+            &transaction,
+            &self.serving_owner,
+            operation,
+            recovery_lease,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
+        if !security_participant_state::native_finishing_original(&transaction, operation)
+            .map_err(map_payment_operation_error)?
+        {
+            transaction
+                .rollback()
+                .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+            return Ok(None);
+        }
+        let journal = crate::budget_store::load_payment_journal(
+            &transaction,
+            operation.binding().operation_id().as_str(),
+        )
+        .map_err(map_payment_budget_error)?
+        .ok_or_else(|| {
+            AdmissionPaymentJournalError::Invariant(
+                "funded payment hold reversal lost its journal".to_owned(),
+            )
+        })?;
+        // Only a released external authorization reaches this writer: the
+        // rail released the hold and the journal retained that completion.
+        if journal != *expected
+            || journal.state != chio_kernel::payment::PaymentJournalState::Settled
+            || journal.settle_action != Some(chio_kernel::payment::PaymentSettleAction::Release)
+            || journal.authorization_id.is_none()
+        {
+            return Err(AdmissionPaymentJournalError::Conflict(
+                "funded payment hold reversal requires the released authorization".to_owned(),
+            ));
+        }
+        security_participant_state::authorize_native_finishing_growth(
+            &transaction,
+            &self.serving_owner,
+            operation,
+            &[recovery::storage::NativeFinishingPurposeV1::PaymentSettlement],
+        )
+        .map_err(map_payment_operation_error)?;
+        let budget = crate::budget_store::SqliteBudgetStore::open_alongside(
+            self.connection.clone(),
+            self.serving_owner.clone(),
+        );
+        let capability_id = operation.binding().capability_id().as_str();
+        let hold_id = operation.budget_hold_id().ok_or_else(|| {
+            AdmissionPaymentJournalError::Invariant(
+                "released payment operation lost its executable hold".to_owned(),
+            )
+        })?;
+        let (executable, mut changed) = budget
+            .reverse_admission_hold_in_transaction(
+                &transaction,
+                capability_id,
+                hold_id.as_str(),
+                &format!("{}:authorize:rollback:recovery", hold_id.as_str()),
+            )
+            .map_err(map_payment_budget_error)?;
+        if let Some(preflight) = nonce_preflight::load_recovery(&transaction, operation)
+            .map_err(map_payment_operation_error)?
+        {
+            let identity = preflight.identity();
+            if identity.parent_operation_id() != operation.binding().operation_id() {
+                return Err(AdmissionPaymentJournalError::Invariant(
+                    "nonce preflight recovery names another operation".to_owned(),
+                ));
+            }
+            if preflight.hold()
+                != chio_kernel::admission_operation::AdmissionNoncePreflightHoldDisposition::Reversed
+            {
+                let (_, preflight_changed) = budget
+                    .reverse_admission_hold_in_transaction(
+                        &transaction,
+                        capability_id,
+                        identity.hold_id().as_str(),
+                        &format!(
+                            "{}:rollback:{}",
+                            identity.authorization_event_id().as_str(),
+                            preflight.authorization_commit_index()
+                        ),
+                    )
+                    .map_err(map_payment_budget_error)?;
+                changed |= preflight_changed;
+            }
+        }
+        if changed {
+            security_participant_state::spend_native_payment_purpose(
+                &transaction,
+                &self.serving_owner,
+                operation,
+                security_participant_state::NativePaymentJournalWrite::PostEffect(
+                    recovery::storage::NativeFinishingPurposeV1::PaymentSettlement,
+                ),
+            )
+            .map_err(map_payment_operation_error)?;
+        }
+        self.commit_write(transaction)
+            .map_err(map_payment_operation_error)?;
+        if changed {
+            self.sync_after_write(&connection)
+                .map_err(map_payment_operation_error)?;
+        }
+        Ok(Some(
+            chio_kernel::receipt_store::AdmissionPaymentHoldReversed { executable },
+        ))
     }
 
     pub fn commit_terminal_projection(

@@ -166,6 +166,17 @@ fn supported_table(table: &str) -> bool {
             | "security_participant_state_declassification_uses"
             | "security_participant_state_declassification_evidence_identity"
             | "security_participant_state_declassification_receipt_outbox"
+            | "payment_journal"
+            | "payment_release_evidence"
+            | "capability_grant_budgets"
+            | "budget_authorization_holds"
+            | "budget_mutation_events"
+            | "budget_event_quota_members"
+            | "budget_event_revocation_members"
+            | "budget_event_authorization_artifacts"
+            | "budget_event_revocation_commits"
+            | "budget_event_cumulative_approval"
+            | "budget_replication_meta"
     )
 }
 

@@ -343,6 +343,17 @@ impl ChioKernel {
             ) if payment_journal_matches_settlement(&journal, settle_action, amount_units) => {
                 (None, None)
             }
+            (
+                crate::payment::PaymentRailMode::ReversibleHold,
+                crate::payment::PaymentJournalState::ReconcileFailed,
+            ) if journal.settle_action.is_some() && journal.authorization_id.is_some() => {
+                // A rail that refused the settlement intent sealed the journal
+                // as reconcile_failed while retaining its settle action and
+                // authorization. Re-drive the same intent through the rail
+                // continuation below; the journal's compare-and-set keeps the
+                // completion once-only and the begin consumes nothing new.
+                (None, None)
+            }
             (crate::payment::PaymentRailMode::PrepaidFinal, _) => {
                 return Err(KernelError::DurableAdmission(
                     "final prepayment journal is not terminal and fixed-price".to_owned(),

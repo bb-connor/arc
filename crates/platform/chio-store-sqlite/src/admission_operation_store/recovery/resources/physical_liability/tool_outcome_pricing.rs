@@ -78,7 +78,7 @@ pub(in crate::admission_operation_store) fn price_native_tool_outcome_phases(
     // This exact full native profile must already authenticate UTF-8, FULL WAL,
     // auto-vacuum=0, current and pending reserved bytes=0, actual supported VFS,
     // whole source/index/trigger catalog and the original producing program.
-    let transactions = describe_native_tool_outcome_transactions(source)?;
+    let transactions = describe_native_tool_outcome_transactions(tx, source)?;
     transactions
         .iter()
         .map(|transaction| {
@@ -127,9 +127,14 @@ fn transaction_profile(
             ("finalization", pure_prefix)
         }
         ToolOutcomeTransactionPurposeData::SecurityRelease => ("security_release", 0),
-        ToolOutcomeTransactionPurposeData::TerminalProjection { observer } => {
-            ("terminal_projection", u64::from(observer))
-        }
+        ToolOutcomeTransactionPurposeData::TerminalProjection { observer, payment } => (
+            "terminal_projection",
+            u64::from(observer) + 2 * u64::from(payment),
+        ),
+        ToolOutcomeTransactionPurposeData::PaymentAuthorization => ("payment_authorization", 0),
+        ToolOutcomeTransactionPurposeData::PaymentCompensation => ("payment_compensation", 0),
+        ToolOutcomeTransactionPurposeData::PaymentSettlement => ("payment_settlement", 0),
+        ToolOutcomeTransactionPurposeData::PaymentCompletion => ("payment_completion", 0),
     };
     let bytes = canonical_json_bytes(&(
         "chio.sqlite.original-tool-outcome-transaction-envelope.v3",
@@ -186,9 +191,14 @@ fn transaction_shape(
         .map_err(invariant)?;
         trees.push(shape.within_retained_rows(ceiling).map_err(invariant)?);
         for &bytes in row.index_record_bytes() {
-            let index = if matches!(row.table(), ToolOutcomeWriteTableData::Operations) {
+            let index = if matches!(
+                row.table(),
+                ToolOutcomeWriteTableData::Operations | ToolOutcomeWriteTableData::PaymentJournal
+            ) {
                 // The recovery index changes when the operation's timestamp
-                // or state changes. Retain deletion and reinsertion walks.
+                // or state changes; the payment journal's state index changes
+                // when its state or updated_at changes. Retain deletion and
+                // reinsertion walks for both.
                 SqliteTreeWriteShapeData::record(Some(bytes), bytes, row.mutations())
             } else {
                 // The content-addressed blob's PK index is inserted only for a

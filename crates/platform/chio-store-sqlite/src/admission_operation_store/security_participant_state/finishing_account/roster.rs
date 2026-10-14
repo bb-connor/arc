@@ -67,7 +67,7 @@ pub(super) fn price_roster(
         return Err(invalid("native finishing requires its spill-free writer"));
     }
     let row_plan = NativeRowPlan::prepare(tx, owner, plan)?;
-    let transactions = crate::admission_operation_store::tool_outcome_liability::describe_native_tool_outcome_transactions(plan)?;
+    let transactions = crate::admission_operation_store::tool_outcome_liability::describe_native_tool_outcome_transactions(tx, plan)?;
     let mut liabilities = Vec::new();
     let prices = price_native_tool_outcome_phases(tx, (owner, origin), plan, row_plan.ceilings())?;
     for (price, transaction) in prices.into_iter().zip(&transactions) {
@@ -84,6 +84,18 @@ pub(super) fn price_roster(
             }
             ToolOutcomeTransactionPurposeData::TerminalProjection { .. } => {
                 NativeFinishingPurposeV1::TerminalProjection
+            }
+            ToolOutcomeTransactionPurposeData::PaymentAuthorization => {
+                NativeFinishingPurposeV1::PaymentAuthorization
+            }
+            ToolOutcomeTransactionPurposeData::PaymentCompensation => {
+                NativeFinishingPurposeV1::PaymentCompensation
+            }
+            ToolOutcomeTransactionPurposeData::PaymentSettlement => {
+                NativeFinishingPurposeV1::PaymentSettlement
+            }
+            ToolOutcomeTransactionPurposeData::PaymentCompletion => {
+                NativeFinishingPurposeV1::PaymentCompletion
             }
         };
         let mut liability = outstanding(purpose, price.profile(), price.physical().clone());

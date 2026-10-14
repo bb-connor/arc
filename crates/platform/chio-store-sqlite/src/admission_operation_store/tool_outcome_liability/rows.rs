@@ -15,6 +15,17 @@ pub(in crate::admission_operation_store) enum ToolOutcomeWriteTableData {
     TerminalProjections,
     TerminalRecords,
     ObserverAttempts,
+    PaymentJournal,
+    PaymentReleaseEvidence,
+    CapabilityGrantBudgets,
+    BudgetAuthorizationHolds,
+    BudgetMutationEvents,
+    BudgetEventQuotaMembers,
+    BudgetEventRevocationMembers,
+    BudgetEventAuthorizationArtifacts,
+    BudgetEventRevocationCommits,
+    BudgetEventCumulativeApproval,
+    BudgetReplicationMeta,
 }
 
 impl ToolOutcomeWriteTableData {
@@ -32,6 +43,17 @@ impl ToolOutcomeWriteTableData {
             Self::AdmissionMeta => "admission_operation_commit_meta",
             Self::GlobalCommits => "authority_global_commits",
             Self::GlobalMeta => "authority_global_commit_meta",
+            Self::PaymentJournal => "payment_journal",
+            Self::PaymentReleaseEvidence => "payment_release_evidence",
+            Self::CapabilityGrantBudgets => "capability_grant_budgets",
+            Self::BudgetAuthorizationHolds => "budget_authorization_holds",
+            Self::BudgetMutationEvents => "budget_mutation_events",
+            Self::BudgetEventQuotaMembers => "budget_event_quota_members",
+            Self::BudgetEventRevocationMembers => "budget_event_revocation_members",
+            Self::BudgetEventAuthorizationArtifacts => "budget_event_authorization_artifacts",
+            Self::BudgetEventRevocationCommits => "budget_event_revocation_commits",
+            Self::BudgetEventCumulativeApproval => "budget_event_cumulative_approval",
+            Self::BudgetReplicationMeta => "budget_replication_meta",
         }
     }
 }
@@ -145,7 +167,7 @@ pub(super) fn describe_transaction_rows(
             rows.push(operation_shape(operation, 1)?);
             1
         }
-        ToolOutcomeTransactionPurposeData::TerminalProjection { observer } => {
+        ToolOutcomeTransactionPurposeData::TerminalProjection { observer, payment } => {
             rows.push(ToolOutcomeRowEnvelopeData {
                 table: ToolOutcomeWriteTableData::TerminalProjections,
                 possible_before_bytes: None,
@@ -156,13 +178,17 @@ pub(super) fn describe_transaction_rows(
                 index_bytes: vec![record_bytes(&[64, 8])?],
             });
             // The signed receipt is bounded by the original receipt envelope;
-            // the tool outcome and observation records by their CHECK bound.
+            // the tool outcome, observation and payment terminal records by
+            // their CHECK bound.
             let mut records = vec![
                 ("receipt".len(), envelope.receipt_bytes),
                 ("tool_outcome".len(), 1_048_576),
             ];
             if observer {
                 records.push(("observation_attempt_zero".len(), 1_048_576));
+            }
+            if payment {
+                records.push(("payment_terminal".len(), 1_048_576));
             }
             for (kind, json) in records {
                 let kind = u64::try_from(kind)
@@ -196,6 +222,14 @@ pub(super) fn describe_transaction_rows(
             }
             rows.push(operation_shape(operation, 1)?);
             1
+        }
+        ToolOutcomeTransactionPurposeData::PaymentAuthorization
+        | ToolOutcomeTransactionPurposeData::PaymentCompensation
+        | ToolOutcomeTransactionPurposeData::PaymentSettlement
+        | ToolOutcomeTransactionPurposeData::PaymentCompletion => {
+            return Err(invariant(
+                "payment journal transaction rows require their budget hold shape",
+            ));
         }
     };
     append_histories(&mut rows, envelope, appends)?;
@@ -347,5 +381,245 @@ fn record_bytes(cells: &[u64]) -> Result<u64, AdmissionOperationStoreError> {
     cells.iter().try_fold(header, |sum, bytes| {
         sum.checked_add(*bytes)
             .ok_or_else(|| invariant("original custody row payload exhausted"))
+    })
+}
+
+/// The actual budget hold a payment original placed before its account was
+/// priced. Every member count bound below is read from the hold's own rows,
+/// so a hold with more members prices a larger settlement transaction.
+pub(super) struct PaymentHoldShape {
+    quota_members: u64,
+    revocation_members: u64,
+    authorization_artifacts: u64,
+    revocation_commit: bool,
+    cumulative_approval: bool,
+}
+
+impl PaymentHoldShape {
+    pub(super) fn load(
+        tx: &Transaction<'_>,
+        source: &VerifiedNativeInitialFinishingPlan<'_, '_>,
+    ) -> Result<Self, AdmissionOperationStoreError> {
+        let hold = source
+            .operation()
+            .budget_hold_id()
+            .ok_or_else(|| invariant("payment original lost its budget hold"))?
+            .as_str();
+        let count = |sql: &str| -> Result<u64, AdmissionOperationStoreError> {
+            let rows: i64 = tx
+                .query_row(sql, [hold], |row| row.get(0))
+                .map_err(sqlite_error)?;
+            u64::try_from(rows).map_err(invariant)
+        };
+        let present = |sql: &str| -> Result<bool, AdmissionOperationStoreError> {
+            let present: bool = tx
+                .query_row(sql, [hold], |row| row.get(0))
+                .map_err(sqlite_error)?;
+            Ok(present)
+        };
+        let shape = Self {
+            quota_members: count(
+                "SELECT COUNT(*) FROM main.budget_hold_quota_members WHERE hold_id=?1",
+            )?,
+            revocation_members: count(
+                "SELECT COUNT(*) FROM main.budget_hold_revocation_members WHERE hold_id=?1",
+            )?,
+            authorization_artifacts: count(
+                "SELECT COUNT(*) FROM main.budget_hold_authorization_artifacts WHERE hold_id=?1",
+            )?,
+            revocation_commit: present(
+                "SELECT EXISTS(SELECT 1 FROM main.budget_hold_revocation_commits
+                 WHERE hold_id=?1)",
+            )?,
+            cumulative_approval: present(
+                "SELECT EXISTS(SELECT 1 FROM main.budget_cumulative_approval_operations
+                 WHERE hold_id=?1)",
+            )?,
+        };
+        if shape.quota_members == 0 {
+            return Err(invariant("payment original hold lost its quota members"));
+        }
+        Ok(shape)
+    }
+}
+
+/// One journal row rewrite at its real column bound plus the state index the
+/// advance always rewrites (state and updated_at are both indexed columns).
+fn payment_journal_row() -> Result<ToolOutcomeRowEnvelopeData, AdmissionOperationStoreError> {
+    let bytes = record_bytes(&[
+        512, 8, 64, 512, 512, 8, 512, 512, 16, 512, 512, 8, 8, 8, 24, 512, 64, 8, 3, 16, 8, 8,
+    ])?;
+    Ok(ToolOutcomeRowEnvelopeData {
+        table: ToolOutcomeWriteTableData::PaymentJournal,
+        possible_before_bytes: Some(bytes),
+        maximum_after_bytes: bytes,
+        mutations: 1,
+        index_bytes: vec![record_bytes(&[16, 8, 512])?],
+    })
+}
+
+/// The immutable release evidence row at its CHECK bound with its two trees.
+fn payment_release_evidence_row() -> Result<ToolOutcomeRowEnvelopeData, AdmissionOperationStoreError>
+{
+    let bytes = record_bytes(&[512, 512, 24, 8, 1_048_576, 64, 8])?;
+    Ok(ToolOutcomeRowEnvelopeData {
+        table: ToolOutcomeWriteTableData::PaymentReleaseEvidence,
+        possible_before_bytes: None,
+        maximum_after_bytes: bytes,
+        mutations: 1,
+        index_bytes: vec![record_bytes(&[512])?, record_bytes(&[512])?],
+    })
+}
+
+/// The journal advance appends one global commit and rewrites its meta head.
+fn payment_append_histories(
+    rows: &mut Vec<ToolOutcomeRowEnvelopeData>,
+    envelope: &ToolOutcomeEnvelopeData,
+    appends: u64,
+) -> Result<(), AdmissionOperationStoreError> {
+    rows.push(ToolOutcomeRowEnvelopeData {
+        table: ToolOutcomeWriteTableData::GlobalCommits,
+        possible_before_bytes: None,
+        maximum_after_bytes: envelope.global_row_bytes,
+        mutations: appends,
+        index_bytes: vec![envelope.global_index_bytes],
+    });
+    rows.push(existing(
+        ToolOutcomeWriteTableData::GlobalMeta,
+        record_bytes(&[8, 8, 64])?,
+        appends,
+    ));
+    Ok(())
+}
+
+/// The four priced payment journal transactions of one payment original.
+/// Every row bound is the real schema CHECK or column bound of its table,
+/// and every member count comes from the hold the original actually placed.
+pub(super) fn payment_transaction(
+    envelope: &ToolOutcomeEnvelopeData,
+    purpose: ToolOutcomeTransactionPurposeData,
+    hold: &PaymentHoldShape,
+) -> Result<ToolOutcomeTransactionEnvelopeData, AdmissionOperationStoreError> {
+    let mut rows = Vec::new();
+    let global_appends = match purpose {
+        ToolOutcomeTransactionPurposeData::PaymentAuthorization
+        | ToolOutcomeTransactionPurposeData::PaymentCompletion => {
+            rows.push(payment_journal_row()?);
+            1
+        }
+        ToolOutcomeTransactionPurposeData::PaymentCompensation => {
+            rows.push(payment_journal_row()?);
+            rows.push(payment_release_evidence_row()?);
+            1
+        }
+        ToolOutcomeTransactionPurposeData::PaymentSettlement => {
+            // The composite budget reconcile: the usage row, the hold row,
+            // one mutation event inserted then projected, its member rows,
+            // the replication sequence and its joint global commit.
+            let usage = record_bytes(&[512, 8, 8, 8, 8, 8, 8])?;
+            rows.push(ToolOutcomeRowEnvelopeData {
+                table: ToolOutcomeWriteTableData::CapabilityGrantBudgets,
+                possible_before_bytes: Some(usage),
+                maximum_after_bytes: usage,
+                mutations: 1,
+                index_bytes: vec![record_bytes(&[8, 8])?],
+            });
+            let hold_row = record_bytes(&[512, 512, 8, 8, 8, 8, 8, 24, 512, 512, 8, 8, 8])?;
+            rows.push(ToolOutcomeRowEnvelopeData {
+                table: ToolOutcomeWriteTableData::BudgetAuthorizationHolds,
+                possible_before_bytes: Some(hold_row),
+                maximum_after_bytes: hold_row,
+                mutations: 1,
+                index_bytes: Vec::new(),
+            });
+            // One mutation event is inserted and then rewritten by its
+            // transition projection inside the same transaction.
+            let event = record_bytes(&[
+                512, 512, 512, 8, 24, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 512, 512, 8, 16, 512,
+                64, 8, 8, 1, 1, 64, 16, 16, 16, 16, 16, 64, 512, 64, 64, 8, 8, 64, 8,
+            ])?;
+            rows.push(ToolOutcomeRowEnvelopeData {
+                table: ToolOutcomeWriteTableData::BudgetMutationEvents,
+                possible_before_bytes: None,
+                maximum_after_bytes: event,
+                mutations: 1,
+                index_bytes: vec![
+                    record_bytes(&[512])?,
+                    record_bytes(&[512, 8, 8])?,
+                    record_bytes(&[8])?,
+                ],
+            });
+            rows.push(existing(
+                ToolOutcomeWriteTableData::BudgetMutationEvents,
+                event,
+                1,
+            ));
+            let quota_member = record_bytes(&[512, 40, 512, 8, 8, 8, 8, 8, 8])?;
+            rows.push(ToolOutcomeRowEnvelopeData {
+                table: ToolOutcomeWriteTableData::BudgetEventQuotaMembers,
+                possible_before_bytes: None,
+                maximum_after_bytes: quota_member,
+                mutations: hold.quota_members,
+                index_bytes: vec![record_bytes(&[512, 40, 512, 8])?],
+            });
+            let revocation_member = record_bytes(&[512, 8, 512])?;
+            rows.push(ToolOutcomeRowEnvelopeData {
+                table: ToolOutcomeWriteTableData::BudgetEventRevocationMembers,
+                possible_before_bytes: None,
+                maximum_after_bytes: revocation_member,
+                mutations: hold.revocation_members,
+                index_bytes: vec![record_bytes(&[512, 8])?, record_bytes(&[512, 512])?],
+            });
+            let artifact = record_bytes(&[512, 8, 64])?;
+            rows.push(ToolOutcomeRowEnvelopeData {
+                table: ToolOutcomeWriteTableData::BudgetEventAuthorizationArtifacts,
+                possible_before_bytes: None,
+                maximum_after_bytes: artifact,
+                mutations: hold.authorization_artifacts,
+                index_bytes: vec![record_bytes(&[512, 8])?, record_bytes(&[512, 64])?],
+            });
+            if hold.revocation_commit {
+                let commit = record_bytes(&[512, 512, 512, 8, 16, 8])?;
+                rows.push(ToolOutcomeRowEnvelopeData {
+                    table: ToolOutcomeWriteTableData::BudgetEventRevocationCommits,
+                    possible_before_bytes: None,
+                    maximum_after_bytes: commit,
+                    mutations: 1,
+                    index_bytes: vec![record_bytes(&[512])?],
+                });
+            }
+            if hold.cumulative_approval {
+                let cumulative = record_bytes(&[
+                    512, 512, 512, 512, 512, 8, 512, 512, 64, 3, 8, 8, 8, 16, 16, 8, 8, 8, 8, 8, 8,
+                ])?;
+                rows.push(ToolOutcomeRowEnvelopeData {
+                    table: ToolOutcomeWriteTableData::BudgetEventCumulativeApproval,
+                    possible_before_bytes: None,
+                    maximum_after_bytes: cumulative,
+                    mutations: 1,
+                    index_bytes: vec![record_bytes(&[512])?],
+                });
+            }
+            rows.push(ToolOutcomeRowEnvelopeData {
+                table: ToolOutcomeWriteTableData::BudgetReplicationMeta,
+                possible_before_bytes: None,
+                maximum_after_bytes: record_bytes(&[8, 8])?,
+                mutations: 1,
+                index_bytes: Vec::new(),
+            });
+            rows.push(payment_journal_row()?);
+            rows.push(payment_release_evidence_row()?);
+            2
+        }
+        // The producing program keeps its five custody purposes; the payment
+        // family is described only through this hold-shaped path.
+        _ => return Err(invariant("payment journal purpose is outside its family")),
+    };
+    payment_append_histories(&mut rows, envelope, global_appends)?;
+    Ok(ToolOutcomeTransactionEnvelopeData {
+        purpose,
+        rows,
+        admission_appends: 0,
+        global_appends,
     })
 }

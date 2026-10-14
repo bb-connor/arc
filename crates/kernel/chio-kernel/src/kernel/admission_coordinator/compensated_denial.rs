@@ -5,11 +5,20 @@ use crate::admission_operation::AdmissionTerminal;
 pub(in crate::kernel) struct ConfirmedPreDispatchCompensation {
     pub(super) context: AdmissionProjectionContext,
     pub(super) terminal: AdmissionTerminal,
+    /// The executable hold's reversal when the store reversed it inside the
+    /// transaction funded by the operation's own account.
+    pub(super) funded_reversal: Option<crate::budget_store::BudgetReverseHoldDecision>,
 }
 
 impl ConfirmedPreDispatchCompensation {
     pub(in crate::kernel) fn trusted_time_unix_ms(&self) -> u64 {
         self.context.trusted_time_unix_ms
+    }
+
+    pub(in crate::kernel) fn funded_reversal(
+        &self,
+    ) -> Option<&crate::budget_store::BudgetReverseHoldDecision> {
+        self.funded_reversal.as_ref()
     }
 }
 

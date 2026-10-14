@@ -66,6 +66,7 @@ pub mod iou_store;
 #[cfg(feature = "lineage")]
 pub mod lineage_cte;
 pub mod memory_provenance_store;
+mod native_authority_capacity;
 mod read_companion;
 pub mod receipt_query;
 pub mod receipt_store;
@@ -78,7 +79,6 @@ pub mod security_admission_operation_store;
 pub mod security_state;
 pub mod serving_owner;
 pub mod settle_attempts;
-mod native_authority_capacity;
 mod store_connection;
 pub mod tool_outcome_store;
 
@@ -522,6 +522,18 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
     {
         admission_operation_store::SqliteAdmissionOperationStore::begin_payment_settlement(
             self, begin,
+        )
+    }
+
+    fn reverse_funded_payment_holds(
+        &self,
+        reversal: chio_kernel::AdmissionPaymentHoldReversal<'_>,
+    ) -> Result<
+        Option<chio_kernel::AdmissionPaymentHoldReversed>,
+        chio_kernel::AdmissionPaymentJournalError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::reverse_funded_payment_holds(
+            self, reversal,
         )
     }
 

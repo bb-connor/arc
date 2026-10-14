@@ -14,9 +14,22 @@ const MAX_TERMINAL_RECORD_BYTES: u64 = 1_048_576;
 pub(super) enum ToolOutcomeTransactionPurposeData {
     RawCustody,
     EvaluationBegin,
-    Finalization { pure_prefix: u64 },
+    Finalization {
+        pure_prefix: u64,
+    },
     SecurityRelease,
-    TerminalProjection { observer: bool },
+    TerminalProjection {
+        observer: bool,
+        payment: bool,
+    },
+    /// The retained authorization write after the external rail hold.
+    PaymentAuthorization,
+    /// The pre-dispatch compensation intent or a refused rail settlement.
+    PaymentCompensation,
+    /// The settlement begin: budget reconcile and its journal intent.
+    PaymentSettlement,
+    /// The once-only journal completion after the rail settled.
+    PaymentCompletion,
 }
 
 pub(super) struct ToolOutcomeTransactionEnvelopeData {
@@ -59,7 +72,10 @@ struct ToolOutcomeEnvelopeData {
 
 /// Only the authenticated pre-effect original supplies these row envelopes.
 /// Source verification must precede both the row description and pricing.
+/// A payment participant additionally carries its four journal transactions,
+/// priced from the actual budget hold this original already placed.
 pub(super) fn describe_native_tool_outcome_transactions(
+    tx: &Transaction<'_>,
     source: &VerifiedNativeInitialFinishingPlan<'_, '_>,
 ) -> Result<Vec<ToolOutcomeTransactionEnvelopeData>, AdmissionOperationStoreError> {
     let original = source.original();
@@ -103,11 +119,11 @@ pub(super) fn describe_native_tool_outcome_transactions(
     };
     validate_envelope(&envelope, profile.envelopes())?;
     let requirements = source.operation().binding().participant_requirements();
-    // The terminal producer writes one record per terminal participant. Only
-    // the receipt, tool outcome and observation records have priced native
-    // shapes; any other terminal participant refuses before the effect.
-    if requirements.payment
-        || requirements.authorization_consumption
+    // The terminal producer writes one record per terminal participant. The
+    // receipt, tool outcome, observation and payment terminal records have
+    // priced native shapes; any other terminal participant still refuses
+    // before the effect.
+    if requirements.authorization_consumption
         || requirements.outcome_eligibility
         || requirements.obligation
         || requirements.channel
@@ -128,12 +144,25 @@ pub(super) fn describe_native_tool_outcome_transactions(
         ToolOutcomeTransactionPurposeData::SecurityRelease,
         ToolOutcomeTransactionPurposeData::TerminalProjection {
             observer: requirements.observation_attempt_zero,
+            payment: requirements.payment,
         },
     ];
-    purposes
-        .into_iter()
-        .map(|purpose| transaction(&envelope, purpose))
-        .collect()
+    let mut transactions = Vec::new();
+    for purpose in purposes {
+        transactions.push(transaction(&envelope, purpose)?);
+    }
+    if requirements.payment {
+        let hold = rows::PaymentHoldShape::load(tx, source)?;
+        for purpose in [
+            ToolOutcomeTransactionPurposeData::PaymentAuthorization,
+            ToolOutcomeTransactionPurposeData::PaymentCompensation,
+            ToolOutcomeTransactionPurposeData::PaymentSettlement,
+            ToolOutcomeTransactionPurposeData::PaymentCompletion,
+        ] {
+            transactions.push(rows::payment_transaction(&envelope, purpose, &hold)?);
+        }
+    }
+    Ok(transactions)
 }
 
 fn validate_envelope(
@@ -175,8 +204,14 @@ fn transaction(
     let appends = match purpose {
         ToolOutcomeTransactionPurposeData::RawCustody
         | ToolOutcomeTransactionPurposeData::EvaluationBegin => 2,
-        ToolOutcomeTransactionPurposeData::SecurityRelease
-        | ToolOutcomeTransactionPurposeData::TerminalProjection { .. } => 1,
+        ToolOutcomeTransactionPurposeData::SecurityRelease => 1,
+        ToolOutcomeTransactionPurposeData::TerminalProjection { .. } => 1,
+        // The payment journal advance appends one global commit; the
+        // settlement begin also carries the budget joint commit.
+        ToolOutcomeTransactionPurposeData::PaymentAuthorization
+        | ToolOutcomeTransactionPurposeData::PaymentCompensation
+        | ToolOutcomeTransactionPurposeData::PaymentCompletion => 1,
+        ToolOutcomeTransactionPurposeData::PaymentSettlement => 2,
         ToolOutcomeTransactionPurposeData::Finalization { pure_prefix } => pure_prefix
             .checked_add(1)
             .ok_or_else(|| invariant("original finalization append capacity exhausted"))?,

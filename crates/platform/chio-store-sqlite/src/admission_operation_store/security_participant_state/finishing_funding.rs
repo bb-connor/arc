@@ -61,10 +61,18 @@ impl SqliteAdmissionOperationStore {
         .map_err(|_| {
             invalid("native external authorization lacks authenticated finishing funding")
         })?;
-        // The payment participant's terminal and journal settlement writes
-        // have no priced native shape, so no account ever prepays them.
-        Err(invalid(
-            "native external authorization has no priced payment settlement purpose",
-        ))
+        // This original is a payment participant: its Confirmed account
+        // prepaid the complete journal family before any effect, and every
+        // purpose is still outstanding here, before the external rail hold.
+        // The later writers spend each purpose in their own transaction, so
+        // the authorization this gate admits can always be settled, released
+        // or compensated without new authority.
+        if !operation.binding().participant_requirements().payment {
+            return Err(invalid(
+                "native pre-authorization is not a priced payment participant",
+            ));
+        }
+        super::finishing_account::require_outstanding_native_payment_purposes(&tx, operation)?;
+        Ok(())
     }
 }

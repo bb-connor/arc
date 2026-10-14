@@ -1686,6 +1686,7 @@ impl ChioKernel {
             coordinator_lease_epoch: lease.coordinator_lease_epoch(),
             store_fence: runtime.fence.clone(),
         };
+        let mut released_payment = None;
         if current
             .attachment(crate::admission_operation::AdmissionAttachmentKind::PaymentParticipant)
             .is_some()
@@ -1716,17 +1717,14 @@ impl ChioKernel {
             }
             if journal.state == crate::payment::PaymentJournalState::Authorized {
                 // The rail hold was authorized before dispatch, so the tool never
-                // ran and the authorization must be released rather than left held.
-                // Drive the durable release the same way the live cleanup path does:
-                // record the no-effect release authority, advance the journal to
-                // Settling, release on the rail, then settle. The release proof is
-                // built from the acquired-participant snapshot, which the terminal
+                // ran and the authorization must be released rather than left
+                // held. Drive the durable release the same way the live
+                // cleanup path does: record the no-effect release authority
+                // and advance the journal to Settling; the shared Settling
+                // drive below completes the release exactly once, for a fresh
+                // call and for a resumed one. The release proof is built from
+                // the acquired-participant snapshot, which the terminal
                 // compensation projection below also accepts.
-                let authorization_id = journal.authorization_id.clone().ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "authorized payment journal omitted its authorization".to_owned(),
-                    )
-                })?;
                 let proof =
                     crate::tool_outcome::VerifiedPreDispatchNoEffect::from_qualified_released_operation_snapshot(
                         &current,
@@ -1761,6 +1759,21 @@ impl ChioKernel {
                         trusted_now_unix_ms,
                     })
                     .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            }
+            if journal.state == crate::payment::PaymentJournalState::Settling
+                && journal.settle_action == Some(crate::payment::PaymentSettleAction::Release)
+            {
+                // One common drive for a fresh and a resumed release: the
+                // journal already retained the release intent and authority,
+                // so completing it needs only the rail release and the
+                // once-only SettlementCompleted. The confirmed unwind evidence
+                // substitutes for a live rail drive when the caller retained
+                // it; the adapter must still be the journal's own rail.
+                let authorization_id = journal.authorization_id.clone().ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "settling payment journal omitted its authorization".to_owned(),
+                    )
+                })?;
                 let transaction_id = if let Some(unwind) = confirmed_payment_unwind {
                     if unwind.authorization_id != authorization_id
                         || unwind.settlement_status
@@ -1775,10 +1788,16 @@ impl ChioKernel {
                 } else {
                     let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
                         KernelError::DurableAdmission(
-                            "authorized pre-dispatch hold has no configured payment adapter"
-                                .to_owned(),
+                            "pre-dispatch hold has no configured payment adapter".to_owned(),
                         )
                     })?;
+                    if adapter.rail_id() != journal.rail
+                        || adapter.rail_mode() != Some(journal.rail_mode)
+                    {
+                        return Err(KernelError::DurableAdmission(
+                            "pre-dispatch payment adapter changed before its release".to_owned(),
+                        ));
+                    }
                     let result = adapter
                         .release(&authorization_id, &journal.operation_id)
                         .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
@@ -1815,6 +1834,9 @@ impl ChioKernel {
                     "pre-dispatch payment release is not durable".to_owned(),
                 ));
             }
+            if released {
+                released_payment = Some(journal);
+            }
         }
         self.release_finding_pool_claim_before_dispatch(
             current.binding().operation_id().as_str(),
@@ -1828,10 +1850,34 @@ impl ChioKernel {
         // Every budget the operation still holds is internal until dispatch
         // commits. Both the executable hold and an owned preflight hold must be
         // physically reversed before the terminal projection can claim no effect.
-        self.release_retained_executable_hold(&current)?;
-        if let Some(preflight) = self.load_durable_nonce_preflight(&current, trusted_now_unix_ms)? {
-            self.release_durable_nonce_preflight_hold(&current, &preflight)?;
-        }
+        // After a released external authorization a native original's account
+        // funds that reversal in one store transaction; every other operation
+        // keeps the budget authority reversal.
+        let funded = match released_payment.as_ref() {
+            Some(journal) => runtime
+                .store
+                .reverse_funded_payment_holds(crate::receipt_store::AdmissionPaymentHoldReversal {
+                    operation: &current,
+                    recovery_lease: &lease,
+                    expected: journal,
+                    active_fence: &runtime.fence,
+                    trusted_now_unix_ms,
+                })
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
+            None => None,
+        };
+        let funded_reversal = match funded {
+            Some(reversed) => reversed.executable,
+            None => {
+                self.release_retained_executable_hold(&current)?;
+                if let Some(preflight) =
+                    self.load_durable_nonce_preflight(&current, trusted_now_unix_ms)?
+                {
+                    self.release_durable_nonce_preflight_hold(&current, &preflight)?;
+                }
+                None
+            }
+        };
         let projection = verified_released_pre_dispatch_compensation_projection(
             &current,
             context,
@@ -1848,9 +1894,24 @@ impl ChioKernel {
                 "pre-dispatch compensation committed a different terminal operation".to_owned(),
             ));
         }
+        if released_payment.is_some() {
+            // The terminal spent its prepaid purpose; a native-only account
+            // releases whatever the unwound program never spent. A crash here
+            // leaves the startup sweep to settle the same account.
+            runtime
+                .store
+                .settle_native_finishing_after_terminal(
+                    current.binding().operation_id(),
+                    self.native_receipt_store_registration.as_ref(),
+                    &runtime.fence,
+                    trusted_now_unix_ms,
+                )
+                .map_err(durable_store_error)?;
+        }
         Ok(ConfirmedPreDispatchCompensation {
             context: projection.context().clone(),
             terminal,
+            funded_reversal,
         })
     }
 

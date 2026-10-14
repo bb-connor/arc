@@ -178,6 +178,87 @@ impl SqliteBudgetStore {
         &self,
         request: BudgetReverseHoldRequest,
     ) -> Result<BudgetReverseHoldDecision, BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection)?;
+        let (decision, changed) =
+            self.reverse_composite_hold_in_transaction(&transaction, &request)?;
+        if changed {
+            self.commit_joint_transaction(transaction)?;
+            self.sync_joint_anchor(&connection)?;
+        } else {
+            transaction.rollback()?;
+        }
+        Ok(decision)
+    }
+
+    /// Reverse the still authorized hold of one admission operation inside the
+    /// caller's transaction. The request is built from the retained hold, never
+    /// from caller DATA: its capability, grant and remaining exposure, under
+    /// this serving owner's own authority. A hold already reversed by the same
+    /// deterministic event replays its decision without a write; a hold that
+    /// left `authorized` by another mutation reverses nothing and returns
+    /// `None`, and the terminal projection verifies its final disposition.
+    pub(crate) fn reverse_admission_hold_in_transaction(
+        &self,
+        transaction: &rusqlite::Transaction<'_>,
+        capability_id: &str,
+        hold_id: &str,
+        event_id: &str,
+    ) -> Result<(Option<BudgetReverseHoldDecision>, bool), BudgetStoreError> {
+        let owner = self.serving_owner.as_ref().ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "admission hold reversal requires a joint serving owner".to_string(),
+            )
+        })?;
+        let hold = load_structured_hold(transaction, hold_id)?.ok_or_else(|| {
+            BudgetStoreError::Invariant(format!("unknown composite budget hold `{hold_id}`"))
+        })?;
+        if hold.capability_id != capability_id {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` belongs to another capability"
+            )));
+        }
+        if hold.invocation_state != BudgetInvocationState::Authorized {
+            let Some(event) = SqliteBudgetStore::load_mutation_event(transaction, event_id)? else {
+                return Ok((None, false));
+            };
+            if !matches!(
+                event.kind,
+                BudgetMutationKind::ReverseInvocation | BudgetMutationKind::ReverseExposure
+            ) || event.hold_id.as_deref() != Some(hold_id)
+                || latest_hold_event_seq(transaction, hold_id)? != Some(event.event_seq)
+            {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "budget event_id `{event_id}` was reused for a different mutation"
+                )));
+            }
+            return Ok((
+                Some(transition_decision_from_event(self, transaction, event)?),
+                false,
+            ));
+        }
+        let request = BudgetReverseHoldRequest {
+            capability_id: hold.capability_id.clone(),
+            grant_index: hold.grant_index,
+            reversed_exposure_units: hold.remaining_exposure,
+            hold_id: Some(hold_id.to_owned()),
+            event_id: Some(event_id.to_owned()),
+            expected_cumulative_approval_state: None,
+            authority: Some(BudgetEventAuthority {
+                authority_id: owner.fence.store_uuid.clone(),
+                lease_id: owner.fence.lease_id.clone(),
+                lease_epoch: owner.fence.owner_epoch,
+            }),
+        };
+        self.reverse_composite_hold_in_transaction(transaction, &request)
+            .map(|(decision, changed)| (Some(decision), changed))
+    }
+
+    pub(crate) fn reverse_composite_hold_in_transaction(
+        &self,
+        transaction: &rusqlite::Transaction<'_>,
+        request: &BudgetReverseHoldRequest,
+    ) -> Result<(BudgetReverseHoldDecision, bool), BudgetStoreError> {
         request.validate()?;
         let hold_id = request.hold_id.as_deref().ok_or_else(|| {
             BudgetStoreError::Invariant("composite reversal requires hold_id".to_string())
@@ -185,10 +266,8 @@ impl SqliteBudgetStore {
         let event_id = request.event_id.as_deref().ok_or_else(|| {
             BudgetStoreError::Invariant("composite reversal requires event_id".to_string())
         })?;
-        let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection)?;
         self.validate_joint_authority(request.authority.as_ref())?;
-        let hold = load_structured_hold(&transaction, hold_id)?.ok_or_else(|| {
+        let hold = load_structured_hold(transaction, hold_id)?.ok_or_else(|| {
             BudgetStoreError::Invariant(format!("unknown composite budget hold `{hold_id}`"))
         })?;
         let reverse_kind = if hold.quotas.is_empty() {
@@ -198,7 +277,7 @@ impl SqliteBudgetStore {
         };
         if let Some(decision) = replay_transition(
             self,
-            &transaction,
+            transaction,
             event_id,
             reverse_kind,
             hold_id,
@@ -210,12 +289,11 @@ impl SqliteBudgetStore {
             None,
             request.expected_cumulative_approval_state,
         )? {
-            transaction.rollback()?;
-            return Ok(decision);
+            return Ok((decision, false));
         }
         validate_transition_identity(
             self,
-            &transaction,
+            transaction,
             &hold,
             &request.capability_id,
             request.grant_index,
@@ -229,7 +307,7 @@ impl SqliteBudgetStore {
                 "budget hold `{hold_id}` cannot be reversed in its current state"
             )));
         }
-        let quota_before = load_quota_states(&transaction, &hold)?;
+        let quota_before = load_quota_states(transaction, &hold)?;
         let mut quota_after = quota_before.clone();
         for state in &mut quota_after {
             if state.reserved == 0 {
@@ -242,7 +320,7 @@ impl SqliteBudgetStore {
                 BudgetStoreError::Overflow("invocation quota version overflowed u64".to_string())
             })?;
         }
-        let cumulative_before = load_cumulative_snapshot(&transaction, &hold)?;
+        let cumulative_before = load_cumulative_snapshot(transaction, &hold)?;
         let cumulative_after = cumulative_before
             .as_ref()
             .map(|(cumulative, state, account, digest)| {
@@ -285,24 +363,24 @@ impl SqliteBudgetStore {
             ));
         }
         let mut usage =
-            load_usage_or_default(&transaction, &request.capability_id, request.grant_index)?;
+            load_usage_or_default(transaction, &request.capability_id, request.grant_index)?;
         if usage.invocation_count == 0 || usage.total_cost_exposed < request.reversed_exposure_units
         {
             return Err(BudgetStoreError::Invariant(
                 "budget usage has no reversible reservation".to_string(),
             ));
         }
-        let event_seq = allocate_budget_replication_seq(&transaction)?;
+        let event_seq = allocate_budget_replication_seq(transaction)?;
         usage.invocation_count -= 1;
         usage.total_cost_exposed -= request.reversed_exposure_units;
         usage.seq = event_seq;
         usage.updated_at = unix_now();
-        write_usage(&transaction, &usage)?;
+        write_usage(transaction, &usage)?;
         for state in &quota_after {
-            write_quota_state(&transaction, state)?;
+            write_quota_state(transaction, state)?;
         }
         if let Some((cumulative, state, account, _)) = cumulative_after.as_ref() {
-            write_cumulative_account(&transaction, account)?;
+            write_cumulative_account(transaction, account)?;
             let changed = transaction.execute(
                 r#"
                 UPDATE budget_cumulative_approval_operations
@@ -355,7 +433,7 @@ impl SqliteBudgetStore {
             ));
         }
         let event = SqliteBudgetStore::append_mutation_event(
-            &transaction,
+            transaction,
             Some(event_id),
             Some(hold_id),
             request.authority.as_ref(),
@@ -375,7 +453,7 @@ impl SqliteBudgetStore {
             usage.total_cost_realized_spend,
         )?;
         write_transition_projection(
-            &transaction,
+            transaction,
             &event.event_id,
             &hold,
             None,
@@ -405,11 +483,9 @@ impl SqliteBudgetStore {
             None,
             request.expected_cumulative_approval_state,
         )?;
-        let decision = transition_decision_from_event(self, &transaction, event)?;
-        self.append_joint_commit(&transaction, reverse_kind, event_id, event_seq)?;
-        self.commit_joint_transaction(transaction)?;
-        self.sync_joint_anchor(&connection)?;
-        Ok(decision)
+        let decision = transition_decision_from_event(self, transaction, event)?;
+        self.append_joint_commit(transaction, reverse_kind, event_id, event_seq)?;
+        Ok((decision, true))
     }
 
     pub(crate) fn cancel_captured_composite_hold(

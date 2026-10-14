@@ -34,7 +34,7 @@ const NATIVE_FINISHING_NAMESPACE_END: &str = "native-finishing.";
 const ACCOUNT_SCHEMA: &str = "chio.native-finishing-account.v1";
 const BANK_SCHEMA: &str = "chio.native-finishing-bank.v1";
 const PUBLICATION_SCHEMA: &str = "chio.native-finishing-prepared-publication.v1";
-const MAX_LIABILITIES: usize = 16;
+const MAX_LIABILITIES: usize = 20;
 /// Bounds of the account's own typed records, enforced by their writer and
 /// used to price every later account and bank head rewrite.
 pub(in crate::admission_operation_store) const NATIVE_FINISHING_ACCOUNT_MAX_BYTES: u64 = 131_072;
@@ -72,6 +72,10 @@ pub(in crate::admission_operation_store) enum NativeFinishingPurposeV1 {
     OutputJoin,
     NativeJournalSeal,
     ReceiptSink,
+    PaymentAuthorization,
+    PaymentCompensation,
+    PaymentSettlement,
+    PaymentCompletion,
     ProcessEnrollment,
     ProcessNonceCustody,
     ProcessUnavailableNotice,
@@ -88,7 +92,11 @@ impl NativeFinishingPurposeV1 {
             | Self::SecurityRelease
             | Self::TerminalProjection
             | Self::OutputJoin
-            | Self::NativeJournalSeal => NativeFinishingFileRoleV1::Native,
+            | Self::NativeJournalSeal
+            | Self::PaymentAuthorization
+            | Self::PaymentCompensation
+            | Self::PaymentSettlement
+            | Self::PaymentCompletion => NativeFinishingFileRoleV1::Native,
             Self::ReceiptSink => NativeFinishingFileRoleV1::ReceiptSink,
             Self::ProcessEnrollment
             | Self::ProcessNonceCustody
@@ -108,6 +116,10 @@ impl NativeFinishingPurposeV1 {
             Self::OutputJoin => 3,
             Self::NativeJournalSeal => 4,
             Self::ReceiptSink => 5,
+            Self::PaymentAuthorization => 13,
+            Self::PaymentCompensation => 14,
+            Self::PaymentSettlement => 15,
+            Self::PaymentCompletion => 16,
             Self::ProcessEnrollment => 6,
             Self::ProcessNonceCustody => 7,
             Self::ProcessUnavailableNotice => 8,
@@ -477,8 +489,9 @@ impl NativeFinishingAccountV1 {
         for loan in &self.transitions.row_loans {
             loan.validate().map_err(invariant)?;
         }
-        let mut slots = [false; 13];
+        let mut slots = [false; 17];
         let mut process_purposes = 0_usize;
+        let mut payment_purposes = 0_usize;
         for liability in &self.liabilities {
             require_lower_digest(&liability.profile_digest)?;
             for loan in &liability.row_loans {
@@ -544,6 +557,23 @@ impl NativeFinishingAccountV1 {
             if liability.purpose.file_role() == NativeFinishingFileRoleV1::Process {
                 process_purposes += 1;
             }
+            if matches!(
+                liability.purpose,
+                NativeFinishingPurposeV1::PaymentAuthorization
+                    | NativeFinishingPurposeV1::PaymentCompensation
+                    | NativeFinishingPurposeV1::PaymentSettlement
+                    | NativeFinishingPurposeV1::PaymentCompletion
+            ) {
+                payment_purposes += 1;
+            }
+        }
+        // The payment participant's journal purposes are one complete prepaid
+        // family: a partial roster could authorize an external payment whose
+        // later settlement write has no funded owner.
+        if payment_purposes != 0 && payment_purposes != 4 {
+            return Err(invariant(
+                "native finishing account carries a partial payment roster",
+            ));
         }
         let has = |purpose: NativeFinishingPurposeV1| slots[usize::from(purpose.slot())];
         if !has(NativeFinishingPurposeV1::RawCustody)
