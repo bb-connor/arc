@@ -480,11 +480,10 @@ async fn subprocess_child_worker() -> Result {
     assert!(!crash);
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response.output.is_none());
-    assert!(response
-        .reason
-        .as_deref()
-        .unwrap_or_default()
-        .contains("OutcomeUnknownAfterDispatch"));
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("dispatch outcome is unknown after recovery")
+    );
     assert!(response.receipt.verify_signature()?);
     assert_eq!(runtime.registry().child_work()?.len(), 1);
     assert_eq!(runtime.process("root")?.tree_calls, 1);

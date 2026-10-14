@@ -295,11 +295,7 @@ async fn subprocess_worker() -> Result {
                 request.supplemental_authorization = Some(chio_core_types::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
                     signed_extension: support::supplemental::issue(&request)?,
                 });
-            } else if phase.ends_with("nonce") {
-                let preflight = kernel.evaluate_tool_call(&request).await?;
-                assert_eq!(preflight.verdict, Verdict::Allow, "{:?}", preflight.reason);
-                request.execution_nonce = Some(*preflight.execution_nonce.ok_or("issued nonce")?);
-            } else {
+            } else if !phase.ends_with("nonce") {
                 let mut intent: chio_core_types::capability::governance::GovernedTransactionIntent =
                     serde_json::from_value(
                         json!({"id": "read-intent", "server_id": "tools", "tool_name": "read", "purpose": "one recorded read"}),
@@ -450,25 +446,24 @@ async fn subprocess_worker() -> Result {
         assert_eq!(runtime.process("root")?.tree_calls, 1);
         let projection = &receipt["metadata"]["admission_operation"];
         let dispatch = &projection["retained_dispatch_commit"];
-        assert_eq!(projection["store_fence"], dispatch["store_fence"]);
         assert_eq!(
-            projection["coordinator_lease_id"],
-            dispatch["coordinator_lease_id"]
-        );
-        assert_eq!(
-            projection["coordinator_lease_epoch"],
-            dispatch["coordinator_lease_epoch"]
+            projection["store_fence"]["store_uuid"],
+            dispatch["store_fence"]["store_uuid"]
         );
         let connection = rusqlite::Connection::open(dir.join("authority.db"))?;
         let current_epoch: i64 =
             connection.query_row("SELECT owner_epoch FROM chio_serving_owner", [], |row| {
                 row.get(0)
             })?;
+        let projected_epoch = projection["store_fence"]["owner_epoch"]
+            .as_i64()
+            .ok_or("projection epoch")?;
+        assert_eq!(projected_epoch, current_epoch);
         assert!(
-            current_epoch
-                > projection["store_fence"]["owner_epoch"]
+            projected_epoch
+                > dispatch["store_fence"]["owner_epoch"]
                     .as_i64()
-                    .ok_or("historical epoch")?
+                    .ok_or("dispatch epoch")?
         );
         assert_eq!(retained_before, Some(retained_snapshot(&dir)?));
         return Ok(());

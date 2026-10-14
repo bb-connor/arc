@@ -125,7 +125,7 @@ fn threshold_recovery(controlled_clock: bool) -> TestResult {
             },
         )?;
         request.request_id = process.request_id("root", "read")?;
-        let pending = executor.block_on(native.kernel.evaluate_tool_call(&request))?;
+        let pending = executor.block_on(process.invoke("root", "read", &request))?;
         assert_eq!(
             pending.verdict,
             Verdict::PendingApproval,

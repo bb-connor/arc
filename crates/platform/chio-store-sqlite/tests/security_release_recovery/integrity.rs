@@ -280,12 +280,9 @@ fn removing_hook_configuration_cannot_erase_a_pending_release() -> TestResult {
     drop(store);
     let receipts = runtime.kernel.receipt_log().len();
     let conflict = runtime.kernel.evaluate_tool_call_blocking(&request);
-    let expected = format!(
-        "request id conflicts with retained operation {}",
-        original.0
-    );
     assert!(
-        matches!(&conflict, Err(KernelError::DurableAdmission(reason)) if reason == &expected),
+        matches!(&conflict, Err(KernelError::DurableAdmission(reason))
+            if reason == "request maps to a retained admission awaiting background recovery"),
         "{conflict:?}"
     );
     assert_eq!(runtime.kernel.receipt_log().len(), receipts);
