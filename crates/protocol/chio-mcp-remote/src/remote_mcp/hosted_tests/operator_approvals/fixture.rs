@@ -110,7 +110,7 @@ pub(super) async fn open(
     let factory = Arc::new(RemoteSessionFactory::new(config.clone())?);
     let sessions = Arc::new(RemoteSessionLedger::new(
         config.clock.clone(),
-        config.lifecycle_policy(),
+        config.lifecycle_policy()?,
         config.session_db_path.clone(),
         factory.resume_hmac_keyring.clone(),
     )?);

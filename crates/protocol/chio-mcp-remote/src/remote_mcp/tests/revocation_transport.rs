@@ -18,7 +18,7 @@ async fn state(directory: &FsPath, remote: Option<String>) -> TestResult<RemoteA
     factory.config.revocation_db_path = Some(directory.join("revocations.db"));
     let sessions = Arc::new(RemoteSessionLedger::new(
         config.clock.clone(),
-        config.lifecycle_policy(),
+        config.lifecycle_policy()?,
         None,
         None,
     )?);

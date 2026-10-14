@@ -77,8 +77,7 @@ fn internal(error: impl ToString) -> Response {
 
 fn storage(state: &RemoteAppState, headers: &HeaderMap) -> Result<(Connection, Keypair), Response> {
     super::remote_mcp_admin::validate_admin_request(headers, state.admin_token.as_deref())?;
-    // The ordinary admin surface historically defaults to the agent credential.
-    // Approval issuance must never inherit that compatibility behavior.
+    // Approval issuance requires an operator credential distinct from the agent's.
     if state.factory.config.auth_token.as_deref() == state.admin_token.as_deref() {
         return Err(failure(
             StatusCode::CONFLICT,

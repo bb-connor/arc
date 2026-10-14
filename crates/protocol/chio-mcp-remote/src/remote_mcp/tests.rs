@@ -2,6 +2,8 @@ use super::*;
 
 #[path = "tests/durable_bounds.rs"]
 mod durable_bounds;
+#[path = "tests/lifecycle_env.rs"]
+mod lifecycle_env;
 #[path = "tests/transport_contract.rs"]
 mod transport_contract;
 #[path = "tests/worker_lifecycle.rs"]
@@ -557,7 +559,15 @@ fn sample_resume_record_with_keyring(
                 drain_deadline_at: None,
             },
             protocol_version: Some("2025-06-18".to_string()),
-            peer_capabilities: PeerCapabilities::default(),
+            peer_capabilities: PeerCapabilities {
+                authorization: Some(
+                    chio_mcp_adapter::edge::authorization::negotiate_authorization_capabilities(
+                        &json!({}),
+                    )
+                    .expect("negotiate empty handshake"),
+                ),
+                ..PeerCapabilities::default()
+            },
             initialize_params: json!({}),
             issued_capabilities: Vec::new(),
             subscriptions: Vec::new(),
@@ -841,7 +851,10 @@ fn validate_restored_peer_capabilities_rejects_tampered_record() {
             "prompts": { "listChanged": true }
         }
     });
-    record.peer_capabilities = PeerCapabilities::default();
+    record.peer_capabilities = PeerCapabilities {
+        authorization: record.peer_capabilities.authorization.clone(),
+        ..PeerCapabilities::default()
+    };
 
     let error = validate_restored_peer_capabilities(&record)
         .expect_err("tampered peer capabilities should fail restore validation");
@@ -852,7 +865,7 @@ fn validate_restored_peer_capabilities_rejects_tampered_record() {
 }
 
 #[test]
-fn restored_authorization_matches_the_handshake_without_upgrading_legacy_sessions() {
+fn restored_authorization_is_required_and_matches_the_handshake() {
     use chio_core::capability::features::{
         CapabilityNegotiation, CHIO_CAPABILITIES_SCHEMA, OPAQUE_SUPPLEMENTAL_AUTHORIZATION,
     };
@@ -905,11 +918,16 @@ fn restored_authorization_matches_the_handshake_without_upgrading_legacy_session
             assert!(!error.to_string().contains(&record.session_id));
         }
 
-        // Older peers could advertise an extension without negotiating it.
-        // Retaining their absent profile must not turn it into authority.
         record.peer_capabilities.authorization = None;
-        let legacy = validate_restored_peer_capabilities(&record).expect("restore legacy");
-        assert!(legacy.authorization.is_none());
+        let error = validate_restored_peer_capabilities(&record)
+            .expect_err("a record without its negotiated profile must not restore");
+        assert_eq!(
+            error.to_string(),
+            CliError::cli_other_error(
+                "stored MCP session lacks its negotiated authorization profile".to_string()
+            )
+            .to_string()
+        );
     }
 
     for malformed in [
@@ -923,7 +941,7 @@ fn restored_authorization_matches_the_handshake_without_upgrading_legacy_session
         });
         record.peer_capabilities.authorization = Some(CapabilityNegotiation::v1_default());
         let error = validate_restored_peer_capabilities(&record)
-            .expect_err("malformed retained negotiation must not become legacy");
+            .expect_err("malformed retained negotiation must not restore");
         assert!(error
             .to_string()
             .contains("invalid authorization negotiation"));

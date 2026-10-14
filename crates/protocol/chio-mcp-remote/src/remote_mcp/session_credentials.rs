@@ -714,7 +714,7 @@ fn reserve_at(
     }
     // Knowing the kernel completed is distinct from the caller having received
     // its result. Even a new request ID remains fenced until explicit delivery
-    // acknowledgement. Legacy completed records have no such proof and stop.
+    // acknowledgement.
     if read_latch(&tx, keypair, &credential.session_id)?
         .is_some_and(|call| call.state != "acknowledged")
     {

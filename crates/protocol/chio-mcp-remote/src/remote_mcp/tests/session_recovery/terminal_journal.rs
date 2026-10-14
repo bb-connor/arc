@@ -54,7 +54,7 @@ impl Store {
     fn boot(&self) -> Result<RemoteSessionLedger, CliError> {
         RemoteSessionLedger::new(
             RemoteClock::new(Arc::new(RecoveryClock(StdMutex::new(reading(13))))),
-            SessionLifecyclePolicy::from_env(),
+            SessionLifecyclePolicy::default(),
             Some(self.path.clone()),
             Some(self.keyring.clone()),
         )
