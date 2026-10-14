@@ -240,7 +240,9 @@ fn constraint_matches(
                 "{key} must use its first-class constraint, not Custom"
             )))
         }
-        Constraint::Custom(key, expected) => Ok(argument_contains_custom(arguments, key, expected)),
+        Constraint::Custom(key, expected) => {
+            Ok(custom_constraint_matches(arguments, key, expected))
+        }
         Constraint::AudienceAllowlist(allowed) => {
             Ok(audience_allowlist_matches(arguments, allowed))
         }
@@ -529,19 +531,36 @@ fn wildcard_matches(pattern: &str, candidate: &str) -> bool {
     pattern_idx == pattern_chars.len()
 }
 
-fn argument_contains_custom(arguments: &serde_json::Value, key: &str, expected: &str) -> bool {
-    match arguments {
-        serde_json::Value::Object(map) => map.iter().any(|(entry_key, value)| {
-            (entry_key == key && value.as_str() == Some(expected))
-                || argument_contains_custom(value, key, expected)
+/// Returns true when `key` occurs at least once in the arguments and every
+/// occurrence, at any depth, carries exactly the string `expected`.
+fn custom_constraint_matches(arguments: &serde_json::Value, key: &str, expected: &str) -> bool {
+    let mut observed = false;
+    custom_occurrences_match(arguments, key, expected, &mut observed) && observed
+}
+
+fn custom_occurrences_match(
+    value: &serde_json::Value,
+    key: &str,
+    expected: &str,
+    observed: &mut bool,
+) -> bool {
+    match value {
+        serde_json::Value::Object(map) => map.iter().all(|(entry_key, entry)| {
+            if entry_key == key {
+                *observed = true;
+                if entry.as_str() != Some(expected) {
+                    return false;
+                }
+            }
+            custom_occurrences_match(entry, key, expected, observed)
         }),
         serde_json::Value::Array(values) => values
             .iter()
-            .any(|value| argument_contains_custom(value, key, expected)),
+            .all(|entry| custom_occurrences_match(entry, key, expected, observed)),
         serde_json::Value::Null
         | serde_json::Value::Bool(_)
         | serde_json::Value::Number(_)
-        | serde_json::Value::String(_) => false,
+        | serde_json::Value::String(_) => true,
     }
 }
 
@@ -737,6 +756,32 @@ mod delivery_spelling_tests {
                 "a custom {key} spelling must reject the call before a clean sibling can serve it"
             );
         }
+    }
+
+    #[test]
+    fn custom_requires_every_occurrence_of_its_key_to_carry_the_value() {
+        let scope = ChioScope {
+            grants: vec![grant(vec![Constraint::Custom(
+                "ticket".to_string(),
+                "INC-1".to_string(),
+            )])],
+            ..ChioScope::default()
+        };
+        for arguments in [
+            serde_json::json!({ "ticket": "INC-1", "meta": { "ticket": "INC-2" } }),
+            serde_json::json!({ "ticket": "INC-1", "items": [{ "ticket": 7 }] }),
+            serde_json::json!({ "ticket": "INC-1", "meta": { "ticket": ["INC-1", "INC-2"] } }),
+            serde_json::json!({ "other": "INC-1" }),
+        ] {
+            assert!(
+                resolve_matching_grants(&scope, "tool", "srv", &arguments)
+                    .is_ok_and(|matches| matches.is_empty()),
+                "{arguments} must match no grant"
+            );
+        }
+        let arguments = serde_json::json!({ "ticket": "INC-1", "meta": { "ticket": "INC-1" } });
+        assert!(resolve_matching_grants(&scope, "tool", "srv", &arguments)
+            .is_ok_and(|matches| matches.len() == 1));
     }
 
     #[test]
