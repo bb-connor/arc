@@ -173,7 +173,7 @@ fn kernel_derived_metadata_keys_are_refused_before_admission() -> TestResult {
 
 fn launched(id: char) -> serde_json::Value {
     let mut metadata = admitted();
-    metadata[crate::admission_operation::ATTEMPT_SCOPED_RECEIPT_METADATA_KEY] = serde_json::json!({
+    metadata["native_launch"] = serde_json::json!({
         "receipt_id": id.to_string().repeat(64),
         "receipt_sha256": "d".repeat(64),
     });
@@ -193,10 +193,11 @@ fn stored_receipt(
 }
 
 #[test]
-fn only_the_native_launch_is_attempt_scoped_admitted_metadata() {
+fn only_the_native_and_worker_launches_are_attempt_scoped_admitted_metadata() {
+    let paths: [&[&str]; 2] = [&["native_launch"], &["chio_process", "worker_profile"]];
     assert_eq!(
-        crate::admission_operation::ATTEMPT_SCOPED_RECEIPT_METADATA_KEY,
-        "native_launch"
+        crate::admission_operation::ATTEMPT_SCOPED_RECEIPT_METADATA_PATHS,
+        paths
     );
 }
 
@@ -283,6 +284,90 @@ fn malformed_native_launch_metadata_is_refused_before_admission() -> TestResult 
         assert!(
             matches!(&error, KernelError::InvalidReceiptMetadata(reason)
                 if reason == "native_launch must name one launch receipt id and sha256"),
+            "{error:?}"
+        );
+        assert!(store
+            .state
+            .lock()
+            .map_err(|_| "state lock")?
+            .operation
+            .is_none());
+        assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    }
+    Ok(())
+}
+
+fn profiled(attempt: u32, id: char) -> serde_json::Value {
+    let mut metadata = admitted();
+    metadata["chio_process"]["worker_profile"] = serde_json::json!({
+        "kind": "container",
+        "launch_attempt": attempt,
+        "launch_ref": {"record_id": id.to_string().repeat(64), "record_sha256": "e".repeat(64)},
+    });
+    metadata
+}
+
+#[test]
+fn a_relaunched_worker_replays_the_admission_named_by_its_admitting_profile() -> TestResult {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("admitted-metadata-worker-relaunch");
+    let admission = begin_admitted(&kernel, &request, &profiled(1, 'a'))?;
+    drop(admission);
+    assert_eq!(kernel.reconcile_recoverable_admissions()?, 1);
+    let receipt = stored_receipt(&store)?;
+    assert_eq!(
+        receipt
+            .metadata
+            .as_ref()
+            .ok_or("receipt metadata")?
+            .pointer("/chio_process/worker_profile"),
+        profiled(1, 'a').pointer("/chio_process/worker_profile")
+    );
+    let receipts = kernel.receipt_log().len();
+    let replay =
+        kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(profiled(2, 'b')))?;
+    assert_eq!(canonical(&replay.receipt)?, canonical(&receipt)?);
+    assert_eq!(kernel.receipt_log().len(), receipts);
+    let missing = kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(admitted()));
+    assert!(
+        matches!(&missing, Err(KernelError::AdmissionRecovery(error))
+            if matches!(error.as_ref(), crate::admission_operation::AdmissionRecoveryError::Store(
+                crate::admission_operation::AdmissionOperationStoreError::Invariant(reason)
+            ) if reason == "original request is missing or changed")),
+        "{missing:?}"
+    );
+    assert_eq!(kernel.receipt_log().len(), receipts);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn malformed_worker_profile_metadata_is_refused_before_admission() -> TestResult {
+    let reference =
+        serde_json::json!({"record_id": "a".repeat(64), "record_sha256": "e".repeat(64)});
+    for profile in [
+        serde_json::json!("container"),
+        serde_json::json!({"kind": "direct", "launch_attempt": 1, "launch_ref": reference}),
+        serde_json::json!({"kind": "container", "launch_attempt": 0, "launch_ref": reference}),
+        serde_json::json!({"kind": "container", "launch_attempt": 1}),
+        serde_json::json!({"kind": "container", "launch_attempt": 1,
+            "launch_ref": {"record_id": "a".repeat(64)}}),
+        serde_json::json!({"kind": "container", "launch_attempt": 1,
+            "launch_ref": {"record_id": "a".repeat(64), "record_sha256": "E".repeat(64)}}),
+        serde_json::json!({"kind": "container", "launch_attempt": 1, "launch_ref": reference,
+            "extra": true}),
+    ] {
+        let (kernel, request, store, invocations) =
+            durable_admission_fixture("admitted-metadata-malformed-profile");
+        let mut metadata = admitted();
+        metadata["chio_process"]["worker_profile"] = profile;
+        let error = kernel
+            .evaluate_tool_call_blocking_with_metadata(&request, Some(metadata))
+            .err()
+            .ok_or("malformed worker profile was admitted")?;
+        assert!(
+            matches!(&error, KernelError::InvalidReceiptMetadata(reason)
+                if reason == "chio_process.worker_profile must name one container launch record and attempt"),
             "{error:?}"
         );
         assert!(store

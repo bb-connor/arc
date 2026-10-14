@@ -183,34 +183,62 @@ fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option
         .find(|key| object.contains_key(*key))
 }
 
-/// Attempt-scoped launch evidence names exactly one launch receipt by its
-/// id and content digest.
+fn is_lower_sha256_hex(value: &serde_json::Value) -> bool {
+    value.as_str().is_some_and(|value| {
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
+/// Attempt-scoped launch evidence must be well formed: a native launch names
+/// one launch receipt, and a worker profile names one container launch record
+/// and its launch attempt.
 fn validate_attempt_launch_metadata(
     metadata: Option<&serde_json::Value>,
 ) -> Result<(), KernelError> {
-    let Some(launch) = metadata.and_then(|value| {
-        value.get(crate::admission_operation::ATTEMPT_SCOPED_RECEIPT_METADATA_KEY)
-    }) else {
+    let Some(metadata) = metadata else {
         return Ok(());
     };
-    let digest = |field: &str| {
-        launch
-            .get(field)
-            .and_then(serde_json::Value::as_str)
-            .is_some_and(|value| {
-                value.len() == 64
-                    && value
-                        .bytes()
-                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-            })
-    };
-    if launch.as_object().is_none_or(|object| object.len() != 2)
-        || !digest("receipt_id")
-        || !digest("receipt_sha256")
+    if let Some(launch) = metadata.get("native_launch") {
+        if launch.as_object().is_none_or(|object| object.len() != 2)
+            || !launch.get("receipt_id").is_some_and(is_lower_sha256_hex)
+            || !launch
+                .get("receipt_sha256")
+                .is_some_and(is_lower_sha256_hex)
+        {
+            return Err(KernelError::InvalidReceiptMetadata(
+                "native_launch must name one launch receipt id and sha256".into(),
+            ));
+        }
+    }
+    if let Some(profile) = metadata
+        .get("chio_process")
+        .and_then(|process| process.get("worker_profile"))
     {
-        return Err(KernelError::InvalidReceiptMetadata(
-            "native_launch must name one launch receipt id and sha256".into(),
-        ));
+        let reference = profile.get("launch_ref");
+        if profile.as_object().is_none_or(|object| object.len() != 3)
+            || profile.get("kind").and_then(serde_json::Value::as_str) != Some("container")
+            || !profile
+                .get("launch_attempt")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(|attempt| (1..=u64::from(u32::MAX)).contains(&attempt))
+            || reference
+                .and_then(serde_json::Value::as_object)
+                .is_none_or(|object| object.len() != 2)
+            || !reference
+                .and_then(|reference| reference.get("record_id"))
+                .is_some_and(is_lower_sha256_hex)
+            || !reference
+                .and_then(|reference| reference.get("record_sha256"))
+                .is_some_and(is_lower_sha256_hex)
+        {
+            return Err(KernelError::InvalidReceiptMetadata(
+                "chio_process.worker_profile must name one container launch record and attempt"
+                    .into(),
+            ));
+        }
     }
     Ok(())
 }

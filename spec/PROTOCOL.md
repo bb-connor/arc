@@ -1040,17 +1040,22 @@ unchanged, so an exact replay returns the identical receipt. A retry whose
 metadata differs from the retained commitment is a conflicting request and
 MUST be refused without a new receipt.
 
-Exactly one admitted key is attempt-scoped evidence rather than request
-identity: `native_launch`, the launch receipt (`receipt_id` and `receipt_sha256`,
-each 64 lowercase hex characters) of the native launch serving the presenting
-attempt. It is excluded from the `chio.tool-admission-request.v1` hash and from
-replay equality; a malformed value MUST be refused before admission, and a replay
-of an admission that retained one MUST present one. Receipts signed during a live
-evaluation name the presenting attempt's launch. Canonical refusals signed from
-the retained admission, including recovery refusals with no live caller, name the
-launch retained at admission. A dispatch performed by a later, relaunched attempt
-of a retained admission is therefore named by its admitting launch if recovery
-signs its terminal refusal; the dispatch commit does not yet record its launch.
+Exactly two admitted entries are attempt-scoped evidence rather than request
+identity: the top-level `native_launch`, the launch receipt (`receipt_id` and
+`receipt_sha256`) of the native launch serving the presenting attempt, and
+`chio_process.worker_profile`, the worker container launch presenting it (`kind`
+`container`, `launch_attempt` of at least 1 and a `launch_ref` with `record_id`
+and `record_sha256`). Digests are 64 lowercase hex characters. Both are excluded
+from the `chio.tool-admission-request.v1` hash and from replay equality; every
+other admitted field, including the rest of `chio_process` and `route`, stays
+bound. A malformed entry MUST be refused before admission, and a replay of an
+admission that retained an entry MUST present it. Receipts signed during a live
+evaluation name the presenting attempt's launches. Canonical refusals signed
+from the retained admission, including recovery refusals with no live caller,
+name the launches retained at admission. A dispatch performed by a later,
+relaunched attempt of a retained admission is therefore named by its admitting
+launches if recovery signs its terminal refusal; the dispatch commit does not yet
+record its launches.
 
 A caller that derives receipt metadata from the request MUST derive it from the
 request's attempt identity (`ToolCallRequest::attempt_identity`): the request

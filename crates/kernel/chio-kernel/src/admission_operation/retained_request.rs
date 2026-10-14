@@ -16,18 +16,45 @@ use crate::ToolCallRequest;
 /// Caller-supplied receipt metadata admitted with the original request.
 pub type AdmittedReceiptMetadata = serde_json::Map<String, serde_json::Value>;
 
-/// The one admitted metadata key that is evidence of the presenting attempt
-/// rather than request identity: the native launch serving the call. It is
-/// excluded from the immutable request hash and from replay equality; every
-/// other admitted key stays bound.
-pub const ATTEMPT_SCOPED_RECEIPT_METADATA_KEY: &str = "native_launch";
+/// The admitted metadata entries that are evidence of the presenting attempt
+/// rather than request identity: the native launch serving the call and the
+/// worker container launch presenting it. They are excluded from the immutable
+/// request hash and from replay equality; every other admitted field stays
+/// bound.
+pub const ATTEMPT_SCOPED_RECEIPT_METADATA_PATHS: [&[&str]; 2] =
+    [&["native_launch"], &["chio_process", "worker_profile"]];
+
+fn attempt_scoped_entry<'a>(
+    metadata: &'a AdmittedReceiptMetadata,
+    path: &[&str],
+) -> Option<&'a serde_json::Value> {
+    let (last, parents) = path.split_last()?;
+    let mut object = metadata;
+    for parent in parents {
+        object = object.get(*parent)?.as_object()?;
+    }
+    object.get(*last)
+}
 
 /// Admitted metadata without its attempt-scoped evidence.
 fn identity_receipt_metadata(
     metadata: Option<&AdmittedReceiptMetadata>,
 ) -> Option<AdmittedReceiptMetadata> {
     let mut identity = metadata?.clone();
-    identity.remove(ATTEMPT_SCOPED_RECEIPT_METADATA_KEY);
+    for path in ATTEMPT_SCOPED_RECEIPT_METADATA_PATHS {
+        let Some((last, parents)) = path.split_last() else {
+            continue;
+        };
+        let mut object = Some(&mut identity);
+        for parent in parents {
+            object = object
+                .and_then(|object| object.get_mut(*parent))
+                .and_then(serde_json::Value::as_object_mut);
+        }
+        if let Some(object) = object {
+            object.remove(*last);
+        }
+    }
     (!identity.is_empty()).then_some(identity)
 }
 
@@ -267,20 +294,24 @@ impl RetainedToolAdmissionRequestV1 {
     }
 
     /// Whether `candidate` re-presents this admission. Equality covers every
-    /// retained field; attempt-scoped launch evidence may differ, but a launch
+    /// retained field; attempt-scoped launch evidence may differ, but evidence
     /// retained at admission must be presented again.
     pub fn matches_replay(&self, candidate: &Self) -> Result<bool, AdmissionOperationStoreError> {
         if self.canonical == candidate.canonical {
             return Ok(true);
         }
-        let launch = |request: &Self| {
+        let presented = |request: &Self, path: &[&str]| {
             request
                 .wire
                 .admitted_receipt_metadata
                 .as_ref()
-                .is_some_and(|metadata| metadata.contains_key(ATTEMPT_SCOPED_RECEIPT_METADATA_KEY))
+                .and_then(|metadata| attempt_scoped_entry(metadata, path))
+                .is_some()
         };
-        if launch(self) != launch(candidate) {
+        if ATTEMPT_SCOPED_RECEIPT_METADATA_PATHS
+            .iter()
+            .any(|path| presented(self, path) != presented(candidate, path))
+        {
             return Ok(false);
         }
         Ok(self.identity_bytes()? == candidate.identity_bytes()?)

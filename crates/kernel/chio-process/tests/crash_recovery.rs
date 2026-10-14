@@ -91,6 +91,17 @@ fn launch(id: char) -> Result<[(String, chio_process::ProcessLaunchReceipt); 1]>
     )])
 }
 
+fn worker_profile(attempt: u32, id: char) -> chio_process::WorkerProfile {
+    chio_process::WorkerProfile {
+        kind: chio_process::WorkerProfileKind::Container,
+        launch_ref: chio_process::LaunchRef {
+            record_id: id.to_string().repeat(64),
+            record_sha256: "e".repeat(64),
+        },
+        launch_attempt: attempt,
+    }
+}
+
 fn phase(dir: &std::path::Path, phase: &str) -> Result<std::process::ExitStatus> {
     Ok(Command::new(std::env::current_exe()?)
         .args(["--exact", "subprocess_worker", "--nocapture"])
@@ -282,6 +293,12 @@ async fn subprocess_worker() -> Result {
         "recover-unknown" => runtime.with_launch_receipts(launch('b')?)?,
         _ => runtime,
     };
+    // The relaunched worker container presents the call under its own launch.
+    match phase.as_str() {
+        "crash-in-tool" => runtime.bind_worker_profile("root", worker_profile(1, 'a'))?,
+        "recover-unknown" => runtime.bind_worker_profile("root", worker_profile(2, 'b'))?,
+        _ => {}
+    }
     if phase.contains("-artifact-") {
         let first = phase.starts_with("crash-");
         let request_path = dir.join("original-request.json");
@@ -583,6 +600,11 @@ async fn subprocess_worker() -> Result {
             metadata["native_launch"],
             serde_json::to_value(&launch('a')?[0].1)?,
             "a recovery refusal names the launch that admitted the call"
+        );
+        assert_eq!(
+            process["worker_profile"],
+            serde_json::to_value(worker_profile(1, 'a'))?,
+            "a recovery refusal names the worker launch that admitted the call"
         );
         let replay = runtime.invoke("root", "publish", &request).await?;
         assert_eq!(
