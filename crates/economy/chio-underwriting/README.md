@@ -31,7 +31,7 @@ authenticate the evidence that supports it before relying on a quote.
 ## Guarantees
 
 `price_premium` declines missing scores, invalid inputs, scores below its
-configured floor, unsafe legacy precision, and overflowing monetary results.
+configured floor, base rates beyond the exact range of a double, and overflowing monetary results.
 It applies a capped behavioral penalty and checked integer pricing.
 `LookbackWindow::new` rejects inverted ranges.
 

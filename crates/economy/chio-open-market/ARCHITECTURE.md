@@ -19,7 +19,7 @@ must supply trusted authorities and current snapshots before using them.
 `fee_schedule.rs` re-exports the fiscal fee-schedule contracts.
 `penalty`, `evidence`, `evaluation`, `authority`, and `validation` define
 penalty issuance, evaluation findings, scope, and authority checks.
-`fiscal_adapter.rs` binds legacy schedules to governed fiscal authorization.
+`fiscal_adapter.rs` binds signed fee schedules to governed fiscal authorization.
 
 `finding_admission.rs` provides allocation snapshots, expiry bounds,
 admission witnesses, and finding-specific bid and accept entry points.

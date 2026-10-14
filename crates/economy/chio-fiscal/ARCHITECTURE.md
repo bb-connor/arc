@@ -17,7 +17,7 @@ SQLite fiscal store and installed runtime adapter registry.
 
 `fiscal.rs` defines signer IDs, parameters, charter/schedule builders, verified
 wrappers, canonical decoding, and schedule lineage rules. `fee_schedule` owns
-open-market scope, fee, and bond types and the legacy fee-schedule builder.
+open-market scope, fee, and bond types and the signed fee-schedule builder.
 `input` routes bounded original bytes through the shared canonical reader.
 
 The private `lifecycle` module re-exports six implementation modules:
