@@ -13,8 +13,8 @@ type CatalogEntry = (String, String, String, Option<String>);
 const NAMESPACE: &str = "lower(name) GLOB 'security_participant_migration*' OR lower(tbl_name) GLOB 'security_participant_migration*'";
 
 fn expected_catalog() -> Result<&'static [CatalogEntry], AdmissionOperationStoreError> {
-    // Only the compiled canonical definition is cached, never observed database
-    // state or row verification. Every read still inspects the live catalog.
+    // The compiled canonical definition is cached. Observed catalog reads are
+    // reused only as `catalog_memo` allows, and row verification never is.
     static EXPECTED: std::sync::OnceLock<Result<Vec<CatalogEntry>, String>> =
         std::sync::OnceLock::new();
     match EXPECTED.get_or_init(|| {
@@ -30,6 +30,14 @@ fn expected_catalog() -> Result<&'static [CatalogEntry], AdmissionOperationStore
 }
 
 fn catalog(connection: &Connection) -> Result<Vec<CatalogEntry>, AdmissionOperationStoreError> {
+    crate::catalog_memo::read(connection, "participant_migration", sqlite_error, || {
+        scan_catalog(connection)
+    })
+}
+
+fn scan_catalog(
+    connection: &Connection,
+) -> Result<Vec<CatalogEntry>, AdmissionOperationStoreError> {
     let (count, bytes): (i64, i64) = connection.query_row(
         &format!("SELECT COUNT(*), COALESCE(SUM(length(CAST(name AS BLOB)) + length(CAST(tbl_name AS BLOB)) + COALESCE(length(CAST(sql AS BLOB)), 0)), 0) FROM sqlite_schema WHERE {NAMESPACE}"),
         [], |row| Ok((row.get(0)?, row.get(1)?)),

@@ -95,6 +95,14 @@ pub(in crate::admission_operation_store) fn sql() -> Result<String, AdmissionOpe
 }
 
 fn catalog(connection: &Connection) -> Result<Vec<CatalogEntry>, AdmissionOperationStoreError> {
+    crate::catalog_memo::read(connection, "participant_state", sqlite_error, || {
+        scan_catalog(connection)
+    })
+}
+
+fn scan_catalog(
+    connection: &Connection,
+) -> Result<Vec<CatalogEntry>, AdmissionOperationStoreError> {
     let (count, bytes): (i64, i64) = connection.query_row(&format!("SELECT COUNT(*), COALESCE(SUM(length(CAST(name AS BLOB)) + length(CAST(tbl_name AS BLOB)) + COALESCE(length(CAST(sql AS BLOB)), 0)), 0) FROM sqlite_schema WHERE {NAMESPACE}"), [], |row| Ok((row.get(0)?, row.get(1)?))).map_err(sqlite_error)?;
     if !(0..=256).contains(&count) || !(0..=1_048_576).contains(&bytes) {
         return Err(invalid("native security catalog exceeds bounds"));

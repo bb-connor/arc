@@ -1,4 +1,4 @@
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::economic_continuity::VerifiedEconomicStateBatchAdvance;
@@ -38,7 +38,7 @@ use rusqlite::{params, Connection, OptionalExtension, Row, Transaction, Transact
 use serde::{Deserialize, Serialize};
 
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 
 mod budget_custody;
 mod caller_budget;
@@ -339,7 +339,7 @@ impl SqliteAdmissionOperationStore {
         }
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, AdmissionOperationStoreError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, AdmissionOperationStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| AdmissionOperationStoreError::Unavailable(fenced.to_string()))

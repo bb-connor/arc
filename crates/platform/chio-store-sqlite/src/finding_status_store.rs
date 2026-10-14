@@ -26,7 +26,7 @@ use chio_finding::{
     FindingStatusVerdict,
 };
 
-use std::sync::{Arc, MutexGuard};
+use std::sync::Arc;
 
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_finding::FindingStatusProofInput;
@@ -44,7 +44,7 @@ use crate::finding_challenge_store::{
     begin_finalizing_under_sanction_tx, FindingFinalizingAuthorizationInput, FindingLiabilityState,
 };
 use crate::serving_owner::SqliteServingOwner;
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 
 const FINDING_STATUS_SCHEMA_KEY: &str = "finding_status";
 pub(crate) const FINDING_STATUS_SUPPORTED_SCHEMA_VERSION: i32 = 5;
@@ -364,7 +364,7 @@ impl SqliteFindingStatusStore {
         self.serving_owner.fence.clone()
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>, FindingStatusStoreError> {
+    fn connection(&self) -> Result<StoreGuard<'_>, FindingStatusStoreError> {
         self.connection
             .lock()
             .map_err(|fenced| FindingStatusStoreError::Unavailable(fenced.to_string()))

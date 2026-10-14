@@ -22,6 +22,8 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use rusqlite::Connection;
 
+use crate::catalog_memo;
+
 /// Proves that the artifact paired with this connection's commits agrees with
 /// the database head. It runs on a recovered connection before the connection
 /// serves again.
@@ -107,7 +109,7 @@ impl StoreConnection {
     /// Acquire the connection. A lock another thread poisoned is recovered
     /// only after the connection's state is re-established and verified; a
     /// fenced connection is refused without being touched.
-    pub(crate) fn lock(&self) -> Result<MutexGuard<'_, Connection>, ConnectionFenced> {
+    pub(crate) fn lock(&self) -> Result<StoreGuard<'_>, ConnectionFenced> {
         if let Some(fenced) = self.fence.get() {
             return Err(fenced.clone());
         }
@@ -117,7 +119,7 @@ impl StoreConnection {
         };
         match self.fence.get() {
             Some(fenced) => Err(fenced.clone()),
-            None => Ok(guard),
+            None => Ok(StoreGuard::new(guard)),
         }
     }
 
@@ -208,6 +210,47 @@ impl StoreConnection {
                 .map_err(|error| FenceReason::ConsistencyCheckFailed(Arc::from(error)))?;
         }
         Ok(())
+    }
+}
+
+/// A held store connection. While it is held, catalog reads on it may be
+/// reused as [`catalog_memo`] describes; a mutable borrow discards them.
+pub(crate) struct StoreGuard<'a> {
+    hold: Option<catalog_memo::Hold>,
+    connection: MutexGuard<'a, Connection>,
+}
+
+impl<'a> StoreGuard<'a> {
+    fn new(connection: MutexGuard<'a, Connection>) -> Self {
+        Self {
+            hold: catalog_memo::Hold::new(&connection),
+            connection,
+        }
+    }
+}
+
+impl Drop for StoreGuard<'_> {
+    fn drop(&mut self) {
+        if let Some(hold) = self.hold.take() {
+            hold.release(&self.connection);
+        }
+    }
+}
+
+impl std::ops::Deref for StoreGuard<'_> {
+    type Target = Connection;
+
+    fn deref(&self) -> &Connection {
+        &self.connection
+    }
+}
+
+impl std::ops::DerefMut for StoreGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Connection {
+        if let Some(hold) = &self.hold {
+            hold.discard();
+        }
+        &mut self.connection
     }
 }
 

@@ -12,6 +12,10 @@ const EVENTS_PER_CALL: [u64; 4] = [1, 2, 1, 1];
 /// Declared checkpoint contract: when a call's flow resolution starts, the
 /// verified suffix retains at most this many completed calls past its seal.
 const CHECKPOINT_CADENCE_CALLS: u64 = 0;
+/// Native `sqlite_schema` catalog scans one complete call may perform. A
+/// catalog read is reused within a held store connection, so this bound
+/// counts store connection holds, not verified history rows.
+const CATALOG_SCANS_PER_CALL: u64 = 512;
 const FAMILIES: [&str; 4] = [
     "security_participant_state",
     "security_participant_egress",
@@ -29,6 +33,7 @@ struct Walks {
     walks: Mutex<Vec<Walk>>,
     gaps: AtomicUsize,
     image_walks: Mutex<Vec<(&'static str, u64)>>,
+    catalog_scans: Mutex<Vec<String>>,
 }
 
 impl Walks {
@@ -64,6 +69,34 @@ impl Walks {
         } else {
             self.gaps.fetch_add(1, Ordering::SeqCst);
         }
+    }
+
+    fn observe_catalog(&self, kind: &str) {
+        self.catalog_scans
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(kind.to_owned());
+    }
+
+    fn catalog_len(&self) -> usize {
+        self.catalog_scans
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len()
+    }
+
+    fn catalog_since(&self, start: usize) -> BTreeMap<String, u64> {
+        let mut scans = BTreeMap::new();
+        for kind in self
+            .catalog_scans
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(start..)
+            .unwrap_or_default()
+        {
+            *scans.entry(kind.clone()).or_insert(0) += 1;
+        }
+        scans
     }
 
     fn image_len(&self) -> usize {
@@ -109,11 +142,16 @@ struct Cost {
     sealed_after: [u64; 2],
     elapsed: std::time::Duration,
     image_walks: Vec<(&'static str, u64)>,
+    catalog_scans: BTreeMap<String, u64>,
 }
 
 impl Cost {
     fn visits(&self) -> u64 {
         self.walks.iter().sum()
+    }
+
+    fn catalog_scans(&self) -> u64 {
+        self.catalog_scans.values().sum()
     }
 }
 
@@ -229,7 +267,19 @@ fn check(index: usize, cost: &Cost, second: Option<&Cost>) -> TestResult {
         cost.walks.iter().all(|events| *events <= walk_bound),
         "call {index} walk exceeds the {walk_bound}-event suffix contract\n{HEADER}\n{measured}"
     );
+    assert!(
+        cost.catalog_scans() <= CATALOG_SCANS_PER_CALL,
+        "call {index} performed {} catalog scans, bound {CATALOG_SCANS_PER_CALL}: {:?}",
+        cost.catalog_scans(),
+        cost.catalog_scans
+    );
     if let Some(second) = second {
+        assert!(
+            cost.catalog_scans() <= second.catalog_scans(),
+            "call {index} performed {} catalog scans, call 2 performed {}",
+            cost.catalog_scans(),
+            second.catalog_scans()
+        );
         // Call 2 supplies the observed baseline for this sequential full-call
         // fixture, including its remaining initialization/checkpoint overhead.
         let slack = u64::try_from(cost.walks.len())?
@@ -308,6 +358,7 @@ fn call(fixture: &mut Fixture, walks: &Walks, index: usize) -> TestResult<Cost> 
     let before = journal(fixture)?;
     let start = walks.len();
     let image_start = walks.image_len();
+    let catalog_start = walks.catalog_len();
     let started = std::time::Instant::now();
     // The trusted host refreshes mutable flow state before each evaluation.
     fixture.context = fixture
@@ -333,6 +384,7 @@ fn call(fixture: &mut Fixture, walks: &Walks, index: usize) -> TestResult<Cost> 
     let elapsed = started.elapsed();
     let (call_walks, threads) = walks.since(start);
     let image_walks = walks.image_since(image_start);
+    let catalog_scans = walks.catalog_since(catalog_start);
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert!(
         matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
@@ -376,6 +428,7 @@ fn call(fixture: &mut Fixture, walks: &Walks, index: usize) -> TestResult<Cost> 
         sealed_after: sealed(fixture)?,
         elapsed,
         image_walks,
+        catalog_scans,
     })
 }
 
@@ -485,6 +538,14 @@ fn native_participant_history_verification_stays_bounded_across_sequential_calls
             move |kind, visited| walks.observe_image(kind, visited)
         })?;
 
+    fixture
+        .authority
+        .admission_operation_store()
+        .observe_native_catalog_scans_for_test({
+            let walks = walks.clone();
+            move |kind| walks.observe_catalog(kind)
+        })?;
+
     eprintln!("native participant history visits\n{HEADER}");
     let mut costs: Vec<Cost> = Vec::with_capacity(CALLS);
     for index in 1..=CALLS {
@@ -504,6 +565,11 @@ fn native_participant_history_verification_stays_bounded_across_sequential_calls
                 visits.iter().max().copied().unwrap_or_default()
             );
         }
+        eprintln!(
+            "catalog call={index} scans={} kinds={:?}",
+            cost.catalog_scans(),
+            cost.catalog_scans
+        );
         if index == 1 {
             calibrate(&fixture, &walks)?;
         }

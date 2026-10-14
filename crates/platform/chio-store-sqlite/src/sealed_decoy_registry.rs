@@ -6,7 +6,6 @@
 // Contracts: docs/security/trust-boundary-inventory.json
 use std::fs;
 use std::path::Path;
-use std::sync::MutexGuard;
 
 use std::time::Duration;
 
@@ -25,7 +24,7 @@ use chio_security_types::{
 };
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Row, Rows, TransactionBehavior};
 
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 
 const RECORDS_TABLE: &str = "sealed_decoy_records_v1";
 const OPERATIONS_TABLE: &str = "sealed_decoy_operation_owners_v1";
@@ -65,7 +64,7 @@ impl SqliteSealedDecoyRegistryStore {
         })
     }
 
-    fn connection(&self) -> PortResult<MutexGuard<'_, Connection>> {
+    fn connection(&self) -> PortResult<StoreGuard<'_>> {
         self.connection.lock().map_err(|_| PortError::unavailable())
     }
 }

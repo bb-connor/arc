@@ -94,6 +94,7 @@ mod read_companion;
 pub mod receipt_query;
 pub mod receipt_query_snapshot;
 // Linux snapshots own a private file and recheck custody on every connection borrow.
+mod catalog_memo;
 #[cfg(target_os = "linux")]
 mod receipt_query_snapshot_backing;
 pub mod receipt_store;

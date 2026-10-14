@@ -2,7 +2,7 @@
 use chio_security_types::clock::{Clock, ClockError, ClockFence, SystemClock};
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 use chio_core::capability::scope::MonetaryAmount;
 use chio_kernel::budget_store::{
@@ -32,7 +32,7 @@ use chio_kernel::tool_outcome::{MonetaryReleaseEvidenceKindV1, MonetaryReleaseEv
 use chio_kernel::{BudgetStore, BudgetStoreError, BudgetUsageRecord, CanonicalRevocationSet};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
-use crate::store_connection::StoreConnection;
+use crate::store_connection::{StoreConnection, StoreGuard};
 
 mod authorization;
 mod composite;
