@@ -23,6 +23,8 @@ mod bearer_verifier;
 mod clock_custody;
 #[path = "tests/dpop_replay.rs"]
 mod dpop_replay;
+#[path = "tests/local_authorization.rs"]
+mod local_authorization;
 #[path = "tests/protocol_refusal.rs"]
 mod protocol_refusal;
 #[path = "tests/resume_record.rs"]
