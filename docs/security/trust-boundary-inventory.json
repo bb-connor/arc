@@ -5961,6 +5961,9 @@
     "crates/platform/chio-control-plane/src/enterprise_federation.rs": [
       "serialize::custom_deserialize"
     ],
+    "crates/platform/chio-control-plane/src/evidence_export/verification.rs": [
+      "verify_http_receipt_evidence::from_value"
+    ],
     "crates/platform/chio-control-plane/src/fiscal_state_anchor.rs": [
       "compare_and_swap::from_slice"
     ],
@@ -8140,6 +8143,22 @@
           ],
           "apis": [
             "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/platform/chio-control-plane/src/evidence_export/verification.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "The embedded HTTP receipt is decoded from the signed evidence package JSON value. Decoding does not establish authority. Verification requires the HTTP content ID, both signatures, equal signer keys, and the complete canonical core receipt projection; evidence policy establishes signer trust.",
+      "readers": [
+        {
+          "reader": "verify_http_receipt_evidence",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
           ],
           "checked": true
         }
