@@ -131,12 +131,7 @@ impl ApprovalHarness {
             self.directory.path().join("locks"),
             Arc::new(self.clock.clone()),
         )?;
-        let durable = DurableAdmissionStores {
-            store: Arc::new(authority.admission_operation_store()),
-            outcome_store: Arc::new(authority.tool_outcome_store()),
-            fence: authority.mutation_fence(),
-            budget_store: Arc::new(authority.budget_store()),
-        };
+        let durable = DurableAdmissionStores::serving(&authority);
         let budget = durable.budget_store.clone();
         let revocation: Arc<dyn chio_kernel::RevocationStore> =
             Arc::new(chio_store_sqlite::SqliteRevocationStore::open(

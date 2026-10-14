@@ -295,6 +295,7 @@ pub struct HttpAuthorityBuilder {
     receipt_store: Option<Arc<dyn ReceiptStore>>,
     revocation_store: Option<Arc<dyn RevocationStore>>,
     durable_admission: Option<DurableAdmissionStores>,
+    stop_control: Option<chio_kernel::stop::StopControl>,
     trusted_capability_issuers: Vec<PublicKey>,
     allow_ephemeral_receipt_log: bool,
     allow_ephemeral_revocation_store: bool,
@@ -332,6 +333,13 @@ impl HttpAuthorityBuilder {
             outcome_store,
             fence,
         });
+        self
+    }
+
+    /// Bind the embedded kernel to the stop control its host shares.
+    #[must_use]
+    pub fn stop_control(mut self, control: chio_kernel::stop::StopControl) -> Self {
+        self.stop_control = Some(control);
         self
     }
 
@@ -388,6 +396,9 @@ impl HttpAuthorityBuilder {
                 .unwrap_or_else(|| Arc::new(chio_security_types::clock::SystemClock)),
         );
         kernel.install_default_dpop_store();
+        if let Some(control) = self.stop_control {
+            kernel.set_stop_control(control);
+        }
         if let Some(store) = self.receipt_store {
             kernel
                 .set_receipt_store_handle(store)
@@ -598,6 +609,12 @@ impl HttpAuthority {
     #[must_use]
     pub fn approval_store(&self) -> Arc<dyn ApprovalStore> {
         Arc::clone(&self.approval_store)
+    }
+
+    /// The stop control the embedded kernel enforces.
+    #[must_use]
+    pub fn stop_control(&self) -> &chio_kernel::stop::StopControl {
+        self.kernel.stop_control()
     }
 
     pub fn set_execution_nonce_store(

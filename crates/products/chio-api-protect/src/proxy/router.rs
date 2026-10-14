@@ -48,6 +48,15 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
             require_sidecar_control_middleware,
         ));
 
+    let stop_routes = Router::new()
+        .route("/chio/emergency-stop", post(stop_handler))
+        .route("/chio/emergency-resume", post(resume_handler))
+        .route("/chio/emergency-status", get(status_handler))
+        .route_layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            require_sidecar_control_middleware,
+        ));
+
     Router::new()
         .route("/chio/evaluate", post(sidecar_evaluate_handler))
         .route("/chio/verify", post(sidecar_verify_handler))
@@ -57,6 +66,7 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
         .route("/chio/live", get(sidecar_liveness_handler))
         .route("/chio/health", get(sidecar_health_handler))
         .merge(approval_routes)
+        .merge(stop_routes)
         .route("/v1/capabilities/mint", post(sidecar_mint_handler))
         // Path alias for `chio-sdk-python`'s `ChioClient.create_capability`,
         // which posts to `/v1/capabilities`. Accepts both the canonical
@@ -218,6 +228,9 @@ pub(crate) async fn proxy_handler(
         Ok(r) => r,
         Err(e) => {
             warn!("evaluation error: {e}");
+            if state.stop.heads().is_stopped() {
+                return stopped_refusal();
+            }
             return evaluation_error_response(&e);
         }
     };
