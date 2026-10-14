@@ -329,13 +329,16 @@ fn legacy_response_transition_canonical_digest_is_unchanged() {
 #[test]
 fn active_defense_schema_and_semantics_reject_mutation_corpus() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
-    let status = std::process::Command::new("python3")
+    let output = std::process::Command::new("python3")
         .arg(root.join("scripts/check-security-wire-vectors.py"))
-        .status()
+        .output()
         .test_expect("security semantic checker runs");
     assert!(
-        status.success(),
-        "security semantic checker rejected corpus"
+        output.status.success(),
+        "security semantic checker failed ({}):\n{}{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
     );
 }
 #[test]
