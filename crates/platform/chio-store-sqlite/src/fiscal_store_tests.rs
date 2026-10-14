@@ -578,6 +578,25 @@ fn obsolete_fiscal_schema_is_refused_without_rewriting() -> TestResult {
 }
 
 #[test]
+fn fiscal_schema_without_the_fee_schedule_binding_table_is_refused() -> TestResult {
+    let mut connection = rusqlite::Connection::open_in_memory()?;
+    initialize_fiscal_schema(&mut connection)?;
+    connection.execute_batch(
+        "ALTER TABLE fiscal_fee_schedule_bindings RENAME TO fiscal_legacy_fee_schedule_bindings",
+    )?;
+    let error = initialize_fiscal_schema(&mut connection)
+        .err()
+        .ok_or("a fiscal schema without its binding table opened")?;
+    assert!(
+        error
+            .to_string()
+            .contains("no such table: fiscal_fee_schedule_bindings"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
 fn fiscal_genesis_is_exact_idempotent_and_survives_restart() -> TestResult {
     let files = store_fixture()?;
     let fixture = fiscal_fixture()?;

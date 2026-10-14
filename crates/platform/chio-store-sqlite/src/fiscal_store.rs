@@ -85,11 +85,11 @@ pub struct FiscalStagedTransitionRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FiscalLegacyFeeScheduleBindingRecord {
-    pub legacy_schedule_id: String,
+pub struct FiscalFeeScheduleBindingRecord {
+    pub fee_schedule_id: String,
     pub fiscal_schedule_id: String,
     pub fiscal_schedule_digest: String,
-    pub legacy_envelope_digest: String,
+    pub envelope_digest: String,
 }
 
 #[derive(Serialize)]
@@ -2372,10 +2372,10 @@ pub(crate) fn verify_fiscal_sql_invariants(
                     )
                 )
                 OR EXISTS(
-                    SELECT 1 FROM fiscal_legacy_fee_schedule_bindings AS binding
-                    WHERE binding.legacy_envelope_digest IS NULL
-                       OR length(binding.legacy_envelope_digest) <> 64
-                       OR binding.legacy_envelope_digest GLOB '*[^0-9a-f]*'
+                    SELECT 1 FROM fiscal_fee_schedule_bindings AS binding
+                    WHERE binding.envelope_digest IS NULL
+                       OR length(binding.envelope_digest) <> 64
+                       OR binding.envelope_digest GLOB '*[^0-9a-f]*'
                        OR NOT EXISTS(
                            SELECT 1 FROM fiscal_schedules AS schedule
                            WHERE schedule.schedule_id = binding.fiscal_schedule_id
@@ -2772,7 +2772,7 @@ fn verify_owner(
 
 mod boundary;
 use boundary::*;
-mod legacy_fee_binding;
+mod fee_schedule_binding;
 
 #[cfg(test)]
 #[path = "fiscal_store_tests.rs"]

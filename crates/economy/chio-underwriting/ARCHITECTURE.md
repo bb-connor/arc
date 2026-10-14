@@ -55,7 +55,7 @@ capped deduction before the risk band is selected. Default quote bands multiply
 the base by 2, 3, or 6; combined scores below 500 decline.
 
 Monetary quoting uses checked `u128` fixed-point arithmetic and half-up rounding.
-The legacy path also declines base rates above 2^53. Governed fiscal schedules
+The unconfigured schedule also declines base rates above 2^53. Governed fiscal schedules
 can price larger exact integer amounts within the `u64` result bound, and
 replace caller tuning with resolved schedule parameters. Fiscal denial returns
 an error rather than a quote.

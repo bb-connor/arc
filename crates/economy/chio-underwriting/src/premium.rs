@@ -93,7 +93,7 @@ impl FiscalDomainParams for FiscalInsurancePremiumSchedule {
 }
 
 impl FiscalInsurancePremiumSchedule {
-    fn legacy(inputs: &PremiumInputs) -> Self {
+    fn unconfigured(inputs: &PremiumInputs) -> Self {
         Self {
             decline_floor: PREMIUM_DECLINE_FLOOR,
             high_risk_floor: PREMIUM_HIGH_RISK_FLOOR,
@@ -346,7 +346,9 @@ pub enum PremiumDeclineReason {
     MissingComplianceScore,
     /// Inputs were malformed (for example currency or base rate).
     InvalidInputs,
-    LegacyPrecisionUnsafe,
+    /// The unconfigured schedule only prices base rates that a double
+    /// represents exactly.
+    BaseRateExceedsExactDoubleRange,
     ArithmeticOverflow,
 }
 
@@ -367,7 +369,7 @@ pub fn price_premium(
         scope,
         lookback_window,
         inputs,
-        &FiscalInsurancePremiumSchedule::legacy(inputs),
+        &FiscalInsurancePremiumSchedule::unconfigured(inputs),
         true,
     )
 }
@@ -400,16 +402,16 @@ pub fn price_fiscal_premium(
 pub fn self_test_fiscal_insurance_premium_adapter() -> Result<(), String> {
     let inputs = PremiumInputs::new(Some(850), Some(1.5), 10_000, "USD");
     let window = LookbackWindow::new(1_000, 2_000)?;
-    let legacy = price_premium("fiscal-readiness", "market", window, &inputs);
+    let unconfigured = price_premium("fiscal-readiness", "market", window, &inputs);
     let installed = price_premium_with_schedule(
         "fiscal-readiness",
         "market",
         window,
         &inputs,
-        &FiscalInsurancePremiumSchedule::legacy(&inputs),
+        &FiscalInsurancePremiumSchedule::unconfigured(&inputs),
         true,
     );
-    if installed != legacy {
+    if installed != unconfigured {
         return Err("insurance-premium bootstrap parity failed".to_owned());
     }
     Ok(())
@@ -421,7 +423,7 @@ fn price_premium_with_schedule(
     lookback_window: LookbackWindow,
     inputs: &PremiumInputs,
     schedule: &FiscalInsurancePremiumSchedule,
-    enforce_legacy_precision: bool,
+    require_exact_double_range: bool,
 ) -> PremiumQuote {
     let mut inputs = inputs.clone();
     inputs.behavioral_threshold = schedule.behavioral_threshold;
@@ -469,15 +471,15 @@ fn price_premium_with_schedule(
         };
     }
 
-    if enforce_legacy_precision && inputs.base_rate_cents > (1_u64 << 53) {
+    if require_exact_double_range && inputs.base_rate_cents > (1_u64 << 53) {
         return PremiumQuote::Declined {
             agent_id: agent_id.to_string(),
             scope: scope.to_string(),
             lookback_window,
             combined_score: Some(combined_score),
-            reason: PremiumDeclineReason::LegacyPrecisionUnsafe,
+            reason: PremiumDeclineReason::BaseRateExceedsExactDoubleRange,
             justification: format!(
-                "premium base_rate_cents {} exceeds the exact legacy integer domain",
+                "premium base_rate_cents {} exceeds the exact integer range of a double",
                 inputs.base_rate_cents
             ),
         };
@@ -767,7 +769,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_pricing_accepts_the_exact_integer_precision_boundary() {
+    fn unconfigured_pricing_accepts_the_exact_double_boundary() {
         let mut boundary = inputs(Some(950), None);
         boundary.base_rate_cents = 1_u64 << 53;
         let quote = price_premium("agent-x", "scope", window(), &boundary);
@@ -775,14 +777,14 @@ mod tests {
     }
 
     #[test]
-    fn legacy_pricing_denies_beyond_the_exact_integer_precision_boundary() {
+    fn unconfigured_pricing_denies_beyond_the_exact_double_boundary() {
         let mut unsafe_base = inputs(Some(950), None);
         unsafe_base.base_rate_cents = (1_u64 << 53) + 1;
         let quote = price_premium("agent-x", "scope", window(), &unsafe_base);
         assert!(matches!(
             quote,
             PremiumQuote::Declined {
-                reason: PremiumDeclineReason::LegacyPrecisionUnsafe,
+                reason: PremiumDeclineReason::BaseRateExceedsExactDoubleRange,
                 ..
             }
         ));
@@ -826,8 +828,8 @@ mod tests {
     fn governed_schedule_ignores_caller_tuning_and_uses_checked_integer_money() {
         let mut request = inputs(Some(950), Some(4.0));
         request.behavioral_threshold = 100.0;
-        let legacy = price_premium("agent", "scope", window(), &request);
-        assert_eq!(legacy.quoted_cents(), Some(2_000));
+        let unconfigured = price_premium("agent", "scope", window(), &request);
+        assert_eq!(unconfigured.quoted_cents(), Some(2_000));
 
         let governed = FiscalInsurancePremiumSchedule {
             decline_floor: 500,

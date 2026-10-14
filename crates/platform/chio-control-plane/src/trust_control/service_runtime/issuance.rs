@@ -6,7 +6,7 @@ use chio_fiscal::{FiscalDomain, FiscalResolution};
 use chio_open_market::fiscal_adapter::{
     build_fiscal_open_market_fee_schedule_artifact, build_fiscal_open_market_penalty_artifact,
     evaluate_fiscal_open_market_penalty, materialize_fiscal_open_market_fee_schedule,
-    FiscalLegacyFeeScheduleBinding, FiscalOpenMarketSchedule,
+    FiscalFeeScheduleBinding, FiscalOpenMarketSchedule,
 };
 
 pub(crate) const AUTHORITY_NOT_CONFIGURED: &str = "trust-control authority is not configured";
@@ -349,7 +349,7 @@ pub(crate) fn bind_governed_fee_schedule(
         return Ok(signed);
     };
     let authorization = runtime
-        .bind_legacy_fee_schedule_admitted(&schedule_id, &signed, || {
+        .bind_fee_schedule_admitted(&schedule_id, &signed, || {
             inspect_authority_state_blocking(state, |state| {
                 if admitted_authority_signers(state)?.admits_signer(&signed.signer_key) {
                     Ok(())
@@ -456,12 +456,12 @@ pub(crate) fn evaluate_open_market_penalty_with_signers(
 fn fiscal_binding(
     runtime: &TrustFiscalRuntime,
     resolver: &chio_fiscal::FiscalResolver<'_>,
-) -> Result<Option<FiscalLegacyFeeScheduleBinding>, String> {
+) -> Result<Option<FiscalFeeScheduleBinding>, String> {
     match resolver
         .resolve::<FiscalOpenMarketSchedule>(FiscalDomain::OpenMarketFeeAndBondSchedule, None)
     {
         FiscalResolution::Governed { schedule_id, .. } => runtime
-            .legacy_fee_schedule_binding(&schedule_id)
+            .fee_schedule_binding(&schedule_id)
             .map_err(|error| error.to_string()),
         FiscalResolution::Fallback(_) => Ok(None),
         FiscalResolution::Denied(reason) => {

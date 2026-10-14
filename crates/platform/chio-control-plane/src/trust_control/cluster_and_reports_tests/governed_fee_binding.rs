@@ -205,7 +205,7 @@ fn fiscal_fee_node(rotate_on_read: Option<usize>, governed: bool) -> GovernedFee
         FiscalScheduleBuilder {
             domain: FiscalDomain::OpenMarketFeeAndBondSchedule,
             params: FiscalParams::OpenMarketFeeAndBondSchedule {
-                legacy_body: Box::new(
+                fee_schedule: Box::new(
                     build_open_market_fee_schedule_artifact(OPERATOR, None, &legacy_request, 70)
                         .test_unwrap(),
                 ),
@@ -442,9 +442,9 @@ fn fiscal_fee_node(rotate_on_read: Option<usize>, governed: bool) -> GovernedFee
 
 fn bound_envelope_digest(node: &GovernedFeeNode) -> Option<String> {
     node.runtime
-        .legacy_fee_schedule_binding(&node.schedule_id)
+        .fee_schedule_binding(&node.schedule_id)
         .test_unwrap()
-        .map(|binding| binding.legacy_envelope_digest)
+        .map(|binding| binding.envelope_digest)
 }
 
 fn envelope_digest(signed: &SignedOpenMarketFeeSchedule) -> String {
@@ -499,7 +499,7 @@ fn fiscal_rows(node: &GovernedFeeNode, table: &str) -> i64 {
 async fn refused_final_authorization_rolls_back_the_binding_and_its_projection_commit() {
     let node = governed_fee_node(Some(BINDING_RECONCILE_READ));
     let projection_commits = fiscal_rows(&node, "fiscal_projection_commits");
-    let bindings = fiscal_rows(&node, "fiscal_legacy_fee_schedule_bindings");
+    let bindings = fiscal_rows(&node, "fiscal_fee_schedule_bindings");
     let refusal = issue_governed_fee_schedule(&node).await;
     assert_eq!(node.anchor.rotations.load(Ordering::SeqCst), 1);
     assert_eq!(refusal, unavailable(AUTHORITY_CHANGED_DURING_SIGNING).await);
@@ -508,10 +508,7 @@ async fn refused_final_authorization_rolls_back_the_binding_and_its_projection_c
         fiscal_rows(&node, "fiscal_projection_commits"),
         projection_commits
     );
-    assert_eq!(
-        fiscal_rows(&node, "fiscal_legacy_fee_schedule_bindings"),
-        bindings
-    );
+    assert_eq!(fiscal_rows(&node, "fiscal_fee_schedule_bindings"), bindings);
 }
 
 #[tokio::test]
@@ -536,6 +533,36 @@ async fn governed_fee_schedule_binds_exactly_the_returned_envelope_and_retries_i
         projection_commits + 1
     );
     assert_eq!(node.anchor.rotations.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn retained_binding_refuses_a_different_envelope_for_the_same_schedule() {
+    let node = governed_fee_node(None);
+    let (status, body) = issue_governed_fee_schedule(&node).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let signed: SignedOpenMarketFeeSchedule = serde_json::from_str(&body).test_unwrap();
+    let projection_commits = fiscal_rows(&node, "fiscal_projection_commits");
+    let resigned =
+        SignedOpenMarketFeeSchedule::sign(signed.body.clone(), &fiscal_key(91)).test_unwrap();
+    assert_ne!(envelope_digest(&resigned), envelope_digest(&signed));
+
+    let refusal = node
+        .runtime
+        .bind_fee_schedule_admitted(&node.schedule_id, &resigned, || Ok::<(), ()>(()));
+    assert!(
+        matches!(
+            refusal,
+            Err(TrustFiscalOperationError::Store(
+                chio_store_sqlite::fiscal_store::FiscalStoreError::Conflict
+            ))
+        ),
+        "{refusal:?}"
+    );
+    assert_eq!(bound_envelope_digest(&node), Some(envelope_digest(&signed)));
+    assert_eq!(
+        fiscal_rows(&node, "fiscal_projection_commits"),
+        projection_commits
+    );
 }
 
 /// Composition, first issue, first bind, retried issue, retried bind.
@@ -568,7 +595,7 @@ async fn fallback_fee_schedule_under_a_fiscal_runtime_binds_nothing() {
     let signed: SignedOpenMarketFeeSchedule = serde_json::from_str(&body).test_unwrap();
     assert_eq!(signed.signer_key, node.custodian.head.public_key());
     assert_eq!(bound_envelope_digest(&node), None);
-    assert_eq!(fiscal_rows(&node, "fiscal_legacy_fee_schedule_bindings"), 0);
+    assert_eq!(fiscal_rows(&node, "fiscal_fee_schedule_bindings"), 0);
     assert_eq!(
         fiscal_rows(&node, "fiscal_projection_commits"),
         projection_commits

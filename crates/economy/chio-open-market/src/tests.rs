@@ -9,7 +9,7 @@ use crate::fee_schedule::{
     OPEN_MARKET_FEE_SCHEDULE_ARTIFACT_SCHEMA,
 };
 use crate::fiscal_adapter::{
-    signed_fee_schedule_digest, verify_fiscal_legacy_binding, FiscalLegacyFeeScheduleBinding,
+    signed_fee_schedule_digest, verify_fiscal_fee_schedule_binding, FiscalFeeScheduleBinding,
     FiscalOpenMarketError,
 };
 use crate::governance::generic::{
@@ -985,15 +985,14 @@ fn build_open_market_fee_schedule_artifact_uses_request_issued_at() {
 }
 
 #[test]
-fn fiscal_legacy_binding_requires_the_exact_signed_envelope_and_body() {
+fn fiscal_fee_schedule_binding_requires_the_exact_signed_envelope_and_body() {
     let signing_keypair = Keypair::from_seed(&[7_u8; 32]);
     let schedule = sample_fee_schedule("https://registry.chio.example", &signing_keypair);
-    let binding = FiscalLegacyFeeScheduleBinding {
+    let binding = FiscalFeeScheduleBinding {
         fiscal_schedule_id: "fiscal-schedule-1".to_owned(),
-        legacy_envelope_digest: signed_fee_schedule_digest(&schedule)
-            .test_expect("digest fee schedule"),
+        envelope_digest: signed_fee_schedule_digest(&schedule).test_expect("digest fee schedule"),
     };
-    verify_fiscal_legacy_binding(
+    verify_fiscal_fee_schedule_binding(
         &schedule,
         &binding,
         "fiscal-schedule-1",
@@ -1005,7 +1004,7 @@ fn fiscal_legacy_binding_requires_the_exact_signed_envelope_and_body() {
     let mut mismatched_body = schedule.body.clone();
     mismatched_body.publication_fee.units += 1;
     assert!(matches!(
-        verify_fiscal_legacy_binding(
+        verify_fiscal_fee_schedule_binding(
             &schedule,
             &binding,
             "fiscal-schedule-1",
@@ -1017,14 +1016,14 @@ fn fiscal_legacy_binding_requires_the_exact_signed_envelope_and_body() {
 
     let wrong_signer = Keypair::from_seed(&[8_u8; 32]);
     assert!(matches!(
-        verify_fiscal_legacy_binding(
+        verify_fiscal_fee_schedule_binding(
             &schedule,
             &binding,
             "fiscal-schedule-1",
             &schedule.body,
             &[wrong_signer.public_key()],
         ),
-        Err(FiscalOpenMarketError::InvalidLegacySchedule(_))
+        Err(FiscalOpenMarketError::InvalidFeeSchedule(_))
     ));
 }
 
