@@ -50,7 +50,7 @@ fn mcp_serve_http_durable_stop_survives_restart_and_resumes() {
         .expect("build reqwest client");
     let base_url = format!("http://{listen}");
     let spawn = || {
-        spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        spawn_http_server_with_policy_path_and_session_lifecycle(
             &dir,
             &policy_path,
             listen,
@@ -59,7 +59,6 @@ fn mcp_serve_http_durable_stop_survives_restart_and_resumes() {
             None,
             None,
             None,
-            "CHIO",
         )
     };
 

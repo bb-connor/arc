@@ -22,7 +22,7 @@ fn state(directory: &FsPath) -> TestResult<RemoteAppState> {
     Ok(RemoteAppState {
         sessions: Arc::new(RemoteSessionLedger::new(
             config.clock.clone(),
-            config.lifecycle_policy(),
+            config.lifecycle_policy()?,
             None,
             None,
         )?),
