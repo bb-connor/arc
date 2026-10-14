@@ -1,0 +1,124 @@
+\section{Execution across evolving plans}
+\label{sec:execution}
+The task graph describes the program's authorized structure. Execution records
+describe what its receiving kernels have admitted and observed. Their identities
+connect the plan to its history, allowing the graph to grow while earlier work
+continues under its original commitments.
+
+\subsection{Plan extension}
+Represent the plan as a signed task graph $G_i$. An extension supplies the digest
+of $G_i$ and a candidate $G_{i+1}$. The store verifies both graphs and checks
+that the candidate retains all earlier tasks, dependencies, routes and
+allocations. The original policy limits, resource pool and revocation epoch
+remain fixed. New tasks must fit within the remaining pool and the original
+depth and fan-out bounds.
+
+Each task has at most one allocation and one single-use continuation. A
+continuation is signed evidence of an execution right. When the graph grows,
+an old continuation is signed for the new graph but retains its identifier and
+all other fields. A new task receives a new identifier. The receiver tracks use
+by that stable identifier, which makes the distinction between a new signature
+and a new execution right enforceable.
+
+For example, suppose the survey used continuation $c$ in invocation $q$.
+Table~\ref{tab:extension} shows what happens when the specialist is added. The
+new graph can describe the survey without authorizing another performance of it.
+
+\begin{table}[ht]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l X X@{}}
+\toprule
+Record & Before extension & After extension\\
+\midrule
+Survey task and allocation & Original terms & Same terms\\
+Survey continuation & Identifier $c$, signed for $G_i$ & Identifier $c$, signed for $G_{i+1}$\\
+Receiver's execution record & $c$ belongs to invocation $q$ & $c$ still belongs to $q$\\
+Specialist continuation & Absent & New identifier $d$\\
+\bottomrule
+\end{tabularx}
+\caption{Graph versions change; the receiver's record of a consumed execution
+right does not. A request using the earlier graph retains its earlier signature
+and resolves that graph from the archive.}
+\label{tab:extension}
+\end{table}
+
+Installation compares the expected graph digest, archives the old version and
+commits the new head in one transaction. Two candidates based on the same head
+cannot both install. A losing writer must extend the committed successor, which
+already includes the winning allocation. Historical lookup returns the exact
+graph named by an old request. Fresh execution under that graph still requires
+current capability, validity, revocation and treaty checks.
+
+\subsection{Admission and execution}
+The receiver checks the commitment and, for paid work, the observed financial
+backing, then creates an execution record for the invocation. The treaty and graph
+continuation rights and the corresponding budget hold are assigned to that
+record. This state becomes durable before the tool is invoked. A later request
+cannot acquire a consumed right by presenting a new graph signature or a
+different request identifier.
+
+The guard checks the returned value against the slot's predicate after output
+transformations. Paid work also follows the agreement's verification procedure.
+The execution statement identifies the original request and output, so the
+verifier cannot substitute a result from another call without breaking the
+binding.
+
+For federated work, the statement is exported from the stored admission record.
+The exporter checks the original treaty, participants, request and admission
+time against the retained outcome. This authenticates the receiving kernel's
+execution record. Delivery of a final bilateral receipt may still require a
+remote co-signer.
+
+\subsection{Recovery}
+A timeout describes a missing response. It does not establish whether the
+receiver dispatched, whether the tool had an effect, or whether acceptance was
+recorded. Recovery consults the state held by the authority responsible for
+each of these facts.
+
+Before sealing, the holder may choose another provider. After sealing, the
+allocation remains bound to the original request even if a crash prevents
+delivery of its permit. A stored permit is returned with its original signature
+and issuance time. If the receiver has recorded a completed result, it can
+return that result without calling the tool again. If dispatch occurred but
+authoritative completion evidence is absent, the state remains
+\textsf{OutcomeUnknownAfterDispatch}. Independent siblings proceed under their
+own allocations.
+
+Settlement recovery follows the same discipline. The implementation stores the
+exact signed transaction before broadcasting it. After a restart it observes
+or rebroadcasts those bytes, preserving the nonce and allocation. This prevents
+recovery from issuing a different transaction in place of an uncertain one.
+Recovery of an arbitrary tool effect still depends on that tool's effect model.
+
+\subsection{Acceptance and payment}
+A submitted claim follows one of two paths:
+\[
+ \textsf{Funded}\to\textsf{Submitted}\to
+ \begin{cases}
+  \textsf{Payable}\to\textsf{Paid},\\
+  \textsf{Rejected}\to\textsf{Refunded}.
+ \end{cases}
+\]
+Undecided work can also expire and refund under its agreed deadlines.
+
+The selected verifier signs a decision identifying the allocation, agreement,
+submission, beneficiary, asset and amount. The escrow authenticates the
+decision and records acceptance under the chosen settlement observation rule.
+That recorded acceptance makes the claim \emph{earned}. A result or an
+unrecorded signature alone does not. Repeating the same decision has no effect;
+a conflicting replay fails.
+
+An earned claim has no timeout or refund transition. Its beneficiary can
+withdraw without another authorization from the payer. Since the parent and
+child have separate reserves, refunding the parent leaves the child's earned
+claim unchanged. In the API example, the specialist collects its reserved
+100 units even if the buyer is refunded for the intermediary's incomplete task.
+The refund does not resolve uncertainty about the intermediary's tool effects.
+
+For the funded example, the full order is: seal the call, bind its payment
+agreement, deposit backing, install the graph extension, admit and dispatch,
+then record acceptance.
+No transaction spans this sequence. A crash may strand capacity or funds until
+the existing agreement resolves them. Retaining that commitment prevents a
+missing response from being treated as permission to allocate the resource
+again.

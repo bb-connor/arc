@@ -1,0 +1,53 @@
+\section{Introduction}
+\label{sec:introduction}
+An agent program can acquire tasks and collaborators as it runs. It may inspect
+data held by one organization, delegate analysis to another and purchase a
+service from a third. Its control flow develops through these interactions,
+while the resources it uses remain subject to different owners. Executing such
+a program requires records establishing what each participant may do, what it
+has already done and which obligations its work has created.
+
+The architectural problem is to preserve the meaning of those records as the
+plan changes. Delegation of a task, authorization to execute it, evidence of its
+outcome and acceptance for payment are distinct decisions. A new plan must
+respect resources already committed. A replacement process must recover the
+history of earlier actions. An owner must be able to enforce its own conditions
+when admitting work from another participant.
+
+We present Chio, a kernel architecture for peer-to-peer verifiable work. Chio
+separates agent planning from the authority and durable state governing its
+effects. An untrusted agent proposes operations. A receiving kernel admits
+them under its owner's capabilities, policies and treaties, assigns their
+execution rights to durable records, and mediates access to local tools.
+Signed receipts make the kernel's decisions available as evidence to other
+participants. Each participant selects the authorities whose evidence it accepts.
+
+The unit of composition is a \emph{work commitment}: linked signed records that
+bind a selected invocation to a bounded allowance, the receiving owner's
+authorization and, for paid work, its settlement terms. The allocator, receiver
+and settlement system each retain the state for the resource they control.
+Authenticated references connect their decisions to the same invocation.
+The resulting program spans these authorities without requiring one of them
+to control every participant's resources.
+
+This organization gives programmable sovereignty an operational meaning.
+Owners express conditions for cooperation through capabilities, policies and
+treaties, and enforce those conditions at admission. A foreign agreement is
+evidence evaluated under that local authority. Once work has been admitted,
+its execution history remains authoritative through recovery; once a funded
+claim has earned payment, subsequent work cannot revoke its reserve.
+
+By \emph{verifiable work}, we mean work with checkable authorization, an
+attributable execution history and acceptance under agreed rules. Verification
+establishes these facts under the selected authorities and acceptance procedure.
+The quality of that procedure determines what acceptance says about the result.
+
+The construction separates a task's identity from the version of the plan that
+contains it. Checked extensions retain earlier allocations and execution rights.
+Durable admission prevents a new graph signature or a restarted planner from
+renewing a consumed right. Independently funded agreements preserve earned
+claims through the failure of the larger program. We specify these mechanisms
+and establish a conditional preservation result for their composition. The
+implementation and evaluation follow delegated work through task discovery,
+graph growth, process loss and settlement, and compare the financial rules with
+transactional escrow and ERC-8183.

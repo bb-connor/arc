@@ -1,0 +1,30 @@
+\section{Scope}
+\label{sec:scope}
+The preservation result applies to the composition rules specified in this
+paper. Plan extension is additive: old tasks, allocations, permissions and
+continuation identifiers remain in place. Removing tasks, reclaiming their budgets, migrating
+receivers or changing the graph's policy limits would require closure or fencing
+rules beyond this operation. A timeout cannot justify reclaiming a resource
+whose use is still uncertain. Retaining earlier graph versions also incurs
+storage and verification costs.
+
+Acceptance is as strong as the agreed check. The implemented delegation
+predicates test bounded properties of JSON output; the funded verifier can
+apply a richer procedure. Success of a child does not establish success of its
+parent. The host must mediate declared operations and readers, and revocation
+cannot recall information already disclosed.
+
+The safety result permits unavailable or unfinished work. Sealing can strand
+capacity; contract expiry can prevent output or recovery checks from completing.
+Hashes detect altered evidence but cannot retrieve withheld evidence. An earned
+claim preserves the right to withdraw, while collection still requires an
+available settlement system and an eligible beneficiary. Verifier failure before
+acceptance is recorded can leave completed work unpaid.
+
+Deployment must protect the authorities in Section~\ref{sec:sovereignty}.
+A compromised allocator can overissue; forked execution stores can duplicate
+authority; a dishonest verifier can approve bad output. The asset and settlement
+observation rule must support the claimed financial transitions. The local
+experiments establish the reported behavior under their stated configuration.
+They do not measure independent administration, public-chain finality,
+hostile-load scalability, integration savings or useful-work profitability.

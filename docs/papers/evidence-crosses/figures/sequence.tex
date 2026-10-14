@@ -1,0 +1,99 @@
+\begin{figure}[!tbp]
+\centering
+\begin{tikzpicture}[
+  scale=0.86,transform shape,
+  font=\scriptsize,
+  org/.style={draw,rounded corners=2pt,align=center,inner sep=3pt,fill=black!5},
+  actA/.style={draw,rounded corners=2pt,align=right,inner sep=2.5pt,fill=white,
+               text width=28mm,anchor=east},
+  actB/.style={draw,rounded corners=2pt,align=left,inner sep=2.5pt,fill=white,
+               text width=66mm,anchor=west},
+  actM/.style={draw,rounded corners=2pt,align=center,inner sep=2.5pt,fill=white,
+               text width=52mm,anchor=center},
+  msg/.style={-{Latex[length=1.6mm]},semithick},
+  ghost/.style={-{Latex[length=1.6mm]},semithick,densely dashed,black!55},
+  life/.style={densely dotted,black!55},
+  phase/.style={black!45,densely dashed},
+  ptag/.style={font=\scriptsize\itshape,black!45,anchor=south west},
+  lbl/.style={font=\scriptsize},
+]
+% Secondary lines inside a box are set apart by style rather than by a smaller
+% size, so no text in this figure is set below the 8pt figure face.
+\def\note#1{{\itshape\color{black!55}#1}}
+
+% -- lifelines and headers ------------------------------------------------
+\node[org,text width=34mm] (a) at (30mm,4mm)
+  {\textbf{Org A} (origin)\\[1pt]
+   \note{kernel key $k_A$, passport key $p_A$}};
+\node[org,text width=52mm] (b) at (86mm,4mm)
+  {\textbf{Org B} (receiver, dispatches)\\[1pt]
+   \note{kernel key $k_B$, passport key $p_B$; \textbf{one key}, per step 17}};
+\draw[life] (30mm,-2mm) -- (30mm,-142mm);
+\draw[life] (86mm,-2mm) -- (86mm,-142mm);
+
+% -- phase 1: activation ---------------------------------------------------
+\node[ptag] at (36mm,-7mm) {before any call};
+\node[actA] at (26mm,-9mm) {\textbf{D1} pins $p_B$ and a rotation deadline};
+\node[actB] at (90mm,-9mm)
+  {\textbf{D2} agreement activated locally; \textbf{D3} B intersects both
+   manifests itself\\
+   \note{created and persisted by B}};
+
+\draw[phase] (-4mm,-18mm) -- (158mm,-18mm);
+
+% -- phase 2: B mints the evidence ----------------------------------------
+\node[ptag] at (36mm,-17mm) {before the request};
+\node[actB] at (90mm,-29mm)
+  {\textbf{D4} admission bundle\quad \textbf{D5} continuation
+   \emph{(unsigned, single use)}\\
+   \textbf{D6} \emph{subject receipt} $R_B$, signed $k_B$\\
+   \textbf{D7} invocation record\quad \textbf{D8} lineage bundle\\
+   \note{all created by B, in B's own store}};
+\node[actB] at (90mm,-47mm)
+  {\textbf{D9} Statement $S$: one subject, the name and SHA-256 of $R_B$'s
+   body; binding reference over D2, D3, D5 to D8 and the request digest\\
+   \note{B signs $\mathrm{PAE}(S)$ with $p_B$}};
+
+\draw[msg] (86mm,-57mm) -- node[above,lbl]{D10 $\mathrm{PAE}(S)$ bytes, $\sigma_B$} (30mm,-57mm);
+\node[actM] at (58mm,-64mm)
+  {A checks the transport peer is B and $\sigma_B$ verifies, then signs the
+   \emph{same bytes}; A does not parse $S$};
+\draw[msg] (30mm,-75mm) -- node[above,lbl]{$\sigma_A$ over those bytes} (86mm,-75mm);
+\node[actB] at (90mm,-81mm)
+  {envelope $\langle S,\sigma_A,\sigma_B\rangle$ \textbf{persisted in B's
+   store}\\ \note{B verifies $\sigma_A$ first}};
+
+\draw[phase] (-4mm,-88mm) -- (158mm,-88mm);
+
+% -- phase 3: the call ------------------------------------------------------
+\node[ptag] at (36mm,-87mm) {the call};
+\draw[msg] (30mm,-93mm) -- node[above,lbl]{D11 tool call: identifiers and digests only} (86mm,-93mm);
+
+\node[actB] at (90mm,-108mm)
+  {\textbf{D12} step 4, the hook: resolve D2, D3, D5, D7, D8 and the envelope
+   from B's own store by identifier; deny on any digest that differs; verify
+   both signatures under the keys \emph{the agreement} carries; compare the
+   binding reference against B's admission bundle; consume D5\\
+   \note{steps 5 and 6: budget hold, revalidate, dispatch}};
+\node[actB] at (90mm,-130mm)
+  {\textbf{D13} step 7: B builds, rechecks, signs with $k_B$ and persists its
+   \emph{own} receipt $R'_B$, then answers\\
+   \note{a different object from $R_B$; no admission path resolves it}};
+
+\draw[ghost] (86mm,-145mm)
+  -- node[above,lbl]{after the fact: co-sign a statement over $R'_B$}
+     node[below,lbl]{gates the response, never the dispatch} (30mm,-145mm);
+
+\end{tikzpicture}
+\caption{One cross-organization call, end to end. Every object the receiving
+kernel checks at step 4 was created by the receiver and was already in the
+receiver's own store before the request arrived; the request carries
+identifiers and digests and nothing else. The statement the hook verifies (D9,
+D10) has as its subject a receipt the \emph{receiver} signed (D6), not the
+peer's, and that is a different receipt from the one the receiver writes for
+this call at step 7 (D13). The dashed return is the outbound co-signature: the
+reference kernel mints it on every federated request that produced verified
+treaty material and fails the response if it cannot, but it is minted after the
+dispatch it describes and no admission path resolves it.}
+\label{fig:sequence}
+\end{figure}

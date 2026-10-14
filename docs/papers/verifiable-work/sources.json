@@ -1,0 +1,183 @@
+{
+  "retrieved_at": "2026-10-02T15:11:12.169464+00:00",
+  "sources": [
+    {
+      "id": "bitcoin",
+      "url": "https://bitcoin.org/bitcoin.pdf",
+      "version": "2008",
+      "bytes": 184292,
+      "sha256": "b1674191a88ec5cdd733e4240a81803105dc412d6c6708d53ab94fc248f4f553",
+      "overlap": "Shared transaction history supplies scarcity; no useful-work equivalence claimed.",
+      "status": "retrieved"
+    },
+    {
+      "id": "ap2",
+      "url": "https://raw.githubusercontent.com/google-agentic-commerce/AP2/e1ea56db72a6385bce3e5c1112b3a56ce60acb43/docs/ap2/specification.md",
+      "version": "e1ea56db72a6385bce3e5c1112b3a56ce60acb43",
+      "bytes": 17172,
+      "sha256": "32c3be5011f481d2760e56e7b9935b0842c3da0d5f7d7b8a68402a599f1e6aa3",
+      "overlap": "Mandates, verification, agent delegation scope; no expressive impossibility.",
+      "status": "retrieved"
+    },
+    {
+      "id": "a2a",
+      "url": "https://raw.githubusercontent.com/a2aproject/A2A/65dadbd9b900fe2d970e05416eb432a91347cd2a/docs/specification.md",
+      "version": "65dadbd9b900fe2d970e05416eb432a91347cd2a",
+      "bytes": 156876,
+      "sha256": "a89afdc9352a10d6d311f4531ebfd5bb1c6bf7b9bd2807db26756222e8a12ee7",
+      "overlap": "Tasks, messages, artifacts and discovery; application profile can extend.",
+      "status": "retrieved"
+    },
+    {
+      "id": "agentcontracts",
+      "url": "https://arxiv.org/html/2601.08815v3",
+      "version": "v3",
+      "bytes": 259674,
+      "sha256": "1c0c0f443cd936c259a76603085f826236d913b2a13ecef4a8e7c4741a4eca7d",
+      "overlap": "Prior contract tuples and delegated budget conservation.",
+      "status": "retrieved"
+    },
+    {
+      "id": "agentbound",
+      "url": "https://arxiv.org/html/2606.30970v2",
+      "version": "v2",
+      "bytes": 132614,
+      "sha256": "8a39c02d1908b3eff8fae0beafdcd707161a39bc7c5d7cfdac06ed2a47dda810",
+      "overlap": "Prior runtime authority composition and governance receipts.",
+      "status": "retrieved"
+    },
+    {
+      "id": "zkcsp",
+      "url": "https://eprint.iacr.org/2017/566",
+      "version": "2017/566 revision 2017-11-01",
+      "bytes": 16856,
+      "sha256": "3642b9a4eb59093c181e164ea214cbc1e12704161d71a15ad8817485c5e107d8",
+      "overlap": "Prior contingent payments for services.",
+      "status": "retrieved"
+    },
+    {
+      "id": "fairswap",
+      "url": "https://eprint.iacr.org/2018/740",
+      "version": "2018/740",
+      "bytes": 15827,
+      "sha256": "1cc06980f1c0414ba1aff0c80c71b7cd15d33ce054597a9b0fed2fd3fb8bddba",
+      "overlap": "Prior smart-contract fair exchange; Chio F1 keeps trusted verifier.",
+      "status": "retrieved"
+    },
+    {
+      "id": "eip712",
+      "url": "https://eips.ethereum.org/EIPS/eip-712",
+      "version": "EIP-712",
+      "bytes": 49852,
+      "sha256": "0951c36c432c48e281bd131331bdd5f4426706417e0d38fa3e667c0b7f84a530",
+      "overlap": "Typed domain-separated decision signing, not replay protection itself.",
+      "status": "retrieved"
+    },
+    {
+      "id": "jcs",
+      "url": "https://www.rfc-editor.org/rfc/rfc8785.txt",
+      "version": "RFC 8785",
+      "bytes": 41879,
+      "sha256": "63d52294eb0e3f0014174288186d388b4ddbf2c67d1ce8af1d9726eb0c3ab240",
+      "overlap": "Canonical JSON encoding.",
+      "status": "retrieved"
+    },
+    {
+      "id": "oauth",
+      "url": "https://www.rfc-editor.org/rfc/rfc8693.txt",
+      "version": "RFC 8693",
+      "bytes": 63031,
+      "sha256": "358d658014738bf4dc56c8aae2094ce716ede23b6d5a80488a7dc8e8d72da609",
+      "overlap": "Profile-defined token and trust semantics.",
+      "status": "retrieved"
+    },
+    {
+      "id": "contractnet",
+      "url": "https://cse-robotics.engr.tamu.edu/dshell/cs631/papers/smith80contract.pdf",
+      "version": "1980",
+      "bytes": 227621,
+      "sha256": "0b098a438af2bfe720c548f810474108c1d95859f9a488190ba49fee837f64cc",
+      "overlap": "Prior distributed task allocation with announcements, bids and awards.",
+      "status": "retrieved"
+    },
+    {
+      "id": "sagas",
+      "url": "https://www.cs.princeton.edu/techreports/1987/070.pdf",
+      "version": "1987",
+      "bytes": 7995440,
+      "sha256": "4ff5b64509883c68f823718822c73fb7ac1fbbe707b20d19fbce303f7fabddcf",
+      "overlap": "Prior long-lived transactions and compensation.",
+      "status": "retrieved"
+    },
+    {
+      "id": "erc8183",
+      "url": "https://raw.githubusercontent.com/ethereum/ERCs/365b4c02879f3e882b91281d42b4f57b406205e9/ERCS/erc-8183.md",
+      "version": "365b4c02879f3e882b91281d42b4f57b406205e9",
+      "sha256": "257c35bbaecab58d0c36823fe8fb2d0fffc83d6f1fd7301d97674707784efa3a",
+      "bytes": 41976,
+      "status": "retrieved",
+      "overlap": "Closest agent commerce or validation standard; credit existing mechanism."
+    },
+    {
+      "id": "erc8004",
+      "url": "https://raw.githubusercontent.com/ethereum/ERCs/365b4c02879f3e882b91281d42b4f57b406205e9/ERCS/erc-8004.md",
+      "version": "365b4c02879f3e882b91281d42b4f57b406205e9",
+      "sha256": "249dc3d96ad7bbe4afd25cacd14be942eb87751abcf1608bab19a610f3c3f8a9",
+      "bytes": 24470,
+      "status": "retrieved",
+      "overlap": "Closest agent commerce or validation standard; credit existing mechanism."
+    },
+    {
+      "id": "pcc",
+      "url": "https://homes.cs.washington.edu/~mernst/teaching/6.893/readings/necula-popl97.pdf",
+      "version": "POPL 1997",
+      "bytes": 1170920,
+      "sha256": "53dc6821c9e6ec014ee4fd3dc03c919c1987fdb0f62f14f0feac3321792b572c",
+      "overlap": "Safety conditions checked locally from supplied proofs; permit signatures here are not program proofs.",
+      "status": "retrieved",
+      "reading_scope": "Abstract and introductory framing; no line-by-line proof replication.",
+      "retrieved_at": "2026-10-03T00:42:46.563867+00:00"
+    },
+    {
+      "id": "interfaceautomata",
+      "url": "https://web.cs.wpi.edu/~heineman/html/teaching_/CS562/p109-de_alfaro.pdf",
+      "version": "ESEC/FSE 2001",
+      "bytes": 260613,
+      "sha256": "e1f5f47ff8923286324860aad22915224918300b97fbd77b54572c1219758e52",
+      "overlap": "Compatibility and refinement under interface assumptions; no semantic goal-refinement result claimed here.",
+      "status": "retrieved",
+      "reading_scope": "Abstract and introductory framing; no line-by-line proof replication.",
+      "retrieved_at": "2026-10-03T00:42:46.802164+00:00"
+    },
+    {
+      "id": "miller",
+      "url": "https://worrydream.com/refs/Miller_2006_-_Robust_Composition.pdf",
+      "version": "2006 dissertation",
+      "overlap": "Object-capability foundations for robust composition of distributed, potentially malicious components.",
+      "bytes": 1882311,
+      "sha256": "ec1850bb8dc0627202d8d19dbcea6a79efb8db7bb2b98c8876f1548cd319f3d3",
+      "status": "retrieved",
+      "retrieved_at": "2026-10-03T02:16:20.499796+00:00"
+    },
+    {
+      "id": "securelink",
+      "url": "https://www.cs.princeton.edu/techreports/2002/663.pdf",
+      "version": "TR-663-02, September 2002",
+      "overlap": "Component linking using certified properties and proof-carrying authentication.",
+      "bytes": 730616,
+      "sha256": "845b8391076426b73a09566bd5afa479b482f6cde4086e0b5aea7412e8535574",
+      "status": "retrieved",
+      "retrieved_at": "2026-10-03T02:16:20.378491+00:00"
+    },
+    {
+      "id": "sessiontypes",
+      "url": "https://mrg.cs.ox.ac.uk/publications/multiparty-asynchronous-session-types/",
+      "version": "POPL 2008 author publication record",
+      "overlap": "Local projection of global interaction types, with communication properties under formal assumptions.",
+      "bytes": 4837,
+      "sha256": "68037ab6c477687b5f3294d39b783141e60b9c2ce59b87642bc1989c3d5e8672",
+      "status": "retrieved",
+      "retrieved_at": "2026-10-03T02:16:21.605533+00:00"
+    }
+  ]
+}
