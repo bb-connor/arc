@@ -27,7 +27,7 @@ use chio_core::receipt::{
 };
 use chio_federation::bilateral::{co_sign_with_origin, InProcessCoSigner};
 use chio_federation::bilateral_dsse::{
-    pae, receipt_subject_name, sign_dsse_envelope, verify_dsse_envelope, DsseEnvelope, Keyid,
+    pae, receipt_subject_name, sign_dsse_envelope, verify_dsse_envelope, Keyid,
     PAYLOAD_TYPE_IN_TOTO, PREDICATE_BODY_SCHEMA, PREDICATE_TYPE_BILATERAL,
 };
 use std::path::Path;
