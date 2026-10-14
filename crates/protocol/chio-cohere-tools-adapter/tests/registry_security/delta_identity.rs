@@ -16,7 +16,7 @@ pub(super) fn streamed(start_arguments: Value, extra: Value) -> Vec<u8> {
     }
     let delta = json!({"type":"tool-call-delta","index":0,"delta":{"message":{"tool_calls":call}}});
     let end = json!({"type":"tool-call-end","index":0});
-    format!("event: tool-call-start\ndata: {start}\n\nevent: tool-call-delta\ndata: {delta}\n\nevent: tool-call-end\ndata: {end}\n\n").into_bytes()
+    message(&format!("event: tool-call-start\ndata: {start}\n\nevent: tool-call-delta\ndata: {delta}\n\nevent: tool-call-end\ndata: {end}\n\n")).into_bytes()
 }
 
 fn rejects(raw: Vec<u8>) {

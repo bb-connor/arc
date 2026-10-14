@@ -86,8 +86,14 @@ fn allow_verdict() -> VerdictResult {
 }
 
 fn tool_call_stream() -> Vec<u8> {
-    br#"event: tool-call-end
+    br#"event: message-start
+data: {"type":"message-start"}
+
+event: tool-call-end
 data: {"tool_call":{"id":"call_taxonomy_1","type":"function","function":{"name":"get_weather","arguments":"{\"city\":\"Paris\"}"}}}
+
+event: message-end
+data: {"type":"message-end"}
 
 "#
     .to_vec()

@@ -17,7 +17,7 @@ const COLD_INIT_P99_BUDGET: Duration = Duration::from_millis(500);
 const P99_SAMPLE_COUNT: usize = 128;
 
 fn stream_bytes() -> Result<Vec<u8>, ProviderError> {
-    let frame = b"event: tool-call-end\ndata: {\"tool_call\": {\"id\": \"call_latency_1\", \"type\": \"function\", \"function\": {\"name\": \"lookup_policy\", \"arguments\": \"{\\\"policy_id\\\":\\\"pol_latency\\\"}\"}}}\n\n";
+    let frame = b"event: message-start\ndata: {\"type\":\"message-start\"}\n\nevent: tool-call-end\ndata: {\"tool_call\": {\"id\": \"call_latency_1\", \"type\": \"function\", \"function\": {\"name\": \"lookup_policy\", \"arguments\": \"{\\\"policy_id\\\":\\\"pol_latency\\\"}\"}}}\n\nevent: message-end\ndata: {\"type\":\"message-end\"}\n\n";
     Ok(frame.to_vec())
 }
 
