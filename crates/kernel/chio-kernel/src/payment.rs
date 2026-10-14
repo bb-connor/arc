@@ -487,11 +487,6 @@ impl AcpPaymentAdapter {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct X402AuthorizeResponse {
-    #[serde(
-        alias = "authorization_id",
-        alias = "transaction_id",
-        alias = "transactionId"
-    )]
     authorization_id: String,
     #[serde(default)]
     settled: bool,
@@ -1331,6 +1326,18 @@ mod tests {
             serde_json::from_value(serde_json::json!({"authorizationId": "x402_txn_absent"}))
                 .expect("response without settled should deserialize");
         assert!(!response.settled);
+    }
+
+    #[test]
+    fn x402_response_requires_the_authorization_id_member() {
+        for field in ["authorization_id", "transaction_id", "transactionId"] {
+            let error = serde_json::from_value::<X402AuthorizeResponse>(serde_json::json!({
+                field: "x402_txn_renamed",
+                "settled": true,
+            }))
+            .expect_err("only authorizationId names the authorization");
+            assert_eq!(error.to_string(), "missing field `authorizationId`");
+        }
     }
 
     #[test]
