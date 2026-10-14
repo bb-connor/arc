@@ -1223,7 +1223,9 @@ fn retain_ordinary_records(
 #[tokio::test]
 async fn native_payment_restart_claims_commit_inside_funded_purposes_under_row_pressure(
 ) -> TestResult {
-    use chio_kernel::admission_operation::QualifiedAdmissionOperationStoreExt;
+    use chio_kernel::admission_operation::{
+        AdmissionOperationId, QualifiedAdmissionOperationStoreExt,
+    };
 
     const OWED_ROW: &str = "owed native table row";
     let directory = Box::pin(crash_after_payment_authorization()).await?;
