@@ -1007,7 +1007,8 @@ pub(crate) fn plain_http_error(status: StatusCode, message: &str) -> Response {
 #[path = "policy_support_tests.rs"]
 mod tests;
 
-/// Snapshot availability has a stable code; legacy errors keep their body.
+/// Query snapshot errors carry a stable wire code; other store errors are
+/// returned as a plain 500 body.
 pub(crate) fn snapshot_error_response(error: ReceiptStoreError) -> Response {
     let ReceiptStoreError::QuerySnapshot(error) = error else {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());

@@ -97,7 +97,8 @@ impl HostedTrustedProxy {
     }
 
     /// Reconstruct the external request context only from one trusted proxy.
-    /// Legacy forwarding headers and multi-hop chains are deliberately refused.
+    /// Exactly one RFC 7239 `Forwarded` element is accepted; `X-Forwarded-*`
+    /// headers and multi-hop chains are refused.
     pub fn reconstruct(
         &self,
         peer_ip: IpAddr,

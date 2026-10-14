@@ -31,7 +31,7 @@ async fn inbound_authority_defaults_refuse_without_upstream_effects() {
     ] {
         let routes = ProtectProxy::routes_from_spec(spec).test_unwrap();
         let mut state = test_state(routes, url.clone());
-        // The shared legacy fixture explicitly enables reads for forwarding tests.
+        // The shared test fixture enables reads for forwarding tests.
         // Restore the production default for this boundary control.
         let inner = Arc::get_mut(&mut state).test_unwrap();
         inner.evaluator = RequestEvaluator::new_ephemeral(
