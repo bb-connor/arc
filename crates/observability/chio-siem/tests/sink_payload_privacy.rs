@@ -549,7 +549,10 @@ fn pinned_prevent_allow_and_observations_keep_distinct_semantics() {
         );
         let mapped = OcsfExporter::format_events(&[event]);
         assert_ne!(mapped[0]["status"], "Success");
-        assert_ne!(mapped[0]["activity_name"], "Grant");
+        assert_ne!(
+            mapped[0]["actor"]["authorizations"][0]["decision"],
+            "Authorized"
+        );
         assert_eq!(mapped[0]["unmapped"]["chio"]["authorized"], false);
         assert_eq!(
             mapped[0]["unmapped"]["chio"]["receipt_kind"],

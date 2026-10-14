@@ -81,18 +81,18 @@
           "const": "1.3.0"
         },
         "category_uid": {
-          "const": 3,
-          "description": "OCSF IAM category."
+          "const": 6,
+          "description": "OCSF Application Activity category."
         },
         "class_uid": {
-          "const": 3002,
-          "description": "OCSF Authorization class."
+          "const": 6003,
+          "description": "OCSF API Activity class."
         },
         "class_name": {
-          "const": "Authorization"
+          "const": "API Activity"
         }
       },
-      "description": "OCSF 1.3.0 Authorization mapping from crates/observability/chio-siem/src/ocsf.rs."
+      "description": "OCSF 1.3.0 API Activity mapping from crates/observability/chio-siem/src/ocsf.rs."
     },
     "cef": {
       "type": "object",
