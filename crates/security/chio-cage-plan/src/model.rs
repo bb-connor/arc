@@ -3,9 +3,9 @@ use super::linux;
 use super::{BTreeMap, CageError, Deserialize, ExecutionIdentity, SeccompProfilePlan, Serialize};
 
 /// Cage-init plan schema emitted by this crate.
-pub const CAGE_INIT_PLAN_SCHEMA: &str = "chio.cage.init-plan.v2";
+pub const CAGE_INIT_PLAN_SCHEMA: &str = "chio.cage.init-plan.v1";
 /// Version of the deterministic compiler semantics.
-pub const CAGE_COMPILER_VERSION: &str = "chio-cage-compiler.v2";
+pub const CAGE_COMPILER_VERSION: &str = "chio-cage-compiler.v1";
 
 pub const PLAN_FD_SLOT: u32 = 3;
 pub const STATUS_FD_SLOT: u32 = 4;

@@ -10,7 +10,7 @@ pub const ENTERPRISE_MIGRATION_TRANSITION_SIGNATURE_DOMAIN: &str =
     "chio.enterprise-migration-transition.v1";
 pub const MAX_ENTERPRISE_MIGRATION_SIGNER_BYTES: usize = 8_192;
 pub const MAX_ENTERPRISE_MIGRATION_SIGNATURE_BYTES: usize = 16_384;
-pub const CAGE_MIGRATION_POSTURE_SCHEMA: &str = "chio.cage-migration-posture.v2";
+pub const CAGE_MIGRATION_POSTURE_SCHEMA: &str = "chio.cage-migration-posture.v1";
 
 /// Digests of every authority-bearing component of a native cage policy.
 ///

@@ -66416,7 +66416,7 @@ pub mod security_broker_release_attempt_acknowledgement_v1 {
         }
     }
 }
-pub mod security_cage_init_plan_v2 {
+pub mod security_cage_init_plan_v1 {
     /// Error types.
     pub mod error {
         /// Error from a `TryFrom` or `FromStr` implementation.
@@ -66629,8 +66629,8 @@ pub mod security_cage_init_plan_v2 {
     ///
     /// ```json
     ///{
-    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v2.schema.json",
-    ///  "title": "Chio cage-init plan v2",
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/cage-init-plan-v1.schema.json",
+    ///  "title": "Chio cage-init plan v1",
     ///  "description": "Canonical, unsigned, launch-bound cage-init plan body consumed from a sealed descriptor after the parent binds target stdin, stdout, and stderr. The pre-launch CompiledCage inspection view is not an instance of this wire schema. Launch-envelope transport bindings and the aggregate 65536-byte UTF-8 environment limit are enforced by the cage runtime outside this structural schema.",
     ///  "type": "object",
     ///  "required": [
@@ -66664,7 +66664,7 @@ pub mod security_cage_init_plan_v2 {
     ///      ]
     ///    },
     ///    "compiler_version": {
-    ///      "const": "chio-cage-compiler.v2"
+    ///      "const": "chio-cage-compiler.v1"
     ///    },
     ///    "environment": {
     ///      "$ref": "#/$defs/environment"
@@ -66694,7 +66694,7 @@ pub mod security_cage_init_plan_v2 {
     ///      "$ref": "#/$defs/resourceLimits"
     ///    },
     ///    "schema": {
-    ///      "const": "chio.cage.init-plan.v2"
+    ///      "const": "chio.cage.init-plan.v1"
     ///    },
     ///    "seccomp": {
     ///      "$ref": "#/$defs/seccompPlan"
@@ -66718,7 +66718,7 @@ pub mod security_cage_init_plan_v2 {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct ChioCageInitPlanV2 {
+    pub struct ChioCageInitPlanV1 {
         pub broker_authentication_digest: ::std::option::Option<Digest>,
         pub compiler_version: ::serde_json::Value,
         pub environment: Environment,
@@ -66737,8 +66737,8 @@ pub mod security_cage_init_plan_v2 {
         pub target_fd_slot: ::serde_json::Value,
         pub working_directory_fd_slot: ::serde_json::Value,
     }
-    impl ::std::convert::From<&ChioCageInitPlanV2> for ChioCageInitPlanV2 {
-        fn from(value: &ChioCageInitPlanV2) -> Self {
+    impl ::std::convert::From<&ChioCageInitPlanV1> for ChioCageInitPlanV1 {
+        fn from(value: &ChioCageInitPlanV1) -> Self {
             value.clone()
         }
     }
@@ -103805,7 +103805,7 @@ pub mod security_lift_rollback_completion_receipt_body_v1 {
         }
     }
 }
-pub mod security_mcp_cage_launch_policy_v2 {
+pub mod security_mcp_cage_launch_policy_v1 {
     /// Error types.
     pub mod error {
         /// Error from a `TryFrom` or `FromStr` implementation.
@@ -104094,8 +104094,8 @@ pub mod security_mcp_cage_launch_policy_v2 {
     ///
     /// ```json
     ///{
-    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v2.schema.json",
-    ///  "title": "Chio signed MCP cage launch policy v2",
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json",
+    ///  "title": "Chio signed MCP cage launch policy v1",
     ///  "description": "Canonical signed operator policy for a migration-enforced MCP stdio cage launch.",
     ///  "type": "object",
     ///  "required": [
@@ -104120,13 +104120,13 @@ pub mod security_mcp_cage_launch_policy_v2 {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct ChioSignedMcpCageLaunchPolicyV2 {
+    pub struct ChioSignedMcpCageLaunchPolicyV1 {
         pub body: PolicyBody,
         pub signature: Signature,
         pub signer_public_key: PublicKey,
     }
-    impl ::std::convert::From<&ChioSignedMcpCageLaunchPolicyV2> for ChioSignedMcpCageLaunchPolicyV2 {
-        fn from(value: &ChioSignedMcpCageLaunchPolicyV2) -> Self {
+    impl ::std::convert::From<&ChioSignedMcpCageLaunchPolicyV1> for ChioSignedMcpCageLaunchPolicyV1 {
+        fn from(value: &ChioSignedMcpCageLaunchPolicyV1) -> Self {
             value.clone()
         }
     }
@@ -109886,7 +109886,7 @@ pub mod security_mcp_cage_launch_policy_v2 {
     ///      "$ref": "#/$defs/runtime"
     ///    },
     ///    "schema": {
-    ///      "const": "chio.mcp.cage-launch-policy.v2"
+    ///      "const": "chio.mcp.cage-launch-policy.v1"
     ///    },
     ///    "signed_manifest": {
     ///      "title": "Chio signed tool manifest v2",

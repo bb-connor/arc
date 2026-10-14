@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: d6aaec4ed51eb065046d70c889ee0c5ee55ba93a4e4d227df67e0404ba4fd9a5
+# Schema sha256: d9413b42552bab1306e06058c45fddfde82effd28a779300028dc434b7b7f0cc
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -49,7 +49,7 @@ from .cage_enforcement_prepared_v1_schema import ChioCageEnforcementPreparedEvid
 from .cage_enforcement_record_v1_schema import ChioCageEnforcementRecordV1, ChioCageEnforcementRecordV11, ChioCageEnforcementRecordV12, ChioCageEnforcementRecordV13, State, State2
 from .cage_exec_transition_observed_v1_schema import ChioCageExecTransitionObservationV1, Digest, FileIdentity, Kind, RegularFileIdentity
 from .cage_fully_enforced_evidence_v1_schema import ChioCageFullyEnforcedEvidenceV1
-from .cage_init_plan_v2_schema import AbsoluteCanonicalPath, Access, AllowedSyscall, ArgumentConstraint, ArtifactEntry, BrokerPeerIdentity, ChioCageInitPlanV2, Digest, DirectoryIdentity, Environment, ExecutionIdentity, FdEntry, FdEntry1, FdEntry10, FdEntry2, FdEntry3, FdEntry4, FdEntry5, FdEntry6, FdEntry7, FdEntry8, FdEntry9, FdEntryBase, FdTable, FdTable1, FileIdentity, FilesystemGrant, ForbiddenResource, Kind, Kind5, Kind6, LandlockPlan, PathIdentity, Profile, Purpose, Purpose1, Purpose2, PurposeBrokerIpc, PurposeCageInitHelper, PurposeIndexedResource, PurposeTargetExecutable, PurposeTargetStderr, PurposeTargetStdin, PurposeTargetStdout, PurposeWorkingDirectory, RegularFileIdentity, ResourceLimits, SeccompPlan, SocketIdentity, StdioEntry, SupplementaryGid, SyscallArgumentConstraint, TargetArgv, TargetArgvItem
+from .cage_init_plan_v1_schema import AbsoluteCanonicalPath, Access, AllowedSyscall, ArgumentConstraint, ArtifactEntry, BrokerPeerIdentity, ChioCageInitPlanV1, Digest, DirectoryIdentity, Environment, ExecutionIdentity, FdEntry, FdEntry1, FdEntry10, FdEntry2, FdEntry3, FdEntry4, FdEntry5, FdEntry6, FdEntry7, FdEntry8, FdEntry9, FdEntryBase, FdTable, FdTable1, FileIdentity, FilesystemGrant, ForbiddenResource, Kind, Kind5, Kind6, LandlockPlan, PathIdentity, Profile, Purpose, Purpose1, Purpose2, PurposeBrokerIpc, PurposeCageInitHelper, PurposeIndexedResource, PurposeTargetExecutable, PurposeTargetStderr, PurposeTargetStdin, PurposeTargetStdout, PurposeWorkingDirectory, RegularFileIdentity, ResourceLimits, SeccompPlan, SocketIdentity, StdioEntry, SupplementaryGid, SyscallArgumentConstraint, TargetArgv, TargetArgvItem
 from .cage_process_exit_evidence_v1_schema import ChioCageProcessExitEvidenceV1, ChioCageProcessExitEvidenceV11, ChioCageProcessExitEvidenceV12, ExitCode, ExitCode1, Signal, Signal1
 from .cage_receipt_body_v1_schema import Bindings, ChioCageReceiptBodyV1, ChioCageReceiptBodyV11, ChioCageReceiptBodyV12, ChioCageReceiptBodyV13, ChioCageReceiptBodyV14, Digest, Identifier, Stage
 from .cage_receipt_metadata_v1_schema import ChioCageReceiptMetadataV1
@@ -80,7 +80,7 @@ from .key_log_witness_readiness_proof_v1_schema import Algorithm, ChioSignedKeyL
 from .key_log_witness_signature_v1_schema import Algorithm, ChioKeyLogWitnessSignatureV1
 from .keyring_artifact_signature_v1_schema import Algorithm, ChioKeyringArtifactSignatureEvidenceV1, Hash, Signature, U64
 from .lift_rollback_completion_receipt_body_v1_schema import ChioLiftOrRollbackCompletionReceiptBodyV1, Effect, FinalState, Header, LiftOutcome, LiftOutcome1, LiftOutcome2, LiftOutcome3, LiftOutcome4, LiftOutcome5
-from .mcp_cage_launch_policy_v2_schema import AbsoluteCanonicalPath, BrokerBinding, BrokerBinding1, BrokerBinding2, BrokerPeerIdentity, ChioSignedMcpCageLaunchPolicyV2, Digest, EnterpriseMigration, EnvironmentVariable, Identifier, Limits, MigrationKey, MinimumGeneration, MinimumHead, NativeSyscallProfile, NonzeroDigest32, NonzeroDigest32Item, OperatorCeilings, PolicyBody, PublicKey, ReceiptRuntime, Runtime, Signature, Stage, TargetArgvItem
+from .mcp_cage_launch_policy_v1_schema import AbsoluteCanonicalPath, BrokerBinding, BrokerBinding1, BrokerBinding2, BrokerPeerIdentity, ChioSignedMcpCageLaunchPolicyV1, Digest, EnterpriseMigration, EnvironmentVariable, Identifier, Limits, MigrationKey, MinimumGeneration, MinimumHead, NativeSyscallProfile, NonzeroDigest32, NonzeroDigest32Item, OperatorCeilings, PolicyBody, PublicKey, ReceiptRuntime, Runtime, Signature, Stage, TargetArgvItem
 from .response_completion_receipt_body_v1_schema import ChioResponseCompletionReceiptBodyV1, CompletionOutcome, CompletionOutcome1, CompletionOutcome2, CompletionOutcome3, DispatchApproval, DispatchApproval1, DispatchApproval2, Effect, ExecutionDispatch, FinalState, Header
 from .response_effect_v1_schema import CanonicalContributionItem, ChioResponseEffectV1, Digest, DigestItem, Identifier, Kind, Target, Target5, Target6, Target7, Target8
 from .response_plan_receipt_body_v1_schema import ChioResponsePlanReceiptBodyV1
@@ -168,7 +168,7 @@ __all__ = [
     "ChioCageEnforcementRecordV13",
     "ChioCageExecTransitionObservationV1",
     "ChioCageFullyEnforcedEvidenceV1",
-    "ChioCageInitPlanV2",
+    "ChioCageInitPlanV1",
     "ChioCageProcessExitEvidenceV1",
     "ChioCageProcessExitEvidenceV11",
     "ChioCageProcessExitEvidenceV12",
@@ -224,7 +224,7 @@ __all__ = [
     "ChioSignedKeyLogEnterpriseReceiptEnvelopeV1",
     "ChioSignedKeyLogEventEnvelopeV1",
     "ChioSignedKeyLogWitnessServiceReadinessProofV1",
-    "ChioSignedMcpCageLaunchPolicyV2",
+    "ChioSignedMcpCageLaunchPolicyV1",
     "ChioSignedSecurityEventProvenanceEnvelopeV1",
     "ChioSignedToolManifestV2",
     "ChioToolManifestV2",

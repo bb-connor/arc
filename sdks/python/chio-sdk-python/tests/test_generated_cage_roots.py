@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from chio_sdk._generated.security.cage_init_plan_v2_schema import AbsoluteCanonicalPath
-from chio_sdk._generated.security.mcp_cage_launch_policy_v2_schema import (
+from chio_sdk._generated.security.cage_init_plan_v1_schema import AbsoluteCanonicalPath
+from chio_sdk._generated.security.mcp_cage_launch_policy_v1_schema import (
     AbsoluteCanonicalPath as LaunchPath,
     EnvironmentVariable as LaunchEnvironmentVariable,
 )
