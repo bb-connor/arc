@@ -1,4 +1,4 @@
-//! The proxy's single durable receipt sink. Legacy receipt rows are never adopted.
+//! The proxy's single durable receipt sink.
 use super::*;
 use std::time::Duration;
 

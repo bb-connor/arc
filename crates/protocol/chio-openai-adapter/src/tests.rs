@@ -802,7 +802,7 @@ fn execute_tool_calls_rejects_shared_legacy_approval_token() {
     let agent = Keypair::generate();
     let approver = Keypair::generate();
     let mut execution = test_execution_context(&kernel, &agent, "test-srv", "*");
-    // The legacy single approval token is request-bound: `execute_tool_call`
+    // The singular approval token is request-bound: `execute_tool_call`
     // clones it into every call while stamping each a distinct per-call
     // request_id, so a shared token cannot satisfy more than one call.
     execution.approval_token = Some(
