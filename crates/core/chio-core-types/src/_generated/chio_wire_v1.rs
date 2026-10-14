@@ -20738,6 +20738,225 @@ pub mod kernel_caller_delivery_report {
                 })
         }
     }
+    ///`CallerDispatchLaunch`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "native_launch",
+    ///    "worker_profile"
+    ///  ],
+    ///  "properties": {
+    ///    "native_launch": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "null"
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "receipt_id",
+    ///            "receipt_sha256"
+    ///          ],
+    ///          "properties": {
+    ///            "receipt_id": {
+    ///              "$ref": "#/$defs/callerDigest"
+    ///            },
+    ///            "receipt_sha256": {
+    ///              "$ref": "#/$defs/callerDigest"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "worker_profile": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "null"
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "launch_attempt",
+    ///            "launch_ref"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "container"
+    ///            },
+    ///            "launch_attempt": {
+    ///              "type": "integer",
+    ///              "maximum": 4294967295.0,
+    ///              "minimum": 1.0
+    ///            },
+    ///            "launch_ref": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "record_id",
+    ///                "record_sha256"
+    ///              ],
+    ///              "properties": {
+    ///                "record_id": {
+    ///                  "$ref": "#/$defs/callerDigest"
+    ///                },
+    ///                "record_sha256": {
+    ///                  "$ref": "#/$defs/callerDigest"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CallerDispatchLaunch {
+        pub native_launch: ::std::option::Option<CallerDispatchLaunchNativeLaunch>,
+        pub worker_profile: ::std::option::Option<CallerDispatchLaunchWorkerProfile>,
+    }
+    impl ::std::convert::From<&CallerDispatchLaunch> for CallerDispatchLaunch {
+        fn from(value: &CallerDispatchLaunch) -> Self {
+            value.clone()
+        }
+    }
+    ///`CallerDispatchLaunchNativeLaunch`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "receipt_id",
+    ///    "receipt_sha256"
+    ///  ],
+    ///  "properties": {
+    ///    "receipt_id": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    },
+    ///    "receipt_sha256": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CallerDispatchLaunchNativeLaunch {
+        pub receipt_id: CallerDigest,
+        pub receipt_sha256: CallerDigest,
+    }
+    impl ::std::convert::From<&CallerDispatchLaunchNativeLaunch> for CallerDispatchLaunchNativeLaunch {
+        fn from(value: &CallerDispatchLaunchNativeLaunch) -> Self {
+            value.clone()
+        }
+    }
+    ///`CallerDispatchLaunchWorkerProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "launch_attempt",
+    ///    "launch_ref"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "container"
+    ///    },
+    ///    "launch_attempt": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "launch_ref": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "record_id",
+    ///        "record_sha256"
+    ///      ],
+    ///      "properties": {
+    ///        "record_id": {
+    ///          "$ref": "#/$defs/callerDigest"
+    ///        },
+    ///        "record_sha256": {
+    ///          "$ref": "#/$defs/callerDigest"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CallerDispatchLaunchWorkerProfile {
+        pub kind: ::serde_json::Value,
+        pub launch_attempt: ::std::num::NonZeroU64,
+        pub launch_ref: CallerDispatchLaunchWorkerProfileLaunchRef,
+    }
+    impl ::std::convert::From<&CallerDispatchLaunchWorkerProfile>
+        for CallerDispatchLaunchWorkerProfile
+    {
+        fn from(value: &CallerDispatchLaunchWorkerProfile) -> Self {
+            value.clone()
+        }
+    }
+    ///`CallerDispatchLaunchWorkerProfileLaunchRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "record_id",
+    ///    "record_sha256"
+    ///  ],
+    ///  "properties": {
+    ///    "record_id": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    },
+    ///    "record_sha256": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CallerDispatchLaunchWorkerProfileLaunchRef {
+        pub record_id: CallerDigest,
+        pub record_sha256: CallerDigest,
+    }
+    impl ::std::convert::From<&CallerDispatchLaunchWorkerProfileLaunchRef>
+        for CallerDispatchLaunchWorkerProfileLaunchRef
+    {
+        fn from(value: &CallerDispatchLaunchWorkerProfileLaunchRef) -> Self {
+            value.clone()
+        }
+    }
     ///`CallerExecutor`
     ///
     /// <details><summary>JSON schema</summary>
@@ -21846,6 +22065,225 @@ pub mod kernel_caller_dispatch_authorization {
                 })
         }
     }
+    ///`CallerDispatchLaunch`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "native_launch",
+    ///    "worker_profile"
+    ///  ],
+    ///  "properties": {
+    ///    "native_launch": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "null"
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "receipt_id",
+    ///            "receipt_sha256"
+    ///          ],
+    ///          "properties": {
+    ///            "receipt_id": {
+    ///              "$ref": "#/$defs/callerDigest"
+    ///            },
+    ///            "receipt_sha256": {
+    ///              "$ref": "#/$defs/callerDigest"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "worker_profile": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "null"
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "launch_attempt",
+    ///            "launch_ref"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "container"
+    ///            },
+    ///            "launch_attempt": {
+    ///              "type": "integer",
+    ///              "maximum": 4294967295.0,
+    ///              "minimum": 1.0
+    ///            },
+    ///            "launch_ref": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "record_id",
+    ///                "record_sha256"
+    ///              ],
+    ///              "properties": {
+    ///                "record_id": {
+    ///                  "$ref": "#/$defs/callerDigest"
+    ///                },
+    ///                "record_sha256": {
+    ///                  "$ref": "#/$defs/callerDigest"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CallerDispatchLaunch {
+        pub native_launch: ::std::option::Option<CallerDispatchLaunchNativeLaunch>,
+        pub worker_profile: ::std::option::Option<CallerDispatchLaunchWorkerProfile>,
+    }
+    impl ::std::convert::From<&CallerDispatchLaunch> for CallerDispatchLaunch {
+        fn from(value: &CallerDispatchLaunch) -> Self {
+            value.clone()
+        }
+    }
+    ///`CallerDispatchLaunchNativeLaunch`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "receipt_id",
+    ///    "receipt_sha256"
+    ///  ],
+    ///  "properties": {
+    ///    "receipt_id": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    },
+    ///    "receipt_sha256": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CallerDispatchLaunchNativeLaunch {
+        pub receipt_id: CallerDigest,
+        pub receipt_sha256: CallerDigest,
+    }
+    impl ::std::convert::From<&CallerDispatchLaunchNativeLaunch> for CallerDispatchLaunchNativeLaunch {
+        fn from(value: &CallerDispatchLaunchNativeLaunch) -> Self {
+            value.clone()
+        }
+    }
+    ///`CallerDispatchLaunchWorkerProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "launch_attempt",
+    ///    "launch_ref"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "container"
+    ///    },
+    ///    "launch_attempt": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "launch_ref": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "record_id",
+    ///        "record_sha256"
+    ///      ],
+    ///      "properties": {
+    ///        "record_id": {
+    ///          "$ref": "#/$defs/callerDigest"
+    ///        },
+    ///        "record_sha256": {
+    ///          "$ref": "#/$defs/callerDigest"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CallerDispatchLaunchWorkerProfile {
+        pub kind: ::serde_json::Value,
+        pub launch_attempt: ::std::num::NonZeroU64,
+        pub launch_ref: CallerDispatchLaunchWorkerProfileLaunchRef,
+    }
+    impl ::std::convert::From<&CallerDispatchLaunchWorkerProfile>
+        for CallerDispatchLaunchWorkerProfile
+    {
+        fn from(value: &CallerDispatchLaunchWorkerProfile) -> Self {
+            value.clone()
+        }
+    }
+    ///`CallerDispatchLaunchWorkerProfileLaunchRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "record_id",
+    ///    "record_sha256"
+    ///  ],
+    ///  "properties": {
+    ///    "record_id": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    },
+    ///    "record_sha256": {
+    ///      "$ref": "#/$defs/callerDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CallerDispatchLaunchWorkerProfileLaunchRef {
+        pub record_id: CallerDigest,
+        pub record_sha256: CallerDigest,
+    }
+    impl ::std::convert::From<&CallerDispatchLaunchWorkerProfileLaunchRef>
+        for CallerDispatchLaunchWorkerProfileLaunchRef
+    {
+        fn from(value: &CallerDispatchLaunchWorkerProfileLaunchRef) -> Self {
+            value.clone()
+        }
+    }
     ///`CallerExecutor`
     ///
     /// <details><summary>JSON schema</summary>
@@ -22241,6 +22679,7 @@ pub mod kernel_caller_dispatch_authorization {
     ///                "committed_version",
     ///                "coordinator_lease_epoch",
     ///                "coordinator_lease_id",
+    ///                "dispatch_launch",
     ///                "provider_attempt",
     ///                "store_fence"
     ///              ],
@@ -22253,6 +22692,9 @@ pub mod kernel_caller_dispatch_authorization {
     ///                },
     ///                "coordinator_lease_id": {
     ///                  "$ref": "#/$defs/callerIdentifier"
+    ///                },
+    ///                "dispatch_launch": {
+    ///                  "$ref": "#/$defs/callerDispatchLaunch"
     ///                },
     ///                "provider_attempt": {
     ///                  "type": "object",
@@ -22427,6 +22869,7 @@ pub mod kernel_caller_dispatch_authorization {
     ///            "committed_version",
     ///            "coordinator_lease_epoch",
     ///            "coordinator_lease_id",
+    ///            "dispatch_launch",
     ///            "provider_attempt",
     ///            "store_fence"
     ///          ],
@@ -22439,6 +22882,9 @@ pub mod kernel_caller_dispatch_authorization {
     ///            },
     ///            "coordinator_lease_id": {
     ///              "$ref": "#/$defs/callerIdentifier"
+    ///            },
+    ///            "dispatch_launch": {
+    ///              "$ref": "#/$defs/callerDispatchLaunch"
     ///            },
     ///            "provider_attempt": {
     ///              "type": "object",
@@ -22600,6 +23046,7 @@ pub mod kernel_caller_dispatch_authorization {
     ///        "committed_version",
     ///        "coordinator_lease_epoch",
     ///        "coordinator_lease_id",
+    ///        "dispatch_launch",
     ///        "provider_attempt",
     ///        "store_fence"
     ///      ],
@@ -22612,6 +23059,9 @@ pub mod kernel_caller_dispatch_authorization {
     ///        },
     ///        "coordinator_lease_id": {
     ///          "$ref": "#/$defs/callerIdentifier"
+    ///        },
+    ///        "dispatch_launch": {
+    ///          "$ref": "#/$defs/callerDispatchLaunch"
     ///        },
     ///        "provider_attempt": {
     ///          "type": "object",
@@ -22701,6 +23151,7 @@ pub mod kernel_caller_dispatch_authorization {
     ///    "committed_version",
     ///    "coordinator_lease_epoch",
     ///    "coordinator_lease_id",
+    ///    "dispatch_launch",
     ///    "provider_attempt",
     ///    "store_fence"
     ///  ],
@@ -22713,6 +23164,9 @@ pub mod kernel_caller_dispatch_authorization {
     ///    },
     ///    "coordinator_lease_id": {
     ///      "$ref": "#/$defs/callerIdentifier"
+    ///    },
+    ///    "dispatch_launch": {
+    ///      "$ref": "#/$defs/callerDispatchLaunch"
     ///    },
     ///    "provider_attempt": {
     ///      "type": "object",
@@ -22772,6 +23226,7 @@ pub mod kernel_caller_dispatch_authorization {
         pub committed_version: CallerPositiveInteger,
         pub coordinator_lease_epoch: CallerPositiveInteger,
         pub coordinator_lease_id: CallerIdentifier,
+        pub dispatch_launch: CallerDispatchLaunch,
         pub provider_attempt: ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitProviderAttempt,
         pub store_fence: ChioSignedCallerDispatchAuthorizationAuthorizationCommittedDispatchCommitStoreFence,
     }
@@ -40506,6 +40961,7 @@ pub mod receipt_admission_metadata {
     ///    "committed_version",
     ///    "coordinator_lease_epoch",
     ///    "coordinator_lease_id",
+    ///    "dispatch_launch",
     ///    "provider_attempt",
     ///    "store_fence"
     ///  ],
@@ -40518,6 +40974,9 @@ pub mod receipt_admission_metadata {
     ///    },
     ///    "coordinator_lease_id": {
     ///      "$ref": "#/$defs/identifier"
+    ///    },
+    ///    "dispatch_launch": {
+    ///      "$ref": "#/$defs/dispatchLaunch"
     ///    },
     ///    "provider_attempt": {
     ///      "oneOf": [
@@ -40543,11 +41002,229 @@ pub mod receipt_admission_metadata {
         pub committed_version: PositiveIJsonInteger,
         pub coordinator_lease_epoch: PositiveIJsonInteger,
         pub coordinator_lease_id: Identifier,
+        pub dispatch_launch: DispatchLaunch,
         pub provider_attempt: ::std::option::Option<ProviderAttempt>,
         pub store_fence: StoreFence,
     }
     impl ::std::convert::From<&DispatchCommit> for DispatchCommit {
         fn from(value: &DispatchCommit) -> Self {
+            value.clone()
+        }
+    }
+    ///`DispatchLaunch`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "native_launch",
+    ///    "worker_profile"
+    ///  ],
+    ///  "properties": {
+    ///    "native_launch": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "null"
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "receipt_id",
+    ///            "receipt_sha256"
+    ///          ],
+    ///          "properties": {
+    ///            "receipt_id": {
+    ///              "$ref": "#/$defs/digest"
+    ///            },
+    ///            "receipt_sha256": {
+    ///              "$ref": "#/$defs/digest"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "worker_profile": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "null"
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "launch_attempt",
+    ///            "launch_ref"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "container"
+    ///            },
+    ///            "launch_attempt": {
+    ///              "type": "integer",
+    ///              "maximum": 4294967295.0,
+    ///              "minimum": 1.0
+    ///            },
+    ///            "launch_ref": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "record_id",
+    ///                "record_sha256"
+    ///              ],
+    ///              "properties": {
+    ///                "record_id": {
+    ///                  "$ref": "#/$defs/digest"
+    ///                },
+    ///                "record_sha256": {
+    ///                  "$ref": "#/$defs/digest"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct DispatchLaunch {
+        pub native_launch: ::std::option::Option<DispatchLaunchNativeLaunch>,
+        pub worker_profile: ::std::option::Option<DispatchLaunchWorkerProfile>,
+    }
+    impl ::std::convert::From<&DispatchLaunch> for DispatchLaunch {
+        fn from(value: &DispatchLaunch) -> Self {
+            value.clone()
+        }
+    }
+    ///`DispatchLaunchNativeLaunch`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "receipt_id",
+    ///    "receipt_sha256"
+    ///  ],
+    ///  "properties": {
+    ///    "receipt_id": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "receipt_sha256": {
+    ///      "$ref": "#/$defs/digest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct DispatchLaunchNativeLaunch {
+        pub receipt_id: Digest,
+        pub receipt_sha256: Digest,
+    }
+    impl ::std::convert::From<&DispatchLaunchNativeLaunch> for DispatchLaunchNativeLaunch {
+        fn from(value: &DispatchLaunchNativeLaunch) -> Self {
+            value.clone()
+        }
+    }
+    ///`DispatchLaunchWorkerProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "launch_attempt",
+    ///    "launch_ref"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "container"
+    ///    },
+    ///    "launch_attempt": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "launch_ref": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "record_id",
+    ///        "record_sha256"
+    ///      ],
+    ///      "properties": {
+    ///        "record_id": {
+    ///          "$ref": "#/$defs/digest"
+    ///        },
+    ///        "record_sha256": {
+    ///          "$ref": "#/$defs/digest"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct DispatchLaunchWorkerProfile {
+        pub kind: ::serde_json::Value,
+        pub launch_attempt: ::std::num::NonZeroU64,
+        pub launch_ref: DispatchLaunchWorkerProfileLaunchRef,
+    }
+    impl ::std::convert::From<&DispatchLaunchWorkerProfile> for DispatchLaunchWorkerProfile {
+        fn from(value: &DispatchLaunchWorkerProfile) -> Self {
+            value.clone()
+        }
+    }
+    ///`DispatchLaunchWorkerProfileLaunchRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "record_id",
+    ///    "record_sha256"
+    ///  ],
+    ///  "properties": {
+    ///    "record_id": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "record_sha256": {
+    ///      "$ref": "#/$defs/digest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct DispatchLaunchWorkerProfileLaunchRef {
+        pub record_id: Digest,
+        pub record_sha256: Digest,
+    }
+    impl ::std::convert::From<&DispatchLaunchWorkerProfileLaunchRef>
+        for DispatchLaunchWorkerProfileLaunchRef
+    {
+        fn from(value: &DispatchLaunchWorkerProfileLaunchRef) -> Self {
             value.clone()
         }
     }
