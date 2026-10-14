@@ -79,24 +79,12 @@ pub(super) fn require_absent_release(
 }
 
 /// Auxiliary reads require the unchanged physical record, not a derived view.
+/// Quota validation already loaded and verified the allocated release.
 pub(in crate::admission_operation_store) fn auxiliary_captured_release(
     tx: &Connection,
     record: &RecoveryWorkflowRecordV1,
 ) -> Result<Option<CapturedWorkflowReleaseV1>, AdmissionOperationStoreError> {
-    let quota = workflow_quota(tx, &record.scope, &record.workflow_id)?;
-    let Some(allocation) = quota.native_release else {
-        return Ok(None);
-    };
-    let key = workflow_key(&record.scope, &record.workflow_id)?;
-    let physical =
-        raw_checked(tx, &key)?.ok_or_else(|| invariant("captured release workflow disappeared"))?;
-    source_reference(tx, &key)?;
-    if physical.payload != encode(record)? {
-        return Err(invariant("captured release requires the physical workflow"));
-    }
-    allocation
-        .load(tx, &record.scope, &record.workflow_id)
-        .map(Some)
+    viewed_workflow_quota(tx, record)?.release(record)
 }
 
 /// The owning release verifier supplies exact native and physical custody.

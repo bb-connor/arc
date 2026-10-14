@@ -96,6 +96,37 @@ fn verify_alias(
     row: &RawRecord,
     value: &SettledCommandAlias,
 ) -> Result<(), AdmissionOperationStoreError> {
+    verify_alias_header(tx, key, row, value)?;
+    let owner = selected_owner(tx, &value.selection.record_key)?;
+    verify_alias_owner(tx, row, value, &owner)
+}
+
+/// The authenticated current source and decoded physical workflow an alias
+/// selection names, read in the verifying transaction.
+struct SelectedOwner {
+    current: ProtectedSourceReference,
+    workflow: RecoveryWorkflowRecordV1,
+}
+
+fn selected_owner(
+    tx: &Connection,
+    record_key: &str,
+) -> Result<SelectedOwner, AdmissionOperationStoreError> {
+    let current = source_reference(tx, record_key)?;
+    let owner = raw_checked(tx, record_key)?
+        .ok_or_else(|| invariant("command alias physical generation disappeared"))?;
+    Ok(SelectedOwner {
+        current,
+        workflow: decode(&owner.payload)?,
+    })
+}
+
+fn verify_alias_header(
+    tx: &Connection,
+    key: &str,
+    row: &RawRecord,
+    value: &SettledCommandAlias,
+) -> Result<(), AdmissionOperationStoreError> {
     if row.version != 1
         || row.kind != "command"
         || row.payload.len() > MAX_ALIAS_BYTES
@@ -117,10 +148,18 @@ fn verify_alias(
         return Err(invariant("settled command alias custody changed"));
     }
     source_reference(tx, key)?;
-    let current = source_reference(tx, &value.selection.record_key)?;
-    let owner = raw_checked(tx, &value.selection.record_key)?
-        .ok_or_else(|| invariant("command alias physical generation disappeared"))?;
-    let owner: RecoveryWorkflowRecordV1 = decode(&owner.payload)?;
+    Ok(())
+}
+
+fn verify_alias_owner(
+    tx: &Connection,
+    row: &RawRecord,
+    value: &SettledCommandAlias,
+    SelectedOwner {
+        current,
+        workflow: owner,
+    }: &SelectedOwner,
+) -> Result<(), AdmissionOperationStoreError> {
     if current.kind() != "workflow"
         || current.scope_key() != row.scope
         || current.version() < value.selection.record_version.get()
@@ -301,14 +340,25 @@ pub(super) fn verify_all(tx: &Connection) -> Result<(), AdmissionOperationStoreE
          ORDER BY scope_key,record_key",
         )
         .map_err(sqlite_error)?;
+    let mut owners = std::collections::BTreeMap::new();
     for key in statement
         .query_map([], |r| r.get::<_, String>(0))
         .map_err(sqlite_error)?
     {
         let key = key.map_err(sqlite_error)?;
         let row = raw_checked(tx, &key)?.ok_or_else(|| invariant("command alias disappeared"))?;
-        let value = decode(&row.payload)?;
-        verify_alias(tx, &key, &row, &value)?;
+        let value: SettledCommandAlias = decode(&row.payload)?;
+        verify_alias_header(tx, &key, &row, &value)?;
+        // This read-only scan shares each selected workflow's authenticated
+        // read across the aliases naming it; every alias binding is checked.
+        let owner = match owners.entry(value.selection.record_key.clone()) {
+            std::collections::btree_map::Entry::Occupied(owner) => owner.into_mut(),
+            std::collections::btree_map::Entry::Vacant(slot) => {
+                let owner = selected_owner(tx, slot.key())?;
+                slot.insert(owner)
+            }
+        };
+        verify_alias_owner(tx, &row, &value, owner)?;
     }
     Ok(())
 }

@@ -417,7 +417,7 @@ impl ViewedWorkflowQuota<'_> {
         Ok(Some(allocation.hold.clone()))
     }
 
-    /// `auxiliary_captured_terminal` over this quota read.
+    /// The verified terminal, after the unchanged physical workflow check.
     pub(in crate::admission_operation_store) fn terminal(
         &self,
         record: &RecoveryWorkflowRecordV1,
@@ -434,7 +434,7 @@ impl ViewedWorkflowQuota<'_> {
         Ok(Some(terminal.clone()))
     }
 
-    /// `auxiliary_captured_release` over this quota read.
+    /// The verified release, after the unchanged physical workflow check.
     pub(in crate::admission_operation_store) fn release(
         &self,
         record: &RecoveryWorkflowRecordV1,

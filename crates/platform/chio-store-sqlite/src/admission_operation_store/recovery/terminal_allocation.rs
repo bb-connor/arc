@@ -57,26 +57,12 @@ pub(super) fn require_absent_terminal(
 }
 
 /// Auxiliary reads require the unchanged physical record, not a derived view.
+/// Quota validation already loaded and verified the allocated terminal.
 pub(in crate::admission_operation_store) fn auxiliary_captured_terminal(
     tx: &Connection,
     record: &RecoveryWorkflowRecordV1,
 ) -> Result<Option<CapturedWorkflowTerminalV1>, AdmissionOperationStoreError> {
-    let quota = workflow_quota(tx, &record.scope, &record.workflow_id)?;
-    let Some(allocation) = quota.native_terminal else {
-        return Ok(None);
-    };
-    let key = workflow_key(&record.scope, &record.workflow_id)?;
-    let physical = raw_checked(tx, &key)?
-        .ok_or_else(|| invariant("captured terminal workflow disappeared"))?;
-    source_reference(tx, &key)?;
-    if physical.payload != encode(record)? {
-        return Err(invariant(
-            "captured terminal requires the physical workflow",
-        ));
-    }
-    allocation
-        .load(tx, &record.scope, &record.workflow_id)
-        .map(Some)
+    viewed_workflow_quota(tx, record)?.terminal(record)
 }
 
 /// The owning terminal verifier supplies exact native and physical custody.
