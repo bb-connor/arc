@@ -1258,6 +1258,36 @@ fn chio_oauth_discovery_profile_metadata_advertises_sender_constraints() {
 }
 
 #[test]
+fn chio_oauth_discovery_validation_rejects_unadvertised_issuer() {
+    let profile =
+        build_chio_oauth_authorization_profile_metadata().expect("build Chio auth profile");
+    let protected_resource_metadata = ProtectedResourceMetadata {
+        resource: "https://edge.example/mcp".to_string(),
+        resource_metadata_url: "https://edge.example/.well-known/oauth-protected-resource/mcp"
+            .to_string(),
+        authorization_servers: vec!["https://edge.example/oauth".to_string()],
+        scopes_supported: vec!["mcp:invoke".to_string()],
+        chio_authorization_profile: profile.clone(),
+    };
+    let authorization_server_metadata = AuthorizationServerMetadata {
+        metadata_path: "/.well-known/oauth-authorization-server/oauth".to_string(),
+        document: json!({
+            "issuer": "https://other.example/oauth",
+            "chio_authorization_profile": profile,
+        }),
+    };
+    let error = validate_chio_oauth_discovery_metadata_pair(
+        &protected_resource_metadata,
+        &authorization_server_metadata,
+    )
+    .expect_err("an unadvertised issuer must be refused");
+    assert_eq!(
+        error.to_string(),
+        "urn:chio:error:cli:other [cli:error]: protected-resource metadata does not advertise authorization server issuer `https://other.example/oauth` (Preserve the original message and migrate the call site to a specific registry code when touched.)"
+    );
+}
+
+#[test]
 fn chio_oauth_discovery_validation_rejects_profile_mismatch() {
     let protected_resource_metadata = ProtectedResourceMetadata {
         resource: "https://edge.example/mcp".to_string(),

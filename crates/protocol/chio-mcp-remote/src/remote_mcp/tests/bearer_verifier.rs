@@ -1064,3 +1064,26 @@ async fn missing_required_scope_answers_403_insufficient_scope_challenge() {
         )
     );
 }
+
+#[tokio::test]
+async fn introspection_bearer_verifier_rejects_audience_mismatch() {
+    let verifier =
+        test_introspection_verifier(Some("https://issuer.example"), Some("chio-mcp"), &[]);
+    let exp = verifier.clock.seconds().expect("clock") + 300;
+    let mut other_audience = introspection_claims(Some("https://issuer.example"), Some(exp));
+    other_audience.aud = Some(JwtAudience::Single("other-mcp".to_string()));
+    let mut no_audience = introspection_claims(Some("https://issuer.example"), Some(exp));
+    no_audience.aud = None;
+    let mut other_resource = introspection_claims(Some("https://issuer.example"), Some(exp));
+    other_resource.aud = None;
+    other_resource.resource = Some("other-mcp".to_string());
+    for claims in [other_audience, no_audience, other_resource] {
+        assert_eq!(
+            refusal(introspect(&verifier, claims)).await,
+            (
+                StatusCode::UNAUTHORIZED,
+                "bearer token audience mismatch".to_string()
+            )
+        );
+    }
+}

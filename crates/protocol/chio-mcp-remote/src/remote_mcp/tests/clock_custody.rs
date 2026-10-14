@@ -7,13 +7,13 @@ mod dispatch;
 #[path = "clock_custody/pinned_authority.rs"]
 mod pinned_authority;
 
-struct TestClock(StdMutex<Result<ClockReading, ClockError>>);
+pub(super) struct TestClock(pub(super) StdMutex<Result<ClockReading, ClockError>>);
 impl Clock for TestClock {
     fn read(&self) -> Result<ClockReading, ClockError> {
         *self.0.lock().unwrap()
     }
 }
-fn reading(wall: u64, mono: u64) -> Result<ClockReading, ClockError> {
+pub(super) fn reading(wall: u64, mono: u64) -> Result<ClockReading, ClockError> {
     Ok(ClockReading::new(
         UnixMillis::new(wall),
         MonotonicInstant::from_nanos(mono),
