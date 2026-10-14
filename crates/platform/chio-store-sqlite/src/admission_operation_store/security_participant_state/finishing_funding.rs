@@ -73,7 +73,13 @@ impl SqliteAdmissionOperationStore {
             ));
         }
         super::finishing_account::require_outstanding_native_payment_purposes(&tx, operation)?;
-        require_priced_payment_hold_text(&tx, operation)?;
+        let requirements = operation.binding().participant_requirements();
+        let executable =
+            crate::admission_operation_store::tool_outcome_liability::PaymentHoldInventory::executable(
+                context.request,
+                requirements.supplemental_authorization,
+            )?;
+        require_priced_payment_holds(&tx, operation, executable)?;
         Ok(())
     }
 }
@@ -82,17 +88,18 @@ impl SqliteAdmissionOperationStore {
 /// bound of its own (`payment::journal` validates payment identifiers to it).
 const PAYMENT_HOLD_TEXT_BYTES: i64 = 512;
 
-/// Every live hold of this operation already holds all the budget text a
-/// funded settlement or reversal later rewrites: no member row is added after
-/// the external authorization. Measure that text here, before the effect,
-/// against the bound its account priced.
-fn require_priced_payment_hold_text(
+/// Every live hold of this operation already holds all the budget rows and
+/// text a funded settlement or reversal later rewrites: no member row is added
+/// after the external authorization. Measure them here, before the effect,
+/// against the inventory and text bound its account priced.
+fn require_priced_payment_holds(
     tx: &Transaction<'_>,
     operation: &AdmissionOperationV1,
+    executable: crate::admission_operation_store::tool_outcome_liability::PaymentHoldInventory,
 ) -> Result<(), AdmissionOperationStoreError> {
     let mut holds = Vec::new();
     if let Some(hold_id) = operation.budget_hold_id() {
-        holds.push(hold_id.as_str().to_owned());
+        holds.push((hold_id.as_str().to_owned(), executable));
     }
     if let Some(preflight) =
         crate::admission_operation_store::nonce_preflight::load_recovery(tx, operation)?
@@ -100,10 +107,63 @@ fn require_priced_payment_hold_text(
         if preflight.hold()
             != chio_kernel::admission_operation::AdmissionNoncePreflightHoldDisposition::Reversed
         {
-            holds.push(preflight.identity().hold_id().as_str().to_owned());
+            holds.push((
+                preflight.identity().hold_id().as_str().to_owned(),
+                executable.preflight(),
+            ));
         }
     }
-    for hold_id in holds {
+    for (hold_id, inventory) in holds {
+        // The member rows a later funded transition copies into its event,
+        // and the supplemental columns it rewrites, lie inside the inventory
+        // the account priced from this same authenticated original.
+        let (quotas, revocations, artifacts, commits, cumulative, verifier): (
+            i64,
+            i64,
+            i64,
+            i64,
+            i64,
+            bool,
+        ) = tx
+            .query_row(
+                "SELECT
+                     (SELECT COUNT(*) FROM main.budget_hold_quota_members WHERE hold_id=?1),
+                     (SELECT COUNT(*) FROM main.budget_hold_revocation_members WHERE hold_id=?1),
+                     (SELECT COUNT(*) FROM main.budget_hold_authorization_artifacts
+                      WHERE hold_id=?1),
+                     (SELECT COUNT(*) FROM main.budget_hold_revocation_commits WHERE hold_id=?1),
+                     (SELECT COUNT(*) FROM main.budget_cumulative_approval_operations
+                      WHERE hold_id=?1),
+                     EXISTS(SELECT 1 FROM main.budget_authorization_holds
+                            WHERE hold_id=?1 AND (supplemental_verifier_id IS NOT NULL
+                                 OR supplemental_verifier_config_digest IS NOT NULL
+                                 OR supplemental_artifact_digest IS NOT NULL))",
+                [hold_id.as_str()],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                    ))
+                },
+            )
+            .map_err(sqlite_error)?;
+        let within =
+            |actual: i64, priced: u64| u64::try_from(actual).is_ok_and(|actual| actual <= priced);
+        if !within(quotas, inventory.quotas)
+            || !within(revocations, inventory.revocations)
+            || !within(artifacts, inventory.artifacts)
+            || !within(commits, u64::from(inventory.revocation_commit))
+            || !within(cumulative, u64::from(inventory.cumulative))
+            || (verifier && !inventory.supplemental)
+        {
+            return Err(invalid(
+                "native payment hold carries members its account did not price",
+            ));
+        }
         let exceeds: bool = tx
             .query_row(
                 "SELECT EXISTS(

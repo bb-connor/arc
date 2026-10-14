@@ -409,30 +409,88 @@ fn event_id_bytes() -> u64 {
     PAYMENT_TEXT + EVENT_SUFFIX
 }
 
-/// The typed member bounds of one composite hold: the admission caps on
-/// invocation quotas, revocation identifiers and authorization artifacts,
-/// plus at most one revocation commit and one cumulative approval.
-struct PaymentHoldMembers {
-    quotas: u64,
-    revocations: u64,
-    artifacts: u64,
+/// The member inventory one composite hold of this payment original can carry,
+/// derived from the authenticated original exactly as the Kernel binds the
+/// hold: the leaf capability and its distinct delegation ancestors, plus a
+/// supplemental claim's revocation identifiers, artifact and revocation
+/// commit; at most the grant, aggregate and supplemental invocation quotas;
+/// and a cumulative approval only under a governed intent. The
+/// pre-authorization gate refuses every live hold outside this inventory, so
+/// each count is an enforced bound, not an estimate.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::admission_operation_store) struct PaymentHoldInventory {
+    pub(in crate::admission_operation_store) revocations: u64,
+    pub(in crate::admission_operation_store) quotas: u64,
+    pub(in crate::admission_operation_store) artifacts: u64,
+    pub(in crate::admission_operation_store) revocation_commit: bool,
+    pub(in crate::admission_operation_store) cumulative: bool,
+    pub(in crate::admission_operation_store) supplemental: bool,
 }
 
-impl PaymentHoldMembers {
-    fn bounded() -> Result<Self, AdmissionOperationStoreError> {
+impl PaymentHoldInventory {
+    /// The executable hold of `request`, whose original selected a
+    /// supplemental authorization exactly when `supplemental` is set.
+    pub(in crate::admission_operation_store) fn executable(
+        request: &chio_kernel::ToolCallRequest,
+        supplemental: bool,
+    ) -> Result<Self, AdmissionOperationStoreError> {
         let count =
             |value: usize| u64::try_from(value).map_err(|error| invariant(error.to_string()));
+        let mut lineage = request
+            .capability
+            .delegation_chain
+            .iter()
+            .map(|link| link.capability_id.as_str())
+            .collect::<Vec<_>>();
+        lineage.push(request.capability.id.as_str());
+        lineage.sort_unstable();
+        lineage.dedup();
+        let claimed = if supplemental {
+            count(chio_kernel::supplemental_quota::MAX_SUPPLEMENTAL_REVOCATION_IDS)?
+        } else {
+            0
+        };
+        let revocations = count(lineage.len())?
+            .checked_add(claimed)
+            .ok_or_else(|| invariant("payment hold revocation inventory exhausted"))?
+            .min(count(
+                chio_kernel::supplemental_quota::MAX_ADMISSION_REVOCATION_IDS,
+            )?);
         Ok(Self {
-            quotas: count(chio_kernel::budget_store::MAX_INVOCATION_QUOTAS_PER_ADMISSION)?,
-            revocations: count(chio_kernel::supplemental_quota::MAX_ADMISSION_REVOCATION_IDS)?,
-            artifacts: count(chio_kernel::budget_store::MAX_AUTHORIZATION_ARTIFACT_DIGESTS)?,
+            revocations,
+            // The grant quota joins only an aggregate or supplemental quota.
+            quotas: 2 + u64::from(supplemental),
+            artifacts: u64::from(supplemental),
+            revocation_commit: supplemental,
+            cumulative: request.governed_intent.is_some(),
+            supplemental,
         })
     }
-}
 
-fn supplemental_verifier_bytes() -> Result<u64, AdmissionOperationStoreError> {
-    u64::try_from(chio_kernel::supplemental_quota::MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES)
-        .map_err(|error| invariant(error.to_string()))
+    /// The nonce preflight hold binds the same capability and quotas but
+    /// never evaluates cumulative approval.
+    pub(in crate::admission_operation_store) fn preflight(self) -> Self {
+        Self {
+            cumulative: false,
+            ..self
+        }
+    }
+
+    fn verifier_bytes(&self) -> Result<u64, AdmissionOperationStoreError> {
+        if !self.supplemental {
+            return Ok(0);
+        }
+        u64::try_from(chio_kernel::supplemental_quota::MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES)
+            .map_err(|error| invariant(error.to_string()))
+    }
+
+    fn supplemental_digest_bytes(&self) -> u64 {
+        if self.supplemental {
+            DIGEST
+        } else {
+            0
+        }
+    }
 }
 
 /// One journal row rewrite at its real column bound plus the state index the
@@ -492,6 +550,7 @@ fn payment_append_histories(
 /// reservation columns and every composite projection column.
 fn hold_record(
     text: &crate::budget_store::CompositeBudgetTextBounds,
+    hold: &PaymentHoldInventory,
 ) -> Result<u64, AdmissionOperationStoreError> {
     record_bytes(&[
         // hold_id, capability_id, grant_index, authorized/remaining exposure,
@@ -535,9 +594,9 @@ fn hold_record(
         text.monetary_state,
         // supplemental verifier id, config digest, artifact digest, expiry,
         // trusted_capture_time
-        supplemental_verifier_bytes()?,
-        DIGEST,
-        DIGEST,
+        hold.verifier_bytes()?,
+        hold.supplemental_digest_bytes(),
+        hold.supplemental_digest_bytes(),
         INTEGER,
         INTEGER,
     ])
@@ -547,6 +606,7 @@ fn hold_record(
 /// projection columns.
 fn event_record(
     text: &crate::budget_store::CompositeBudgetTextBounds,
+    hold: &PaymentHoldInventory,
 ) -> Result<u64, AdmissionOperationStoreError> {
     record_bytes(&[
         // event_id, hold_id, capability_id, grant_index, kind, allowed,
@@ -592,9 +652,9 @@ fn event_record(
         DIGEST,
         // supplemental verifier id, config digest, artifact digest, expiry,
         // invocation_quotas_explicit, trusted_time, expected_cumulative_state
-        supplemental_verifier_bytes()?,
-        DIGEST,
-        DIGEST,
+        hold.verifier_bytes()?,
+        hold.supplemental_digest_bytes(),
+        hold.supplemental_digest_bytes(),
         INTEGER,
         INTEGER,
         INTEGER,
@@ -602,112 +662,77 @@ fn event_record(
     ])
 }
 
-/// One composite budget transition of one hold: the usage row, the hold row,
-/// the event inserted then projected, its member rows and the replication
-/// head. `reversal` adds the quota and cumulative rewrites only a reversal
-/// performs. Every changed index is a separate delete and reinsert walk.
+/// One composite budget transition of each of `holds`: the usage row, the
+/// hold row, the event inserted then projected, its member rows and the
+/// replication head. `reversal` adds the quota and cumulative rewrites only a
+/// reversal performs. A member table no hold can write prices no tree. Every
+/// changed index is a separate delete and reinsert walk.
 fn hold_transition_rows(
-    members: &PaymentHoldMembers,
     text: &crate::budget_store::CompositeBudgetTextBounds,
-    holds: u64,
+    holds: &[PaymentHoldInventory],
     reversal: bool,
 ) -> Result<Vec<ToolOutcomeRowEnvelopeData>, AdmissionOperationStoreError> {
-    let times = |count: u64| {
-        count
-            .checked_mul(holds)
-            .ok_or_else(|| invariant("payment hold transition rows exhausted"))
+    let total = |member: fn(&PaymentHoldInventory) -> u64| {
+        holds.iter().try_fold(0_u64, |sum, hold| {
+            sum.checked_add(member(hold))
+                .ok_or_else(|| invariant("payment hold transition rows exhausted"))
+        })
+    };
+    let count = u64::try_from(holds.len()).map_err(|error| invariant(error.to_string()))?;
+    let largest = |record: fn(
+        &crate::budget_store::CompositeBudgetTextBounds,
+        &PaymentHoldInventory,
+    ) -> Result<u64, AdmissionOperationStoreError>| {
+        holds.iter().try_fold(0_u64, |largest, hold| {
+            Ok::<_, AdmissionOperationStoreError>(largest.max(record(text, hold)?))
+        })
     };
     let mut rows = Vec::new();
-    // capability_grant_budgets: the same usage row is rewritten once per hold;
-    // its updated_at and seq indexes change on every rewrite.
-    let usage = record_bytes(&[PAYMENT_TEXT, 8, 8, 8, 8, 8, 8])?;
-    rows.push(ToolOutcomeRowEnvelopeData {
-        table: ToolOutcomeWriteTableData::CapabilityGrantBudgets,
-        possible_before_bytes: Some(usage),
-        maximum_after_bytes: usage,
-        mutations: holds,
-        index_bytes: vec![
-            record_bytes(&[INTEGER, INTEGER])?,
-            record_bytes(&[INTEGER, INTEGER])?,
-        ],
-    });
-    // budget_authorization_holds: disposition changes, so the
-    // (disposition, reserved_until) index entry is deleted and reinserted.
-    let hold = hold_record(text)?;
-    rows.push(ToolOutcomeRowEnvelopeData {
-        table: ToolOutcomeWriteTableData::BudgetAuthorizationHolds,
-        possible_before_bytes: Some(hold),
-        maximum_after_bytes: hold,
-        mutations: holds,
-        index_bytes: vec![record_bytes(&[text.disposition, INTEGER, INTEGER])?],
-    });
-    // budget_mutation_events: one insert with its primary key, capability
-    // and sequence indexes, then the same-key projection rewrite.
-    let event = event_record(text)?;
-    rows.push(ToolOutcomeRowEnvelopeData {
-        table: ToolOutcomeWriteTableData::BudgetMutationEvents,
-        possible_before_bytes: None,
-        maximum_after_bytes: event,
-        mutations: holds,
-        index_bytes: vec![
-            record_bytes(&[event_id_bytes(), INTEGER])?,
-            record_bytes(&[PAYMENT_TEXT, INTEGER, INTEGER, INTEGER])?,
-            record_bytes(&[INTEGER, INTEGER])?,
-        ],
-    });
-    rows.push(existing(
-        ToolOutcomeWriteTableData::BudgetMutationEvents,
-        event,
-        holds,
-    ));
+    let mut members = |table, after: u64, mutations: u64, index_bytes: Vec<u64>| {
+        if mutations != 0 {
+            rows.push(ToolOutcomeRowEnvelopeData {
+                table,
+                possible_before_bytes: None,
+                maximum_after_bytes: after,
+                mutations,
+                index_bytes,
+            });
+        }
+    };
     let event_id = event_id_bytes();
-    rows.push(ToolOutcomeRowEnvelopeData {
-        table: ToolOutcomeWriteTableData::BudgetEventQuotaMembers,
-        possible_before_bytes: None,
-        maximum_after_bytes: record_bytes(&[
-            event_id,
-            text.quota_profile,
-            PAYMENT_TEXT,
-            8,
-            8,
-            8,
-            8,
-            8,
-            8,
-        ])?,
-        mutations: times(members.quotas)?,
-        index_bytes: vec![record_bytes(&[
+    members(
+        ToolOutcomeWriteTableData::BudgetEventQuotaMembers,
+        record_bytes(&[event_id, text.quota_profile, PAYMENT_TEXT, 8, 8, 8, 8, 8, 8])?,
+        total(|hold| hold.quotas)?,
+        vec![record_bytes(&[
             event_id,
             text.quota_profile,
             PAYMENT_TEXT,
             INTEGER,
             INTEGER,
         ])?],
-    });
-    rows.push(ToolOutcomeRowEnvelopeData {
-        table: ToolOutcomeWriteTableData::BudgetEventRevocationMembers,
-        possible_before_bytes: None,
-        maximum_after_bytes: record_bytes(&[event_id, 8, PAYMENT_TEXT])?,
-        mutations: times(members.revocations)?,
-        index_bytes: vec![
+    );
+    members(
+        ToolOutcomeWriteTableData::BudgetEventRevocationMembers,
+        record_bytes(&[event_id, 8, PAYMENT_TEXT])?,
+        total(|hold| hold.revocations)?,
+        vec![
             record_bytes(&[event_id, INTEGER, INTEGER])?,
             record_bytes(&[event_id, PAYMENT_TEXT, INTEGER])?,
         ],
-    });
-    rows.push(ToolOutcomeRowEnvelopeData {
-        table: ToolOutcomeWriteTableData::BudgetEventAuthorizationArtifacts,
-        possible_before_bytes: None,
-        maximum_after_bytes: record_bytes(&[event_id, 8, DIGEST])?,
-        mutations: times(members.artifacts)?,
-        index_bytes: vec![
+    );
+    members(
+        ToolOutcomeWriteTableData::BudgetEventAuthorizationArtifacts,
+        record_bytes(&[event_id, 8, DIGEST])?,
+        total(|hold| hold.artifacts)?,
+        vec![
             record_bytes(&[event_id, INTEGER, INTEGER])?,
             record_bytes(&[event_id, DIGEST, INTEGER])?,
         ],
-    });
-    rows.push(ToolOutcomeRowEnvelopeData {
-        table: ToolOutcomeWriteTableData::BudgetEventRevocationCommits,
-        possible_before_bytes: None,
-        maximum_after_bytes: record_bytes(&[
+    );
+    members(
+        ToolOutcomeWriteTableData::BudgetEventRevocationCommits,
+        record_bytes(&[
             event_id,
             PAYMENT_TEXT,
             PAYMENT_TEXT,
@@ -715,13 +740,12 @@ fn hold_transition_rows(
             text.guarantee_level,
             8,
         ])?,
-        mutations: holds,
-        index_bytes: vec![record_bytes(&[event_id, INTEGER])?],
-    });
-    rows.push(ToolOutcomeRowEnvelopeData {
-        table: ToolOutcomeWriteTableData::BudgetEventCumulativeApproval,
-        possible_before_bytes: None,
-        maximum_after_bytes: record_bytes(&[
+        total(|hold| u64::from(hold.revocation_commit))?,
+        vec![record_bytes(&[event_id, INTEGER])?],
+    );
+    members(
+        ToolOutcomeWriteTableData::BudgetEventCumulativeApproval,
+        record_bytes(&[
             event_id,
             PAYMENT_TEXT,
             PAYMENT_TEXT,
@@ -744,57 +768,105 @@ fn hold_transition_rows(
             8,
             8,
         ])?,
-        mutations: holds,
-        index_bytes: vec![record_bytes(&[event_id, INTEGER])?],
+        total(|hold| u64::from(hold.cumulative))?,
+        vec![record_bytes(&[event_id, INTEGER])?],
+    );
+    // capability_grant_budgets: the same usage row is rewritten once per hold;
+    // its updated_at and seq indexes change on every rewrite.
+    let usage = record_bytes(&[PAYMENT_TEXT, 8, 8, 8, 8, 8, 8])?;
+    rows.push(ToolOutcomeRowEnvelopeData {
+        table: ToolOutcomeWriteTableData::CapabilityGrantBudgets,
+        possible_before_bytes: Some(usage),
+        maximum_after_bytes: usage,
+        mutations: count,
+        index_bytes: vec![
+            record_bytes(&[INTEGER, INTEGER])?,
+            record_bytes(&[INTEGER, INTEGER])?,
+        ],
     });
+    // budget_authorization_holds: disposition changes, so the
+    // (disposition, reserved_until) index entry is deleted and reinserted.
+    let hold = largest(hold_record)?;
+    rows.push(ToolOutcomeRowEnvelopeData {
+        table: ToolOutcomeWriteTableData::BudgetAuthorizationHolds,
+        possible_before_bytes: Some(hold),
+        maximum_after_bytes: hold,
+        mutations: count,
+        index_bytes: vec![record_bytes(&[text.disposition, INTEGER, INTEGER])?],
+    });
+    // budget_mutation_events: one insert with its primary key, capability
+    // and sequence indexes, then the same-key projection rewrite.
+    let event = largest(event_record)?;
+    rows.push(ToolOutcomeRowEnvelopeData {
+        table: ToolOutcomeWriteTableData::BudgetMutationEvents,
+        possible_before_bytes: None,
+        maximum_after_bytes: event,
+        mutations: count,
+        index_bytes: vec![
+            record_bytes(&[event_id, INTEGER])?,
+            record_bytes(&[PAYMENT_TEXT, INTEGER, INTEGER, INTEGER])?,
+            record_bytes(&[INTEGER, INTEGER])?,
+        ],
+    });
+    rows.push(existing(
+        ToolOutcomeWriteTableData::BudgetMutationEvents,
+        event,
+        count,
+    ));
     rows.push(existing(
         ToolOutcomeWriteTableData::BudgetReplicationMeta,
         record_bytes(&[8, 8])?,
-        holds,
+        count,
     ));
     if reversal {
         // The reversal releases each quota reservation and the cumulative
         // reservation: same-key rewrites with no changed index key.
-        rows.push(existing(
-            ToolOutcomeWriteTableData::BudgetInvocationQuotas,
-            record_bytes(&[text.quota_profile, PAYMENT_TEXT, 8, 8, 8, 8, 8])?,
-            times(members.quotas)?,
-        ));
-        rows.push(existing(
-            ToolOutcomeWriteTableData::BudgetCumulativeApprovalAccounts,
-            record_bytes(&[
-                PAYMENT_TEXT,
-                PAYMENT_TEXT,
-                PAYMENT_TEXT,
-                8,
-                PAYMENT_TEXT,
-                PAYMENT_TEXT,
-                PAYMENT_TEXT,
-                PAYMENT_TEXT,
-                8,
-                8,
-                8,
-                8,
-            ])?,
-            holds,
-        ));
-        rows.push(existing(
-            ToolOutcomeWriteTableData::BudgetCumulativeApprovalOperations,
-            record_bytes(&[
-                PAYMENT_TEXT,
-                PAYMENT_TEXT,
-                PAYMENT_TEXT,
-                PAYMENT_TEXT,
-                PAYMENT_TEXT,
-                8,
-                8,
-                8,
-                text.cumulative_state,
-                DIGEST,
-                8,
-            ])?,
-            holds,
-        ));
+        let quotas = total(|hold| hold.quotas)?;
+        if quotas != 0 {
+            rows.push(existing(
+                ToolOutcomeWriteTableData::BudgetInvocationQuotas,
+                record_bytes(&[text.quota_profile, PAYMENT_TEXT, 8, 8, 8, 8, 8])?,
+                quotas,
+            ));
+        }
+        let cumulative = total(|hold| u64::from(hold.cumulative))?;
+        if cumulative != 0 {
+            rows.push(existing(
+                ToolOutcomeWriteTableData::BudgetCumulativeApprovalAccounts,
+                record_bytes(&[
+                    PAYMENT_TEXT,
+                    PAYMENT_TEXT,
+                    PAYMENT_TEXT,
+                    8,
+                    PAYMENT_TEXT,
+                    PAYMENT_TEXT,
+                    PAYMENT_TEXT,
+                    PAYMENT_TEXT,
+                    8,
+                    8,
+                    8,
+                    8,
+                ])?,
+                cumulative,
+            ));
+            rows.push(existing(
+                ToolOutcomeWriteTableData::BudgetCumulativeApprovalOperations,
+                record_bytes(&[
+                    PAYMENT_TEXT,
+                    PAYMENT_TEXT,
+                    PAYMENT_TEXT,
+                    PAYMENT_TEXT,
+                    PAYMENT_TEXT,
+                    8,
+                    8,
+                    8,
+                    text.cumulative_state,
+                    DIGEST,
+                    8,
+                ])?,
+                cumulative,
+            ));
+        }
     }
     Ok(rows)
 }
@@ -833,13 +905,14 @@ fn dominating_rows(
 
 /// The four priced payment journal transactions of one payment original,
 /// described before its budget hold exists: every row bound is the real
-/// column set at its typed bound, and every member count is the admission cap.
-/// `reversal_holds` is the number of holds a pre-dispatch reversal can find
-/// live: the executable hold and, for a nonce original, its preflight hold.
+/// column set at its typed bound, and every member count is the inventory the
+/// gate later enforces on the live holds. `preflight` is the nonce preflight
+/// hold a pre-dispatch reversal can still find live.
 pub(super) fn payment_transaction(
     envelope: &ToolOutcomeEnvelopeData,
     purpose: ToolOutcomeTransactionPurposeData,
-    reversal_holds: u64,
+    executable: PaymentHoldInventory,
+    preflight: Option<PaymentHoldInventory>,
 ) -> Result<ToolOutcomeTransactionEnvelopeData, AdmissionOperationStoreError> {
     let mut rows = Vec::new();
     let global_appends = match purpose {
@@ -858,14 +931,19 @@ pub(super) fn payment_transaction(
             // intent and evidence, two global commits) or, before dispatch
             // after a released authorization, the reversal of every live hold
             // (one budget global commit each). Never both for one operation.
-            let members = PaymentHoldMembers::bounded()?;
             let text = crate::budget_store::composite_budget_text_bounds();
-            let mut settle = hold_transition_rows(&members, &text, 1, false)?;
+            let mut settle = hold_transition_rows(&text, &[executable], false)?;
             settle.push(payment_journal_row()?);
             settle.push(payment_release_evidence_row()?);
-            let reverse = hold_transition_rows(&members, &text, reversal_holds, true)?;
+            let reversed = [Some(executable), preflight]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>();
+            let reverse = hold_transition_rows(&text, &reversed, true)?;
             rows = dominating_rows(settle, reverse)?;
-            reversal_holds.max(2)
+            u64::try_from(reversed.len())
+                .map_err(|error| invariant(error.to_string()))?
+                .max(2)
         }
         // The producing program keeps its five custody purposes; the payment
         // family is described only through this path.

@@ -5,7 +5,9 @@ use super::*;
 use chio_kernel::tool_outcome::{EvaluationModeV1, EvaluationPhaseV1};
 
 mod rows;
-pub(super) use rows::{ToolOutcomeRowEnvelopeData, ToolOutcomeWriteTableData};
+pub(super) use rows::{
+    PaymentHoldInventory, ToolOutcomeRowEnvelopeData, ToolOutcomeWriteTableData,
+};
 
 /// The terminal record CHECK bound; a larger signed receipt cannot be retained.
 const MAX_TERMINAL_RECORD_BYTES: u64 = 1_048_576;
@@ -151,10 +153,17 @@ pub(super) fn describe_native_tool_outcome_transactions(
         transactions.push(transaction(&envelope, purpose)?);
     }
     if requirements.payment {
-        // The account is priced before any budget hold exists. A nonce
+        // The account is priced before any budget hold exists, from the
+        // inventory the authenticated original binds into it. A nonce
         // original may still own its preflight hold when a pre-dispatch
-        // reversal runs, so its reversal shape covers two holds.
-        let reversal_holds = 1 + u64::from(requirements.execution_nonce);
+        // reversal runs, so its reversal shape covers that hold too.
+        let executable = rows::PaymentHoldInventory::executable(
+            source.request(),
+            requirements.supplemental_authorization,
+        )?;
+        let preflight = requirements
+            .execution_nonce
+            .then_some(executable.preflight());
         for purpose in [
             ToolOutcomeTransactionPurposeData::PaymentAuthorization,
             ToolOutcomeTransactionPurposeData::PaymentCompensation,
@@ -162,9 +171,7 @@ pub(super) fn describe_native_tool_outcome_transactions(
             ToolOutcomeTransactionPurposeData::PaymentCompletion,
         ] {
             transactions.push(rows::payment_transaction(
-                &envelope,
-                purpose,
-                reversal_holds,
+                &envelope, purpose, executable, preflight,
             )?);
         }
     }

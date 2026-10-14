@@ -308,6 +308,10 @@ impl VerifiedNativeInitialFinishingPlan<'_, '_> {
     pub(in crate::admission_operation_store) fn operation(&self) -> &AdmissionOperationV1 {
         self.custody.operation
     }
+    /// The live request, already validated against the retained original.
+    pub(in crate::admission_operation_store) fn request(&self) -> &ToolCallRequest {
+        self.custody.request
+    }
     pub(in crate::admission_operation_store) fn frozen_steps(&self) -> &[FrozenEvaluationStepV1] {
         self.original.post_return_steps()
     }
