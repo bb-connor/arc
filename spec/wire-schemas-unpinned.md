@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-161 of 520 identifier constants in the security crates are unpinned.
+159 of 518 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (25)
 
@@ -90,22 +90,20 @@ since been pinned is removed by the next `--update`.
 
 - `crates/kernel/chio-kernel-core/src/passport_verify.rs:46` `PORTABLE_PASSPORT_SCHEMA` = `chio.portable-agent-passport.v1`
 
-## crates/platform/chio-control-plane (41)
+## crates/platform/chio-control-plane (39)
 
 - `crates/platform/chio-control-plane/src/certify/schema.rs:7` `CERTIFICATION_PUBLIC_SEARCH_SCHEMA` = `chio.certify.search.v1`
 - `crates/platform/chio-control-plane/src/certify/schema.rs:8` `CERTIFICATION_PUBLIC_TRANSPARENCY_SCHEMA` = `chio.certify.transparency.v1`
 - `crates/platform/chio-control-plane/src/certify/schema.rs:9` `CERTIFICATION_CONSUMPTION_POLICY_PROFILE_V1` = `chio.certify.consume.v1`
 - `crates/platform/chio-control-plane/src/federation_policy.rs:15` `FEDERATION_ADMISSION_POLICY_RECORD_SCHEMA` = `chio.permissionless-federation-policy.v1`
 - `crates/platform/chio-control-plane/src/federation_policy.rs:17` `FEDERATION_ADMISSION_POLICY_REGISTRY_VERSION` = `chio.permissionless-federation-policy-registry.v1`
-- `crates/platform/chio-control-plane/src/keyring_runtime.rs:1317` `AUTHORITY_SEED_HANDOFF_SCHEMA` = `chio.authority-seed-handoff.v1`
+- `crates/platform/chio-control-plane/src/keyring_runtime.rs:1297` `AUTHORITY_SEED_HANDOFF_SCHEMA` = `chio.authority-seed-handoff.v1`
 - `crates/platform/chio-control-plane/src/passport_verifier.rs:54` `PASSPORT_STATUS_REGISTRY_VERSION` = `chio.passport-status-registry.v1`
 - `crates/platform/chio-control-plane/src/passport_verifier.rs:55` `PASSPORT_ISSUANCE_REGISTRY_VERSION` = `chio.passport-issuance-offers.v1`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:13` `SCIM_LIFECYCLE_REGISTRY_VERSION` = `chio.scim-lifecycle-registry.v1`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:14` `SCIM_LIFECYCLE_RECORD_SCHEMA` = `chio.scim-lifecycle-record.v1`
 - `crates/platform/chio-control-plane/src/security/event_consumer/admission.rs:43` `ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA` = `chio.attested-finding-admission-artifacts.v1`
 - `crates/platform/chio-control-plane/src/security/event_consumer/verification.rs:14` `SECURITY_EVENT_RECEIPT_PROJECTION_VERSION` = `chio.security-event-receipt-projection.v1`
-- `crates/platform/chio-control-plane/src/security/migration_evidence.rs:11` `ENTERPRISE_MIGRATION_CANARY_EVIDENCE_SCHEMA` = `chio.enterprise-migration-canary-evidence.v1`
-- `crates/platform/chio-control-plane/src/security/migration_evidence.rs:13` `ENTERPRISE_MIGRATION_CUTOVER_ATTESTATION_SCHEMA` = `chio.enterprise-migration-cutover-attestation.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:145` `DEFECT_DOMAIN` = `chio.finding.defect.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:157` `EFFECT_FEE_DOMAIN` = `chio.finding.effect.fee.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:160` `EFFECT_ROOT_INTENT_DOMAIN` = `chio.finding.effect.root-intent.v1`
