@@ -251,3 +251,22 @@ fn hosted_mcp_sessions_expire_under_ttl_and_cannot_be_reused() {
     assert_ne!(fresh_session.id, session.id);
     assert_eq!(fresh_session.protocol_version, session.protocol_version);
 }
+
+#[test]
+fn hosted_test_server_stops_listening_when_dropped() {
+    let server = start_http_server("hosted-token");
+    let address = server
+        .base_url
+        .strip_prefix("http://")
+        .expect("http base URL")
+        .parse::<std::net::SocketAddr>()
+        .expect("listen address");
+    assert!(std::net::TcpStream::connect(address).is_ok());
+    drop(server);
+    assert_eq!(
+        std::net::TcpStream::connect(address)
+            .map(|_| ())
+            .map_err(|error| error.kind()),
+        Err(std::io::ErrorKind::ConnectionRefused)
+    );
+}
