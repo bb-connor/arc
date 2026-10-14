@@ -56,6 +56,14 @@ fn threshold_restart(protocol: Protocol) -> TestResult {
     assert_eq!(proposal.body.request_id, request.request_id);
     assert_eq!(proposal.body.threshold, 2);
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        proposal.body.governed_intent_hash,
+        request
+            .governed_intent
+            .as_ref()
+            .ok_or("intent")?
+            .binding_hash()?
+    );
     request = fixture.approved_request(&request, proposal)?;
     let completed = consumer.invoke(&request)?;
     assert_eq!(completed.decision, "allow", "{:?}", completed.receipt);
