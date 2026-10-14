@@ -14,7 +14,7 @@ use crate::tripwire::{Clock, SystemClock};
 use crate::MissingContextPolicy;
 
 const GUARD_NAME: &str = "chio-session-throttle";
-const INVOCATION_DOMAIN: &[u8] = b"chio.session-throttle-invocation.v2\0";
+const INVOCATION_DOMAIN: &[u8] = b"chio.session-throttle-invocation.v1\0";
 
 #[derive(Serialize)]
 #[serde(deny_unknown_fields)]
@@ -72,7 +72,7 @@ impl SessionThrottleGuard {
         key: &SessionThrottleKey,
     ) -> Result<RecordId, PortError> {
         let commitment = InvocationCommitment {
-            schema_version: 2,
+            schema_version: 1,
             tenant_id: key.tenant_id.as_str(),
             session_id: key.session_id.as_str(),
             request_id: guard_context.request.request_id.as_str(),
