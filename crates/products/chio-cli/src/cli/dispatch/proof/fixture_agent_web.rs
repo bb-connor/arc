@@ -29,6 +29,7 @@ struct AgentWebReceiptIntent {
 pub(super) fn resign_agent_web_receipts_for_policy(
     bundle: &Path,
     policy_sha256: &str,
+    allow_unbound_receipts: bool,
 ) -> Result<(), CliError> {
     let receipt_intents = agent_web_receipt_intents(bundle)?;
     if receipt_intents.is_empty() {
@@ -88,9 +89,7 @@ pub(super) fn resign_agent_web_receipts_for_policy(
         };
         validate_agent_web_receipt_ref_path(&receipt_path, path_stem, &receipt_ref)?;
         let Some(intent) = receipt_intents.get(&receipt_ref) else {
-            if receipt_ref.starts_with("receipt-agent-web-")
-                && !is_intentional_unbound_receipt_fixture(bundle)
-            {
+            if receipt_ref.starts_with("receipt-agent-web-") && !allow_unbound_receipts {
                 return Err(CliError::cli_other_error(format!(
                     "proof fixture Agent Web receipt has no envelope intent: {}: {receipt_ref}",
                     receipt_path.display()
@@ -157,7 +156,7 @@ pub(super) fn resign_agent_web_receipts_for_policy(
         })?;
         write_json_line_file(&receipt_path, &signed_receipt)?;
     }
-    if !is_intentional_unbound_receipt_fixture(bundle) {
+    if !allow_unbound_receipts {
         if let Some(missing_ref) = receipt_intents
             .keys()
             .find(|receipt_ref| !normalized_refs.contains(*receipt_ref))
@@ -182,12 +181,6 @@ fn validate_agent_web_receipt_ref_path(
         )));
     }
     Ok(())
-}
-
-fn is_intentional_unbound_receipt_fixture(bundle: &Path) -> bool {
-    bundle
-        .components()
-        .any(|component| component.as_os_str().to_str() == Some("agent-web-vc-unbound-receipt"))
 }
 
 fn agent_web_receipt_intents(
