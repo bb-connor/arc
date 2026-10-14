@@ -178,7 +178,7 @@ cargo test --locked -p chio-cli --features real-linux-enforcement \
 
 - `chio-mcp-adapter` and `chio-mcp-remote` unit tests: 17 of 17 passed.
 - RS-14 and RS-16 ran with the full `chio-mcp-remote` and `chio-mcp-adapter`
-  suites at `687e9f7f75`: 230 and 137 passed.
+  suites on `05bb3ce0f3` with the fix applied: 230 and 137 passed.
 - `chio-cli` `mcp_serve_http` and `mcp_auth_server`: 11 of 11 passed. These
   tests launch the wrapped server inside the native cage and run only with
   the enforced native fixture (`CHIO_CAGE_INIT`, read grants, runtime files
