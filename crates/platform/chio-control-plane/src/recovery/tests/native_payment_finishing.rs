@@ -1223,6 +1223,8 @@ fn retain_ordinary_records(
 #[tokio::test]
 async fn native_payment_restart_claims_commit_inside_funded_purposes_under_row_pressure(
 ) -> TestResult {
+    use chio_kernel::admission_operation::QualifiedAdmissionOperationStoreExt;
+
     const OWED_ROW: &str = "owed native table row";
     let directory = Box::pin(crash_after_payment_authorization()).await?;
     let retained_path = directory.path().to_path_buf();
@@ -1271,6 +1273,7 @@ async fn native_payment_restart_claims_commit_inside_funded_purposes_under_row_p
     }
     let store = f.authority.admission_operation_store();
     let fence = f.authority.mutation_fence();
+    let operation_id = AdmissionOperationId::from_persisted(operation_id.as_str())?;
     let original = store
         .load_by_operation_id(&operation_id)?
         .ok_or("authorized payment original absent")?;
