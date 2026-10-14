@@ -44,6 +44,7 @@ fn fixture() -> TestResult<Fixture> {
                 "committed_version": 9, "coordinator_lease_id": "coordinator", "coordinator_lease_epoch": 3,
                 "store_fence": {"store_uuid": "authority", "lease_id": "owner", "owner_epoch": 3},
                 "provider_attempt": {"operation_id": operation, "attempt_id": "attempt", "transport_id": "caller-report:server", "transport_key_epoch": 7},
+                "dispatch_launch": {"native_launch": null, "worker_profile": null},
             },
         },
         "not_before_unix_ms": now - 1_000, "expires_at_unix_ms": now + 30_000,
