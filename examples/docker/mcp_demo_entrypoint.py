@@ -120,9 +120,26 @@ def native_cage_arguments() -> list[str]:
     return arguments
 
 
+def supplementary_gid_arguments() -> list[str]:
+    """Bind every supplementary group of the edge user.
+
+    An unprivileged cage helper refuses a launch whose observed groups differ
+    from the bound identity, so the provision names each group the edge
+    process holds except its primary group. The root group is refused.
+    """
+    primary = os.getgid()
+    arguments = []
+    for gid in sorted(set(os.getgroups()) - {primary}):
+        if gid == 0:
+            raise SystemExit("the demo edge must not hold the root supplementary group")
+        arguments.extend(["--execution-supplementary-gid", str(gid)])
+    return arguments
+
+
 def provision_launch(server_id: str, server_name: str, server_version: str) -> dict:
     """Provision the launch material for the mock server and return the edge flags."""
     cage_arguments = native_cage_arguments()
+    group_arguments = supplementary_gid_arguments()
     target = os.path.realpath("/usr/bin/python3")
     output_dir = os.path.join(provision_root(), "security")
     environment = {
@@ -150,6 +167,7 @@ def provision_launch(server_id: str, server_name: str, server_version: str) -> d
                 str(os.getuid()),
                 "--execution-gid",
                 str(os.getgid()),
+                *group_arguments,
                 "--server-id",
                 server_id,
                 "--server-name",

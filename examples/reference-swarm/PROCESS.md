@@ -549,15 +549,23 @@ exist at its canonical absolute path. Provisioning records the reviewed values;
 Linux authenticates the actual connected peer's PID, UID and GID when preparing
 each launch. A missing socket, changed peer or failed connection denies launch.
 
-With a reviewed static MCP executable and its reviewed `tools/list` fixture:
+With a reviewed static MCP executable and its reviewed `tools/list` fixture,
+provision for the non-root user that runs the process host. The unprivileged
+cage helper refuses a launch whose observed user, primary group or
+supplementary groups differ from the bound identity, so bind every group that
+user holds:
 
 ```sh
+tool_groups=
+for gid in $(id -G); do
+  [ "$gid" = "$(id -g)" ] || tool_groups="$tool_groups --execution-supplementary-gid $gid"
+done
 chio security provision-reference-runtime \
   --output-dir "$FRESH_LAUNCH_DIRECTORY" \
   --cage-init "$CAGE_INIT" --target "$BROKERED_MCP_TOOL" \
   --tools-fixture "$REVIEWED_TOOLS" --broker-binding "$REVIEWED_BROKER_BINDING" \
   --receipt-rollback-anchor-root "$PRIVATE_EXTERNAL_ANCHOR" \
-  --execution-uid "$TOOL_UID" --execution-gid "$TOOL_GID" \
+  --execution-uid "$(id -u)" --execution-gid "$(id -g)" $tool_groups \
   --server-id brokered-reference-tool
 ```
 
