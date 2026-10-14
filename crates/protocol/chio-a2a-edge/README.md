@@ -16,7 +16,7 @@ use chio_manifest::VerifiedManifestRegistry;
 let registry = VerifiedManifestRegistry::default();
 let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), &registry)?;
 assert!(edge.skill_ids().is_empty());
-assert!(edge.agent_card().capabilities.streaming);
+assert!(!edge.agent_card().capabilities.streaming);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -31,12 +31,13 @@ assert!(edge.agent_card().capabilities.streaming);
 
 `ChioA2aEdge::new` requires a `VerifiedManifestRegistry` and validates Agent Card configuration. `handle_jsonrpc` validates original JSON bytes with a 1 MiB limit before dispatch. Kernel execution supplies capability enforcement and receipts.
 
-Use the request-ID entrypoints for request-bound authorization artifacts.
-Deferred task queries and cancellation retain host-authenticated owner checks.
+The edge serves A2A v1.0.0 `SendMessage`, `GetTask` and `CancelTask`; other methods return `-32601`. `message.messageId` is the kernel request ID. The host-authenticated execution context supplies authority; message metadata never does. Task lookups return the same `-32001` for absent and inaccessible tasks.
 
 ## Status
 
-Implemented library entrypoints cover blocking sends and deferred task execution. Streaming creates a task; `task/get` resolves it and `task/cancel` can cancel pending work. The embedding host supplies authenticated execution context and HTTP routing.
+`SendMessage` blocks until the kernel returns a result, with omitted or `false` `configuration.returnImmediately`; `true` returns `-32004` before task creation. Approval-blocked work returns `TASK_STATE_INPUT_REQUIRED`. The owner resumes it with `SendMessage`, the original `messageId` and the returned `taskId`; the tool, arguments, capability and intent stay fixed and only the signed approval artifacts change. `GetTask` observes a task without executing it, and `CancelTask` cancels work awaiting approval.
+
+The Agent Card advertises `text/plain` and `application/json` and does not advertise streaming. Multi-turn contexts, history, file parts and message extensions are refused. The embedding host supplies authentication, HTTP routing, TLS and protocol-version header enforcement.
 
 The crate is workspace-internal (`publish = false`). Its tests exercise
 library behavior; deployment configuration needs its own verification.

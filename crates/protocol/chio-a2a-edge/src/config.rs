@@ -1,4 +1,5 @@
 // Edge configuration surfaced in the published Agent Card.
+use super::A2aEdgeError;
 
 /// Configuration for the A2A edge.
 #[derive(Debug, Clone)]
@@ -32,7 +33,7 @@ impl Default for A2aEdgeConfig {
 }
 
 impl A2aEdgeConfig {
-    fn validate_for_agent_card(&self) -> Result<(), A2aEdgeError> {
+    pub(super) fn validate_for_agent_card(&self) -> Result<(), A2aEdgeError> {
         self.peer_capabilities
             .validate()
             .map_err(|error| A2aEdgeError::InvalidRequest(error.to_string()))?;

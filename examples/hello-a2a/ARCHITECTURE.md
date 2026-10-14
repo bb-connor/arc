@@ -5,8 +5,7 @@
 `examples/hello-a2a` owns the maintained A2A protocol-edge teaching example. It
 builds a small Chio kernel, registers one streaming-capable `hello_task` tool,
 publishes that tool through `ChioA2aEdge`, prints the generated Agent Card, and
-serves line-based JSON-RPC requests for authoritative `message/send`,
-`message/stream`, and `task/get` flows.
+serves line-based A2A v1.0.0 JSON-RPC `SendMessage` requests.
 
 The package depends on public APIs from:
 
@@ -21,16 +20,14 @@ The package depends on public APIs from:
 
 - Preserve the server id `hello-a2a-srv`, tool id `hello_task`, Agent Card skill
   shape, capability scope, and receipt-bearing metadata in terminal results.
-- Preserve the documented JSON-RPC flow: `message/send`, deferred
-  `message/stream`, and `task/get`.
+- Preserve the documented JSON-RPC flow: blocking `SendMessage` in JSON and
+  text output modes.
 - Preserve kernel-mediated authorization. The example must not bypass
   capability validation, guard execution, receipt signing, revocation, budget,
   approval, or runtime policy paths.
 - As a protocol-edge reference, `HelloStreamServer` self-defends its
   registration boundary on both blocking and streaming paths even though the
   kernel routes only registered tools.
-- Preserve deferred task ownership semantics and the `receiptPending` metadata
-  on working task responses.
 - Do not change `chio-a2a-edge` public APIs from this example.
 
 ## Affected Dependents

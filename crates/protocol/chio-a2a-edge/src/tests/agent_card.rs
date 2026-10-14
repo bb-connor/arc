@@ -170,7 +170,7 @@ fn agent_card_custom_config() {
     let card = edge.agent_card();
     assert_eq!(card.name, "My Agent");
     assert_eq!(card.description, "Custom agent");
-    assert!(card.capabilities.streaming);
+    assert!(!card.capabilities.streaming);
     assert_eq!(card.supported_interfaces[0].url, "https://myagent.com");
     assert_eq!(card.supported_interfaces[0].protocol_binding, "HTTP+JSON");
 }
@@ -218,7 +218,7 @@ fn cancellation_tool_is_adapted_with_truthful_caveats() {
     };
     assert!(caveats
         .iter()
-        .any(|c| c.contains("cancellation is available only for deferred `message/stream` tasks")));
+        .any(|c| c.contains("`CancelTask` applies only to tasks awaiting approval")));
 }
 
 #[test]
@@ -240,7 +240,7 @@ fn streaming_tool_is_adapted_with_truthful_caveats() {
     let BridgeFidelity::Adapted { caveats } = &skill.bridge_fidelity else {
         panic!("expected adapted fidelity");
     };
-    assert!(caveats.iter().any(|c| c.contains("deferred tasks")));
+    assert!(caveats.iter().any(|c| c.contains("blocking `SendMessage`")));
     assert!(caveats.iter().any(|c| c.contains("terminal task payload")));
 }
 

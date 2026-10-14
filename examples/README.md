@@ -36,7 +36,7 @@ See [`docs/guides/WEB_BACKEND_QUICKSTART.md`](../docs/guides/WEB_BACKEND_QUICKST
 The `hello-*` family follows one shared contract:
 
 1. Expose one safe read path such as `GET /hello` or a discovery/list call.
-2. Expose one governed path such as `POST /echo`, `tool/invoke`, or `message/send`.
+2. Expose one governed path such as `POST /echo`, `tool/invoke`, or `SendMessage`.
 3. Show the deny path without a capability token where applicable.
 4. Show the allow path with a capability token or authoritative session.
 5. Capture or print at least one Chio receipt or receipt id.

@@ -1699,10 +1699,10 @@ fn runtime_lifecycle_contract_serializes_shared_surface_metadata() {
     let lifecycle = runtime_lifecycle_contract(RuntimeLifecycleSurface::A2aAuthoritative);
     let json = serde_json::to_value(lifecycle).unwrap();
     assert_eq!(json["surface"], "a2a_authoritative");
-    assert_eq!(json["blockingEntrypoint"], "message/send");
-    assert_eq!(json["streamEntrypoint"], "message/stream");
-    assert_eq!(json["followUpEntrypoint"], "task/get");
-    assert_eq!(json["cancelEntrypoint"], "task/cancel");
+    assert_eq!(json["blockingEntrypoint"], "SendMessage");
+    assert_eq!(json["streamEntrypoint"], "SendMessage");
+    assert_eq!(json["followUpEntrypoint"], "GetTask");
+    assert_eq!(json["cancelEntrypoint"], "CancelTask");
     assert_eq!(json["claimEligible"], true);
 }
 

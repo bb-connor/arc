@@ -7,21 +7,21 @@
 //! Responsibilities:
 //!
 //! 1. Publish an A2A Agent Card at `/.well-known/agent-card.json`.
-//! 2. Accept `SendMessage` requests and route them through the Chio kernel by
-//!    default.
-//! 3. Expose a truthful blocking `message/send` surface plus deferred
-//!    receipt-bearing `message/stream` task lifecycle.
+//! 2. Serve the A2A v1.0.0 JSON-RPC methods `SendMessage`, `GetTask` and
+//!    `CancelTask`, routing every invocation through the Chio kernel.
+//! 3. Retain approval-blocked tasks so the owner can resume them with
+//!    `SendMessage` under the original message ID and task ID.
 //! 4. Evaluate `BridgeFidelity` per tool to signal translation quality.
 //!
-//! Kernel-backed entrypoints produce signed Chio receipts. The streaming
-//! surface is truthful but bounded: `message/stream` creates a deferred task,
-//! `task/get` resolves the terminal receipt-bearing result, and `task/cancel`
-//! can cancel a deferred task before execution.
+//! Kernel-backed entrypoints produce signed Chio receipts. `SendMessage`
+//! blocks until the kernel returns a result; `GetTask` observes a retained
+//! task and never executes it; `CancelTask` cancels a task awaiting approval.
 //!
 //! ## Modules
 //!
 //! The implementation is split into focused source fragments that share this
-//! crate-root module scope (via `include!`):
+//! crate-root module scope (via `include!`), plus private configuration, conversion
+//! and v1 protocol modules:
 //!
 //! - `error`: the [`A2aEdgeError`] type and receipt-write accounting helpers.
 //! - `config`: the [`A2aEdgeConfig`] published in the Agent Card.
@@ -29,6 +29,7 @@
 //! - `bridge`: capability bridge, skill candidates, fidelity, orchestration.
 //! - `conversion`: message conversion and Chio metadata envelope builders.
 //! - `edge`: the [`ChioA2aEdge`] server.
+//! - `v1`: the A2A v1.0.0 JSON-RPC projection and owner continuation.
 
 #![forbid(unsafe_code)]
 
@@ -80,12 +81,22 @@ pub mod otel;
 // visibility resolve as if the fragments were inlined here.
 
 include!("error.rs");
-include!("config.rs");
+mod config;
+pub use config::A2aEdgeConfig;
 include!("types.rs");
 include!("bridge.rs");
-include!("conversion.rs");
+mod conversion;
+#[cfg(test)]
+use conversion::result_to_parts;
+use conversion::{
+    build_a2a_source_envelope, cancelled_task_metadata, ensure_chio_metadata,
+    extract_arguments_from_message, pending_task_metadata, task_response_from_orchestrated,
+};
 include!("edge.rs");
+mod task_completion;
 include!("jsonrpc.rs");
+mod v1;
+use v1::V1OutputMode;
 include!("tests/all.rs");
 
 #[cfg(test)]
@@ -95,3 +106,7 @@ mod nonce_preflight_tests;
 #[cfg(test)]
 #[path = "tests/boundaries.rs"]
 mod boundary_tests;
+
+#[cfg(test)]
+#[path = "tests/v1.rs"]
+mod v1_tests;

@@ -18,6 +18,18 @@ pub enum A2aEdgeError {
     #[error("invalid request: {0}")]
     InvalidRequest(String),
 
+    /// The requested operation or execution mode is not supported.
+    #[error("unsupported operation: {0}")]
+    UnsupportedOperation(&'static str),
+
+    /// The requested task does not exist or is inaccessible to this caller.
+    #[error("task not found: {0}")]
+    TaskNotFound(String),
+
+    /// The task has reached a terminal state that cannot be cancelled.
+    #[error("task is not cancelable: {0}")]
+    TaskNotCancelable(String),
+
     /// The kernel denied the request.
     #[error("kernel error: {0}")]
     Kernel(String),

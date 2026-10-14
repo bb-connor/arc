@@ -158,7 +158,7 @@ mod tests {
         Keypair::from_seed(&[seed; 32]).public_key().to_hex()
     }
 
-    struct MockToolServer {
+    pub(super) struct MockToolServer {
         server_id: String,
         tools: Vec<String>,
         response: Value,
@@ -353,7 +353,7 @@ mod tests {
         }
     }
 
-    fn test_server() -> MockToolServer {
+    pub(super) fn test_server() -> MockToolServer {
         MockToolServer {
             server_id: "test-srv".to_string(),
             tools: vec!["echo".to_string(), "write".to_string()],
@@ -1205,11 +1205,11 @@ mod tests {
             .handle_send_message("echo", &text_message("hello"), &kernel, &execution)
             .test_expect_err("supplemental authorization must require a stable request id");
 
-        assert_eq!(
-            error.to_string(),
-            "invalid request: A2A request-bound authorization artifacts and execution nonces \
-             require handle_send_message_with_request_id or handle_stream_message_with_request_id"
-        );
+        let message = error.to_string();
+        assert!(message.starts_with(
+            "invalid request: A2A request-bound authorization artifacts and execution nonces require "
+        ));
+        assert!(message.contains("handle_send_message_with_request_id"));
     }
 
     #[test]
@@ -1244,11 +1244,11 @@ mod tests {
             .handle_send_message("echo", &text_message("hello"), &kernel, &execution)
             .test_expect_err("a singular approval token must require a stable request id");
 
-        assert_eq!(
-            error.to_string(),
-            "invalid request: A2A request-bound authorization artifacts and execution nonces \
-             require handle_send_message_with_request_id or handle_stream_message_with_request_id"
-        );
+        let message = error.to_string();
+        assert!(message.starts_with(
+            "invalid request: A2A request-bound authorization artifacts and execution nonces require "
+        ));
+        assert!(message.contains("handle_send_message_with_request_id"));
     }
 
     #[test]
@@ -1622,8 +1622,8 @@ mod tests {
     // ---- JSON-RPC handler tests ----
 
     #[test]
-    fn jsonrpc_send_message_param_parser_infers_single_skill_and_labels_stream_errors() {
-        let edge = ChioA2aEdge::new(
+    fn jsonrpc_send_message_infers_single_skill_and_rejects_invalid_params() {
+        let mut edge = ChioA2aEdge::new(
             A2aEdgeConfig::default(),
             vec![{
                 let mut manifest = test_manifest();
@@ -1633,46 +1633,49 @@ mod tests {
         )
         .test_unwrap();
 
-        let (skill_id, request) = edge
-            .parse_jsonrpc_send_message_params(
-                serde_json::to_value(text_message("hi")).test_unwrap(),
-                "SendMessage",
-            )
+        let skill_id = edge
+            .resolve_jsonrpc_target_skill_id(&json!({"message": {"messageId": "m-1"}}))
             .test_unwrap();
         assert_eq!(skill_id, "echo");
-        assert_eq!(request.message.role, "user");
 
-        let error = match edge.parse_jsonrpc_send_message_params(
-            json!({
-                "message": {
-                    "role": "user",
-                    "parts": "bad"
-                }
-            }),
-            "SendStreamingMessage",
-        ) {
-            Ok(_) => panic!("expected invalid request error"),
-            Err(error) => error,
-        };
+        let (kernel, execution) = kernel_for_server(test_server());
+        let response = edge
+            .handle_jsonrpc(
+                &serde_json::to_vec(&json!({
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "SendMessage",
+                    "params": {"message": {"messageId": "m-1", "role": "ROLE_USER", "parts": "bad"}}
+                }))
+                .test_unwrap(),
+                &kernel,
+                &execution,
+            )
+            .test_unwrap();
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "urn:chio:error:attest:signed-json-invalid-shape"
+        );
         assert!(matches!(
-            error,
-            A2aEdgeError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(_))
+            response.local_error(),
+            Some(A2aEdgeError::UntrustedInput(
+                chio_core::canonical::UntrustedJsonError::Decode(_)
+            ))
         ));
+        assert!(edge.tasks.is_empty());
     }
 
     #[test]
-    fn jsonrpc_send_message_param_parser_requires_skill_id_for_multiple_skills() {
+    fn jsonrpc_target_skill_resolution_requires_skill_id_for_multiple_skills() {
         let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
 
-        let error = match edge.parse_jsonrpc_send_message_params(
-            json!({
+        let error = match edge.resolve_jsonrpc_target_skill_id(&json!({
                 "message": {
                     "role": "user",
                     "parts": [{"type": "text", "text": "hi"}]
                 }
-            }),
-            "SendMessage",
-        ) {
+            })) {
             Ok(_) => panic!("expected missing target skill error"),
             Err(error) => error,
         };
@@ -1697,8 +1700,7 @@ mod tests {
         )
         .test_unwrap();
 
-        let error = match edge.parse_jsonrpc_send_message_params(
-            json!({
+        let error = match edge.resolve_jsonrpc_target_skill_id(&json!({
                 "message": {
                     "role": "user",
                     "parts": [{"type": "text", "text": "hi"}]
@@ -1706,9 +1708,7 @@ mod tests {
                 "metadata": {
                     "chio": "not-an-object"
                 }
-            }),
-            "SendMessage",
-        ) {
+            })) {
             Ok(_) => panic!("expected malformed metadata.chio to fail"),
             Err(error) => error,
         };
@@ -1730,8 +1730,7 @@ mod tests {
         )
         .test_unwrap();
 
-        let error = match edge.parse_jsonrpc_send_message_params(
-            json!({
+        let error = match edge.resolve_jsonrpc_target_skill_id(&json!({
                 "message": {
                     "role": "user",
                     "parts": [{"type": "text", "text": "hi"}]
@@ -1739,9 +1738,7 @@ mod tests {
                 "metadata": {
                     "chio": {"targetSkillId": 123}
                 }
-            }),
-            "SendMessage",
-        ) {
+            })) {
             Ok(_) => panic!("expected non-string targetSkillId to fail"),
             Err(error) => error,
         };
@@ -1763,8 +1760,7 @@ mod tests {
         )
         .test_unwrap();
 
-        let error = match edge.parse_jsonrpc_send_message_params(
-            json!({
+        let error = match edge.resolve_jsonrpc_target_skill_id(&json!({
                 "message": {
                     "role": "user",
                     "parts": [{"type": "text", "text": "hi"}]
@@ -1772,9 +1768,7 @@ mod tests {
                 "metadata": {
                     "chio": {"targetSkillId": "   "}
                 }
-            }),
-            "SendMessage",
-        ) {
+            })) {
             Ok(_) => panic!("expected empty targetSkillId to fail before lookup"),
             Err(error) => error,
         };
@@ -1788,8 +1782,7 @@ mod tests {
     fn jsonrpc_rejects_padded_target_skill_id_before_lookup() {
         let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
 
-        let error = match edge.parse_jsonrpc_send_message_params(
-            json!({
+        let error = match edge.resolve_jsonrpc_target_skill_id(&json!({
                 "message": {
                     "role": "user",
                     "parts": [{"type": "text", "text": "hi"}]
@@ -1797,9 +1790,7 @@ mod tests {
                 "metadata": {
                     "chio": {"targetSkillId": " echo "}
                 }
-            }),
-            "SendMessage",
-        ) {
+            })) {
             Ok(_) => panic!("expected padded targetSkillId to fail before lookup"),
             Err(error) => error,
         };
@@ -1844,11 +1835,12 @@ mod tests {
             json!({
                 "jsonrpc": "2.0",
                 "id": 1,
-                "method": "message/send",
+                "method": "SendMessage",
                 "params": {
                     "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "hi"}]
+                        "messageId": "m-1",
+                        "role": "ROLE_USER",
+                        "parts": [{"text": "hi"}]
                     }
                 }
             }),
@@ -1857,7 +1849,7 @@ mod tests {
         );
         assert!(response.get("result").is_some());
         assert_eq!(
-            response["result"]["metadata"]["chio"]["authorityPath"].as_str(),
+            response["result"]["task"]["metadata"]["chio"]["authorityPath"].as_str(),
             Some("cross_protocol_orchestrator")
         );
     }
@@ -1895,10 +1887,11 @@ mod tests {
             json!({
                 "jsonrpc": "2.0",
                 "id": 1,
-                "method": "message/send",
+                "method": "SendMessage",
                 "params": {
                     "message": {
-                        "role": "user",
+                        "messageId": "m-1",
+                        "role": "ROLE_USER",
                         "parts": []
                     }
                 }
@@ -1939,11 +1932,12 @@ mod tests {
             json!({
                 "jsonrpc": "2.0",
                 "id": 1,
-                "method": "message/send",
+                "method": "SendMessage",
                 "params": {
                     "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "hi"}]
+                        "messageId": "m-1",
+                        "role": "ROLE_USER",
+                        "parts": [{"text": "hi"}]
                     },
                     "metadata": {
                         "chio": {"targetSkillId": "echo"}
@@ -1955,7 +1949,7 @@ mod tests {
         );
         assert!(response.get("result").is_some());
         assert_eq!(
-            response["result"]["metadata"]["chio"]["authorityPath"].as_str(),
+            response["result"]["task"]["metadata"]["chio"]["authorityPath"].as_str(),
             Some("cross_protocol_orchestrator")
         );
     }
@@ -1985,11 +1979,12 @@ mod tests {
             json!({
                 "jsonrpc": "2.0",
                 "id": 1,
-                "method": "message/send",
+                "method": "SendMessage",
                 "params": {
                     "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "hi"}]
+                        "messageId": "m-1",
+                        "role": "ROLE_USER",
+                        "parts": [{"text": "hi"}]
                     }
                 }
             }),
@@ -2034,47 +2029,7 @@ mod tests {
     }
 
     #[test]
-    fn jsonrpc_send_rejects_non_object_params_before_skill_resolution() {
-        let mut edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-        let config = test_kernel_config();
-        let kernel_issuer = config.keypair.clone();
-        let mut kernel = ChioKernel::new(config);
-        kernel.register_tool_server(Box::new(test_server()));
-        let subject = Keypair::generate();
-        let execution = A2aKernelExecutionContext {
-            capability: capability_for_tool(&kernel_issuer, &subject, "test-srv", "echo"),
-            agent_id: subject.public_key().to_hex(),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-        };
-
-        let response = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 41,
-                "method": "message/send",
-                "params": []
-            }),
-            &kernel,
-            &execution,
-        );
-
-        assert_eq!(response["error"]["code"], -32602);
-        assert_eq!(
-            response["error"]["message"],
-            "message/send params must be an object"
-        );
-    }
-
-    #[test]
-    fn jsonrpc_task_get_rejects_non_object_params_before_lookup() {
+    fn jsonrpc_get_task_rejects_non_object_params_before_lookup() {
         let mut edge =
             ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -2098,7 +2053,7 @@ mod tests {
             json!({
                 "jsonrpc": "2.0",
                 "id": 42,
-                "method": "task/get",
+                "method": "GetTask",
                 "params": []
             }),
             &kernel,
@@ -2108,7 +2063,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "task/get params must be an object"
+            "urn:chio:error:attest:signed-json-invalid-shape"
         );
     }
 
@@ -2179,7 +2134,7 @@ mod tests {
             json!({
                 "jsonrpc": "1.0",
                 "id": "request-7",
-                "method": "message/send",
+                "method": "SendMessage",
                 "params": {}
             }),
             &kernel,
@@ -2208,7 +2163,7 @@ mod tests {
             json!({
                 "jsonrpc": "2.0",
                 "id": 43,
-                "method": "message/send",
+                "method": "SendMessage",
                 "params": []
             }),
             &kernel,
@@ -2218,7 +2173,7 @@ mod tests {
         assert_eq!(response["error"]["code"], -32602);
         assert_eq!(
             response["error"]["message"],
-            "message/send params must be an object"
+            "urn:chio:error:attest:signed-json-invalid-shape"
         );
     }
 
@@ -2238,11 +2193,12 @@ mod tests {
             json!({
                 "jsonrpc": "2.0",
                 "id": 9,
-                "method": "message/send",
+                "method": "SendMessage",
                 "params": {
                     "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "hi"}]
+                        "messageId": "m-1",
+                        "role": "ROLE_USER",
+                        "parts": [{"text": "hi"}]
                     }
                 }
             }),
@@ -2250,22 +2206,22 @@ mod tests {
             &execution,
         );
         assert_eq!(
-            response["result"]["metadata"]["chio"]["authorityPath"].as_str(),
+            response["result"]["task"]["metadata"]["chio"]["authorityPath"].as_str(),
             Some("cross_protocol_orchestrator")
         );
         assert_eq!(
-            response["result"]["metadata"]["chio"]["authoritative"].as_bool(),
+            response["result"]["task"]["metadata"]["chio"]["authoritative"].as_bool(),
             Some(true)
         );
-        assert!(response["result"]["metadata"]["chio"]["receiptId"]
+        assert!(response["result"]["task"]["metadata"]["chio"]["receiptId"]
             .as_str()
             .is_some());
         assert_eq!(
-            response["result"]["metadata"]["chio"]["lifecycle"]["messageStream"].as_str(),
+            response["result"]["task"]["metadata"]["chio"]["lifecycle"]["messageStream"].as_str(),
             Some("deferred_task_poll")
         );
         assert_eq!(
-            response["result"]["metadata"]["chio"]["runtimeLifecycle"]["surface"].as_str(),
+            response["result"]["task"]["metadata"]["chio"]["runtimeLifecycle"]["surface"].as_str(),
             Some("a2a_authoritative")
         );
     }
@@ -2296,12 +2252,14 @@ mod tests {
             json!({
                 "jsonrpc": "2.0",
                 "id": 10,
-                "method": "message/send",
+                "method": "SendMessage",
                 "params": {
                     "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "start"}]
-                    }
+                        "messageId": "m-1",
+                        "role": "ROLE_USER",
+                        "parts": [{"text": "start"}]
+                    },
+                    "configuration": {"acceptedOutputModes": ["text/plain"]}
                 }
             }),
             &kernel,
@@ -2309,10 +2267,10 @@ mod tests {
         );
 
         assert_eq!(
-            response["result"]["metadata"]["chio"]["streamProjection"].as_str(),
+            response["result"]["task"]["metadata"]["chio"]["streamProjection"].as_str(),
             Some("collated_final_message")
         );
-        let parts = response["result"]["message"]["parts"]
+        let parts = response["result"]["task"]["artifacts"][0]["parts"]
             .as_array()
             .test_expect("stream response should contain parts");
         assert_eq!(parts.len(), 2);
@@ -2320,17 +2278,9 @@ mod tests {
         assert_eq!(parts[1]["text"], "chunk-2");
     }
 
-    #[test]
-    fn jsonrpc_stream_creates_deferred_task_and_task_get_resolves_result() {
-        let mut edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
-        let config = test_kernel_config();
-        let kernel_issuer = config.keypair.clone();
-        let mut kernel = ChioKernel::new(config);
-        kernel.register_tool_server(Box::new(StreamingToolServer));
-        let subject = Keypair::generate();
-        let execution = A2aKernelExecutionContext {
-            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
+    fn stream_execution(issuer: &Keypair, subject: &Keypair) -> A2aKernelExecutionContext {
+        A2aKernelExecutionContext {
+            capability: capability_for_tool(issuer, subject, "stream-srv", "stream"),
             agent_id: subject.public_key().to_hex(),
             dpop_proof: None,
             execution_nonce: None,
@@ -2340,64 +2290,43 @@ mod tests {
             threshold_approval_proposal: None,
             supplemental_authorization: None,
             model_metadata: None,
-        };
+        }
+    }
 
-        let response = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 10,
-                "method": "message/stream",
-                "params": {
-                    "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "start"}]
-                    }
-                }
-            }),
-            &kernel,
-            &execution,
-        );
-        assert_eq!(response["result"]["status"].as_str(), Some("working"));
-        assert_eq!(
-            response["result"]["metadata"]["chio"]["runtimeLifecycle"]["streamEntrypoint"].as_str(),
-            Some("message/stream")
-        );
-        let task_id = response["result"]["id"]
-            .as_str()
-            .test_expect("message/stream should return task id")
-            .to_string();
-        assert_eq!(
-            response["result"]["metadata"]["chio"]["receiptPending"].as_bool(),
-            Some(true)
-        );
+    fn retain_stream_task(
+        edge: &mut ChioA2aEdge,
+        kernel: &ChioKernel,
+        execution: &A2aKernelExecutionContext,
+        request_id: &str,
+    ) -> TaskResponse {
+        edge.retain_task(
+            request_id,
+            "stream",
+            &text_message("start"),
+            kernel,
+            execution,
+            V1OutputMode::Json,
+        )
+        .test_unwrap()
+    }
 
-        let resolved = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 11,
-                "method": "task/get",
-                "params": {
-                    "taskId": task_id
+    fn stream_send_request(id: u64, message_id: &str) -> Value {
+        json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": "SendMessage",
+            "params": {
+                "message": {
+                    "messageId": message_id,
+                    "role": "ROLE_USER",
+                    "parts": [{"text": "start"}]
                 }
-            }),
-            &kernel,
-            &execution,
-        );
-        assert_eq!(resolved["result"]["status"].as_str(), Some("completed"));
-        assert_eq!(
-            resolved["result"]["metadata"]["chio"]["receiptId"]
-                .as_str()
-                .map(|value| !value.is_empty()),
-            Some(true)
-        );
-        let parts = resolved["result"]["message"]["parts"]
-            .as_array()
-            .test_expect("resolved task should contain parts");
-        assert_eq!(parts.len(), 2);
+            }
+        })
     }
 
     #[test]
-    fn jsonrpc_task_get_runtime_admission_denies_before_deferred_dispatch() {
+    fn jsonrpc_send_runtime_admission_denies_before_dispatch() {
         let mut edge =
             ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
@@ -2408,309 +2337,142 @@ mod tests {
             invocations: Arc::clone(&invocations),
         }));
         let subject = Keypair::generate();
-        let execution = A2aKernelExecutionContext {
-            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
-            agent_id: subject.public_key().to_hex(),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-        };
-
-        let accepted = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 10,
-                "method": "message/stream",
-                "params": {
-                    "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "start"}]
-                    }
-                }
-            }),
-            &kernel,
-            &execution,
-        );
-        assert_eq!(accepted["result"]["status"].as_str(), Some("working"));
-        assert_eq!(invocations.load(Ordering::SeqCst), 0);
-        let task_id = accepted["result"]["id"]
-            .as_str()
-            .test_expect("message/stream should return task id")
-            .to_string();
+        let execution = stream_execution(&kernel_issuer, &subject);
 
         kernel.set_runtime_admission_hook(Arc::new(DenyingRuntimeAdmissionHook));
-        let denied = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 11,
-                "method": "task/get",
-                "params": {
-                    "taskId": task_id
-                }
-            }),
-            &kernel,
-            &execution,
-        );
+        let denied =
+            edge.handle_jsonrpc_value(stream_send_request(11, "start-1"), &kernel, &execution);
 
-        assert_eq!(denied["result"]["status"].as_str(), Some("failed"));
+        let task = &denied["result"]["task"];
+        assert_eq!(task["status"]["state"].as_str(), Some("TASK_STATE_FAILED"));
         assert_eq!(
-            denied["result"]["statusMessage"].as_str(),
+            task["status"]["message"]["parts"][0]["text"].as_str(),
             Some("a2a edge runtime admission denied")
         );
         assert_eq!(
-            denied["result"]["metadata"]
+            task["metadata"]
                 .pointer("/chio/receipt/metadata/chio_runtime/failure_code")
                 .and_then(Value::as_str),
             Some("a2a_edge_runtime_admission_denied")
         );
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
+        assert!(edge.tasks.is_empty());
     }
 
     #[test]
-    fn jsonrpc_stream_notification_creates_task_without_response() {
+    fn jsonrpc_task_methods_never_find_blank_or_unknown_task_ids() {
         let mut edge =
             ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
         let subject = Keypair::generate();
-        let execution = A2aKernelExecutionContext {
-            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
-            agent_id: subject.public_key().to_hex(),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-        };
+        let execution = stream_execution(&kernel_issuer, &subject);
 
-        let response = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "method": "message/stream",
-                "params": {
-                    "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "start"}]
-                    }
-                }
-            }),
-            &kernel,
-            &execution,
-        );
-
-        assert!(response.is_notification());
-        assert_eq!(edge.tasks.len(), 1);
+        for method in ["GetTask", "CancelTask"] {
+            for task_id in ["", " task-1 ", "a2a-task-1\na2a-task-2", "absent"] {
+                let response = edge.handle_jsonrpc_value(
+                    json!({
+                        "jsonrpc": "2.0",
+                        "id": 32,
+                        "method": method,
+                        "params": { "id": task_id }
+                    }),
+                    &kernel,
+                    &execution,
+                );
+                assert_eq!(response["error"]["code"], -32001, "{method} {task_id:?}");
+                assert_eq!(response["error"]["message"], "task not found");
+            }
+        }
     }
 
     #[test]
-    fn jsonrpc_task_get_retains_completed_deferred_task_result() {
-        let mut edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
-        let config = test_kernel_config();
-        let kernel_issuer = config.keypair.clone();
-        let mut kernel = ChioKernel::new(config);
-        kernel.register_tool_server(Box::new(StreamingToolServer));
-        let subject = Keypair::generate();
-        let execution = A2aKernelExecutionContext {
-            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
-            agent_id: subject.public_key().to_hex(),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-        };
-
-        let created = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 30,
-                "method": "message/stream",
-                "params": {
-                    "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "start"}]
-                    }
-                }
-            }),
-            &kernel,
-            &execution,
-        );
-        let task_id = created["result"]["id"].as_str().test_unwrap().to_string();
-
-        let resolved = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 31,
-                "method": "task/get",
-                "params": { "taskId": task_id.clone() }
-            }),
-            &kernel,
-            &execution,
-        );
-
-        assert_eq!(resolved["result"]["status"].as_str(), Some("completed"));
-        assert!(edge.tasks.contains_key(&task_id));
-
-        let repeated = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 32,
-                "method": "task/get",
-                "params": { "taskId": task_id.clone() }
-            }),
-            &kernel,
-            &execution,
-        );
-        assert_eq!(repeated["result"]["status"].as_str(), Some("completed"));
-        assert_eq!(
-            repeated["result"]["metadata"]["chio"]["receiptId"],
-            resolved["result"]["metadata"]["chio"]["receiptId"]
-        );
-    }
-
-    #[test]
-    fn jsonrpc_task_get_rejects_empty_task_id_before_lookup() {
+    fn jsonrpc_task_methods_require_the_id_param() {
         let mut edge =
             ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
         let subject = Keypair::generate();
-        let execution = A2aKernelExecutionContext {
-            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
-            agent_id: subject.public_key().to_hex(),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-        };
+        let execution = stream_execution(&kernel_issuer, &subject);
 
-        let response = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 32,
-                "method": "task/get",
-                "params": { "taskId": "" }
-            }),
-            &kernel,
-            &execution,
-        );
-
-        assert_eq!(response["error"]["code"], -32602);
-        assert_eq!(
-            response["error"]["message"],
-            "task/get params.taskId must not be empty"
-        );
-    }
-
-    #[test]
-    fn jsonrpc_task_id_params_reject_surrounding_whitespace_before_lookup() {
-        let error = match ChioA2aEdge::parse_jsonrpc_task_id_params(
-            &json!({ "taskId": " task-1 " }),
-            "task/cancel",
-        ) {
-            Ok(_) => panic!("expected padded taskId to fail before lookup"),
-            Err(error) => error,
-        };
-        let A2aEdgeError::InvalidRequest(message) = error else {
-            panic!("expected invalid request error");
-        };
-        assert_eq!(
-            message,
-            "task/cancel params.taskId must not include leading or trailing whitespace"
-        );
-    }
-
-    #[test]
-    fn jsonrpc_task_id_params_reject_control_characters_before_lookup() {
-        let error = match ChioA2aEdge::parse_jsonrpc_task_id_params(
-            &json!({ "taskId": "a2a-task-1\na2a-task-2" }),
-            "task/get",
-        ) {
-            Ok(_) => panic!("expected control-character taskId to fail before lookup"),
-            Err(error) => error,
-        };
-        let A2aEdgeError::InvalidRequest(message) = error else {
-            panic!("expected invalid request error");
-        };
-        assert_eq!(
-            message,
-            "task/get params.taskId must not include control characters"
-        );
-    }
-
-    #[test]
-    fn jsonrpc_stream_rejects_deferred_task_map_over_cap() {
-        let mut edge =
-            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
-        let config = test_kernel_config();
-        let kernel_issuer = config.keypair.clone();
-        let kernel = ChioKernel::new(config);
-        let subject = Keypair::generate();
-        let execution = A2aKernelExecutionContext {
-            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
-            agent_id: subject.public_key().to_hex(),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-        };
-
-        for index in 0..1_024 {
+        for method in ["GetTask", "CancelTask"] {
             let response = edge.handle_jsonrpc_value(
                 json!({
                     "jsonrpc": "2.0",
-                    "id": index,
-                    "method": "message/stream",
-                    "params": {
-                        "message": {
-                            "role": "user",
-                            "parts": [{"type": "text", "text": "start"}]
-                        }
-                    }
+                    "id": 33,
+                    "method": method,
+                    "params": { "taskId": "task-1" }
                 }),
                 &kernel,
                 &execution,
             );
-            assert_eq!(response["result"]["status"].as_str(), Some("working"));
+            assert_eq!(response["error"]["code"], -32602, "{method}");
         }
+    }
 
-        let rejected = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 2_000,
-                "method": "message/stream",
-                "params": {
-                    "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "start"}]
-                    }
-                }
-            }),
-            &kernel,
-            &execution,
-        );
+    #[test]
+    fn jsonrpc_removed_slash_methods_are_not_found() {
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let execution = stream_execution(&kernel_issuer, &subject);
+
+        for method in ["message/send", "message/stream", "task/get", "task/cancel"] {
+            let response = edge.handle_jsonrpc_value(
+                json!({"jsonrpc": "2.0", "id": 34, "method": method, "params": {}}),
+                &kernel,
+                &execution,
+            );
+            assert_eq!(response["error"]["code"], -32601, "{method}");
+        }
+        assert!(edge.tasks.is_empty());
+    }
+
+    fn fill_retained_tasks(
+        edge: &mut ChioA2aEdge,
+        kernel: &ChioKernel,
+        kernel_issuer: &Keypair,
+        execution: &mut A2aKernelExecutionContext,
+        terminal_status: Option<TaskStatus>,
+    ) {
+        for index in 0..MAX_DEFERRED_A2A_TASKS {
+            if index % MAX_DEFERRED_A2A_TASKS_PER_SUBJECT == 0 {
+                let subject = Keypair::generate();
+                *execution = stream_execution(kernel_issuer, &subject);
+            }
+            let created = retain_stream_task(edge, kernel, execution, &format!("fill-{index}"));
+            assert_eq!(created.status, TaskStatus::Working);
+            if let Some(status) = terminal_status {
+                edge.tasks
+                    .get_mut(&created.id)
+                    .test_expect("retained task should be present")
+                    .response
+                    .status = status;
+            }
+        }
+    }
+
+    #[test]
+    fn jsonrpc_send_rejects_deferred_task_map_over_cap() {
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let kernel = ChioKernel::new(config);
+        let subject = Keypair::generate();
+        let mut execution = stream_execution(&kernel_issuer, &subject);
+
+        fill_retained_tasks(&mut edge, &kernel, &kernel_issuer, &mut execution, None);
+
+        let subject = Keypair::generate();
+        execution = stream_execution(&kernel_issuer, &subject);
+        let rejected =
+            edge.handle_jsonrpc_value(stream_send_request(2_000, "over-cap"), &kernel, &execution);
 
         assert!(rejected["error"]["message"]
             .as_str()
@@ -2719,41 +2481,18 @@ mod tests {
     }
 
     #[test]
-    fn jsonrpc_stream_rejects_padded_execution_agent_id_before_task_retention() {
+    fn jsonrpc_send_rejects_padded_execution_agent_id_before_task_retention() {
         let mut edge =
             ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
         let subject = Keypair::generate();
-        let execution = A2aKernelExecutionContext {
-            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
-            agent_id: format!(" {} ", subject.public_key().to_hex()),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-        };
+        let mut execution = stream_execution(&kernel_issuer, &subject);
+        execution.agent_id = format!(" {} ", subject.public_key().to_hex());
 
-        let rejected = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 2_500,
-                "method": "message/stream",
-                "params": {
-                    "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "start"}]
-                    }
-                }
-            }),
-            &kernel,
-            &execution,
-        );
+        let rejected =
+            edge.handle_jsonrpc_value(stream_send_request(2_500, "padded"), &kernel, &execution);
 
         assert_eq!(rejected["error"]["code"], -32602);
         assert_eq!(
@@ -2764,7 +2503,7 @@ mod tests {
     }
 
     #[test]
-    fn jsonrpc_stream_capacity_counts_retained_terminal_deferred_tasks() {
+    fn jsonrpc_send_capacity_counts_retained_terminal_deferred_tasks() {
         for terminal_status in [TaskStatus::Cancelled, TaskStatus::Completed] {
             let mut edge =
                 ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
@@ -2772,61 +2511,22 @@ mod tests {
             let kernel_issuer = config.keypair.clone();
             let kernel = ChioKernel::new(config);
             let subject = Keypair::generate();
-            let execution = A2aKernelExecutionContext {
-                capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
-                agent_id: subject.public_key().to_hex(),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-            };
+            let mut execution = stream_execution(&kernel_issuer, &subject);
 
-            for index in 0..MAX_DEFERRED_A2A_TASKS {
-                let created = edge.handle_jsonrpc_value(
-                    json!({
-                        "jsonrpc": "2.0",
-                        "id": index,
-                        "method": "message/stream",
-                        "params": {
-                            "message": {
-                                "role": "user",
-                                "parts": [{"type": "text", "text": "start"}]
-                            }
-                        }
-                    }),
-                    &kernel,
-                    &execution,
-                );
-                assert_eq!(created["result"]["status"].as_str(), Some("working"));
-                let task_id = created["result"]["id"]
-                    .as_str()
-                    .test_expect("message/stream should return task id")
-                    .to_string();
-                let task = edge
-                    .tasks
-                    .get_mut(&task_id)
-                    .test_expect("stream task should be retained");
-                task.response.status = terminal_status;
-            }
-
+            fill_retained_tasks(
+                &mut edge,
+                &kernel,
+                &kernel_issuer,
+                &mut execution,
+                Some(terminal_status),
+            );
             assert_eq!(edge.tasks.len(), MAX_DEFERRED_A2A_TASKS);
 
+            // A fresh subject still encounters the global memory bound.
+            let subject = Keypair::generate();
+            execution = stream_execution(&kernel_issuer, &subject);
             let accepted = edge.handle_jsonrpc_value(
-                json!({
-                    "jsonrpc": "2.0",
-                    "id": 3_000,
-                    "method": "message/stream",
-                    "params": {
-                        "message": {
-                            "role": "user",
-                            "parts": [{"type": "text", "text": "start"}]
-                        }
-                    }
-                }),
+                stream_send_request(3_000, "terminal-cap"),
                 &kernel,
                 &execution,
             );
@@ -2840,76 +2540,36 @@ mod tests {
     }
 
     #[test]
-    fn jsonrpc_task_cancel_marks_stream_task_cancelled() {
+    fn jsonrpc_cancel_task_marks_retained_task_cancelled() {
         let mut edge =
             ChioA2aEdge::new(A2aEdgeConfig::default(), vec![stream_manifest()]).test_unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let kernel = ChioKernel::new(config);
         let subject = Keypair::generate();
-        let execution = A2aKernelExecutionContext {
-            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
-            agent_id: subject.public_key().to_hex(),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-        };
+        let execution = stream_execution(&kernel_issuer, &subject);
+        let task_id = retain_stream_task(&mut edge, &kernel, &execution, "cancel-1").id;
 
-        let response = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 12,
-                "method": "message/stream",
-                "params": {
-                    "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "start"}]
-                    }
-                }
-            }),
-            &kernel,
-            &execution,
+        let cancel = json!({
+            "jsonrpc": "2.0",
+            "id": 13,
+            "method": "CancelTask",
+            "params": { "id": task_id }
+        });
+        let cancelled = edge.handle_jsonrpc_value(cancel.clone(), &kernel, &execution);
+        assert_eq!(
+            cancelled["result"]["status"]["state"].as_str(),
+            Some("TASK_STATE_CANCELED")
         );
-        let task_id = response["result"]["id"].as_str().test_unwrap().to_string();
-
-        let cancelled = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 13,
-                "method": "task/cancel",
-                "params": {
-                    "taskId": task_id
-                }
-            }),
-            &kernel,
-            &execution,
-        );
-        assert_eq!(cancelled["result"]["status"].as_str(), Some("cancelled"));
         assert_eq!(
             cancelled["result"]["metadata"]["chio"]["decision"].as_str(),
             Some("cancelled")
         );
 
-        let cancelled_again = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 14,
-                "method": "task/cancel",
-                "params": {
-                    "taskId": task_id
-                }
-            }),
-            &kernel,
-            &execution,
-        );
+        let cancelled_again = edge.handle_jsonrpc_value(cancel, &kernel, &execution);
         assert_eq!(
-            cancelled_again["result"]["status"].as_str(),
-            Some("cancelled")
+            cancelled_again["result"]["status"]["state"].as_str(),
+            Some("TASK_STATE_CANCELED")
         );
         assert_eq!(
             cancelled_again["result"]["metadata"]["chio"]["decision"].as_str(),
@@ -2926,49 +2586,23 @@ mod tests {
         let mut kernel = ChioKernel::new(config);
         kernel.register_tool_server(Box::new(StreamingToolServer));
         let subject = Keypair::generate();
-        let execution = A2aKernelExecutionContext {
-            capability: capability_for_tool(&kernel_issuer, &subject, "stream-srv", "stream"),
-            agent_id: subject.public_key().to_hex(),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-        };
-
-        let created = edge.handle_jsonrpc_value(
-            json!({
-                "jsonrpc": "2.0",
-                "id": 15,
-                "method": "message/stream",
-                "params": {
-                    "message": {
-                        "role": "user",
-                        "parts": [{"type": "text", "text": "start"}]
-                    }
-                }
-            }),
-            &kernel,
-            &execution,
-        );
-        let task_id = created["result"]["id"].as_str().test_unwrap().to_string();
+        let execution = stream_execution(&kernel_issuer, &subject);
+        let task_id = retain_stream_task(&mut edge, &kernel, &execution, "cancel-2").id;
 
         let cancelled = edge.handle_jsonrpc_value(
             json!({
                 "jsonrpc": "2.0",
                 "id": 16,
-                "method": "task/cancel",
-                "params": {
-                    "taskId": task_id.clone()
-                }
+                "method": "CancelTask",
+                "params": { "id": task_id.clone() }
             }),
             &kernel,
             &execution,
         );
-        assert_eq!(cancelled["result"]["status"].as_str(), Some("cancelled"));
+        assert_eq!(
+            cancelled["result"]["status"]["state"].as_str(),
+            Some("TASK_STATE_CANCELED")
+        );
 
         let completed_after_cancel = edge.complete_task(&task_id, &kernel, &execution, json!(17));
         assert_eq!(
@@ -2984,15 +2618,16 @@ mod tests {
             json!({
                 "jsonrpc": "2.0",
                 "id": 18,
-                "method": "task/get",
-                "params": {
-                    "taskId": task_id
-                }
+                "method": "GetTask",
+                "params": { "id": task_id }
             }),
             &kernel,
             &execution,
         );
-        assert_eq!(repeated["result"]["status"].as_str(), Some("cancelled"));
+        assert_eq!(
+            repeated["result"]["status"]["state"].as_str(),
+            Some("TASK_STATE_CANCELED")
+        );
     }
 
     #[test]

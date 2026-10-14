@@ -41,67 +41,6 @@ impl ChioA2aEdge {
         })
     }
 
-    fn ensure_jsonrpc_params_object_for_supported_method(
-        id: &Value,
-        method: &str,
-        params: &Value,
-        supported_methods: &[&str],
-    ) -> Result<(), Value> {
-        if !supported_methods.contains(&method) || params.is_object() {
-            return Ok(());
-        }
-
-        Err(Self::jsonrpc_error_payload(
-            id.clone(),
-            -32602,
-            &format!("{method} params must be an object"),
-        ))
-    }
-
-    fn parse_jsonrpc_send_message_params(
-        &self,
-        params: Value,
-        _request_name: &str,
-    ) -> Result<(String, SendMessageRequest), A2aEdgeError> {
-        let skill_id = self.resolve_jsonrpc_target_skill_id(&params)?;
-        let request = serde_json::from_value::<SendMessageRequest>(params)
-            .map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
-
-        Ok((skill_id, request))
-    }
-
-    fn parse_jsonrpc_task_id_params(
-        params: &Value,
-        operation: &str,
-    ) -> Result<String, A2aEdgeError> {
-        let Some(task_id) = params.get("taskId") else {
-            return Err(A2aEdgeError::InvalidRequest(format!(
-                "{operation} requires params.taskId"
-            )));
-        };
-        let Some(task_id) = task_id.as_str() else {
-            return Err(A2aEdgeError::InvalidRequest(format!(
-                "{operation} params.taskId must be a string"
-            )));
-        };
-        if task_id.trim().is_empty() {
-            return Err(A2aEdgeError::InvalidRequest(format!(
-                "{operation} params.taskId must not be empty"
-            )));
-        }
-        if task_id.trim() != task_id {
-            return Err(A2aEdgeError::InvalidRequest(format!(
-                "{operation} params.taskId must not include leading or trailing whitespace"
-            )));
-        }
-        if task_id.chars().any(char::is_control) {
-            return Err(A2aEdgeError::InvalidRequest(format!(
-                "{operation} params.taskId must not include control characters"
-            )));
-        }
-        Ok(task_id.to_string())
-    }
-
     fn resolve_jsonrpc_target_skill_id(&self, params: &Value) -> Result<String, A2aEdgeError> {
         let skill_id_from_metadata = Self::target_skill_id_from_metadata(params)?;
 

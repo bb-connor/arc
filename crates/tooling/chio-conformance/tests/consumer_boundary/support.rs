@@ -17,9 +17,19 @@ use chio_manifest::{RuntimeToolTopology, VerifiedManifestRegistry};
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteReceiptStore};
 use serde_json::{json, Value};
 
+#[path = "a2a_continuation_clock.rs"]
+mod a2a_continuation_clock;
+#[path = "a2a_v1.rs"]
+mod a2a_v1;
+
 pub type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 pub const SERVER: &str = "consumer-server";
 pub const TOOL: &str = "read_file";
+const APPROVAL_TENANT: &str = "consumer-boundary";
+
+fn policy_hash() -> String {
+    chio_core::sha256_hex(b"consumer-boundary-policy")
+}
 
 #[derive(Clone, Copy, Debug)]
 pub enum Protocol {
@@ -124,29 +134,99 @@ impl Fixture {
         }))?)
     }
 
+    pub fn approval_request(&self, id: &str) -> TestResult<ToolCallRequest> {
+        let mut request = self.request(id)?;
+        let mut intent = serde_json::from_value(json!({
+            "id": format!("intent-{id}"), "server_id": SERVER, "tool_name": TOOL,
+            "purpose": "authorize one counted consumer invocation",
+            "max_amount": {"units": 100, "currency": "USD"}
+        }))?;
+        chio_kernel::approval::ToolApprovalContext::bind(
+            &mut intent,
+            &request.capability,
+            &request.arguments,
+            &request.request_id,
+            &policy_hash(),
+            APPROVAL_TENANT,
+        )?;
+        request.governed_intent = Some(intent);
+        Ok(request)
+    }
+
+    pub fn approved_request(
+        &self,
+        request: &ToolCallRequest,
+        proposal: chio_core::capability::governance::ThresholdApprovalProposal,
+    ) -> TestResult<ToolCallRequest> {
+        use chio_core::capability::governance::{
+            GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+        };
+        let mut request = request.clone();
+        let proposal_hash = proposal.artifact_digest()?;
+        let intent_hash = request
+            .governed_intent
+            .as_ref()
+            .ok_or("intent")?
+            .binding_hash()?;
+        request.approval_tokens = self
+            .approvers
+            .iter()
+            .enumerate()
+            .map(|(index, approver)| {
+                GovernedApprovalToken::sign(
+                    GovernedApprovalTokenBody {
+                        id: format!("consumer-approval-{index}"),
+                        approver: approver.public_key(),
+                        subject: self.agent.public_key(),
+                        governed_intent_hash: intent_hash.clone(),
+                        request_id: request.request_id.clone(),
+                        threshold_proposal_hash: Some(proposal_hash.clone()),
+                        issued_at: proposal.body.proposal_created_at,
+                        expires_at: proposal.body.proposal_deadline,
+                        decision: GovernedApprovalDecision::Approved,
+                    },
+                    approver,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        request.threshold_approval_proposal = Some(proposal);
+        Ok(request)
+    }
+
     pub fn open(&self, protocol: Protocol) -> TestResult<Consumer> {
+        self.open_with_clock(protocol, Arc::new(chio_security_types::clock::SystemClock))
+    }
+
+    pub fn open_with_clock(
+        &self,
+        protocol: Protocol,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> TestResult<Consumer> {
         let authority = SqliteAuthorityStore::open_serving(
             self.directory.path().join("authority.db"),
             self.directory.path().join("locks"),
         )?;
-        let mut kernel = ChioKernel::new(KernelConfig {
-            keypair: self.signer.clone(),
-            ca_public_keys: vec![self.signer.public_key()],
-            max_delegation_depth: 5,
-            policy_hash: chio_core::sha256_hex(b"consumer-boundary-policy"),
-            allow_sampling: false,
-            allow_sampling_tool_use: false,
-            allow_elicitation: false,
-            max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-            max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-            require_web3_evidence: false,
-            allow_ephemeral_receipt_log: false,
-            allow_ephemeral_revocation_store: false,
-            checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
-            retention_config: None,
-            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        });
+        let mut kernel = ChioKernel::new_with_clock(
+            KernelConfig {
+                keypair: self.signer.clone(),
+                ca_public_keys: vec![self.signer.public_key()],
+                max_delegation_depth: 5,
+                policy_hash: policy_hash(),
+                allow_sampling: false,
+                allow_sampling_tool_use: false,
+                allow_elicitation: false,
+                max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+                max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+                require_web3_evidence: false,
+                allow_ephemeral_receipt_log: false,
+                allow_ephemeral_revocation_store: false,
+                checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+                retention_config: None,
+                memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+                deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            },
+            clock,
+        );
         let receipts = SqliteReceiptStore::open(self.directory.path().join("receipts.db"))?;
         receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
         kernel.set_receipt_store_handle(Arc::new(receipts))?;
@@ -161,7 +241,11 @@ impl Fixture {
             use chio_core::capability::threshold_approval::{
                 ThresholdApprovalRequirement, ThresholdApproverIdentity,
             };
-            let policy = chio_core::sha256_hex(b"consumer-boundary-policy");
+            kernel.set_governed_approval_policy(
+                APPROVAL_TENANT.into(),
+                self.approvers.iter().map(Keypair::public_key).collect(),
+            )?;
+            let policy = policy_hash();
             let requirement = ThresholdApprovalRequirement::new(
                 policy.clone(),
                 2,
