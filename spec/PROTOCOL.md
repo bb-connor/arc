@@ -1882,13 +1882,7 @@ source version. The envelope is accepted only with
 `chio.agent-web.external-projection-manifest.v1` and
 `chio.agent-web.interop-verifier-report.v1` for the same projection.
 
-`chio.agent-web-proof-envelope.v1` remains a verification-only compatibility
-format. Its published schema and canonical signed payload do not contain the
-passport-scope digest, and legacy duplicate receipt references remain valid at
-the schema boundary. New producers MUST emit v2. Verifiers that accept v1 MUST
-use the v1 canonical identifier and signature payload, require the legacy
-receipt-to-envelope bindings, and MUST NOT reinterpret v1 as carrying v2 scope
-authority.
+Verifiers MUST refuse an envelope carrying any other schema identifier.
 
 The projection manifest declares which external fields were used, which were
 not used, the digest algorithm, source protocol version, sidecar-bound fields,

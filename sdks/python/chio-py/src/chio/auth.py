@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass
 import hashlib
+import html
 import json
 from typing import Any, Callable
 import urllib.parse
@@ -12,6 +13,16 @@ import urllib.request
 @dataclass(frozen=True)
 class StaticBearerAuth:
     auth_token: str
+
+
+def _consent_nonce_from_page(page: str) -> str:
+    """Return the single-use nonce the authorization server embeds in its consent form."""
+    marker = 'name="consent_nonce" value="'
+    start = page.find(marker)
+    end = page.find('"', start + len(marker)) if start >= 0 else -1
+    if start < 0 or end <= start + len(marker):
+        raise RuntimeError("authorization approval page carries no consent nonce")
+    return html.unescape(page[start + len(marker) : end])
 
 
 def static_bearer_auth(auth_token: str) -> StaticBearerAuth:
@@ -151,14 +162,7 @@ def perform_authorization_code_flow(
         authorization_endpoint,
         data=urllib.parse.urlencode(
             {
-                "response_type": "code",
-                "client_id": client_id,
-                "redirect_uri": redirect_uri,
-                "state": state,
-                "resource": resource,
-                "scope": auth_scope,
-                "code_challenge": challenge,
-                "code_challenge_method": "S256",
+                "consent_nonce": _consent_nonce_from_page(authorize_page),
                 "decision": "approve",
             }
         ).encode("utf-8"),

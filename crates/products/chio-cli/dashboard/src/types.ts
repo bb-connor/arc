@@ -1155,7 +1155,7 @@ export interface ProofRoomPublicSettlementVerifierReport {
 }
 
 export interface ProofRoomAgentWebEnvelope {
-  schema: 'chio.agent-web-proof-envelope.v1' | 'chio.agent-web-proof-envelope.v2'
+  schema: 'chio.agent-web-proof-envelope.v2'
   envelope_id?: string
   transaction_passport_ref?: string
   source_protocol?: string

@@ -24,6 +24,7 @@ func TestPKCEChallengeAndMetadataURL(t *testing.T) {
 
 func TestDiscoverResolveAndExchangeOAuthFlow(t *testing.T) {
 	transcript := make([]map[string]any, 0)
+	var redirectURI, state string
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
@@ -45,15 +46,18 @@ func TestDiscoverResolveAndExchangeOAuthFlow(t *testing.T) {
 			})
 		case "/oauth/authorize":
 			if request.Method == http.MethodGet {
+				redirectURI = request.URL.Query().Get("redirect_uri")
+				state = request.URL.Query().Get("state")
 				writer.Header().Set("Content-Type", "text/html")
-				_, _ = writer.Write([]byte("<html><body><button>Approve</button></body></html>"))
+				_, _ = writer.Write([]byte(`<html><body><form method="post"><input type="hidden" name="consent_nonce" value="fixture-nonce"><button>Approve</button></form></body></html>`))
 				return
 			}
 			if err := request.ParseForm(); err != nil {
 				t.Fatalf("failed to parse form: %v", err)
 			}
-			redirectURI := request.Form.Get("redirect_uri")
-			state := request.Form.Get("state")
+			if request.Form.Get("consent_nonce") != "fixture-nonce" || request.Form.Get("decision") != "approve" {
+				t.Fatalf("unexpected consent submission: %v", request.Form)
+			}
 			http.Redirect(writer, request, redirectURI+"?code=fixture-code&state="+state, http.StatusFound)
 		case "/oauth/token":
 			body, err := io.ReadAll(request.Body)

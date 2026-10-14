@@ -2,7 +2,7 @@
 //!
 //! An external attestation that asserts a settlement fact (for example that a
 //! Merkle root was anchored) is carried only inside a
-//! `chio.agent-web-proof-envelope.v1` projection. The anchor recompute lane
+//! `chio.agent-web-proof-envelope.v2` projection. The anchor recompute lane
 //! (`verify_anchor_inclusion_proof`) takes the committed root only from the
 //! kernel-signed checkpoint statement and never admits an attested value.
 
@@ -13,7 +13,7 @@ use chio_web3::anchors::{
 };
 use serde_json::{json, Value};
 
-const AGENT_WEB_PROOF_ENVELOPE_SCHEMA: &str = "chio.agent-web-proof-envelope.v1";
+const AGENT_WEB_PROOF_ENVELOPE_SCHEMA: &str = "chio.agent-web-proof-envelope.v2";
 
 const ANCHOR_INCLUSION_PROOF_FIXTURE: &str =
     include_str!("../../../../docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json");

@@ -875,6 +875,7 @@ struct LocalAuthorizationServer {
     code_ttl_secs: u64,
     access_token_ttl_secs: u64,
     codes: Arc<StdMutex<HashMap<String, AuthorizationCodeGrant>>>,
+    consents: Arc<StdMutex<HashMap<String, PendingConsent>>>,
     sender_dpop_nonce_store: Arc<DpopNonceStore>,
     sender_dpop_config: DpopConfig,
 }
@@ -897,6 +898,14 @@ impl RemoteAppState {
         self.enterprise_provider_registry()
             .and_then(|registry| registry.validated_provider(provider_id))
     }
+}
+
+/// An authorization request whose consent page was rendered and not yet
+/// answered, keyed by the single-use nonce embedded in that page.
+#[derive(Clone, Debug)]
+struct PendingConsent {
+    deadline: AuthorityDeadline,
+    request: AuthorizationRequest,
 }
 
 #[derive(Clone, Debug)]

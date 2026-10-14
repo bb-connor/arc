@@ -341,6 +341,7 @@ fn build_authorization_server_metadata(
             ],
             "token_endpoint_auth_methods_supported": ["none"],
             "code_challenge_methods_supported": ["S256"],
+            "authorization_response_iss_parameter_supported": true,
             "chio_authorization_profile": chio_authorization_profile,
         });
         if !config.auth_scopes.is_empty() {
@@ -682,6 +683,7 @@ fn build_local_auth_server(
         code_ttl_secs: config.auth_code_ttl_secs,
         access_token_ttl_secs: config.auth_access_token_ttl_secs,
         codes: Arc::new(StdMutex::new(HashMap::new())),
+        consents: Arc::new(StdMutex::new(HashMap::new())),
         sender_dpop_nonce_store,
         sender_dpop_config,
     }))
