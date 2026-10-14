@@ -1501,6 +1501,7 @@
     "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs::qualified_replay_owners::from_wire",
     "crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json::from_wire",
     "crates/platform/chio-transaction-passport/src/minimal.rs::transparency_anchor_state::from_wire",
+    "crates/platform/chio-workflow/src/delegation/store.rs::decode::from_wire",
     "crates/products/chio-api-protect/src/proxy/approval_authority.rs::load::from_wire",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode::from_wire",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode_arguments::from_wire",
@@ -16883,6 +16884,7 @@
     "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs::qualified_replay_owners::from_wire#1::decode_canonical",
     "crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json::from_wire#1::decode_signed",
     "crates/platform/chio-transaction-passport/src/minimal.rs::transparency_anchor_state::from_wire#1::decode_external",
+    "crates/platform/chio-workflow/src/delegation/store.rs::decode::from_wire#1::decode_signed",
     "crates/products/chio-api-protect/src/proxy/approval_authority.rs::load::from_wire#1::decode_signed",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode::from_wire#1::decode_signed",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode_arguments::from_wire#1::decode_document",
@@ -22501,6 +22503,22 @@
       "run::shared-reader::crates/products/chio-cli/src/cli/process_host/stop_control.rs::via_socket",
       "serve::shared-reader::crates/products/chio-cli/src/cli/process_host/stop_control.rs::handle",
       "via_socket::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/platform/chio-workflow/src/delegation/store.rs": [
+      "allocation_digest#1::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required",
+      "allocation_digest#2::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required",
+      "claim_dispatch::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required",
+      "create_root::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::read",
+      "decode::original-json-reader::UntrustedJsonText",
+      "read::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::decode",
+      "read::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::decode",
+      "required::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::read",
+      "seal_dispatch::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::decode",
+      "seal_dispatch::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required",
+      "select::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required",
+      "slot::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required",
+      "subdivide::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::read",
+      "subdivide::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required"
     ]
   },
   "retired_direct_readers": {
