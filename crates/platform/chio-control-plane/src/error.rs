@@ -89,7 +89,7 @@ pub enum CliError {
     Json(#[from] serde_json::Error),
 
     #[error("yaml error: {0}")]
-    Yaml(#[from] serde_yml::Error),
+    Yaml(#[from] yaml_serde::Error),
 
     #[error("http error: {0}")]
     Reqwest(#[from] reqwest::Error),

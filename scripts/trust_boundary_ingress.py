@@ -16,8 +16,7 @@ INVENTORY = "docs/security/http-ingress-contracts.json"
 CONTROL_INPUT = "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs"
 
 FORMATS = {
-    "serde_yaml": ("yaml", {"from_str", "from_slice", "from_reader"}),
-    "serde_yml": ("yaml", {"from_str", "from_slice", "from_reader"}),
+    "yaml_serde": ("yaml", {"from_str", "from_slice", "from_reader"}),
     "toml": ("toml", {"from_str", "from_slice"}),
     "ciborium": ("cbor", {"from_reader"}),
     "serde_cbor": ("cbor", {"from_reader", "from_slice"}),

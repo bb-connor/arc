@@ -532,7 +532,7 @@ fn test_underwriting_simulation_report_surfaces() {
     };
     std::fs::write(
         &policy_file,
-        serde_yml::to_string(&simulation_policy).expect("serialize simulation policy"),
+        yaml_serde::to_string(&simulation_policy).expect("serialize simulation policy"),
     )
     .expect("write simulation policy");
 

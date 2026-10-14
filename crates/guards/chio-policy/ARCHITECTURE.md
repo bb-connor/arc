@@ -90,7 +90,7 @@ An analysis result applies to the modeled policy fragments and configured limits
 provides budgets and approver directories; `chio-core` supplies scope and
 threshold types. `chio-security-types` provides clocks and security vocabulary;
 `chio-appraisal` is declared in the manifest; policy source has no direct import.
-Serde, serde_json, and serde_yml handle documents. Regex handles patterns;
+Serde, serde_json, and yaml_serde handle documents. Regex handles patterns;
 SHA-256 and hex support hashing. UUID identifies decision records; chrono and
 chrono-tz support timestamps and calendar conditions. Proptest is test-only.
 The manifest declares no features; filesystem operations require host access.

@@ -726,7 +726,7 @@ rules:
 
     #[test]
     fn posture_validation_reports_state_budget_and_transition_issues() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: posture-validation
@@ -806,7 +806,7 @@ extensions:
 
     #[test]
     fn posture_validation_accepts_zero_budgets_and_valid_duration_suffixes() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: posture-validation-boundaries
@@ -840,7 +840,7 @@ extensions:
 
     #[test]
     fn posture_validation_rejects_zero_duration_windows() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: posture-zero-duration
@@ -871,7 +871,7 @@ extensions:
 
     #[test]
     fn posture_validation_rejects_empty_state_sets() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: empty-posture
@@ -894,7 +894,7 @@ extensions:
 
     #[test]
     fn detection_validation_reports_threshold_errors_and_warning_ordering() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: detection-validation
@@ -946,7 +946,7 @@ extensions:
 
     #[test]
     fn detection_validation_requires_threat_intel_pattern_db_when_enabled() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: detection-validation
@@ -967,7 +967,7 @@ extensions:
 
     #[test]
     fn reputation_validation_reports_scoring_scope_and_operation_issues() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: reputation-validation
@@ -1045,7 +1045,7 @@ extensions:
 
     #[test]
     fn reputation_validation_accepts_single_point_score_range() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: reputation-single-point-tier
@@ -1072,7 +1072,7 @@ extensions:
 
     #[test]
     fn reputation_validation_rejects_empty_tiers() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: empty-reputation
@@ -1092,7 +1092,7 @@ extensions:
 
     #[test]
     fn runtime_assurance_validation_reports_empty_scope_and_blank_verifiers() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: runtime-assurance-validation
@@ -1150,7 +1150,7 @@ extensions:
 
     #[test]
     fn runtime_assurance_validation_rejects_empty_tiers() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: empty-runtime-assurance
@@ -1170,7 +1170,7 @@ extensions:
 
     #[test]
     fn runtime_assurance_validation_rejects_duplicate_minimum_tiers() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: duplicate-runtime-assurance
@@ -1208,7 +1208,7 @@ extensions:
 
     #[test]
     fn runtime_assurance_validation_rejects_invalid_trusted_verifier_rules() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: trusted-verifiers
@@ -1278,7 +1278,7 @@ extensions:
 
     #[test]
     fn tool_access_workload_identity_validation_rejects_bad_match_fields() {
-        let spec: HushSpec = serde_yml::from_str(
+        let spec: HushSpec = yaml_serde::from_str(
             r#"
 hushspec: "0.1.0"
 name: workload-identity-validation

@@ -1215,7 +1215,7 @@ mod tests {
         let policy_path = fixture_root.join("tests/conformance/fixtures/mcp_core/policy.yaml");
         let raw = fs::read_to_string(&policy_path)
             .unwrap_or_else(|error| panic!("read {}: {error}", policy_path.display()));
-        let policy: FixturePolicy = serde_yaml::from_str(&raw)
+        let policy: FixturePolicy = yaml_serde::from_str(&raw)
             .unwrap_or_else(|error| panic!("parse {}: {error}", policy_path.display()));
 
         if policy.kernel.allow_ephemeral_receipt_log {

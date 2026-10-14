@@ -191,7 +191,7 @@ fn operator_policy_accepts_producer_numbers_in_json_and_yaml(
     let actual = crate::load_underwriting_decision_policy(&json)?;
     assert_eq!(actual, policy);
     let yaml = dir.path().join("policy.yaml");
-    std::fs::write(&yaml, serde_yml::to_string(&policy)?)?;
+    std::fs::write(&yaml, yaml_serde::to_string(&policy)?)?;
     assert_eq!(crate::load_underwriting_decision_policy(&yaml)?, policy);
     Ok(())
 }

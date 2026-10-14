@@ -427,7 +427,7 @@ mod tests {
             signing_key: "generate"
             bogus_field: true
         "#;
-        let result: Result<KernelConfig, _> = serde_yml::from_str(yaml);
+        let result: Result<KernelConfig, _> = yaml_serde::from_str(yaml);
         assert!(result.is_err());
     }
 
@@ -439,7 +439,7 @@ mod tests {
             upstream: "http://localhost:8000"
             not_a_field: 42
         "#;
-        let result: Result<AdapterConfig, _> = serde_yml::from_str(yaml);
+        let result: Result<AdapterConfig, _> = yaml_serde::from_str(yaml);
         assert!(result.is_err());
     }
 
@@ -455,7 +455,7 @@ mod tests {
               header: "Authorization"
         "#;
         let adapter: AdapterConfig =
-            serde_yml::from_str(yaml).unwrap_or_else(|e| panic!("deser failed: {e}"));
+            yaml_serde::from_str(yaml).unwrap_or_else(|e| panic!("deser failed: {e}"));
         assert_eq!(adapter.id, "petstore");
         let auth = adapter.auth.unwrap_or_else(|| panic!("auth missing"));
         assert_eq!(auth.auth_type, "bearer");

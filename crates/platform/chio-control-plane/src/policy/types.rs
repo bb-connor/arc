@@ -112,7 +112,7 @@ pub enum PolicyError {
     Io(#[from] std::io::Error),
 
     #[error("failed to parse policy YAML: {0}")]
-    Yaml(#[from] serde_yml::Error),
+    Yaml(#[from] yaml_serde::Error),
 
     #[error("failed to resolve HushSpec policy: {0}")]
     Resolve(#[from] chio_policy::ResolveError),

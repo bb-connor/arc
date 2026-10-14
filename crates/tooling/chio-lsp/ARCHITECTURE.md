@@ -70,7 +70,7 @@ fallback. File reads have no size limit in this resolver.
 
 `tower-lsp` supplies protocol types, client publication, and stdio serving;
 Tokio supplies asynchronous I/O. `dashmap` stores shared document entries.
-`serde_yml` parses the diagnostic inputs. `chio-errors` provides registered
+`yaml_serde` parses the diagnostic inputs. `chio-errors` provides registered
 error descriptions for hover responses.
 
 ## Verification

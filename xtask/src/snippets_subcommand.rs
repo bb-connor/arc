@@ -106,7 +106,7 @@ fn load_snippets(source_dir: &Path, schema_path: &Path) -> Result<Vec<Snippet>, 
     // so any new field must round-trip through this validator before
     // it reaches an editor manifest. Without this gate, additional or
     // misspelled keys (for example unknown scope IDs) silently pass
-    // through `serde_yml::from_str` and ship into editor outputs.
+    // through `yaml_serde::from_str` and ship into editor outputs.
     let schema_raw = fs::read_to_string(schema_path)
         .map_err(|err| XtaskError::Io(schema_path.display().to_string(), err))?;
     let schema_value: serde_json::Value = serde_json::from_str(&schema_raw)
@@ -125,7 +125,7 @@ fn load_snippets(source_dir: &Path, schema_path: &Path) -> Result<Vec<Snippet>, 
         // First validate the YAML document against the snippet schema
         // (after a YAML -> JSON round trip), then deserialize into the
         // strongly-typed `Snippet` struct used by the renderers.
-        let yaml_value: serde_yml::Value = serde_yml::from_str(&raw)
+        let yaml_value: yaml_serde::Value = yaml_serde::from_str(&raw)
             .map_err(|err| XtaskError::Yaml(path.display().to_string(), err))?;
         let json_value = yaml_to_json(yaml_value).map_err(|err| {
             XtaskError::Validation(format!(
@@ -149,12 +149,12 @@ fn load_snippets(source_dir: &Path, schema_path: &Path) -> Result<Vec<Snippet>, 
     Ok(out)
 }
 
-/// Convert a `serde_yml::Value` to `serde_json::Value` so the
+/// Convert a `yaml_serde::Value` to `serde_json::Value` so the
 /// JSON-schema validator can be applied. YAML supports a strict
 /// superset of JSON, but the snippet schema only references JSON
 /// types, so any YAML feature that cannot be re-serialized as JSON
 /// (for example non-string mapping keys) is rejected here.
-fn yaml_to_json(value: serde_yml::Value) -> Result<serde_json::Value, String> {
+fn yaml_to_json(value: yaml_serde::Value) -> Result<serde_json::Value, String> {
     let raw = serde_json::to_string(&value).map_err(|err| err.to_string())?;
     serde_json::from_str(&raw).map_err(|err| err.to_string())
 }

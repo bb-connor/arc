@@ -1399,13 +1399,6 @@ user-id = 3726
 user-login = "cfallin"
 user-name = "Chris Fallin"
 
-[[publisher.serde_yaml_ng]]
-version = "0.10.0"
-when = "2024-05-26"
-user-id = 141900
-user-login = "acatton"
-user-name = "Antoine Catton"
-
 [[publisher.unicode-normalization]]
 version = "0.1.25"
 when = "2025-10-30"

@@ -817,7 +817,7 @@ fn test_credit_bonded_execution_simulation_report_surfaces() {
     };
     std::fs::write(
         &kill_switch_policy_file,
-        serde_yml::to_string(&kill_switch_policy).expect("serialize kill switch policy"),
+        yaml_serde::to_string(&kill_switch_policy).expect("serialize kill switch policy"),
     )
     .expect("write kill switch policy");
 

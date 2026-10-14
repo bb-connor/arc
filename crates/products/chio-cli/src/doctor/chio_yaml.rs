@@ -1,6 +1,6 @@
 //! `chio.yaml` schema validation probe.
 //!
-//! Loads the project `chio.yaml`, parses it with `serde_yml`, and
+//! Loads the project `chio.yaml`, parses it with `yaml_serde`, and
 //! validates the document against the embedded set of required keys.
 //! Errors carry line and column anchors derived from the parser
 //! location so editors can jump to the offending span.
@@ -15,7 +15,7 @@
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
-use serde_yml::Value;
+use yaml_serde::Value;
 
 use super::probe::{Probe, ProbeConfig, ProbeReport, ProbeSeverity};
 
@@ -143,7 +143,7 @@ impl ChioYamlProbe {
     }
 
     fn validate_body(&self, path: &Path, body: &str) -> ProbeReport {
-        let doc: Value = match serde_yml::from_str(body) {
+        let doc: Value = match yaml_serde::from_str(body) {
             Ok(v) => v,
             Err(err) => {
                 let (line, column) = err

@@ -22,7 +22,7 @@ chio-provider-conformance = { workspace = true, features = [
 clap = { version = "4", features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-serde_yml = { workspace = true }
+yaml_serde = { workspace = true }
 thiserror = { workspace = true }
 
 [lints]

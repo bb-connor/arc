@@ -2609,10 +2609,3 @@ user-id = 2927 # Mingun
 start = "2022-05-25"
 end = "2027-08-29"
 notes = "Scoped publisher trust for the maintained XML parser version that clears the known resource-exhaustion advisories."
-
-[[trusted.serde_yaml_ng]]
-criteria = "safe-to-deploy"
-user-id = 141900 # Antoine Catton (acatton)
-start = "2024-05-03"
-end = "2027-08-29"
-notes = "Scoped publisher trust for the RustSec-recommended maintained serde_yaml fork replacing unsound serde_yml."

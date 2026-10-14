@@ -101,23 +101,23 @@ fn ensure_finite_policy_numbers(policy: &impl serde::Serialize) -> Result<(), Po
     // JSON serialization silently turns NaN and infinities into null. Inspect
     // a typed representation that retains these numbers before JSON encoding
     // can erase differences in the configured enforcement behavior.
-    let value = serde_yml::to_value(policy)?;
+    let value = yaml_serde::to_value(policy)?;
     let mut pending = vec![&value];
     while let Some(value) = pending.pop() {
         match value {
-            serde_yml::Value::Number(number)
+            yaml_serde::Value::Number(number)
                 if number.as_f64().is_some_and(|number| !number.is_finite()) =>
             {
                 return Err(PolicyError::Invalid(
                     "policy identity requires finite numeric values".to_string(),
                 ));
             }
-            serde_yml::Value::Sequence(values) => pending.extend(values),
-            serde_yml::Value::Mapping(values) => {
+            yaml_serde::Value::Sequence(values) => pending.extend(values),
+            yaml_serde::Value::Mapping(values) => {
                 pending.extend(values.keys());
                 pending.extend(values.values());
             }
-            serde_yml::Value::Tagged(value) => pending.push(&value.value),
+            yaml_serde::Value::Tagged(value) => pending.push(&value.value),
             _ => {}
         }
     }

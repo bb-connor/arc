@@ -40,7 +40,7 @@ fn yaml(bytes: &[u8]) -> Result<Value, CliError> {
         nodes: MAX_NODES,
         bytes: super::MAX_DOCUMENT_BYTES,
     };
-    let mut documents = serde_yml::Deserializer::from_slice(bytes);
+    let mut documents = yaml_serde::Deserializer::from_slice(bytes);
     let document = documents
         .next()
         .ok_or_else(|| CliError::cli_other_error("configuration document is empty"))?;

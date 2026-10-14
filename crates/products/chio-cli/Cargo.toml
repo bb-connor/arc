@@ -90,7 +90,7 @@ chio-trace-validate = { workspace = true }
 chio-workflow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["raw_value"] }
-serde_yml = { workspace = true }
+yaml_serde = { workspace = true }
 thiserror = { workspace = true }
 clap = { version = "4", features = ["derive", "env"] }
 tracing = { workspace = true }

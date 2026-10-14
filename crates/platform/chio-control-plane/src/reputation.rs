@@ -326,7 +326,7 @@ fn load_passport_verifier_policy(path: &Path) -> Result<PassportVerifierPolicy, 
         .is_some_and(|ext| matches!(ext, "yaml" | "yml"))
     {
         // Explicit operator configuration format, never a signed-document fallback.
-        serde_yml::from_slice(&bytes)?
+        yaml_serde::from_slice(&bytes)?
     } else {
         let value: serde_json::Value = input.decode_signed()?;
         let signed = value.as_object().is_some_and(|object| {

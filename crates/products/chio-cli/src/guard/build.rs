@@ -75,7 +75,7 @@ pub(super) fn pack_from_dir(project_dir: &Path) -> Result<(), CliError> {
     let manifest_path = project_dir.join("guard-manifest.yaml");
     let manifest_content = fs::read_to_string(&manifest_path)
         .map_err(|e| guard_io_error(format!("failed to read {}: {e}", manifest_path.display())))?;
-    let manifest: GuardManifest = serde_yml::from_str(&manifest_content)
+    let manifest: GuardManifest = yaml_serde::from_str(&manifest_content)
         .map_err(|e| guard_yaml_error(format!("failed to parse guard-manifest.yaml: {e}")))?;
 
     // Resolve the wasm file relative to the project directory
@@ -187,7 +187,7 @@ pub(crate) fn cmd_guard_install(archive_path: &Path, target_dir: &Path) -> Resul
     let manifest_content = fs::read_to_string(&tmp_manifest_path).map_err(|e| {
         guard_io_error(format!("archive does not contain guard-manifest.yaml: {e}"))
     })?;
-    let manifest: GuardManifest = serde_yml::from_str(&manifest_content)
+    let manifest: GuardManifest = yaml_serde::from_str(&manifest_content)
         .map_err(|e| guard_yaml_error(format!("failed to parse manifest from archive: {e}")))?;
 
     let guard_name = &manifest.name;
@@ -242,17 +242,17 @@ pub(crate) fn cmd_guard_install(archive_path: &Path, target_dir: &Path) -> Resul
 
 /// Rewrite the `wasm_path` field in the manifest YAML to point to the given filename.
 fn update_manifest_wasm_path(content: &str, new_wasm_path: &str) -> Result<String, CliError> {
-    let mut value: serde_yml::Value = serde_yml::from_str(content).map_err(|e| {
+    let mut value: yaml_serde::Value = yaml_serde::from_str(content).map_err(|e| {
         guard_yaml_error(format!(
             "failed to parse manifest for wasm_path update: {e}"
         ))
     })?;
-    if let serde_yml::Value::Mapping(ref mut map) = value {
+    if let yaml_serde::Value::Mapping(ref mut map) = value {
         map.insert(
-            serde_yml::Value::String("wasm_path".to_string()),
-            serde_yml::Value::String(new_wasm_path.to_string()),
+            yaml_serde::Value::String("wasm_path".to_string()),
+            yaml_serde::Value::String(new_wasm_path.to_string()),
         );
     }
-    serde_yml::to_string(&value)
+    yaml_serde::to_string(&value)
         .map_err(|e| guard_yaml_error(format!("failed to serialize updated manifest: {e}")))
 }

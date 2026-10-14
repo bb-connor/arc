@@ -25,7 +25,7 @@ pub enum DiffOracleError {
     #[error("failed to parse YAML {path}: {source}")]
     Yaml {
         path: PathBuf,
-        source: serde_yaml::Error,
+        source: yaml_serde::Error,
     },
     #[error("failed to list {path}: {source}")]
     List {
@@ -343,7 +343,7 @@ pub fn load_error_registry_urns(path: &Path) -> Result<BTreeSet<String>, DiffOra
         source,
     })?;
     let registry =
-        serde_yaml::from_str::<ErrorRegistry>(&text).map_err(|source| DiffOracleError::Yaml {
+        yaml_serde::from_str::<ErrorRegistry>(&text).map_err(|source| DiffOracleError::Yaml {
             path: path.to_path_buf(),
             source,
         })?;

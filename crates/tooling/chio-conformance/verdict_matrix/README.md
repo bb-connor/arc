@@ -91,7 +91,7 @@ cargo test -p chio-conformance --test deployment_shape_smoke
 ```
 
 Both modes compile the same `tests/*.rs` files; the embedded runs resolve
-`chio_core`, `chio_kernel`, `chio_kernel_browser`, and `serde_yaml` from
+`chio_core`, `chio_kernel`, `chio_kernel_browser`, and `yaml_serde` from
 `chio-conformance`'s dependency graph rather than this crate's own.
 
 ## See also

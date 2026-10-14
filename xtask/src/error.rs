@@ -6,7 +6,7 @@ use std::fmt;
 pub(crate) enum XtaskError {
     Usage(String),
     Io(String, std::io::Error),
-    Yaml(String, serde_yml::Error),
+    Yaml(String, yaml_serde::Error),
     Json(String, serde_json::Error),
     Drift(String),
     Validation(String),

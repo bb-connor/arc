@@ -49,7 +49,7 @@ pub fn load_policy(path: &Path) -> Result<LoadedPolicy, PolicyError> {
         return load_hushspec_policy(path, source_hash);
     }
 
-    let policy: ChioPolicy = serde_yml::from_str(&contents)?;
+    let policy: ChioPolicy = yaml_serde::from_str(&contents)?;
     policy.kernel.validate()?;
     let default_capabilities = build_runtime_default_capabilities(&policy)?;
     let runtime_hash = runtime_hash_for_chio_yaml(&policy, &default_capabilities)?;
@@ -202,7 +202,7 @@ fn hushspec_source_hash_with_assets(
 
 /// Parse a policy from a YAML string.
 pub fn parse_policy(yaml: &str) -> Result<ChioPolicy, PolicyError> {
-    let policy: ChioPolicy = serde_yml::from_str(yaml)?;
+    let policy: ChioPolicy = yaml_serde::from_str(yaml)?;
     policy.kernel.validate()?;
     Ok(policy)
 }

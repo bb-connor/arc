@@ -48,10 +48,10 @@ pub(crate) fn decode<T: serde::de::DeserializeOwned>(
 }
 
 /// A local YAML parser cause whose public diagnostics do not contain input.
-pub struct ManifestYamlError(serde_yml::Error);
+pub struct ManifestYamlError(yaml_serde::Error);
 
-impl From<serde_yml::Error> for ManifestYamlError {
-    fn from(error: serde_yml::Error) -> Self {
+impl From<yaml_serde::Error> for ManifestYamlError {
+    fn from(error: yaml_serde::Error) -> Self {
         Self(error)
     }
 }

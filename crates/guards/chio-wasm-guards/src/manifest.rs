@@ -134,10 +134,10 @@ pub fn load_manifest(wasm_path: &str) -> Result<GuardManifest, WasmGuardError> {
         })?;
     // Value's Mapping decoder rejects duplicate keys, including config and
     // ignored fields, before the typed manifest can project the document.
-    let value: serde_yml::Value =
-        serde_yml::from_slice(&contents).map_err(crate::ManifestYamlError::from)?;
+    let value: yaml_serde::Value =
+        yaml_serde::from_slice(&contents).map_err(crate::ManifestYamlError::from)?;
     let manifest: GuardManifest =
-        serde_yml::from_value(value).map_err(crate::ManifestYamlError::from)?;
+        yaml_serde::from_value(value).map_err(crate::ManifestYamlError::from)?;
     verify_wit_world(manifest.wit_world.as_deref())?;
     Ok(manifest)
 }
@@ -454,7 +454,7 @@ config:
   threshold: "0.8"
   mode: strict
 "#;
-        let manifest: GuardManifest = serde_yml::from_str(yaml).unwrap();
+        let manifest: GuardManifest = yaml_serde::from_str(yaml).unwrap();
         assert_eq!(manifest.name, "pii-scanner");
         assert_eq!(manifest.version, "1.0.0");
         assert_eq!(manifest.abi_version, "1");
@@ -476,7 +476,7 @@ wit_world: "chio:guard/guard@0.2.0"
 wasm_path: simple.wasm
 wasm_sha256: deadbeef
 "#;
-        let manifest: GuardManifest = serde_yml::from_str(yaml).unwrap();
+        let manifest: GuardManifest = yaml_serde::from_str(yaml).unwrap();
         assert_eq!(manifest.name, "simple-guard");
         assert!(
             manifest.config.is_empty(),
@@ -493,7 +493,7 @@ abi_version: "1"
 wasm_sha256: abc123
 wasm_path: foo.wasm
 "#;
-        let result = serde_yml::from_str::<GuardManifest>(yaml);
+        let result = yaml_serde::from_str::<GuardManifest>(yaml);
         assert!(result.is_err(), "should reject YAML missing 'name'");
 
         // Missing abi_version
@@ -503,7 +503,7 @@ version: "1.0.0"
 wasm_sha256: abc123
 wasm_path: foo.wasm
 "#;
-        let result = serde_yml::from_str::<GuardManifest>(yaml);
+        let result = yaml_serde::from_str::<GuardManifest>(yaml);
         assert!(result.is_err(), "should reject YAML missing 'abi_version'");
 
         // Missing wasm_sha256
@@ -513,7 +513,7 @@ version: "1.0.0"
 abi_version: "1"
 wasm_path: foo.wasm
 "#;
-        let result = serde_yml::from_str::<GuardManifest>(yaml);
+        let result = yaml_serde::from_str::<GuardManifest>(yaml);
         assert!(result.is_err(), "should reject YAML missing 'wasm_sha256'");
     }
 
@@ -931,7 +931,7 @@ wasm_sha256: deadbeef
 signer_public_key: "aabbccdd"
 allow_unsigned: false
 "#;
-        let m: GuardManifest = serde_yml::from_str(yaml).unwrap();
+        let m: GuardManifest = yaml_serde::from_str(yaml).unwrap();
         assert_eq!(m.signer_public_key.as_deref(), Some("aabbccdd"));
         assert!(!m.allow_unsigned);
     }
@@ -945,7 +945,7 @@ abi_version: "1"
 wasm_path: g.wasm
 wasm_sha256: deadbeef
 "#;
-        let m: GuardManifest = serde_yml::from_str(yaml).unwrap();
+        let m: GuardManifest = yaml_serde::from_str(yaml).unwrap();
         assert!(m.signer_public_key.is_none());
         assert!(!m.allow_unsigned, "allow_unsigned should default to false");
     }

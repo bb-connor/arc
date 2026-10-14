@@ -1691,6 +1691,10 @@ criteria = "safe-to-deploy"
 version = "0.37.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.libyaml-rs]]
+version = "0.3.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.linux-raw-sys]]
 version = "0.12.1"
 criteria = "safe-to-deploy"
@@ -2457,6 +2461,10 @@ criteria = "safe-to-deploy"
 version = "1.1.4"
 criteria = "safe-to-deploy"
 
+[[exemptions.rustls]]
+version = "0.23.46"
+criteria = "safe-to-deploy"
+
 [[exemptions.rustls-native-certs]]
 version = "0.8.3"
 criteria = "safe-to-deploy"
@@ -2640,10 +2648,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.serde_with_macros]]
 version = "3.18.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.serde_yaml]]
-version = "0.9.34+deprecated"
 criteria = "safe-to-deploy"
 
 [[exemptions.serdect]]
@@ -2976,10 +2980,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.universal-hash]]
 version = "0.5.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.unsafe-libyaml]]
-version = "0.2.11"
 criteria = "safe-to-deploy"
 
 [[exemptions.untrusted]]
@@ -3368,6 +3368,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.xmlparser]]
 version = "0.13.6"
+criteria = "safe-to-deploy"
+
+[[exemptions.yaml_serde]]
+version = "0.10.7"
 criteria = "safe-to-deploy"
 
 [[exemptions.yansi]]
