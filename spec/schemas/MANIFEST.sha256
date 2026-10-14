@@ -1,8 +1,7 @@
-96cce22ccf593a3f6c6dd3f05785b722117c130b6c585a20fbb05c785ae0dcc6  spec/schemas/MANIFEST.sha256
+16cd51164a75a54a7901331a933814a003cecc561ccaaf929e372fe4c6508d88  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
-a3c748be49a7de93b4c9056b898681e38ae2fdf482513f9df346234c60c28533  spec/schemas/chio-agent-web/v1/proof-envelope.schema.json
 4d2dd61d9d9bdea44a15267d9f6c48a9cca539b8cc48c07e7f4f4504d68e7751  spec/schemas/chio-agent-web/v2/proof-envelope.schema.json
 c5974243c2fd599c1efc8935bac8acee693cc141ed4221c343d6ac6f3e642409  spec/schemas/chio-attest/v1/buyer-attestation-explanation.schema.json
 76c94fff2abd91971427390060322bf024438820f092c34c2ae9c279f06e6e57  spec/schemas/chio-attest/v1/buyer-attestation-packet.schema.json
@@ -542,4 +541,4 @@ a89cebb22ad42d0353c5c0a2b35af56a2198a003b172e864741c5b9a878eaccc  spec/schemas/c
 f109672e496e5e3bb56c5a3d61ed882b922d8bbade45899975d1852921f7890e  spec/schemas/financial-credential-defs.v1.schema.json
 049d7788253b57ddf472ebed0e8e6cb1a26e2249e9645e9e18cfdc3606a2b669  spec/schemas/fiscal-defs.v1.schema.json
 216ca7d9c174f728a1931f84791858702bb365cb5f5acba24c5e936bc923955e  spec/schemas/policy/analysis-report.schema.json
-75bc07ce1f680808ab64a0859bc8efbf2f13712c9b21decee8e69156c9d8bdb4  spec/schemas/registry.json
+58da265b574d10f2979e981bffed31cdab0ab0b96c2315eb50c88e486e696cb6  spec/schemas/registry.json

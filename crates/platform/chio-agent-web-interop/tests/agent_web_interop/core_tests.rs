@@ -96,42 +96,6 @@ fn published_agent_web_schemas_accept_supported_projection_fixtures() {
 }
 
 #[test]
-fn published_v1_proof_envelope_schema_accepts_legacy_shape() {
-    let envelope_schema =
-        read_workspace_json("spec/schemas/chio-agent-web/v1/proof-envelope.schema.json");
-    let envelope_path = agent_web_envelope_or_manifest_paths(
-        "fixtures/proof-room/agent-web/valid-webhook-cloudevents",
-    )
-    .into_iter()
-    .find(|path| path.ends_with("-envelope.json"))
-    .test_expect("Agent Web fixture contains a proof envelope");
-    let mut legacy_envelope = read_workspace_json(&envelope_path);
-    legacy_envelope["schema"] = json!("chio.agent-web-proof-envelope.v1");
-    legacy_envelope
-        .as_object_mut()
-        .test_expect("proof envelope is an object")
-        .remove("agent_web_passport_scope_sha256");
-    let receipt_ref = legacy_envelope["receipt_refs"][0]
-        .as_str()
-        .test_expect("proof envelope has a receipt ref")
-        .to_string();
-    legacy_envelope["receipt_refs"] = json!([receipt_ref, receipt_ref]);
-
-    assert_schema_accepts_value(
-        &envelope_schema,
-        &legacy_envelope,
-        "legacy unscoped v1 proof envelope",
-    );
-
-    legacy_envelope["agent_web_passport_scope_sha256"] = json!(format!("{:064x}", 1));
-    assert_schema_rejects_value(
-        &envelope_schema,
-        &legacy_envelope,
-        "v1 proof envelope with a v2-only passport scope digest",
-    );
-}
-
-#[test]
 fn published_v2_proof_envelope_schema_requires_scope_and_unique_receipts() {
     let envelope_schema =
         read_workspace_json("spec/schemas/chio-agent-web/v2/proof-envelope.schema.json");
@@ -205,82 +169,17 @@ fn published_v2_proof_envelope_schema_requires_scope_and_unique_receipts() {
 }
 
 #[test]
-fn verifier_accepts_signed_legacy_v1_envelope() {
+fn verifier_refuses_unsupported_envelope_schema() {
     let mut bundle = agent_web_bundle(AgentWebCase::Valid);
-    downgrade_agent_web_bundle_to_signed_v1(&mut bundle);
+    relabel_agent_web_envelopes_as_v1(&mut bundle);
 
-    let receipt: chio_core_types::receipt::body::ChioReceipt = serde_json::from_slice(
-        bundle
-            .artifacts
-            .get("receipts/receipt-agent-web-webhook-allow.json")
-            .test_expect("legacy Agent Web receipt exists"),
-    )
-    .test_expect("legacy Agent Web receipt parses");
-    assert!(receipt
-        .action
-        .parameters
-        .get("agent_web_receipt_ref")
-        .is_none());
-    assert!(receipt.action.parameters.get("content_hash").is_none());
+    let error = verify_agent_web_interop(&bundle)
+        .test_expect_err("an envelope outside the supported schema must be refused");
+
     assert_eq!(
-        receipt
-            .metadata
-            .as_ref()
-            .and_then(|metadata| metadata.get("agent_web_receipt_ref"))
-            .and_then(serde_json::Value::as_str),
-        Some("receipt-agent-web-webhook-allow")
+        error.to_string(),
+        "invalid evidence graph artifact: unsupported evidence graph node schema: chio.agent-web-proof-envelope.v1"
     );
-    assert!(receipt
-        .verify_signature()
-        .test_expect("legacy Agent Web receipt signature verifies"));
-    let envelope: serde_json::Value = serde_json::from_slice(
-        bundle
-            .artifacts
-            .get("standard-webhooks-envelope.json")
-            .test_expect("legacy Agent Web envelope exists"),
-    )
-    .test_expect("legacy Agent Web envelope parses");
-    assert_eq!(
-        Some(receipt.content_hash.as_str()),
-        envelope
-            .get("external_subject_digest")
-            .and_then(serde_json::Value::as_str)
-    );
-
-    verify_agent_web_interop(&bundle)
-        .test_expect("new verifier accepts signed main-shape v1 envelopes and receipts");
-}
-
-#[test]
-fn verifier_accepts_legacy_v1_receipt_node_aliases() {
-    for alias_field in ["id", "sha256", "path"] {
-        let mut bundle = agent_web_bundle(AgentWebCase::Valid);
-        downgrade_agent_web_bundle_to_signed_v1(&mut bundle);
-        let graph: serde_json::Value = serde_json::from_slice(&bundle.evidence_graph_bytes)
-            .test_expect("legacy Agent Web evidence graph parses");
-        let receipt_node = graph["nodes"]
-            .as_array()
-            .test_expect("legacy Agent Web evidence graph has nodes")
-            .iter()
-            .find(|node| {
-                node["path"].as_str() == Some("receipts/receipt-agent-web-webhook-allow.json")
-            })
-            .test_expect("legacy Agent Web receipt node exists");
-        let alias = receipt_node[alias_field]
-            .as_str()
-            .test_expect("legacy Agent Web receipt alias exists")
-            .to_string();
-
-        replace_agent_web_envelope_artifact(
-            &mut bundle,
-            "standard-webhooks-envelope.json",
-            |envelope| envelope["receipt_refs"] = json!([alias]),
-        );
-
-        verify_agent_web_interop(&bundle).test_expect(
-            "v1 receipt references retain node id, digest, and artifact path compatibility",
-        );
-    }
 }
 
 #[test]
