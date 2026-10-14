@@ -1,7 +1,7 @@
 //! OCSF exporter for Chio receipts.
 //!
 //! This exporter transforms each [`SiemEvent`] into an OCSF 1.3.0
-//! Authorization event (class_uid 3002) using [`siem_event_to_ocsf`] and forwards
+//! API Activity event (class_uid 6003) using [`siem_event_to_ocsf`] and forwards
 //! the resulting JSON to a configurable HTTPS sink (for example, AWS Security
 //! Lake's custom source ingestion endpoint or a Splunk OCSF add-on receiver).
 //!
@@ -77,7 +77,7 @@ impl Default for OcsfExporterConfig {
     }
 }
 
-/// Exporter that transforms Chio receipts into OCSF 1.3.0 Authorization events
+/// Exporter that transforms Chio receipts into OCSF 1.3.0 API Activity events
 /// before forwarding them to an HTTPS sink.
 pub struct OcsfExporter {
     config: OcsfExporterConfig,
