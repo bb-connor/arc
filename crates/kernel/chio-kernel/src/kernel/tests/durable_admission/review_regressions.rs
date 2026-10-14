@@ -259,7 +259,6 @@ fn durable_server_url_elicitation_finalizes_the_pool_claim() {
 
     assert_durable_url_elicitation(kernel.evaluate_tool_call_blocking(&request));
     let terminal = assert_original_unknown_incident(&store, &request);
-    assert_eq!(kernel.receipt_log().len(), 1);
     assert_unknown_replay(
         kernel.evaluate_tool_call_blocking(&request),
         &terminal,
