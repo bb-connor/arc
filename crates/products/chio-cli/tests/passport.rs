@@ -2,6 +2,9 @@
 
 #[path = "support/private_fixture.rs"]
 mod private_fixture;
+#[path = "support/trust_health.rs"]
+mod trust_health;
+
 use private_fixture::write_private_file;
 
 #[path = "support/fixture_paths.rs"]
@@ -371,10 +374,10 @@ fn wait_for_trust_service(client: &Client, base_url: &str, service: &mut ServerG
                 read_child_stderr(&mut service.child)
             );
         }
-        match client.get(format!("{base_url}/health")).send() {
-            Ok(response) if response.status() == reqwest::StatusCode::OK => return,
-            Ok(_) | Err(_) => std::thread::sleep(std::time::Duration::from_millis(100)),
+        if trust_health::trust_service_ready(client, base_url) {
+            return;
         }
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
     panic!("trust service did not become ready");
 }

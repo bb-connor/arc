@@ -363,18 +363,6 @@ pub(crate) fn spawn_trust_service_without_receipt_db(
     }
 }
 
-fn receipt_query_health_ready(response: reqwest::blocking::Response) -> bool {
-    if response.status() != reqwest::StatusCode::OK {
-        return false;
-    }
-    response.json::<serde_json::Value>().is_ok_and(|body| {
-        !body["stores"]["receiptsConfigured"]
-            .as_bool()
-            .unwrap_or(false)
-            || body["receiptQuerySnapshot"]["state"] == "ready"
-    })
-}
-
 pub(crate) fn wait_for_trust_service_result(
     client: &Client,
     base_url: &str,
@@ -387,15 +375,10 @@ pub(crate) fn wait_for_trust_service_result(
                 "trust service exited before becoming ready (status {status}): {stderr}"
             ));
         }
-        match client.get(format!("{base_url}/health")).send() {
-            Ok(response) => {
-                if receipt_query_health_ready(response) {
-                    return Ok(());
-                }
-                thread::sleep(Duration::from_millis(100));
-            }
-            Err(_) => thread::sleep(Duration::from_millis(100)),
+        if super::trust_health::trust_service_ready(client, base_url) {
+            return Ok(());
         }
+        thread::sleep(Duration::from_millis(100));
     }
     Err("trust service did not become ready before timeout".to_string())
 }
@@ -406,10 +389,17 @@ pub(crate) fn wait_for_trust_service(client: &Client, base_url: &str) {
         match client.get(format!("{base_url}/health")).send() {
             Ok(response) => {
                 let observed_status = response.status();
-                if receipt_query_health_ready(response) {
+                let health = response.json::<serde_json::Value>().ok();
+                if observed_status == reqwest::StatusCode::OK
+                    && health
+                        .as_ref()
+                        .is_some_and(super::trust_health::receipt_reads_ready)
+                {
                     return;
                 }
-                last_error = Some(format!("health not query-ready (HTTP {observed_status})"));
+                last_error = Some(format!(
+                    "health not query-ready (HTTP {observed_status}): {health:?}"
+                ));
                 thread::sleep(Duration::from_millis(100));
             }
             Err(error) => {

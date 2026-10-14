@@ -9,3 +9,5 @@ pub(crate) mod receipt_query;
 pub(crate) mod receipt_query_capital_authority;
 #[allow(dead_code)]
 pub(crate) mod receipt_query_helpers;
+#[allow(dead_code)]
+pub(crate) mod trust_health;
