@@ -4926,16 +4926,12 @@ dependencies = [
  "chio-core-types",
  "chrono",
  "ed25519-dalek 2.2.0",
- "flate2",
  "hex",
- "reqwest 0.13.2",
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "tar",
  "tempfile",
  "thiserror 1.0.69",
- "toml 0.8.23",
 ]
 
 [[package]]

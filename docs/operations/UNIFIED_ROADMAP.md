@@ -465,7 +465,6 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
   - #1160's post-merge obligations, or the CT-REL preview exception once D8 is approved and its landing-ledger amendment is recorded.
   - Close out the AWS-LC fork audit (review sufficiency: D16). The source audit and its independent review are already on main (`docs/security/audits/aws-lc-rs-1.18.1-fork.md`, `aws-lc-rs-1.18.1-independent-review.md`). The audit states that it is not an approval to publish a release.
   - Turn the Release Qualification workflow green. `docs/release/RISK_REGISTER.md` requires hosted CI and Release Qualification success before tagging, and Release Qualification has failed on every recent push to main.
-  - Retarget `release-tagged.yml`, which checks out `project/roadmap-04-25-2026`, a branch section 7 archives.
   - Signed binaries for Linux x86_64 and arm64 and macOS arm64.
   - A container image with the dashboard embedded. Today the dashboard is in no release artifact.
   - Carry #1046's workspace dependency versions so that `cargo package` works; #1046 closed without them (section 7).

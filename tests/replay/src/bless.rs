@@ -69,8 +69,8 @@ pub const GOLDENS_DIR_PREFIX: &str = "tests/replay/goldens/";
 
 /// Working-tree path that is allowed to be dirty during bless.
 ///
-/// `docs/replay-compat.md` is updated alongside goldens to document
-/// cross-version compatibility shifts.
+/// `docs/replay-compat.md` records each bless alongside the goldens it
+/// rewrites.
 pub const REPLAY_COMPAT_DOC_PATH: &str = "docs/replay-compat.md";
 
 /// Errors emitted by the CHIO_BLESS gate.

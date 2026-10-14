@@ -1,9 +1,8 @@
 // Incremental synthetic-root accumulator for `chio replay`.
 //
 // Computes SHA-256(receipt_canonical_bytes_0 || ... || receipt_canonical_bytes_n-1)
-// in streaming fashion, matching the derivation in
-// `tests/replay/src/cross_version/reverify.rs`. The output is bit-identical to
-// a one-shot digest over the same concatenated input.
+// in streaming fashion. The output is bit-identical to a one-shot digest over
+// the same concatenated input.
 
 use sha2::{Digest, Sha256};
 

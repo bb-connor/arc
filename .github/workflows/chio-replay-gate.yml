@@ -334,26 +334,3 @@ jobs:
 
       - name: Run TypeScript replay conformance
         run: bun test sdks/typescript/packages/conformance/test/replay.spec.ts
-
-  cross-version:
-    # Cross-version receipt-compatibility sanity job. Runs the non-ignored
-    # test in tests/replay/tests/cross_version_replay.rs, which asserts
-    # release_compat_matrix.toml parses and contains at least the floor entries.
-    # The full re-verify suite (--ignored) requires live HTTPS to the release
-    # CDN and is intentionally not part of the default gate.
-    name: cross-version
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: replay-gate
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-rust
-        with:
-          toolchain: stable
-
-      - name: Run cross_version_replay (non-ignored sanity)
-        run: cargo test -p chio-replay-gate --test cross_version_replay

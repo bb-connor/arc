@@ -1,8 +1,7 @@
 # Chio Replay Compatibility
 
 Tracks bless events for the deterministic replay corpus
-(`tests/replay/goldens/**`) and cross-version compatibility
-annotations.
+(`tests/replay/goldens/**`).
 
 This file is the operator-facing audit surface for the
 replay-gate's golden snapshot. Every re-bless of the corpus appends an
@@ -75,30 +74,12 @@ operator-facing wrapper that drives the binary's `--bless` flag.
 
 ## Replay Corpus Stability
 
-Chio has no public cross-version compatibility matrix before the first public
-v1 release tag. Replay goldens are pre-release fixtures for the current v1
-branch. Internal `v2.x` and `v3.x` milestone labels are not protocol versions
-and must not be listed as supported compatibility floors.
-
-Future public tags may add a compatibility matrix after an explicit release
-decision.
+Replay goldens are fixtures for the current v1 protocol. A protocol change
+that alters golden bytes rewrites the goldens in the same commit, with a bless
+audit entry stating the reason and a refreshed vector manifest.
 
 ## Bless history
 
 | date       | branch                          | reason                          |
 | ---------- | ------------------------------- | ------------------------------- |
 | 2026-04-26 | replay-goldens bootstrap branch | Initial bless of replay corpus. |
-
-## Future Ratchet Rule
-
-After a public v1 release, release engineering may add a tag-based replay
-ratchet. Until then, the current branch may destructively rewrite pre-release
-goldens when protocol semantics change, provided the bless audit explains the
-reason and the vector manifest is refreshed.
-
-### Promoting from best_effort to supported
-
-A `best_effort` row is promoted to `supported` only after the canonical
-formats have stabilized for at least one full release cycle and the row
-is within the N=5 window. Promotion lands as a single PR titled
-`chore(replay): promote vX.Y to supported in release_compat_matrix.toml`.

@@ -333,11 +333,6 @@ chio replay ./fixtures/run-42/ --json | jq -r '.first_divergence.kind'
 - Replay-gate CI job: `.github/workflows/chio-replay-gate.yml`
   invokes `chio replay` over each goldens directory in the corpus and
   asserts exit code 0. Any divergence fails the gate.
-- Cross-version compatibility: the matrix at
-  `tests/replay/release_compat_matrix.toml` lists tagged-release
-  bundles the current main is expected to replay clean (`compat =
-  "supported"`) or best-effort (`compat = "best_effort"`). See
-  `docs/replay-compat.md` for the human-readable table.
 
 ## See also
 
@@ -351,4 +346,4 @@ chio replay ./fixtures/run-42/ --json | jq -r '.first_divergence.kind'
   and the `SCHEMA_ID` constant).
 - `spec/schemas/chio-replay-report/v1.schema.json` (formal JSON Schema
   for the `chio.replay.report/v1` document).
-- `docs/replay-compat.md` (cross-version compatibility table).
+- `docs/replay-compat.md` (bless history and re-bless protocol).
