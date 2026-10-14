@@ -171,8 +171,8 @@
       "issued_at": 1743292800,
       "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
       "merkle_root": "0xfba90da7db4859cf33cd97a64b2ce07f244c8fcafe51c19ddd67b03c8490c3eb",
-      "schema": "chio.checkpoint_statement.v2",
-      "signature": "71972bebefffeb11acc85872cda69ac3de943a2b5fa8133d419b9ea974a5710980e0c385f142d900fe40f5cd04bf62eee2cba83ae141406cfd0af834eda4b108",
+      "schema": "chio.checkpoint_statement.v1",
+      "signature": "ca94a77f269911405b2dc699acfd4da07535be277de23c7aceb7d286a778e0871e33b941cb72a3383131afaa19eafe81d581966bf2fb7704f335f91f3ddba608",
       "tree_size": 1
     },
     "key_binding_certificate": {

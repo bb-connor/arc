@@ -20,7 +20,6 @@ fn resource_preparation_binds_original_caller_and_survives_restart(
         directory.path(),
         loaded,
         true,
-        false,
         None,
         clock.clone(),
     )?;

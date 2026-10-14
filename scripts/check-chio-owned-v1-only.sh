@@ -230,11 +230,6 @@ while IFS= read -r line; do
     continue
   fi
 
-  # Kernel checkpoint statements carry the chio.checkpoint_statement.v2 id.
-  if [[ "$text" =~ chio\.checkpoint_statement\.v2 ]]; then
-    continue
-  fi
-
   failures+=("$line")
 done <"$tmp"
 

@@ -15,6 +15,7 @@ type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn process(args: &[&str]) -> Result<Output> {
     Ok(Command::new(env!("CARGO_BIN_EXE_chio"))
+        .arg("--json")
         .arg("process")
         .args(args)
         .output()?)
@@ -146,6 +147,16 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
         format!("/results/alice/custody/history/{retained_episode}/history/disposition");
     let cases = [
         (
+            "/schema",
+            json!("chio.process.completed-fanout.v2"),
+            "process host: run schema or pinned runtime differs",
+        ),
+        (
+            "/schema",
+            json!("chio.process.completed-fanout.v3"),
+            "process host: run schema or pinned runtime differs",
+        ),
+        (
             "/results/alice/response/execution_nonce_json",
             json!(serde_json::to_string(&extra_nonce)?),
             "execution nonce fields",
@@ -171,7 +182,11 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
             json!(1),
             "issuance interval",
         ),
-        ("/results/alice/receipt_log", Value::Null, "payload differs"),
+        (
+            "/results/alice/receipt_log",
+            Value::Null,
+            "invalid type: null, expected struct Evidence",
+        ),
         (
             "/results/alice/receipt_log",
             original.action.parameters["results"]["bob"]["receipt_log"].clone(),
@@ -265,6 +280,13 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
         std::fs::write(&path, canonical_json_bytes(&signed)?)?;
         let denied = verify(&path, runtime)?;
         assert!(!denied.status.success(), "accepted {pointer}");
+        if pointer == "/schema" {
+            assert_eq!(denied.status.code(), Some(1));
+            assert!(denied.stdout.is_empty());
+            let report: Value = serde_json::from_slice(&denied.stderr)?;
+            assert_eq!(report["code"], "urn:chio:error:cli:other");
+            assert_eq!(report["message"], reason);
+        }
         assert!(
             String::from_utf8_lossy(&denied.stderr).contains(reason),
             "{pointer}: {}",

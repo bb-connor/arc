@@ -123,7 +123,7 @@ capabilities:
         assert descriptor["credential"] not in json.dumps(response)
         assert out.stat().st_mode & 0o777 == 0o600
         assert descriptor["schema"] == "chio.process.connection.v1"
-        assert descriptor["abi"] == "chio.process.abi.v3"
+        assert descriptor["abi"] == "chio.process.abi.v1"
         assert descriptor["runtime_id"]
         assert descriptor["capability_id"]
         assert descriptor["process_id"] == process
@@ -193,7 +193,7 @@ capabilities:
     host_record = state / "host.json"
     recorded = host_record.read_bytes()
     host_json = json.loads(recorded)
-    assert host_json["abi"] == "chio.process.abi.v3"
+    assert host_json["abi"] == "chio.process.abi.v1"
     assert host_json["written_by"].startswith("chio-cli ")
     host_record.write_bytes(json.dumps({**host_json, "abi": "chio.process.abi.v0"}).encode())
     refused = cli(
@@ -217,15 +217,15 @@ capabilities:
     assert (state / "authority.db").read_bytes() == before_export
     status = cli("status", "--state", state)
     assert status["abi"] == {
-        "serving": "chio.process.abi.v3",
+        "serving": "chio.process.abi.v1",
         "host": "chio.process.abi.v0",
         "written_by": host_json["written_by"],
     }
     # ABI is checked before decoding manifest shapes.
-    other = {**host_json, "abi": "chio.process.abi.v1", "manifests": {"other": "incompatible shape"}}
+    other = {**host_json, "abi": "chio.process.abi.v3", "manifests": {"other": "incompatible shape"}}
     host_record.write_text(json.dumps(other))
-    assert "process ABI chio.process.abi.v1" in cli("export", "--state", state, success=False)
-    assert cli("status", "--state", state)["abi"]["host"] == "chio.process.abi.v1"
+    assert "process ABI chio.process.abi.v3" in cli("export", "--state", state, success=False)
+    assert cli("status", "--state", state)["abi"]["host"] == "chio.process.abi.v3"
     assert (state / "authority.db").read_bytes() == before_export
     missing = {key: value for key, value in other.items() if key != "abi"}
     host_record.write_text(json.dumps(missing))

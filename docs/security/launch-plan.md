@@ -1571,7 +1571,7 @@ replay store, in either order. These were store-level replay-boundary failures,
 not an observed tool-execution bypass: durable nonce configuration was and
 remains rejected by the kernel coordinator.
 
-New operation-owned nonces use `chio.execution_nonce.v2`. The signature commits
+New operation-owned nonces use `chio.operation_execution_nonce.v1`. The signature commits
 to a canonical, domain-separated context containing the full nonce body and the
 trusted operation ID. That ID binds the authenticated namespace, capability
 artifact, request, policy and effect class. The presented nonce cannot select

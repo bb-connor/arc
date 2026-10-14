@@ -38,9 +38,6 @@ pub(super) struct Config {
     pub spawn_templates: Vec<SpawnTemplate>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub supervised_children: bool,
-    /// Require the original operation-owned nonce before every tool dispatch.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub execution_nonces: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_broker: Option<super::native_broker::Config>,
 }
@@ -433,14 +430,12 @@ pub(super) fn kernel(
     directory: &Path,
     loaded: policy::LoadedPolicy,
     initializing: bool,
-    execution_nonces: bool,
     keyring_config: Option<&super::keyring::Config>,
 ) -> Result<KernelAssembly, CliError> {
     kernel_with_clock(
         directory,
         loaded,
         initializing,
-        execution_nonces,
         keyring_config,
         Arc::new(chio_security_types::clock::SystemClock),
     )
@@ -450,7 +445,6 @@ pub(super) fn kernel_with_clock(
     directory: &Path,
     loaded: policy::LoadedPolicy,
     initializing: bool,
-    execution_nonces: bool,
     keyring_config: Option<&super::keyring::Config>,
     clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<KernelAssembly, CliError> {
@@ -483,15 +477,13 @@ pub(super) fn kernel_with_clock(
             )
         })
         .transpose()?;
-    if execution_nonces {
-        kernel.set_execution_nonce_store(
-            ExecutionNonceConfig {
-                require_nonce: true,
-                ..ExecutionNonceConfig::default()
-            },
-            Box::new(OperationOwnedNonceOnly),
-        );
-    }
+    kernel.set_execution_nonce_store(
+        ExecutionNonceConfig {
+            require_nonce: true,
+            ..ExecutionNonceConfig::default()
+        },
+        Box::new(OperationOwnedNonceOnly),
+    );
     kernel.set_capability_trust_root(key.public_key(), scope_hash(&root_scope).map_err(error)?);
     let receipts = Arc::new(match keyring_config {
         Some(config) => chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool_with_clock(
@@ -615,7 +607,6 @@ impl Host {
             lease.directory.path(),
             policy,
             false,
-            record.config.execution_nonces,
             record
                 .config
                 .native_broker
@@ -762,26 +753,27 @@ mod tests {
     }
 
     #[test]
-    fn host_state_under_another_process_abi_is_refused() -> Result<(), Box<dyn std::error::Error>>
-    {
+    fn host_state_under_another_process_abi_is_refused() -> Result<(), Box<dyn std::error::Error>> {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("host.json");
-        std::fs::write(
-            &path,
-            serde_json::to_vec(&json!({"abi": "chio.process.abi.v1", "config": {}}))?,
-        )?;
-        let error = match read_current_record(&path) {
-            Ok(_) => return Err("host state under another ABI was read".into()),
-            Err(error) => error,
-        };
-        assert_eq!(
-            error.to_string(),
-            super::error(format!(
-                "host state was recorded under process ABI chio.process.abi.v1; this build speaks {}",
-                chio_process::PROCESS_ABI
-            ))
-            .to_string()
-        );
+        for abi in ["chio.process.abi.v2", "chio.process.abi.v3"] {
+            std::fs::write(
+                &path,
+                serde_json::to_vec(&json!({"abi": abi, "config": {}}))?,
+            )?;
+            let error = match read_current_record(&path) {
+                Ok(_) => return Err("host state under another ABI was read".into()),
+                Err(error) => error,
+            };
+            assert_eq!(
+                error.to_string(),
+                super::error(format!(
+                    "host state was recorded under process ABI {abi}; this build speaks {}",
+                    chio_process::PROCESS_ABI
+                ))
+                .to_string()
+            );
+        }
         Ok(())
     }
 

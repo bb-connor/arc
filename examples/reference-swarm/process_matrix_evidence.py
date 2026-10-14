@@ -245,16 +245,13 @@ def verify_observations(name, case, verified, identity):
     calls, observed = run["calls"], case["observation"]
     states = verified["observed_operations"]
     require(
-        verified["artifact_schema"] in (
-            "chio.process.worker-outcomes.v2", "chio.process.worker-outcomes.v3"
-        ),
-        "matrix requires native-bound outcomes v2 or v3",
+        verified["artifact_schema"] == "chio.process.worker-outcomes.v1",
+        "matrix requires native-bound worker outcomes",
     )
-    if verified["artifact_schema"] == "chio.process.worker-outcomes.v3":
-        require(
-            {"execution_nonces", "receipt_log_inclusion"} <= set(verified["checks"]),
-            "nonce-aware outcomes require nonce custody and receipt-log verification",
-        )
+    require(
+        {"execution_nonces", "receipt_log_inclusion"} <= set(verified["checks"]),
+        "outcomes require nonce custody and receipt-log verification",
+    )
     require(
         set(verified["native_launches"]) == set(calls),
         "matrix requires a verified native launch for every worker",
@@ -609,11 +606,10 @@ def verify_bundle(chio, artifact, trusted_pins):
                     == set(verified["observed_operations"]),
                     "completed run differs from outcomes",
                 )
-                if verified["artifact_schema"] == "chio.process.worker-outcomes.v3":
-                    require(
-                        {"execution_nonces", "receipt_log_inclusion"} <= set(joined["checks"]),
-                        "completed run omits verified nonce custody or receipt-log inclusion",
-                    )
+                require(
+                    {"execution_nonces", "receipt_log_inclusion"} <= set(joined["checks"]),
+                    "completed run omits verified nonce custody or receipt-log inclusion",
+                )
                 completed_calls = case["completed_run"]["action"]["parameters"][
                     "results"
                 ]

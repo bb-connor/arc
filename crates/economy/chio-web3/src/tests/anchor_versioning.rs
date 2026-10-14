@@ -11,11 +11,11 @@ fn anchor_inclusion_proof_refuses_retired_schemas() {
     ));
 
     let mut proof = sample_anchor_inclusion_proof();
-    proof.checkpoint_statement.schema = "chio.checkpoint_statement.v1".to_string();
+    proof.checkpoint_statement.schema = "chio.checkpoint_statement.v2".to_string();
     assert!(matches!(
         validate_anchor_inclusion_proof(&proof),
         Err(Web3ContractError::UnsupportedSchema(schema))
-            if schema == "chio.checkpoint_statement.v1"
+            if schema == "chio.checkpoint_statement.v2"
     ));
 }
 

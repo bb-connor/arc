@@ -153,7 +153,6 @@ pub(super) fn init(
         lease.directory.path(),
         policy,
         true,
-        config.execution_nonces,
         config
             .native_broker
             .as_ref()

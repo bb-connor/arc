@@ -195,9 +195,9 @@ before the host lease is released. Host restart preserves completed replay;
 uncertain effects retain their original captured accounting.
 
 After stopping the host, `process attest-call` exports a
-`chio.process.call-observation.v3` artifact through the existing call evidence
+`chio.process.broker-call-observation.v1` artifact through the existing call evidence
 command. It binds the signed broker response, original composite quota capture,
-cage launch and terminal receipts, original execution nonce when required, and
+cage launch and terminal receipts, original execution nonce, and
 kernel receipt-log inclusion. `process verify-call` requires
 `--trusted-broker-host-config` in addition to the original request, context,
 kernel key and runtime pins. Retain the normalized `config` from `STATE/host.json`

@@ -241,7 +241,7 @@ fn native_consumer_services_helper_process() -> TestResult {
     write_private(
         &campaign.directory.join("config.json"),
         &canonical_json_bytes(&json!({
-            "schema":"chio.process.host.v1","policy":policy_path,"servers":servers,"execution_nonces":true,
+            "schema":"chio.process.host.v1","policy":policy_path,"servers":servers,
             "limits":{"max_calls":24,"max_processes":2,"max_depth":1},
             "children":[{"id":"coder","parent":"root","budget_share_bps":9000,"tools":grants}],
             "native_broker":{"keyring":null,"security":{"tenant_id":TENANT_SCOPE,"isolation_epoch_id":"consumer-epoch","generation":1},

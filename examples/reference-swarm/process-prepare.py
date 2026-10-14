@@ -135,7 +135,6 @@ capabilities:
     share, remainder = divmod(10000, len(inputs))
     config = {
         "schema": "chio.process.host.v1",
-        "execution_nonces": True,
         "policy": str(policy),
         "servers": [
             {

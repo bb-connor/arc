@@ -12,8 +12,8 @@
       "required": ["schema", "nonce_id", "issued_at", "expires_at", "bound_to"],
       "properties": {
         "schema": {
-          "enum": ["chio.execution_nonce.v1", "chio.execution_nonce.v2"],
-          "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers."
+          "enum": ["chio.execution_nonce.v1", "chio.operation_execution_nonce.v1"],
+          "description": "chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier."
         },
         "nonce_id": { "type": "string", "minLength": 1 },
         "issued_at": { "type": "integer", "minimum": 0 },

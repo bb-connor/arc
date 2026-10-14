@@ -1488,14 +1488,14 @@ fn validate_checkpoint_rejects_retired_statement_schema() {
     let kp = Keypair::generate();
     let mut checkpoint =
         build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("build failed");
-    checkpoint.body.schema = "chio.checkpoint_statement.v1".to_string();
+    checkpoint.body.schema = "chio.checkpoint_statement.v2".to_string();
     checkpoint.signature =
         kp.sign(&canonical_json_bytes(&checkpoint.body).expect("canonical retired body"));
 
     let error = validate_checkpoint(&checkpoint).expect_err("retired schema must be refused");
     assert_eq!(
         error.to_string(),
-        "invalid checkpoint: unsupported checkpoint schema chio.checkpoint_statement.v1"
+        "invalid checkpoint: unsupported checkpoint schema chio.checkpoint_statement.v2"
     );
 }
 
@@ -1550,7 +1550,7 @@ fn checkpoint_body_schema_field() {
 fn checkpoint_schema_support_is_exactly_the_current_schema() {
     assert!(is_supported_checkpoint_schema(CHECKPOINT_SCHEMA));
     assert!(!is_supported_checkpoint_schema(
-        "chio.checkpoint_statement.v1"
+        "chio.checkpoint_statement.v2"
     ));
 }
 

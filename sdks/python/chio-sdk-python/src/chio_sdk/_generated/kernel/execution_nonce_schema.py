@@ -24,7 +24,7 @@ class Schema(Enum):
     """
 
     chio_execution_nonce_v1 = "chio.execution_nonce.v1"
-    chio_execution_nonce_v2 = "chio.execution_nonce.v2"
+    chio_operation_execution_nonce_v1 = "chio.operation_execution_nonce.v1"
 
 
 class BoundTo(BaseModel):

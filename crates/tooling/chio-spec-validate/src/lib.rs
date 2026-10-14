@@ -554,6 +554,45 @@ mod tests {
     }
 
     #[test]
+    fn web3_anchor_schema_rejects_retired_checkpoint_schemas() {
+        let schema_path = workspace_schema_path("chio-web3/v1/anchor-inclusion-proof.schema.json");
+        let schema =
+            load_json(&schema_path).unwrap_or_else(|error| panic!("load anchor schema: {error}"));
+        let document_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json");
+        let document = load_json(&document_path)
+            .unwrap_or_else(|error| panic!("load anchor example: {error}"));
+        assert_eq!(
+            document.pointer("/checkpoint_statement/schema"),
+            Some(&json!("chio.checkpoint_statement.v1"))
+        );
+        validate_value(&schema_path, &schema, &document_path, &document)
+            .unwrap_or_else(|error| panic!("current anchor example must validate: {error}"));
+
+        for retired in [
+            "chio.checkpoint_statement.v2",
+            "chio.checkpoint_statement.v3",
+        ] {
+            let mut changed = document.clone();
+            changed["checkpoint_statement"]["schema"] = json!(retired);
+            match validate_value(&schema_path, &schema, &document_path, &changed) {
+                Err(ValidateError::SchemaViolation(actual_schema, actual_document, errors)) => {
+                    assert_eq!(actual_schema, schema_path);
+                    assert_eq!(actual_document, document_path);
+                    assert_eq!(
+                        errors,
+                        vec!["\"chio.checkpoint_statement.v1\" was expected".to_string()],
+                        "{retired}"
+                    );
+                }
+                other => {
+                    panic!("expected exact checkpoint schema refusal for {retired}, got {other:?}")
+                }
+            }
+        }
+    }
+
+    #[test]
     fn receipt_inclusion_proof_schema_accepts_supported_checkpoint_algorithms() {
         let schema_path =
             workspace_schema_path("chio-transparency/v1/receipt-inclusion-proof.schema.json");
@@ -611,7 +650,7 @@ mod tests {
                 "verified_at": 1,
                 "checkpoint_statement": {
                     "body": {
-                        "schema": "chio.checkpoint_statement.v2",
+                        "schema": "chio.checkpoint_statement.v1",
                         "checkpoint_seq": 1,
                         "batch_start_seq": 1,
                         "batch_end_seq": 1,
@@ -677,7 +716,7 @@ mod tests {
                 "verified_at": 1,
                 "checkpoint_statement": {
                     "body": {
-                        "schema": "chio.checkpoint_statement.v2",
+                        "schema": "chio.checkpoint_statement.v1",
                         "checkpoint_seq": 1,
                         "batch_start_seq": 1,
                         "batch_end_seq": 1,
@@ -709,9 +748,9 @@ mod tests {
         let schema = load_json(&schema_path)
             .unwrap_or_else(|error| panic!("load transparency schema: {error}"));
         let invalid_documents = [
-            transparency_document("chio.checkpoint_statement.v2", 1, None),
+            transparency_document("chio.checkpoint_statement.v1", 1, None),
             transparency_document(
-                "chio.checkpoint_statement.v1",
+                "chio.checkpoint_statement.v2",
                 1,
                 Some(json!(format!("0x{}", "3".repeat(64)))),
             ),
@@ -728,7 +767,7 @@ mod tests {
             ));
         }
 
-        let detached_later = transparency_document("chio.checkpoint_statement.v2", 2, None);
+        let detached_later = transparency_document("chio.checkpoint_statement.v1", 2, None);
         validate_value(
             &schema_path,
             &schema,
@@ -746,7 +785,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("load transparency schema: {error}"));
         let canonical_chain_root = json!(format!("0x{}", "3".repeat(64)));
         let canonical = transparency_document(
-            "chio.checkpoint_statement.v2",
+            "chio.checkpoint_statement.v1",
             1,
             Some(canonical_chain_root),
         );
@@ -784,7 +823,7 @@ mod tests {
         let schema = load_json(&schema_path)
             .unwrap_or_else(|error| panic!("load transparency schema: {error}"));
         let mut document = transparency_document(
-            "chio.checkpoint_statement.v2",
+            "chio.checkpoint_statement.v1",
             1,
             Some(json!(format!("0x{}", "3".repeat(64)))),
         );

@@ -134,8 +134,9 @@ impl AdmissionExecutionNonceReservationV1 {
         if nonce.schema == OPERATION_EXECUTION_NONCE_SCHEMA {
             profile::verify(&wire.signed_nonce, operation, trusted_issuer, &binding, now)?;
         } else {
-            // Legacy artifacts are retained for authenticated history and
-            // compensation. Fresh durable authority requires the v2 profile.
+            // chio.execution_nonce.v1 artifacts remain authenticated history and
+            // compensation evidence. Fresh durable authority requires
+            // chio.operation_execution_nonce.v1.
             validate_execution_nonce(&wire.signed_nonce, trusted_issuer, &binding, now)
                 .map_err(invalid)?;
         }

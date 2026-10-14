@@ -602,7 +602,7 @@ def relocated(binary, directory):
     )
     manifest_path = other_abi / "relocation.json"
     manifest = json.loads(manifest_path.read_text())
-    assert manifest["abi"] == "chio.process.abi.v3"
+    assert manifest["abi"] == "chio.process.abi.v1"
     unsupported_abi = manifest["abi"] + ".unsupported"
     manifest_path.write_text(json.dumps({**manifest, "abi": unsupported_abi}))
     authority_before = (other_abi / "authority.db").read_bytes()

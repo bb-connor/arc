@@ -397,7 +397,7 @@
       }
     },
     {
-      "name": "legacy-execution-nonce",
+      "name": "execution-nonce",
       "schema_file": "kernel/execution_nonce.schema.json",
       "valid": true,
       "instance": {
@@ -424,7 +424,7 @@
       "valid": true,
       "instance": {
         "nonce": {
-          "schema": "chio.execution_nonce.v2",
+          "schema": "chio.operation_execution_nonce.v1",
           "nonce_id": "schema-fixture-nonce",
           "issued_at": 100,
           "expires_at": 130,
@@ -446,7 +446,7 @@
       "valid": false,
       "instance": {
         "nonce": {
-          "schema": "chio.execution_nonce.v2",
+          "schema": "chio.operation_execution_nonce.v1",
           "nonce_id": "schema-fixture-nonce",
           "issued_at": 100,
           "expires_at": 130,
@@ -800,7 +800,7 @@
       "valid": false,
       "instance": {
         "nonce": {
-          "schema": "chio.execution_nonce.v2",
+          "schema": "chio.operation_execution_nonce.v1",
           "nonce_id": "schema-fixture-nonce",
           "issued_at": true,
           "expires_at": 130,

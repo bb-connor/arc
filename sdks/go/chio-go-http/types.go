@@ -379,8 +379,8 @@ const (
 
 // Defines values for KernelExecutionNonceNonceSchema.
 const (
-	KernelExecutionNonceNonceSchemaChioExecutionNonceV1 KernelExecutionNonceNonceSchema = "chio.execution_nonce.v1"
-	KernelExecutionNonceNonceSchemaChioExecutionNonceV2 KernelExecutionNonceNonceSchema = "chio.execution_nonce.v2"
+	KernelExecutionNonceNonceSchemaChioExecutionNonceV1          KernelExecutionNonceNonceSchema = "chio.execution_nonce.v1"
+	KernelExecutionNonceNonceSchemaChioOperationExecutionNonceV1 KernelExecutionNonceNonceSchema = "chio.operation_execution_nonce.v1"
 )
 
 // Defines values for KernelHeartbeatType.

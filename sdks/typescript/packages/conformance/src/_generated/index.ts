@@ -584,7 +584,7 @@ export namespace Agent_ToolCallRequest {
       /**
        * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
        */
-      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
+      schema: "chio.execution_nonce.v1" | "chio.operation_execution_nonce.v1";
       nonce_id: string;
       issued_at: number;
       expires_at: number;
@@ -2030,7 +2030,7 @@ export namespace Kernel_ExecutionNonce {
       /**
        * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
        */
-      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
+      schema: "chio.execution_nonce.v1" | "chio.operation_execution_nonce.v1";
       nonce_id: string;
       issued_at: number;
       expires_at: number;
@@ -2331,7 +2331,7 @@ export namespace Kernel_ToolCallResponse {
       /**
        * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
        */
-      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
+      schema: "chio.execution_nonce.v1" | "chio.operation_execution_nonce.v1";
       nonce_id: string;
       issued_at: number;
       expires_at: number;

@@ -1275,7 +1275,10 @@ async fn durable_mediation_reserves_the_operation_and_settles_the_caller_report(
         false
     );
     let nonce_json = authorized["execution_nonce"].clone();
-    assert_eq!(nonce_json["nonce"]["schema"], "chio.execution_nonce.v2");
+    assert_eq!(
+        nonce_json["nonce"]["schema"],
+        "chio.operation_execution_nonce.v1"
+    );
 
     // The caller's report settles the same operation once and replays after.
     let reconcile_body = serde_json::json!({

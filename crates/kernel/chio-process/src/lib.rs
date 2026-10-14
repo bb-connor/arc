@@ -67,7 +67,7 @@ pub use types::{
 /// documents, and the relocation manifest. A host records the ABI it was
 /// initialized under and refuses to serve, run or import state recorded under
 /// another; an incompatible change to any covered surface is a new ABI.
-pub const PROCESS_ABI: &str = "chio.process.abi.v3";
+pub const PROCESS_ABI: &str = "chio.process.abi.v1";
 
 /// Dispatch attempts one logical operation may consume: the first, plus a bounded
 /// number of fresh dispatches after the kernel reports an unknown outcome for a

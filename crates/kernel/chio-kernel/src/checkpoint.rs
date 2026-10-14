@@ -4,7 +4,7 @@
 //! to a Merkle root. Inclusion proofs allow verifying that a specific receipt
 //! was part of a batch without replaying the entire log.
 //!
-//! Statement schema: "chio.checkpoint_statement.v2"
+//! Statement schema: "chio.checkpoint_statement.v1"
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -35,7 +35,7 @@ std::thread_local! {
 }
 
 /// Signed checkpoint statement carrying the checkpoint-chain commitment.
-pub const CHECKPOINT_SCHEMA: &str = "chio.checkpoint_statement.v2";
+pub const CHECKPOINT_SCHEMA: &str = "chio.checkpoint_statement.v1";
 pub const CHECKPOINT_PUBLICATION_SCHEMA: &str = "chio.checkpoint_publication.v1";
 pub const CHECKPOINT_WITNESS_SCHEMA: &str = "chio.checkpoint_witness.v1";
 /// Cryptographic checkpoint-chain consistency proof.

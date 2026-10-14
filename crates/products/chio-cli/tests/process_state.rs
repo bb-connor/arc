@@ -82,7 +82,7 @@ fn retained_state_is_read_without_launch_keys_credentials_or_migration() -> Resu
     assert!(!dir.path().join("process.db-wal").exists());
     fs::write(&path, &before)?;
     let mut unsupported = record.clone();
-    unsupported["abi"] = json!("chio.process.abi.v1");
+    unsupported["abi"] = json!("chio.process.abi.v3");
     fs::write(
         dir.path().join("host.json"),
         serde_json::to_vec(&unsupported)?,

@@ -40,30 +40,20 @@ pub(super) fn verify(
             &call.response,
             key,
         )?;
-        if evidence.schema == SCHEMA {
-            let id = super::super::super::nonce_evidence::verify(
-                call.nonce.as_ref(),
-                &receipt,
-                &call.response,
-                cap,
-                key,
-                bundle.now_unix_ms,
-            )?
-            .ok_or_else(|| error("missing completed execution nonce"))?;
-            require(
-                nonce_ids.insert(id),
-                "execution nonce reused across workers",
-            )?;
-            call.receipt_log
-                .as_ref()
-                .ok_or_else(|| error("missing receipt log inclusion"))?
-                .verify(&receipt, key, bundle.now_unix_ms)?;
-        } else {
-            require(
-                call.nonce.is_none() && call.receipt_log.is_none(),
-                "legacy run carries unsupported nonce or log claims",
-            )?;
-        }
+        let id = super::super::super::nonce_evidence::verify(
+            Some(&call.nonce),
+            &receipt,
+            &call.response,
+            cap,
+            key,
+            bundle.now_unix_ms,
+        )?
+        .ok_or_else(|| error("missing completed execution nonce"))?;
+        require(
+            nonce_ids.insert(id),
+            "execution nonce reused across workers",
+        )?;
+        call.receipt_log.verify(&receipt, key, bundle.now_unix_ms)?;
         require(
             receipt.decision == Some(Decision::Allow)
                 && receipt.timestamp >= evidence.bootstrap.timestamp
@@ -102,7 +92,7 @@ pub(super) fn verify(
             &receipt,
             token,
             &evidence.runtime_id,
-            call.nonce.as_ref(),
+            Some(&call.nonce),
         )?;
         require(
             receipt

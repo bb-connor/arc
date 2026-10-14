@@ -15,7 +15,7 @@ use crate::merkle::{leaf_hash, MerkleProof};
 use crate::receipt::body::ChioReceipt;
 use crate::validation::{ensure_non_empty, evm_addresses_match};
 
-pub const CHIO_CHECKPOINT_STATEMENT_SCHEMA: &str = "chio.checkpoint_statement.v2";
+pub const CHIO_CHECKPOINT_STATEMENT_SCHEMA: &str = "chio.checkpoint_statement.v1";
 pub const CHIO_ANCHOR_INCLUSION_PROOF_SCHEMA: &str = "chio.anchor-inclusion-proof.v1";
 pub const CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA: &str = "chio.oracle-conversion-evidence.v1";
 pub const CHIO_LINK_ORACLE_AUTHORITY: &str = "chio_link_runtime_v1";

@@ -272,7 +272,7 @@ For native tools, use each server ID and policy signer from the operator-owned
 host configuration. Repeat `--trusted-launch-policy-signer SERVER=PUBLIC_KEY`
 for multiple native servers; omit it for hosts with only built-in mailboxes.
 The supervised script supplies these pins from that configuration automatically.
-The v2 artifact includes the original signed launch policy and the existing
+The artifact includes the original signed launch policy and the existing
 enforcement and terminal receipts. The verifier checks the tool receipt's launch
 reference, policy signer, manifest, executable bindings, execution identity,
 matching launch attempt and observed lifetime. Export fails if its independently
@@ -285,20 +285,18 @@ the issued family limit. Each completed call also carries fenced readback of its
 operation-owned continuation claims. The verifier recomputes the original claim
 commitment named in the signed tool receipt and matches the retained token,
 prepared plan, request binding and terminal receipt. Historical evidence cannot
-authorize another effect. Hosts provisioned with `execution_nonces: true` produce
-version 3 artifacts. The process runtime retains the original operation-bound
+authorize another effect. The process runtime retains the original operation-bound
 nonce before dispatch and reuses it during recovery. Export reads its issuance,
 reservation and historical validation time from the anchored admission store.
 Verification binds that nonce to the exact request, capability, operation and
 original continuation commitment, and checks its historical validity interval.
 
-Version 3 also includes the original call receipt's Merkle inclusion proof and
+Each completed call also includes the original call receipt's Merkle inclusion proof and
 signed checkpoint from the host's receipt store. Export checkpoints the committed
 tail through the existing writer. Verification checks the pinned signer, receipt
 bytes, sequence, leaf index, tree size and root. These are local log membership
 claims; external checkpoint publication and the full M5 matrix remain separate.
-Version 2 artifacts retain explicit unchecked nonce and log claims. Every report
-still includes `m5_acceptance_complete: false`.
+Every report includes `m5_acceptance_complete: false`.
 
 ### Observe a denied or uncertain call
 
@@ -367,7 +365,7 @@ records that the worker finished processing its response; the response can
 still describe a denied or interrupted tool call. The original live graph
 authority is retained without minting a successful join or graph completion.
 
-Version 2 also includes each response's original signed launch reference, its
+The artifact also includes each response's original signed launch reference, its
 signed Enforced policy and any matching retained exit receipt. Verification
 binds the original host configuration, signed manifest, exact policy bytes,
 route and executable identity to the independently pinned policy signer. Each
@@ -378,13 +376,11 @@ process exit; they do not assert that the call completed inside its lifetime.
 A recovery refusal's connection can be a replacement connection. Its launch
 evidence does not identify the earlier external effect or establish that the
 original target died. Those observations, physical effects and the complete
-scenario matrix still require additional evidence. Version 3 outcomes carry
-version 2 call observations with the original nonce custody and receipt-log
+scenario matrix still require additional evidence. Worker outcomes carry
+call observations with the original nonce custody and receipt-log
 inclusion, including signed recovery refusals. An uncertain effect stays uncertain;
 the proof authenticates that refusal without inventing a completed tool result.
-`m5_acceptance_complete` remains false. Version 1 artifacts remain verifiable
-with their original limits and no native policy signer options. The separate
-completed-run verifier continues to require actual terminal launch receipts.
+`m5_acceptance_complete` remains false. The separate completed-run verifier continues to require actual terminal launch receipts.
 
 ### Verify a launch when the observing host died
 

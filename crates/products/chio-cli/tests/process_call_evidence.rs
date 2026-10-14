@@ -47,7 +47,7 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
     )?;
     let verify = |artifact: &Path, runtime: &str, folder: &Path, key: &Path| -> Result<Output> {
         Ok(Command::new(env!("CARGO_BIN_EXE_chio"))
-            .args(["process", "verify-call", "--artifact"])
+            .args(["--json", "process", "verify-call", "--artifact"])
             .arg(artifact)
             .arg("--trusted-kernel-pubkey")
             .arg(key)
@@ -109,6 +109,8 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
         };
         assert!(!verify(&artifact, runtime, &other, &key)?.status.success());
         let mut cases = vec![
+            ("/schema", json!("chio.process.call-observation.v2")),
+            ("/schema", json!("chio.process.call-observation.v3")),
             ("/receipt_log", Value::Null),
             ("/receipt_log/inclusion/receipt_seq", json!(999)),
             ("/runtime_id", json!("another-runtime")),
@@ -193,6 +195,16 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
             std::fs::write(&path, canonical_json_bytes(&signed)?)?;
             let rejected = verify(&path, runtime, &folder, &key)?;
             assert!(!rejected.status.success(), "accepted {name} {pointer}");
+            if pointer == "/schema" {
+                assert_eq!(rejected.status.code(), Some(1));
+                assert!(rejected.stdout.is_empty());
+                let report: Value = serde_json::from_slice(&rejected.stderr)?;
+                assert_eq!(report["code"], "urn:chio:error:cli:other");
+                assert_eq!(
+                    report["message"],
+                    "process host: call schema, runtime pin or signed payload differs"
+                );
+            }
         }
         let mut unsigned = serde_json::to_value(&original)?;
         unsigned["action"]["parameters"]["operation"]["private_request"] = json!({});

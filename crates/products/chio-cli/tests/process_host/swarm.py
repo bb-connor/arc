@@ -68,7 +68,6 @@ capabilities:
         json.dumps(
             {
                 "schema": "chio.process.host.v1",
-                "execution_nonces": True,
                 "policy": str(policy),
                 "mailboxes": [{"id": "jobs"}],
                 "children": children,

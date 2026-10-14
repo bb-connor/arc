@@ -26,8 +26,7 @@ mod native;
 #[path = "run_evidence/verify.rs"]
 mod verification;
 
-const SCHEMA: &str = "chio.process.completed-fanout.v3";
-const LEGACY_SCHEMA: &str = "chio.process.completed-fanout.v2";
+const SCHEMA: &str = "chio.process.completed-fanout.v1";
 const MAX_ARTIFACT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Serialize, Deserialize)]
@@ -52,10 +51,8 @@ struct CompletedCall {
     context: Value,
     response: Value,
     custody: custody::Observation,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    nonce: Option<super::nonce_evidence::Evidence>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    receipt_log: Option<super::receipt_evidence::Evidence>,
+    nonce: super::nonce_evidence::Evidence,
+    receipt_log: super::receipt_evidence::Evidence,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -138,12 +135,8 @@ pub(super) fn verify_file(
     if !evidence.confinement.is_empty() {
         checks.push("confinement_receipt_chain");
     }
-    let mut unchecked = vec!["scenario_matrix"];
-    if evidence.schema == SCHEMA {
-        checks.extend(["execution_nonces", "receipt_log_inclusion"]);
-    } else {
-        unchecked.extend(["execution_nonces", "receipt_log_inclusion"]);
-    }
+    checks.extend(["execution_nonces", "receipt_log_inclusion"]);
+    let unchecked = vec!["scenario_matrix"];
     println!(
         "{}",
         json!({
