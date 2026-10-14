@@ -39,20 +39,16 @@ pub struct SqliteApprovalStore {
     pool: Pool<SqliteConnectionManager>,
 }
 
-/// Approval-store schema revision. Bump on every schema-affecting change.
-// Revision 3 adds authenticated request-route bindings to collector records.
-// Existing unbound records are retained but require explicit trusted migration.
-const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 4;
+/// The approval store's single schema version.
+const APPROVAL_STORE_SCHEMA_VERSION: i32 = 1;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table. Distinct from the co-located receipt store's key so the
 /// two track their revisions independently in the one sidecar file.
 const APPROVAL_STORE_SCHEMA_KEY: &str = "approval";
 /// Tables that identify a database this standalone approval store may open, all
 /// of them the store's own. `chio_hitl_pending` is the sole approval anchor.
-/// Receipt tables are deliberately excluded: a standalone receipt database (whose
-/// only tables are `chio_tool_receipts` or the pre-stamping `http_receipts` /
-/// `tool_receipts`) must be refused here rather than adopted and written with HITL
-/// tables. The sidecar co-location, where a receipt store creates the shared file
+/// Receipt tables are deliberately excluded: a standalone receipt database must be
+/// refused here rather than adopted and written with HITL tables. The sidecar co-location, where a receipt store creates the shared file
 /// first, adopts a receipt-anchored file through
 /// [`SqliteApprovalStore::open_colocated_with_receipt_store`] instead. A populated
 /// database carrying no approval anchor is refused rather than adopted, so a path
@@ -72,12 +68,8 @@ const APPROVAL_STORE_OWN_ANCHOR_TABLES: &[&str] = &["chio_hitl_pending"];
 /// [`SqliteApprovalStore::open_colocated_with_receipt_store`]; the default
 /// [`SqliteApprovalStore::open`] keeps the strict own-anchor set so a standalone
 /// receipt database is never adopted as an approval store outside the sidecar.
-const APPROVAL_STORE_COLOCATED_ANCHOR_TABLES: &[&str] = &[
-    "chio_hitl_pending",
-    "http_receipts",
-    "tool_receipts",
-    "chio_tool_receipts",
-];
+const APPROVAL_STORE_COLOCATED_ANCHOR_TABLES: &[&str] =
+    &["chio_hitl_pending", "chio_tool_receipts"];
 
 impl SqliteApprovalStore {
     /// Open the store at the given path. Creates the parent directory
@@ -121,7 +113,7 @@ impl SqliteApprovalStore {
             .build(manager)
             .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;
         let store = Self { pool };
-        store.run_migrations(anchor_tables)?;
+        store.open_schema(anchor_tables)?;
         Ok(store)
     }
 
@@ -133,118 +125,40 @@ impl SqliteApprovalStore {
             .build(manager)
             .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;
         let store = Self { pool };
-        store.run_migrations(APPROVAL_STORE_OWN_ANCHOR_TABLES)?;
+        store.open_schema(APPROVAL_STORE_OWN_ANCHOR_TABLES)?;
         Ok(store)
     }
 
-    fn run_migrations(&self, anchor_tables: &[&str]) -> Result<(), ApprovalStoreError> {
-        let mut conn = self
+    fn open_schema(&self, anchor_tables: &[&str]) -> Result<(), ApprovalStoreError> {
+        let conn = self
             .pool
             .get()
             .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
-        let on_disk = crate::check_schema_version(
+        let state = crate::check_current_schema(
             &conn,
             APPROVAL_STORE_SCHEMA_KEY,
-            APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
+            APPROVAL_STORE_SCHEMA_VERSION,
             anchor_tables,
         )
         .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+        let provisioned: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chio_hitl_pending')",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| ApprovalStoreError::Backend(format!("schema probe: {e}")))?;
+        if state == crate::SchemaState::Unstamped && provisioned {
+            return Err(ApprovalStoreError::Backend(
+                "approval storage is provisioned without a schema stamp".into(),
+            ));
+        }
         conn.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
             PRAGMA synchronous = FULL;
             PRAGMA busy_timeout = 5000;
             PRAGMA foreign_keys = ON;
-
-            CREATE TABLE IF NOT EXISTS chio_hitl_consumed_tokens (
-                token_id TEXT NOT NULL,
-                parameter_hash TEXT NOT NULL,
-                token_digest TEXT
-                    CHECK (token_digest IS NULL OR (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*')),
-                consumed_at INTEGER NOT NULL,
-                PRIMARY KEY (token_id, parameter_hash)
-            );
-            "#,
-        )
-        .map_err(|e| ApprovalStoreError::Backend(format!("migration setup: {e}")))?;
-        let has_token_digest = {
-            let mut statement = conn
-                .prepare("PRAGMA table_info(chio_hitl_consumed_tokens)")
-                .map_err(|e| ApprovalStoreError::Backend(format!("migration inspect: {e}")))?;
-            let columns = statement
-                .query_map([], |row| row.get::<_, String>(1))
-                .map_err(|e| ApprovalStoreError::Backend(format!("migration inspect: {e}")))?
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| ApprovalStoreError::Backend(format!("migration inspect: {e}")))?;
-            columns.iter().any(|column| column == "token_digest")
-        };
-        if !has_token_digest {
-            conn.execute_batch(
-                r#"
-                ALTER TABLE chio_hitl_consumed_tokens ADD COLUMN token_digest TEXT
-                    CHECK (token_digest IS NULL OR (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*'));
-                "#,
-            )
-            .map_err(|e| ApprovalStoreError::Backend(format!("migration alter: {e}")))?;
-        }
-        if on_disk < 2 {
-            let votes_table_exists: bool = conn
-                .query_row(
-                    r#"
-                    SELECT EXISTS(
-                        SELECT 1 FROM sqlite_master
-                        WHERE type = 'table'
-                          AND name = 'chio_threshold_approval_collector_votes'
-                    )
-                    "#,
-                    [],
-                    |row| row.get(0),
-                )
-                .map_err(|e| ApprovalStoreError::Backend(format!("migration probe: {e}")))?;
-            if votes_table_exists {
-                let transaction = conn
-                    .transaction()
-                    .map_err(|e| ApprovalStoreError::Backend(format!("migration begin: {e}")))?;
-                transaction
-                    .execute_batch(
-                        r#"
-                        ALTER TABLE chio_threshold_approval_collector_votes
-                            RENAME TO chio_threshold_approval_collector_votes_v1;
-                        CREATE TABLE chio_threshold_approval_collector_votes (
-                            proposal_id TEXT NOT NULL,
-                            token_id TEXT NOT NULL,
-                            approver_fingerprint TEXT NOT NULL,
-                            canonical_token_digest TEXT NOT NULL UNIQUE,
-                            token_json BLOB NOT NULL,
-                            received_at INTEGER NOT NULL,
-                            PRIMARY KEY (proposal_id, token_id),
-                            UNIQUE (proposal_id, approver_fingerprint),
-                            UNIQUE (proposal_id, canonical_token_digest),
-                            FOREIGN KEY (proposal_id)
-                                REFERENCES chio_threshold_approval_collectors(proposal_id)
-                        );
-                        INSERT INTO chio_threshold_approval_collector_votes (
-                            proposal_id, token_id, approver_fingerprint,
-                            canonical_token_digest, token_json, received_at
-                        )
-                        SELECT proposal_id, token_id, approver_fingerprint,
-                               canonical_token_digest, token_json, received_at
-                        FROM chio_threshold_approval_collector_votes_v1;
-                        DROP TABLE chio_threshold_approval_collector_votes_v1;
-                        "#,
-                    )
-                    .map_err(|e| {
-                        ApprovalStoreError::Backend(format!(
-                            "threshold vote uniqueness migration: {e}"
-                        ))
-                    })?;
-                transaction
-                    .commit()
-                    .map_err(|e| ApprovalStoreError::Backend(format!("migration commit: {e}")))?;
-            }
-        }
-        conn.execute_batch(
-            r#"
 
             CREATE TABLE IF NOT EXISTS chio_hitl_pending (
                 approval_id TEXT PRIMARY KEY,
@@ -403,11 +317,11 @@ impl SqliteApprovalStore {
             );
             "#,
         )
-        .map_err(|e| ApprovalStoreError::Backend(format!("migration: {e}")))?;
+        .map_err(|e| ApprovalStoreError::Backend(format!("schema: {e}")))?;
         crate::stamp_schema_version(
             &conn,
             APPROVAL_STORE_SCHEMA_KEY,
-            APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
+            APPROVAL_STORE_SCHEMA_VERSION,
         )
         .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
         Ok(())
@@ -1284,32 +1198,9 @@ mod tests {
 
     #[test]
     fn standalone_open_refuses_a_receipt_sidecar_that_colocated_open_adopts() {
-        // `chio api protect` keeps the approval store in the same file as its
-        // receipt and revocation sidecar tables, and opens the receipt store
-        // first so it owns the shared file's provenance anchor; the approval store
-        // then co-locates onto it. A database carrying only receipt (and
-        // revocation) tables and no approval anchor therefore belongs to the
-        // receipt store. The standalone approval open must refuse it rather than
-        // write HITL tables into a receipt store's file, while the dedicated
-        // co-located open adopts it as its sibling.
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("sidecar.sqlite3");
-        {
-            let conn = rusqlite::Connection::open(&path).unwrap();
-            conn.execute_batch(
-                "CREATE TABLE http_receipts (id TEXT PRIMARY KEY, receipt_json TEXT NOT NULL);
-                 CREATE TABLE tool_receipts (id TEXT PRIMARY KEY, receipt_json TEXT NOT NULL);
-                 CREATE TABLE revoked_capabilities (capability_id TEXT PRIMARY KEY);",
-            )
-            .unwrap();
-            let app_id: i32 = conn
-                .query_row("PRAGMA application_id", [], |row| row.get(0))
-                .unwrap();
-            assert_eq!(
-                app_id, 0,
-                "fixture must be unstamped like a legacy database"
-            );
-        }
+        crate::SqliteReceiptStore::open(&path).unwrap();
 
         assert!(
             SqliteApprovalStore::open(&path).is_err(),
@@ -1342,85 +1233,40 @@ mod tests {
     }
 
     #[test]
-    fn open_migrates_v1_threshold_vote_ids_to_proposal_scope() {
+    fn approval_schema_other_than_current_is_refused() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("approval-v1.sqlite3");
+        let path = dir.path().join("approval-stale.sqlite3");
         drop(SqliteApprovalStore::open(&path).unwrap());
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        crate::stamp_schema_version(&connection, APPROVAL_STORE_SCHEMA_KEY, 4).unwrap();
+        drop(connection);
 
+        let error = SqliteApprovalStore::open(&path).err().unwrap();
+        assert_eq!(
+            error.to_string(),
+            "storage backend error: database schema version 4 is not the current schema version 1; refusing to open"
+        );
+    }
+
+    #[test]
+    fn unstamped_provisioned_approval_database_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("approval-unstamped.sqlite3");
+        drop(SqliteApprovalStore::open(&path).unwrap());
         let connection = rusqlite::Connection::open(&path).unwrap();
         connection
-            .execute_batch(
-                r#"
-                ALTER TABLE chio_threshold_approval_collector_votes
-                    RENAME TO chio_threshold_approval_collector_votes_v2;
-                CREATE TABLE chio_threshold_approval_collector_votes (
-                    proposal_id TEXT NOT NULL,
-                    token_id TEXT NOT NULL UNIQUE,
-                    approver_fingerprint TEXT NOT NULL,
-                    canonical_token_digest TEXT NOT NULL UNIQUE,
-                    token_json BLOB NOT NULL,
-                    received_at INTEGER NOT NULL,
-                    UNIQUE (proposal_id, approver_fingerprint),
-                    UNIQUE (proposal_id, canonical_token_digest),
-                    FOREIGN KEY (proposal_id)
-                        REFERENCES chio_threshold_approval_collectors(proposal_id)
-                );
-                DROP TABLE chio_threshold_approval_collector_votes_v2;
-                INSERT INTO chio_threshold_approval_collectors (
-                    proposal_id, request_id, governed_intent_hash,
-                    subject_fingerprint, authorizing_capability_digest,
-                    policy_hash, threshold, eligible_set_digest,
-                    proposal_created_at, proposal_deadline, submitter_fingerprint,
-                    require_submitter_separation, state, version, updated_at,
-                    proposal_json, requirement_json, record_json
-                ) VALUES (
-                    'proposal-v1', 'request-v1', 'intent-v1', 'subject-v1',
-                    'capability-v1', 'policy-v1', 1, 'eligible-v1',
-                    100, 200, NULL, 0, 'collecting', 1, 100,
-                    X'01', X'01', X'01'
-                );
-                INSERT INTO chio_threshold_approval_collector_votes (
-                    proposal_id, token_id, approver_fingerprint,
-                    canonical_token_digest, token_json, received_at
-                ) VALUES (
-                    'proposal-v1', 'shared-token', 'approver-v1',
-                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-                    X'01', 101
-                );
-                UPDATE chio_store_schema_versions
-                SET version = 1
-                WHERE store_key = 'approval';
-                "#,
+            .execute(
+                "DELETE FROM chio_store_schema_versions WHERE store_key = ?1",
+                [APPROVAL_STORE_SCHEMA_KEY],
             )
             .unwrap();
         drop(connection);
 
-        let store = SqliteApprovalStore::open(&path).unwrap();
-        let connection = store.pool.get().unwrap();
-        let primary_key_columns: String = connection
-            .query_row(
-                r#"
-                SELECT group_concat(name, ',')
-                FROM (
-                    SELECT name
-                    FROM pragma_table_info('chio_threshold_approval_collector_votes')
-                    WHERE pk > 0
-                    ORDER BY pk
-                )
-                "#,
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        let retained_votes: i64 = connection
-            .query_row(
-                "SELECT COUNT(*) FROM chio_threshold_approval_collector_votes",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(primary_key_columns, "proposal_id,token_id");
-        assert_eq!(retained_votes, 1);
+        let error = SqliteApprovalStore::open(&path).err().unwrap();
+        assert_eq!(
+            error.to_string(),
+            "storage backend error: approval storage is provisioned without a schema stamp"
+        );
     }
 
     #[test]

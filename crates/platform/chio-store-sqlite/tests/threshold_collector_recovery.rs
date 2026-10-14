@@ -377,10 +377,6 @@ fn trusted_context_migration_survives_reopen_without_rewriting_delivery_time() -
         "UPDATE chio_threshold_approval_collectors SET record_json = ?1",
         [chio_core::canonical_json_bytes(&retained)?],
     )?;
-    fixture.connection()?.execute(
-        "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'approval'",
-        [],
-    )?;
     let (_, collector) = fixture.reopen()?;
     assert!(collector.get_proposal("proposal-1", 121).is_err());
     let bound = collector.bind_existing_proposal("proposal-1", 122)?;

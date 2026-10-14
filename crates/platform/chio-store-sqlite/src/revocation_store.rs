@@ -56,14 +56,13 @@ fn path_opens_in_memory(path: &Path) -> bool {
     })
 }
 
-/// Revocation-store schema revision. Bump on every schema-affecting change.
-pub(crate) const REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 4;
+/// The revocation store's single schema version.
+pub(crate) const REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const REVOCATION_STORE_SCHEMA_KEY: &str = "revocation";
-/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
-/// revocation database rather than reject it as foreign.
-const REVOCATION_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["revoked_capabilities"];
+/// Table that identifies a populated revocation database.
+const REVOCATION_STORE_ANCHOR_TABLES: &[&str] = &["revoked_capabilities"];
 
 impl SqliteRevocationStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, RevocationStoreError> {
@@ -122,13 +121,23 @@ impl SqliteRevocationStore {
                 "provisioned sqlite authority store requires joint serving owner at epoch {epoch}"
             )));
         }
-        crate::check_schema_version(
+        let state = crate::check_current_schema(
             &connection,
             REVOCATION_STORE_SCHEMA_KEY,
             REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
-            REVOCATION_STORE_LEGACY_ANCHOR_TABLES,
+            REVOCATION_STORE_ANCHOR_TABLES,
         )
         .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
+        let provisioned: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'revoked_capabilities')",
+            [],
+            |row| row.get(0),
+        )?;
+        if state == crate::SchemaState::Unstamped && provisioned {
+            return Err(RevocationStoreError::Sync(
+                "revocation storage is provisioned without a schema stamp".into(),
+            ));
+        }
         initialize_revocation_schema(&mut connection, false)?;
         crate::stamp_schema_version(
             &connection,
@@ -749,8 +758,6 @@ pub(crate) fn initialize_revocation_schema(
 
         "#,
     )?;
-    ensure_revocation_index_column(connection)?;
-    ensure_admission_authority_index_column(connection)?;
 
     if !shared_authority_sequence {
         connection.execute_batch(
@@ -978,50 +985,6 @@ fn rotate_revocation_stream_identity(
     Ok(())
 }
 
-fn ensure_revocation_index_column(connection: &Connection) -> Result<(), RevocationStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(revoked_capabilities)")?;
-    let columns = statement
-        .query_map([], |row| row.get::<_, String>(1))?
-        .collect::<Result<Vec<_>, _>>()?;
-    if !columns.iter().any(|column| column == "revocation_index") {
-        connection.execute(
-            "ALTER TABLE revoked_capabilities ADD COLUMN revocation_index INTEGER",
-            [],
-        )?;
-        connection.execute(
-            "CREATE UNIQUE INDEX idx_revoked_capabilities_index ON revoked_capabilities(revocation_index)",
-            [],
-        )?;
-    }
-    Ok(())
-}
-
-fn ensure_admission_authority_index_column(
-    connection: &Connection,
-) -> Result<(), RevocationStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(revoked_capabilities)")?;
-    let columns = statement
-        .query_map([], |row| row.get::<_, String>(1))?
-        .collect::<Result<Vec<_>, _>>()?;
-    if !columns
-        .iter()
-        .any(|column| column == "admission_authority_commit_index")
-    {
-        connection.execute(
-            "ALTER TABLE revoked_capabilities ADD COLUMN admission_authority_commit_index INTEGER",
-            [],
-        )?;
-    }
-    connection.execute(
-        r#"
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_revoked_capabilities_admission_authority
-        ON revoked_capabilities(admission_authority_commit_index)
-        "#,
-        [],
-    )?;
-    Ok(())
-}
-
 fn allocate_revocation_index(
     transaction: &Transaction<'_>,
     shared_authority_sequence: bool,
@@ -1089,41 +1052,16 @@ fn initialize_revocation_delta_log(
          ON CONFLICT(singleton) DO NOTHING",
         [],
     )?;
-    let existing_count =
-        transaction.query_row("SELECT COUNT(*) FROM revocation_delta_log", [], |row| {
-            row.get::<_, i64>(0)
-        })?;
-    if existing_count == 0 {
-        let records = {
-            let mut statement = transaction.prepare(
-                "SELECT capability_id, revoked_at FROM revoked_capabilities \
-                 ORDER BY revoked_at ASC, capability_id ASC",
-            )?;
-            let records = statement
-                .query_map([], |row| {
-                    Ok(RevocationRecord {
-                        capability_id: row.get(0)?,
-                        revoked_at: row.get(1)?,
-                    })
-                })?
-                .collect::<Result<Vec<_>, _>>()?;
-            records
-        };
-        for record in records {
-            append_revocation_delta(transaction, &record)?;
-        }
-    } else {
-        let max_seq = transaction.query_row(
-            "SELECT COALESCE(MAX(seq), 0) FROM revocation_delta_log",
-            [],
-            |row| row.get::<_, i64>(0),
-        )?;
-        transaction.execute(
-            "UPDATE revocation_delta_meta SET next_seq = MAX(next_seq, ?1) \
-             WHERE singleton = 1",
-            params![max_seq],
-        )?;
-    }
+    let max_seq = transaction.query_row(
+        "SELECT COALESCE(MAX(seq), 0) FROM revocation_delta_log",
+        [],
+        |row| row.get::<_, i64>(0),
+    )?;
+    transaction.execute(
+        "UPDATE revocation_delta_meta SET next_seq = MAX(next_seq, ?1) \
+         WHERE singleton = 1",
+        params![max_seq],
+    )?;
     Ok(())
 }
 
@@ -1464,116 +1402,44 @@ mod tests {
     }
 
     #[test]
-    fn v2_projection_migrates_to_a_dense_append_only_delta_log(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = unique_db_path("chio-rev-v2-delta-migration");
-        let store = SqliteRevocationStore::open(&path)?;
-        store.upsert_revocation(&RevocationRecord {
-            capability_id: "cap-b".to_string(),
-            revoked_at: 20,
-        })?;
-        store.upsert_revocation(&RevocationRecord {
-            capability_id: "cap-a".to_string(),
-            revoked_at: 10,
-        })?;
-        drop(store);
-
+    fn revocation_schema_other_than_current_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+        let path = unique_db_path("chio-rev-stale-schema");
+        drop(SqliteRevocationStore::open(&path)?);
         let connection = Connection::open(&path)?;
-        connection.execute_batch(
-            r#"
-            DROP TABLE revocation_delta_log;
-            DROP TABLE revocation_delta_meta;
-            UPDATE chio_store_schema_versions
-            SET version = 2
-            WHERE store_key = 'revocation';
-            "#,
-        )?;
+        crate::stamp_schema_version(&connection, REVOCATION_STORE_SCHEMA_KEY, 4)?;
         drop(connection);
 
-        let migrated = SqliteRevocationStore::open(&path)?;
-        let rows = migrated.list_revocations_after_seq(10, 0)?;
-        assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0].seq, 1);
-        assert_eq!(rows[0].record.capability_id, "cap-a");
-        assert_eq!(rows[1].seq, 2);
-        assert_eq!(rows[1].record.capability_id, "cap-b");
-
-        migrated.upsert_revocation(&RevocationRecord {
-            capability_id: "cap-a".to_string(),
-            revoked_at: 30,
-        })?;
-        let appended = migrated.list_revocations_after_seq(10, 2)?;
-        assert_eq!(appended.len(), 1);
-        assert_eq!(appended[0].seq, 3);
-        assert_eq!(appended[0].record.revoked_at, 30);
-
+        let error = SqliteRevocationStore::open(&path)
+            .err()
+            .ok_or("stale schema opened")?;
+        assert_eq!(
+            error.to_string(),
+            "revocation store synchronization error: database schema version 4 is not the current schema version 1; refusing to open"
+        );
         let _ = fs::remove_file(&path);
         Ok(())
     }
 
     #[test]
-    fn v3_store_migrates_stream_identity_and_projection_history_index(
+    fn unstamped_provisioned_revocation_database_is_refused(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = unique_db_path("chio-rev-v3-stream-migration");
-        let store = SqliteRevocationStore::open(&path)?;
-        store.upsert_revocation(&RevocationRecord {
-            capability_id: "cap-indexed".to_string(),
-            revoked_at: 44,
-        })?;
-        drop(store);
-
+        let path = unique_db_path("chio-rev-unstamped");
+        drop(SqliteRevocationStore::open(&path)?);
         let connection = Connection::open(&path)?;
-        connection.execute_batch(
-            r#"
-            DROP INDEX idx_revocation_delta_log_projection;
-            DROP TABLE revocation_stream_meta;
-            UPDATE chio_store_schema_versions
-            SET version = 3
-            WHERE store_key = 'revocation';
-            "#,
+        connection.execute(
+            "DELETE FROM chio_store_schema_versions WHERE store_key = ?1",
+            [REVOCATION_STORE_SCHEMA_KEY],
         )?;
         drop(connection);
 
-        let migrated = SqliteRevocationStore::open(&path)?;
+        let error = SqliteRevocationStore::open(&path)
+            .err()
+            .ok_or("unstamped store opened")?;
         assert_eq!(
-            uuid::Uuid::parse_str(&migrated.revocation_stream_id()?)?.get_version_num(),
-            7
+            error.to_string(),
+            "revocation store synchronization error: revocation storage is provisioned without a schema stamp"
         );
-        drop(migrated);
-
-        let connection = Connection::open(&path)?;
-        let version: i32 = connection.query_row(
-            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'revocation'",
-            [],
-            |row| row.get(0),
-        )?;
-        assert_eq!(version, REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION);
-        let plan = {
-            let mut statement = connection.prepare(
-                r#"
-                EXPLAIN QUERY PLAN
-                SELECT EXISTS(
-                    SELECT 1 FROM revoked_capabilities AS revoked
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM revocation_delta_log AS delta
-                        WHERE delta.capability_id = revoked.capability_id
-                          AND delta.revoked_at = revoked.revoked_at
-                    )
-                )
-                "#,
-            )?;
-            let details = statement
-                .query_map([], |row| row.get::<_, String>(3))?
-                .collect::<Result<Vec<_>, _>>()?;
-            details
-        };
-        assert!(
-            plan.iter()
-                .any(|detail| detail.contains("idx_revocation_delta_log_projection")),
-            "projection-history lookup must use the composite index: {plan:?}"
-        );
-
-        let _ = fs::remove_file(path);
+        let _ = fs::remove_file(&path);
         Ok(())
     }
 
