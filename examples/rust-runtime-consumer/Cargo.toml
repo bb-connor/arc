@@ -9,11 +9,11 @@ publish = false
 [workspace]
 
 [dependencies]
-chio-core = { version = "=0.1.0", registry = "chio-preview" }
-chio-kernel = { version = "=0.1.0", registry = "chio-preview" }
-chio-kernel-core = { version = "=0.1.0", registry = "chio-preview" }
-chio-store-sqlite = { version = "=0.1.0", registry = "chio-preview" }
-chio-swarm-authority = { version = "=0.1.0", registry = "chio-preview" }
+chio-core = { version = "=0.2.0-alpha.1", registry = "chio-preview" }
+chio-kernel = { version = "=0.2.0-alpha.1", registry = "chio-preview" }
+chio-kernel-core = { version = "=0.2.0-alpha.1", registry = "chio-preview" }
+chio-store-sqlite = { version = "=0.2.0-alpha.1", registry = "chio-preview" }
+chio-swarm-authority = { version = "=0.2.0-alpha.1", registry = "chio-preview" }
 async-trait = { version = "0.1", registry = "chio-preview" }
 serde_json = { version = "1", registry = "chio-preview" }
 

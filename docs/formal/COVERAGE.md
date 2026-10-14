@@ -1312,8 +1312,8 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `.dst/harnesses.toml`: `02c022579994294816ab40683c211766ef131b18a6cd13c2c5692f91fd62f1a1`
 - `.kani/harnesses.toml`: `ca35873e230f172eb9d581c4b5fbbba9709aaa135181d332064a48afaee0aebf`
 - `.loom/harnesses.toml`: `07b7f087e6e7f484c16be0d7cd079def72dcc35e536e02bf241337fc915b562b`
-- `Cargo.lock`: `8a4362ff6a26450fe17f87b53bc2af2276f64bf03418a503bff390e53c4f2c6a`
-- `Cargo.toml`: `f056415355918634a4a695621264b1865328ccaf710c7141ae6d3a7a20f59bae`
+- `Cargo.lock`: `5fb4753c6980e823b70c4cafab94df1681b7ec623ea59e70899324de97ff52d2`
+- `Cargo.toml`: `79ac40d5babba18da80cdba661af67fc0a8446e34addef52204f864a4c8f3e90`
 - `audits/evidence/mutants/chio-weights/2026-05-08.json`: `452aaf5734039a489967a629ec3c6b1b9d1351e06ec1f8e76c136ae389477ca7`
 - `audits/mutation/per-crate-configs/chio-anchor.toml`: `9d5a1f0e850ddadc3e621dd67282bb36460e13d3cb6e1af06a3fc03597af8ec3`
 - `audits/mutation/per-crate-configs/chio-attest-verify.toml`: `28f31f18a2676af227db8d66b6812c2517bdc49a965ac0524c6d50cce0695475`
@@ -1427,7 +1427,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/economy/chio-credit/src/kani_public_harnesses.rs`: `1cc7f5c38ca1ba5d420b21c005932014232e44e35a568aead55bdfe8181e8275`
 - `crates/economy/chio-open-market/src/kani_public_harnesses.rs`: `33edb04ba22bf6f233d3238fd6f17c3f094e7bbf2eed71d1ac274bccb2df050b`
 - `crates/economy/chio-web3/src/kani_public_harnesses.rs`: `5406b789197a0fe44d05b4fcc681b7634992be6296d1d3e2e6dd29ac57e9e6ad`
-- `crates/kernel/chio-kernel-core/Cargo.toml`: `fa82089212ed8b184d3f2cf63583179f287ab39bbe31a2aaf2e6572eb75fe9cf`
+- `crates/kernel/chio-kernel-core/Cargo.toml`: `1f4fdb0c7e1e1b2ec2338d6ee89bc71b3ebb61c9e29d08824ae72c42bd385ab0`
 - `crates/kernel/chio-kernel-core/src/accounting.rs`: `12e866077b1230efe845abc2c4f828b73283d32f9d344893250a502126981870`
 - `crates/kernel/chio-kernel-core/src/accounting/kani.rs`: `2c4edd2abf974ff73ce8db1c04708729ee689c51ed44d7af37bd75d55166a80e`
 - `crates/kernel/chio-kernel-core/src/accounting/tests.rs`: `8927b16cc871ce24cc66432ddf2acc4df88add6253d3293919576c7321fbdae6`

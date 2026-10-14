@@ -18,7 +18,7 @@ openai_responses_api_snapshot = "2026-04-25"
 
 [dependencies]
 async-trait = { workspace = true }
-chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.2.0-alpha.1", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-cross-protocol = { workspace = true }
 chio-kernel = { workspace = true }
 chio-security-types = { workspace = true }
