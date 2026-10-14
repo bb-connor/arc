@@ -1130,6 +1130,11 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
 first_seen = "d91c44dcc7"
 
 [[schema]]
+value = "chio.computer.branch-record.v1"
+files = ["crates/kernel/chio-runtime-core/src/computer/branches/records.rs"]
+first_seen = "56292a8ff7"
+
+[[schema]]
 value = "chio.computer.compiled-description.v1"
 files = ["crates/kernel/chio-runtime-core/src/program/mod.rs"]
 first_seen = "66672c5b7b"
@@ -1158,6 +1163,11 @@ first_seen = "66672c5b7b"
 value = "chio.computer.program.v1"
 files = ["crates/kernel/chio-runtime-core/src/program/compiler.rs"]
 first_seen = "66672c5b7b"
+
+[[schema]]
+value = "chio.computer.publication-record.v1"
+files = ["crates/kernel/chio-runtime-core/src/computer/branches/records.rs"]
+first_seen = "56292a8ff7"
 
 [[schema]]
 value = "chio.computer.revision.v1"
