@@ -13,6 +13,7 @@ from runner import command, wait_for, write
 
 HERE = Path(__file__).resolve().parent
 REPOSITORY = HERE.parents[4]
+NODE = shutil.which("node")
 
 
 def route(server, tool):
@@ -100,7 +101,7 @@ capabilities:
     data = {"directory": str(directory), **options}
     python = [sys.executable, str(HERE / "adaptive_worker.py")]
     node = [
-        shutil.which("node"),
+        NODE,
         str(HERE / "adaptive_leaf.mjs"),
         (REPOSITORY / "sdks/typescript/packages/process/index.mjs").as_uri(),
     ]
@@ -299,6 +300,8 @@ def fair(binary, directory):
 
 
 def main():
+    if NODE is None:
+        sys.exit("adaptive qualification requires node on PATH")
     os.umask(0o077)
     binary = sys.argv[1]
     base = Path(tempfile.mkdtemp(prefix="chio-adaptive-"))
