@@ -67,6 +67,16 @@ fn valid_fixture() -> Result<(ComplianceCertificate, ComplianceConfig), Box<dyn 
 }
 
 #[test]
+fn receipt_set_digest_has_an_exact_v1_golden_vector() -> TestResult {
+    let (certificate, _) = valid_fixture()?;
+    assert_eq!(
+        certificate.body.receipt_set_digest,
+        "aedaddf6066ea64aab943075bcc6cca90f0e5af33f86dde1a4f72026de450dcd"
+    );
+    Ok(())
+}
+
+#[test]
 fn compliance_bundle_full_mode_refuses_absent_receipts() -> TestResult {
     let (certificate, config) = valid_fixture()?;
     let result =
