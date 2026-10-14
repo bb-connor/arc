@@ -48,6 +48,8 @@ root_modules = [
   "formal/lean4/Chio/Chio/Treaty/IntersectionLegacy.lean",
   "formal/lean4/Chio/Chio/Treaty/BridgeEquivalence.lean",
   "formal/lean4/Chio/Chio/Treaty/BilateralAccept.lean",
+  "formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean",
+  "formal/lean4/Chio/Chio/Treaty/PredicateShape.lean",
 ]
 
 gate_commands = [
