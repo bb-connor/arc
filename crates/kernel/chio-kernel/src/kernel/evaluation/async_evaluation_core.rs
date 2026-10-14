@@ -873,8 +873,11 @@ impl ChioKernel {
             let msg = error.to_string();
             if durable_admission.as_ref().is_some_and(|admission| {
                 runtime_release_retained
-                    || admission.state()
-                        != crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
+                    || !matches!(
+                        admission.state(),
+                        crate::admission_operation::AdmissionOperationState::Prepared
+                            | crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
+                    )
             }) {
                 return Err(error);
             }
