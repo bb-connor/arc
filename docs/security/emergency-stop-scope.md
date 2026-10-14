@@ -69,6 +69,12 @@ denial is a signed deny receipt whose identity disposition is `reusable` and
 whose `retryable_after_resume` is `true`: the same request id may be retried
 after resume.
 
+The recovery sweep, at startup and on each periodic batch, leaves a returned
+(`Finalizing`) operation untouched while a stop is in force: its output stays
+in durable custody, no recovery deferral is recorded, and a sweep or a replay
+of the same request after resume releases it. A host restarted during a stop with such work therefore
+comes up `ready_stopped`.
+
 ## Operator reach
 
 | Surface | Credential | Recorded authorizer |
@@ -87,9 +93,6 @@ durable admission store, enforced early at the in-kernel check sites. Not yet
 in force:
 
 - tier-2 predicates inside the dispatch-commit and release transactions;
-- the startup sweep retaining stop-withheld `Finalizing` work, so a restart
-  with such work while stopped can fail startup closed instead of serving
-  `ready_stopped`;
 - the stop-intent journal and the signing obligation, so a stop whose commit
   fails holds only in the process;
 - mounted routes on trust control and the api-protect sidecar, and stop checks

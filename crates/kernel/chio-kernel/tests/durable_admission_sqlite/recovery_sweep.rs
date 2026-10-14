@@ -8,6 +8,8 @@ use std::sync::Mutex;
 mod authority_time;
 #[path = "recovery_sweep/signer_identity.rs"]
 mod signer_identity;
+#[path = "recovery_sweep/stopped.rs"]
+mod stopped;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 

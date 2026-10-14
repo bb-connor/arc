@@ -6,13 +6,13 @@ use chio_kernel::admission_operation::{
     AdmissionRecoveryPhase, AdmissionRecoveryStatusV1,
 };
 
-struct Retained {
-    signer: Keypair,
-    request: ToolCallRequest,
-    operation: AdmissionOperationV1,
+pub(super) struct Retained {
+    pub(super) signer: Keypair,
+    pub(super) request: ToolCallRequest,
+    pub(super) operation: AdmissionOperationV1,
 }
 
-fn signing_kernel(
+pub(super) fn signing_kernel(
     serving: &Serving,
     clock: &Arc<SweepClock>,
     signer: &Keypair,
@@ -34,7 +34,7 @@ fn signing_kernel(
 }
 
 /// Leave one paid operation in `Finalizing` under `signer`.
-fn retain(
+pub(super) fn retain(
     serving: &Serving,
     kernel: &ChioKernel,
     calls: &PaymentCalls,
@@ -130,7 +130,7 @@ fn retained_signer(
     Ok(serde_json::to_value(identity)?["public_key"].clone())
 }
 
-fn state(serving: &Serving, retained: &Retained) -> TestResult<AdmissionOperationState> {
+pub(super) fn state(serving: &Serving, retained: &Retained) -> TestResult<AdmissionOperationState> {
     Ok(serving
         .operations
         .load_by_operation_id(retained.operation.binding().operation_id())?
@@ -138,7 +138,7 @@ fn state(serving: &Serving, retained: &Retained) -> TestResult<AdmissionOperatio
         .state())
 }
 
-fn journal(serving: &Serving, retained: &Retained) -> TestResult<PaymentJournalState> {
+pub(super) fn journal(serving: &Serving, retained: &Retained) -> TestResult<PaymentJournalState> {
     Ok(serving
         .operations
         .load_payment_journal(
@@ -149,7 +149,7 @@ fn journal(serving: &Serving, retained: &Retained) -> TestResult<PaymentJournalS
         .state)
 }
 
-fn status(
+pub(super) fn status(
     serving: &Serving,
     clock: &SweepClock,
     retained: &Retained,

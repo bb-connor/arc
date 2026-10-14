@@ -49,6 +49,13 @@ impl ChioKernel {
         }
         let mut item_now = now;
         for operation in page.operations {
+            // A stop withholds every release: a returned operation stays
+            // `Finalizing`, its output in custody, with no deferral recorded.
+            if operation.state() == AdmissionOperationState::Finalizing
+                && self.is_emergency_stopped()
+            {
+                continue;
+            }
             let Some(_live_owner) = runtime
                 .mutation_sequencer
                 .try_own_operation(operation.binding().operation_id())
