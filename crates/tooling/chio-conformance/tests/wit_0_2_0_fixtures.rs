@@ -78,7 +78,14 @@ enum ExpectedStatus {
 }
 
 fn repo_root() -> PathBuf {
-    chio_conformance::default_repo_root()
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    match manifest_dir.ancestors().nth(3) {
+        Some(root) => root.to_path_buf(),
+        None => panic!(
+            "chio-conformance manifest dir has no workspace root: {}",
+            manifest_dir.display()
+        ),
+    }
 }
 
 fn corpus_root() -> PathBuf {
