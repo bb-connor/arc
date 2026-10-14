@@ -59,6 +59,7 @@ pub mod plan;
 pub mod pq;
 pub mod provider_attempt;
 pub mod receipt;
+pub mod recovery;
 pub mod runtime_attestation;
 pub mod runtime_replay;
 pub mod runtime_schema;

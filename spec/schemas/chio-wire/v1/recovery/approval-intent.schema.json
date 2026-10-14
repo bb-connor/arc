@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/approval-intent.schema.json",
+  "title": "Recovery approval intent V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "approval_intent",
+    "challenge",
+    "scope",
+    "action_intent",
+    "authorization_requirements",
+    "offer",
+    "plan",
+    "preview",
+    "recipient",
+    "purpose",
+    "reviewer",
+    "obligations",
+    "issued_at_unix_ms",
+    "expires_at_unix_ms"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.recovery.approval-intent.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "approval_intent": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "challenge": {
+      "$ref": "#/$defs/opaqueId"
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "action_intent": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "authorization_requirements": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "offer": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "plan": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "preview": {
+      "$ref": "#/$defs/recoveryDigest32"
+    },
+    "recipient": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+      "x-maxUtf8Bytes": 256
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+      "x-maxUtf8Bytes": 256
+    },
+    "reviewer": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+      "x-maxUtf8Bytes": 256
+    },
+    "obligations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "owner"
+            ],
+            "properties": {
+              "kind": {
+                "const": "owner_release"
+              },
+              "owner": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                "x-maxUtf8Bytes": 256
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "compartment"
+            ],
+            "properties": {
+              "kind": {
+                "const": "compartment_release"
+              },
+              "compartment": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                "x-maxUtf8Bytes": 256
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "principal"
+            ],
+            "properties": {
+              "kind": {
+                "const": "user_acceptance"
+              },
+              "principal": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                "x-maxUtf8Bytes": 256
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "principal"
+            ],
+            "properties": {
+              "kind": {
+                "const": "integrity_endorsement"
+              },
+              "principal": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                "x-maxUtf8Bytes": 256
+              }
+            }
+          }
+        ]
+      }
+    },
+    "issued_at_unix_ms": {
+      "$ref": "#/$defs/safeInteger"
+    },
+    "expires_at_unix_ms": {
+      "$ref": "#/$defs/safeInteger"
+    }
+  },
+  "$defs": {
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    }
+  }
+}

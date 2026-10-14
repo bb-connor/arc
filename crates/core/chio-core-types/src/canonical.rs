@@ -30,6 +30,7 @@ mod secret;
 #[path = "canonical/signed_json.rs"]
 mod signed_json;
 pub use secret::canonical_json_bytes_zeroizing;
+pub(crate) use signed_json::parse_signed_json;
 #[path = "canonical/untrusted.rs"]
 mod untrusted;
 pub use untrusted::{SharedUntrustedJsonError, UntrustedJsonError, UntrustedJsonText};

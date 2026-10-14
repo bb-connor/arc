@@ -38,6 +38,8 @@ use std::path::{Path, PathBuf};
 use jsonschema::{Retrieve, Uri};
 use serde_json::Value;
 
+mod utf8_bytes;
+
 const CHIO_SCHEMA_URI_PREFIXES: &[&str] = &[
     "https://chio.world/schemas/",
     "https://chio-protocol.dev/schemas/",
@@ -106,7 +108,7 @@ pub fn validate_value(
     doc_path: &Path,
     doc: &Value,
 ) -> Result<(), ValidateError> {
-    let mut options = jsonschema::options();
+    let mut options = jsonschema::options().with_keyword("x-maxUtf8Bytes", utf8_bytes::keyword);
     if let Some(base_uri) = schema_base_uri(schema_path) {
         options = options.with_base_uri(base_uri);
     }

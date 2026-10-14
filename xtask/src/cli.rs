@@ -168,6 +168,13 @@ pub enum GenCommand {
         #[arg(long)]
         check: bool,
     },
+    /// Re-sign the recovery authority positives and derive their contract corpus.
+    #[command(name = "recovery-authority-vectors")]
+    RecoveryAuthorityVectors {
+        /// Compare the generated vectors with the committed vectors.
+        #[arg(long)]
+        check: bool,
+    },
     /// Generate the declared verification evidence matrix.
     #[command(name = "proof-coverage")]
     ProofCoverage {
