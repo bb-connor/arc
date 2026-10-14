@@ -1005,7 +1005,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator/runtime_participant.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator/runtime_participant.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=8e1e1cf46380272b7581215f61dd8800f1d5602a2e8a5600b6c6f049cd8d31bd, rust_symbols=store_call,ChioKernel::release_retained_runtime_participants,load_exact_history,validate_recovery_history)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator/runtime_reserved.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator/runtime_reserved.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=ba65202a432cc129eeb0b3b9027a6260905588a339fd038a24b1410b56d4ac8c, rust_symbols=ChioKernel::revalidate_reserved_caller_runtime)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator/security_release.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator/security_release.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=4a8d2b341238c71b73943cbf2efa84d0d9ab1b0dc403b71c9da0f9f6a68d0fbe, rust_symbols=DurableSecurityReleaseInput,recovery_required,ChioKernel::verify_durable_security_release,ChioKernel::require_durable_security_release,ChioKernel::complete_durable_security_release)
-- `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=0f67cd7a07a07144d8d406eecbec6d577ce45e56451ac1493efed87b3a4b117f, rust_symbols=ChioKernel::completed_durable_tool_response,ChioKernel::validate_completed_durable_receipt,ChioKernel::finalize_durable_tool_return_with_security_release)
+- `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=9f6be6cbbcd5b5e852b07daa2dffaf380959b055979c6da030eb0aa1d5f3f1a2, rust_symbols=ChioKernel::completed_durable_tool_response,ChioKernel::validate_completed_durable_receipt,ChioKernel::finalize_durable_tool_return_with_security_release)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/evaluation_contract.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/evaluation_contract.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=dcd50fb5ae9e472126522f2e885ab01f0d927e43da6208905afbf1b876a220d9, rust_symbols=ChioKernel::durable_evaluation_contract)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/financial_receipt.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/financial_receipt.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=32fddf180aee7c4af32557389270a5ce06f53181d27e737ed5e3b0379f4cd200, rust_symbols=ChioKernel::validate_retained_financial_receipt)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/payment_pricing.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/payment_pricing.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=e3502d1489d2e6490a8f59cbb74a3bdf04c1b86761b9c746daa29cb7338538a7, rust_symbols=payment_cost_breakdown)
@@ -1270,7 +1270,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `f6af0bd77f84df2141ed57a35fe0553a614f33106fd9fe954dc273c8dc2e4eca`
+- Input digest: `879331b278d341c73c5deba0c54a361bd1b7311633ce45744177fab75380a838`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1429,7 +1429,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/kernel/chio-kernel/src/kernel/ledger_audit.rs`: `defcb8e3b9de79e211b55fc1309609847d18e13d7df357a02a8a6f5a87aeb137`
 - `crates/kernel/chio-kernel/src/kernel/responses/allow_responses.rs`: `7077aa6eff4befa4436b8eb8b8ef3c99279f05b246d937da7c66f92923cf8ffa`
 - `crates/kernel/chio-kernel/src/kernel/responses/finalization.rs`: `44e7dc20b5447a46a9251beba90401cef5dbcf722bba404bd8a9c85ce988ea8a`
-- `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs`: `26f52fa9f2bb8559e0b969aab1117a8407fca1435f6a54d8efb8e3aaae8516b1`
+- `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs`: `add0cf5817d365e3661f6477c9fec6e8eaf73db67f027496850735fddfe351f6`
 - `crates/kernel/chio-kernel/src/kernel/tests/budget.rs`: `4a47a40dc3563acbd82f698c5bcdec032c6a712a7f965721a7dd9936c254d518`
 - `crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/child_receipts.rs`: `c7691e99f88100c2d98741054012284c2cc08717a9cb99fc34514d159e2ef50f`
 - `crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/post_dispatch_retention.rs`: `329b171f3fd99648d830cff00eaf61eed2b62f9a558510c88f62212fc1fbad66`
@@ -1529,7 +1529,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/mutation/evidence/spec-mutants-7b24142e8523fe08e501063dbf3d4f6cea3397be.json`: `82878e03aaafa1ceeb1f791386cffd57f9f88453b24113bd51e43b67996a66c2`
 - `formal/mutation/evidence/spec-mutants-d292f14df1c493873199f4f9d969ade00472ff28.json`: `d7b7a63401bfb071af87743ec07191e380c29ee1e306cca1fe35859a8194e623`
 - `formal/mutation/registry.toml`: `48387345d00fe7c53e777326f73e31370f7bc3d362a09f1059cadc06c98b6bb6`
-- `formal/proof-manifest.toml`: `13d71a9a958c05c1364158858845f8abfcbd6bd34db93ff18381bedcf1fee0e4`
+- `formal/proof-manifest.toml`: `75e428387fc79915f7ddda64a229170b22455adf1b1eccfa2ac6ec2ad9e69087`
 - `formal/rust-verification/creusot-contracts.toml`: `83000c98743013d3d6d468976a163edaf16d0d621070410d741f146bf61a28a5`
 - `formal/rust-verification/formal-mutants.toml`: `5f15de2f3833b11db3d783d05ab6efcd2c49840ede010fe7ec54fc2846c48fc6`
 - `formal/rust-verification/kani-harnesses.toml`: `60b49af814071bb16f3e027749b26fb9c86d032a00bb022aa0719b6d15c7506f`
@@ -1553,7 +1553,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `b3569c8aedf4d8175cc9809fbe052198acad8d6cf18f6ebff6a0248759e1f465`
 - `fuzz/target-map.toml`: `d51f046241b1f125ea8e93e51a40e6411b3b8ed5444c7fd93d72aad7ff036f26`
-- `git-worktree://rust-files`: `07a744f8952fc10c76e46613cab8c57a3484eb8587de2d3e0850fa373ed3102f`
+- `git-worktree://rust-files`: `10cce71acb82a2bfd1aa91221d4b85bfc867293d3eae9b3405646c1837142c5b`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`
