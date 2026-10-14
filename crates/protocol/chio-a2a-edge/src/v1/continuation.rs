@@ -42,7 +42,7 @@ impl ChioA2aEdge {
         let retained = self
             .tasks
             .get(task_id)
-            .filter(|task| task.is_owned_by(execution) && task.v1_output_mode.is_some())
+            .filter(|task| task.is_owned_by(execution))
             .ok_or_else(|| A2aEdgeError::TaskNotFound(task_id.to_string()))?;
         if retained.response.status.is_terminal() {
             return Err(v1_invalid("terminal tasks cannot accept a continuation"));
@@ -54,7 +54,7 @@ impl ChioA2aEdge {
         {
             return Err(v1_invalid("continuation context does not match its task"));
         }
-        if retained.v1_output_mode != Some(invocation.output_mode) {
+        if retained.output_mode != invocation.output_mode {
             return Err(v1_invalid("continuation must preserve its output mode"));
         }
         if invocation.message_id != retained.request.kernel_request_id {

@@ -241,7 +241,7 @@ impl ChioA2aEdge {
     ) -> Result<A2aJsonRpcResponse, A2aEdgeError> {
         let skill = self.resolve_jsonrpc_target_skill_id(&params)?;
         let parsed: V1SendRequest = serde_json::from_value(params)
-            .map_err(|error| v1_invalid(format!("invalid SendMessage request: {error}")))?;
+            .map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
         let invocation = parsed.into_internal()?;
         if invocation.task_id.is_some() {
             return self.handle_v1_continuation(id, &skill, invocation, kernel, execution);
@@ -255,16 +255,14 @@ impl ChioA2aEdge {
             output_mode,
             ..
         } = invocation;
-        let task = self.handle_stream_message_with_request_id(
+        let task = self.retain_task(
             &message_id,
             &skill,
             &request,
             kernel,
             execution,
+            output_mode,
         )?;
-        if let Some(retained) = self.tasks.get_mut(&task.id) {
-            retained.v1_output_mode = Some(output_mode);
-        }
         let response = self.complete_task(&task.id, kernel, execution, id);
         let projected = self.v1_project_response(response, true);
         // Successful nonterminal admission retains bounded custody for lookup
@@ -298,8 +296,7 @@ impl ChioA2aEdge {
         let mode = self
             .tasks
             .get(&task.id)
-            .and_then(|task| task.v1_output_mode)
-            .unwrap_or(V1OutputMode::Json);
+            .map_or(V1OutputMode::Json, |task| task.output_mode);
         let value = v1_task(&task, mode);
         let result = if wrap { json!({"task": value}) } else { value };
         Ok(A2aJsonRpcResponse::response(json!({
@@ -335,7 +332,7 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
     ) -> Result<A2aJsonRpcResponse, A2aEdgeError> {
         let parsed: V1TaskRequest = serde_json::from_value(params)
-            .map_err(|error| v1_invalid(format!("invalid {method} request: {error}")))?;
+            .map_err(chio_core::canonical::UntrustedJsonError::Decode)?;
         if parsed.history_length != 0 {
             return Err(v1_invalid("task history is not supported"));
         }
@@ -351,16 +348,14 @@ impl ChioA2aEdge {
             .filter(|task| task.is_owned_by(execution))
             .ok_or_else(|| A2aEdgeError::TaskNotFound(parsed.id.clone()))?;
         if method == "GetTask" {
-            let mode = task.v1_output_mode.unwrap_or(V1OutputMode::Json);
             return Ok(A2aJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0", "id": id, "result": v1_task(&task.response, mode),
+                "jsonrpc": "2.0", "id": id, "result": v1_task(&task.response, task.output_mode),
             })));
         }
-        if task.response.status.is_terminal() && task.response.status != TaskStatus::Cancelled {
-            return Err(A2aEdgeError::TaskNotCancelable(parsed.id));
-        }
-        let params = json!({"taskId": parsed.id});
-        let response = self.handle_jsonrpc_task_cancel(id, params, kernel, execution);
-        self.v1_project_response(response, false)
+        let mode = task.output_mode;
+        let cancelled = self.cancel_task(&parsed.id)?;
+        Ok(A2aJsonRpcResponse::response(json!({
+            "jsonrpc": "2.0", "id": id, "result": v1_task(&cancelled, mode),
+        })))
     }
 }

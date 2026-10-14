@@ -7,7 +7,7 @@ struct DeferredA2aTask {
     request: CrossProtocolExecutionRequest,
     response: TaskResponse,
     deadline: AuthorityDeadline,
-    v1_output_mode: Option<V1OutputMode>,
+    output_mode: V1OutputMode,
 }
 
 impl DeferredA2aTask {
@@ -99,7 +99,7 @@ fn reject_request_bound_artifacts_without_stable_request_id(
     }
     Err(A2aEdgeError::InvalidRequest(
         "A2A request-bound authorization artifacts and execution nonces require \
-         handle_send_message_with_request_id or handle_stream_message_with_request_id"
+         handle_send_message_with_request_id"
             .to_string(),
     ))
 }
@@ -577,63 +577,30 @@ impl ChioA2aEdge {
         Ok(task_response_from_orchestrated(task_id, orchestrated))
     }
 
-    /// Start an authoritative deferred task for A2A streaming/task lifecycle.
-    pub fn handle_stream_message(
-        &mut self,
-        skill_id: &str,
-        request: &SendMessageRequest,
-        kernel: &ChioKernel,
-        execution: &A2aKernelExecutionContext,
-    ) -> Result<TaskResponse, A2aEdgeError> {
-        validate_execution_context(execution, &self.config.peer_capabilities)?;
-        reject_request_bound_artifacts_without_stable_request_id(execution)?;
-        self.handle_stream_message_with_optional_request_id(
-            skill_id, request, kernel, execution, None,
-        )
-    }
-
-    /// Start an authoritative deferred task under the caller's stable request ID.
-    pub fn handle_stream_message_with_request_id(
+    /// Retain a working task under the caller's stable request ID.
+    fn retain_task(
         &mut self,
         request_id: &str,
         skill_id: &str,
         request: &SendMessageRequest,
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
+        output_mode: V1OutputMode,
     ) -> Result<TaskResponse, A2aEdgeError> {
         validate_execution_context(execution, &self.config.peer_capabilities)?;
-        self.handle_stream_message_with_optional_request_id(
-            skill_id,
-            request,
-            kernel,
-            execution,
-            Some(request_id),
-        )
-    }
-
-    fn handle_stream_message_with_optional_request_id(
-        &mut self,
-        skill_id: &str,
-        request: &SendMessageRequest,
-        kernel: &ChioKernel,
-        execution: &A2aKernelExecutionContext,
-        request_id: Option<&str>,
-    ) -> Result<TaskResponse, A2aEdgeError> {
         let binding = self.resolve_skill_binding(skill_id)?;
         let now = kernel.authority_clock_reading()?;
         let deadline = AuthorityDeadline::for_timeout_ms(now, DEFERRED_A2A_TASK_TTL_MILLIS)?;
         self.ensure_deferred_task_capacity(now, execution)?;
         let task_id = self.next_task_id()?;
-        let kernel_request_id =
-            request_id.map_or_else(|| format!("a2a-stream-{task_id}"), str::to_string);
         let orchestrated_request = Self::build_execution_request(
             binding,
             skill_id,
             request,
             extract_arguments_from_message(&request.message)?,
             execution,
-            request_id.map_or_else(|| task_id.clone(), |id| format!("a2a-request-{id}")),
-            kernel_request_id,
+            format!("a2a-request-{request_id}"),
+            request_id.to_string(),
         )?;
 
         let response = TaskResponse {
@@ -653,7 +620,7 @@ impl ChioA2aEdge {
                 request: orchestrated_request,
                 response: response.clone(),
                 deadline,
-                v1_output_mode: None,
+                output_mode,
             },
         );
         Ok(response)
@@ -676,28 +643,10 @@ impl ChioA2aEdge {
         };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
-        if matches!(method.as_str(), "SendMessage" | "GetTask" | "CancelTask") {
-            let response = self.handle_v1_jsonrpc(id, &method, params, kernel, execution);
-            return if should_respond {
-                response
-            } else {
-                response.suppress_wire_response()
-            };
-        }
-        if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
-            &id,
-            &method,
-            &params,
-            &["message/send", "message/stream", "task/get", "task/cancel"],
-        ) {
-            return A2aJsonRpcResponse::from_optional(should_respond.then_some(response));
-        }
-
         let response = match method.as_str() {
-            "message/send" => self.handle_jsonrpc_send_message(id, params, kernel, execution),
-            "message/stream" => self.handle_jsonrpc_stream_message(id, params, kernel, execution),
-            "task/get" => self.handle_jsonrpc_task_get(id, params, kernel, execution),
-            "task/cancel" => self.handle_jsonrpc_task_cancel(id, params, kernel, execution),
+            "SendMessage" | "GetTask" | "CancelTask" => {
+                self.handle_v1_jsonrpc(id, &method, params, kernel, execution)
+            }
             _ => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
@@ -714,121 +663,11 @@ impl ChioA2aEdge {
         }
     }
 
-    fn handle_jsonrpc_send_message(
-        &mut self,
-        id: Value,
-        params: Value,
-        kernel: &ChioKernel,
-        execution: &A2aKernelExecutionContext,
-    ) -> A2aJsonRpcResponse {
-        let (skill_id, request) =
-            match self.parse_jsonrpc_send_message_params(params, "SendMessage") {
-                Ok(parsed) => parsed,
-                Err(error) => return Self::jsonrpc_error_response(id, error),
-            };
-
-        match self.handle_send_message(&skill_id, &request, kernel, execution) {
-            Ok(response) => A2aJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-            })),
-            Err(error) => Self::jsonrpc_error_response(id, error),
-        }
-    }
-
-    fn handle_jsonrpc_stream_message(
-        &mut self,
-        id: Value,
-        params: Value,
-        kernel: &ChioKernel,
-        execution: &A2aKernelExecutionContext,
-    ) -> A2aJsonRpcResponse {
-        let (skill_id, request) =
-            match self.parse_jsonrpc_send_message_params(params, "SendStreamingMessage") {
-                Ok(parsed) => parsed,
-                Err(error) => return Self::jsonrpc_error_response(id, error),
-            };
-
-        match self.handle_stream_message(&skill_id, &request, kernel, execution) {
-            Ok(response) => A2aJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-            })),
-            Err(error) => Self::jsonrpc_error_response(id, error),
-        }
-    }
-
-    fn handle_jsonrpc_task_get(
-        &mut self,
-        id: Value,
-        params: Value,
-        kernel: &ChioKernel,
-        execution: &A2aKernelExecutionContext,
-    ) -> A2aJsonRpcResponse {
-        let now = match kernel.authority_clock_reading() {
-            Ok(now) => now,
-            Err(error) => return Self::jsonrpc_error_response(id, error.into()),
-        };
-        if let Err(error) = self.prune_deferred_tasks(now) {
-            return Self::jsonrpc_error_response(id, error.into());
-        }
-        let task_id = match Self::parse_jsonrpc_task_id_params(&params, "task/get") {
-            Ok(task_id) => task_id,
-            Err(error) => return Self::jsonrpc_error_response(id, error),
-        };
-        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
-            return Self::jsonrpc_error_response(id, error);
-        }
-
-        match self.resolve_task(&task_id, execution) {
-            Ok(response) if response.status == TaskStatus::Working => {
-                self.complete_task(&task_id, kernel, execution, id)
-            }
-            Ok(response) => A2aJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-            })),
-            Err(error) => Self::jsonrpc_error_response(id, error),
-        }
-    }
-
-    fn handle_jsonrpc_task_cancel(
-        &mut self,
-        id: Value,
-        params: Value,
-        kernel: &ChioKernel,
-        execution: &A2aKernelExecutionContext,
-    ) -> A2aJsonRpcResponse {
-        let now = match kernel.authority_clock_reading() {
-            Ok(now) => now,
-            Err(error) => return Self::jsonrpc_error_response(id, error.into()),
-        };
-        if let Err(error) = self.prune_deferred_tasks(now) {
-            return Self::jsonrpc_error_response(id, error.into());
-        }
-        let task_id = match Self::parse_jsonrpc_task_id_params(&params, "task/cancel") {
-            Ok(task_id) => task_id,
-            Err(error) => return Self::jsonrpc_error_response(id, error),
-        };
-        if let Err(error) = validate_execution_context(execution, &self.config.peer_capabilities) {
-            return Self::jsonrpc_error_response(id, error);
-        }
-
-        let Some(task) = self.tasks.get_mut(&task_id) else {
-            return Self::jsonrpc_error_response(
-                id,
-                A2aEdgeError::ToolNotFound(task_id.to_string()),
-            );
-        };
-        if !task.is_owned_by(execution) {
-            return Self::jsonrpc_error_response(
-                id,
-                A2aEdgeError::InvalidRequest("task is not owned by the current agent".to_string()),
-            );
-        }
+    fn cancel_task(&mut self, task_id: &str) -> Result<TaskResponse, A2aEdgeError> {
+        let task = self
+            .tasks
+            .get_mut(task_id)
+            .ok_or_else(|| A2aEdgeError::TaskNotFound(task_id.to_string()))?;
         match task.response.status {
             TaskStatus::Working => {
                 task.response.status = TaskStatus::Cancelled;
@@ -837,41 +676,12 @@ impl ChioA2aEdge {
                     "cross_protocol_orchestrator",
                     "deferred_task_poll",
                 ));
-                let response = task.response.clone();
-                A2aJsonRpcResponse::response(json!({
-                    "jsonrpc": "2.0",
-                    "id": id,
-                    "result": serde_json::to_value(&response).unwrap_or(Value::Null)
-                }))
+                Ok(task.response.clone())
             }
-            TaskStatus::Cancelled => A2aJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": serde_json::to_value(&task.response).unwrap_or(Value::Null)
-            })),
-            status => Self::jsonrpc_error_response(
-                id,
-                A2aEdgeError::InvalidRequest(format!(
-                    "cannot cancel task in terminal status `{status:?}`"
-                )),
-            ),
+            TaskStatus::Cancelled => Ok(task.response.clone()),
+            TaskStatus::Completed | TaskStatus::Failed => {
+                Err(A2aEdgeError::TaskNotCancelable(task_id.to_string()))
+            }
         }
-    }
-
-    fn resolve_task(
-        &self,
-        task_id: &str,
-        execution: &A2aKernelExecutionContext,
-    ) -> Result<TaskResponse, A2aEdgeError> {
-        let task = self
-            .tasks
-            .get(task_id)
-            .ok_or_else(|| A2aEdgeError::ToolNotFound(task_id.to_string()))?;
-        if !task.is_owned_by(execution) {
-            return Err(A2aEdgeError::InvalidRequest(
-                "task is not owned by the current agent".to_string(),
-            ));
-        }
-        Ok(task.response.clone())
     }
 }

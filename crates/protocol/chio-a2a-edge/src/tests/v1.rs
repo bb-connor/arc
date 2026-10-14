@@ -88,7 +88,7 @@ fn v1_async_rejection_accepts_no_work_and_allows_a_blocking_retry() {
 }
 
 #[test]
-fn v1_get_observes_legacy_tasks_without_dispatching_them() {
+fn v1_get_observes_retained_tasks_without_dispatching_them() {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
     let config = test_kernel_config();
@@ -103,22 +103,7 @@ fn v1_get_observes_legacy_tasks_without_dispatching_them() {
         },
     ));
     let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-    let pending = edge
-        .handle_stream_message_with_request_id(
-            "legacy-pending",
-            "echo",
-            &SendMessageRequest {
-                message: A2aMessage {
-                    role: "user".to_string(),
-                    parts: vec![A2aPart::Data { data: json!({}) }],
-                    metadata: None,
-                },
-                metadata: None,
-            },
-            &kernel,
-            &owner,
-        )
-        .test_unwrap();
+    let pending = retained_task(&mut edge, &kernel, &owner, "retained-pending");
     let get = json!({"jsonrpc": "2.0", "id": "observation", "method": "GetTask", "params": {"id": pending.id}});
     for _ in 0..2 {
         let observed = edge
@@ -128,22 +113,7 @@ fn v1_get_observes_legacy_tasks_without_dispatching_them() {
         assert_eq!(calls.load(Ordering::SeqCst), 0);
         assert!(kernel.receipt_log().receipts().is_empty());
     }
-    let legacy = json!({"jsonrpc": "2.0", "id": "execution", "method": "task/get", "params": {"taskId": pending.id}});
-    let completed = edge
-        .handle_jsonrpc(&serde_json::to_vec(&legacy).test_unwrap(), &kernel, &owner)
-        .test_unwrap();
-    assert_eq!(completed["result"]["status"], "completed");
-    for _ in 0..2 {
-        let observed = edge
-            .handle_jsonrpc(&serde_json::to_vec(&get).test_unwrap(), &kernel, &owner)
-            .test_unwrap();
-        assert_eq!(
-            observed["result"]["status"]["state"],
-            "TASK_STATE_COMPLETED"
-        );
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
-        assert_eq!(kernel.receipt_log().receipts().len(), 1);
-    }
+    assert_eq!(edge.tasks[&pending.id].response.status, TaskStatus::Working);
 }
 
 #[test]
@@ -194,29 +164,36 @@ fn v1_blocking_completion_releases_task_custody_on_success_and_failure() {
 }
 
 #[test]
-fn legacy_deferred_capacity_is_bounded_per_subject() {
+fn retained_task_capacity_is_bounded_per_subject() {
     let config = test_kernel_config();
     let mut owner = v1_execution(&config.keypair);
     let other = v1_execution(&config.keypair);
     let kernel = ChioKernel::new(config);
     let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     for index in 0..128 {
-        let response = legacy_pending(&mut edge, &kernel, &owner, &format!("deferred-{index}"));
+        let response = retained_task(&mut edge, &kernel, &owner, &format!("deferred-{index}"));
         assert_eq!(response.status, TaskStatus::Working);
     }
     // Display-name changes cannot bypass the authenticated subject's quota.
     owner.agent_id = "renamed-owner".into();
-    let request = legacy_request();
+    let request = empty_request();
     let denied = edge
-        .handle_stream_message_with_request_id("quota", "echo", &request, &kernel, &owner)
+        .retain_task(
+            "quota",
+            "echo",
+            &request,
+            &kernel,
+            &owner,
+            V1OutputMode::Json,
+        )
         .test_unwrap_err();
     assert!(matches!(denied, A2aEdgeError::TaskCapacity));
-    let allowed = legacy_pending(&mut edge, &kernel, &other, "independent-owner");
+    let allowed = retained_task(&mut edge, &kernel, &other, "independent-owner");
     assert_eq!(allowed.status, TaskStatus::Working);
     assert_eq!(edge.tasks.len(), 129);
 }
 
-fn legacy_request() -> SendMessageRequest {
+fn empty_request() -> SendMessageRequest {
     SendMessageRequest {
         message: A2aMessage {
             role: "user".to_string(),
@@ -227,14 +204,21 @@ fn legacy_request() -> SendMessageRequest {
     }
 }
 
-fn legacy_pending(
+fn retained_task(
     edge: &mut ChioA2aEdge,
     kernel: &ChioKernel,
     owner: &A2aKernelExecutionContext,
     id: &str,
 ) -> TaskResponse {
-    edge.handle_stream_message_with_request_id(id, "echo", &legacy_request(), kernel, owner)
-        .test_unwrap()
+    edge.retain_task(
+        id,
+        "echo",
+        &empty_request(),
+        kernel,
+        owner,
+        V1OutputMode::Json,
+    )
+    .test_unwrap()
 }
 
 #[test]
@@ -299,7 +283,7 @@ fn v1_task_get_and_cancel_keep_the_original_owner_boundary() {
     let other = v1_execution(&config.keypair);
     let kernel = ChioKernel::new(config);
     let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-    let started = legacy_pending(&mut edge, &kernel, &owner, "owner-boundary");
+    let started = retained_task(&mut edge, &kernel, &owner, "owner-boundary");
     let task_id = started.id.as_str();
     for method in ["GetTask", "CancelTask"] {
         let request =
@@ -362,11 +346,9 @@ fn v1_unknown_task_errors_use_standard_codes_and_preserve_typed_causes() {
     let owner = v1_execution(&config.keypair);
     let kernel = ChioKernel::new(config);
     let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-    for (method, legacy_method) in [("GetTask", "task/get"), ("CancelTask", "task/cancel")] {
+    for method in ["GetTask", "CancelTask"] {
         let request = json!({"jsonrpc": "2.0", "id": "missing-task", "method": method,
             "params": {"id": "unknown-task"}});
-        let legacy = json!({"jsonrpc": "2.0", "id": "missing-task", "method": legacy_method,
-            "params": {"taskId": "unknown-task"}});
         let response = edge
             .handle_jsonrpc(&serde_json::to_vec(&request).test_unwrap(), &kernel, &owner)
             .test_unwrap();
@@ -375,17 +357,11 @@ fn v1_unknown_task_errors_use_standard_codes_and_preserve_typed_causes() {
             response.local_error(),
             Some(A2aEdgeError::TaskNotFound(task_id)) if task_id == "unknown-task"
         ));
-        let expected = edge
-            .handle_jsonrpc(&serde_json::to_vec(&legacy).test_unwrap(), &kernel, &owner)
-            .test_unwrap();
-        assert!(matches!(
-            expected.local_error(),
-            Some(A2aEdgeError::ToolNotFound(task_id)) if task_id == "unknown-task"
-        ));
-        let mut expected = expected.into_value().test_unwrap();
-        assert_eq!(expected["error"]["code"], -32602);
-        expected["error"] = json!({"code": -32001, "message": "task not found"});
-        assert_eq!(response.into_value().test_unwrap(), expected);
+        assert_eq!(
+            response.into_value().test_unwrap(),
+            json!({"jsonrpc": "2.0", "id": "missing-task",
+                "error": {"code": -32001, "message": "task not found"}})
+        );
     }
 }
 
@@ -396,12 +372,8 @@ fn v1_completed_task_cancellation_reports_the_standard_error() {
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(test_server()));
     let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-    let pending = legacy_pending(&mut edge, &kernel, &owner, "completed-cancel");
-    let legacy =
-        json!({"jsonrpc": "2.0", "id": 1, "method": "task/get", "params": {"taskId": pending.id}});
-    let completed = edge
-        .handle_jsonrpc(&serde_json::to_vec(&legacy).test_unwrap(), &kernel, &owner)
-        .test_unwrap();
+    let pending = retained_task(&mut edge, &kernel, &owner, "completed-cancel");
+    let completed = edge.complete_task(&pending.id, &kernel, &owner, json!(1));
     assert_eq!(completed["result"]["status"], "completed");
     let cancel =
         json!({"jsonrpc": "2.0", "id": 2, "method": "CancelTask", "params": {"id": pending.id}});
@@ -428,12 +400,10 @@ fn task_ownership_keeps_the_subject_boundary_when_agent_labels_overlap() {
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(test_server()));
     let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-    let pending = legacy_pending(&mut edge, &kernel, &owner, "overlapping-labels");
+    let pending = retained_task(&mut edge, &kernel, &owner, "overlapping-labels");
     for (method, params, expected_code) in [
         ("GetTask", json!({"id": pending.id}), -32001),
         ("CancelTask", json!({"id": pending.id}), -32001),
-        ("task/get", json!({"taskId": pending.id}), -32602),
-        ("task/cancel", json!({"taskId": pending.id}), -32602),
     ] {
         let request =
             json!({"jsonrpc": "2.0", "id": "other-subject", "method": method, "params": params});
@@ -447,10 +417,14 @@ fn task_ownership_keeps_the_subject_boundary_when_agent_labels_overlap() {
         assert_eq!(edge.tasks[&pending.id].response.status, TaskStatus::Working);
         assert!(kernel.receipt_log().receipts().is_empty());
     }
-    let own = json!({"jsonrpc": "2.0", "id": "owner", "method": "task/get", "params": {"taskId": pending.id}});
-    let completed = edge
+    let own =
+        json!({"jsonrpc": "2.0", "id": "owner", "method": "GetTask", "params": {"id": pending.id}});
+    let observed = edge
         .handle_jsonrpc(&serde_json::to_vec(&own).test_unwrap(), &kernel, &owner)
         .test_unwrap();
+    assert_eq!(observed["result"]["status"]["state"], "TASK_STATE_WORKING");
+    assert!(kernel.receipt_log().receipts().is_empty());
+    let completed = edge.complete_task(&pending.id, &kernel, &owner, json!("owner"));
     assert_eq!(completed["result"]["status"], "completed");
     assert_eq!(kernel.receipt_log().receipts().len(), 1);
 }
@@ -533,7 +507,8 @@ fn v1_blocking_output_negotiation_supports_omitted_and_false_execution_modes() {
     }
 }
 
-fn assert_inaccessible_continuation(expired: bool) {
+#[test]
+fn v1_continuation_rejects_expired_tasks() {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
     let config = test_kernel_config();
@@ -548,13 +523,12 @@ fn assert_inaccessible_continuation(expired: bool) {
         },
     ));
     let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-    let accepted = legacy_pending(&mut edge, &kernel, &owner, "unavailable-continuation");
-    if expired {
+    let accepted = retained_task(&mut edge, &kernel, &owner, "unavailable-continuation");
+    {
         use chio_security_types::clock::{ClockReading, MonotonicInstant, UnixMillis};
-        // Stamp the retained fixture with a v1 profile and an already elapsed
-        // deadline. The real clock and request handler run without sleeps.
+        // Stamp the retained fixture with an already elapsed deadline. The
+        // real clock and request handler run without sleeps.
         let retained = edge.tasks.get_mut(&accepted.id).test_unwrap();
-        retained.v1_output_mode = Some(V1OutputMode::Json);
         retained.deadline = AuthorityDeadline::for_timeout_ms(
             ClockReading::new(UnixMillis::new(1), MonotonicInstant::from_nanos(0)),
             1,
@@ -574,22 +548,5 @@ fn assert_inaccessible_continuation(expired: bool) {
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert!(kernel.receipt_log().receipts().is_empty());
     assert_eq!(edge.task_counter, 1);
-    if expired {
-        assert!(edge.tasks.is_empty());
-    } else {
-        assert_eq!(
-            edge.tasks[&accepted.id].response.status,
-            TaskStatus::Working
-        );
-    }
-}
-
-#[test]
-fn v1_continuation_rejects_legacy_only_tasks() {
-    assert_inaccessible_continuation(false);
-}
-
-#[test]
-fn v1_continuation_rejects_expired_tasks() {
-    assert_inaccessible_continuation(true);
+    assert!(edge.tasks.is_empty());
 }
