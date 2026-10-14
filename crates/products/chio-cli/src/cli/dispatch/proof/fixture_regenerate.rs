@@ -1,3 +1,6 @@
+use super::fixture_committed_disclosure::{
+    committed_selective_disclosure_proofs, offer_committed_selective_disclosure_proofs,
+};
 use super::*;
 
 const AGENT_WEB_REPLAY_STORE_PATH_ENV: &str = "CHIO_AGENT_WEB_REPLAY_STORE_PATH";
@@ -297,28 +300,6 @@ fn regenerate_pass(
         }
     }
     Ok(changed)
-}
-
-fn committed_selective_disclosure_proofs(
-    root: &Path,
-    descriptors: &[ProofFixtureDescriptor],
-) -> Result<Vec<chio_selective_disclosure::SelectiveDisclosureProof>, CliError> {
-    let mut proofs = Vec::new();
-    for descriptor in descriptors {
-        let fixture = root.join(installed_fixture_path(descriptor));
-        if !fixture.is_dir() {
-            continue;
-        }
-        crate::input::collection::walk_files(&fixture, |path, budget| {
-            if path.file_name() == Some(std::ffi::OsStr::new("selective-disclosure-proof.json")) {
-                if let Ok(proof) = serde_json::from_slice(&budget.read(path)?) {
-                    proofs.push(proof);
-                }
-            }
-            Ok(())
-        })?;
-    }
-    Ok(proofs)
 }
 
 fn directory_contents(root: &Path) -> Result<BTreeMap<PathBuf, Vec<u8>>, CliError> {
