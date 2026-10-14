@@ -42,7 +42,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-host-docs-${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || format('main-{0}', github.sha) }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

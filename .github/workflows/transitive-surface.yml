@@ -71,7 +71,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('pr-{0}-transitive-surface', github.ref) || format('main-{0}-transitive-surface', github.sha) }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
