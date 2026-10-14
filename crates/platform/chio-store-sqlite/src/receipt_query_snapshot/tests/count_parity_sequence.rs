@@ -138,7 +138,6 @@ struct Stored {
 /// A valid capability lineage row the campaign added.
 struct Lineage {
     subject: String,
-    token: CapabilityToken,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -608,7 +607,7 @@ impl<'p> Campaign<'p> {
             .store
             .record_capability_snapshot(&token, None)
             .unwrap();
-        let row = Lineage { subject, token };
+        let row = Lineage { subject };
         self.lineage.insert(capability, row);
         self.after_valid_change();
         true
