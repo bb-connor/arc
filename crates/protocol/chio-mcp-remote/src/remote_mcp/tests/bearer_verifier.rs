@@ -749,3 +749,185 @@ fn inbound_authority_remote_subject_is_the_authenticated_sender_key() {
     let subject = derive_session_agent_public_key(&test_remote_config(), &auth, true).unwrap();
     assert_eq!(subject, sender.public_key());
 }
+
+async fn refusal(result: Result<SessionAuthContext, Response>) -> (StatusCode, String) {
+    let response = result.expect_err("bearer token must be refused");
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), 4096)
+        .await
+        .expect("read refusal body");
+    (
+        status,
+        String::from_utf8(body.to_vec()).expect("utf-8 refusal body"),
+    )
+}
+
+fn introspection_claims(iss: Option<&str>, exp: Option<u64>) -> JwtClaims {
+    JwtClaims {
+        iss: iss.map(ToOwned::to_owned),
+        sub: Some("opaque-user".to_string()),
+        aud: Some(JwtAudience::Single("chio-mcp".to_string())),
+        scope: None,
+        scp: vec![],
+        client_id: None,
+        jti: None,
+        oid: None,
+        azp: None,
+        appid: None,
+        tid: None,
+        tenant_id: None,
+        org_id: None,
+        organization_id: None,
+        groups: Vec::new(),
+        roles: Vec::new(),
+        resource: None,
+        authorization_details: None,
+        chio_transaction_context: None,
+        cnf: None,
+        exp,
+        nbf: None,
+    }
+}
+
+fn introspect(
+    verifier: &IntrospectionBearerVerifier,
+    claims: JwtClaims,
+) -> Result<SessionAuthContext, Response> {
+    verifier.session_auth_context_from_introspection(super::IntrospectionSessionAuthInput {
+        token: "opaque-token",
+        headers: (&empty_header_map()).into(),
+        introspection: OAuthIntrospectionResponse {
+            active: true,
+            token_type: Some("Bearer".to_string()),
+            claims,
+        },
+        origin: None,
+        protected_resource_metadata: None,
+        expected_method: "POST",
+        expected_target: "chio-mcp",
+    })
+}
+
+#[tokio::test]
+async fn jwt_bearer_verifier_rejects_token_without_exp() {
+    let key = Keypair::generate();
+    let verifier = inbound_sender_verifier(&key);
+    let now = verifier.clock.seconds().expect("clock");
+    let token = sign_jwt(
+        &key,
+        &json!({"iss": "https://issuer.example", "aud": "chio-mcp", "sub": "user", "iat": now}),
+    );
+    assert_eq!(
+        refusal(verifier.authenticate_token(
+            &token,
+            &empty_header_map(),
+            None,
+            None,
+            "POST",
+            "chio-mcp"
+        ))
+        .await,
+        (
+            StatusCode::UNAUTHORIZED,
+            "JWT bearer token has no exp".to_string()
+        )
+    );
+}
+
+#[tokio::test]
+async fn introspection_bearer_verifier_rejects_token_without_exp() {
+    let verifier =
+        test_introspection_verifier(Some("https://issuer.example"), Some("chio-mcp"), &[]);
+    let now = verifier.clock.seconds().expect("clock");
+    assert!(introspect(
+        &verifier,
+        introspection_claims(Some("https://issuer.example"), Some(now + 300))
+    )
+    .is_ok());
+    assert_eq!(
+        refusal(introspect(
+            &verifier,
+            introspection_claims(Some("https://issuer.example"), None)
+        ))
+        .await,
+        (
+            StatusCode::UNAUTHORIZED,
+            "bearer token has no exp".to_string()
+        )
+    );
+}
+
+#[tokio::test]
+async fn jwt_bearer_verifier_rejects_issuer_mismatch() {
+    let key = Keypair::generate();
+    let verifier = inbound_sender_verifier(&key);
+    let exp = verifier.clock.seconds().expect("clock") + 300;
+    for claims in [
+        json!({"iss": "https://other.example", "aud": "chio-mcp", "sub": "user", "exp": exp}),
+        json!({"iss": "https://issuer.example/", "aud": "chio-mcp", "sub": "user", "exp": exp}),
+        json!({"aud": "chio-mcp", "sub": "user", "exp": exp}),
+    ] {
+        let token = sign_jwt(&key, &claims);
+        assert_eq!(
+            refusal(verifier.authenticate_token(
+                &token,
+                &empty_header_map(),
+                None,
+                None,
+                "POST",
+                "chio-mcp"
+            ))
+            .await,
+            (
+                StatusCode::UNAUTHORIZED,
+                "JWT bearer issuer mismatch".to_string()
+            )
+        );
+    }
+}
+
+#[tokio::test]
+async fn introspection_bearer_verifier_rejects_missing_or_mismatched_issuer() {
+    let verifier =
+        test_introspection_verifier(Some("https://issuer.example"), Some("chio-mcp"), &[]);
+    let exp = verifier.clock.seconds().expect("clock") + 300;
+    for iss in [
+        None,
+        Some("https://other.example"),
+        Some("https://issuer.example/"),
+    ] {
+        assert_eq!(
+            refusal(introspect(&verifier, introspection_claims(iss, Some(exp)))).await,
+            (
+                StatusCode::UNAUTHORIZED,
+                "bearer token issuer mismatch".to_string()
+            )
+        );
+    }
+}
+
+#[test]
+fn local_authorization_server_rejects_subject_token_without_exp() {
+    let server = test_local_authorization_server();
+    let subject_token = sign_jwt(
+        &server.signing_key,
+        &json!({"iss": server.issuer, "aud": server.default_audience, "sub": "operator",
+            "scope": "mcp:invoke", "client_id": "client-abc"}),
+    );
+    let form: TokenRequestForm = serde_json::from_value(json!({
+        "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+        "subject_token": subject_token,
+        "subject_token_type": "urn:ietf:params:oauth:token-type:access_token",
+    }))
+    .expect("token exchange form");
+    let response = server
+        .exchange_subject_token((&empty_header_map()).into(), form)
+        .expect_err("subject token without exp must be refused");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let cause = response
+        .extensions()
+        .get::<Arc<OAuthRejection>>()
+        .expect("local OAuth cause");
+    assert_eq!(cause.kind, OAuthError::InvalidGrant);
+    assert_eq!(cause.local_detail(), "subject token has no exp");
+}

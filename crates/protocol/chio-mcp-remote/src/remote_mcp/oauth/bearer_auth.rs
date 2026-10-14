@@ -356,6 +356,13 @@ pub(super) fn build_static_bearer_session_auth_context(
     SessionAuthContext::streamable_http_static_bearer(principal, token_fingerprint, origin)
 }
 
+/// A token is accepted only when it names the configured issuer exactly. A
+/// verifier without a configured issuer, or a token without `iss`, never
+/// matches.
+fn issuer_matches(token_issuer: Option<&str>, expected_issuer: Option<&str>) -> bool {
+    matches!((token_issuer, expected_issuer), (Some(actual), Some(expected)) if actual == expected)
+}
+
 impl JwtBearerVerifier {
     pub(super) fn authenticate_token<'a>(
         &self,
@@ -392,21 +399,23 @@ impl JwtBearerVerifier {
                 ));
             }
         }
-        if let Some(exp) = claims.exp {
-            if now >= exp {
-                return Err(unauthorized_bearer_response(
-                    "JWT bearer token expired",
-                    protected_resource_metadata,
-                ));
-            }
+        let Some(exp) = claims.exp else {
+            return Err(unauthorized_bearer_response(
+                "JWT bearer token has no exp",
+                protected_resource_metadata,
+            ));
+        };
+        if now >= exp {
+            return Err(unauthorized_bearer_response(
+                "JWT bearer token expired",
+                protected_resource_metadata,
+            ));
         }
-        if let Some(expected_issuer) = self.issuer.as_deref() {
-            if claims.iss.as_deref() != Some(expected_issuer) {
-                return Err(unauthorized_bearer_response(
-                    "JWT bearer issuer mismatch",
-                    protected_resource_metadata,
-                ));
-            }
+        if !issuer_matches(claims.iss.as_deref(), self.issuer.as_deref()) {
+            return Err(unauthorized_bearer_response(
+                "JWT bearer issuer mismatch",
+                protected_resource_metadata,
+            ));
         }
         if let Some(expected_audience) = self
             .audience
@@ -662,23 +671,23 @@ impl IntrospectionBearerVerifier {
                 ));
             }
         }
-        if let Some(exp) = claims.exp {
-            if now >= exp {
-                return Err(unauthorized_bearer_response(
-                    "bearer token expired",
-                    input.protected_resource_metadata,
-                ));
-            }
+        let Some(exp) = claims.exp else {
+            return Err(unauthorized_bearer_response(
+                "bearer token has no exp",
+                input.protected_resource_metadata,
+            ));
+        };
+        if now >= exp {
+            return Err(unauthorized_bearer_response(
+                "bearer token expired",
+                input.protected_resource_metadata,
+            ));
         }
-        if let Some(expected_issuer) = self.issuer.as_deref() {
-            if let Some(actual_issuer) = claims.iss.as_deref() {
-                if actual_issuer != expected_issuer {
-                    return Err(unauthorized_bearer_response(
-                        "bearer token issuer mismatch",
-                        input.protected_resource_metadata,
-                    ));
-                }
-            }
+        if !issuer_matches(claims.iss.as_deref(), self.issuer.as_deref()) {
+            return Err(unauthorized_bearer_response(
+                "bearer token issuer mismatch",
+                input.protected_resource_metadata,
+            ));
         }
         if let Some(expected_audience) = self.audience.as_deref().or_else(|| {
             input
@@ -810,7 +819,7 @@ impl IntrospectionBearerVerifier {
             SessionAuthContext::streamable_http_oauth_bearer_with_claims(
                 chio_core::OAuthBearerSessionAuthInput {
                     principal,
-                    issuer: claims.iss.clone().or_else(|| self.issuer.clone()),
+                    issuer: claims.iss.clone(),
                     subject: claims.sub.clone(),
                     audience,
                     scopes,

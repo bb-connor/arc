@@ -515,14 +515,19 @@ impl LocalAuthorizationServer {
                 "subject token issuer mismatch",
             ));
         }
-        if let Some(exp) = claims.exp {
-            if self.clock.seconds().map_err(clock::rejection)? >= exp {
-                return Err(oauth_token_error(
-                    StatusCode::BAD_REQUEST,
-                    OAuthError::InvalidGrant,
-                    "subject token expired",
-                ));
-            }
+        let Some(exp) = claims.exp else {
+            return Err(oauth_token_error(
+                StatusCode::BAD_REQUEST,
+                OAuthError::InvalidGrant,
+                "subject token has no exp",
+            ));
+        };
+        if self.clock.seconds().map_err(clock::rejection)? >= exp {
+            return Err(oauth_token_error(
+                StatusCode::BAD_REQUEST,
+                OAuthError::InvalidGrant,
+                "subject token expired",
+            ));
         }
         if let Some(value) = claims.authorization_details.clone() {
             let _ = parse_request_time_authorization_details_from_value(value)?;

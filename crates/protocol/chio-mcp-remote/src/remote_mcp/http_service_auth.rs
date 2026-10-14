@@ -110,7 +110,7 @@ fn build_remote_auth_state(
 ) -> Result<(RemoteAuthMode, Option<Arc<str>>), CliError> {
     let auth_mode = build_remote_auth_mode(
         config,
-        Some(local_addr),
+        local_addr,
         discovered_identity_provider,
         enterprise_provider_registry.clone(),
     )?;
@@ -279,7 +279,7 @@ fn build_protected_resource_metadata(
     discovered_identity_provider: Option<&DiscoveredIdentityProvider>,
 ) -> Result<Option<ProtectedResourceMetadata>, CliError> {
     if matches!(
-        build_remote_auth_mode(config, Some(local_addr), discovered_identity_provider, None,)?,
+        build_remote_auth_mode(config, local_addr, discovered_identity_provider, None)?,
         RemoteAuthMode::StaticBearer { .. }
     ) {
         return Ok(None);
@@ -316,7 +316,7 @@ fn build_authorization_server_metadata(
     discovered_identity_provider: Option<&DiscoveredIdentityProvider>,
 ) -> Result<Option<AuthorizationServerMetadata>, CliError> {
     if matches!(
-        build_remote_auth_mode(config, Some(local_addr), discovered_identity_provider, None,)?,
+        build_remote_auth_mode(config, local_addr, discovered_identity_provider, None)?,
         RemoteAuthMode::StaticBearer { .. }
     ) {
         return Ok(None);
@@ -442,7 +442,7 @@ fn build_authorization_server_metadata(
 
 fn build_remote_auth_mode(
     config: &RemoteServeHttpConfig,
-    local_addr: Option<SocketAddr>,
+    local_addr: SocketAddr,
     discovered_identity_provider: Option<&DiscoveredIdentityProvider>,
     enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
 ) -> Result<RemoteAuthMode, CliError> {
@@ -500,16 +500,7 @@ fn build_remote_auth_mode(
                 key_source: JwtVerificationKeySource::Static(
                     load_or_create_authority_keypair(seed_path)?.public_key(),
                 ),
-                issuer: config.auth_jwt_issuer.clone().or_else(|| {
-                    local_addr
-                        .map(|addr| {
-                            normalize_public_base_url(config.public_base_url.as_deref(), addr)
-                        })
-                        .transpose()
-                        .ok()
-                        .flatten()
-                        .map(|base_url| format!("{base_url}/oauth"))
-                }),
+                issuer: Some(expected_bearer_issuer(config, local_addr, None)?),
                 audience: config.auth_jwt_audience.clone(),
                 required_scopes: config.auth_scopes.clone(),
                 provider_profile,
@@ -554,22 +545,11 @@ fn build_remote_auth_mode(
                 introspection_url: parsed_introspection_url,
                 client_id: config.auth_introspection_client_id.clone(),
                 client_secret: config.auth_introspection_client_secret.clone(),
-                issuer: config
-                    .auth_jwt_issuer
-                    .clone()
-                    .or_else(|| {
-                        discovered_identity_provider.map(|provider| provider.issuer.clone())
-                    })
-                    .or_else(|| {
-                        local_addr
-                            .map(|addr| {
-                                normalize_public_base_url(config.public_base_url.as_deref(), addr)
-                            })
-                            .transpose()
-                            .ok()
-                            .flatten()
-                            .map(|base_url| format!("{base_url}/oauth"))
-                    }),
+                issuer: Some(expected_bearer_issuer(
+                    config,
+                    local_addr,
+                    discovered_identity_provider,
+                )?),
                 audience: config.auth_jwt_audience.clone(),
                 required_scopes: config.auth_scopes.clone(),
                 provider_profile,
@@ -601,20 +581,11 @@ fn build_remote_auth_mode(
         verifier: Arc::new(JwtBearerVerifier {
             clock: config.clock.clone(),
             key_source,
-            issuer: config
-                .auth_jwt_issuer
-                .clone()
-                .or_else(|| discovered_identity_provider.map(|provider| provider.issuer.clone()))
-                .or_else(|| {
-                    local_addr
-                        .map(|addr| {
-                            normalize_public_base_url(config.public_base_url.as_deref(), addr)
-                        })
-                        .transpose()
-                        .ok()
-                        .flatten()
-                        .map(|base_url| format!("{base_url}/oauth"))
-                }),
+            issuer: Some(expected_bearer_issuer(
+                config,
+                local_addr,
+                discovered_identity_provider,
+            )?),
             audience: config.auth_jwt_audience.clone(),
             required_scopes: config.auth_scopes.clone(),
             provider_profile,
@@ -623,6 +594,24 @@ fn build_remote_auth_mode(
             sender_dpop_config,
         }),
     })
+}
+
+/// The issuer every accepted bearer token must name: `--auth-jwt-issuer`, else
+/// the discovered identity provider's issuer, else the embedded authorization
+/// server's issuer under the public base URL.
+fn expected_bearer_issuer(
+    config: &RemoteServeHttpConfig,
+    local_addr: SocketAddr,
+    discovered_identity_provider: Option<&DiscoveredIdentityProvider>,
+) -> Result<String, CliError> {
+    if let Some(issuer) = config.auth_jwt_issuer.as_deref() {
+        return Ok(issuer.to_string());
+    }
+    if let Some(provider) = discovered_identity_provider {
+        return Ok(provider.issuer.clone());
+    }
+    let base_url = normalize_public_base_url(config.public_base_url.as_deref(), local_addr)?;
+    Ok(format!("{base_url}/oauth"))
 }
 
 fn build_sender_dpop_runtime(
