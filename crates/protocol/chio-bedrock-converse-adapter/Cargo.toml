@@ -35,7 +35,7 @@ bytes = "1"
 http-body = "1"
 aws-types = { version = "1", default-features = false }
 chio-attest-verify = { workspace = true }
-chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.2.0-alpha.1", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-manifest = { workspace = true }
 chio-provider-adapter-core = { workspace = true }
 chio-tool-call-fabric = { workspace = true }

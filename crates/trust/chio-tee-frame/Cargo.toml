@@ -14,7 +14,7 @@ name = "chio_tee_frame"
 [dependencies]
 base64 = { workspace = true }
 chrono = { workspace = true }
-chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.2.0-alpha.1", package = "chio-core-types", path = "../../core/chio-core-types" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
