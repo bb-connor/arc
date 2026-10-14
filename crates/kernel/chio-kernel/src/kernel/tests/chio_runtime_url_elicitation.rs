@@ -107,6 +107,17 @@ fn non_durable_url_elicitation_retains_sibling_budget() -> Result<(), Box<dyn st
         matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
         "the delegated child must reach dispatch and surface UrlElicitationsRequired: {result:?}"
     );
+    assert_eq!(
+        kernel
+            .receipt_log()
+            .receipts()
+            .last()
+            .and_then(|receipt| receipt.decision.clone()),
+        Some(chio_core::receipt::decision::Decision::Cancelled {
+            reason: "tool server returned URL elicitation after dispatch; outcome is unknown"
+                .into(),
+        })
+    );
 
     kernel
         .release_admitted_capability_budget(&child_a)

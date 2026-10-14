@@ -72,6 +72,75 @@ fn durable_exact_output_guard_runs_after_transform_and_again_at_replay_release()
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 
+struct DurableToolErrorServer {
+    store: std::sync::Arc<TestAdmissionOperationStore>,
+}
+
+const TOOL_CONTROLLED_ERROR: &str = "tool-controlled text must never be signed";
+
+#[async_trait::async_trait]
+impl ToolServerConnection for DurableToolErrorServer {
+    fn server_id(&self) -> &str {
+        "durable-server"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["mutate".to_owned()]
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        assert_eq!(
+            self.store.operation().state(),
+            AdmissionOperationState::DispatchCommitted
+        );
+        Err(KernelError::ToolServerError(
+            TOOL_CONTROLLED_ERROR.to_owned(),
+        ))
+    }
+}
+
+#[test]
+fn durable_tool_error_after_dispatch_signs_a_kernel_reason() {
+    let (mut kernel, request, store, _invocations) =
+        durable_admission_fixture("durable-tool-error");
+    kernel.register_tool_server(Box::new(DurableToolErrorServer {
+        store: store.clone(),
+    }));
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("signed terminal refusal");
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("dispatch outcome is unknown after transport_return: CHIO-KERNEL-TOOL-SERVER")
+    );
+    let retained = assert_original_unknown_incident(
+        &store,
+        &request,
+        &unknown_after("transport_return", "CHIO-KERNEL-TOOL-SERVER"),
+    );
+    let receipt = store
+        .state
+        .lock()
+        .expect("admission state")
+        .receipt
+        .clone()
+        .expect("signed terminal refusal");
+    assert!(!serde_json::to_string(&receipt)
+        .expect("receipt json")
+        .contains(TOOL_CONTROLLED_ERROR));
+    assert_eq!(
+        retained.state(),
+        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    );
+}
+
 #[test]
 fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
     let (mut kernel, request, store, _invocations) =
@@ -81,7 +150,8 @@ fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
     }));
 
     assert_durable_url_elicitation(kernel.evaluate_tool_call_blocking(&request));
-    let retained = assert_original_unknown_incident(&store, &request);
+    let retained =
+        assert_original_unknown_incident(&store, &request, &url_elicitation_after_dispatch());
     assert_eq!(kernel.receipt_log().len(), 1);
     assert_unknown_replay(
         kernel.evaluate_tool_call_blocking(&request),
@@ -204,7 +274,8 @@ fn dpop_profile_removal_distinguishes_selected_authority_from_configuration() {
         }
         assert!(!kernel.can_redispatch_unknown_read(&request));
         assert_durable_url_elicitation(kernel.evaluate_tool_call_blocking(&request));
-        let retained = assert_original_unknown_incident(&store, &request);
+        let retained =
+            assert_original_unknown_incident(&store, &request, &url_elicitation_after_dispatch());
         assert_eq!(kernel.receipt_log().len(), 1);
         assert_unknown_replay(
             kernel.evaluate_tool_call_blocking(&request),
@@ -258,7 +329,8 @@ fn durable_server_url_elicitation_finalizes_the_pool_claim() {
         .expect("qualified finding pool ledger");
 
     assert_durable_url_elicitation(kernel.evaluate_tool_call_blocking(&request));
-    let terminal = assert_original_unknown_incident(&store, &request);
+    let terminal =
+        assert_original_unknown_incident(&store, &request, &url_elicitation_after_dispatch());
     assert_unknown_replay(
         kernel.evaluate_tool_call_blocking(&request),
         &terminal,
@@ -443,7 +515,8 @@ fn nested_durable_url_elicitation_terminalizes_as_outcome_unknown() {
         &mut client,
         None,
     ));
-    let retained = assert_original_unknown_incident(&store, &request);
+    let retained =
+        assert_original_unknown_incident(&store, &request, &url_elicitation_after_dispatch());
     assert_eq!(kernel.receipt_log().len(), 1);
     assert_unknown_replay(
         kernel.evaluate_tool_call_with_nested_flow_client(

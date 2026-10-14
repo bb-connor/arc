@@ -51,6 +51,42 @@ struct ObligationParts<'a> {
     unknown_child: Option<UnknownChildAppend>,
 }
 
+pub(in crate::kernel) const URL_ELICITATION_AFTER_DISPATCH: &str =
+    "tool server returned URL elicitation after dispatch; outcome is unknown";
+
+/// The terminal refusal a dispatched call signs when its tool outcome is not
+/// known. The reason is kernel-authored; tool-supplied text never reaches it.
+pub(in crate::kernel) struct PostDispatchRefusal {
+    pub(in crate::kernel) reason: String,
+    pub(in crate::kernel) cancelled: bool,
+}
+
+impl PostDispatchRefusal {
+    pub(in crate::kernel) fn classify(step: &str, error: &KernelError) -> Self {
+        match error {
+            KernelError::UrlElicitationsRequired { .. } => Self {
+                reason: URL_ELICITATION_AFTER_DISPATCH.to_owned(),
+                cancelled: true,
+            },
+            KernelError::RequestCancelled { reason, .. } => Self {
+                reason: reason.clone(),
+                cancelled: true,
+            },
+            KernelError::HotPathDeadlineExceeded { stage, budget_ms } => Self {
+                reason: format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms"),
+                cancelled: true,
+            },
+            error => Self {
+                reason: format!(
+                    "dispatch outcome is unknown after {step}: {}",
+                    error.report().code
+                ),
+                cancelled: false,
+            },
+        }
+    }
+}
+
 #[must_use = "an executed call must retain one terminal owner"]
 pub(in crate::kernel) struct PostEffectObligation<'a> {
     kernel: &'a ChioKernel,
@@ -316,7 +352,7 @@ impl<'a> PostEffectObligation<'a> {
             let mut delivery_error = None;
             if let Some(admission) = parts.inputs.admission.as_ref() {
                 // An existing tool outcome excludes a competing unknown terminal.
-                let reason = source.to_string();
+                let refusal = PostDispatchRefusal::classify(step, &source);
                 match self.kernel.terminalize_dispatch_committed_admission(
                     admission.operation(),
                     parts
@@ -326,8 +362,8 @@ impl<'a> PostEffectObligation<'a> {
                         .saturating_mul(1_000),
                     parts.inputs.return_context.as_ref(),
                     super::admission_coordinator::DurableRefusalResponse {
-                        reason: &reason,
-                        cancelled: matches!(&source, KernelError::RequestCancelled { .. }),
+                        reason: &refusal.reason,
+                        cancelled: refusal.cancelled,
                         matched_grant_index: Some(parts.inputs.matched_grant_index),
                         metadata: self.kernel.ambiguous_dispatch_receipt_metadata(
                             &parts.inputs.budget,

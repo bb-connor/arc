@@ -98,11 +98,15 @@ fn dispatched_refusal_replays_one_signed_terminal_across_restart() -> TestResult
     assert_eq!(initial.verdict, Verdict::Deny);
     assert_eq!(
         initial.reason.as_deref(),
-        Some("tool server error: child scope is refused")
+        Some("dispatch outcome is unknown after transport_return: CHIO-KERNEL-TOOL-SERVER")
     );
     assert!(initial.output.is_none());
     assert!(initial.receipt.verify_signature()?);
-    let operation = assert_original_unknown_incident(&store, &request);
+    let operation = assert_original_unknown_incident(
+        &store,
+        &request,
+        &unknown_after("transport_return", "CHIO-KERNEL-TOOL-SERVER"),
+    );
     let hold_id = operation.budget_hold_id().ok_or("captured hold")?;
     let hold = store
         .budget
@@ -173,7 +177,11 @@ fn refused_delivery_mirror_failure_retains_the_committed_receipt() -> TestResult
     let error = kernel
         .evaluate_tool_call_blocking(&request)
         .expect_err("mirror failure refuses delivery");
-    let terminal = assert_original_unknown_incident(&store, &request);
+    let terminal = assert_original_unknown_incident(
+        &store,
+        &request,
+        &unknown_after("transport_return", "CHIO-KERNEL-TOOL-SERVER"),
+    );
     let original = store
         .state
         .lock()

@@ -3,9 +3,23 @@ use crate::admission_operation::{
     AdmissionCompensationStatus, AdmissionReceiptMetadataV1, ADMISSION_RECEIPT_METADATA_KEY,
 };
 
+pub(super) fn url_elicitation_after_dispatch() -> chio_core::receipt::decision::Decision {
+    chio_core::receipt::decision::Decision::Cancelled {
+        reason: "tool server returned URL elicitation after dispatch; outcome is unknown".into(),
+    }
+}
+
+pub(super) fn unknown_after(step: &str, code: &str) -> chio_core::receipt::decision::Decision {
+    chio_core::receipt::decision::Decision::Deny {
+        reason: format!("dispatch outcome is unknown after {step}: {code}"),
+        guard: "kernel".into(),
+    }
+}
+
 pub(super) fn assert_original_unknown_incident(
     store: &TestAdmissionOperationStore,
     request: &ToolCallRequest,
+    decision: &chio_core::receipt::decision::Decision,
 ) -> AdmissionOperationV1 {
     let operation = store.operation();
     operation
@@ -33,6 +47,7 @@ pub(super) fn assert_original_unknown_incident(
     assert_eq!(receipt.tool_server, request.server_id);
     assert_eq!(receipt.tool_name, request.tool_name);
     assert_eq!(receipt.action.parameters, request.arguments);
+    assert_eq!(receipt.decision.as_ref(), Some(decision));
     assert_unknown_receipt(&receipt, &operation);
     operation
 }
@@ -51,10 +66,6 @@ fn assert_unknown_receipt(
     assert_eq!(receipt.id, receipt_id.as_str());
     assert_eq!(projection_digest.as_str().len(), 64);
     assert!(receipt.verify_signature().expect("valid receipt signature"));
-    assert!(matches!(
-        receipt.decision,
-        Some(chio_core::receipt::decision::Decision::Deny { .. })
-    ));
     assert_eq!(
         receipt.capability_id,
         operation.binding().capability_id().as_str()
@@ -131,9 +142,12 @@ pub(super) fn assert_unknown_replay(
         .clone()
         .expect("persisted original terminal receipt");
     assert_same_receipt(&response.receipt, &receipt);
-    let Some(chio_core::receipt::decision::Decision::Deny { reason, .. }) = &receipt.decision
+    let Some(
+        chio_core::receipt::decision::Decision::Deny { reason, .. }
+        | chio_core::receipt::decision::Decision::Cancelled { reason },
+    ) = &receipt.decision
     else {
-        panic!("the original receipt must deny output");
+        panic!("the original receipt must refuse output");
     };
     assert_eq!(response.reason.as_deref(), Some(reason.as_str()));
     assert_unknown_receipt(&response.receipt, operation)

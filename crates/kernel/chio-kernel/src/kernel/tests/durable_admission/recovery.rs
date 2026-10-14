@@ -192,16 +192,15 @@ fn failed_tool_return_persistence_terminalizes_unknown_and_blocks_redispatch() {
     let response = kernel
         .evaluate_tool_call_blocking(&request)
         .expect("unrecordable return persists its original terminal refusal");
-    let expected = KernelError::AdmissionRecovery(Box::new(
-        crate::admission_operation::AdmissionRecoveryError::Outcome(
-            ToolOutcomeStoreError::Unavailable("injected tool outcome write failure".to_owned()),
-        ),
-    ));
     assert_eq!(
         response.reason.as_deref(),
-        Some(expected.to_string().as_str())
+        Some("dispatch outcome is unknown after durable_return: CHIO-KERNEL-DURABLE-ADMISSION")
     );
-    let retained = assert_original_unknown_incident(&store, &request);
+    let retained = assert_original_unknown_incident(
+        &store,
+        &request,
+        &unknown_after("durable_return", "CHIO-KERNEL-DURABLE-ADMISSION"),
+    );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     let usage = store
         .budget
