@@ -184,7 +184,7 @@ mod combined_delegation_chain_tests {
             delegation_depth: snapshot_depth,
             parent_capability_id: snapshot_parent.map(ToString::to_string),
             federated_parent_capability_id: federated_parent.map(ToString::to_string),
-            provenance: chio_kernel::CapabilitySnapshotProvenance::LegacyProjection,
+            provenance: chio_kernel::CapabilitySnapshotProvenance::SyntheticAnchor,
             signed_capability: None,
         }
     }
