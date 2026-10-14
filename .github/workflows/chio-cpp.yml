@@ -2,6 +2,7 @@ name: Chio C++ SDK
 
 on:
   push:
+    branches: [main]
     paths:
       - ".github/workflows/chio-cpp.yml"
       - "crates/sdk/chio-bindings-ffi/**"
