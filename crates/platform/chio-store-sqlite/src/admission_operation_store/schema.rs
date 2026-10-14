@@ -1,263 +1,63 @@
 use super::*;
 
 mod clock;
-mod migration_v17;
-mod migration_v19;
-mod migration_v20;
-mod migration_v21;
-mod migration_v22;
-mod migration_v23;
-mod migration_v24;
-mod migration_v25;
-mod migration_v26;
-mod migration_v27;
-mod migration_v28;
-mod migration_v29;
-mod migration_v30;
-mod migration_v31;
-mod migration_v32;
-mod migration_v33;
-mod migration_v34;
-mod migration_v35;
-mod migration_v36;
-mod migration_v37;
-mod migration_v38;
 
-#[cfg(test)]
-pub(crate) fn pre_caller_wait_schema_fixture() -> String {
-    migration_v35::predecessor_sql(migration_v34::predecessor_schema())
-}
-
-#[cfg(test)]
-pub(crate) fn pre_recovery_schema_fixture() -> String {
-    migration_v35::predecessor_sql(ADMISSION_OPERATION_SCHEMA.to_owned())
-}
-
-#[cfg(test)]
-pub(crate) fn pre_dpop_claim_schema_fixture() -> String {
-    migration_v26::predecessor_admission_schema()
-}
-
-#[cfg(test)]
-pub(super) fn pre_dpop_activation_schema_fixture() -> String {
-    migration_v25::predecessor_schema()
-}
-
-#[cfg(test)]
-pub(super) fn pre_approval_claim_schema_fixture() -> String {
-    migration_v23::predecessor_admission_schema()
-}
-
-#[cfg(test)]
-pub(super) fn pre_approval_activation_schema_fixture() -> String {
-    migration_v23::predecessor_approval_schema()
-}
 pub(super) use clock::authority_validation_time;
 pub(crate) use clock::{observe_authority_time, verify_trusted_time};
 
-#[cfg(test)]
-pub(super) fn pre_runtime_claim_schema_fixture() -> String {
-    migration_v20::predecessor_schema()
-}
-
-#[cfg(test)]
-pub(super) fn pre_runtime_activation_schema_fixture() -> String {
-    migration_v21::predecessor_schema()
+/// The single admission schema, as the ordered fragments every store is
+/// created from and every open is verified against.
+fn admission_operation_schema_sql() -> Result<String, AdmissionOperationStoreError> {
+    let fragments = [
+        ADMISSION_OPERATION_SCHEMA,
+        super::recovery::SCHEMA,
+        include_str!("../admission_operation_nonce.sql"),
+        include_str!("../admission_operation_nonce_preflight.sql"),
+        RUNTIME_REPLAY_MIGRATION_SCHEMA,
+        RUNTIME_PARTICIPANT_SCHEMA,
+        GOVERNED_APPROVAL_REPLAY_MIGRATION_SCHEMA,
+        GOVERNED_APPROVAL_CLAIM_SCHEMA,
+        DPOP_REPLAY_MIGRATION_SCHEMA,
+        DPOP_AUTHORITY_SCHEMA,
+        DPOP_CLAIM_SCHEMA,
+        SECURITY_PARTICIPANT_MIGRATION_SCHEMA,
+        &super::security_participant_state::schema::sql()?,
+        super::security_participant_state::egress::sql(),
+        super::security_participant_state::dispatch_ledger::sql(),
+        super::security_participant_state::output::sql(),
+        super::security_participant_state::nonce_preflight::sql(),
+        super::security_participant_state::checkpoint::sql(),
+        super::caller_budget::SCHEMA,
+        super::stop_epoch::SCHEMA,
+    ];
+    Ok(fragments.join("\n"))
 }
 
 pub(crate) fn initialize_admission_operation_schema(
     connection: &mut Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
     crate::security_state::deny_native_mutations(connection).map_err(sqlite_error)?;
-    let on_disk = crate::check_schema_version(
+    let state = crate::check_current_schema(
         connection,
         ADMISSION_OPERATION_SCHEMA_KEY,
         ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
         ADMISSION_OPERATION_SCHEMA_ANCHORS,
     )
     .map_err(|error| invariant(error.to_string()))?;
-    if on_disk == ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION {
+    if state == crate::SchemaState::Current {
         return verify_admission_operation_invariants(connection);
     }
-    migration_v17::preserving_parent_names(connection, |connection| {
-        migrate_schema(connection, on_disk)
-    })
-}
-
-fn migrate_schema(
-    connection: &mut Connection,
-    on_disk: i32,
-) -> Result<(), AdmissionOperationStoreError> {
+    if table_exists(connection, "admission_operations")? {
+        return Err(invariant(
+            "admission storage is provisioned without a schema stamp",
+        ));
+    }
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
-    if on_disk < 19 {
-        migration_v19::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 20 {
-        migration_v20::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 21 {
-        migration_v21::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 22 {
-        migration_v22::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 23 {
-        migration_v23::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 24 {
-        migration_v24::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 25 {
-        migration_v25::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 26 {
-        migration_v26::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 27 {
-        migration_v27::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 28 {
-        migration_v28::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 29 {
-        migration_v29::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 30 {
-        migration_v30::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 31 {
-        migration_v31::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 32 {
-        migration_v32::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 33 {
-        migration_v33::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 34 {
-        migration_v34::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 35 {
-        migration_v35::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 36 {
-        migration_v36::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    if on_disk < 37 {
-        migration_v37::verify_pre_migration_schema(&transaction, on_disk)?;
-    }
-    migration_v38::verify_pre_migration_schema(&transaction, on_disk)?;
-    if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
-        // The legacy report-after-effect contract could refund an executed
-        // caller as pre-dispatch compensation. A refunded terminal is not
-        // authoritative evidence that the external executor never acted.
-        let ambiguous_callers: bool = transaction.query_row(
-            "SELECT EXISTS(SELECT 1 FROM admission_operations AS operation,
-                json_each(operation.operation_json, '$.attachments') AS attachment
-             WHERE (operation.terminal = 0 OR operation.state IN (
-                    'compensated_before_dispatch', 'not_accepted_after_dispatch_commit',
-                    'denied_after_delivery'))
-               AND json_extract(attachment.value, '$.BrokerAttempt.transport_id') LIKE 'caller-report:%')",
-            [], |row| row.get(0),
-        ).map_err(sqlite_error)?;
-        if ambiguous_callers {
-            return Err(invariant("legacy caller reservations require authoritative external-effect reconciliation before schema migration"));
-        }
-    }
-    if on_disk < 9 && table_exists(&transaction, "threshold_approval_tokens")? {
-        migrate_threshold_approval_token_scope(&transaction)?;
-    }
-    if obligation_disposition_references_terminal_projection(&transaction)? {
-        migrate_obligation_lifecycle_foundation(&transaction)?;
-    }
-    if on_disk == 2 {
-        migrate_admission_commit_participant_digest(&transaction)?;
-    }
-    if on_disk == 3 {
-        migrate_admission_commit_begin_participant_digest(&transaction)?;
-    }
-    if matches!(on_disk, 1 | 4) {
-        migrate_admission_commit_channel_reservation_kind(&transaction)?;
-    }
-    if matches!(on_disk, 2 | 3) {
-        migrate_terminal_record_kinds(&transaction)?;
-    }
-    migration_v34::migrate(&transaction, on_disk)?;
-    migration_v17::migrate_commit_observation_clock(&transaction)?;
-    migration_v20::migrate_commit_kinds(&transaction)?;
-    if on_disk < 21 {
-        migration_v21::migrate_activation_event(&transaction)?;
-    }
-    if on_disk < 23 {
-        migration_v23::migrate(&transaction)?;
-    }
-    if on_disk < 25 {
-        migration_v25::migrate(&transaction)?;
-    }
-    if on_disk < 26 {
-        migration_v26::migrate(&transaction)?;
-    }
     transaction
-        .execute_batch(ADMISSION_OPERATION_SCHEMA)
+        .execute_batch(&admission_operation_schema_sql()?)
         .map_err(sqlite_error)?;
-    migration_v35::migrate(&transaction)?;
-    transaction
-        .execute_batch(super::recovery::SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(include_str!("../admission_operation_nonce.sql"))
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(include_str!("../admission_operation_nonce_preflight.sql"))
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(RUNTIME_REPLAY_MIGRATION_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(RUNTIME_PARTICIPANT_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(GOVERNED_APPROVAL_REPLAY_MIGRATION_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(GOVERNED_APPROVAL_CLAIM_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(DPOP_REPLAY_MIGRATION_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(DPOP_AUTHORITY_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(DPOP_CLAIM_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(SECURITY_PARTICIPANT_MIGRATION_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(&super::security_participant_state::schema::sql()?)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(super::security_participant_state::egress::sql())
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(super::security_participant_state::dispatch_ledger::sql())
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(super::security_participant_state::output::sql())
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(super::security_participant_state::nonce_preflight::sql())
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(super::security_participant_state::checkpoint::sql())
-        .map_err(sqlite_error)?;
-    if on_disk < 37 {
-        migration_v37::migrate(&transaction)?;
-    }
-    migration_v38::migrate(&transaction)?;
     crate::stamp_schema_version(
         &transaction,
         ADMISSION_OPERATION_SCHEMA_KEY,
@@ -265,16 +65,6 @@ fn migrate_schema(
     )
     .map_err(|error| invariant(error.to_string()))?;
     verify_admission_operation_invariants(&transaction)?;
-    let foreign_key_violation: bool = transaction
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM pragma_foreign_key_check)",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    if foreign_key_violation {
-        return Err(invariant("admission schema migration broke a foreign key"));
-    }
     transaction.commit().map_err(sqlite_error)
 }
 
@@ -296,297 +86,12 @@ fn table_exists(
         .map_err(sqlite_error)
 }
 
-fn migrate_threshold_approval_token_scope(
-    transaction: &Transaction<'_>,
-) -> Result<(), AdmissionOperationStoreError> {
-    transaction
-        .execute_batch(
-            r#"
-            DROP TRIGGER IF EXISTS threshold_approval_tokens_immutable;
-            DROP TRIGGER IF EXISTS threshold_approval_tokens_no_delete;
-            ALTER TABLE threshold_approval_tokens
-                RENAME TO threshold_approval_tokens_v8;
-            CREATE TABLE threshold_approval_tokens (
-                proposal_id TEXT NOT NULL,
-                token_id TEXT NOT NULL
-                    CHECK (length(token_id) BETWEEN 1 AND 512),
-                approver_fingerprint TEXT NOT NULL
-                    CHECK (approver_fingerprint <> ''),
-                canonical_token_digest TEXT NOT NULL UNIQUE CHECK (
-                    length(canonical_token_digest) = 64
-                    AND canonical_token_digest NOT GLOB '*[^0-9a-f]*'
-                ),
-                token_json BLOB NOT NULL
-                    CHECK (length(token_json) BETWEEN 1 AND 262144),
-                PRIMARY KEY (proposal_id, token_id),
-                UNIQUE (proposal_id, approver_fingerprint),
-                UNIQUE (proposal_id, canonical_token_digest),
-                FOREIGN KEY (proposal_id)
-                    REFERENCES threshold_approval_proposals(proposal_id)
-            );
-            INSERT INTO threshold_approval_tokens (
-                proposal_id, token_id, approver_fingerprint,
-                canonical_token_digest, token_json
-            )
-            SELECT proposal_id, token_id, approver_fingerprint,
-                   canonical_token_digest, token_json
-            FROM threshold_approval_tokens_v8;
-            DROP TABLE threshold_approval_tokens_v8;
-            "#,
-        )
-        .map_err(sqlite_error)
-}
-
-fn obligation_disposition_references_terminal_projection(
-    transaction: &Transaction<'_>,
-) -> Result<bool, AdmissionOperationStoreError> {
-    transaction
-        .query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1
-                FROM pragma_foreign_key_list('obligation_disposition_records')
-                WHERE "table" = 'admission_operation_terminal_projections'
-            )
-            "#,
-            [],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)
-}
-
-fn migrate_obligation_lifecycle_foundation(
-    transaction: &Transaction<'_>,
-) -> Result<(), AdmissionOperationStoreError> {
-    let obligation_count: i64 = transaction
-        .query_row("SELECT COUNT(*) FROM obligation_atoms", [], |row| {
-            row.get(0)
-        })
-        .map_err(sqlite_error)?;
-    if obligation_count != 0 {
-        return Err(invariant(
-            "populated admission schema v5 requires offline authoritative settlement reconciliation",
-        ));
-    }
-    transaction
-        .execute_batch(
-            r#"
-            DROP TRIGGER obligation_disposition_records_exact_lease;
-            DROP TRIGGER obligation_disposition_records_immutable;
-            DROP TRIGGER obligation_disposition_records_no_delete;
-            DROP INDEX obligation_disposition_records_operation;
-            ALTER TABLE obligation_disposition_records
-                RENAME TO obligation_disposition_records_v5;
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(ADMISSION_OPERATION_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(
-            r#"
-            DROP TRIGGER obligation_settlement_lifecycle_records_exact_lease;
-            DROP TRIGGER obligation_heads_exact_lease_insert;
-            DROP TRIGGER obligation_heads_exact_lease_update;
-            DROP TRIGGER obligation_disposition_records_exact_lease;
-            INSERT INTO obligation_disposition_records (
-                obligation_id, version, lifecycle_fence, atom_digest,
-                disposition_digest, operation_id, record_json, committed_at_unix_ms,
-                store_uuid, store_lease_id, store_owner_epoch
-            )
-            SELECT obligation_id, version, lifecycle_fence, atom_digest,
-                   disposition_digest, operation_id, record_json, committed_at_unix_ms,
-                   store_uuid, store_lease_id, store_owner_epoch
-            FROM obligation_disposition_records_v5
-            ORDER BY obligation_id, version;
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(
-            r#"
-            DROP TABLE obligation_disposition_records_v5;
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(ADMISSION_OPERATION_SCHEMA)
-        .map_err(sqlite_error)
-}
-
-fn migrate_terminal_record_kinds(
-    transaction: &Transaction<'_>,
-) -> Result<(), AdmissionOperationStoreError> {
-    transaction
-        .execute_batch(
-            r#"
-            DROP TRIGGER IF EXISTS admission_operation_terminal_records_immutable;
-            DROP TRIGGER IF EXISTS admission_operation_terminal_records_no_delete;
-            DROP INDEX IF EXISTS admission_operation_terminal_records_kind;
-            ALTER TABLE admission_operation_terminal_records
-                RENAME TO admission_operation_terminal_records_v3;
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(ADMISSION_OPERATION_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(
-            r#"
-            INSERT INTO admission_operation_terminal_records (
-                operation_id, record_kind, record_id, record_digest, record_json
-            )
-            SELECT operation_id, record_kind, record_id, record_digest, record_json
-            FROM admission_operation_terminal_records_v3;
-            DROP TABLE admission_operation_terminal_records_v3;
-            "#,
-        )
-        .map_err(sqlite_error)
-}
-
-fn migrate_admission_commit_participant_digest(
-    transaction: &Transaction<'_>,
-) -> Result<(), AdmissionOperationStoreError> {
-    transaction
-        .execute_batch(
-            r#"
-            DROP TRIGGER admission_operation_commits_exact_lease;
-            DROP TRIGGER admission_operation_commits_immutable;
-            DROP TRIGGER admission_operation_commits_no_delete;
-            DROP INDEX admission_operation_commits_operation;
-            ALTER TABLE admission_operation_commits
-                RENAME TO admission_operation_commits_v2;
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(ADMISSION_OPERATION_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch("DROP TRIGGER admission_operation_commits_exact_lease;")
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(
-            r#"
-            INSERT INTO admission_operation_commits (
-                commit_sequence, operation_id, operation_version, mutation_kind,
-                operation_digest, recovery_claim_digest, participant_digest,
-                previous_chain_digest, chain_digest,
-                store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
-            )
-            SELECT commit_sequence, operation_id, operation_version, mutation_kind,
-                   operation_digest, recovery_claim_digest, NULL,
-                   previous_chain_digest, chain_digest,
-                   store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
-            FROM admission_operation_commits_v2
-            ORDER BY commit_sequence;
-            DROP TABLE admission_operation_commits_v2;
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(ADMISSION_OPERATION_SCHEMA)
-        .map_err(sqlite_error)
-}
-
-fn migrate_admission_commit_begin_participant_digest(
-    transaction: &Transaction<'_>,
-) -> Result<(), AdmissionOperationStoreError> {
-    transaction
-        .execute_batch(
-            r#"
-            DROP TRIGGER admission_operation_commits_exact_lease;
-            DROP TRIGGER admission_operation_commits_immutable;
-            DROP TRIGGER admission_operation_commits_no_delete;
-            DROP INDEX admission_operation_commits_operation;
-            ALTER TABLE admission_operation_commits
-                RENAME TO admission_operation_commits_v3;
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(ADMISSION_OPERATION_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch("DROP TRIGGER admission_operation_commits_exact_lease;")
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(
-            r#"
-            INSERT INTO admission_operation_commits (
-                commit_sequence, operation_id, operation_version, mutation_kind,
-                operation_digest, recovery_claim_digest, participant_digest,
-                previous_chain_digest, chain_digest,
-                store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
-            )
-            SELECT commit_sequence, operation_id, operation_version, mutation_kind,
-                   operation_digest, recovery_claim_digest, participant_digest,
-                   previous_chain_digest, chain_digest,
-                   store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
-            FROM admission_operation_commits_v3
-            ORDER BY commit_sequence;
-            DROP TABLE admission_operation_commits_v3;
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(ADMISSION_OPERATION_SCHEMA)
-        .map_err(sqlite_error)
-}
-
-fn migrate_admission_commit_channel_reservation_kind(
-    transaction: &Transaction<'_>,
-) -> Result<(), AdmissionOperationStoreError> {
-    transaction
-        .execute_batch(
-            r#"
-            DROP TRIGGER admission_operation_commits_exact_lease;
-            DROP TRIGGER admission_operation_commits_immutable;
-            DROP TRIGGER admission_operation_commits_no_delete;
-            DROP INDEX admission_operation_commits_operation;
-            ALTER TABLE admission_operation_commits
-                RENAME TO admission_operation_commits_v4;
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(ADMISSION_OPERATION_SCHEMA)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch("DROP TRIGGER admission_operation_commits_exact_lease;")
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(
-            r#"
-            INSERT INTO admission_operation_commits (
-                commit_sequence, operation_id, operation_version, mutation_kind,
-                operation_digest, recovery_claim_digest, participant_digest,
-                previous_chain_digest, chain_digest,
-                store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
-            )
-            SELECT commit_sequence, operation_id, operation_version, mutation_kind,
-                   operation_digest, recovery_claim_digest, participant_digest,
-                   previous_chain_digest, chain_digest,
-                   store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
-            FROM admission_operation_commits_v4
-            ORDER BY commit_sequence;
-            DROP TABLE admission_operation_commits_v4;
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(ADMISSION_OPERATION_SCHEMA)
-        .map_err(sqlite_error)
-}
-
 pub(crate) fn verify_admission_operation_invariants(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
-    verify_admission_operation_schema(connection, ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)?;
+    verify_admission_operation_schema(connection)?;
 
-    verify_operation_data(connection, CallerShareIndex::Current)?;
+    verify_operation_data(connection)?;
     super::caller_budget::verify_ownership(connection)?;
     super::runtime_participant::verify_all(connection)?;
     super::governed_approval_claim::verify_all(connection)?;
@@ -614,9 +119,11 @@ pub(crate) fn verify_admission_operation_invariants(
 
 fn verify_admission_operation_schema(
     connection: &Connection,
-    version: i32,
 ) -> Result<(), AdmissionOperationStoreError> {
-    let expected = expected_admission_operation_schema(version)?;
+    let expected = Connection::open_in_memory().map_err(sqlite_error)?;
+    expected
+        .execute_batch(&admission_operation_schema_sql()?)
+        .map_err(sqlite_error)?;
     if admission_operation_schema_catalog(connection)?
         != admission_operation_schema_catalog(&expected)?
     {
@@ -625,131 +132,6 @@ fn verify_admission_operation_schema(
         ));
     }
     Ok(())
-}
-
-fn expected_admission_operation_schema(
-    version: i32,
-) -> Result<Connection, AdmissionOperationStoreError> {
-    let expected = Connection::open_in_memory().map_err(sqlite_error)?;
-    let mut admission_sql = if version < 20 {
-        migration_v20::predecessor_schema()
-    } else if version < 23 {
-        migration_v23::predecessor_admission_schema()
-    } else if version < 26 {
-        migration_v26::predecessor_admission_schema()
-    } else if version < 34 {
-        migration_v34::predecessor_schema()
-    } else {
-        ADMISSION_OPERATION_SCHEMA.to_owned()
-    };
-    if version < 35 {
-        admission_sql = migration_v35::predecessor_sql(admission_sql);
-    }
-    expected
-        .execute_batch(&admission_sql)
-        .map_err(sqlite_error)?;
-    if version >= 35 {
-        expected
-            .execute_batch(super::recovery::SCHEMA)
-            .map_err(sqlite_error)?;
-    }
-    if version >= 19 {
-        expected
-            .execute_batch(&if version < 21 {
-                migration_v21::predecessor_schema()
-            } else {
-                RUNTIME_REPLAY_MIGRATION_SCHEMA.to_owned()
-            })
-            .map_err(sqlite_error)?;
-    }
-    if version >= 20 {
-        expected
-            .execute_batch(RUNTIME_PARTICIPANT_SCHEMA)
-            .map_err(sqlite_error)?;
-    }
-    if version >= 22 {
-        expected
-            .execute_batch(&if version < 23 {
-                migration_v23::predecessor_approval_schema()
-            } else {
-                GOVERNED_APPROVAL_REPLAY_MIGRATION_SCHEMA.to_owned()
-            })
-            .map_err(sqlite_error)?;
-    }
-    if version >= 23 {
-        expected
-            .execute_batch(GOVERNED_APPROVAL_CLAIM_SCHEMA)
-            .map_err(sqlite_error)?;
-    }
-    if version >= 24 {
-        expected
-            .execute_batch(&if version < 25 {
-                migration_v25::predecessor_schema()
-            } else {
-                DPOP_REPLAY_MIGRATION_SCHEMA.to_owned()
-            })
-            .map_err(sqlite_error)?;
-    }
-    if version >= 25 {
-        expected
-            .execute_batch(DPOP_AUTHORITY_SCHEMA)
-            .map_err(sqlite_error)?;
-    }
-    if version >= 26 {
-        expected
-            .execute_batch(DPOP_CLAIM_SCHEMA)
-            .map_err(sqlite_error)?;
-    }
-    if version >= 27 {
-        expected
-            .execute_batch(SECURITY_PARTICIPANT_MIGRATION_SCHEMA)
-            .map_err(sqlite_error)?;
-    }
-    if version >= 28 {
-        expected
-            .execute_batch(&if version == 28 {
-                super::security_participant_state::schema::predecessor_sql()
-            } else {
-                super::security_participant_state::schema::sql()?
-            })
-            .map_err(sqlite_error)?;
-    }
-    if version >= 30 {
-        expected
-            .execute_batch(super::security_participant_state::egress::sql())
-            .map_err(sqlite_error)?;
-    }
-    if version >= 31 {
-        expected
-            .execute_batch(super::security_participant_state::dispatch_ledger::sql())
-            .map_err(sqlite_error)?;
-    }
-    if version >= 32 {
-        expected
-            .execute_batch(super::security_participant_state::output::sql())
-            .map_err(sqlite_error)?;
-    }
-    if version >= 33 {
-        expected
-            .execute_batch(super::security_participant_state::nonce_preflight::sql())
-            .map_err(sqlite_error)?;
-    }
-    if version >= 36 {
-        expected
-            .execute_batch(super::security_participant_state::checkpoint::sql())
-            .map_err(sqlite_error)?;
-    }
-    if version >= 37 {
-        expected
-            .execute_batch(super::caller_budget::SCHEMA)
-            .map_err(sqlite_error)?;
-    }
-    if version >= 38 {
-        expected
-            .execute_batch(super::stop_epoch::SCHEMA)
-            .map_err(sqlite_error)?;
-    }
-    Ok(expected)
 }
 
 pub(super) fn verify_admission_commit_chronology(
@@ -899,24 +281,7 @@ pub(super) fn verify_admission_commit_chronology(
     Ok(())
 }
 
-/// Whether the store being verified carries the caller-share parent index.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum CallerShareIndex {
-    Predecessor,
-    Current,
-}
-
-/// Verify a predecessor schema's rows before migrating them.
-fn verify_admission_operation_data_invariants(
-    connection: &Connection,
-) -> Result<(), AdmissionOperationStoreError> {
-    verify_operation_data(connection, CallerShareIndex::Predecessor)
-}
-
-fn verify_operation_data(
-    connection: &Connection,
-    caller_shares: CallerShareIndex,
-) -> Result<(), AdmissionOperationStoreError> {
+fn verify_operation_data(connection: &Connection) -> Result<(), AdmissionOperationStoreError> {
     verify_admission_commit_chronology(connection)?;
     let history = CheckedHistoryScope::from_verified_chain(
         connection,
@@ -944,9 +309,7 @@ fn verify_operation_data(
         super::execution_nonce::verify_reservation(connection, &stored.operation)?;
         let retained =
             super::retained_request::load_retained_request_tx(connection, &stored.operation)?;
-        if caller_shares == CallerShareIndex::Current {
-            super::caller_budget::verify_indexed(connection, &stored.operation, retained.as_ref())?;
-        }
+        super::caller_budget::verify_indexed(connection, &stored.operation, retained.as_ref())?;
         super::caller_dispatch_context::load(connection, &stored.operation)?;
         super::security_participant_state::dispatch_ledger::verify_capture_attachment(
             connection,

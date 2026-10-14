@@ -916,3 +916,36 @@ mod connection_recovery;
 
 #[path = "admission_operation_store_tests/authorization_consumption.rs"]
 mod authorization_consumption;
+
+#[test]
+fn golden_fresh_schema_dump() -> AnchoredTestResult {
+    let fixture = fixture();
+    let connection = fixture.store.connection()?;
+    let mut statement = connection.prepare(
+        "SELECT type, name, tbl_name, COALESCE(sql, '') FROM sqlite_schema ORDER BY type, name, tbl_name",
+    )?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok(format!(
+                "{}\t{}\t{}\t{}",
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    let versions: Vec<String> = connection
+        .prepare(
+            "SELECT store_key || '=' || version FROM chio_store_schema_versions ORDER BY store_key",
+        )?
+        .query_map([], |row| row.get(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    if let Ok(path) = std::env::var("CHIO_SCHEMA_DUMP") {
+        std::fs::write(
+            path,
+            format!("{}\n--\n{}\n", rows.join("\n"), versions.join("\n")),
+        )?;
+    }
+    Ok(())
+}

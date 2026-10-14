@@ -12,17 +12,9 @@ pub(in crate::admission_operation_store::security_participant_state) fn verify_c
         )
         .map_err(map_integrity)?;
     if !exists(connection).map_err(map_integrity)? {
-        let version: i32 = connection.query_row(
-            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",
-            [], |row| row.get(0),
-        ).map_err(map_integrity)?;
-        return if global == 0 && version < 33 {
-            Ok(())
-        } else {
-            Err(map_integrity(
-                "native nonce preflight requires its current catalog",
-            ))
-        };
+        return Err(map_integrity(
+            "native nonce preflight requires its current catalog",
+        ));
     }
     verify_catalog(connection).map_err(map_integrity)?;
     let local: i64 = connection

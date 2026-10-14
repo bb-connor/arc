@@ -101,15 +101,7 @@ pub(super) fn hydrate(
     tx: &Transaction<'_>,
     source: &SecurityParticipantMigrationRecord,
 ) -> Result<(), AdmissionOperationStoreError> {
-    hydrate_at_version(tx, source, 29)
-}
-
-pub(super) fn hydrate_at_version(
-    tx: &Transaction<'_>,
-    source: &SecurityParticipantMigrationRecord,
-    version: i32,
-) -> Result<(), AdmissionOperationStoreError> {
-    if !schema::verify_version(tx, version)? {
+    if !schema::verify(tx)? {
         return Err(invalid("native schema is absent"));
     }
     let authority = source.snapshot().binding().security_authority_id().as_str();
