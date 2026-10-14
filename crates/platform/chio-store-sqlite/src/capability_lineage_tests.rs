@@ -8,7 +8,6 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::Keypair;
-use chio_kernel::CapabilitySnapshotProvenance;
 use rusqlite::{params, Connection};
 
 use crate::receipt_store::SqliteReceiptStore;
@@ -397,66 +396,6 @@ fn reopen_does_not_normalize_synthetic_anchor_with_signed_token(
     assert_eq!(provenance, "synthetic_anchor");
 
     drop(reopened);
-    let _ = fs::remove_file(path);
-    Ok(())
-}
-
-#[test]
-fn legacy_null_signed_capability_migrates_without_reconstruction(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("cl-signed-legacy");
-    let store = SqliteReceiptStore::open(&path)?;
-    let subject = Keypair::generate();
-    let issuer = Keypair::generate();
-    let token = make_token("cap-legacy", &subject, &issuer, 1000, 2000);
-    store.record_capability_snapshot(&token, None)?;
-    drop(store);
-
-    let connection = Connection::open(&path)?;
-    connection.execute("DROP INDEX idx_capability_lineage_federated_parent", [])?;
-    for table in ["capability_lineage", "federated_share_capability_lineage"] {
-        for column in [
-            "provenance",
-            "federated_parent_capability_id",
-            "signed_capability_json",
-        ] {
-            connection.execute(&format!("ALTER TABLE {table} DROP COLUMN {column}"), [])?;
-        }
-    }
-    crate::stamp_schema_version(&connection, "receipt", 0)?;
-    drop(connection);
-
-    let migrated = SqliteReceiptStore::open(&path)?;
-    let snapshot = migrated
-        .get_lineage(&token.id)?
-        .ok_or_else(|| std::io::Error::other("migrated snapshot missing"))?;
-    assert!(snapshot.signed_capability.is_none());
-    assert_eq!(
-        snapshot.provenance,
-        CapabilitySnapshotProvenance::LegacyProjection
-    );
-    assert!(chio_kernel::ReceiptStore::get_capability_snapshot(&migrated, &token.id)?.is_none());
-    assert!(
-        chio_kernel::ReceiptStore::get_capability_delegation_chain(&migrated, &token.id)?
-            .is_empty()
-    );
-    let signed_json: Option<String> = migrated.connection()?.query_row(
-        "SELECT signed_capability_json FROM capability_lineage WHERE capability_id = ?1",
-        params![token.id],
-        |row| row.get(0),
-    )?;
-    assert!(signed_json.is_none());
-
-    migrated.record_capability_snapshot(&token, None)?;
-    let upgraded = migrated
-        .get_lineage(&token.id)?
-        .ok_or_else(|| std::io::Error::other("upgraded snapshot missing"))?;
-    assert!(upgraded.signed_capability.is_some());
-    assert_eq!(
-        upgraded.provenance,
-        CapabilitySnapshotProvenance::SignedToken
-    );
-
     let _ = fs::remove_file(path);
     Ok(())
 }

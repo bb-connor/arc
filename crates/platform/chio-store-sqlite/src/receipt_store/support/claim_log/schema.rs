@@ -105,19 +105,12 @@ pub(crate) fn receipt_cost_projection(
     })
 }
 
-pub(crate) fn migrate_receipt_cost_projection(
-    transaction: &rusqlite::Transaction<'_>,
-    backfill_charged: bool,
+pub(crate) fn install_receipt_cost_indexes(
+    connection: &Connection,
 ) -> Result<(), ReceiptStoreError> {
-    migrate_receipt_cost_projection_table(
-        transaction,
-        "chio_tool_receipts",
-        "PRAGMA table_info(chio_tool_receipts)",
-        RECEIPT_COST_INDEX_SQL,
-        RECEIPT_GLOBAL_COST_INDEX_SQL,
-        "tool receipt cost projection migration",
-        backfill_charged,
-    )
+    connection.execute(RECEIPT_COST_INDEX_SQL, [])?;
+    connection.execute(RECEIPT_GLOBAL_COST_INDEX_SQL, [])?;
+    Ok(())
 }
 
 pub(crate) fn verify_receipt_cost_projection(
@@ -135,42 +128,14 @@ pub(crate) fn verify_receipt_cost_projection(
 pub(crate) fn audit_receipt_cost_projection(
     connection: &Connection,
 ) -> Result<(), ReceiptStoreError> {
-    reconcile_receipt_cost_projection(
-        connection,
-        "chio_tool_receipts",
-        "persisted tool receipt cost projection",
-        false,
-        false,
-    )
+    reconcile_receipt_cost_projection(connection, "persisted tool receipt cost projection")
 }
 
-pub(crate) fn migrate_archive_receipt_cost_projection(
-    transaction: &rusqlite::Transaction<'_>,
-    backfill_charged: bool,
+pub(crate) fn install_archive_receipt_cost_indexes(
+    connection: &Connection,
 ) -> Result<(), ReceiptStoreError> {
-    // An archive inspected through open_existing has the canonical update and
-    // delete guards. Remove only its update guard inside this transaction, then
-    // restore the same verified definition before the migration commits.
-    let update_guard = archive_receipt_update_guard(transaction)?;
-    if update_guard.is_some() {
-        transaction.execute_batch("DROP TRIGGER archive.chio_tool_receipts_reject_update")?;
-    }
-    migrate_receipt_cost_projection_table(
-        transaction,
-        "archive.chio_tool_receipts",
-        "PRAGMA archive.table_info(chio_tool_receipts)",
-        ARCHIVE_RECEIPT_COST_INDEX_SQL,
-        ARCHIVE_RECEIPT_GLOBAL_COST_INDEX_SQL,
-        "archived tool receipt cost projection migration",
-        backfill_charged,
-    )?;
-    if let Some(sql) = update_guard {
-        transaction.execute_batch(&sql.replacen(
-            "CREATE TRIGGER ",
-            "CREATE TRIGGER archive.",
-            1,
-        ))?;
-    }
+    connection.execute(ARCHIVE_RECEIPT_COST_INDEX_SQL, [])?;
+    connection.execute(ARCHIVE_RECEIPT_GLOBAL_COST_INDEX_SQL, [])?;
     Ok(())
 }
 
@@ -305,80 +270,27 @@ fn receipt_cost_schema_error() -> ReceiptStoreError {
     )
 }
 
-fn migrate_receipt_cost_projection_table(
-    transaction: &rusqlite::Transaction<'_>,
-    table: &str,
-    table_info: &str,
-    create_index: &str,
-    create_global_index: &str,
-    context: &str,
-    backfill_charged: bool,
-) -> Result<(), ReceiptStoreError> {
-    let columns = transaction
-        .prepare(table_info)?
-        .query_map([], |row| row.get::<_, String>(1))?
-        .collect::<Result<Vec<_>, _>>()?;
-    if !backfill_charged
-        && (!columns.iter().any(|column| column == "cost_currency")
-            || !columns.iter().any(|column| column == "cost_charged_be"))
-    {
-        return Err(receipt_cost_schema_error());
-    }
-    if !columns.iter().any(|column| column == "cost_currency") {
-        transaction.execute(
-            &format!("ALTER TABLE {table} ADD COLUMN {RECEIPT_COST_CURRENCY_COLUMN}"),
-            [],
-        )?;
-    }
-    if !columns.iter().any(|column| column == "cost_charged_be") {
-        transaction.execute(
-            &format!("ALTER TABLE {table} ADD COLUMN {RECEIPT_COST_KEY_COLUMN}"),
-            [],
-        )?;
-    }
-
-    let backfill_attempted = !columns.iter().any(|column| column == "attempted_cost_be");
-    if backfill_attempted {
-        transaction.execute(
-            &format!("ALTER TABLE {table} ADD COLUMN {RECEIPT_ATTEMPTED_COST_COLUMN}"),
-            [],
-        )?;
-    }
-    reconcile_receipt_cost_projection(
-        transaction,
-        table,
-        context,
-        backfill_charged,
-        backfill_attempted,
-    )?;
-    transaction.execute(create_index, [])?;
-    transaction.execute(create_global_index, [])?;
-    Ok(())
-}
-
 fn reconcile_receipt_cost_projection(
     connection: &Connection,
-    table: &str,
     context: &str,
-    backfill_charged: bool,
-    backfill_attempted: bool,
 ) -> Result<(), ReceiptStoreError> {
     let mut previous_seq = 0_i64;
     loop {
-        let sql = format!(
-            "SELECT seq, raw_json, cost_currency, cost_charged_be, attempted_cost_be FROM {table} \
-             WHERE seq > ?1 ORDER BY seq ASC LIMIT 1"
-        );
         let row = connection
-            .query_row(&sql, [previous_seq], |row| {
-                Ok((
-                    row.get::<_, i64>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                    row.get::<_, Option<Vec<u8>>>(3)?,
-                    row.get::<_, Option<Vec<u8>>>(4)?,
-                ))
-            })
+            .query_row(
+                "SELECT seq, raw_json, cost_currency, cost_charged_be, attempted_cost_be \
+                 FROM chio_tool_receipts WHERE seq > ?1 ORDER BY seq ASC LIMIT 1",
+                [previous_seq],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, Option<Vec<u8>>>(3)?,
+                        row.get::<_, Option<Vec<u8>>>(4)?,
+                    ))
+                },
+            )
             .optional()?;
         let Some((seq, raw_json, currency, charged, attempted)) = row else {
             break;
@@ -389,170 +301,16 @@ fn reconcile_receipt_cost_projection(
             Some(sqlite_positive_u64(seq, "tool receipt source_seq")?),
         )?;
         let expected = receipt_cost_projection(&receipt)?;
-        let fill_charged = backfill_charged && currency.is_none() && charged.is_none();
-        // Only a newly added attempted-cost column can be filled. A preexisting
-        // projection must match the signed body, including absence versus zero.
-        if (!fill_charged && (currency != expected.currency || charged != expected.charged))
-            || (!backfill_attempted && attempted != expected.attempted)
+        if currency != expected.currency
+            || charged != expected.charged
+            || attempted != expected.attempted
         {
             return Err(ReceiptStoreError::Conflict(format!(
                 "tool receipt `{}` already exists with different cost projection",
                 receipt.id
             )));
         }
-        if fill_charged || backfill_attempted {
-            connection.execute(
-                &format!(
-                    "UPDATE {table} SET cost_currency = ?1, cost_charged_be = ?2, \
-                     attempted_cost_be = ?3 WHERE seq = ?4"
-                ),
-                params![expected.currency, expected.charged, expected.attempted, seq],
-            )?;
-        }
         previous_seq = seq;
     }
-    Ok(())
-}
-
-pub(crate) fn ensure_tool_receipt_attribution_columns(
-    connection: &Connection,
-) -> Result<(), ReceiptStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(chio_tool_receipts)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = columns.collect::<Result<Vec<_>, _>>()?;
-
-    if !columns.iter().any(|column| column == "subject_key") {
-        connection.execute(
-            "ALTER TABLE chio_tool_receipts ADD COLUMN subject_key TEXT",
-            [],
-        )?;
-    }
-    if !columns.iter().any(|column| column == "issuer_key") {
-        connection.execute(
-            "ALTER TABLE chio_tool_receipts ADD COLUMN issuer_key TEXT",
-            [],
-        )?;
-    }
-    if !columns.iter().any(|column| column == "grant_index") {
-        connection.execute(
-            "ALTER TABLE chio_tool_receipts ADD COLUMN grant_index INTEGER",
-            [],
-        )?;
-    }
-
-    // Multi-tenant receipt isolation: tenant_id column.
-    //
-    // Unattributed rows remain operator-only. Tenant reads require an exact
-    // tenant_id and cannot opt into a NULL fallback.
-    if !columns.iter().any(|column| column == "tenant_id") {
-        connection.execute(
-            "ALTER TABLE chio_tool_receipts ADD COLUMN tenant_id TEXT",
-            [],
-        )?;
-    }
-
-    connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_subject ON chio_tool_receipts(subject_key)",
-        [],
-    )?;
-    connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_grant ON chio_tool_receipts(capability_id, grant_index)",
-        [],
-    )?;
-    connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_tenant ON chio_tool_receipts(tenant_id)",
-        [],
-    )?;
-    Ok(())
-}
-
-pub(crate) fn ensure_receipt_lineage_statement_columns(
-    connection: &Connection,
-) -> Result<(), ReceiptStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(receipt_lineage_statements)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = columns.collect::<Result<Vec<_>, _>>()?;
-
-    if !columns.iter().any(|column| column == "statement_id") {
-        connection.execute(
-            "ALTER TABLE receipt_lineage_statements ADD COLUMN statement_id TEXT",
-            [],
-        )?;
-    }
-
-    connection.execute(
-        r#"
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_receipt_lineage_statement_id
-            ON receipt_lineage_statements(statement_id)
-            WHERE statement_id IS NOT NULL
-        "#,
-        [],
-    )?;
-    connection.execute(
-        r#"
-        UPDATE receipt_lineage_statements
-        SET statement_id = json_extract(raw_json, '$.id')
-        WHERE statement_id IS NULL
-          AND json_extract(raw_json, '$.schema') = ?1
-        "#,
-        params![chio_core::receipt::lineage::CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA],
-    )?;
-    Ok(())
-}
-
-pub(crate) fn backfill_tool_receipt_attribution_columns(
-    connection: &Connection,
-) -> Result<(), ReceiptStoreError> {
-    connection.execute_batch(
-        r#"
-        UPDATE chio_tool_receipts
-        SET grant_index = CAST(COALESCE(
-            json_extract(raw_json, '$.metadata.attribution.grant_index'),
-            json_extract(raw_json, '$.metadata.financial.grant_index')
-        ) AS INTEGER)
-        WHERE grant_index IS NULL
-          AND COALESCE(
-                json_extract(raw_json, '$.metadata.attribution.grant_index'),
-                json_extract(raw_json, '$.metadata.financial.grant_index')
-              ) IS NOT NULL;
-
-        UPDATE chio_tool_receipts
-        SET subject_key = COALESCE(
-            subject_key,
-            CAST(json_extract(raw_json, '$.metadata.attribution.subject_key') AS TEXT),
-            (SELECT cl.subject_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id)
-        )
-        WHERE subject_key IS NULL
-          AND COALESCE(
-                CAST(json_extract(raw_json, '$.metadata.attribution.subject_key') AS TEXT),
-                (SELECT cl.subject_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id)
-              ) IS NOT NULL;
-
-        UPDATE chio_tool_receipts
-        SET issuer_key = COALESCE(
-            issuer_key,
-            CAST(json_extract(raw_json, '$.metadata.attribution.issuer_key') AS TEXT),
-            (SELECT cl.issuer_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id)
-        )
-        WHERE issuer_key IS NULL
-          AND COALESCE(
-                CAST(json_extract(raw_json, '$.metadata.attribution.issuer_key') AS TEXT),
-                (SELECT cl.issuer_key FROM capability_lineage cl WHERE cl.capability_id = chio_tool_receipts.capability_id)
-              ) IS NOT NULL;
-
-        -- Multi-tenant receipt isolation: hydrate tenant_id
-        -- from the canonical receipt body. Receipts whose body carries no
-        -- tenant_id stay NULL. Tenant-scoped reads match tenant_id exactly,
-        -- so NULL-tagged rows are invisible to every tenant; only
-        -- administrative reads without a tenant filter return them.
-        --
-        -- The receipt body uses snake_case field names (no rename_all),
-        -- so the JSON key is `tenant_id`, not `tenantId`.
-        UPDATE chio_tool_receipts
-        SET tenant_id = CAST(json_extract(raw_json, '$.tenant_id') AS TEXT)
-        WHERE tenant_id IS NULL
-          AND json_extract(raw_json, '$.tenant_id') IS NOT NULL;
-        "#,
-    )?;
     Ok(())
 }

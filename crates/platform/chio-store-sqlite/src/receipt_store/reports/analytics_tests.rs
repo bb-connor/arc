@@ -21,7 +21,7 @@ mod read_bounds;
 const JSON_COST_CHARGED_SUM: &str = "COALESCE(SUM(CAST(COALESCE(json_extract(r.raw_json, \
      '$.metadata.financial.cost_charged'), 0) AS INTEGER)), 0)";
 
-/// Legacy attempted-cost aggregate, retained only for the exact signed-i64
+/// JSON-extracted attempted-cost aggregate, the oracle for the exact signed-i64
 /// comparison domain. Production uses the full-u64 typed projection.
 const JSON_ATTEMPTED_COST_SUM: &str = "COALESCE(SUM(CAST(COALESCE(json_extract(r.raw_json, \
      '$.metadata.financial.attempted_cost'), 0) AS INTEGER)), 0)";
