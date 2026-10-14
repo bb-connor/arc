@@ -504,8 +504,9 @@ fn get_lineage_rejects_negative_persisted_unsigned_fields() {
                     expires_at,
                     grants_json,
                     delegation_depth,
-                    parent_capability_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)
+                    parent_capability_id,
+                    provenance
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, 'signed_token')
                 "#,
             params![
                 "cap-corrupt-read",
@@ -542,8 +543,9 @@ fn record_child_snapshot_rejects_negative_parent_depth() {
                     expires_at,
                     grants_json,
                     delegation_depth,
-                    parent_capability_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)
+                    parent_capability_id,
+                    provenance
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, 'signed_token')
                 "#,
             params![
                 "cap-corrupt-parent",
@@ -593,8 +595,9 @@ fn lineage_replication_rejects_negative_snapshot_fields() {
                     expires_at,
                     grants_json,
                     delegation_depth,
-                    parent_capability_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)
+                    parent_capability_id,
+                    provenance
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, 'signed_token')
                 "#,
             params![
                 "cap-corrupt-repl",

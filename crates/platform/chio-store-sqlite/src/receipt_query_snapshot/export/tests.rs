@@ -662,7 +662,7 @@ fn lineage_with_subject(subject_sql: &str) -> (tempfile::TempDir, rusqlite::Conn
     let path = directory.path().join("live.db");
     drop(SqliteReceiptStore::open(&path).unwrap());
     let connection = rusqlite::Connection::open(&path).unwrap();
-    assert_eq!(connection.execute(&format!("INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap', {subject_sql}, 'issuer', 1, 100, '{{}}', 0, 'legacy_projection')"), []).unwrap(), 1);
+    assert_eq!(connection.execute(&format!("INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap', {subject_sql}, 'issuer', 1, 100, '{{}}', 0, 'signed_token')"), []).unwrap(), 1);
     (directory, connection)
 }
 

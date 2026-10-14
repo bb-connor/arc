@@ -1579,8 +1579,8 @@ fn co_archival_rejects_conflicting_capability_lineage() -> Result<(), Box<dyn st
     store.writer_handle().run_write(|connection| {
         connection.execute(
             "INSERT INTO capability_lineage \
-             (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, parent_capability_id) \
-             VALUES ('cap-1', 'subject-live', 'issuer-live', 1, 100, '[]', 0, NULL)",
+             (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, parent_capability_id, provenance) \
+             VALUES ('cap-1', 'subject-live', 'issuer-live', 1, 100, '[]', 0, NULL, 'signed_token')",
             [],
         )?;
         Ok(())
@@ -1595,8 +1595,8 @@ fn co_archival_rejects_conflicting_capability_lineage() -> Result<(), Box<dyn st
         let seed = rusqlite::Connection::open(&archive)?;
         seed.execute(
             "INSERT INTO capability_lineage \
-             (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, parent_capability_id) \
-             VALUES ('cap-1', 'subject-stale', 'issuer-stale', 1, 100, '[]', 0, NULL)",
+             (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, parent_capability_id, provenance) \
+             VALUES ('cap-1', 'subject-stale', 'issuer-stale', 1, 100, '[]', 0, NULL, 'signed_token')",
             [],
         )?;
     }

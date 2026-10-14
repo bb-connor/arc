@@ -103,8 +103,6 @@ enum Op {
     AppendChild,
     Rotate,
     SignedLineage,
-    UnsignedLineage,
-    UpgradeLineage,
     Latch,
     ProjectionTamper,
     CustodyFailure,
@@ -115,13 +113,11 @@ enum Op {
     MalformedLineage,
 }
 
-const WEIGHTS: [(Op, u64); 14] = [
+const WEIGHTS: [(Op, u64); 12] = [
     (Op::Append, 40),
     (Op::AppendChild, 4),
     (Op::Rotate, 8),
-    (Op::SignedLineage, 6),
-    (Op::UnsignedLineage, 6),
-    (Op::UpgradeLineage, 3),
+    (Op::SignedLineage, 12),
     (Op::Latch, 1),
     (Op::ProjectionTamper, 1),
     (Op::CustodyFailure, 1),
@@ -143,8 +139,6 @@ struct Stored {
 struct Lineage {
     subject: String,
     token: CapabilityToken,
-    /// Inserted without its signed token, as a pre-provenance local row.
-    unsigned: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -465,9 +459,7 @@ impl<'p> Campaign<'p> {
                 self.after_valid_change();
                 true
             }
-            Op::SignedLineage => self.add_lineage(false),
-            Op::UnsignedLineage => self.add_lineage(true),
-            Op::UpgradeLineage => self.upgrade_lineage(),
+            Op::SignedLineage => self.add_lineage(),
             Op::Latch => self.latch(),
             Op::ProjectionTamper => self.projection_tamper(),
             Op::CustodyFailure => self.custody_failure(),
@@ -590,7 +582,7 @@ impl<'p> Campaign<'p> {
     /// Add a valid lineage row. Lineage arrives before any unattributed
     /// receipt of its capability is archived: an archive keeps the lineage
     /// rows it was written with.
-    fn add_lineage(&mut self, unsigned: bool) -> bool {
+    fn add_lineage(&mut self) -> bool {
         let live: Vec<String> = self
             .unattributed()
             .into_iter()
@@ -612,45 +604,12 @@ impl<'p> Campaign<'p> {
         let serial = self.next_serial();
         let token = token(&capability, serial);
         let subject = token.subject.to_hex();
-        if unsigned {
-            self.insert_lineage(&capability, &subject, &token, "legacy_projection", None);
-        } else {
-            let store = &self.fixture.store;
-            store.record_capability_snapshot(&token, None).unwrap();
-        }
-        let row = Lineage {
-            subject,
-            token,
-            unsigned,
-        };
+        self.fixture
+            .store
+            .record_capability_snapshot(&token, None)
+            .unwrap();
+        let row = Lineage { subject, token };
         self.lineage.insert(capability, row);
-        self.after_valid_change();
-        true
-    }
-
-    /// Upgrade an unsigned row to its signed token, before any receipt of its
-    /// capability is archived.
-    fn upgrade_lineage(&mut self) -> bool {
-        let archived: BTreeSet<&str> = self
-            .receipts
-            .iter()
-            .filter(|stored| stored.archived)
-            .map(|stored| stored.spec.capability.as_str())
-            .collect();
-        let candidates: Vec<String> = self
-            .lineage
-            .iter()
-            .filter(|(capability, row)| row.unsigned && !archived.contains(capability.as_str()))
-            .map(|(capability, _)| capability.clone())
-            .collect();
-        if candidates.is_empty() {
-            return false;
-        }
-        let capability = self.rng.pick(&candidates).clone();
-        let row = self.lineage.get_mut(&capability).unwrap();
-        let store = &self.fixture.store;
-        store.record_capability_snapshot(&row.token, None).unwrap();
-        row.unsigned = false;
         self.after_valid_change();
         true
     }
@@ -1110,15 +1069,23 @@ impl<'p> Campaign<'p> {
             self.within(deadline, "the lineage to drop after a malformed row");
             std::thread::sleep(Duration::from_millis(2));
         }
-        // Retire the row in place: its rowid stays taken, and its capability
-        // is one no receipt uses.
+        // Retire the row in place as a valid synthetic anchor: its rowid stays
+        // taken, and its capability is one no receipt uses.
         let retired = self
             .fixture
             .tamper()
             .execute(
-                "UPDATE capability_lineage SET capability_id = ?2, provenance = 'legacy_projection',
-                    signed_capability_json = NULL WHERE capability_id = ?1",
-                rusqlite::params![capability, format!("retired-{serial}")],
+                "UPDATE capability_lineage SET capability_id = ?2, subject_key = ?3,
+                    provenance = 'synthetic_anchor', signed_capability_json = NULL
+                 WHERE capability_id = ?1",
+                rusqlite::params![
+                    capability,
+                    format!(
+                        "fed-del-{}",
+                        chio_core::sha256_hex(format!("retired-{serial}").as_bytes())
+                    ),
+                    signed.subject.to_hex()
+                ],
             )
             .unwrap();
         assert_eq!(retired, 1);
@@ -1572,8 +1539,6 @@ fn op_name(op: Op) -> &'static str {
         Op::AppendChild => "append child",
         Op::Rotate => "rotate",
         Op::SignedLineage => "signed lineage",
-        Op::UnsignedLineage => "unsigned lineage",
-        Op::UpgradeLineage => "upgrade lineage",
         Op::Latch => "latch",
         Op::ProjectionTamper => "projection tamper",
         Op::CustodyFailure => "custody failure",
