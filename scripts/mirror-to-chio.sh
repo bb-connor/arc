@@ -21,9 +21,14 @@
 # object id instead, and verifies against the LFS batch API rather than trusting
 # an exit code.
 #
+# With --tag, the mirror commit is built from the release tag's commit instead
+# of main's tip, and the tag is pushed to the mirror pointing at that mirror
+# commit. Run it at the cut, before main is mirrored past the tag.
+#
 # Usage:
 #   scripts/mirror-to-chio.sh
 #   scripts/mirror-to-chio.sh --dry-run
+#   scripts/mirror-to-chio.sh --tag v0.2.0-alpha.1
 #   scripts/mirror-to-chio.sh --exclude-file PATH --dry-run
 #   scripts/mirror-to-chio.sh -h | --help
 
@@ -39,10 +44,11 @@ MIRROR_SLUG="${MIRROR_SLUG:-backbay-labs/chio}"
 EXCLUDE_PATH="scripts/mirror-exclude.txt"
 EXCLUDE_FILE=""
 DRY_RUN=0
+TAG=""
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/mirror-to-chio.sh [--dry-run] [--exclude-file PATH]
+Usage: scripts/mirror-to-chio.sh [--dry-run] [--exclude-file PATH] [--tag TAG]
 
 Commits origin/main's tree, minus the paths in scripts/mirror-exclude.txt, onto
 the backbay-labs/chio mirror, reconciles Git LFS objects, and verifies the
@@ -53,6 +59,9 @@ Options:
                        pushing.
   --exclude-file PATH  Read exclusions from PATH instead of
                        scripts/mirror-exclude.txt at origin/main.
+  --tag TAG            Mirror the commit of release tag TAG (v<semver>, an
+                       ancestor of origin/main) and push TAG to the mirror at
+                       the resulting mirror commit.
   -h, --help           Show this message.
 USAGE
 }
@@ -68,6 +77,11 @@ while [ $# -gt 0 ]; do
     --exclude-file)
       [ $# -ge 2 ] || die "--exclude-file needs a path"
       EXCLUDE_FILE="$2"
+      shift
+      ;;
+    --tag)
+      [ $# -ge 2 ] || die "--tag needs a release tag"
+      TAG="$2"
       shift
       ;;
     -h|--help) usage; exit 0 ;;
@@ -89,10 +103,23 @@ git fetch "$UPSTREAM_REMOTE" "$UPSTREAM_REF" --quiet
 git fetch "$MIRROR_REMOTE" --quiet --force
 
 SRC="$(git rev-parse "$UPSTREAM_REMOTE/$UPSTREAM_REF")"
+if [ -n "$TAG" ]; then
+  printf '%s\n' "$TAG" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$' \
+    || die "release tag must be v<semver>: $TAG"
+  git fetch "$UPSTREAM_REMOTE" "refs/tags/$TAG:refs/tags/$TAG" --quiet --force \
+    || die "$UPSTREAM_REMOTE has no tag $TAG"
+  TAGGED="$(git rev-parse --verify "refs/tags/$TAG^{commit}")"
+  git merge-base --is-ancestor "$TAGGED" "$SRC" \
+    || die "$TAG ($TAGGED) is not on $UPSTREAM_REMOTE/$UPSTREAM_REF"
+  SRC="$TAGGED"
+  SRC_LABEL="$TAG"
+else
+  SRC_LABEL="$UPSTREAM_REMOTE/$UPSTREAM_REF"
+fi
 DST="$(git rev-parse --verify --quiet "$MIRROR_REMOTE/main" || true)"
 SUBJECT="mirror: $UPSTREAM_SLUG@$SRC"
 
-printf '    upstream %s/%s = %s\n' "$UPSTREAM_REMOTE" "$UPSTREAM_REF" "$SRC"
+printf '    upstream %s = %s\n' "$SRC_LABEL" "$SRC"
 printf '    mirror   %s/main = %s\n' "$MIRROR_REMOTE" "${DST:-<absent>}"
 
 # A chio/main that is a mirror commit must record an arc commit that origin/main
@@ -105,13 +132,13 @@ if [ -n "$DST" ]; then
       MIRRORED="${DST_SUBJECT#"mirror: $UPSTREAM_SLUG@"}"
       git merge-base --is-ancestor "$MIRRORED" "$SRC" 2>/dev/null \
         || die "$MIRROR_REMOTE/main mirrors $MIRRORED, which is not an ancestor of
-$UPSTREAM_REMOTE/$UPSTREAM_REF ($SRC). Resolve by hand; this script will not
+$SRC_LABEL ($SRC). Resolve by hand; this script will not
 move the mirror backwards or across a rewritten upstream."
       ;;
     *)
       git merge-base --is-ancestor "$DST" "$SRC" \
         || die "$MIRROR_REMOTE/main ($DST) is neither a mirror commit nor an ancestor of
-$UPSTREAM_REMOTE/$UPSTREAM_REF. Something was committed directly to the mirror.
+$SRC_LABEL ($SRC). Something was committed directly to the mirror.
 Resolve by hand; this script will not bury it."
       ;;
   esac
@@ -220,27 +247,33 @@ if not entries:
     sys.exit(0)
 
 token = subprocess.check_output(["gh", "auth", "token"], text=True).strip()
-body = json.dumps({
-    "operation": "download",
-    "transfers": ["basic"],
-    "objects": [{"oid": o, "size": int(s)} for o, s, _ in entries],
-}).encode()
 
-req = urllib.request.Request(
-    "https://github.com/'"$MIRROR_SLUG"'.git/info/lfs/objects/batch",
-    data=body,
-    headers={
-        "Accept": "application/vnd.git-lfs+json",
-        "Content-Type": "application/vnd.git-lfs+json",
-        "Authorization": "Basic " + __import__("base64").b64encode(f"x:{token}".encode()).decode(),
-    },
-)
-with urllib.request.urlopen(req) as resp:
-    data = json.load(resp)
+# The batch API rejects oversized requests, so ask in fixed-size chunks.
+objects = []
+for start in range(0, len(entries), 100):
+    body = json.dumps({
+        "operation": "download",
+        "transfers": ["basic"],
+        "objects": [{"oid": o, "size": int(s)} for o, s, _ in entries[start:start + 100]],
+    }).encode()
+    req = urllib.request.Request(
+        "https://github.com/'"$MIRROR_SLUG"'.git/info/lfs/objects/batch",
+        data=body,
+        headers={
+            "Accept": "application/vnd.git-lfs+json",
+            "Content-Type": "application/vnd.git-lfs+json",
+            "Authorization": "Basic " + __import__("base64").b64encode(f"x:{token}".encode()).decode(),
+        },
+    )
+    with urllib.request.urlopen(req) as resp:
+        objects.extend(json.load(resp).get("objects", []))
 
 paths = {o: p for o, _, p in entries}
 missing = 0
-for obj in data.get("objects", []):
+if {obj["oid"] for obj in objects} != set(paths):
+    print("LFS batch response does not cover every referenced object", file=sys.stderr)
+    sys.exit(1)
+for obj in objects:
     err = obj.get("error")
     name = paths.get(obj["oid"], obj["oid"][:12])
     if err:
@@ -253,6 +286,16 @@ if missing:
     print(f"{missing} LFS object(s) missing from the mirror", file=sys.stderr)
     sys.exit(1)
 ' || [ "$DRY_RUN" -eq 1 ] || exit 1
+  fi
+fi
+
+if [ -n "$TAG" ]; then
+  REMOTE_TAG="$(git ls-remote "$MIRROR_REMOTE" "refs/tags/$TAG" | awk '{print $1}')"
+  [ -z "$REMOTE_TAG" ] || [ "$REMOTE_TAG" = "$NEW" ] \
+    || die "$MIRROR_REMOTE already has $TAG at $REMOTE_TAG, not $NEW; refusing to move a release tag"
+  printf '==> tag %s -> %s (mirror of %s@%s)\n' "$TAG" "$NEW" "$UPSTREAM_SLUG" "$SRC"
+  if [ "$DRY_RUN" -eq 0 ] && [ -z "$REMOTE_TAG" ]; then
+    git push "$MIRROR_REMOTE" "$NEW:refs/tags/$TAG"
   fi
 fi
 
@@ -273,4 +316,9 @@ DST_TREE="$(git rev-parse "$MIRROR_REMOTE/main^{tree}")"
 
 printf '    commit %s\n' "$FINAL"
 printf '    tree   %s\n' "$DST_TREE"
+if [ -n "$TAG" ]; then
+  [ "$(git ls-remote "$MIRROR_REMOTE" "refs/tags/$TAG" | awk '{print $1}')" = "$NEW" ] \
+    || die "$MIRROR_REMOTE tag $TAG does not point at $NEW"
+  printf '    tag    %s\n' "$TAG"
+fi
 printf '==> mirror verified\n'
