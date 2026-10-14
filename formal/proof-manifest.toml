@@ -4492,9 +4492,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recove
 rust_symbols = [
   "ChioKernel::reconcile_admission_recovery_page",
 ]
-normalized_sha256 = "2e36d5fb8ead3716ad98df7d7ba8bf91a61b7729eb25831cfd55be969a6fba59"
+normalized_sha256 = "d123f6b776f23b6afe6290398cce9c6824c058684e8fe331ee78fbdb4dbd02c9"
 symbol_sha256 = [
-  { symbol = "ChioKernel::reconcile_admission_recovery_page", sha256 = "83eda21b94654ac883e001a6c665c117848425dece2dc2422e1f6d839dce1ea8" },
+  { symbol = "ChioKernel::reconcile_admission_recovery_page", sha256 = "d7ee7a23c8c8d7b9dd766e879243b88cd3b3dbba749c96e41152a68635b3661e" },
 ]
 
 [[mirror]]
