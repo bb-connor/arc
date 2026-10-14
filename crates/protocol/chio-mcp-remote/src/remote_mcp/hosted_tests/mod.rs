@@ -1,4 +1,5 @@
 //! Hosted HTTP/auth/session scenarios exercised at the runtime owner with mock transports.
+mod auth_config;
 mod auth_flows;
 mod cross_crate_pipeline;
 mod error_contract;

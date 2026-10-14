@@ -1,8 +1,11 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+use std::collections::BTreeMap;
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 use chio_conformance::{default_run_options, run_conformance_harness, unique_run_dir};
+use serde_json::Value;
 
 fn command_available(program: &str) -> bool {
     Command::new(program)
@@ -38,6 +41,28 @@ fn python3_supports_chio_sdk() -> bool {
     (major, minor) >= (3, 11)
 }
 
+fn scenario_statuses(path: &Path) -> BTreeMap<String, String> {
+    let results: Vec<Value> =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("read peer results"))
+            .expect("decode peer results");
+    let mut statuses = BTreeMap::new();
+    for result in results {
+        let id = result["scenarioId"]
+            .as_str()
+            .expect("scenario id")
+            .to_owned();
+        let status = result["status"]
+            .as_str()
+            .expect("scenario status")
+            .to_owned();
+        assert!(
+            statuses.insert(id.clone(), status).is_none(),
+            "duplicate result for {id}"
+        );
+    }
+    statuses
+}
+
 #[test]
 fn notifications_harness_runs_against_live_js_and_python_peers() {
     if !command_available("node") || !python3_supports_chio_sdk() {
@@ -54,19 +79,25 @@ fn notifications_harness_runs_against_live_js_and_python_peers() {
 
     let summary = run_conformance_harness(&options).expect("run conformance harness");
     let report = std::fs::read_to_string(&summary.report_output).expect("read report");
-    let js_results = std::fs::read_to_string(summary.results_dir.join("js-remote-http.json"))
-        .expect("js results");
-    let python_results =
-        std::fs::read_to_string(summary.results_dir.join("python-remote-http.json"))
-            .expect("python results");
-
     assert!(report.contains("## MCP Core"));
-    assert!(report.contains("`resources-subscribe-updated-notification`"));
-    assert!(report.contains("`catalog-list-changed-notifications`"));
-    assert!(report.contains("4/4 pass"));
-    assert!(js_results.contains("\"scenarioId\": \"resources-subscribe-updated-notification\""));
-    assert!(js_results.contains("\"scenarioId\": \"catalog-list-changed-notifications\""));
-    assert!(python_results.contains("\"scenarioId\": \"resources-subscribe-updated-notification\""));
-    assert!(python_results.contains("\"scenarioId\": \"catalog-list-changed-notifications\""));
-    assert!(python_results.contains("\"status\": \"pass\""));
+
+    let expected: BTreeMap<String, String> = [
+        ("catalog-list-changed-notifications", "pass"),
+        ("hosted-replay-across-restart", "unsupported"),
+        ("hosted-subscription-across-restart", "unsupported"),
+        ("resources-subscribe-updated-notification", "pass"),
+    ]
+    .into_iter()
+    .map(|(scenario, status)| (scenario.to_owned(), status.to_owned()))
+    .collect();
+    for peer in ["js-remote-http.json", "python-remote-http.json"] {
+        assert_eq!(
+            scenario_statuses(&summary.results_dir.join(peer)),
+            expected,
+            "{peer}"
+        );
+    }
+    for scenario in expected.keys() {
+        assert!(report.contains(&format!("`{scenario}`")), "{scenario}");
+    }
 }

@@ -515,7 +515,7 @@ impl TestServer {
     }
 }
 
-fn unique_test_dir() -> PathBuf {
+pub fn unique_test_dir() -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
@@ -544,7 +544,7 @@ pub fn create_private_test_directory(path: &Path) {
     }
 }
 
-fn reserve_listen_addr() -> SocketAddr {
+pub fn reserve_listen_addr() -> SocketAddr {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind temp listener");
     let addr = listener.local_addr().expect("listener addr");
     drop(listener);

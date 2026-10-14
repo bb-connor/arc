@@ -55,6 +55,13 @@ The unsigned body of a compliance certificate.
 | `guards_compliant` | bool | Whether all required guards have evidence in every receipt. |
 | `anomalies` | string[] | Summary of any anomalies detected. Empty if fully compliant. |
 | `kernel_key` | PublicKey | The kernel public key that signed the session receipts. |
+| `receipt_set_digest` | string | Lowercase hex SHA-256 commitment to the ordered, domain-separated set of signed receipts. |
+| `compliance_profile_digest` | string | Lowercase hex SHA-256 of the canonical `chio.acp.compliance-profile.v1` commitment to the configured checks. |
+| `invocation_count` | u64 | Count of allowed mediated receipts. MUST NOT exceed `receipt_count`. |
+| `checks` | object | Per-check status (`tool_targets`, `required_guards`, `allowed_mediated_receipt_limit`, `tenant`), each `not_evaluated`, `not_applicable` or `passed`. |
+| `coverage` | object | `supplied_receipt_set`, or a signed retained-snapshot reference. |
+
+Every field is required. A body that omits any of them is rejected.
 
 For a certificate to represent full compliance, all boolean fields MUST be
 `true` and the `anomalies` array MUST be empty.

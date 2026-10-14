@@ -87,7 +87,7 @@ fn long_session_generates_and_fully_verifies_then_refuses_incomplete_input(
     let artifact: chio_acp_proxy::ComplianceCertificate =
         serde_json::from_slice(&std::fs::read(&certificate)?)?;
     assert_eq!(artifact.body.receipt_count, 4_097);
-    assert_eq!(artifact.body.invocation_count, Some(0));
+    assert_eq!(artifact.body.invocation_count, 0);
     assert!(!artifact.body.scope_compliant && !artifact.body.guards_compliant);
     let verified = Command::new(env!("CARGO_BIN_EXE_chio"))
         .args(["--json", "cert", "verify", "--certificate"])
@@ -182,7 +182,7 @@ fn explicit_profile_checks_are_bound_at_the_binary_entrypoint(
             && artifact.body.guards_compliant
             && artifact.body.budget_compliant
     );
-    assert_eq!(artifact.body.invocation_count, Some(1));
+    assert_eq!(artifact.body.invocation_count, 1);
     let verify = || {
         Command::new(env!("CARGO_BIN_EXE_chio"))
             .args(["--json", "cert", "verify", "--certificate"])

@@ -123,13 +123,7 @@ pub(in crate::authority) fn persist_snapshot(
             &key.public_key_hex,
             key.generation,
             key.activated_at,
-        )?;
-        connection.execute(
-            "UPDATE authority_trusted_keys SET lifecycle_json = ?1 WHERE public_key_hex = ?2",
-            params![
-                key.lifecycle.as_ref().map(encode).transpose()?,
-                key.public_key_hex
-            ],
+            &key.lifecycle,
         )?;
     }
     connection.execute(
@@ -146,7 +140,7 @@ pub(super) fn decode<T: DeserializeOwned>(text: &str) -> Result<T, AuthorityStor
     )?
     .decode_signed()?)
 }
-fn encode<T: Serialize>(value: &T) -> Result<String, AuthorityStoreError> {
+pub(super) fn encode<T: Serialize>(value: &T) -> Result<String, AuthorityStoreError> {
     let text = serde_json::to_string(value).map_err(chio_core::error::Error::from)?;
     if text.len() > MAX_AUTHORITY_WIRE_BYTES {
         return Err(refused("authority replication record too large"));

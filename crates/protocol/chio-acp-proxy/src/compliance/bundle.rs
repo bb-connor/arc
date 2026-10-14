@@ -56,7 +56,7 @@ pub struct ComplianceProfile {
     pub required_guards: Vec<String>,
     #[serde(default)]
     pub tool_targets: Vec<ComplianceToolTarget>,
-    /// Explicit legacy tool-name prefixes, not resource scopes.
+    /// Explicit tool-name prefixes, not resource scopes.
     #[serde(default)]
     pub authorized_tool_prefixes: Vec<String>,
     #[serde(default)]
@@ -143,7 +143,7 @@ pub(crate) fn profile_digest(
         return Err(ComplianceBundleError::InvalidProfile.into());
     }
     let bytes = canonical_json_bytes(&ProfileCommitment {
-        schema: "chio.acp.compliance-profile.v2",
+        schema: "chio.acp.compliance-profile.v1",
         allowed_mediated_receipt_limit: config.budget_limit,
         required_guards: &config.required_guards,
         tool_targets: &config.authorized_tool_targets,

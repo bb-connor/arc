@@ -9,7 +9,7 @@ pub(crate) fn cmd_chio_runtime_sign_trust_input(
     signing_seed_file: &Path,
     out: &Path,
 ) -> Result<(), CliError> {
-    let body: chio_runtime::RuntimeVerifierTrustBundleV4 =
+    let body: chio_runtime::RuntimeVerifierTrustBundle =
         crate::input::text(&read_utf8_json_file(body, "Chio runtime trust input body")?)?;
     let keypair = crate::load_existing_authority_keypair(signing_seed_file)?;
     let signed = chio_core::receipt::lineage::SignedExportEnvelope::sign(body, &keypair).map_err(

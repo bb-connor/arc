@@ -4,7 +4,7 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 const FINDING_STATUS_FLOOR_MAX_BYTES: usize = 16 * 1024;
-const FINDING_STATUS_FLOOR_SCHEMA_V2: &str = "chio.finding.status-cli-floor.v2";
+const FINDING_STATUS_FLOOR_SCHEMA: &str = "chio.finding.status-cli-floor.v1";
 const FINDING_STATUS_RETRACTION_MAX_BYTES: usize = 4 * 1024;
 const FINDING_STATUS_RETRACTION_SCHEMA_V1: &str = "chio.finding.status-cli-retraction.v1";
 const FINDING_STATUS_TRUSTED_TIME_MAX_BYTES: usize = 512;
@@ -196,7 +196,7 @@ fn read_status_floor_state(path: &Path) -> Result<Option<FindingStatusCliFloor>,
         return Ok(None);
     };
     let floor: FindingStatusCliFloor = crate::input::canonical_ijson(&bytes)?;
-    if floor.schema != FINDING_STATUS_FLOOR_SCHEMA_V2 {
+    if floor.schema != FINDING_STATUS_FLOOR_SCHEMA {
         return Err(CliError::cli_other_error(
             "finding status rollback floor schema is unsupported",
         ));
@@ -421,7 +421,7 @@ pub(super) fn advance_status_floor_locked(
     advance_trusted_time_locked(path, trusted_now)?;
     let current = read_status_floor_state(path)?;
     if let Some(current) = current.as_ref() {
-        if current.schema != FINDING_STATUS_FLOOR_SCHEMA_V2
+        if current.schema != FINDING_STATUS_FLOOR_SCHEMA
             || current.feed_id != status.feed_id
             || current.operator_id != authorization.operator.authority_id
             || current.rotation_policy_ref != authorization.operator.rotation_policy_ref
@@ -485,7 +485,7 @@ pub(super) fn advance_status_floor_locked(
     write_status_floor(
         path,
         &FindingStatusCliFloor {
-            schema: FINDING_STATUS_FLOOR_SCHEMA_V2.to_owned(),
+            schema: FINDING_STATUS_FLOOR_SCHEMA.to_owned(),
             feed_id: status.feed_id.to_owned(),
             operator_id: authorization.operator.authority_id.clone(),
             rotation_policy_ref: authorization.operator.rotation_policy_ref.clone(),
@@ -502,4 +502,4 @@ pub(super) fn advance_status_floor_locked(
 }
 
 #[cfg(test)]
-pub(super) const TEST_FINDING_STATUS_FLOOR_SCHEMA: &str = FINDING_STATUS_FLOOR_SCHEMA_V2;
+pub(super) const TEST_FINDING_STATUS_FLOOR_SCHEMA: &str = FINDING_STATUS_FLOOR_SCHEMA;

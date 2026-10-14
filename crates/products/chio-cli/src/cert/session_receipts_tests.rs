@@ -100,16 +100,14 @@ fn session_receipts_cli_generates_from_authenticated_chio_store() -> TestResult 
     append(&f, 1)?;
     let certificate = generate(&f)?;
     assert_eq!(certificate.body.receipt_count, 1);
-    assert_eq!(certificate.body.invocation_count, Some(0));
+    assert_eq!(certificate.body.invocation_count, 0);
     assert!(!certificate.body.scope_compliant && !certificate.body.guards_compliant);
     assert!(matches!(
         certificate.body.coverage,
-        Some(
-            chio_acp_proxy::ComplianceCoverage::RetainedSnapshotReference {
-                snapshot_end_entry_seq: 1,
-                ..
-            }
-        )
+        chio_acp_proxy::ComplianceCoverage::RetainedSnapshotReference {
+            snapshot_end_entry_seq: 1,
+            ..
+        }
     ));
     cmd_cert_verify(&f.output, true, Some(&f.path), &f.public_key, true)?;
     Ok(())
@@ -125,7 +123,7 @@ fn certificate_collection_certifies_a_session_beyond_the_proof_artifact_limit() 
     assert_eq!((entries[0].seq, entries[4_096].seq), (1, 4_097));
     let certificate = generate(&f)?;
     assert_eq!(certificate.body.receipt_count, 4_097);
-    assert_eq!(certificate.body.invocation_count, Some(0));
+    assert_eq!(certificate.body.invocation_count, 0);
     cmd_cert_verify(&f.output, true, Some(&f.path), &f.public_key, true)?;
     Ok(())
 }
@@ -239,7 +237,7 @@ fn session_receipts_cli_preserves_interleaved_archived_and_live_history() -> Tes
     assert_eq!(snapshot.coverage().snapshot_end_entry_seq, 4);
     let certificate = generate(&f)?;
     assert_eq!(certificate.body.receipt_count, 3);
-    assert_eq!(certificate.body.invocation_count, Some(0));
+    assert_eq!(certificate.body.invocation_count, 0);
     cmd_cert_verify(&f.output, true, Some(&f.path), &f.public_key, true)?;
     Ok(())
 }

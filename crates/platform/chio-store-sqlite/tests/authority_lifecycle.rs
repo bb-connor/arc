@@ -71,14 +71,14 @@ fn kg2_lifecycle_deadlines_retirement_and_replay_survive_restart() -> TestResult
     let source = SqliteCapabilityAuthority::open_with_clock(&source_path, clock.clone())?;
     let follower = SqliteCapabilityAuthority::open_with_clock(&follower_path, clock.clone())?;
     let anchor = source.initialize_replication("lifecycle-tests")?;
-    assert_eq!(anchor.schema, "chio.authority-replication-anchor.v2");
+    assert_eq!(anchor.schema, "chio.authority-replication-anchor.v1");
     follower.pin_replication_anchor(&anchor)?;
     let old = source.authority_public_key();
     clock.0.store(101, Ordering::SeqCst);
     let new = source.rotate_with_verification_deadline(110)?.public_key;
     let rotation = source.signed_snapshot()?;
     let proof = rotation.proof.as_ref().ok_or("rotation proof missing")?;
-    assert_eq!(proof.schema, "chio.authority-snapshot.v2");
+    assert_eq!(proof.schema, "chio.authority-snapshot.v1");
     assert_eq!(
         proof
             .transitions
@@ -86,7 +86,7 @@ fn kg2_lifecycle_deadlines_retirement_and_replay_survive_restart() -> TestResult
             .ok_or("rotation transition missing")?
             .body
             .schema,
-        "chio.authority-lifecycle.v2"
+        "chio.authority-lifecycle.v1"
     );
     follower.apply_signed_snapshot(&rotation)?;
     clock.0.store(109, Ordering::SeqCst);
@@ -259,104 +259,67 @@ fn kg2_competing_lifecycle_imports_commit_one_complete_history() -> TestResult {
 }
 
 #[test]
-fn kg2_legacy_signed_checkpoint_migrates_without_commitment_rewrite_or_downgrade() -> TestResult {
+fn kg2_authority_wire_without_explicit_lifecycle_is_refused() -> TestResult {
     use chio_core::crypto::{sha256_hex, Keypair};
     use chio_kernel::authority::{
-        lifecycle::AuthorityLifecycleChange,
-        replication::{
-            AuthorityTransitionBody, SignedAuthoritySnapshot, SignedAuthorityTransition,
-        },
+        lifecycle::{apply_lifecycle_change, AuthorityLifecycleChange},
+        replication::{verify_authority_chain, AuthorityTransitionBody, SignedAuthorityTransition},
     };
-    use chio_kernel::AuthorityTrustedKeySnapshot;
     let root = private_root()?;
-    let clock = Arc::new(AuthorityClock(AtomicU64::new(100)));
-    let source =
-        SqliteCapabilityAuthority::open_with_clock(root.path().join("source.db"), clock.clone())?;
-    let follower =
-        SqliteCapabilityAuthority::open_with_clock(root.path().join("follower.db"), clock.clone())?;
-    let a = source.current_keypair()?;
-    let b = Keypair::generate();
-    let mut anchor = source.initialize_replication("legacy-wire")?;
-    anchor.schema = "chio.authority-replication-anchor.v1".into();
-    let anchor_bytes = chio_core::canonical_json_bytes(&anchor)?;
-    assert!(!String::from_utf8(anchor_bytes.clone())?.contains("lifecycle"));
-    follower.pin_replication_anchor(&anchor)?;
-    let mut historical = anchor.snapshot.clone();
-    historical.public_key_hex = b.public_key().to_hex();
-    historical.generation = 2;
-    historical.rotated_at = 101;
-    historical.trusted_keys.push(AuthorityTrustedKeySnapshot {
-        public_key_hex: b.public_key().to_hex(),
-        generation: 2,
-        activated_at: 101,
-        lifecycle: None,
-    });
+    let source = SqliteCapabilityAuthority::open_with_clock(
+        root.path().join("source.db"),
+        Arc::new(AuthorityClock(AtomicU64::new(100))),
+    )?;
+    let anchor = source.initialize_replication("rotation-domain")?;
+    let next = Keypair::generate();
+    let change = AuthorityLifecycleChange::Rotate { verify_until: 200 };
+    let derived =
+        apply_lifecycle_change(&anchor.snapshot, &change, &next.public_key().to_hex(), 100)?;
     let body = AuthorityTransitionBody {
         schema: "chio.authority-rotation.v1".into(),
         stream_id: anchor.stream_id.clone(),
         anchor_digest: anchor.commitment()?,
         previous_commitment: anchor.commitment()?,
-        generation: 2,
-        public_key_hex: b.public_key().to_hex(),
-        rotated_at: 101,
-        issuer_set_digest: sha256_hex(&chio_core::canonical_json_bytes(&historical.trusted_keys)?),
-        change: None,
+        generation: derived.generation,
+        public_key_hex: derived.public_key_hex,
+        rotated_at: 100,
+        issuer_set_digest: sha256_hex(&chio_core::canonical_json_bytes(&derived.trusted_keys)?),
+        change,
     };
-    let first = SignedAuthorityTransition {
-        signature: a.sign_canonical(&body)?.0,
-        body,
-    };
-    let mut legacy = SignedAuthoritySnapshot::sign(&anchor, vec![first.clone()], 101, &b)?;
-    let proof = legacy.proof.as_mut().ok_or("missing proof")?;
-    proof.schema = "chio.authority-snapshot.v1".into();
-    let envelope = serde_json::json!({"schema":proof.schema, "streamId":proof.stream_id, "anchorDigest":proof.anchor_digest,
-        "chainCommitment":proof.chain_commitment, "issuedAt":proof.issued_at, "expiresAt":proof.expires_at, "snapshot":legacy.snapshot});
-    proof.signature = b.sign_canonical(&envelope)?.0;
-    clock.0.store(101, Ordering::SeqCst);
-    follower.apply_signed_snapshot(&legacy)?;
-    assert_eq!(
-        follower.trusted_public_keys(),
-        vec![a.public_key(), b.public_key()]
-    );
-    let retire = SignedAuthorityTransition::sign_change(
+    let signature = source.current_keypair()?.sign_canonical(&body)?.0;
+    let result = verify_authority_chain(
         &anchor,
-        &historical,
-        &first.commitment()?,
-        AuthorityLifecycleChange::Retire {
-            public_key_hex: a.public_key().to_hex(),
-        },
-        &b.public_key(),
-        101,
-        &b,
-    )?;
-    let current = SignedAuthoritySnapshot::sign(&anchor, vec![first, retire.clone()], 101, &b)?;
-    follower.apply_signed_snapshot(&current)?;
-    assert_eq!(follower.trusted_public_keys(), vec![b.public_key()]);
-    assert_eq!(
-        chio_core::canonical_json_bytes(&follower.replication_anchor()?)?,
-        anchor_bytes
+        &[SignedAuthorityTransition {
+            body: body.clone(),
+            signature,
+        }],
     );
-    let mut bad = current.clone();
-    let mut body = retire.body;
-    body.schema = "chio.authority-rotation.v1".into();
-    body.change = None;
-    body.generation += 1;
-    body.previous_commitment = current
-        .proof
-        .as_ref()
-        .ok_or("missing proof")?
-        .chain_commitment
-        .clone();
-    let signature = b.sign_canonical(&body)?.0;
-    bad.proof
-        .as_mut()
-        .ok_or("missing proof")?
-        .transitions
-        .push(SignedAuthorityTransition { body, signature });
     assert!(
-        matches!(follower.apply_signed_snapshot(&bad), Err(chio_kernel::AuthorityStoreError::Fence(message)) if message == "authority lifecycle downgrade or missing operation")
+        matches!(result, Err(chio_kernel::AuthorityStoreError::Fence(message))
+        if message == "authority transition predecessor or domain mismatch")
     );
-    assert_eq!(follower.snapshot()?, current.snapshot);
+    let mut wire = serde_json::to_value(&body)?;
+    wire.as_object_mut()
+        .ok_or("transition body is not an object")?
+        .remove("change");
+    let error = serde_json::from_value::<AuthorityTransitionBody>(wire)
+        .err()
+        .ok_or("transition without a lifecycle operation decoded")?;
+    assert_eq!(error.to_string(), "missing field `change`");
+    let mut key = serde_json::to_value(anchor.snapshot.trusted_keys.first().ok_or("no issuer")?)?;
+    key.as_object_mut()
+        .ok_or("trusted key is not an object")?
+        .remove("lifecycle");
+    let error = serde_json::from_value::<chio_kernel::AuthorityTrustedKeySnapshot>(key)
+        .err()
+        .ok_or("trusted key without a lifecycle decoded")?;
+    assert_eq!(error.to_string(), "missing field `lifecycle`");
+    let mut foreign = anchor.clone();
+    foreign.schema = "chio.authority-replication-anchor.v2".into();
+    assert!(
+        matches!(foreign.validate(), Err(chio_kernel::AuthorityStoreError::Fence(message))
+        if message == "invalid replication anchor domain")
+    );
     Ok(())
 }
 
@@ -443,7 +406,7 @@ fn kg2_signed_history_cannot_promote_recovery_root_to_issuer() -> TestResult {
         100,
     )?;
     let body = AuthorityTransitionBody {
-        schema: "chio.authority-lifecycle.v2".into(),
+        schema: "chio.authority-lifecycle.v1".into(),
         stream_id: anchor.stream_id.clone(),
         anchor_digest: anchor.commitment()?,
         previous_commitment: anchor.commitment()?,
@@ -451,7 +414,7 @@ fn kg2_signed_history_cannot_promote_recovery_root_to_issuer() -> TestResult {
         public_key_hex: derived.public_key_hex,
         rotated_at: 100,
         issuer_set_digest: sha256_hex(&chio_core::canonical_json_bytes(&derived.trusted_keys)?),
-        change: Some(change),
+        change,
     };
     let signature = source.current_keypair()?.sign_canonical(&body)?.0;
     let result = verify_authority_chain(&anchor, &[SignedAuthorityTransition { body, signature }]);

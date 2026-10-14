@@ -395,22 +395,12 @@ files = ["crates/platform/chio-control-plane/src/security/event_consumer/admissi
 first_seen = "b39b131271"
 
 [[schema]]
-value = "chio.authority-lifecycle.v2"
+value = "chio.authority-lifecycle.v1"
 files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
-first_seen = "a617c0b02f"
+first_seen = "95dc6dadcf"
 
 [[schema]]
 value = "chio.authority-replication-anchor.v1"
-files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
-first_seen = "0fd0a9d66d"
-
-[[schema]]
-value = "chio.authority-replication-anchor.v2"
-files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
-first_seen = "a617c0b02f"
-
-[[schema]]
-value = "chio.authority-rotation.v1"
 files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
 first_seen = "0fd0a9d66d"
 
@@ -423,11 +413,6 @@ first_seen = "b39b131271"
 value = "chio.authority-snapshot.v1"
 files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
 first_seen = "0fd0a9d66d"
-
-[[schema]]
-value = "chio.authority-snapshot.v2"
-files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
-first_seen = "a617c0b02f"
 
 [[schema]]
 value = "chio.autonomous-comparison-report.v1"
@@ -1170,14 +1155,44 @@ files = ["crates/protocol/chio-acp-proxy/src/compliance.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.compliance.certificate.v2"
-files = ["crates/protocol/chio-acp-proxy/src/compliance.rs"]
-first_seen = "d0496c14d8"
-
-[[schema]]
 value = "chio.comptroller.surface-report.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
 first_seen = "d91c44dcc7"
+
+[[schema]]
+value = "chio.computer.compiled-description.v1"
+files = ["crates/kernel/chio-runtime-core/src/program/mod.rs"]
+first_seen = "66672c5b7b"
+
+[[schema]]
+value = "chio.computer.compiled.v1"
+files = ["crates/kernel/chio-runtime-core/src/program/compiler.rs"]
+first_seen = "66672c5b7b"
+
+[[schema]]
+value = "chio.computer.description.v1"
+files = ["crates/kernel/chio-runtime-core/src/computer/mod.rs"]
+first_seen = "66672c5b7b"
+
+[[schema]]
+value = "chio.computer.namespace.v1"
+files = ["crates/kernel/chio-runtime-core/src/computer/validation.rs"]
+first_seen = "66672c5b7b"
+
+[[schema]]
+value = "chio.computer.occurrence.v1"
+files = ["crates/kernel/chio-runtime-core/src/program/compiler.rs"]
+first_seen = "66672c5b7b"
+
+[[schema]]
+value = "chio.computer.program.v1"
+files = ["crates/kernel/chio-runtime-core/src/program/compiler.rs"]
+first_seen = "66672c5b7b"
+
+[[schema]]
+value = "chio.computer.revision.v1"
+files = ["crates/kernel/chio-runtime-core/src/computer/validation.rs"]
+first_seen = "66672c5b7b"
 
 [[schema]]
 value = "chio.conformance.peers/v1"
@@ -2440,9 +2455,9 @@ files = ["crates/products/chio-cli/src/cli/dispatch/finding/operator.rs"]
 first_seen = "29ec8f809b"
 
 [[schema]]
-value = "chio.finding.status-cli-floor.v2"
+value = "chio.finding.status-cli-floor.v1"
 files = ["crates/products/chio-cli/src/cli/dispatch/finding/status_floor.rs"]
-first_seen = "39c7713cf3"
+first_seen = "24a23c7356"
 
 [[schema]]
 value = "chio.finding.status-cli-retraction.v1"

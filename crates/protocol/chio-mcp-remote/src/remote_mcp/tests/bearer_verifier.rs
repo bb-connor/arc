@@ -931,3 +931,136 @@ fn local_authorization_server_rejects_subject_token_without_exp() {
     assert_eq!(cause.kind, OAuthError::InvalidGrant);
     assert_eq!(cause.local_detail(), "subject token has no exp");
 }
+
+const TEST_RESOURCE_METADATA_URL: &str =
+    "https://edge.example/.well-known/oauth-protected-resource/mcp";
+
+fn test_protected_resource_metadata() -> ProtectedResourceMetadata {
+    ProtectedResourceMetadata {
+        resource: "chio-mcp".to_string(),
+        resource_metadata_url: TEST_RESOURCE_METADATA_URL.to_string(),
+        authorization_servers: vec!["https://issuer.example".to_string()],
+        scopes_supported: vec!["mcp:invoke".to_string()],
+        chio_authorization_profile: Value::Null,
+    }
+}
+
+async fn challenge(result: Result<SessionAuthContext, Response>) -> (StatusCode, String, String) {
+    let response = result.expect_err("bearer token must be refused");
+    let challenge = response
+        .headers()
+        .get(WWW_AUTHENTICATE)
+        .expect("www-authenticate header")
+        .to_str()
+        .expect("challenge string")
+        .to_string();
+    let (status, body) = refusal(Err(response)).await;
+    (status, challenge, body)
+}
+
+#[tokio::test]
+async fn invalid_token_challenge_carries_error_invalid_token() {
+    let metadata = test_protected_resource_metadata();
+    let key = Keypair::generate();
+    let verifier = inbound_sender_verifier(&key);
+    let exp = verifier.clock.seconds().expect("clock") + 300;
+    let token = sign_jwt(
+        &key,
+        &json!({"iss": "https://issuer.example", "aud": "other", "sub": "user", "exp": exp}),
+    );
+    assert_eq!(
+        challenge(verifier.authenticate_token(
+            &token,
+            &empty_header_map(),
+            None,
+            Some(&metadata),
+            "POST",
+            "chio-mcp"
+        ))
+        .await,
+        (
+            StatusCode::UNAUTHORIZED,
+            format!(
+                "Bearer error=\"invalid_token\", resource_metadata=\"{TEST_RESOURCE_METADATA_URL}\", scope=\"mcp:invoke\""
+            ),
+            "JWT bearer audience mismatch".to_string(),
+        )
+    );
+    assert_eq!(
+        challenge(
+            extract_bearer_token(&empty_header_map(), Some(&metadata)).map(|_| unreachable!())
+        )
+        .await,
+        (
+            StatusCode::UNAUTHORIZED,
+            format!(
+                "Bearer resource_metadata=\"{TEST_RESOURCE_METADATA_URL}\", scope=\"mcp:invoke\""
+            ),
+            "missing bearer token".to_string(),
+        )
+    );
+}
+
+#[tokio::test]
+async fn missing_required_scope_answers_403_insufficient_scope_challenge() {
+    let metadata = test_protected_resource_metadata();
+    let key = Keypair::generate();
+    let mut verifier = inbound_sender_verifier(&key);
+    verifier.required_scopes = vec!["mcp:invoke".to_string()];
+    let exp = verifier.clock.seconds().expect("clock") + 300;
+    let token = sign_jwt(
+        &key,
+        &json!({"iss": "https://issuer.example", "aud": "chio-mcp", "sub": "user",
+            "scope": "tools.read", "exp": exp}),
+    );
+    let expected_challenge = format!(
+        "Bearer error=\"insufficient_scope\", scope=\"mcp:invoke\", resource_metadata=\"{TEST_RESOURCE_METADATA_URL}\""
+    );
+    assert_eq!(
+        challenge(verifier.authenticate_token(
+            &token,
+            &empty_header_map(),
+            None,
+            Some(&metadata),
+            "POST",
+            "chio-mcp"
+        ))
+        .await,
+        (
+            StatusCode::FORBIDDEN,
+            expected_challenge.clone(),
+            "JWT bearer token is missing required scope".to_string(),
+        )
+    );
+
+    let introspection = test_introspection_verifier(
+        Some("https://issuer.example"),
+        Some("chio-mcp"),
+        &["mcp:invoke"],
+    );
+    let mut claims = introspection_claims(Some("https://issuer.example"), Some(exp));
+    claims.scope = Some("tools.read".to_string());
+    let result = introspection.session_auth_context_from_introspection(
+        super::IntrospectionSessionAuthInput {
+            token: "opaque-token",
+            headers: (&empty_header_map()).into(),
+            introspection: OAuthIntrospectionResponse {
+                active: true,
+                token_type: Some("Bearer".to_string()),
+                claims,
+            },
+            origin: None,
+            protected_resource_metadata: Some(&metadata),
+            expected_method: "POST",
+            expected_target: "chio-mcp",
+        },
+    );
+    assert_eq!(
+        challenge(result).await,
+        (
+            StatusCode::FORBIDDEN,
+            expected_challenge,
+            "bearer token is missing required scope".to_string(),
+        )
+    );
+}

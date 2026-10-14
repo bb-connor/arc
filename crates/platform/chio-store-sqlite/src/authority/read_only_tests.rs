@@ -179,28 +179,28 @@ fn inspection_refuses_unsafe_custody_and_never_repairs_it() -> TestResult {
 }
 
 #[test]
-fn inspection_refuses_storage_that_needs_owner_migration() -> TestResult {
+fn inspection_refuses_storage_outside_schema_v1() -> TestResult {
     let (_directory, path, owner) = provisioned()?;
     drop(owner);
     let raw = Connection::open(&path)?;
     raw.execute(
         "UPDATE chio_store_schema_versions SET version = ?1 WHERE store_key = ?2",
         rusqlite::params![
-            AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION - 1,
+            AUTHORITY_STORE_SCHEMA_VERSION + 1,
             AUTHORITY_STORE_SCHEMA_KEY
         ],
     )?;
     assert!(matches!(
         SqliteAuthorityInspection::open_existing_with_clock(&path, fixed(PROVISIONED_AT_MS)),
         Err(AuthorityInspectionError::Store(AuthorityStoreError::Schema(message)))
-            if message.contains("needs migration")
+            if message == "database schema version 2 is not the current schema version 1; refusing to open"
     ));
     let version: i32 = raw.query_row(
         "SELECT version FROM chio_store_schema_versions WHERE store_key = ?1",
         [AUTHORITY_STORE_SCHEMA_KEY],
         |row| row.get(0),
     )?;
-    assert_eq!(version, AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION - 1);
+    assert_eq!(version, AUTHORITY_STORE_SCHEMA_VERSION + 1);
     Ok(())
 }
 
