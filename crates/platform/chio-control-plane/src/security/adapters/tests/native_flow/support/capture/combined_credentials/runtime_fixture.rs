@@ -106,7 +106,7 @@ pub(super) fn install(fixture: &mut Fixture) -> TestResult {
         local_kernel_id: local_kernel.into(), verifier_id: verifier_id.into(),
         issued_at_unix_ms: now, expires_at_unix_ms: expires,
     }, source)
-        .with_runtime_trust_input(SignedExportEnvelope::sign(RuntimeVerifierTrustBundleV4 {
+        .with_runtime_trust_input(SignedExportEnvelope::sign(RuntimeVerifierTrustBundle {
             schema: CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA.into(), verifier_id: verifier_id.into(),
             key_id: key_id.into(), version: 1, previous_hash_sha256: None,
             trust_bundle_sha256: "b".repeat(64), verification_context_sha256: "c".repeat(64),

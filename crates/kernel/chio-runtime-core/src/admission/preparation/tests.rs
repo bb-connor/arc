@@ -17,7 +17,7 @@ type SignedPreparationPolicy = (
 
 fn signed_preparation_policy(
     signer: &Keypair,
-    trust: &RuntimeVerifierTrustBundleV4,
+    trust: &RuntimeVerifierTrustBundle,
 ) -> TestResult<SignedPreparationPolicy> {
     let weights = RuntimePeerWeights {
         schema: CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA.to_owned(),
@@ -167,7 +167,7 @@ fn prepare_owned_with_destructive(
         verification_context_sha256: "c".repeat(64),
     };
     let trust = SignedExportEnvelope::sign(
-        RuntimeVerifierTrustBundleV4 {
+        RuntimeVerifierTrustBundle {
             schema: CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA.to_string(),
             verifier_id: profile.verifier_id.clone(),
             key_id: "key-preparation".to_string(),
