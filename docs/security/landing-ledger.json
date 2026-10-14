@@ -139811,5 +139811,14 @@
     "original_requirement_count": 2029,
     "original_requirements_raw_sha256": "5b81da14b6ac25918f9ee93765ce943c69de7ce1f974c52597d404b65d2de9ca",
     "full_qualified": false
+  },
+  "preview_exception_20261014": {
+    "path": "docs/security/audits/preview-exception-20261014.json",
+    "sha256": "4514702a07acad5441a30e0013917c02cc667ffd7bbb0f78c849260774138510",
+    "observed_utc": "2026-10-14T23:06:47Z",
+    "decision": "D8",
+    "authority": "Owner decision D8 (2026-10-14), relayed by the Claude lead: tagged 0.2.0-alpha.N previews are permitted before the foundation's post-merge pre-release obligations close.",
+    "amends": "foundation-landing-boundary-20261008.json release_permitted: false, for previews only",
+    "requirement_closure_inferred": false
   }
 }

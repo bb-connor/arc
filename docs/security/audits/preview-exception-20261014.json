@@ -1,0 +1,44 @@
+{
+  "schema": "chio.foundation-preview-exception.v1",
+  "observed_utc": "2026-10-14T23:06:47Z",
+  "decision": "D8",
+  "decision_source": {
+    "kind": "owner_decision_relayed_by_claude_lead",
+    "decided_on": "2026-10-14"
+  },
+  "amends": {
+    "path": "docs/security/audits/foundation-landing-boundary-20261008.json",
+    "sha256": "c5b206178164527ce083d2bdf23f28a7c4b21fc6f39c29fad180770da34a68a7",
+    "field": "release_permitted",
+    "recorded_value": false
+  },
+  "release_permitted": "preview_only",
+  "preview": {
+    "tag": "v0.2.0-alpha.N on bb-connor/arc",
+    "github_release": "prerelease, never marked Latest",
+    "mirror": "backbay-labs/chio carries the tag only",
+    "artifacts": [
+      "signed chio binaries for x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu and aarch64-apple-darwin",
+      "the trust-control dashboard container image"
+    ],
+    "excluded": [
+      "SDK packages",
+      "crates.io publication"
+    ],
+    "claims": "Labelled as a preview; claims limited under ADR-0011."
+  },
+  "required_before_tagging": [
+    "scripts/check-release-source-gates.py passes on the exact tagged commit: ci.yml push (Build, lint, test; MSRV build and test; cargo-vet; cargo-deny), Release Qualification dispatch, cve-monitor and cargo-vet on main.",
+    "release-binaries.yml provenance verification and the operator promotion step in docs/install/PUBLISHING.md."
+  ],
+  "claim_prohibitions": [
+    "docs/security/audits/kani-open-residual-20261009.json: no preview claim may state or rely on the unproved full-domain attestation obligation (KANI-PROOF-QUAL)."
+  ],
+  "unchanged": "Every post_merge_pre_release_requirements entry keeps its recorded status; none is reported passed. A non-preview release remains not permitted.",
+  "open_owner_decisions": [
+    "D9 licensing",
+    "D16 AWS-LC review sufficiency",
+    "D20 contract version number",
+    "dashboard image name and registry"
+  ]
+}
