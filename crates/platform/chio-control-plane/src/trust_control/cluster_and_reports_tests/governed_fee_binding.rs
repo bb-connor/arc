@@ -535,6 +535,36 @@ async fn governed_fee_schedule_binds_exactly_the_returned_envelope_and_retries_i
     assert_eq!(node.anchor.rotations.load(Ordering::SeqCst), 0);
 }
 
+#[tokio::test]
+async fn retained_binding_refuses_a_different_envelope_for_the_same_schedule() {
+    let node = governed_fee_node(None);
+    let (status, body) = issue_governed_fee_schedule(&node).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let signed: SignedOpenMarketFeeSchedule = serde_json::from_str(&body).test_unwrap();
+    let projection_commits = fiscal_rows(&node, "fiscal_projection_commits");
+    let resigned =
+        SignedOpenMarketFeeSchedule::sign(signed.body.clone(), &fiscal_key(91)).test_unwrap();
+    assert_ne!(envelope_digest(&resigned), envelope_digest(&signed));
+
+    let refusal = node
+        .runtime
+        .bind_fee_schedule_admitted(&node.schedule_id, &resigned, || Ok::<(), ()>(()));
+    assert!(
+        matches!(
+            refusal,
+            Err(TrustFiscalOperationError::Store(
+                chio_store_sqlite::fiscal_store::FiscalStoreError::Conflict
+            ))
+        ),
+        "{refusal:?}"
+    );
+    assert_eq!(bound_envelope_digest(&node), Some(envelope_digest(&signed)));
+    assert_eq!(
+        fiscal_rows(&node, "fiscal_projection_commits"),
+        projection_commits
+    );
+}
+
 /// Composition, first issue, first bind, retried issue, retried bind.
 const RETRIED_BINDING_RECONCILE_READ: usize = 5;
 
