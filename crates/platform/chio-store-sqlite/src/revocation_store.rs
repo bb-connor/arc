@@ -506,23 +506,6 @@ impl SqliteRevocationStore {
         Ok(true)
     }
 
-    /// The head of the revocation stream as the pagination cursor tuple
-    /// (revoked_at, capability_id), or None when empty. list_revocations_after
-    /// paginates ascending, so the head is the descending row.
-    pub fn latest_revocation_cursor(&self) -> Result<Option<(i64, String)>, RevocationStoreError> {
-        self.read(|transaction| {
-            transaction
-                .query_row(
-                    "SELECT revoked_at, capability_id FROM revoked_capabilities \
-                 ORDER BY revoked_at DESC, capability_id DESC LIMIT 1",
-                    [],
-                    |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-                )
-                .optional()
-                .map_err(Into::into)
-        })
-    }
-
     pub fn latest_revocation_stream_head(
         &self,
     ) -> Result<Option<StoredRevocation>, RevocationStoreError> {
@@ -1439,27 +1422,6 @@ mod tests {
 
         let _ = fs::remove_file(path);
         let _ = fs::remove_file(restored_snapshot);
-        Ok(())
-    }
-
-    #[test]
-    fn latest_revocation_cursor_returns_head_or_none() -> Result<(), Box<dyn std::error::Error>> {
-        let path = unique_db_path("chio-rev-head");
-        let store = SqliteRevocationStore::open(&path)?;
-        assert_eq!(store.latest_revocation_cursor()?, None);
-        store.upsert_revocation(&RevocationRecord {
-            capability_id: "cap-a".to_string(),
-            revoked_at: 10,
-        })?;
-        store.upsert_revocation(&RevocationRecord {
-            capability_id: "cap-b".to_string(),
-            revoked_at: 25,
-        })?;
-        assert_eq!(
-            store.latest_revocation_cursor()?,
-            Some((25, "cap-b".to_string()))
-        );
-        let _ = fs::remove_file(&path);
         Ok(())
     }
 
