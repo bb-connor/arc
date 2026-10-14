@@ -154,7 +154,7 @@ def initialized(repository, tmp_path):
 def test_obsolete_workspace_schema_is_refused_before_opening_journal(repository, tmp_path):
     state = initialized(repository, tmp_path)
     config = json.loads((state / "workspace.json").read_text())
-    config["schema"] = "chio.repository.workspace.v1"
+    config["schema"] = "chio.repository.workspace.v2"
     store.atomic_bytes(state / "workspace.json", json.dumps(config).encode())
     journal = (state / "journal.db").read_bytes()
     with pytest.raises(ValueError, match="Unsupported repository workspace"):
@@ -184,7 +184,7 @@ def test_snapshot_storage_failure_never_advances_workspace(
     monkeypatch.setattr(store.Workspace, "containers", lambda *_: Completed())
     with store.Workspace(state) as workspace:
         before = workspace.status()
-        assert before["schema"] == "chio.repository.workspace.v2"
+        assert before["schema"] == "chio.repository.workspace.v1"
         original = workspace.snapshot(before["snapshot"])
         if failure == "admission_budget":
             monkeypatch.setattr(store, "MAX_STORAGE", workspace.snapshot_store.usage())

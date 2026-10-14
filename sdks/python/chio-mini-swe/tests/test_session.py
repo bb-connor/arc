@@ -173,7 +173,7 @@ def test_scoped_session_binds_selection_into_workspace_and_worker_templates(setu
     state = initialize(setup)
     workspace = json.loads((state / "repository/workspace.json").read_text())
     request = json.loads((state / "provisioning-request.json").read_text())
-    assert workspace["schema"] == "chio.repository.workspace.v3"
+    assert workspace["schema"] == "chio.repository.scoped-workspace.v1"
     assert workspace["source_paths"] == ["file"]
     assert request["configuration_sha256"] == repository_store.configuration_digest(workspace)
     assert "Selected source paths" in request["servers"]["sandbox"]["tools"][0]["description"]

@@ -8,7 +8,7 @@ from chio_process import MAX_STATE_BLOB_BYTES, ProcessClient
 from chio_process.snapshot import SCHEMA as SNAPSHOT_SCHEMA
 from chio_process.snapshot import JsonSnapshot
 
-SCHEMA = "chio.mini-swe.v2"
+SCHEMA = "chio.mini-swe.v1"
 MAX_SNAPSHOT_BYTES = 8 * MAX_STATE_BLOB_BYTES
 
 

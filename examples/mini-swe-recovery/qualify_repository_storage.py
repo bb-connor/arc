@@ -58,7 +58,7 @@ def main():
     state = root / "state"
     started = time.monotonic()
     config = initialize(source, commit, images["execution_image"], helper, state, 60)
-    assert config["schema"] == "chio.repository.workspace.v2"
+    assert config["schema"] == "chio.repository.workspace.v1"
     report = {
         "schema": "chio.repository.storage-qualification.v1",
         "private_state": str(root),

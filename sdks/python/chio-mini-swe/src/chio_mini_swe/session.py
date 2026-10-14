@@ -12,11 +12,11 @@ from chio_mini_swe.repository_scope import normalize_source_paths
 from chio_mini_swe.repository_store import Workspace, atomic_bytes, configuration_digest
 
 CONFIG = "chio.mini-swe.session-config.v1"
-SCOPED_CONFIG = "chio.mini-swe.session-config.v2"
+SCOPED_CONFIG = "chio.mini-swe.scoped-session-config.v1"
 INITIALIZED = "chio.mini-swe.session-initialized.v1"
 PREPARED = "chio.mini-swe.session-prepared.v1"
-AUTHORIZATION = "chio.mini-swe.session-authorization.v2"
-REQUEST = "chio.mini-swe.provisioning-request.v2"
+AUTHORIZATION = "chio.mini-swe.session-authorization.v1"
+REQUEST = "chio.mini-swe.provisioning-request.v1"
 ROUTES = [
     {"server_id": "model", "tool_name": "model_infer"},
     {"server_id": "sandbox", "tool_name": "execute"},

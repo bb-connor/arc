@@ -5,7 +5,7 @@ from pathlib import PurePosixPath
 
 from chio_mini_swe.repository_archive import entries, path_name
 
-SCOPED_SCHEMA = "chio.repository.workspace.v3"
+SCOPED_SCHEMA = "chio.repository.scoped-workspace.v1"
 
 
 def normalize_source_paths(value):
