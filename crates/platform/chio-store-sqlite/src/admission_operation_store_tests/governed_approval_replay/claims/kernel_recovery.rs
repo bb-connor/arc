@@ -17,7 +17,7 @@ pub(super) fn kernel_with_signer(
             keypair: signer,
             ca_public_keys: vec![],
             max_delegation_depth: 5,
-            policy_hash: sha256_hex(b"approval-custody-recovery"),
+            policy_hash: super::super::super::retained_request::original_policy_hash(),
             allow_sampling: false,
             allow_sampling_tool_use: false,
             allow_elicitation: false,

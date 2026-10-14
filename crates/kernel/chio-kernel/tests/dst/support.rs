@@ -35,7 +35,7 @@ const TOOL_NAME: &str = "mutate";
 const GRANT_INDEX: usize = 0;
 const PRE_DISPATCH_DROP_REASON: &str =
     "tool evaluation future dropped before dispatch with cleanup fault";
-const POST_DISPATCH_DROP_REASON: &str = "tool evaluation future dropped after admission";
+const POST_DISPATCH_DROP_REASON: &str = "post-effect finalization failed; output withheld";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum EpisodeClass {

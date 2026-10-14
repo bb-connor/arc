@@ -45,6 +45,12 @@ pub(super) fn original_with_intent(
     )
 }
 
+/// Policy hash bound into helper-built original requests. A kernel that
+/// recovers these operations signs its refusal under this policy.
+pub(super) fn original_policy_hash() -> String {
+    "a".repeat(64)
+}
+
 /// Receipt signer frozen into helper-built original requests. A kernel that
 /// recovers these operations must sign with this key.
 pub(super) fn original_signer() -> TestResult<Keypair> {
@@ -132,7 +138,7 @@ pub(super) fn original_with_capability(
             )?,
             requirements,
         )?,
-        policy_hash: digest("policy", 'a'),
+        policy_hash: AdmissionDigest::try_new("policy", original_policy_hash())?,
         effect_class: SideEffectClass::SideEffecting,
     })?;
     Ok((
