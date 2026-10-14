@@ -34,7 +34,16 @@ fn caller_cannot_supply_receipt_namespace_or_disposition() {
                 "request_namespace_digest": "caller-selected", "identity_disposition": "reusable"
             }})),
         );
-        assert!(result.is_err(), "caller metadata key {key} must be refused");
+        let expected = match key {
+            "chio_runtime" => {
+                "chio_runtime is reserved for kernel-derived runtime admission reservations"
+            }
+            _ => "receipt_context is reserved for kernel-derived receipts",
+        };
+        assert!(
+            matches!(&result, Err(KernelError::InvalidReceiptMetadata(reason)) if reason == expected),
+            "caller metadata key {key}: {result:?}"
+        );
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
         assert!(kernel.receipt_log().is_empty());
     }

@@ -229,9 +229,16 @@ fn exercise_cumulative_approval(
             charge.cleanup_custody,
             crate::budget_store::BudgetHoldCleanupCustody::Unknown
         );
-        assert!(kernel
-            .reverse_budget_charge(&approved.capability.id, charge)
-            .is_err());
+        let refusal = format!(
+            "budget hold cleanup requires fresh custody; current call custody is {}",
+            charge.cleanup_custody.as_str()
+        );
+        assert!(matches!(
+            kernel.reverse_budget_charge(&approved.capability.id, charge),
+            Err(KernelError::BudgetStore(
+                crate::budget_store::BudgetStoreError::Invariant(reason)
+            )) if reason == refusal
+        ));
         assert_eq!(
             admission.operation().state(),
             AdmissionOperationState::BudgetAuthorized

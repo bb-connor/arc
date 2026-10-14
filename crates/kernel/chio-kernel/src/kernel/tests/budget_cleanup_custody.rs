@@ -205,8 +205,20 @@ fn exercise_cleanup(replay: bool, legacy: bool) -> TestResult {
         assert!(evidence.is_some());
         assert_eq!(released.load(Ordering::SeqCst), 1);
     } else {
-        assert!(outcome.is_err());
-        assert!(kernel.reverse_budget_charge(&cap.id, &charge).is_err());
+        let refusal = format!(
+            "budget hold cleanup requires fresh custody; current call custody is {}",
+            charge.cleanup_custody.as_str()
+        );
+        let custody_refused = |error: &KernelError| {
+            matches!(error, KernelError::BudgetStore(
+                crate::budget_store::BudgetStoreError::Invariant(reason)
+            ) if reason == &refusal)
+        };
+        assert!(matches!(&outcome, Err(failure) if custody_refused(&failure.error)));
+        assert!(kernel
+            .reverse_budget_charge(&cap.id, &charge)
+            .err()
+            .is_some_and(|error| custody_refused(&error)));
         assert_eq!(released.load(Ordering::SeqCst), 0);
     }
     assert_eq!(refunded.load(Ordering::SeqCst), 0);
