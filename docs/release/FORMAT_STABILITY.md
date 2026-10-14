@@ -58,9 +58,6 @@ A revision that is not on this list is not exempt until the owner adds it.
 
 These questions are open. This note does not decide them.
 
-- **D8, preview exception.** Whether tagged `0.2.0-alpha.N` previews may ship
-  before the post-merge obligations of #1160 close
-  ([UNIFIED_ROADMAP.md](../operations/UNIFIED_ROADMAP.md), decision table).
 - **D10, crates.io.** Whether to yank the `chio-*` 0.1.x crates in favour of
   the preview channel, or keep the Rust library in the preview's supported
   surface.

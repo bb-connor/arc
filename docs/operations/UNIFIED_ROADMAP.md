@@ -209,7 +209,7 @@ Gate 0 exists so that parallel lanes do not collide. Everything a lane builds ag
 
 - **Preview versions:** `0.2.0-alpha.N`. This is SEC-M10's developer preview, widened to include what HOST-M3 needs.
 - **Repos:** `bb-connor/arc` is the development repo; `backbay-labs/chio` is the distribution mirror, synced on every tag (D7, decided 2026-10-09).
-- **Preview exception (conditional):** #1160's landing ledger records `release_permitted: false`. Previews may ship before #1160's full-release obligations close only if the owner approves D8 (still open) and the resulting amendment is recorded in that ledger. Until both happen, previews wait for those obligations.
+- **Preview exception:** the owner approved D8 on 2026-10-14, and the amendment is recorded in the landing ledger as `preview_exception_20261014` (`docs/security/audits/preview-exception-20261014.json`). Tagged `0.2.0-alpha.N` previews may ship before #1160's full-release obligations close; a non-preview release still waits for them.
 - **Host compatibility:** tested version ranges for harness hosts, instead of exact pinned hashes.
 
 ### G0.4 Work that starts without waiting for Gate 0
@@ -462,7 +462,7 @@ Only the kernel hold ledger durably records consumption. Money is not pooled acr
 
 - **REL-1: the preview train.**
   - SEC-M9 packaging and SEC-M10 publishing.
-  - #1160's post-merge obligations, or the CT-REL preview exception once D8 is approved and its landing-ledger amendment is recorded.
+  - #1160's post-merge obligations for a full release; previews ship under the D8 exception recorded in the landing ledger.
   - Close out the AWS-LC fork audit (review sufficiency: D16). The source audit and its independent review are already on main (`docs/security/audits/aws-lc-rs-1.18.1-fork.md`, `aws-lc-rs-1.18.1-independent-review.md`). The audit states that it is not an approval to publish a release.
   - Turn the Release Qualification workflow green. `docs/release/RISK_REGISTER.md` requires hosted CI and Release Qualification success before tagging, and Release Qualification has failed on every recent push to main.
   - Signed binaries for Linux x86_64 and arm64 and macOS arm64.
@@ -737,7 +737,7 @@ None of these depended on #1160, which is now on main. Status is as of main `b6a
 | D5 | Unpaid work agreement | Add an unpaid `Agreement` variant to `chio.work.v1`. | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes the CT-WORK `Agreement` variant. | Gate 0 |
 | D6 | Holder possession | Require DPoP for federated grants at the door. | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes the CT-COOP DPoP profile; COOP-2 implements it. | Gate 0, COOP-2 |
 | D7 | Canonical repositories | `bb-connor/arc` is the development repo; `backbay-labs/chio` is the distribution mirror, synced on every tag. | **Decided 2026-10-09:** the owner accepted the recommendation. Freezes the CT-REL repos; the REL-1 mirror sync assumes it. | Gate 0, REL-1 |
-| D8 | Preview exception | Allow tagged `0.2.0-alpha.N` previews before #1160's full-release obligations close. They are labelled as previews, with claims limited under ADR-0011. | Open. Adopting it amends #1160's operator ruling of 2026-10-08 (`release_permitted: false` in `docs/security/audits/foundation-landing-boundary-20261008.json`), so the amendment is also recorded in the landing ledger. | G1 |
+| D8 | Preview exception | Allow tagged `0.2.0-alpha.N` previews before #1160's full-release obligations close. They are labelled as previews, with claims limited under ADR-0011. | **Decided 2026-10-14:** the owner adopted it. The amendment to #1160's operator ruling of 2026-10-08 (`release_permitted: false` in `docs/security/audits/foundation-landing-boundary-20261008.json`) is recorded as `preview_exception_20261014` in the landing ledger; non-preview releases stay not permitted. | G1 |
 | D9 | Licensing (STRAT-F5) | Apache-2.0 for verifiers, adapters and preview binaries. | Open | G1 |
 | D10 | crates.io | Yank 0.1.x with a pointer to the preview channel, unless the Rust library is in the preview's supported surface. | Open | G1 |
 | D11 | IETF -00 | Submit as an individual draft, with the multi-hop rule flagged as an open issue. | Open | OUT-3 |
