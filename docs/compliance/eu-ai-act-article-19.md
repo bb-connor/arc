@@ -4,22 +4,22 @@
 
 | Field | Value |
 |-------|-------|
-| Regulation | EU AI Act, Regulation (EU) 2024/1689 |
+| Regulation | EU AI Act, Regulation (EU) 2024/1689, as amended by Regulation (EU) 2026/1744 |
 | Scope | Article 19: Automatically generated logs; Annex IV: Technical documentation; Annex VIII: EU database registration |
 | Chio Profile | Current v1-only pre-release profile |
 | Document Date | 2026-03-22 |
-| Filing Deadline | August 2, 2026 |
+| Application Date | Chapter III, Sections 1 to 3 (including Articles 12, 19 and 26): 2 December 2027 for Annex III high-risk systems; 2 August 2028 for Annex I (Article 6(1)) high-risk systems |
 | Maintained by | Chio Protocol Team |
 
 ---
 
 ## Executive Summary
 
-The EU AI Act (Regulation 2024/1689) imposes logging, traceability, and technical documentation requirements on providers and deployers of high-risk AI systems. Article 19 specifically requires high-risk AI systems to automatically generate logs of their operation, with sufficient detail for post-hoc accountability and oversight. Annex IV extends this to require technical documentation that describes the system's design, capabilities, and monitoring procedures. Chio satisfies these requirements through its cryptographically-signed receipt log, Merkle-committed checkpoint infrastructure, and configurable retention policy.
+The EU AI Act (Regulation 2024/1689) imposes logging, traceability, and technical documentation requirements on providers and deployers of high-risk AI systems. Article 12 requires high-risk AI systems to technically allow the automatic recording of events (logs) over their lifetime, with logging capabilities that enable traceability appropriate to the intended purpose. Article 19(1) requires providers, and Article 26(6) deployers, to keep those logs for at least six months. Annex IV extends this to require technical documentation that describes the system's design, capabilities, and monitoring procedures. Chio satisfies these requirements through its cryptographically-signed receipt log, Merkle-committed checkpoint infrastructure, and configurable retention policy.
 
-Every tool invocation processed by the Chio kernel produces a signed `ChioReceipt` -- a tamper-evident log entry containing the capability identifier, tool server, tool name, invocation parameters hash, decision (allow or deny), policy hash, and a kernel key reference. Receipts are appended to an SQLite log in sequence order and are periodically committed into Merkle checkpoint batches, each signed by the kernel's Ed25519 keypair. This provides a tamper-evident, automatically-generated operation log that satisfies Article 19(1)'s traceability requirement without requiring any manual recording by operators or users.
+Every tool invocation processed by the Chio kernel produces a signed `ChioReceipt` -- a tamper-evident log entry containing the capability identifier, tool server, tool name, invocation parameters hash, decision (allow or deny), policy hash, and a kernel key reference. Receipts are appended to an SQLite log in sequence order and are periodically committed into Merkle checkpoint batches, each signed by the kernel's Ed25519 keypair. This provides a tamper-evident, automatically-generated operation log that satisfies Article 12(2)'s traceability requirement without requiring any manual recording by operators or users.
 
-Annex IV Section 2(g) requires that records be retained for a specified period and remain accessible for post-hoc review. Chio's `RetentionConfig` on `KernelConfig` provides configurable `retention_days` (default 90 days) and `max_size_bytes` (default 10 GB) for time-based and size-based rotation. Archived receipts are moved to a separate SQLite file and continue to verify against stored Merkle checkpoint roots in the archive database -- satisfying the requirement that records remain verifiable after archival. The DPoP (Demonstration of Proof-of-Possession) module adds per-invocation cryptographic binding between the invoking agent's keypair and each specific tool call, providing Article 14-compatible human oversight anchors and ensuring that agent actions are attributable to the registered entity that holds the capability token.
+Articles 19(1) and 26(6) require logs to be kept for a period appropriate to the intended purpose, of at least six months, unless other Union or national law provides otherwise. Chio's `RetentionConfig` on `KernelConfig` provides configurable `retention_days` (default 90 days) and `max_size_bytes` (default 10 GB) for time-based and size-based rotation. Archived receipts are moved to a separate SQLite file and continue to verify against stored Merkle checkpoint roots in the archive database -- satisfying the requirement that records remain verifiable after archival. The DPoP (Demonstration of Proof-of-Possession) module adds per-invocation cryptographic binding between the invoking agent's keypair and each specific tool call, providing Article 14-compatible human oversight anchors and ensuring that agent actions are attributable to the registered entity that holds the capability token.
 
 ---
 
@@ -27,11 +27,11 @@ Annex IV Section 2(g) requires that records be retained for a specified period a
 
 | Article/Annex | Requirement Summary | Chio Mechanism | Test File | Test Function |
 |---------------|---------------------|----------------|-----------|---------------|
-| Article 19(1) -- Automatic logging | High-risk AI systems must automatically generate logs of their operation for the period appropriate to the intended purpose | Signed `ChioReceipt` appended automatically for every tool invocation (allow or deny); no manual recording required | `crates/kernel/chio-kernel/src/lib.rs` | `all_calls_produce_verified_receipts` |
-| Article 19(1) -- Traceability of AI system actions | Logs must enable traceability of the AI system's actions during the system's lifetime | Receipt log links `capability_id`, `tool_server`, `tool_name`, `decision`, `policy_hash`, and `parameter_hash` in every record; `kernel_persists_tool_receipts_to_sqlite_store` confirms durable persistence | `crates/kernel/chio-kernel/src/lib.rs` | `kernel_persists_tool_receipts_to_sqlite_store` |
+| Article 12(1) -- Automatic logging | High-risk AI systems must technically allow for the automatic recording of events (logs) over the lifetime of the system | Signed `ChioReceipt` appended automatically for every tool invocation (allow or deny); no manual recording required | `crates/kernel/chio-kernel/src/lib.rs` | `all_calls_produce_verified_receipts` |
+| Article 12(2) -- Traceability of AI system actions | Logging capabilities must enable a level of traceability of the functioning of the system appropriate to its intended purpose | Receipt log links `capability_id`, `tool_server`, `tool_name`, `decision`, `policy_hash`, and `parameter_hash` in every record; `kernel_persists_tool_receipts_to_sqlite_store` confirms durable persistence | `crates/kernel/chio-kernel/src/lib.rs` | `kernel_persists_tool_receipts_to_sqlite_store` |
 | Article 19(1) -- Denial traceability | Logs must record denied operations with sufficient detail for audit | Deny `ChioReceipt` is signed and persisted with the same fields as allow; monetary denials carry `FinancialReceiptMetadata.attempted_cost` | `crates/kernel/chio-kernel/src/lib.rs` | `monetary_denial_receipt_contains_financial_metadata` |
 | Article 19(2) -- Logging capability description | Technical documentation must describe the logging capabilities of the system | `ToolManifest` with signed `ToolDefinition` per tool including human-readable description and parameter schema; manifest verification via Ed25519 signature | `crates/platform/chio-manifest/src/lib.rs` | `sign_and_verify_manifest` |
-| Annex IV Section 2(g) -- Record retention | Records must be retained for a period appropriate to the intended purpose; default minimum is 10 years for certain high-risk systems | `RetentionConfig.retention_days` (default 90, configurable) controls time-based rotation; operators set the retention period to match their regulatory obligation | `crates/kernel/chio-kernel/tests/retention.rs` | `retention_rotates_at_time_boundary` |
+| Articles 19(1) and 26(6) -- Log retention | Providers and deployers must keep automatically generated logs for a period appropriate to the intended purpose, of at least six months, unless other Union or national law provides otherwise | `RetentionConfig.retention_days` (default 90, configurable) controls time-based rotation; operators set the retention period to match their regulatory obligation | `crates/kernel/chio-kernel/tests/retention.rs` | `retention_rotates_at_time_boundary` |
 | Annex IV Section 2(g) -- Size-based rotation | Storage management must not lose records; size-based triggers must archive, not delete | `RetentionConfig.max_size_bytes` (default 10 GB) triggers archival (not deletion) of older receipts when the live DB exceeds the threshold | `crates/kernel/chio-kernel/tests/retention.rs` | `retention_rotates_at_size_boundary` |
 | Annex IV Section 2(g) -- Records verifiable after archival | Archived records must remain verifiable and accessible for review | Archived receipts verify against Merkle checkpoint roots stored in the archive DB; `verify_checkpoint_signature` confirms the checkpoint signature is authentic in the archive | `crates/kernel/chio-kernel/tests/retention.rs` | `archived_receipt_verifies_against_checkpoint` |
 | Annex IV Section 2(g) -- Checkpoint integrity in archive | Checkpoints must accompany their receipt batches in the archive | Archival logic copies checkpoint rows whose `batch_end_seq` is fully covered by archived receipts (partial-batch exclusion); batch 2 checkpoint remains in live DB when only batch 1 is archived | `crates/kernel/chio-kernel/tests/retention.rs` | `archive_preserves_checkpoint_rows` |
@@ -102,7 +102,7 @@ cargo test -p chio-kernel -- dpop
 # Checkpoint tamper-evidence tests (Annex IV Section 7)
 cargo test -p chio-kernel -- checkpoint
 
-# Automatic logging and traceability tests (Article 19(1))
+# Automatic logging and traceability tests (Article 12(1) and 12(2))
 cargo test -p chio-kernel -- all_calls_produce_verified_receipts kernel_persists_tool_receipts
 
 # Monetary budget tests (Article 9)
@@ -118,7 +118,7 @@ Expected output: all referenced test functions exist and report `ok`.
 
 ## Regulatory Notes
 
-The Article and Annex references above reflect the EU AI Act as published in the Official Journal of the European Union (OJ L 2024/1689, 12 July 2024). Article 19 applies to providers of high-risk AI systems listed in Annex III. Annex IV specifies technical documentation content requirements. Annex VIII specifies EU database registration obligations.
+The Article and Annex references above reflect the EU AI Act as published in the Official Journal of the European Union (OJ L 2024/1689, 12 July 2024) and as amended by Regulation (EU) 2026/1744 (OJ L 2026/1744, 24 July 2026), which entered into force on 27 July 2026. Under Article 113, as amended, Chapter III, Sections 1 to 3 (which contain Articles 12, 19 and 26) apply from 2 December 2027 to high-risk AI systems classified under Article 6(2) and Annex III, and from 2 August 2028 to those classified under Article 6(1) and Annex I. Article 19 applies to providers of high-risk AI systems; Article 26(6) places the corresponding log-keeping obligation on deployers. Annex IV specifies technical documentation content requirements. Annex VIII specifies EU database registration obligations.
 
 Chio operates as infrastructure for the Runtime Kernel layer of an AI agent system. It provides the automatic logging (Article 19), technical documentation anchors (Annex IV), and human oversight support (Article 14) described above.
 
