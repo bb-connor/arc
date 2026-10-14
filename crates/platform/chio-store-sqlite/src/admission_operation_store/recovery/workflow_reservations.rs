@@ -211,23 +211,7 @@ impl WorkflowQuota {
         if let Some(hold) = &self.native_hold {
             hold.verify(tx, scope, workflow)?;
         }
-        let terminal = match &self.native_terminal {
-            Some(terminal) => Some(terminal.load(tx, scope, workflow)?),
-            None => {
-                terminal_allocation::require_absent_terminal(tx, scope, workflow)?;
-                None
-            }
-        };
-        let release = match (&self.native_release, &terminal) {
-            (Some(release), Some(terminal)) => {
-                Some(release.load_for_terminal(tx, scope, workflow, terminal)?)
-            }
-            (Some(_), None) => return Err(invariant("recovery workflow quota is corrupt")),
-            (None, _) => {
-                release_allocation::require_absent_release(tx, scope, workflow)?;
-                None
-            }
-        };
+        let custody = self.load_native_custody(tx, scope, workflow)?;
         if let Some(archive) = &self.native_archive {
             let expected = format!(
                 "deployment-history:{}:{}",
@@ -249,6 +233,33 @@ impl WorkflowQuota {
                 return Err(invariant("recovery native archive allocation changed"));
             }
         }
+        Ok(custody)
+    }
+
+    /// Verified custody is boxed: this runs beneath deep owning stacks.
+    fn load_native_custody(
+        &self,
+        tx: &Connection,
+        scope: &RecoveryScopeV1,
+        workflow: &WorkflowId,
+    ) -> Result<ValidatedNativeCustody, AdmissionOperationStoreError> {
+        let terminal = match &self.native_terminal {
+            Some(terminal) => Some(Box::new(terminal.load(tx, scope, workflow)?)),
+            None => {
+                terminal_allocation::require_absent_terminal(tx, scope, workflow)?;
+                None
+            }
+        };
+        let release = match (&self.native_release, &terminal) {
+            (Some(release), Some(terminal)) => Some(Box::new(
+                release.load_for_terminal(tx, scope, workflow, terminal)?,
+            )),
+            (Some(_), None) => return Err(invariant("recovery workflow quota is corrupt")),
+            (None, _) => {
+                release_allocation::require_absent_release(tx, scope, workflow)?;
+                None
+            }
+        };
         Ok(ValidatedNativeCustody { terminal, release })
     }
 
@@ -337,13 +348,13 @@ fn workflow_quota(
     scope: &RecoveryScopeV1,
     workflow: &WorkflowId,
 ) -> Result<WorkflowQuota, AdmissionOperationStoreError> {
-    workflow_quota_with_count(tx, scope, workflow, None)
+    validated_workflow_quota(tx, scope, workflow, None).map(|(quota, _)| quota)
 }
 
 /// Terminal and release custody `WorkflowQuota::validate` loaded and verified.
 struct ValidatedNativeCustody {
-    terminal: Option<CapturedWorkflowTerminalV1>,
-    release: Option<CapturedWorkflowReleaseV1>,
+    terminal: Option<Box<CapturedWorkflowTerminalV1>>,
+    release: Option<Box<CapturedWorkflowReleaseV1>>,
 }
 
 /// One validated quota read for a single read-only workflow view. It borrows
@@ -412,7 +423,7 @@ impl ViewedWorkflowQuota<'_> {
         record: &RecoveryWorkflowRecordV1,
     ) -> Result<Option<CapturedWorkflowTerminalV1>, AdmissionOperationStoreError> {
         self.require_owner(record)?;
-        let Some(terminal) = &self.custody.terminal else {
+        let Some(terminal) = self.custody.terminal.as_deref() else {
             return Ok(None);
         };
         self.require_physical(
@@ -429,7 +440,7 @@ impl ViewedWorkflowQuota<'_> {
         record: &RecoveryWorkflowRecordV1,
     ) -> Result<Option<CapturedWorkflowReleaseV1>, AdmissionOperationStoreError> {
         self.require_owner(record)?;
-        let Some(release) = &self.custody.release else {
+        let Some(release) = self.custody.release.as_deref() else {
             return Ok(None);
         };
         self.require_physical(
@@ -605,18 +616,7 @@ fn validated_workflow_quota(
         source_reference(tx, &physical_key)?;
     }
     let revision = match &workflow_row {
-        Some(row) => {
-            let record: RecoveryWorkflowRecordV1 = decode(&row.payload)?;
-            if row.scope != scope_key(scope)?
-                || row.kind != "workflow"
-                || record.scope != *scope
-                || record.workflow_id != *workflow
-                || record.revision.get() != row.version
-            {
-                return Err(invariant("recovery workflow quota owner changed"));
-            }
-            row.version
-        }
+        Some(row) => quota_owner_revision(row, scope, workflow)?,
         None => 0,
     };
     if let Some(row) = raw_checked(tx, &key)? {
@@ -640,24 +640,12 @@ fn validated_workflow_quota(
         };
         let custody = quota.validate(tx, scope, workflow, revision, commands, row.version)?;
         if let Some(archive) = &quota.native_archive {
-            let retained: RecoveryWorkflowRecordV1 = decode(
-                &workflow_row
+            require_archive_owner(
+                workflow_row
                     .as_ref()
-                    .ok_or_else(|| invariant("recovery archive workflow disappeared"))?
-                    .payload,
+                    .ok_or_else(|| invariant("recovery archive workflow disappeared"))?,
+                archive,
             )?;
-            if retained.deployment_digest != archive.deployment_digest
-                || (retained.captured
-                    && retained
-                        .captured_deployment
-                        .as_ref()
-                        .is_none_or(|reference| {
-                            reference.deployment_digest != archive.deployment_digest
-                                || reference.record_version.get() != 1
-                        }))
-            {
-                return Err(invariant("recovery archive workflow reference changed"));
-            }
         }
         return Ok((quota, custody));
     }
@@ -702,6 +690,44 @@ fn validated_workflow_quota(
             release: None,
         },
     ))
+}
+
+// The decoded workflow lives only in these frames, not across validation.
+fn quota_owner_revision(
+    row: &RawRecord,
+    scope: &RecoveryScopeV1,
+    workflow: &WorkflowId,
+) -> Result<u64, AdmissionOperationStoreError> {
+    let record: RecoveryWorkflowRecordV1 = decode(&row.payload)?;
+    if row.scope != scope_key(scope)?
+        || row.kind != "workflow"
+        || record.scope != *scope
+        || record.workflow_id != *workflow
+        || record.revision.get() != row.version
+    {
+        return Err(invariant("recovery workflow quota owner changed"));
+    }
+    Ok(row.version)
+}
+
+fn require_archive_owner(
+    row: &RawRecord,
+    archive: &WorkflowArchiveAllocation,
+) -> Result<(), AdmissionOperationStoreError> {
+    let retained: RecoveryWorkflowRecordV1 = decode(&row.payload)?;
+    if retained.deployment_digest != archive.deployment_digest
+        || (retained.captured
+            && retained
+                .captured_deployment
+                .as_ref()
+                .is_none_or(|reference| {
+                    reference.deployment_digest != archive.deployment_digest
+                        || reference.record_version.get() != 1
+                }))
+    {
+        return Err(invariant("recovery archive workflow reference changed"));
+    }
+    Ok(())
 }
 
 fn save_quota(
