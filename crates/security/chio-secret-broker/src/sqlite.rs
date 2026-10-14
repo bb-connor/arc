@@ -7,7 +7,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use chio_core_types::canonical_json_bytes;
-use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Transaction};
+use chio_store_sqlite::{
+    check_current_schema, stamp_schema_version, SchemaState, SchemaVersionError,
+};
+use rusqlite::{
+    params, Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior,
+};
 
 use crate::budget::ExecutionQuota;
 use crate::store::{
@@ -100,7 +105,7 @@ impl SqliteAttemptStore {
     }
 
     fn migrate(&self) -> Result<()> {
-        let connection = self.connection()?;
+        let mut connection = self.connection()?;
         connection
             .execute_batch(
                 r#"
@@ -111,61 +116,28 @@ impl SqliteAttemptStore {
                 "#,
             )
             .map_err(storage)?;
-        migrate_registered_attempt_state(&connection)?;
-        connection
-            .execute_batch(
-                r#"
-
-                CREATE TABLE IF NOT EXISTS broker_attempts (
-                    attempt_id TEXT PRIMARY KEY,
-                    operation_id TEXT NOT NULL UNIQUE,
-                    invocation_id TEXT NOT NULL,
-                    parent_capability_id TEXT NOT NULL,
-                    broker_capability_id TEXT NOT NULL,
-                    request_digest TEXT NOT NULL,
-                    request_canonical_digest TEXT NOT NULL,
-                    proof_digest TEXT NOT NULL,
-                    proof_key_id TEXT NOT NULL,
-                    proof_nonce TEXT NOT NULL,
-                    nonce_expires_at INTEGER NOT NULL CHECK(nonce_expires_at >= 0),
-                    hold_id TEXT NOT NULL UNIQUE,
-                    authorize_event_id TEXT NOT NULL UNIQUE,
-                    reverse_event_id TEXT NOT NULL UNIQUE,
-                    capture_event_id TEXT NOT NULL UNIQUE,
-                    quotas_json BLOB NOT NULL,
-                    authority_metadata_digest TEXT NOT NULL,
-                    revocation_authority_domain TEXT NOT NULL,
-                    state TEXT NOT NULL CHECK(state IN (
-                        'registered', 'prepared', 'held', 'captured', 'dispatch_committed',
-                        'reversed', 'unknown_outcome', 'completed', 'failed'
-                    )),
-                    dispatch_claim_id TEXT,
-                    revocation_set_digest TEXT,
-                    budget_commit_index INTEGER,
-                    revocation_commit_index INTEGER,
-                    authority_commit_index INTEGER,
-                    leader_epoch INTEGER,
-                    response_digest TEXT,
-                    updated_at INTEGER NOT NULL CHECK(updated_at >= 0)
-                ) STRICT;
-
-                CREATE TABLE IF NOT EXISTS broker_nonces (
-                    proof_key_id TEXT NOT NULL,
-                    proof_nonce TEXT NOT NULL,
-                    attempt_id TEXT NOT NULL UNIQUE,
-                    expires_at INTEGER NOT NULL CHECK(expires_at >= 0),
-                    PRIMARY KEY (proof_key_id, proof_nonce),
-                    FOREIGN KEY (attempt_id) REFERENCES broker_attempts(attempt_id)
-                        ON DELETE RESTRICT
-                ) STRICT;
-
-                CREATE INDEX IF NOT EXISTS idx_broker_attempts_recovery
-                    ON broker_attempts(state, updated_at, attempt_id);
-                "#,
-            )
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(storage)?;
-        migrate_dispatch_claim_column(&connection)?;
-        migrate_registration_binding_columns(&connection)
+        let state = check_current_schema(
+            &transaction,
+            BROKER_ATTEMPT_SCHEMA_KEY,
+            BROKER_ATTEMPT_SCHEMA_VERSION,
+            BROKER_ATTEMPT_SCHEMA_ANCHORS,
+        )
+        .map_err(schema_error)?;
+        if state == SchemaState::Unstamped {
+            transaction
+                .execute_batch(BROKER_ATTEMPT_SCHEMA)
+                .map_err(storage)?;
+            stamp_schema_version(
+                &transaction,
+                BROKER_ATTEMPT_SCHEMA_KEY,
+                BROKER_ATTEMPT_SCHEMA_VERSION,
+            )
+            .map_err(schema_error)?;
+        }
+        transaction.commit().map_err(storage)
     }
 }
 
@@ -181,176 +153,59 @@ impl ProductionSqliteAttemptStore {
     }
 }
 
-fn migrate_registered_attempt_state(connection: &Connection) -> Result<()> {
-    let schema: Option<String> = connection
-        .query_row(
-            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'broker_attempts'",
-            [],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(storage)?;
-    let Some(schema) = schema else {
-        return Ok(());
-    };
-    if schema.contains("'registered'") {
-        return Ok(());
-    }
-    connection
-        .execute_batch(
-            r#"
-            PRAGMA foreign_keys = OFF;
-            BEGIN IMMEDIATE;
+const BROKER_ATTEMPT_SCHEMA_KEY: &str = "broker_attempts";
+const BROKER_ATTEMPT_SCHEMA_VERSION: i32 = 1;
+const BROKER_ATTEMPT_SCHEMA_ANCHORS: &[&str] = &["broker_attempts", "broker_nonces"];
+const BROKER_ATTEMPT_SCHEMA: &str = r#"
+CREATE TABLE broker_attempts (
+    attempt_id TEXT PRIMARY KEY,
+    operation_id TEXT NOT NULL UNIQUE,
+    invocation_id TEXT NOT NULL,
+    parent_capability_id TEXT NOT NULL,
+    broker_capability_id TEXT NOT NULL,
+    request_digest TEXT NOT NULL,
+    request_canonical_digest TEXT NOT NULL,
+    proof_digest TEXT NOT NULL,
+    proof_key_id TEXT NOT NULL,
+    proof_nonce TEXT NOT NULL,
+    nonce_expires_at INTEGER NOT NULL CHECK(nonce_expires_at >= 0),
+    hold_id TEXT NOT NULL UNIQUE,
+    authorize_event_id TEXT NOT NULL UNIQUE,
+    reverse_event_id TEXT NOT NULL UNIQUE,
+    capture_event_id TEXT NOT NULL UNIQUE,
+    quotas_json BLOB NOT NULL,
+    authority_metadata_digest TEXT NOT NULL,
+    revocation_authority_domain TEXT NOT NULL,
+    state TEXT NOT NULL CHECK(state IN (
+        'registered', 'prepared', 'held', 'captured', 'dispatch_committed',
+        'reversed', 'unknown_outcome', 'completed', 'failed'
+    )),
+    dispatch_claim_id TEXT,
+    revocation_set_digest TEXT,
+    budget_commit_index INTEGER,
+    revocation_commit_index INTEGER,
+    authority_commit_index INTEGER,
+    leader_epoch INTEGER,
+    response_digest TEXT,
+    updated_at INTEGER NOT NULL CHECK(updated_at >= 0)
+) STRICT;
 
-            ALTER TABLE broker_nonces RENAME TO broker_nonces_before_registration;
-            ALTER TABLE broker_attempts RENAME TO broker_attempts_before_registration;
+CREATE TABLE broker_nonces (
+    proof_key_id TEXT NOT NULL,
+    proof_nonce TEXT NOT NULL,
+    attempt_id TEXT NOT NULL UNIQUE,
+    expires_at INTEGER NOT NULL CHECK(expires_at >= 0),
+    PRIMARY KEY (proof_key_id, proof_nonce),
+    FOREIGN KEY (attempt_id) REFERENCES broker_attempts(attempt_id)
+        ON DELETE RESTRICT
+) STRICT;
 
-            CREATE TABLE broker_attempts (
-                attempt_id TEXT PRIMARY KEY,
-                operation_id TEXT NOT NULL UNIQUE,
-                invocation_id TEXT NOT NULL,
-                parent_capability_id TEXT NOT NULL,
-                broker_capability_id TEXT NOT NULL,
-                request_digest TEXT NOT NULL,
-                proof_digest TEXT NOT NULL,
-                proof_key_id TEXT NOT NULL,
-                proof_nonce TEXT NOT NULL,
-                nonce_expires_at INTEGER NOT NULL CHECK(nonce_expires_at >= 0),
-                hold_id TEXT NOT NULL UNIQUE,
-                authorize_event_id TEXT NOT NULL UNIQUE,
-                reverse_event_id TEXT NOT NULL UNIQUE,
-                capture_event_id TEXT NOT NULL UNIQUE,
-                quotas_json BLOB NOT NULL,
-                authority_metadata_digest TEXT NOT NULL,
-                state TEXT NOT NULL CHECK(state IN (
-                    'registered', 'prepared', 'held', 'captured', 'dispatch_committed',
-                    'reversed', 'unknown_outcome', 'completed', 'failed'
-                )),
-                dispatch_claim_id TEXT,
-                revocation_set_digest TEXT,
-                budget_commit_index INTEGER,
-                revocation_commit_index INTEGER,
-                authority_commit_index INTEGER,
-                leader_epoch INTEGER,
-                response_digest TEXT,
-                updated_at INTEGER NOT NULL CHECK(updated_at >= 0)
-            ) STRICT;
+CREATE INDEX idx_broker_attempts_recovery
+    ON broker_attempts(state, updated_at, attempt_id);
+"#;
 
-            INSERT INTO broker_attempts (
-                attempt_id, operation_id, invocation_id, parent_capability_id,
-                broker_capability_id, request_digest, proof_digest, proof_key_id,
-                proof_nonce, nonce_expires_at, hold_id, authorize_event_id,
-                reverse_event_id, capture_event_id, quotas_json,
-                authority_metadata_digest, state, revocation_set_digest,
-                budget_commit_index, revocation_commit_index,
-                authority_commit_index, leader_epoch, response_digest, updated_at
-            )
-            SELECT
-                attempt_id, operation_id, invocation_id, parent_capability_id,
-                broker_capability_id, request_digest, proof_digest, proof_key_id,
-                proof_nonce, nonce_expires_at, hold_id, authorize_event_id,
-                reverse_event_id, capture_event_id, quotas_json,
-                authority_metadata_digest, state, revocation_set_digest,
-                budget_commit_index, revocation_commit_index,
-                authority_commit_index, leader_epoch, response_digest, updated_at
-            FROM broker_attempts_before_registration;
-
-            CREATE TABLE broker_nonces (
-                proof_key_id TEXT NOT NULL,
-                proof_nonce TEXT NOT NULL,
-                attempt_id TEXT NOT NULL UNIQUE,
-                expires_at INTEGER NOT NULL CHECK(expires_at >= 0),
-                PRIMARY KEY (proof_key_id, proof_nonce),
-                FOREIGN KEY (attempt_id) REFERENCES broker_attempts(attempt_id)
-                    ON DELETE RESTRICT
-            ) STRICT;
-
-            INSERT INTO broker_nonces (proof_key_id, proof_nonce, attempt_id, expires_at)
-            SELECT proof_key_id, proof_nonce, attempt_id, expires_at
-            FROM broker_nonces_before_registration;
-
-            DROP TABLE broker_nonces_before_registration;
-            DROP TABLE broker_attempts_before_registration;
-            CREATE INDEX idx_broker_attempts_recovery
-                ON broker_attempts(state, updated_at, attempt_id);
-
-            COMMIT;
-            PRAGMA foreign_keys = ON;
-            "#,
-        )
-        .map_err(storage)
-}
-
-fn migrate_dispatch_claim_column(connection: &Connection) -> Result<()> {
-    let mut statement = connection
-        .prepare("PRAGMA table_info(broker_attempts)")
-        .map_err(storage)?;
-    let columns = statement
-        .query_map([], |row| row.get::<_, String>(1))
-        .map_err(storage)?
-        .collect::<std::result::Result<Vec<_>, _>>()
-        .map_err(storage)?;
-    drop(statement);
-    if !columns.iter().any(|column| column == "dispatch_claim_id") {
-        connection
-            .execute(
-                "ALTER TABLE broker_attempts ADD COLUMN dispatch_claim_id TEXT",
-                [],
-            )
-            .map_err(storage)?;
-    }
-    Ok(())
-}
-
-fn migrate_registration_binding_columns(connection: &Connection) -> Result<()> {
-    let mut statement = connection
-        .prepare("PRAGMA table_info(broker_attempts)")
-        .map_err(storage)?;
-    let columns = statement
-        .query_map([], |row| row.get::<_, String>(1))
-        .map_err(storage)?
-        .collect::<std::result::Result<Vec<_>, _>>()
-        .map_err(storage)?;
-    drop(statement);
-    if !columns
-        .iter()
-        .any(|column| column == "request_canonical_digest")
-    {
-        connection
-            .execute(
-                "ALTER TABLE broker_attempts ADD COLUMN request_canonical_digest TEXT NOT NULL DEFAULT ''",
-                [],
-            )
-            .map_err(storage)?;
-    }
-    if !columns
-        .iter()
-        .any(|column| column == "revocation_authority_domain")
-    {
-        connection
-            .execute(
-                "ALTER TABLE broker_attempts ADD COLUMN revocation_authority_domain TEXT NOT NULL DEFAULT ''",
-                [],
-            )
-            .map_err(storage)?;
-    }
-    // Rows written before canonical request binding cannot be resumed safely.
-    // Preserve them for audit, but terminalize them during the schema upgrade.
-    connection
-        .execute(
-            r#"
-            UPDATE broker_attempts
-            SET request_canonical_digest = ?1,
-                revocation_authority_domain = 'legacy-unbound',
-                state = 'failed',
-                dispatch_claim_id = NULL
-            WHERE request_canonical_digest = ''
-               OR revocation_authority_domain = ''
-            "#,
-            params!["0".repeat(64)],
-        )
-        .map_err(storage)?;
-    Ok(())
+fn schema_error(error: SchemaVersionError) -> BrokerError {
+    BrokerError::Storage(format!("broker attempt store schema: {error}"))
 }
 
 impl DurableBrokerDatabaseFile {
@@ -1397,6 +1252,67 @@ mod tests {
 
     use super::*;
     use crate::store::derive_attempt_ids;
+
+    fn migrate_seeded(seed: &str) -> Result<SqliteAttemptStore> {
+        let connection = Connection::open_in_memory().map_err(storage)?;
+        connection.execute_batch(seed).map_err(storage)?;
+        let store = SqliteAttemptStore {
+            connection: Mutex::new(connection),
+            durable_file: None,
+        };
+        store.migrate()?;
+        Ok(store)
+    }
+
+    fn assert_storage_refusal(result: Result<SqliteAttemptStore>, expected: &str) {
+        match result {
+            Err(BrokerError::Storage(message)) => assert_eq!(message, expected),
+            Err(other) => panic!("unexpected attempt store error: {other}"),
+            Ok(_) => panic!("attempt store opened a database it must refuse"),
+        }
+    }
+
+    #[test]
+    fn attempt_store_reopens_its_current_schema() {
+        let store = SqliteAttemptStore::open_in_memory().test_expect("fresh attempt store");
+        store.migrate().test_expect("current schema reopens");
+        let version: i32 = store
+            .connection()
+            .test_expect("connection")
+            .query_row(
+                "SELECT version FROM chio_store_schema_versions WHERE store_key = 'broker_attempts'",
+                [],
+                |row| row.get(0),
+            )
+            .test_expect("schema stamp");
+        assert_eq!(version, BROKER_ATTEMPT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn attempt_store_refuses_a_stale_schema_stamp() {
+        assert_storage_refusal(
+            migrate_seeded(
+                "PRAGMA application_id = 1128810831;
+                 CREATE TABLE broker_attempts (attempt_id TEXT PRIMARY KEY);
+                 CREATE TABLE chio_store_schema_versions (
+                     store_key TEXT PRIMARY KEY,
+                     version INTEGER NOT NULL
+                 );
+                 INSERT INTO chio_store_schema_versions VALUES ('broker_attempts', 0);",
+            ),
+            "broker attempt store schema: database schema version 0 is not the current schema version 1; refusing to open",
+        );
+    }
+
+    #[test]
+    fn attempt_store_refuses_an_unstamped_populated_database() {
+        assert_storage_refusal(
+            migrate_seeded(
+                "CREATE TABLE broker_attempts (attempt_id TEXT PRIMARY KEY, state TEXT NOT NULL);",
+            ),
+            "broker attempt store schema: database application_id 0x0 is not a Chio store (expected 0x4348494f)",
+        );
+    }
 
     fn registration(nonce: &str) -> AttemptRegistration {
         let request_digest = "a".repeat(64);
