@@ -17,13 +17,19 @@ set_option autoImplicit false
 
 namespace Chio.Treaty
 
-/-- Ordered governance modes accepted by the production ladder parser. -/
+/--
+  Governance ladder modes ordered by intensity as fixed in
+  `spec/CHIO_LADDER.md` section 3: `observation < guarded < receipt_backed <
+  partition_contingency < maintenance`. Maintenance ranks highest because it
+  requires authenticated operator presence. `quorum-required` is a consistency
+  model attached to an action class, not a mode.
+-/
 inductive TrustMode where
   | observation
   | guarded
   | receiptBacked
   | partitionContingency
-  | quorumRequired
+  | maintenance
   deriving Repr, BEq, DecidableEq, Inhabited
 
 def TrustMode.rank : TrustMode -> Nat
@@ -31,7 +37,7 @@ def TrustMode.rank : TrustMode -> Nat
   | .guarded => 1
   | .receiptBacked => 2
   | .partitionContingency => 3
-  | .quorumRequired => 4
+  | .maintenance => 4
 
 def TrustMode.atLeast (mode floor : TrustMode) : Bool :=
   decide (floor.rank <= mode.rank)
@@ -303,6 +309,110 @@ theorem negated_unknown_mode_denies
     (hMode : view.resolvedMode = none) :
     denote (.neg (.atom (.modeAtLeast floor))) view = false := by
   simp [denote, supported, defined, atomDefined, hMode]
+
+/-- Whether an atom without a semantics occurs anywhere in a predicate. -/
+def containsUnsupported : Predicate -> Bool
+  | .atom tag => !supportedAtom tag
+  | .top => false
+  | .bot => false
+  | .conj p q => containsUnsupported p || containsUnsupported q
+  | .disj p q => containsUnsupported p || containsUnsupported q
+  | .neg p => containsUnsupported p
+
+/-- Whether an atom the projected input cannot interpret occurs anywhere in a predicate. -/
+def containsUndefined : Predicate -> AdmissionView -> Bool
+  | .atom tag, view => !atomDefined tag view
+  | .top, _ => false
+  | .bot, _ => false
+  | .conj p q, view => containsUndefined p view || containsUndefined q view
+  | .disj p q, view => containsUndefined p view || containsUndefined q view
+  | .neg p, view => containsUndefined p view
+
+/-- `supported` is false exactly when an unsupported atom occurs somewhere in the tree. -/
+theorem containsUnsupported_eq_not_supported (predicate : Predicate) :
+    containsUnsupported predicate = !supported predicate := by
+  induction predicate with
+  | atom tag => rfl
+  | top => rfl
+  | bot => rfl
+  | conj p q ihp ihq => simp [containsUnsupported, supported, ihp, ihq]
+  | disj p q ihp ihq => simp [containsUnsupported, supported, ihp, ihq]
+  | neg p ih => simp [containsUnsupported, supported, ih]
+
+/-- `defined` is false exactly when an undefined atom occurs somewhere in the tree. -/
+theorem containsUndefined_eq_not_defined
+    (predicate : Predicate) (view : AdmissionView) :
+    containsUndefined predicate view = !defined predicate view := by
+  induction predicate with
+  | atom tag => rfl
+  | top => rfl
+  | bot => rfl
+  | conj p q ihp ihq => simp [containsUndefined, defined, ihp, ihq]
+  | disj p q ihp ihq => simp [containsUndefined, defined, ihp, ihq]
+  | neg p ih => simp [containsUndefined, defined, ih]
+
+theorem contains_unsupported_denies
+    (predicate : Predicate) (view : AdmissionView)
+    (hContains : containsUnsupported predicate = true) :
+    denote predicate view = false := by
+  apply unsupported_predicate_denies
+  rw [containsUnsupported_eq_not_supported] at hContains
+  simpa using hContains
+
+theorem contains_undefined_denies
+    (predicate : Predicate) (view : AdmissionView)
+    (hContains : containsUndefined predicate view = true) :
+    denote predicate view = false := by
+  apply undefined_predicate_denies
+  rw [containsUndefined_eq_not_defined] at hContains
+  simpa using hContains
+
+/-- Atoms occurring in a predicate, in left-to-right order. -/
+def atoms : Predicate -> List AtomTag
+  | .atom tag => [tag]
+  | .top => []
+  | .bot => []
+  | .conj p q => atoms p ++ atoms q
+  | .disj p q => atoms p ++ atoms q
+  | .neg p => atoms p
+
+theorem supported_eq_all_atoms (predicate : Predicate) :
+    supported predicate = (atoms predicate).all supportedAtom := by
+  induction predicate with
+  | atom tag => simp [supported, atoms]
+  | top => rfl
+  | bot => rfl
+  | conj p q ihp ihq => simp [supported, atoms, ihp, ihq]
+  | disj p q ihp ihq => simp [supported, atoms, ihp, ihq]
+  | neg p ih => simp [supported, atoms, ih]
+
+theorem defined_eq_all_atoms (predicate : Predicate) (view : AdmissionView) :
+    defined predicate view =
+      (atoms predicate).all (fun tag => atomDefined tag view) := by
+  induction predicate with
+  | atom tag => simp [defined, atoms]
+  | top => rfl
+  | bot => rfl
+  | conj p q ihp ihq => simp [defined, atoms, ihp, ihq]
+  | disj p q ihp ihq => simp [defined, atoms, ihp, ihq]
+  | neg p ih => simp [defined, atoms, ih]
+
+theorem unsupported_atom_anywhere_denies
+    (predicate : Predicate) (view : AdmissionView) (name : String)
+    (hMember : AtomTag.unsupported name ∈ atoms predicate) :
+    denote predicate view = false := by
+  apply unsupported_predicate_denies
+  rw [supported_eq_all_atoms]
+  exact List.all_eq_false.mpr ⟨_, hMember, by simp [supportedAtom]⟩
+
+theorem undefined_atom_anywhere_denies
+    (predicate : Predicate) (view : AdmissionView) (tag : AtomTag)
+    (hMember : tag ∈ atoms predicate)
+    (hUndefined : atomDefined tag view = false) :
+    denote predicate view = false := by
+  apply undefined_predicate_denies
+  rw [defined_eq_all_atoms]
+  exact List.all_eq_false.mpr ⟨tag, hMember, by simp [hUndefined]⟩
 
 /-- A finite list of predicates evaluated conjunctively. -/
 structure SyntacticConstitution where
