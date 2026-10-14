@@ -28,7 +28,7 @@ It excludes unrelated adapter/Hermes edits, the separate technical-paper edits,
 formal Lean edits and large unrelated evidence campaigns. No private run-state
 directory is copied into the repository.
 
-The [candidate inventory](00-candidate-inventory.json) freshly hashes all
+The [candidate inventory](https://github.com/bb-connor/arc/blob/archive/pr1173-head-20261014/docs/market/open-agent-work/execution/00-candidate-inventory.json) freshly hashes all
 163 workspace-member manifests, 142 functional crates, three standalone research
 manifests and the 82 previously reviewed source files. All match that source
 inventory. It records declared features/test targets and this run's selection;
