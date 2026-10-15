@@ -130,9 +130,8 @@ pub struct PlatformProbe {
 
 impl PlatformProbe {
     /// A probe over the host. With `require_enforcement`, a missing
-    /// prerequisite is an error; otherwise it is a warning, because a
-    /// developer host that only provisions and serves at migration stage
-    /// Disabled does not need the cage.
+    /// prerequisite is an error; otherwise it is a warning, because a host
+    /// that only provisions launch material does not run the cage.
     pub fn host(require_enforcement: bool) -> Self {
         Self::with_source(Box::new(HostPlatform), require_enforcement)
     }
@@ -177,7 +176,7 @@ impl Probe for PlatformProbe {
             )
             .with_help(
                 "cage enforcement evidence is produced on Linux x86_64 with kernel 6.7 or newer; \
-                 a host without these still provisions and serves at migration stage Disabled",
+                 a host without these can provision launch material but cannot launch tools",
             )
         };
         let mut report = report

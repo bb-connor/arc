@@ -208,7 +208,7 @@ fn provision_native_mcp_runtime(
         .arg(env::var("CHIO_CAGE_INIT").map_err(|_| "set CHIO_CAGE_INIT to the canonical static cage helper path")?)
         .arg("--receipt-rollback-anchor-root")
         .arg(env::var("CHIO_RECEIPT_ANCHOR_ROOT").map_err(|_| "set CHIO_RECEIPT_ANCHOR_ROOT to a private directory on a separate persistent filesystem")?)
-        .args(["--stage", "enforced", "--max-artifact-bytes", "268435456"])
+        .args(["--max-artifact-bytes", "268435456"])
         .arg("--output-dir")
         .arg(security_dir)
         .arg("--tools-fixture")

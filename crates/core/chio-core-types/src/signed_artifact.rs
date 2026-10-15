@@ -307,7 +307,7 @@ pub const CHIO_SWARM_BUDGET_POOL_V1_SCHEMA: &str = "chio.swarm.budget-pool.v1";
 pub const CHIO_SWARM_REVOCATION_EPOCH_V1_SCHEMA: &str = "chio.swarm.revocation-epoch.v1";
 pub const CHIO_SWARM_AUTHORITY_VERIFIER_REPORT_V1_SCHEMA: &str =
     "chio.swarm.authority-verifier-report.v1";
-pub const CHIO_TOOL_MANIFEST_V2_SCHEMA: &str = "chio.manifest.v2";
+pub const CHIO_TOOL_MANIFEST_SCHEMA: &str = "chio.manifest.v1";
 
 type SignedArtifactSchemaSpec = (&'static str, Option<(&'static str, &'static str)>);
 
@@ -1191,8 +1191,8 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("swarm_authority_verifier_report", "swarm-authority-v1")),
     ),
     (
-        CHIO_TOOL_MANIFEST_V2_SCHEMA,
-        Some(("tool_manifest", "manifest-v2")),
+        CHIO_TOOL_MANIFEST_SCHEMA,
+        Some(("tool_manifest", "manifest-v1")),
     ),
     (AZURE_MAA_ATTESTATION_SCHEMA, None),
     (AWS_NITRO_ATTESTATION_SCHEMA, None),

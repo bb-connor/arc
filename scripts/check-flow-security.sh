@@ -192,7 +192,7 @@ run_exact_target --label "flow lattice and enforcement engine" --expected \
   lattice::tests::top_is_mathematical_top_but_operationally_denied_on_egress \
   -- cargo test -p chio-flow --features std --lib
 
-run_exact_target --label "strict manifest v2" --expected \
+run_exact_target --label "strict manifest" --expected \
   cage_authorization_binds_registry_manifest_and_every_tool_topology \
   cage_authorization_requires_profile_matched_runtime_topology \
   changing_flow_metadata_invalidates_manifest_signature \
@@ -206,11 +206,14 @@ run_exact_target --label "strict manifest v2" --expected \
   json_boundary::signed_file_preserves_existing_numeric_schema_contract \
   json_boundary::signed_file_rejects_fractional_precision_aliases \
   json_boundary::signed_file_rejects_shadowed_nested_schema_keywords \
+  manifest_rejects_alternate_json_spellings_of_signed_fields \
+  manifest_rejects_noncanonical_permission_spellings \
+  manifest_schema_accepts_runtime_shape_and_rejects_unknown_nested_fields \
+  manifest_signs_and_verifies_with_normalized_permissions \
+  old_permission_shape_under_the_current_id_is_refused_structurally \
+  old_tool_shape_under_the_current_id_is_refused_structurally \
   required_permissions_reject_implicit_ports_and_loader_environment \
-  v2_manifest_signs_and_verifies_with_normalized_permissions \
-  v2_rejects_alternate_json_spellings_of_signed_fields \
-  v2_rejects_noncanonical_permission_spellings \
-  v2_schema_accepts_runtime_shape_and_rejects_unknown_nested_fields \
+  retired_manifest_ids_are_refused_as_unsupported_schema \
   verified_registry_admits_provider_server_tools_only_as_remote_egress \
   verified_registry_composes_registered_key_policy_and_runtime_topology \
   verified_registry_merge_preserves_security_and_rejects_duplicates_atomically \
@@ -218,7 +221,7 @@ run_exact_target --label "strict manifest v2" --expected \
   verified_registry_rejects_tampering_and_remote_tools_without_policy_clearance \
   verified_registry_requires_an_exact_live_bridge_security_value \
   verified_registry_runtime_requirement_includes_derived_remote_topology \
-  -- cargo test -p chio-manifest --test manifest_v2
+  -- cargo test -p chio-manifest --test manifest_admission
 
 run_exact_target --label "security kernel adapters" --expected \
   atomic_post_evidence_remains_bound_to_each_concurrent_response \

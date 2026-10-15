@@ -17,7 +17,7 @@ It is allowed to own:
 - signing and verification helpers
 - receipt parsing and verification helpers
 - capability parsing and verification helpers
-- signed manifest parsing and verification helpers
+- signed `chio.manifest.v1` parsing and verification helpers
 - stable bindings-oriented error codes
 
 It is not allowed to own:
@@ -76,7 +76,7 @@ The current public export surface is:
 - `CapabilityTimeStatus`
 - `CapabilityVerification`
 
-### Signed manifests
+### Signed manifests (`chio.manifest.v1`)
 
 - `parse_signed_manifest_json`
 - `signed_manifest_body_canonical_json`

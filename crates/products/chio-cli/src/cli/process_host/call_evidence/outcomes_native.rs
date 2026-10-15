@@ -233,7 +233,8 @@ mod tests {
         assert_eq!(
             error.to_string(),
             CliError::cli_other_error(
-                "native launch evidence: expected the pinned server's selected Enforced policy"
+                "failed to parse cage launch policy exported-launch-policy: \
+                 urn:chio:error:attest:signed-json-invalid-shape"
             )
             .to_string()
         );

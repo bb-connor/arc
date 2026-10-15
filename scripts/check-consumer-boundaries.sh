@@ -48,7 +48,7 @@ run_case "supervisor readiness invalid configuration" supervise::readiness::secu
 run_case "supervisor readiness private addresses" supervise::readiness::security_tests::readiness_accepts_operator_selected_private_addresses cargo test -p chio-cli --bin chio
 run_case "operator readiness DNS deadline" operator_readiness::tests::dns_uses_the_async_resolver_inside_the_deadline cargo test -p chio-egress-contract --features reqwest-egress --lib
 run_case "supervisor readiness rejects before child launch" invalid_http_readiness_refuses_to_start_the_service cargo test -p chio-cli --test security_supervise
-run_case "current signed manifest corpus" current_manifest_consumer_corpus_preserves_wire_and_registered_signature cargo test -p chio-manifest --test manifest_v2
+run_case "current signed manifest corpus" current_manifest_consumer_corpus_preserves_wire_and_registered_signature cargo test -p chio-manifest --test manifest_admission
 run_target "Rust generated protocol corpus" generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures cargo test -p chio-core-types --test protocol_primitives_generated
 run_case "authoritative protocol schema corpus" protocol_primitives_shared_fixtures_match_authoritative_schemas cargo test -p chio-core-types --test wire_protocol_schema
 run_case "signed receipt origin vocabulary" receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary cargo test -p chio-core-types --test wire_protocol_schema

@@ -114,7 +114,5 @@ pub(crate) use cage_policy::{
 pub(crate) use emit_config::cmd_mcp_emit_config;
 pub(crate) use governed_sim::{cmd_mcp_governed_sim, GovernedSimArgs};
 pub(crate) use manifest::cmd_mcp_print_scopes;
-pub(crate) use provision::{
-    cmd_provision_native_mcp_demo, cmd_provision_reference_runtime, ProvisionReferenceRuntimeArgs,
-};
+pub(crate) use provision::{cmd_provision_reference_runtime, ProvisionReferenceRuntimeArgs};
 pub(crate) use wrap::{cmd_mcp_wrap_e2e_fixture, cmd_mcp_wrap_run, McpWrapArgs};

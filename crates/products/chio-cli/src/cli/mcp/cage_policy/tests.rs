@@ -96,12 +96,9 @@ pub(super) fn policy(
         enterprise_migration: CageMigrationPolicy {
             state_database_path: PathBuf::from("/operator/enterprise-migration.sqlite3"),
             deployment_id,
-            stage: chio_security_types::EnterpriseMigrationStage::Enforced,
             trusted_transition_signers: vec![keypair.public_key()],
-            minimum_head: chio_security_types::EnterpriseMigrationMinimumHead {
+            head: chio_security_types::EnterpriseMigrationHead {
                 key: migration_key,
-                minimum_generation: chio_security_types::EnterpriseMigrationStage::Enforced
-                    .generation(),
                 transition_digest: chio_security_types::ports::Digest32::new([0x77; 32]),
             },
         },
@@ -138,9 +135,13 @@ fn test_launch_contract() -> chio_security_types::CageLaunchContractDigests {
     }
 }
 
-fn durable_migration_policy_at_stage(
+fn durable_migration_policy(directory: &Path) -> (CageMigrationPolicy, chio_core::Keypair) {
+    durable_migration_policy_with_evidence(directory, 0x31)
+}
+
+fn durable_migration_policy_with_evidence(
     directory: &Path,
-    target_stage: chio_security_types::EnterpriseMigrationStage,
+    evidence: u8,
 ) -> (CageMigrationPolicy, chio_core::Keypair) {
     let trusted_directory = directory
         .canonicalize()
@@ -166,81 +167,38 @@ fn durable_migration_policy_at_stage(
         .test_expect("cage migration open policy"),
     )
     .test_expect("open cage migration ledger");
-    let genesis = chio_security_types::EnterpriseMigrationTransitionBody::genesis(
+    let body = chio_security_types::EnterpriseMigrationTransitionBody::enforced(
         key.clone(),
         chio_security_types::cage_migration_posture_digest(
             &deployment_id,
             &tool_server_id,
-            chio_security_types::EnterpriseMigrationStage::Disabled,
             &test_launch_contract(),
         )
-        .test_expect("cage migration genesis posture"),
-        chio_security_types::ports::Digest32::new([0x31; 32]),
+        .test_expect("cage migration posture"),
+        chio_security_types::ports::Digest32::new([evidence; 32]),
         chio_security_types::ports::Digest32::new([0x32; 32]),
         chio_security_types::ports::Digest32::new([0x33; 32]),
         1,
         signer.public_key().to_hex(),
     )
-    .test_expect("cage migration genesis body");
-    let genesis = chio_store_sqlite::sign_enterprise_migration_transition(genesis, &signer)
-        .test_expect("sign cage migration genesis");
+    .test_expect("cage migration registration body");
+    let registration = chio_store_sqlite::sign_enterprise_migration_transition(body, &signer)
+        .test_expect("sign cage migration registration");
     let _ = store
-        .register(&genesis)
-        .test_expect("register cage migration genesis");
-    let mut state = store
+        .register(&registration)
+        .test_expect("register cage migration ledger");
+    let state = store
         .load(&key)
-        .test_expect("load cage migration genesis")
-        .test_expect("cage migration genesis exists");
-    while state.stage < target_stage {
-        let next = state.stage.next().test_expect("cage migration next stage");
-        let body = chio_security_types::EnterpriseMigrationTransitionBody::promotion(
-            &state,
-            chio_security_types::cage_migration_posture_digest(
-                &deployment_id,
-                &tool_server_id,
-                next,
-                &test_launch_contract(),
-            )
-            .test_expect("cage migration promotion posture"),
-            chio_security_types::ports::Digest32::new(
-                [0x40_u8.saturating_add(next.generation() as u8); 32],
-            ),
-            chio_security_types::ports::Digest32::new(
-                [0x50_u8.saturating_add(next.generation() as u8); 32],
-            ),
-            chio_security_types::ports::Digest32::new(
-                [0x60_u8.saturating_add(next.generation() as u8); 32],
-            ),
-            next.generation().saturating_add(10),
-            signer.public_key().to_hex(),
-        )
-        .test_expect("cage migration promotion body");
-        let transition = chio_store_sqlite::sign_enterprise_migration_transition(body, &signer)
-            .test_expect("sign cage migration promotion");
-        let _ = store
-            .compare_and_promote(&transition)
-            .test_expect("promote cage migration state");
-        state = store
-            .load(&key)
-            .test_expect("load promoted cage migration state")
-            .test_expect("promoted cage migration state exists");
-    }
+        .test_expect("load cage migration registration")
+        .test_expect("cage migration registration exists");
     (
         CageMigrationPolicy {
             state_database_path,
             deployment_id,
-            stage: target_stage,
             trusted_transition_signers: vec![signer.public_key()],
-            minimum_head: state.minimum_head(),
+            head: state.head(),
         },
         signer,
-    )
-}
-
-fn durable_migration_policy(directory: &Path) -> (CageMigrationPolicy, chio_core::Keypair) {
-    durable_migration_policy_at_stage(
-        directory,
-        chio_security_types::EnterpriseMigrationStage::Enforced,
     )
 }
 
@@ -361,14 +319,12 @@ fn migration_posture_changes_with_every_authority_component() {
     let first_posture = chio_security_types::cage_migration_posture_digest(
         &deployment_id,
         &tool_server_id,
-        chio_security_types::EnterpriseMigrationStage::Enforced,
         &first_contract,
     )
     .test_expect("first posture");
     let changed_posture = chio_security_types::cage_migration_posture_digest(
         &deployment_id,
         &tool_server_id,
-        chio_security_types::EnterpriseMigrationStage::Enforced,
         &changed_contract,
     )
     .test_expect("changed posture");
@@ -441,66 +397,55 @@ fn launch_factory_pins_verified_policy_bytes_at_construction() {
 }
 
 #[test]
-fn cage_migration_revalidates_after_preparation_and_recovers_only_by_rebuild() {
+fn cage_migration_binding_fails_closed_when_the_ledger_is_replaced() {
     let directory = tempfile::tempdir().test_expect("cage migration test directory");
-    let (policy, signer) = durable_migration_policy(directory.path());
+    let (policy, _signer) = durable_migration_policy(directory.path());
     let enforcer =
         load_cage_migration_enforcer(&policy, "cage-policy-test", &test_launch_contract())
             .test_expect("load enforced cage migration binding");
     enforcer
-        .require_enforced()
+        .revalidate()
         .test_expect("revalidate unchanged cage migration binding");
 
-    let store = chio_store_sqlite::SqliteEnterpriseMigrationStateStore::open(
+    let replacement = tempfile::tempdir().test_expect("replacement ledger directory");
+    let (replacement_policy, _) =
+        durable_migration_policy_with_evidence(replacement.path(), 0x41);
+    std::fs::remove_file(&policy.state_database_path).test_expect("remove pinned ledger");
+    std::fs::copy(
+        &replacement_policy.state_database_path,
         &policy.state_database_path,
-        chio_store_sqlite::SqliteEnterpriseMigrationOpenPolicy::new(
-            vec![signer.public_key()],
-            Vec::new(),
-        )
-        .test_expect("mutating cage migration open policy"),
     )
-    .test_expect("open mutating cage migration ledger");
-    let prior = store
-        .load(&policy.minimum_head.key)
-        .test_expect("load enforced cage migration state")
-        .test_expect("enforced cage migration state exists");
-    let tool_server_id = policy.minimum_head.key.scope_id.clone();
-    let body = chio_security_types::EnterpriseMigrationTransitionBody::promotion(
-        &prior,
-        chio_security_types::cage_migration_posture_digest(
-            &policy.deployment_id,
-            &tool_server_id,
-            chio_security_types::EnterpriseMigrationStage::LegacyRemoved,
-            &test_launch_contract(),
-        )
-        .test_expect("legacy-removed cage posture"),
-        chio_security_types::ports::Digest32::new([0x71; 32]),
-        chio_security_types::ports::Digest32::new([0x72; 32]),
-        chio_security_types::ports::Digest32::new([0x73; 32]),
-        20,
-        signer.public_key().to_hex(),
-    )
-    .test_expect("legacy-removed cage transition body");
-    let transition = chio_store_sqlite::sign_enterprise_migration_transition(body, &signer)
-        .test_expect("sign legacy-removed cage transition");
-    let _ = store
-        .compare_and_promote(&transition)
-        .test_expect("promote cage migration beyond retained binding");
-    let promoted = store
-        .load(&policy.minimum_head.key)
-        .test_expect("load legacy-removed cage state")
-        .test_expect("legacy-removed cage state exists");
+    .test_expect("install a different valid ledger");
+    assert!(enforcer.revalidate().is_err());
 
-    assert!(enforcer.require_enforced().is_err());
-    let mut rebuilt_policy = policy;
-    rebuilt_policy.stage = chio_security_types::EnterpriseMigrationStage::LegacyRemoved;
-    rebuilt_policy.minimum_head = promoted.minimum_head();
-    let rebuilt =
-        load_cage_migration_enforcer(&rebuilt_policy, "cage-policy-test", &test_launch_contract())
-            .test_expect("rebuild cage migration binding at the anchored head");
-    rebuilt
-        .require_enforced()
-        .test_expect("revalidate rebuilt cage migration binding");
+    let error = load_cage_migration_enforcer(&policy, "cage-policy-test", &test_launch_contract())
+        .err()
+        .test_expect("a replaced ledger cannot satisfy the pinned registration head");
+    assert_eq!(
+        error.to_string(),
+        CliError::cli_other_error(
+            "cage migration ledger denied: enterprise migration state schema or transition ledger failed integrity validation"
+        )
+        .to_string()
+    );
+}
+
+#[test]
+fn cage_migration_binding_refuses_a_different_launch_posture() {
+    let directory = tempfile::tempdir().test_expect("cage migration test directory");
+    let (policy, _signer) = durable_migration_policy(directory.path());
+    let mut changed_contract = test_launch_contract();
+    changed_contract.limits_digest = chio_security_types::ports::Digest32::new([0x99; 32]);
+    let error = load_cage_migration_enforcer(&policy, "cage-policy-test", &changed_contract)
+        .err()
+        .test_expect("a different launch contract cannot bind the registered posture");
+    assert_eq!(
+        error.to_string(),
+        CliError::cli_other_error(
+            "cage migration runtime binding denied: enterprise migration posture differs from the registered posture"
+        )
+        .to_string()
+    );
 }
 
 #[test]
@@ -752,31 +697,36 @@ fn unprotected_wrapper_uses_signed_registry_flow_requirement() {
 }
 
 #[test]
-fn inactive_signed_policies_cannot_prepare_native_launches() {
-    for stage in [
-        chio_security_types::EnterpriseMigrationStage::Disabled,
-        chio_security_types::EnterpriseMigrationStage::Shadow,
+fn staged_migration_policy_shapes_are_refused() {
+    let body = policy(
+        chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+        chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+    );
+    let current = serde_json::to_value(&body).test_unwrap();
+    for (field, value) in [
+        ("stage", serde_json::json!("enforced")),
+        ("minimum_head", current["enterprise_migration"]["head"].clone()),
     ] {
-        let mut body = policy(
-            chio_manifest::NativeSyscallProfile::NativeMinimalV1,
-            chio_manifest::NativeSyscallProfile::NativeMinimalV1,
-        );
-        body.enterprise_migration.stage = stage;
-        let signer = chio_core::Keypair::from_seed(&[91; 32]);
-        let bytes = chio_core::canonical_json_bytes(&signed_policy(body, &signer)).test_unwrap();
-        let error = load_native_mcp_launch_from_bytes(
-            Path::new("/not-opened/policy.json"),
-            &bytes,
-            &signer.public_key(),
-            "/operator/mcp-server",
-            &[],
-            None,
-        )
-        .test_expect_err("inactive migration cannot authorize a native launch");
+        let mut staged = current.clone();
+        staged["enterprise_migration"][field] = value;
+        let error = serde_json::from_value::<McpCageLaunchPolicy>(staged)
+            .err()
+            .test_expect("a staged migration policy shape decoded");
         assert!(
-            error
-                .to_string()
-                .contains("requires an enforced migration stage")
+            error.to_string().starts_with(&format!("unknown field `{field}`")),
+            "{field}: {error}"
         );
     }
+    let mut generation_bound = current;
+    generation_bound["enterprise_migration"]["head"]["minimum_generation"] =
+        serde_json::json!(2);
+    let error = serde_json::from_value::<McpCageLaunchPolicy>(generation_bound)
+        .err()
+        .test_expect("a generation-bounded head decoded");
+    assert!(
+        error
+            .to_string()
+            .starts_with("unknown field `minimum_generation`"),
+        "{error}"
+    );
 }

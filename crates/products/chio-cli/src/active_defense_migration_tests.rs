@@ -37,7 +37,7 @@ fn tool(name: &str, flow: Option<ToolFlowDeclaration>) -> ToolDefinition {
     }
 }
 
-fn signed_v2_registration(
+fn signed_registration(
     signer: &Keypair,
     registry_id: &str,
     flow: Option<ToolFlowDeclaration>,
@@ -53,7 +53,7 @@ fn signed_v2_registration(
         required_permissions: None,
         public_key: signer.public_key().to_hex(),
     };
-    let signed = sign_manifest(&manifest, signer).test_expect("sign v2 manifest");
+    let signed = sign_manifest(&manifest, signer).test_expect("sign manifest");
     ManifestRegistration {
         registry_id: registry_id.to_string(),
         registered_key_id: "manifest-key".to_string(),
@@ -87,7 +87,7 @@ fn base_input(signer: &Keypair) -> ShadowMigrationInput {
             public_key: signer.public_key(),
         }],
         receipt_public_keys: Vec::new(),
-        manifests: vec![signed_v2_registration(
+        manifests: vec![signed_registration(
             signer,
             "registry.one",
             Some(ToolFlowDeclaration::public_egress()),
@@ -161,12 +161,12 @@ fn signed_backfill_receipt(
 }
 
 #[test]
-fn verifies_v2_against_the_registered_key_and_rejects_a_tampered_body() {
+fn verifies_manifest_against_the_registered_key_and_rejects_a_tampered_body() {
     let signer = key(1);
     let input = base_input(&signer);
     let report = build_shadow_migration_report(input.clone()).test_expect("verified report");
     assert_eq!(report.manifests.len(), 1);
-    assert_eq!(report.manifests[0].outcome, ManifestOutcome::VerifiedV2);
+    assert_eq!(report.manifests[0].outcome, ManifestOutcome::Verified);
 
     let mut tampered = input;
     tampered.manifests[0].signed_envelope.manifest["name"] =
@@ -175,32 +175,24 @@ fn verifies_v2_against_the_registered_key_and_rejects_a_tampered_body() {
 }
 
 #[test]
-fn rejects_manifest_v1_even_with_an_authentic_signature() {
+fn rejects_the_old_manifest_shape_under_the_current_id_even_when_signed() {
     let signer = key(2);
-    let v1 = serde_json::json!({
-        "schema": "chio.manifest.v1",
-        "server_id": "server.legacy",
-        "name": "Legacy Server",
-        "description": "legacy",
+    let old_shape = serde_json::json!({
+        "schema": TOOL_MANIFEST_SCHEMA,
+        "server_id": "server.old-shape",
+        "name": "Old Shape Server",
         "version": "1.0.0",
         "tools": [{
             "name": "read",
             "description": "read fixture",
             "input_schema": {"type": "object"},
-            "output_schema": {"type": "object"},
-            "annotations": {
-                "read_only": true,
-                "destructive": false,
-                "idempotent": true,
-                "requires_approval": false,
-                "estimated_duration_ms": 999
-            }
+            "has_side_effects": false
         }],
-        "server_tools": [],
-        "required_permissions": null,
         "public_key": signer.public_key().to_hex()
     });
-    let (signature, _) = signer.sign_canonical(&v1).test_expect("sign v1");
+    let (signature, _) = signer
+        .sign_canonical(&old_shape)
+        .test_expect("sign old-shape manifest");
     let input = ShadowMigrationInput {
         schema: SHADOW_MIGRATION_INPUT_SCHEMA.to_string(),
         manifest_public_keys: vec![RegisteredPublicKey {
@@ -209,10 +201,10 @@ fn rejects_manifest_v1_even_with_an_authentic_signature() {
         }],
         receipt_public_keys: Vec::new(),
         manifests: vec![ManifestRegistration {
-            registry_id: "registry.legacy".to_string(),
+            registry_id: "registry.old-shape".to_string(),
             registered_key_id: "manifest-key".to_string(),
             signed_envelope: ManifestEnvelope {
-                manifest: v1,
+                manifest: old_shape,
                 signature,
                 signer_key: signer.public_key(),
             },
@@ -233,12 +225,28 @@ fn rejects_manifest_v1_even_with_an_authentic_signature() {
     };
 
     assert!(matches!(build_shadow_migration_report(input.clone()),
-        Err(ShadowMigrationError::Invalid(message)) if message == "manifest schema is unsupported: chio.manifest.v1"));
+        Err(ShadowMigrationError::Input(chio_core::canonical::UntrustedJsonError::Decode(error)))
+            if error.to_string() == "unknown field `has_side_effects`, expected one of `name`, `description`, `input_schema`, `output_schema`, `pricing`, `annotations`, `latency_hint`, `flow`"));
 
     let mut forged = input;
     forged.manifests[0].signed_envelope.manifest["version"] =
         serde_json::Value::String("9.9.9".to_string());
     assert!(build_shadow_migration_report(forged).is_err());
+}
+
+#[test]
+fn rejects_the_retired_manifest_id_even_when_signed() {
+    let signer = key(2);
+    let mut input = base_input(&signer);
+    input.manifests[0].signed_envelope.manifest["schema"] =
+        serde_json::Value::String("chio.manifest.v2".to_string());
+    let (signature, _) = signer
+        .sign_canonical(&input.manifests[0].signed_envelope.manifest)
+        .test_expect("re-sign retired-id manifest");
+    input.manifests[0].signed_envelope.signature = signature;
+    assert!(matches!(build_shadow_migration_report(input),
+        Err(ShadowMigrationError::Invalid(message))
+            if message == "manifest schema is unsupported: chio.manifest.v2"));
 }
 
 #[test]
@@ -249,7 +257,7 @@ fn reports_egress_adapter_purpose_credential_and_cage_findings() {
     let flow = ToolFlowDeclaration::new(None, Some(InformationLabel::bottom()), true, purposes)
         .test_expect("flow");
     let mut input = base_input(&signer);
-    input.manifests[0] = signed_v2_registration(&signer, "registry.one", Some(flow));
+    input.manifests[0] = signed_registration(&signer, "registry.one", Some(flow));
     let deployment = &mut input.manifests[0].tools[0];
     deployment.policy_clearances.clear();
     deployment.adapters[0].preserves_exact_flow_declaration = false;
@@ -278,7 +286,7 @@ fn reports_egress_adapter_purpose_credential_and_cage_findings() {
 }
 
 #[test]
-fn backfill_requires_pinned_receipts_and_verified_v2_manifest_evidence() {
+fn backfill_requires_pinned_receipts_and_verified_manifest_evidence() {
     let manifest_signer = key(4);
     let receipt_signer = key(5);
     let mut input = base_input(&manifest_signer);

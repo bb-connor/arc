@@ -21,7 +21,7 @@ cargo test --locked -p chio-cli --features real-linux-enforcement --test process
 
 The `mcp_auth_server`, `mcp_serve`, and `mcp_serve_http` integration targets use
 the same enforcing host. Their shared helper calls
-`chio security provision-reference-runtime --stage enforced --discover-tools`.
+`chio security provision-reference-runtime --discover-tools`.
 It requires the following inputs from the fixture action:
 
 - `CHIO_CAGE_INIT` and `CHIO_RECEIPT_ANCHOR_ROOT`.

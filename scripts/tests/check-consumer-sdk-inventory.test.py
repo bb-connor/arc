@@ -18,12 +18,12 @@ SPEC.loader.exec_module(MODULE)
 
 class SdkInventoryCalibration(unittest.TestCase):
     def test_terminal_inventory_mutations(self):
-        manifest = json.loads((ROOT / "tests/bindings/fixtures/manifest-v2-consumers.json").read_text())["cases"]
+        manifest = json.loads((ROOT / "tests/bindings/fixtures/manifest-consumers.json").read_text())["cases"]
         corpus = json.loads((ROOT / "tests/bindings/fixtures/protocol-primitives-v1.json").read_text())
         primitives, raw = corpus["cases"], corpus["raw_cases"]
         python = ET.Element("testsuites")
         suite = ET.SubElement(python, "testsuite")
-        for name in [f"test_manifest_v2_runtime_corpus[{case['name']}]" for case in manifest] + ["test_protocol_primitives_shared_fixtures_parse_reject_and_round_trip"]:
+        for name in [f"test_manifest_runtime_corpus[{case['name']}]" for case in manifest] + ["test_protocol_primitives_shared_fixtures_parse_reject_and_round_trip"]:
             ET.SubElement(suite, "testcase", name=name)
         for name, status in MODULE.RAW_CASE_STATUS.items():
             raw_case = ET.SubElement(suite, "testcase", name=f"test_protocol_primitives_raw_cases_reject_duplicate_keys[{name}]")
@@ -31,7 +31,7 @@ class SdkInventoryCalibration(unittest.TestCase):
                 ET.SubElement(raw_case, "skipped", type="pytest.xfail")
         go = [{"Action": "pass", "Test": name} for name in [
             "TestGeneratedProtocolPrimitivesConsumeSharedFixtures",
-            "TestGeneratedManifestV2RuntimeCorpus",
+            "TestGeneratedManifestRuntimeCorpus",
             "TestChioToolCallRequestPreservesApprovalSetAndOpaqueExtension",
             "TestProtocolPublicDecoderRejectsMutationsWithoutReplacingPriorValue",
             "TestProtocolNumbersPreserveOpaqueValuesAndRejectTypedOverflow",
@@ -39,7 +39,7 @@ class SdkInventoryCalibration(unittest.TestCase):
             "TestProtocolWireBoundsAndOpaqueDuplicatesReject",
             "TestReceiptOriginRejectsInvalidValuesWithoutReplacingPriorValue",
         ]]
-        for test, fixtures in [("TestGeneratedProtocolPrimitivesConsumeSharedFixtures", primitives + raw), ("TestGeneratedManifestV2RuntimeCorpus", manifest)]:
+        for test, fixtures in [("TestGeneratedProtocolPrimitivesConsumeSharedFixtures", primitives + raw), ("TestGeneratedManifestRuntimeCorpus", manifest)]:
             go.extend({"Action": "pass", "Test": f"{test}/{case['name']}"} for case in fixtures)
         titles = [case["name"] for case in manifest] + [
             "retains the complete shared inventory",

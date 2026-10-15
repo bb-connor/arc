@@ -4,7 +4,7 @@
   "cases": [
     {
       "id": "signed_manifest_signature_tampered",
-      "base": "positive/signed-tool-manifest-v2.json",
+      "base": "positive/signed-tool-manifest-v1.json",
       "mutation": {
         "op": "replace",
         "path": "/signature",
@@ -160,19 +160,35 @@
       }
     },
     {
-      "id": "policy_enterprise_migration_stage_generation_mismatch",
+      "id": "policy_enterprise_migration_retired_stage",
       "base": "positive/mcp-cage-launch-policy-v1.json",
       "mutation": {
-        "op": "replace",
+        "op": "add",
         "path": "/body/enterprise_migration/stage",
-        "value": "shadow"
+        "value": "enforced"
       },
-      "coverage": ["enterprise_migration", "stage_generation_binding"],
+      "coverage": ["enterprise_migration", "closed_vocabulary"],
       "expected": {
         "json_parse_valid": true,
         "json_schema_valid": false,
         "semantic_valid": false,
-        "failure": "migration_stage_generation_mismatch"
+        "failure": "unknown_field"
+      }
+    },
+    {
+      "id": "policy_enterprise_migration_retired_head_generation",
+      "base": "positive/mcp-cage-launch-policy-v1.json",
+      "mutation": {
+        "op": "add",
+        "path": "/body/enterprise_migration/head/minimum_generation",
+        "value": 2
+      },
+      "coverage": ["enterprise_migration", "closed_vocabulary"],
+      "expected": {
+        "json_parse_valid": true,
+        "json_schema_valid": false,
+        "semantic_valid": false,
+        "failure": "unknown_field"
       }
     },
     {

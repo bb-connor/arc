@@ -258,7 +258,6 @@ fn brokered_provisioning_signs_the_exact_connection_and_rejects_rebinding() {
     assert!(first.status.success(), "{}", stderr(&first));
     let report = report(&first);
     assert_eq!(report["broker"], binding);
-    assert_eq!(report["securityMode"], "enforced_cage");
     let policy_path = output.join("cage-launch-policy.json");
     let original = std::fs::read(&policy_path).expect("signed policy");
     let policy = read_json(&policy_path);
@@ -302,11 +301,10 @@ fn brokered_provisioning_signs_the_exact_connection_and_rejects_rebinding() {
 }
 
 #[test]
-fn brokered_provisioning_rejects_legacy_stage_discovery_and_file_grants() {
+fn brokered_provisioning_rejects_discovery_and_file_grants() {
     let fixture = Fixture::new();
     let (_listener, binding, _) = broker_fixture(&fixture);
     for (index, extra) in [
-        vec!["--stage", "shadow"],
         vec!["--discover-tools"],
         vec![
             "--read-path",
@@ -431,20 +429,14 @@ fn an_explicit_artifact_ceiling_is_signed_and_cannot_change_on_reopen() {
 #[test]
 fn enforced_provisioning_refuses_missing_anchor_before_creating_artifacts() {
     let fixture = Fixture::new();
-    for extra in [&[][..], &["--stage", "enforced"][..]] {
-        let output = fixture.output("missing-anchor");
-        let refused = fixture
-            .command(&output)
-            .args(extra)
-            .output()
-            .expect("run provisioner");
-        assert!(!refused.status.success());
-        assert!(stderr(&refused).contains("--receipt-rollback-anchor-root"));
-        assert!(
-            !output.exists(),
-            "failed provisioning created operator state"
-        );
-    }
+    let output = fixture.output("missing-anchor");
+    let refused = fixture.command(&output).output().expect("run provisioner");
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains("--receipt-rollback-anchor-root"));
+    assert!(
+        !output.exists(),
+        "failed provisioning created operator state"
+    );
     let output = fixture.output("file-anchor");
     let refused = fixture.provision(
         &output,
@@ -511,7 +503,7 @@ fn the_receipt_anchor_is_signed_and_cannot_change_on_reopen() {
 }
 
 #[test]
-fn an_enforced_provision_binds_the_helper_the_grants_and_a_promoted_ledger() {
+fn an_enforced_provision_binds_the_helper_the_grants_and_a_registered_ledger() {
     let fixture = Fixture::new();
     let output = fixture.output("enforced");
     let first = fixture.provision(&output, &[]);
@@ -521,16 +513,16 @@ fn an_enforced_provision_binds_the_helper_the_grants_and_a_promoted_ledger() {
         report["schema"],
         "chio.reference-runtime-provision-report.v1"
     );
-    assert_eq!(report["securityMode"], "enforced_cage");
-    assert_eq!(report["containmentEnforced"], true);
-    assert_eq!(report["migrationStage"], "enforced");
-    assert_eq!(report["migrationGeneration"], 2);
-    assert_eq!(
-        report["migrationTransitionDigests"]
-            .as_array()
-            .map(Vec::len),
-        Some(3)
-    );
+    for removed in [
+        "securityMode",
+        "containmentEnforced",
+        "migrationStage",
+        "migrationGeneration",
+        "migrationTransitionDigests",
+    ] {
+        assert!(report.get(removed).is_none(), "{removed} is reported");
+    }
+    assert!(report["artifacts"].get("migrationPromotions").is_none());
     assert_eq!(report["cageInitPath"], fixture.helper.to_str().unwrap());
     assert_eq!(
         report["readPaths"],
@@ -546,33 +538,28 @@ fn an_enforced_provision_binds_the_helper_the_grants_and_a_promoted_ledger() {
             fixture.repository.to_str().unwrap()
         ])
     );
-    let promotions: Vec<PathBuf> = report["artifacts"]["migrationPromotions"]
-        .as_array()
-        .expect("promotions")
-        .iter()
-        .map(|path| PathBuf::from(path.as_str().unwrap()))
-        .collect();
-    assert_eq!(
-        promotions
-            .iter()
-            .map(|path| path.file_name().unwrap().to_string_lossy().into_owned())
-            .collect::<Vec<_>>(),
-        ["cage-migration-shadow.json", "cage-migration-enforced.json"]
+    let registration_path = PathBuf::from(
+        report["artifacts"]["migrationRegistration"]
+            .as_str()
+            .unwrap(),
     );
-    for (promotion, stage) in promotions.iter().zip(["shadow", "enforced"]) {
-        let transition = read_json(promotion);
-        assert_eq!(
-            transition["body"]["to_stage"],
-            stage,
-            "{}",
-            promotion.display()
-        );
+    assert_eq!(
+        registration_path.file_name().unwrap(),
+        "cage-migration-registration.json"
+    );
+    let registration = read_json(&registration_path);
+    for removed in ["generation", "from_stage", "to_stage", "prior_head_digest"] {
+        assert!(registration["body"].get(removed).is_none(), "{removed}");
     }
     let policy = read_json(&output.join("cage-launch-policy.json"));
-    assert_eq!(policy["body"]["enterprise_migration"]["stage"], "enforced");
+    let migration = &policy["body"]["enterprise_migration"];
+    assert!(migration.get("stage").is_none());
+    assert!(migration.get("minimum_head").is_none());
     assert_eq!(
-        policy["body"]["enterprise_migration"]["minimum_head"]["minimum_generation"],
-        2
+        migration["head"]["transition_digest"],
+        json!(hex_to_bytes(
+            report["migrationTransitionDigest"].as_str().unwrap()
+        ))
     );
     assert_eq!(
         policy["body"]["runtime"]["cage_init_path"],
@@ -584,17 +571,10 @@ fn an_enforced_provision_binds_the_helper_the_grants_and_a_promoted_ledger() {
     );
     let manifest = read_json(&output.join("signed-manifest.json"));
     let permissions = &manifest["manifest"]["required_permissions"];
-    let permissions = if permissions.is_null() {
-        &manifest["manifest"]["requiredPermissions"]
-    } else {
-        permissions
-    };
-    let read_paths = if permissions["read_paths"].is_null() {
-        &permissions["readPaths"]
-    } else {
-        &permissions["read_paths"]
-    };
-    assert_eq!(read_paths, &json!([fixture.repository.to_str().unwrap()]));
+    assert_eq!(
+        permissions["read_paths"],
+        json!([fixture.repository.to_str().unwrap()])
+    );
 
     let again = fixture.provision(&output, &[]);
     assert!(again.status.success(), "{}", stderr(&again));
@@ -603,37 +583,50 @@ fn an_enforced_provision_binds_the_helper_the_grants_and_a_promoted_ledger() {
         "a rerun revalidates the same material"
     );
 
-    let enforced = output.join("cage-migration-enforced.json");
-    let mut bytes = std::fs::read(&enforced).expect("read promotion");
+    let mut bytes = std::fs::read(&registration_path).expect("read registration");
     let last = bytes.len() - 2;
     bytes[last] = if bytes[last] == b'a' { b'b' } else { b'a' };
-    std::fs::write(&enforced, bytes).expect("tamper");
+    std::fs::write(&registration_path, bytes).expect("tamper");
     let tampered = fixture.provision(&output, &[]);
     assert!(!tampered.status.success());
     assert!(
-        stderr(&tampered).contains("promotion") || stderr(&tampered).contains("tamper"),
+        stderr(&tampered).contains("registration") || stderr(&tampered).contains("tamper"),
         "{}",
         stderr(&tampered)
     );
 }
 
+fn hex_to_bytes(hex: &str) -> Vec<u8> {
+    (0..hex.len())
+        .step_by(2)
+        .map(|index| u8::from_str_radix(&hex[index..index + 2], 16).unwrap())
+        .collect()
+}
+
 #[test]
-fn a_shadow_provision_has_no_launch_authority() {
+fn the_retired_stage_flag_is_refused_before_creating_artifacts() {
     let fixture = Fixture::new();
-    let output = fixture.output("shadow");
-    let provisioned = fixture
-        .command(&output)
-        .args(["--stage", "shadow"])
-        .output()
-        .expect("provision shadow profile without an anchor");
+    for stage in ["shadow", "enforced"] {
+        let output = fixture.output(&format!("stage-{stage}"));
+        let refused = fixture.provision(&output, &["--stage", stage]);
+        assert!(!refused.status.success());
+        assert!(
+            stderr(&refused).contains("unexpected argument '--stage' found"),
+            "{}",
+            stderr(&refused)
+        );
+        assert!(!output.exists());
+    }
+}
+
+#[test]
+fn the_preflight_refuses_a_different_wrapped_command() {
+    let fixture = Fixture::new();
+    let output = fixture.output("enforced-other-command");
+    let provisioned = fixture.provision(&output, &[]);
     assert!(provisioned.status.success(), "{}", stderr(&provisioned));
-    let report = report(&provisioned);
-    assert_eq!(report["securityMode"], "shadow_preparation_only");
-    assert_eq!(report["containmentEnforced"], false);
-    assert_eq!(report["migrationStage"], "shadow");
-    assert_eq!(report["migrationGeneration"], 1);
-    assert!(output.join("cage-migration-shadow.json").is_file());
-    assert!(!output.join("cage-migration-enforced.json").exists());
+    let other_target = fixture.root.path().join("other-reader");
+    static_executable(&other_target, ELF_TYPE_EXECUTABLE, b"other");
     let preflight = Command::new(chio())
         .args(["security", "preflight", "--signed-manifest"])
         .arg(output.join("signed-manifest.json"))
@@ -652,12 +645,13 @@ fn a_shadow_provision_has_no_launch_authority() {
                 .trim(),
         )
         .args(["--server-id", "reference-repo-reader", "--"])
-        .arg(&fixture.target)
+        .arg(&other_target)
         .arg("--root")
         .arg(&fixture.repository)
         .output()
         .expect("run preflight");
     let text = String::from_utf8_lossy(&preflight.stdout).into_owned();
+    assert!(!preflight.status.success(), "{text}");
     assert!(
         text.contains("launch: refused"),
         "{text}{}",
@@ -773,80 +767,20 @@ fn a_dynamic_target_needs_its_runtime_files_and_a_dynamic_helper_is_refused() {
 }
 
 #[test]
-fn the_demo_provisioner_keeps_its_disabled_stage_report() {
+fn the_removed_demo_provisioner_is_refused() {
     let fixture = Fixture::new();
     let output = fixture.output("demo");
-    let provisioned = Command::new(chio())
+    let refused = Command::new(chio())
         .args(["security", "provision-native-mcp-demo", "--output-dir"])
         .arg(&output)
-        .arg("--tools-fixture")
-        .arg(&fixture.tools)
-        .arg("--target")
-        .arg(&fixture.target)
-        .args([
-            "--execution-uid",
-            "10001",
-            "--execution-gid",
-            "10001",
-            "--server-id",
-            "demo-reader",
-        ])
         .output()
-        .expect("run demo provisioner");
-    assert!(provisioned.status.success(), "{}", stderr(&provisioned));
-    let report = report(&provisioned);
-    assert_eq!(report["schema"], "chio.native-mcp-demo-provision-report.v1");
-    assert_eq!(report["securityMode"], "disabled_preparation_only");
-    assert_eq!(report["migrationStage"], "disabled");
-    assert_eq!(report["migrationGeneration"], 0);
-    for absent in ["cageInitPath", "readPaths", "migrationTransitionDigests"] {
-        assert!(
-            report.get(absent).is_none(),
-            "{absent} must not appear in the demo report"
-        );
-    }
-    assert!(report["artifacts"].get("migrationPromotions").is_none());
-}
-
-#[test]
-fn shadow_discovery_refuses_before_executing_the_target() {
-    let fixture = Fixture::new();
-    let marker = fixture.root.path().join("executed");
-    write_executable(&fixture.target, b"#!/bin/sh\nprintf launched > \"$1\"\n");
-    let output = fixture.output("shadow-discovery");
-    let rejected = Command::new(chio())
-        .args([
-            "security",
-            "provision-reference-runtime",
-            "--stage",
-            "shadow",
-            "--discover-tools",
-        ])
-        .arg("--output-dir")
-        .arg(&output)
-        .arg("--cage-init")
-        .arg(&fixture.helper)
-        .arg("--target")
-        .arg(&fixture.target)
-        .arg("--target-arg")
-        .arg(&marker)
-        .args([
-            "--execution-uid",
-            "10001",
-            "--execution-gid",
-            "10001",
-            "--server-id",
-            "shadow-discovery-reader",
-        ])
-        .output()
-        .expect("run shadow discovery");
-    assert!(!rejected.status.success());
+        .expect("run the removed demo provisioner");
+    assert!(!refused.status.success());
     assert!(
-        stderr(&rejected).contains("live MCP discovery requires an enforced migration stage"),
+        stderr(&refused).contains("unrecognized subcommand 'provision-native-mcp-demo'"),
         "{}",
-        stderr(&rejected)
+        stderr(&refused)
     );
-    assert!(!marker.exists());
     assert!(!output.exists());
 }
 

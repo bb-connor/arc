@@ -47,10 +47,8 @@ class NativeLaunchTests(unittest.TestCase):
                         environment={"PATH": "/usr/bin"},
                     )
             arguments, kwargs = calls[0]
-            self.assertEqual(
-                arguments[1:5],
-                ["security", "provision-reference-runtime", "--stage", "enforced"],
-            )
+            self.assertEqual(arguments[1:3], ["security", "provision-reference-runtime"])
+            self.assertNotIn("--stage", arguments)
             self.assertEqual(arguments[arguments.index("--cage-init") + 1], "/helper")
             self.assertEqual(
                 arguments[arguments.index("--receipt-rollback-anchor-root") + 1], "/anchor"

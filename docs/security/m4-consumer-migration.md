@@ -5,16 +5,20 @@ authorize deployment or qualify a platform. Consult the
 [support ledger](consumer-support.md) and [launch status](launch-status.md) for
 the tested profile and evidence state.
 
-## Manifest v2
+## Tool manifest
 
-`ToolDefinition.annotations.estimated_duration_ms` is no longer a public Rust
-field. Manifest v2 already rejected that field in its authoritative schema.
-Use the existing `latency_hint` field (`instant`, `fast`, `moderate`, or `slow`).
-Do not emit both representations. Only the explicit, private v1 migration
-parser accepts the old field and maps it into the v2 representation.
+The tool manifest schema id is `chio.manifest.v1`. `ToolManifest`,
+`ToolDefinition` and `RequiredPermissions` are closed types with required
+fields, so a payload in the shape shipped by v0.1.0 (tools carrying
+`has_side_effects`, permissions carrying `network_hosts`) is refused by
+structure even when it carries the `chio.manifest.v1` id. The retired id
+`chio.manifest.v2` is refused as an unsupported schema.
 
-Migration is not signature preservation: a migrated manifest must be reviewed
-and signed by the configured publisher before insertion into
+`ToolDefinition.annotations` has no `estimated_duration_ms` field. Use the
+`latency_hint` field (`instant`, `fast`, `moderate`, or `slow`).
+
+There is no conversion path: a manifest in an older shape must be rewritten,
+reviewed and signed by the configured publisher before insertion into
 `VerifiedManifestRegistry`. Discovery documents and unsigned tool descriptions
 cannot replace that registry. Flow declarations remain constrained by the
 host's tenant policy, data-owner policy and effective egress topology.
@@ -144,10 +148,9 @@ its JSON value to 32 KiB. The caller corpus checks wire shape and preservation,
 not the authenticity of its illustrative signatures. M3's exact signed custody gate owns
 that separate contract.
 
-Legacy invariant packages (`chio-py`, `chio-ts`, and `chio-go`) retain their
-explicit manifest-v1 helper contract. Their legacy vector tests are not evidence
-of current manifest-v2 verification. Run both the legacy binding lane and the
-current four-language consumer corpus when changing shared shapes.
+The invariant packages (`chio-py`, `chio-ts`, and `chio-go`) carry no manifest
+helper. Signed manifests are checked by the generated-type lanes against the
+four-language consumer corpus; run it when changing shared shapes.
 
 ## Caller and recovery ownership
 

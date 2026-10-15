@@ -10,18 +10,15 @@ from chio.invariants import (
     canonicalize_json_string,
     parse_capability_json,
     parse_receipt_json,
-    parse_signed_manifest_json,
     receipt_body_canonical_json,
     receipt_signing_body_canonical_json,
     sha256_hex_utf8,
     sign_json_string_ed25519,
     sign_utf8_message_ed25519,
-    signed_manifest_body_canonical_json,
     verify_capability,
     verify_json_string_signature_ed25519,
     verify_receipt,
     verify_receipt_with_trusted_signers,
-    verify_signed_manifest,
     verify_utf8_message_ed25519,
 )
 from chio.errors import ChioInvariantError
@@ -187,21 +184,6 @@ class VectorTests(unittest.TestCase):
                     parse_capability_json(payload)
                 self.assertEqual(raised.exception.code, "json")
                 self.assertEqual(str(raised.exception), "capability must be a JSON object")
-
-    def test_manifest_vectors(self) -> None:
-        fixture = load_vector("manifest")
-        for case in fixture["cases"]:
-            signed_manifest = parse_signed_manifest_json(json.dumps(case["signed_manifest"]))
-            self.assertEqual(
-                signed_manifest_body_canonical_json(signed_manifest),
-                case["manifest_body_canonical_json"],
-                case["id"],
-            )
-            self.assertEqual(
-                verify_signed_manifest(signed_manifest),
-                case["expected"],
-                case["id"],
-            )
 
 
 if __name__ == "__main__":

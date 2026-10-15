@@ -9,9 +9,9 @@
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json"
     },
     {
-      "id": "signed_tool_manifest_v2",
-      "file": "positive/signed-tool-manifest-v2.json",
-      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/signed-tool-manifest-v2.schema.json"
+      "id": "signed_tool_manifest_v1",
+      "file": "positive/signed-tool-manifest-v1.json",
+      "schema_id": "https://chio.world/schemas/chio-wire/v1/security/signed-tool-manifest-v1.schema.json"
     },
     {
       "id": "cage_init_plan_native_v1",

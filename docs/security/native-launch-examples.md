@@ -1,7 +1,7 @@
 # Enforced native launches in examples
 
-Native MCP tools require an Enforced signed reference-runtime policy. Disabled
-and Shadow stages can prepare offline artifacts but cannot launch processes.
+Native MCP tools launch only under a signed reference-runtime policy bound to a
+registered enterprise migration ledger head.
 The shared shell helper, Python process SDK helper, Docker entrypoint and native
 conformance runner all use the same explicit operator configuration:
 
@@ -32,7 +32,7 @@ chio_provision_mcp_launch "$(command -v chio)" "$PWD/reader-security" \
   /absolute/path/to/chio-tool-repo-reader --root /absolute/reviewed/repository
 ```
 
-The helper uses `security provision-reference-runtime --stage enforced` and
+The helper uses `security provision-reference-runtime` and
 confines live tool discovery. It binds the invoking user with its supplementary
 groups, binds every target argument that names a regular file as a read path
 and retained runtime file at its canonical path, and signs an artifact bound

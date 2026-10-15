@@ -17,9 +17,8 @@ use chio_core::crypto::{Keypair, SigningBackend};
 use chio_security_types::clock::{Clock, SystemClock};
 use chio_security_types::ports::{Digest32, RecordId};
 use chio_security_types::{
-    EnterpriseMigrationControl, EnterpriseMigrationKey, EnterpriseMigrationMinimumHead,
-    EnterpriseMigrationRuntimeBinding, EnterpriseMigrationScopeKind, EnterpriseMigrationStage,
-    EnterpriseMigrationStateStore,
+    EnterpriseMigrationControl, EnterpriseMigrationHead, EnterpriseMigrationKey,
+    EnterpriseMigrationRuntimeBinding, EnterpriseMigrationScopeKind, EnterpriseMigrationStateStore,
 };
 use chio_store_sqlite::{SqliteEnterpriseMigrationOpenPolicy, SqliteEnterpriseMigrationStateStore};
 use zeroize::Zeroizing;
@@ -47,8 +46,8 @@ struct MigrationGuardedSigningBackend {
 }
 
 impl MigrationGuardedSigningBackend {
-    fn require_enforced(&self) -> chio_core::error::Result<()> {
-        self.migration_binding.require_enforced().map_err(|error| {
+    fn revalidate(&self) -> chio_core::error::Result<()> {
+        self.migration_binding.revalidate().map_err(|error| {
             chio_core::error::Error::InvalidSignature(format!(
                 "key-log verification migration denied keyring signing: {error}"
             ))
@@ -70,9 +69,9 @@ impl SigningBackend for MigrationGuardedSigningBackend {
     }
 
     fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<chio_core::Signature> {
-        self.require_enforced()?;
+        self.revalidate()?;
         let signature = self.inner.sign_bytes(message)?;
-        self.require_enforced()?;
+        self.revalidate()?;
         Ok(signature)
     }
 
@@ -80,9 +79,9 @@ impl SigningBackend for MigrationGuardedSigningBackend {
         &self,
         message: &[u8],
     ) -> chio_core::error::Result<chio_core::crypto::SigningOutcome> {
-        self.require_enforced()?;
+        self.revalidate()?;
         let outcome = self.inner.sign_bytes_with_identity(message)?;
-        self.require_enforced()?;
+        self.revalidate()?;
         Ok(outcome)
     }
 
@@ -91,9 +90,9 @@ impl SigningBackend for MigrationGuardedSigningBackend {
         expected_key: &chio_core::PublicKey,
         message: &[u8],
     ) -> chio_core::error::Result<chio_core::crypto::SigningOutcome> {
-        self.require_enforced()?;
+        self.revalidate()?;
         let outcome = self.inner.sign_bytes_for_identity(expected_key, message)?;
-        self.require_enforced()?;
+        self.revalidate()?;
         Ok(outcome)
     }
 
@@ -103,9 +102,9 @@ impl SigningBackend for MigrationGuardedSigningBackend {
             chio_core::canonical::CanonicalJsonWitness,
         >,
     ) -> chio_core::error::Result<chio_core::Signature> {
-        self.require_enforced()?;
+        self.revalidate()?;
         let signature = self.inner.sign_canonical_bytes(canonical)?;
-        self.require_enforced()?;
+        self.revalidate()?;
         Ok(signature)
     }
 }
@@ -114,14 +113,14 @@ impl SigningBackend for MigrationGuardedSigningBackend {
 struct KeyLogMigrationBinding(EnterpriseMigrationRuntimeBinding);
 
 impl KeyLogMigrationBinding {
-    fn require_enforced(&self) -> Result<(), chio_security_types::EnterpriseMigrationRuntimeError> {
-        self.0.require_enforced()
+    fn revalidate(&self) -> Result<(), chio_security_types::EnterpriseMigrationRuntimeError> {
+        self.0.revalidate()
     }
 }
 
 impl chio_keyring::KeyLogActivationGuard for KeyLogMigrationBinding {
     fn require_activation(&self) -> chio_keyring::Result<()> {
-        self.require_enforced().map_err(|_| {
+        self.revalidate().map_err(|_| {
             chio_keyring::KeyringError::StateInvariant(
                 "key-log verification migration denied selector activation",
             )
@@ -188,7 +187,7 @@ where
 
 impl KeyringRuntimeComposition {
     fn require_key_log_verification(&self) -> Result<(), CliError> {
-        self.migration_binding.require_enforced().map_err(|error| {
+        self.migration_binding.revalidate().map_err(|error| {
             CliError::cli_other_error(format!(
                 "key-log verification migration enforcement failed: {error}"
             ))
@@ -638,7 +637,7 @@ impl chio_keyring::KeyEnterpriseReceiptSink for ControlPlaneKeyEnterpriseReceipt
         &self,
         receipt: &chio_keyring::SignedKeyEnterpriseReceipt,
     ) -> chio_keyring::Result<()> {
-        self.migration_binding.require_enforced().map_err(|_| {
+        self.migration_binding.revalidate().map_err(|_| {
             chio_keyring::KeyringError::StateInvariant(
                 "key-log verification migration denied enterprise receipt persistence",
             )
@@ -651,7 +650,7 @@ impl chio_keyring::KeyEnterpriseReceiptSink for ControlPlaneKeyEnterpriseReceipt
             .ok_or(chio_keyring::KeyringError::StateInvariant(
                 "production key rotation requires an attached normal receipt store",
             ))?;
-        self.migration_binding.require_enforced().map_err(|_| {
+        self.migration_binding.revalidate().map_err(|_| {
             chio_keyring::KeyringError::StateInvariant(
                 "key-log verification migration denied enterprise receipt verification",
             )
@@ -698,18 +697,12 @@ struct KeyringRuntimeConfig {
 struct KeyLogVerificationMigrationConfig {
     state_database_path: PathBuf,
     deployment_id: RecordId,
-    stage: EnterpriseMigrationStage,
     trusted_transition_signers: Vec<chio_core::PublicKey>,
-    minimum_heads: Vec<EnterpriseMigrationMinimumHead>,
+    heads: Vec<EnterpriseMigrationHead>,
 }
 
 impl KeyLogVerificationMigrationConfig {
     fn validated_key(&self) -> Result<EnterpriseMigrationKey, CliError> {
-        if !self.stage.operational_failure_must_deny() {
-            return Err(CliError::cli_other_error(
-                "production key-log verification migration must be enforced".to_string(),
-            ));
-        }
         if self.trusted_transition_signers.is_empty()
             || self.trusted_transition_signers.len() > 16
             || self
@@ -728,10 +721,7 @@ impl KeyLogVerificationMigrationConfig {
             scope_id: self.deployment_id.clone(),
             control: EnterpriseMigrationControl::KeyLogVerification,
         };
-        if !matches!(self.minimum_heads.as_slice(), [head]
-            if head.key == key && head.is_valid()
-                && head.minimum_generation == self.stage.generation())
-        {
+        if !matches!(self.heads.as_slice(), [head] if head.key == key && head.is_valid()) {
             return Err(CliError::cli_other_error(
                 "key-log migration requires one exact externally anchored deployment head"
                     .to_string(),
@@ -747,21 +737,18 @@ struct KeyLogVerificationMigrationPosture<'a> {
     schema: &'static str,
     deployment_id: &'a RecordId,
     control: EnterpriseMigrationControl,
-    stage: EnterpriseMigrationStage,
     key_log_configuration_binding: chio_core::Hash,
 }
 
 /// Bind an operator's migration transition to the exact key-log trust policy.
 pub fn key_log_verification_migration_posture_digest(
     deployment_id: &RecordId,
-    stage: EnterpriseMigrationStage,
     key_log_configuration_binding: chio_core::Hash,
 ) -> Result<Digest32, CliError> {
     let canonical = chio_core::canonical_json_bytes(&KeyLogVerificationMigrationPosture {
         schema: "chio.key-log-verification-migration-posture.v1",
         deployment_id,
         control: EnterpriseMigrationControl::KeyLogVerification,
-        stage,
         key_log_configuration_binding,
     })?;
     Ok(Digest32::new(
@@ -807,14 +794,13 @@ fn load_key_log_verification_migration_binding(
     )?;
     let posture_digest = key_log_verification_migration_posture_digest(
         &config.deployment_id,
-        config.stage,
         key_log_policy
             .configuration_binding()
             .map_err(|error| CliError::cli_other_error(error.to_string()))?,
     )?;
     let policy = SqliteEnterpriseMigrationOpenPolicy::new(
         config.trusted_transition_signers.clone(),
-        config.minimum_heads.clone(),
+        config.heads.clone(),
     )
     .map_err(|error| {
         CliError::cli_other_error(format!("key-log migration open policy failed: {error}"))
@@ -830,17 +816,11 @@ fn load_key_log_verification_migration_binding(
     );
     let store: Arc<dyn EnterpriseMigrationStateStore> = concrete;
     let binding =
-        EnterpriseMigrationRuntimeBinding::load(&store, &key, config.stage, posture_digest)
-            .map_err(|error| {
-                CliError::cli_other_error(format!(
-                    "key-log verification migration binding failed: {error}"
-                ))
-            })?;
-    binding.require_enforced().map_err(|error| {
-        CliError::cli_other_error(format!(
-            "key-log verification migration is not enforced: {error}"
-        ))
-    })?;
+        EnterpriseMigrationRuntimeBinding::load(&store, &key, posture_digest).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "key-log verification migration binding failed: {error}"
+            ))
+        })?;
     Ok(KeyLogMigrationBinding(binding))
 }
 
@@ -1173,7 +1153,7 @@ fn persist_key_enterprise_receipt(
     receipt_store: &dyn chio_kernel::ReceiptStore,
     migration_binding: &KeyLogMigrationBinding,
 ) -> Result<bool, CliError> {
-    migration_binding.require_enforced().map_err(|error| {
+    migration_binding.revalidate().map_err(|error| {
         CliError::cli_other_error(format!(
             "key-log verification migration denied enterprise receipt verification: {error}"
         ))
@@ -1194,7 +1174,7 @@ fn persist_key_enterprise_receipt(
             "normal receipt store contains conflicting key-enterprise evidence".to_string(),
         )),
         None => {
-            migration_binding.require_enforced().map_err(|error| {
+            migration_binding.revalidate().map_err(|error| {
                 CliError::cli_other_error(format!(
                     "key-log verification migration denied enterprise receipt persistence: {error}"
                 ))
@@ -1817,7 +1797,7 @@ pub(crate) mod tests {
                 .test_unwrap(),
         )
         .test_unwrap();
-        let genesis = EnterpriseMigrationTransitionBody::genesis(
+        let registration = EnterpriseMigrationTransitionBody::enforced(
             key.clone(),
             digest,
             digest,
@@ -1829,18 +1809,12 @@ pub(crate) mod tests {
         .test_unwrap();
         store
             .register(
-                &chio_store_sqlite::sign_enterprise_migration_transition(genesis, &signer)
+                &chio_store_sqlite::sign_enterprise_migration_transition(registration, &signer)
                     .test_unwrap(),
             )
             .test_unwrap();
         let store: Arc<dyn EnterpriseMigrationStateStore> = Arc::new(store);
-        let binding = EnterpriseMigrationRuntimeBinding::load(
-            &store,
-            &key,
-            EnterpriseMigrationStage::Disabled,
-            digest,
-        )
-        .test_unwrap();
+        let binding = EnterpriseMigrationRuntimeBinding::load(&store, &key, digest).test_unwrap();
         let guarded = MigrationGuardedSigningBackend {
             inner: Arc::new(UnreadableSelectorBackend(
                 chio_core::crypto::Ed25519Backend::new(Keypair::from_seed(&[0x42; 32])),
@@ -1871,16 +1845,14 @@ pub(crate) mod tests {
             "enterprise_migration": {
                 "state_database_path": "/var/lib/chio/key-log-migration.sqlite3",
                 "deployment_id": deployment_id,
-                "stage": "enforced",
                 "trusted_transition_signers": [transition_signer.to_hex()],
-                "minimum_heads": [{
+                "heads": [{
                     "key": {
                         "deployment_id": deployment_id,
                         "scope_kind": "deployment",
                         "scope_id": deployment_id,
                         "control": "key_log_verification"
                     },
-                    "minimum_generation": 2,
                     "transition_digest": vec![1_u8; 32]
                 }]
             },
@@ -1918,12 +1890,42 @@ pub(crate) mod tests {
             "max_checkpoint_future_skew_seconds": 30
         });
 
-        let config: KeyringRuntimeConfig = serde_json::from_value(value).test_unwrap();
+        let config: KeyringRuntimeConfig = serde_json::from_value(value.clone()).test_unwrap();
         let key = config.enterprise_migration.validated_key().test_unwrap();
         assert_eq!(key.deployment_id.as_str(), deployment_id);
         assert_eq!(key.scope_id.as_str(), deployment_id);
         assert_eq!(config.witness_public_keys.len(), 3);
         assert_eq!(config.audit_public_keys.len(), 2);
+
+        for (field, field_value) in [
+            ("stage", serde_json::json!("shadow")),
+            ("minimum_heads", serde_json::json!([])),
+        ] {
+            let mut staged = value.clone();
+            staged["enterprise_migration"]
+                .as_object_mut()
+                .test_unwrap()
+                .insert(field.to_string(), field_value);
+            let error = serde_json::from_value::<KeyringRuntimeConfig>(staged).test_unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                format!(
+                    "unknown field `{field}`, expected one of `state_database_path`, \
+                     `deployment_id`, `trusted_transition_signers`, `heads`"
+                )
+            );
+        }
+
+        let mut unanchored = config.enterprise_migration.clone();
+        unanchored.heads[0].key.scope_id = RecordId::new("deployment.other").test_unwrap();
+        assert_eq!(
+            unanchored.validated_key().test_unwrap_err().to_string(),
+            CliError::cli_other_error(
+                "key-log migration requires one exact externally anchored deployment head"
+                    .to_string()
+            )
+            .to_string()
+        );
     }
 
     #[test]

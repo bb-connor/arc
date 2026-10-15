@@ -54,11 +54,7 @@ impl SignedCagePolicyLaunchFactory {
             &self.signed_policy_bytes,
             &self.trusted_policy_signer_key,
         )?;
-        if policy
-            .enterprise_migration
-            .stage
-            .legacy_fallback_permitted()
-            || policy.signed_manifest.manifest.server_id != server_id
+        if policy.signed_manifest.manifest.server_id != server_id
             || policy
                 .signed_manifest
                 .manifest
@@ -70,7 +66,7 @@ impl SignedCagePolicyLaunchFactory {
                 })
         {
             return Err(CliError::cli_other_error(
-                "process broker route requires an Enforced brokered-native policy",
+                "process broker route requires a brokered-native policy",
             ));
         }
         let broker = policy
@@ -126,12 +122,7 @@ impl chio_mcp_adapter::transport::NativeMcpLaunchFactory for SignedCagePolicyLau
             &self.trusted_policy_signer_key,
         )
         .map_err(|error| AdapterError::ConnectionFailed(error.to_string()))?;
-        if policy
-            .enterprise_migration
-            .stage
-            .legacy_fallback_permitted()
-            || policy.signed_manifest.manifest.server_id != expected_server_id
-        {
+        if policy.signed_manifest.manifest.server_id != expected_server_id {
             return Err(AdapterError::ConnectionFailed(
                 "prepared broker policy must enforce the exact tool server".to_string(),
             ));
@@ -233,9 +224,8 @@ pub(crate) struct McpCageLaunchPolicy {
 struct CageMigrationPolicy {
     state_database_path: PathBuf,
     deployment_id: chio_security_types::ports::RecordId,
-    stage: chio_security_types::EnterpriseMigrationStage,
     trusted_transition_signers: Vec<chio_core::PublicKey>,
-    minimum_head: chio_security_types::EnterpriseMigrationMinimumHead,
+    head: chio_security_types::EnterpriseMigrationHead,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -350,11 +340,10 @@ pub(super) struct ProvisionedCeilings {
 #[allow(dead_code)]
 pub(super) struct ProvisionedCagePolicyInput {
     pub(super) max_artifact_bytes: u64,
-    pub(super) receipt_rollback_anchor_root: Option<PathBuf>,
+    pub(super) receipt_rollback_anchor_root: PathBuf,
     pub(super) signed_manifest: chio_manifest::SignedManifest,
     pub(super) registered_public_key: chio_core::PublicKey,
     pub(super) policy_signer_public_key: chio_core::PublicKey,
-    pub(super) stage: chio_security_types::EnterpriseMigrationStage,
     pub(super) ceilings: ProvisionedCeilings,
     pub(super) broker: Option<ProvisionedBrokerBinding>,
     pub(super) syscall_profile: chio_manifest::NativeSyscallProfile,
@@ -376,8 +365,8 @@ pub(super) struct ProvisionedCagePolicyInput {
 }
 
 /// Constructs and signs the exact private policy types consumed by native MCP
-/// launch. Disabled and Shadow artifacts are preparation only. Runtime
-/// launch admission requires an enforced durable migration binding.
+/// launch. Runtime launch admission requires the durable migration
+/// registration the policy pins.
 #[allow(dead_code)]
 pub(super) struct ProvisionedCagePolicyFactory {
     input: ProvisionedCagePolicyInput,
@@ -393,17 +382,17 @@ impl ProvisionedCagePolicyFactory {
             ));
         }
         input.execution_identity.validate().map_err(|error| {
-            CliError::cli_other_error(format!("demo cage execution identity is invalid: {error}"))
+            CliError::cli_other_error(format!("provisioned cage execution identity is invalid: {error}"))
         })?;
         chio_manifest::verify_manifest(&input.signed_manifest, &input.registered_public_key)
             .map_err(|error| {
                 CliError::cli_other_error(format!(
-                    "demo native MCP manifest verification failed: {error}"
+                    "provisioned native MCP manifest verification failed: {error}"
                 ))
             })?;
         if input.signed_manifest.manifest.schema != chio_manifest::TOOL_MANIFEST_SCHEMA {
             return Err(CliError::cli_other_error(
-                "demo native MCP provisioning requires an exact signed v2 manifest".to_string(),
+                "native MCP provisioning requires an exact signed manifest".to_string(),
             ));
         }
         let permissions = input
@@ -413,18 +402,17 @@ impl ProvisionedCagePolicyFactory {
             .as_ref()
             .ok_or_else(|| {
                 CliError::cli_other_error(
-                    "demo native MCP manifest requires explicit platform permissions".to_string(),
+                    "provisioned native MCP manifest requires explicit platform permissions".to_string(),
                 )
             })?;
         let expected_profile = if let Some(broker) = &input.broker {
             broker.validate()?;
-            if input.stage != chio_security_types::EnterpriseMigrationStage::Enforced
-                || !input.ceilings.read_paths.is_empty()
+            if !input.ceilings.read_paths.is_empty()
                 || !input.ceilings.write_paths.is_empty()
                 || !input.ceilings.runtime_files.is_empty()
             {
                 return Err(CliError::cli_other_error(
-                    "brokered provisioning requires Enforced stage without file or runtime-file grants".to_string(),
+                    "brokered provisioning requires no file or runtime-file grants".to_string(),
                 ));
             }
             chio_manifest::NativeSyscallProfile::BrokeredNativeV1
@@ -500,18 +488,17 @@ impl ProvisionedCagePolicyFactory {
     pub(super) fn launch_contract(
         &self,
     ) -> Result<chio_security_types::CageLaunchContractDigests, CliError> {
-        let placeholder_minimum_head = chio_security_types::EnterpriseMigrationMinimumHead {
+        let placeholder_head = chio_security_types::EnterpriseMigrationHead {
             key: self.migration_key.clone(),
-            minimum_generation: self.input.stage.generation(),
             transition_digest: chio_security_types::ports::Digest32::new([1_u8; 32]),
         };
-        let policy = self.policy(placeholder_minimum_head)?;
+        let policy = self.policy(placeholder_head)?;
         cage_launch_contract_digests(&policy, &self.input.policy_signer_public_key)
     }
 
     pub(super) fn signed_policy_bytes(
         &self,
-        minimum_head: chio_security_types::EnterpriseMigrationMinimumHead,
+        head: chio_security_types::EnterpriseMigrationHead,
         signer: &chio_core::Keypair,
     ) -> Result<Vec<u8>, CliError> {
         if signer.public_key() != self.input.policy_signer_public_key {
@@ -519,7 +506,7 @@ impl ProvisionedCagePolicyFactory {
                 "cage policy signer does not match the committed policy trust root".to_string(),
             ));
         }
-        let body = self.policy(minimum_head)?;
+        let body = self.policy(head)?;
         let (signature, _) = signer.sign_canonical(&body).map_err(|error| {
             CliError::cli_other_error(format!("failed to sign cage policy: {error}"))
         })?;
@@ -535,17 +522,12 @@ impl ProvisionedCagePolicyFactory {
 
     fn policy(
         &self,
-        minimum_head: chio_security_types::EnterpriseMigrationMinimumHead,
+        head: chio_security_types::EnterpriseMigrationHead,
     ) -> Result<McpCageLaunchPolicy, CliError> {
-        if minimum_head.key != self.migration_key
-            || minimum_head.minimum_generation != self.input.stage.generation()
-            || minimum_head.transition_digest.is_zero()
-        {
-            return Err(CliError::cli_other_error(format!(
-                "cage migration head must bind the exact {:?} generation-{} ledger",
-                self.input.stage,
-                self.input.stage.generation()
-            )));
+        if head.key != self.migration_key || head.transition_digest.is_zero() {
+            return Err(CliError::cli_other_error(
+                "cage migration head must bind the exact tool server registration".to_string(),
+            ));
         }
         Ok(McpCageLaunchPolicy {
             schema: MCP_CAGE_LAUNCH_POLICY_SCHEMA.to_string(),
@@ -583,7 +565,7 @@ impl ProvisionedCagePolicyFactory {
             },
             receipt: CageReceiptRuntimePolicy {
                 database_path: self.input.receipt_database_path.clone(),
-                rollback_anchor_root: self.input.receipt_rollback_anchor_root.clone(),
+                rollback_anchor_root: Some(self.input.receipt_rollback_anchor_root.clone()),
                 signer_seed_path: self.input.receipt_signer_seed_path.clone(),
                 trusted_signer_public_key: self.input.receipt_signer_public_key.to_hex(),
                 capability_id: self.input.receipt_capability_id.clone(),
@@ -592,9 +574,8 @@ impl ProvisionedCagePolicyFactory {
             enterprise_migration: CageMigrationPolicy {
                 state_database_path: self.input.migration_database_path.clone(),
                 deployment_id: self.input.deployment_id.clone(),
-                stage: self.input.stage,
                 trusted_transition_signers: vec![self.input.migration_signer_public_key.clone()],
-                minimum_head,
+                head,
             },
             broker: self
                 .input
@@ -691,19 +672,14 @@ fn load_cage_migration_enforcer(
         scope_id: tool_server_id.clone(),
         control: chio_security_types::EnterpriseMigrationControl::CageEnforcement,
     };
-    if policy.minimum_head.key != expected_key
-        || !policy.minimum_head.is_valid()
-        || policy.minimum_head.minimum_generation != policy.stage.generation()
-    {
+    if policy.head.key != expected_key || !policy.head.is_valid() {
         return Err(CliError::cli_other_error(
-            "cage migration anchor does not match the exact tool server, control, and stage"
-                .to_string(),
+            "cage migration anchor does not match the exact tool server and control".to_string(),
         ));
     }
     let posture = chio_security_types::cage_migration_posture_digest(
         &policy.deployment_id,
         &tool_server_id,
-        policy.stage,
         launch_contract,
     )
     .map_err(|error| {
@@ -711,7 +687,7 @@ fn load_cage_migration_enforcer(
     })?;
     let open_policy = chio_store_sqlite::SqliteEnterpriseMigrationOpenPolicy::new(
         policy.trusted_transition_signers.clone(),
-        vec![policy.minimum_head.clone()],
+        vec![policy.head.clone()],
     )
     .map_err(|error| {
         CliError::cli_other_error(format!("invalid cage migration open policy: {error}"))
@@ -729,7 +705,6 @@ fn load_cage_migration_enforcer(
     chio_security_types::EnterpriseMigrationRuntimeBinding::load(
         &store,
         &expected_key,
-        policy.stage,
         posture,
     )
     .map_err(|error| {
@@ -759,12 +734,10 @@ pub(crate) fn load_native_mcp_launch(
     )
 }
 
-/// Validate a staged provisioned policy without composing
-/// the launch: the signature, the bound server, the stage, the launch
-/// contract and the migration ledger it names. Inactive stages prepare artifacts
-/// only. Composing an enforced launch retains
-/// the cage helper and the target on the enforcing host, which is the
-/// edge's and the preflight's job.
+/// Validate a provisioned policy without composing the launch: the
+/// signature, the bound server, the launch contract and the migration ledger
+/// registration it pins. Composing the launch retains the cage helper and the
+/// target on the enforcing host, which is the edge's and the preflight's job.
 #[allow(dead_code)]
 pub(super) fn validate_provisioned_policy(
     path: &Path,
@@ -772,17 +745,14 @@ pub(super) fn validate_provisioned_policy(
     command: &str,
     args: &[&str],
     expected_server_id: &str,
-    expected_stage: chio_security_types::EnterpriseMigrationStage,
     physical_migration_database_path: &Path,
 ) -> Result<(), CliError> {
     let bytes = read_cage_policy(path)?;
     let policy = decode_cage_policy(path, &bytes, trusted_policy_signer)?;
-    if policy.enterprise_migration.stage != expected_stage
-        || policy.signed_manifest.manifest.server_id != expected_server_id
-    {
-        return Err(CliError::cli_other_error(format!(
-            "provisioned policy must bind the exact server at {expected_stage:?} stage"
-        )));
+    if policy.signed_manifest.manifest.server_id != expected_server_id {
+        return Err(CliError::cli_other_error(
+            "provisioned policy must bind the exact server".to_string(),
+        ));
     }
     let expected_argv = std::iter::once(command.to_string())
         .chain(args.iter().map(|argument| (*argument).to_string()))
@@ -798,22 +768,11 @@ pub(super) fn validate_provisioned_policy(
     let launch_contract = cage_launch_contract_digests(&policy, trusted_policy_signer)?;
     let mut migration = policy.enterprise_migration;
     migration.state_database_path = physical_migration_database_path.to_path_buf();
-    let binding = load_cage_migration_enforcer(
+    load_cage_migration_enforcer(
         &migration,
         &policy.signed_manifest.manifest.server_id,
         &launch_contract,
     )?;
-    if matches!(
-        expected_stage,
-        chio_security_types::EnterpriseMigrationStage::Enforced
-            | chio_security_types::EnterpriseMigrationStage::LegacyRemoved
-    ) {
-        binding.require_enforced().map_err(|error| {
-            CliError::cli_other_error(format!(
-                "provisioned migration ledger does not enforce the launch: {error}"
-            ))
-        })?;
-    }
     Ok(())
 }
 
@@ -826,15 +785,6 @@ fn load_native_mcp_launch_from_bytes(
     admitted_manifest_registry: Option<Arc<chio_manifest::VerifiedManifestRegistry>>,
 ) -> Result<chio_mcp_adapter::transport::CageRequiredLaunch, CliError> {
     let policy = decode_cage_policy(path, bytes, trusted_policy_signer)?;
-    if !matches!(
-        policy.enterprise_migration.stage,
-        chio_security_types::EnterpriseMigrationStage::Enforced
-            | chio_security_types::EnterpriseMigrationStage::LegacyRemoved
-    ) {
-        return Err(CliError::cli_other_error(
-            "native MCP launch requires an enforced migration stage",
-        ));
-    }
     let launch_contract = cage_launch_contract_digests(&policy, trusted_policy_signer)?;
     compose_cage_required_launch(
         policy,
@@ -1012,7 +962,7 @@ fn compose_cage_required_launch_with_prepared_broker(
     }
     if policy.signed_manifest.manifest.schema != chio_manifest::TOOL_MANIFEST_SCHEMA {
         return Err(CliError::cli_other_error(
-            "cage launch policy requires a strict v2 signed manifest".to_string(),
+            "cage launch policy requires a strict signed manifest".to_string(),
         ));
     }
     let declared_permissions = policy
@@ -1116,9 +1066,9 @@ fn compose_cage_required_launch_with_prepared_broker(
     };
     let migration =
         load_cage_migration_enforcer(&policy.enterprise_migration, &server_id, launch_contract)?;
-    migration.require_enforced().map_err(|error| {
+    migration.revalidate().map_err(|error| {
         CliError::cli_other_error(format!(
-            "native MCP launch requires enforced migration: {error}"
+            "native MCP launch requires the registered migration ledger: {error}"
         ))
     })?;
     if policy.runtime.runtime_files.iter().any(|runtime_file| {

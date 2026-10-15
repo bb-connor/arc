@@ -16571,6 +16571,7 @@ dependencies = [
  "chio-core-types",
  "chio-eval-receipt",
  "chio-formal-diff-tests",
+ "chio-manifest",
  "chio-spec-codegen",
  "chio-spec-validate",
  "clap 4.6.0",

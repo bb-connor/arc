@@ -15,11 +15,6 @@ pub(super) fn start(
     inputs: &ProvisionInputs,
     deadline: std::time::Instant,
 ) -> Result<(DiscoveryChild, File, File, File), CliError> {
-    if !inputs.profile.containment_enforced() {
-        return Err(CliError::cli_other_error(
-            "live MCP discovery requires an enforced migration stage; supply --tools-fixture for inactive preparation",
-        ));
-    }
     use chio_manifest::{
         RequiredPermissions, RuntimeToolTopology, ToolAnnotations, ToolDefinition, ToolManifest,
         VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,

@@ -17,7 +17,7 @@ func TestManifestSizeRefusesBeforeAllowedFieldCopy(t *testing.T) {
 	// The allowed value would be copied before the missing-field check unless
 	// the public decoder refuses the whole artifact before preflight starts.
 	payload := []byte(`{"manifest":{"input_schema":"` + strings.Repeat("x", maxSecurityWireBytes) + `"}}`)
-	manifest := SecuritySignedToolManifestV2{SignerKey: "retained-key"}
+	manifest := SecuritySignedToolManifestV1{SignerKey: "retained-key"}
 	want := manifest
 	err := manifest.UnmarshalJSON(payload)
 	if !errors.Is(err, errSecurityWireTooLarge) {
@@ -29,7 +29,7 @@ func TestManifestSizeRefusesBeforeAllowedFieldCopy(t *testing.T) {
 }
 
 func TestManifestExactSizeBoundaryPreservesValidFields(t *testing.T) {
-	path := filepath.Join("..", "..", "..", "tests", "bindings", "fixtures", "manifest-v2-consumers.json")
+	path := filepath.Join("..", "..", "..", "tests", "bindings", "fixtures", "manifest-consumers.json")
 	payload, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -44,7 +44,7 @@ func TestManifestExactSizeBoundaryPreservesValidFields(t *testing.T) {
 		if !fixture.Valid {
 			continue
 		}
-		var want, manifest SecuritySignedToolManifestV2
+		var want, manifest SecuritySignedToolManifestV1
 		if err := json.Unmarshal(fixture.Instance, &want); err != nil {
 			t.Fatal(err)
 		}
@@ -66,8 +66,8 @@ func TestManifestExactSizeBoundaryPreservesValidFields(t *testing.T) {
 	t.Fatal("manifest corpus has no valid size-boundary control")
 }
 
-func TestGeneratedManifestV2RuntimeCorpus(t *testing.T) {
-	path := filepath.Join("..", "..", "..", "tests", "bindings", "fixtures", "manifest-v2-consumers.json")
+func TestGeneratedManifestRuntimeCorpus(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "tests", "bindings", "fixtures", "manifest-consumers.json")
 	payload, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +83,7 @@ func TestGeneratedManifestV2RuntimeCorpus(t *testing.T) {
 	}
 	for _, fixture := range corpus.Cases {
 		t.Run(fixture.Name, func(t *testing.T) {
-			var manifest SecuritySignedToolManifestV2
+			var manifest SecuritySignedToolManifestV1
 			// Exercise the public type's ordinary decoder, not a test-only
 			// strict wrapper which could conceal security-field loss by callers.
 			err := json.Unmarshal(fixture.Instance, &manifest)
@@ -119,7 +119,7 @@ func TestGeneratedManifestV2RuntimeCorpus(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if fmt.Sprintf("%x", sha256.Sum256(canonical)) != "4f9a91d6859c909e118bc89d1645d20da15fc3ac90aae26c4d796e3c56e8d603" {
+			if fmt.Sprintf("%x", sha256.Sum256(canonical)) != "46062e102f1d1dab0c4200c8a8354796fc180f931785ef9dc89363bc1806ffed" {
 				t.Fatal("current manifest canonical vector hash changed")
 			}
 		})

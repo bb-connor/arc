@@ -138,7 +138,7 @@ class EntrypointTests(unittest.TestCase):
         self.assertEqual(len(provisioning), 1)
         command, environment = provisioning[0]
         self.assertEqual(command[:3], [module.EXECUTABLE, "security", "provision-reference-runtime"])
-        self.assertEqual(command[command.index("--stage") + 1], "enforced")
+        self.assertNotIn("--stage", command)
         self.assertEqual(command[command.index("--cage-init") + 1], "/usr/local/bin/chio-cage-init")
         self.assertEqual(command[command.index("--receipt-rollback-anchor-root") + 1], "/independent-anchor")
         self.assertEqual([command[i + 1] for i, value in enumerate(command) if value == "--read-path"], ["/usr/lib", "/opt/chio/examples"])

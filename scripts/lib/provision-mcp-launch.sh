@@ -244,7 +244,6 @@ PY
 
   local -a provision=(
     "${chio}" security provision-reference-runtime
-    --stage enforced
     --cage-init "${cage_init}"
     --receipt-rollback-anchor-root "${anchor_root}"
     --max-artifact-bytes "${max_artifact_bytes}"

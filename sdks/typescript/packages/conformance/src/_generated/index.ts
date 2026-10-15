@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 9ad4818a321c54c0b3ef404efc2f3760edc9e3b3be196a5556a7079d63244c97
+// Schema SHA: b8343ed0237561cac00993a9aa2019cc127e7a0111b0757b7536f69056b26d02
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -9388,122 +9388,6 @@ export namespace Security_McpCageLaunchPolicyV1 {
   export type EnvironmentVariable = string;
   export type Digest = string;
   export type Identifier = string;
-  export type EnterpriseMigration = {
-    [k: string]: unknown;
-  } & {
-    state_database_path: AbsoluteCanonicalPath;
-    deployment_id: Identifier;
-    stage: "disabled" | "shadow" | "enforced" | "legacy_removed";
-    /**
-     * @minItems 1
-     * @maxItems 16
-     */
-    trusted_transition_signers:
-      | [PublicKey]
-      | [PublicKey, PublicKey]
-      | [PublicKey, PublicKey, PublicKey]
-      | [PublicKey, PublicKey, PublicKey, PublicKey]
-      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
-      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
-      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
-      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
-      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
-      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
-      | [
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey
-        ]
-      | [
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey
-        ]
-      | [
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey
-        ]
-      | [
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey
-        ]
-      | [
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey
-        ]
-      | [
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey,
-          PublicKey
-        ];
-    minimum_head: MinimumHead;
-  };
   /**
    * @minItems 32
    * @maxItems 32
@@ -9561,7 +9445,7 @@ export namespace Security_McpCageLaunchPolicyV1 {
   }
   export interface PolicyBody {
     schema: "chio.mcp.cage-launch-policy.v1";
-    signed_manifest: ChioSignedToolManifestV2;
+    signed_manifest: ChioSignedToolManifestV1;
     registered_public_key: PublicKey;
     operator_ceilings: OperatorCeilings;
     runtime: Runtime;
@@ -9573,16 +9457,16 @@ export namespace Security_McpCageLaunchPolicyV1 {
   /**
    * Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.
    */
-  export interface ChioSignedToolManifestV2 {
-    manifest: ChioToolManifestV2;
+  export interface ChioSignedToolManifestV1 {
+    manifest: ChioToolManifestV1;
     signature: string;
     signer_key: string;
   }
   /**
    * Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
    */
-  export interface ChioToolManifestV2 {
-    schema: "chio.manifest.v2";
+  export interface ChioToolManifestV1 {
+    schema: "chio.manifest.v1";
     server_id: string;
     name: string;
     description?: string;
@@ -9724,9 +9608,121 @@ export namespace Security_McpCageLaunchPolicyV1 {
     capability_id: Identifier;
     tenant_id?: Identifier;
   }
-  export interface MinimumHead {
+  export interface EnterpriseMigration {
+    state_database_path: AbsoluteCanonicalPath;
+    deployment_id: Identifier;
+    /**
+     * @minItems 1
+     * @maxItems 16
+     */
+    trusted_transition_signers:
+      | [PublicKey]
+      | [PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey, PublicKey]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ]
+      | [
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey,
+          PublicKey
+        ];
+    head: MigrationHead;
+  }
+  export interface MigrationHead {
     key: MigrationKey;
-    minimum_generation: 0 | 1 | 2 | 3;
     transition_digest: NonzeroDigest32;
   }
   export interface MigrationKey {
@@ -10550,21 +10546,21 @@ export namespace Security_SignedSecurityEventEnvelopeV1 {
 }
 
 // -----------------------------------------------------------------------------
-// Source: spec/schemas/chio-wire/v1/security/signed-tool-manifest-v2.schema.json
-export namespace Security_SignedToolManifestV2 {
+// Source: spec/schemas/chio-wire/v1/security/signed-tool-manifest-v1.schema.json
+export namespace Security_SignedToolManifestV1 {
   /**
    * Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.
    */
-  export interface ChioSignedToolManifestV2 {
-    manifest: ChioToolManifestV2;
+  export interface ChioSignedToolManifestV1 {
+    manifest: ChioToolManifestV1;
     signature: string;
     signer_key: string;
   }
   /**
    * Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
    */
-  export interface ChioToolManifestV2 {
-    schema: "chio.manifest.v2";
+  export interface ChioToolManifestV1 {
+    schema: "chio.manifest.v1";
     server_id: string;
     name: string;
     description?: string;
@@ -10689,13 +10685,13 @@ export namespace Security_ToolFlowDeclaration {
 }
 
 // -----------------------------------------------------------------------------
-// Source: spec/schemas/chio-wire/v1/security/tool-manifest-v2.schema.json
-export namespace Security_ToolManifestV2 {
+// Source: spec/schemas/chio-wire/v1/security/tool-manifest-v1.schema.json
+export namespace Security_ToolManifestV1 {
   /**
    * Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.
    */
-  export interface ChioToolManifestV2 {
-    schema: "chio.manifest.v2";
+  export interface ChioToolManifestV1 {
+    schema: "chio.manifest.v1";
     server_id: string;
     name: string;
     description?: string;

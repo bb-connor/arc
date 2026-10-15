@@ -72,8 +72,6 @@ fn privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup() -> T
                 "security",
                 "provision-reference-runtime",
                 "--discover-tools",
-                "--stage",
-                "enforced",
             ])
             .arg("--output-dir")
             .arg(&output_dir)
@@ -164,7 +162,6 @@ fn privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup() -> T
         if mode == "respond" {
             assert!(result.success(), "{error}");
             let report: serde_json::Value = serde_json::from_slice(&std::fs::read(&stdout)?)?;
-            assert_eq!(report["containmentEnforced"], true);
             assert_eq!(report["reviewedToolCount"], 1);
             assert_eq!(report["reviewedToolsSource"], "discovered");
             let reviewed: serde_json::Value =

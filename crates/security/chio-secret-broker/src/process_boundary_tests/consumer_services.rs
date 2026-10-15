@@ -95,8 +95,6 @@ fn provision(
     let mut args: Vec<String> = [
         "security",
         "provision-reference-runtime",
-        "--stage",
-        "enforced",
         "--max-artifact-bytes",
         "67108864",
     ]

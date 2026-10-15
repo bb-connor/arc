@@ -160,10 +160,11 @@ pub enum GenCommand {
         #[arg(long)]
         check: bool,
     },
-    /// Re-sign the cage launch policy binding vector with the fixed test signer.
+    /// Regenerate the signed tool manifest vector and re-sign the cage launch
+    /// policy vector that embeds it.
     #[command(name = "cage-vectors")]
     CageVectors {
-        /// Compare the generated vector with the committed vector.
+        /// Compare the generated vectors with the committed vectors.
         #[arg(long)]
         check: bool,
     },

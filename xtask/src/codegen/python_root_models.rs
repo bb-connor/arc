@@ -21,7 +21,7 @@ pub(super) fn harden(root: &Path) -> Result<(), XtaskError> {
             &["AbsoluteCanonicalPath", "EnvironmentVariable"][..],
         ),
         (
-            "tool_manifest_v2_schema.py",
+            "tool_manifest_v1_schema.py",
             &["ReadPath", "WritePath", "EnvironmentVariable"][..],
         ),
     ] {

@@ -125,8 +125,6 @@ pub(crate) fn materialize_mcp_security(
         .args([
             "security",
             "provision-reference-runtime",
-            "--stage",
-            "enforced",
             "--discover-tools",
         ])
         .arg("--output-dir")

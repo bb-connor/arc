@@ -1,8 +1,8 @@
 {
   "cases": [
     {
-      "name": "signed-manifest-v2",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "name": "signed-manifest",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": true,
       "instance": {
         "manifest": {
@@ -27,7 +27,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -76,13 +76,13 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
       "name": "unknown-envelope-field",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -107,7 +107,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -156,14 +156,14 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
         "authorized": true
       }
     },
     {
       "name": "unknown-manifest-field",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -188,7 +188,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -238,13 +238,13 @@
           "version": "1.0.0",
           "allow_unconfined": true
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
-      "name": "legacy-latency-authority",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "name": "second-latency-authority",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -269,7 +269,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -319,13 +319,13 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
       "name": "null-flow-alias",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -350,7 +350,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -387,13 +387,13 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
       "name": "null-latency-alias",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -418,7 +418,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -467,13 +467,13 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
       "name": "missing-annotation",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -498,7 +498,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -546,13 +546,13 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
       "name": "numeric-boolean",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -577,7 +577,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -626,13 +626,13 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
       "name": "missing-egress",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -657,7 +657,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -705,13 +705,13 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
       "name": "unknown-flow-field",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -736,7 +736,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -786,13 +786,13 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
       "name": "unknown-native-profile",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -817,7 +817,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -866,13 +866,13 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
-      "name": "legacy-network-hosts",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "name": "old-shape-network-hosts",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -900,7 +900,7 @@
               "api.example.com"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -949,13 +949,13 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
       "name": "missing-network-port",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -979,7 +979,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -1028,13 +1028,13 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
     {
       "name": "zero-network-port",
-      "schema_file": "security/signed-tool-manifest-v2.schema.json",
+      "schema_file": "security/signed-tool-manifest-v1.schema.json",
       "valid": false,
       "instance": {
         "manifest": {
@@ -1059,7 +1059,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "chio.manifest.v2",
+          "schema": "chio.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -1108,7 +1108,7 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "05325a7130fbc7413b37819635f8a47533f3758fa990186a4b967b4167813186ed144223516700dd4d8ba7ac0bac958ee12d20e0fd718e4f43cefe5a88930e01",
+        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     }

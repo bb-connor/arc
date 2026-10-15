@@ -11,18 +11,15 @@ import {
   capabilitySigningBodyCanonicalJson,
   parseCapabilityJson,
   parseReceiptJson,
-  parseSignedManifestJson,
   receiptBodyCanonicalJson,
   receiptSigningBodyCanonicalJson,
   sha256HexUtf8,
   signJsonStringEd25519,
   signUtf8MessageEd25519,
-  signedManifestBodyCanonicalJson,
   verifyCapability,
   verifyJsonStringSignatureEd25519,
   verifyReceipt,
   verifyReceiptWithTrustedSigners,
-  verifySignedManifest,
   verifyUtf8MessageEd25519,
 } from "../src/index.ts";
 
@@ -303,26 +300,5 @@ test("capability parser rejects a token without the v1 schema", () => {
         error.message === 'capability schema must be "chio.capability.v1"',
       payload,
     );
-  }
-});
-
-test("manifest vectors match the TS manifest helpers", async () => {
-  const fixture = await readJson("tests/bindings/vectors/manifest/v1.json") as {
-    cases: Array<{
-      id: string;
-      signed_manifest: unknown;
-      manifest_body_canonical_json: string;
-      expected: unknown;
-    }>;
-  };
-
-  for (const vectorCase of fixture.cases) {
-    const signedManifest = parseSignedManifestJson(JSON.stringify(vectorCase.signed_manifest));
-    assert.equal(
-      signedManifestBodyCanonicalJson(signedManifest),
-      vectorCase.manifest_body_canonical_json,
-      vectorCase.id,
-    );
-    assert.deepEqual(verifySignedManifest(signedManifest), vectorCase.expected, vectorCase.id);
   }
 });

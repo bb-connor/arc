@@ -96,7 +96,7 @@ fn daemon_runtime_config_is_closed_and_rejects_partial_authority_or_storage() {
         .test_expect_err("a runtime config with another schema must be rejected");
 
     let mut missing_binding = valid.clone();
-    missing_binding.enterprise_migration.minimum_heads.clear();
+    missing_binding.enterprise_migration.heads.clear();
     missing_binding
         .validate()
         .test_expect_err("both broker migration bindings are required");
@@ -118,26 +118,32 @@ fn daemon_runtime_config_is_closed_and_rejects_partial_authority_or_storage() {
         .test_expect_err("migration heads must match the configured provider");
 
     let mut wrong_control = valid.clone();
-    wrong_control.enterprise_migration.minimum_heads[0]
-        .key
-        .control = chio_security_types::EnterpriseMigrationControl::BrokerQuotaEnforcement;
+    wrong_control.enterprise_migration.heads[0].key.control =
+        chio_security_types::EnterpriseMigrationControl::BrokerQuotaEnforcement;
     wrong_control
         .validate()
         .test_expect_err("migration heads must bind both exact controls");
 
-    let mut fallback_stage = valid.clone();
-    fallback_stage.enterprise_migration.credential_custody_stage =
-        chio_security_types::EnterpriseMigrationStage::Shadow;
-    fallback_stage
-        .validate()
-        .test_expect_err("production custody migration cannot permit fallback");
-
-    let mut wrong_stage = valid.clone();
-    wrong_stage.enterprise_migration.quota_enforcement_stage =
-        chio_security_types::EnterpriseMigrationStage::LegacyRemoved;
-    wrong_stage
-        .validate()
-        .test_expect_err("migration head generation must equal the configured stage");
+    for (field, value) in [
+        ("credentialCustodyStage", serde_json::json!("shadow")),
+        ("quotaEnforcementStage", serde_json::json!("legacy_removed")),
+        ("minimumHeads", serde_json::json!([])),
+    ] {
+        let mut encoded = serde_json::to_value(&valid).test_expect("encode runtime config");
+        encoded["enterpriseMigration"]
+            .as_object_mut()
+            .test_expect("enterprise migration object")
+            .insert(field.to_string(), value);
+        let error = serde_json::from_value::<BrokerDaemonConfig>(encoded)
+            .test_expect_err("a staged migration field must be refused structurally");
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "unknown field `{field}`, expected one of `stateDatabasePath`, `deploymentId`, \
+                 `credentialProvider`, `trustedTransitionSigners`, `heads`"
+            )
+        );
+    }
 
     let mut reused_runner = valid.clone();
     reused_runner.trusted_audit_runner = reused_runner.broker_identity.clone();
@@ -319,7 +325,7 @@ mod startup {
         let audit_socket = daemon_config.privileged_audit.socket_path.clone();
 
         let mut wrong_head = daemon_config.clone();
-        wrong_head.enterprise_migration.minimum_heads[0].transition_digest =
+        wrong_head.enterprise_migration.heads[0].transition_digest =
             chio_security_types::ports::Digest32::new([0xee; 32]);
         assert!(BrokerDaemonRuntime::build(
             wrong_head,

@@ -17,7 +17,7 @@ pub(super) fn protect(
     profile
         .ceilings
         .forbidden_paths
-        .extend(profile.receipt_rollback_anchor_root.iter().cloned());
+        .insert(profile.receipt_rollback_anchor_root.clone());
     for grant in profile
         .ceilings
         .read_paths
@@ -58,8 +58,10 @@ pub(super) fn existing(profile: &ProvisionProfile) -> Result<BTreeSet<PathBuf>, 
 pub(super) fn runtime_ceilings(profile: &ProvisionProfile, runtime: &Path) -> ProvisionedCeilings {
     // Staging output may be absent in the deployment filesystem. Its exclusion
     // is enforced before discovery; runtime admission retains deployed authority.
-    let mut forbidden_paths = BTreeSet::from([runtime.to_owned()]);
-    forbidden_paths.extend(profile.receipt_rollback_anchor_root.iter().cloned());
+    let forbidden_paths = BTreeSet::from([
+        runtime.to_owned(),
+        profile.receipt_rollback_anchor_root.clone(),
+    ]);
     ProvisionedCeilings {
         forbidden_paths,
         ..profile.ceilings.clone()
@@ -71,14 +73,28 @@ mod tests {
     use super::*;
     use std::error::Error;
 
+    fn profile(anchor: &Path) -> ProvisionProfile {
+        ProvisionProfile {
+            max_artifact_bytes: 1024 * 1024,
+            receipt_rollback_anchor_root: anchor.to_owned(),
+            report_schema: "chio.reference-runtime-provision-report.v1",
+            warning: "",
+            deployment_id_prefix: "chio.reference-runtime.",
+            receipt_capability_id: "reference-runtime-launch",
+            cage_init: PathBuf::from("/operator/chio-cage-init"),
+            ceilings: ProvisionedCeilings::default(),
+            broker: None,
+            syscall_profile: chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+        }
+    }
+
     #[test]
     fn authority_is_excluded_before_creation_and_on_restart() -> Result<(), Box<dyn Error>> {
         let directory = tempfile::tempdir()?;
         let output = directory.path().join("authority");
         let anchors = directory.path().join("anchors");
         std::fs::create_dir(&anchors)?;
-        let mut profile = ProvisionProfile::native_mcp_demo();
-        profile.receipt_rollback_anchor_root = Some(anchors.clone());
+        let mut profile = profile(&anchors);
         protect(&mut profile, &output, &output)?;
         assert_eq!(existing(&profile)?, BTreeSet::from([anchors.clone()]));
         std::fs::create_dir(&output)?;
@@ -108,8 +124,7 @@ mod tests {
         let staging = tempfile::tempdir()?;
         let runtime = tempfile::tempdir()?;
         let anchor = tempfile::tempdir()?;
-        let mut profile = ProvisionProfile::native_mcp_demo();
-        profile.receipt_rollback_anchor_root = Some(anchor.path().to_owned());
+        let mut profile = profile(anchor.path());
         protect(&mut profile, staging.path(), runtime.path())?;
         let deployed = runtime_ceilings(&profile, runtime.path());
         drop(staging);

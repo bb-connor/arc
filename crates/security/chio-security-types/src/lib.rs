@@ -65,16 +65,14 @@ pub use flow::{
 #[cfg(feature = "std")]
 pub use migration::cage_migration_posture_digest;
 pub use migration::{
-    CageLaunchContractDigests, CageMigrationPostureDigestError, EnterpriseMigrationCasOutcome,
-    EnterpriseMigrationControl, EnterpriseMigrationKey, EnterpriseMigrationMinimumHead,
-    EnterpriseMigrationRegisterOutcome, EnterpriseMigrationRuntimeBinding,
-    EnterpriseMigrationRuntimeError, EnterpriseMigrationScopeKind, EnterpriseMigrationStage,
-    EnterpriseMigrationState, EnterpriseMigrationStateStore, EnterpriseMigrationTransition,
-    EnterpriseMigrationTransitionBody, EnterpriseMigrationTransitionValidationError,
-    EnterpriseOperationalFailureDisposition, EnterpriseRuntimeBindingError,
-    CAGE_MIGRATION_POSTURE_SCHEMA, ENTERPRISE_MIGRATION_STATE_SCHEMA_VERSION,
-    ENTERPRISE_MIGRATION_TRANSITION_SIGNATURE_DOMAIN, MAX_ENTERPRISE_MIGRATION_SIGNATURE_BYTES,
-    MAX_ENTERPRISE_MIGRATION_SIGNER_BYTES,
+    CageLaunchContractDigests, CageMigrationPostureDigestError, EnterpriseMigrationControl,
+    EnterpriseMigrationHead, EnterpriseMigrationKey, EnterpriseMigrationRegisterOutcome,
+    EnterpriseMigrationRuntimeBinding, EnterpriseMigrationRuntimeError,
+    EnterpriseMigrationScopeKind, EnterpriseMigrationState, EnterpriseMigrationStateStore,
+    EnterpriseMigrationTransition, EnterpriseMigrationTransitionBody,
+    EnterpriseMigrationTransitionValidationError, CAGE_MIGRATION_POSTURE_SCHEMA,
+    ENTERPRISE_MIGRATION_STATE_SCHEMA_VERSION, ENTERPRISE_MIGRATION_TRANSITION_SIGNATURE_DOMAIN,
+    MAX_ENTERPRISE_MIGRATION_SIGNATURE_BYTES, MAX_ENTERPRISE_MIGRATION_SIGNER_BYTES,
 };
 pub use response::{
     is_legal_response_transition, response_completion_effect_shape_is_valid,

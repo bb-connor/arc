@@ -8,7 +8,7 @@ from chio_sdk._generated.security.mcp_cage_launch_policy_v1_schema import (
     AbsoluteCanonicalPath as LaunchPath,
     EnvironmentVariable as LaunchEnvironmentVariable,
 )
-from chio_sdk._generated.security.tool_manifest_v2_schema import (
+from chio_sdk._generated.security.tool_manifest_v1_schema import (
     EnvironmentVariable,
     ReadPath,
     WritePath,

@@ -49,8 +49,6 @@ fn cage_arguments(
     setting: impl Fn(&str) -> Option<OsString>,
 ) -> Result<Vec<OsString>, RunnerError> {
     let mut arguments = vec![
-        OsString::from("--stage"),
-        OsString::from("enforced"),
         OsString::from("--max-artifact-bytes"),
         OsString::from("67108864"),
     ];
@@ -240,8 +238,6 @@ mod tests {
             _ => None,
         })?;
         let expected: Vec<OsString> = [
-            "--stage",
-            "enforced",
             "--max-artifact-bytes",
             "67108864",
             "--cage-init",

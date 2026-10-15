@@ -12,8 +12,8 @@ use std::sync::Arc;
 use chio_core_types::{Ed25519Backend, PublicKey, SigningBackend};
 use chio_security_types::ports::RecordId;
 use chio_security_types::{
-    EnterpriseMigrationControl, EnterpriseMigrationKey, EnterpriseMigrationMinimumHead,
-    EnterpriseMigrationScopeKind, EnterpriseMigrationStage, EnterpriseMigrationStateStore,
+    EnterpriseMigrationControl, EnterpriseMigrationHead, EnterpriseMigrationKey,
+    EnterpriseMigrationScopeKind, EnterpriseMigrationStateStore,
 };
 use chio_store_sqlite::{SqliteEnterpriseMigrationOpenPolicy, SqliteEnterpriseMigrationStateStore};
 use serde::{Deserialize, Serialize};
@@ -114,9 +114,7 @@ pub struct BrokerDaemonMigrationConfig {
     pub deployment_id: RecordId,
     pub credential_provider: RecordId,
     pub trusted_transition_signers: Vec<PublicKey>,
-    pub minimum_heads: Vec<EnterpriseMigrationMinimumHead>,
-    pub credential_custody_stage: EnterpriseMigrationStage,
-    pub quota_enforcement_stage: EnterpriseMigrationStage,
+    pub heads: Vec<EnterpriseMigrationHead>,
 }
 
 impl BrokerDaemonMigrationConfig {
@@ -134,39 +132,25 @@ impl BrokerDaemonMigrationConfig {
                 .trusted_transition_signers
                 .array_windows::<2>()
                 .any(|pair| pair[0].to_hex() >= pair[1].to_hex())
-            || !self
-                .credential_custody_stage
-                .operational_failure_must_deny()
-            || !self.quota_enforcement_stage.operational_failure_must_deny()
         {
             return Err(BrokerError::InvalidRequest(
-                "daemon enterprise migration signers must be bounded, sorted, and unique, and both controls must deny on failure"
+                "daemon enterprise migration signers must be bounded, sorted, and unique"
                     .to_string(),
             ));
         }
         let expected = [
-            (
-                EnterpriseMigrationKey {
-                    deployment_id: self.deployment_id.clone(),
-                    scope_kind: EnterpriseMigrationScopeKind::Provider,
-                    scope_id: self.credential_provider.clone(),
-                    control: EnterpriseMigrationControl::BrokerCredentialCustody,
-                },
-                self.credential_custody_stage,
-            ),
-            (
-                EnterpriseMigrationKey {
-                    deployment_id: self.deployment_id.clone(),
-                    scope_kind: EnterpriseMigrationScopeKind::Provider,
-                    scope_id: self.credential_provider.clone(),
-                    control: EnterpriseMigrationControl::BrokerQuotaEnforcement,
-                },
-                self.quota_enforcement_stage,
-            ),
-        ];
-        if self.minimum_heads.len() != expected.len()
+            EnterpriseMigrationControl::BrokerCredentialCustody,
+            EnterpriseMigrationControl::BrokerQuotaEnforcement,
+        ]
+        .map(|control| EnterpriseMigrationKey {
+            deployment_id: self.deployment_id.clone(),
+            scope_kind: EnterpriseMigrationScopeKind::Provider,
+            scope_id: self.credential_provider.clone(),
+            control,
+        });
+        if self.heads.len() != expected.len()
             || self
-                .minimum_heads
+                .heads
                 .array_windows::<2>()
                 .any(|pair| pair[0].key >= pair[1].key)
         {
@@ -175,14 +159,10 @@ impl BrokerDaemonMigrationConfig {
                     .to_string(),
             ));
         }
-        for (head, (expected_key, expected_stage)) in self.minimum_heads.iter().zip(expected.iter())
-        {
-            if !head.is_valid()
-                || &head.key != expected_key
-                || head.minimum_generation != expected_stage.generation()
-            {
+        for (head, expected_key) in self.heads.iter().zip(expected.iter()) {
+            if !head.is_valid() || &head.key != expected_key {
                 return Err(BrokerError::InvalidRequest(
-                    "daemon enterprise migration anchor is misbound to its provider, control, or stage"
+                    "daemon enterprise migration anchor is misbound to its provider or control"
                         .to_string(),
                 ));
             }
@@ -537,7 +517,7 @@ impl BrokerDaemonRuntime {
                 .enterprise_migration
                 .trusted_transition_signers
                 .clone(),
-            config.enterprise_migration.minimum_heads.clone(),
+            config.enterprise_migration.heads.clone(),
         )
         .map_err(|error| {
             BrokerError::InvalidRequest(format!(
@@ -571,8 +551,6 @@ impl BrokerDaemonRuntime {
                 &migration_store,
                 &config.enterprise_migration.deployment_id,
                 &config.enterprise_migration.credential_provider,
-                config.enterprise_migration.credential_custody_stage,
-                config.enterprise_migration.quota_enforcement_stage,
             )?);
         prepare_socket_parent(&config.ipc_socket_path, config.trusted_service_uid)?;
         let database_files: [(&Path, &str); 4] = [

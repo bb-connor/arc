@@ -69,15 +69,6 @@ type capabilityVectors struct {
 	} `json:"cases"`
 }
 
-type manifestVectors struct {
-	Cases []struct {
-		Expected                  invariants.ManifestVerification `json:"expected"`
-		ID                        string                          `json:"id"`
-		ManifestBodyCanonicalJSON string                          `json:"manifest_body_canonical_json"`
-		SignedManifest            map[string]any                  `json:"signed_manifest"`
-	} `json:"cases"`
-}
-
 func TestCanonicalVectors(t *testing.T) {
 	var vectors canonicalVectors
 	loadVectorFile(t, filepath.Join(vectorRoot, "canonical", "v1.json"), &vectors)
@@ -337,29 +328,6 @@ func TestCapabilityVectors(t *testing.T) {
 				if withDepth != *testCase.ExpectedWithMaxDelegationDepth {
 					t.Fatalf("unexpected max-depth capability verification: %#v", withDepth)
 				}
-			}
-		})
-	}
-}
-
-func TestManifestVectors(t *testing.T) {
-	var vectors manifestVectors
-	loadVectorFile(t, filepath.Join(vectorRoot, "manifest", "v1.json"), &vectors)
-	for _, testCase := range vectors.Cases {
-		t.Run(testCase.ID, func(t *testing.T) {
-			renderedBody, err := invariants.SignedManifestBodyCanonicalJSON(testCase.SignedManifest)
-			if err != nil {
-				t.Fatalf("SignedManifestBodyCanonicalJSON returned error: %v", err)
-			}
-			if renderedBody != testCase.ManifestBodyCanonicalJSON {
-				t.Fatalf("unexpected manifest body: %s", renderedBody)
-			}
-			verification, err := invariants.VerifySignedManifest(testCase.SignedManifest)
-			if err != nil {
-				t.Fatalf("VerifySignedManifest returned error: %v", err)
-			}
-			if verification != testCase.Expected {
-				t.Fatalf("unexpected manifest verification: %#v", verification)
 			}
 		})
 	}

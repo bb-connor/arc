@@ -1455,16 +1455,6 @@ files = ["crates/tooling/chio-conformance/src/econsim.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
-value = "chio.enterprise-migration-canary-evidence.v1"
-files = ["crates/platform/chio-control-plane/src/security/migration_evidence.rs"]
-first_seen = "b39b131271"
-
-[[schema]]
-value = "chio.enterprise-migration-cutover-attestation.v1"
-files = ["crates/platform/chio-control-plane/src/security/migration_evidence.rs"]
-first_seen = "b39b131271"
-
-[[schema]]
 value = "chio.enterprise-migration-transition.v1"
 files = ["crates/security/chio-security-types/src/migration.rs"]
 first_seen = "6ea79bb5da"
@@ -2980,9 +2970,9 @@ files = ["crates/economy/chio-link/src/monitor.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.manifest.v2"
+value = "chio.manifest.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
-first_seen = "3d3e4b4d9d"
+first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.market.auto-bind.v1"
@@ -3413,11 +3403,6 @@ first_seen = "7e54c14a60"
 value = "chio.native-flow-dispatch-policy.v2"
 files = ["crates/security/chio-security-types/src/flow.rs"]
 first_seen = "252b259d44"
-
-[[schema]]
-value = "chio.native-mcp-demo-provision-report.v1"
-files = ["crates/products/chio-cli/src/cli/mcp/provision.rs"]
-first_seen = "6a12a69155"
 
 [[schema]]
 value = "chio.native-security-authority-binding.v1"

@@ -153,8 +153,8 @@ advance.
 ## Invariants
 
 The `chio.invariants` module exposes canonical JSON, SHA-256 hashing,
-Ed25519 signing and verification, receipt verification, capability
-verification, and signed-manifest verification helpers.
+Ed25519 signing and verification, receipt verification, and capability
+verification helpers.
 
 ## Official Example
 

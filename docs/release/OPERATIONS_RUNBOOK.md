@@ -24,8 +24,8 @@ The current ship boundary is:
 - **receipts and checkpoints:** signed local audit evidence with checkpoint
   export and inclusion-proof material; not public transparency-log semantics
 - **native MCP launch:** exact publisher and cage-policy trust roots, immutable
-  executable and argv bindings, and fail-closed cage launch are mandatory; the
-  demo provisioner remains migration stage `Disabled` and is not containment
+  executable and argv bindings, an enforced migration ledger registration, and
+  fail-closed cage launch are mandatory
 
 ## 1. Required Runtime Inputs
 
@@ -258,10 +258,9 @@ curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
 1. Obtain the publisher-signed manifest, signed cage policy, and their public
    keys through independent registration. Ensure the exact executable, argv,
    working directory, file digests, and operator ceilings match the signed cage
-   policy. `chio security provision-native-mcp-demo` creates demo-only private
-   signers for offline preparation at migration stage `Disabled`; those artifacts
-   cannot launch tools. Native runtime use requires an Enforced reference-runtime
-   policy, the cage helper and independent receipt anchor.
+   policy. `chio security provision-reference-runtime` creates the signed launch
+   material with an enforced migration ledger registration; native runtime use
+   requires that policy, the cage helper and an independent receipt anchor.
 
 2. Create a dedicated session HMAC keyring as a regular mode `0600` file under
    a mode `0700` operator-owned directory. Generate each `keyBase64` from 32
@@ -285,8 +284,7 @@ curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
    and the native-launch policy the way the edge does and refuses what the
    edge would refuse; its exit code follows the worst finding, so a
    supervisor can gate the launch on it. Without `--require-enforcement` a
-   host that cannot enforce the cage, or material provisioned at migration
-   stage `Disabled`, is reported as a warning.
+   host that cannot enforce the cage is reported as a warning.
 
    ```bash
    chio \

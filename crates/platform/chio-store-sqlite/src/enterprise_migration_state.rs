@@ -5,9 +5,8 @@ use std::path::{Component, Path, PathBuf};
 use chio_core::{canonical_json_bytes, sha256, Keypair, PublicKey, Signature};
 use chio_security_types::ports::{Digest32, PortError, PortResult, RecordId};
 use chio_security_types::{
-    EnterpriseMigrationCasOutcome, EnterpriseMigrationControl, EnterpriseMigrationKey,
-    EnterpriseMigrationMinimumHead, EnterpriseMigrationRegisterOutcome,
-    EnterpriseMigrationScopeKind, EnterpriseMigrationStage, EnterpriseMigrationState,
+    EnterpriseMigrationControl, EnterpriseMigrationHead, EnterpriseMigrationKey,
+    EnterpriseMigrationRegisterOutcome, EnterpriseMigrationScopeKind, EnterpriseMigrationState,
     EnterpriseMigrationStateStore, EnterpriseMigrationTransition,
     EnterpriseMigrationTransitionBody, ENTERPRISE_MIGRATION_STATE_SCHEMA_VERSION,
     MAX_ENTERPRISE_MIGRATION_SIGNATURE_BYTES, MAX_ENTERPRISE_MIGRATION_SIGNER_BYTES,
@@ -22,20 +21,16 @@ use crate::store_connection::{StoreConnection, StoreGuard};
 const TABLE_NAME: &str = "enterprise_migration_transitions";
 const NO_UPDATE_TRIGGER_NAME: &str = "enterprise_migration_transitions_no_update";
 const NO_DELETE_TRIGGER_NAME: &str = "enterprise_migration_transitions_no_delete";
-const CHAIN_TRIGGER_NAME: &str = "enterprise_migration_transitions_require_predecessor";
+const RETIRED_TABLE_NAME: &str = "enterprise_migration_state";
 
 const CREATE_TABLE_SQL: &str = r#"
 CREATE TABLE IF NOT EXISTS enterprise_migration_transitions (
     deployment_id TEXT NOT NULL CHECK (length(deployment_id) > 0 AND length(deployment_id) <= 256),
     scope_kind TEXT NOT NULL CHECK (scope_kind IN ('deployment', 'provider', 'tool_server')),
     scope_id TEXT NOT NULL CHECK (length(scope_id) > 0 AND length(scope_id) <= 256),
-    control TEXT NOT NULL CHECK (control IN ('key_log_verification', 'broker_credential_custody', 'broker_quota_enforcement', 'cage_enforcement', 'legacy_configuration')),
+    control TEXT NOT NULL CHECK (control IN ('key_log_verification', 'broker_credential_custody', 'broker_quota_enforcement', 'cage_enforcement')),
     signature_domain TEXT NOT NULL CHECK (signature_domain = 'chio.enterprise-migration-transition.v1'),
     schema_version INTEGER NOT NULL CHECK (schema_version = 1),
-    generation INTEGER NOT NULL CHECK (generation >= 0 AND generation <= 3),
-    from_stage INTEGER,
-    to_stage INTEGER NOT NULL CHECK (to_stage >= 0 AND to_stage <= 3),
-    prior_head_digest BLOB,
     posture_digest BLOB NOT NULL CHECK (length(posture_digest) = 32 AND posture_digest <> zeroblob(32)),
     evidence_digest BLOB NOT NULL CHECK (length(evidence_digest) = 32 AND evidence_digest <> zeroblob(32)),
     authorization_digest BLOB NOT NULL CHECK (length(authorization_digest) = 32 AND authorization_digest <> zeroblob(32)),
@@ -44,19 +39,11 @@ CREATE TABLE IF NOT EXISTS enterprise_migration_transitions (
     signer_public_key TEXT NOT NULL CHECK (length(signer_public_key) > 0 AND length(signer_public_key) <= 8192),
     signature TEXT NOT NULL CHECK (length(signature) > 0 AND length(signature) <= 16384),
     transition_digest BLOB NOT NULL CHECK (length(transition_digest) = 32 AND transition_digest <> zeroblob(32)),
-    PRIMARY KEY (deployment_id, scope_kind, scope_id, control, generation),
-    UNIQUE (deployment_id, scope_kind, scope_id, control, transition_digest),
-    CHECK (generation = to_stage),
+    PRIMARY KEY (deployment_id, scope_kind, scope_id, control),
     CHECK (
         (control = 'key_log_verification' AND scope_kind = 'deployment')
         OR (control IN ('broker_credential_custody', 'broker_quota_enforcement') AND scope_kind = 'provider')
         OR (control = 'cage_enforcement' AND scope_kind = 'tool_server')
-        OR control = 'legacy_configuration'
-    ),
-    CHECK (
-        (generation = 0 AND from_stage IS NULL AND prior_head_digest IS NULL AND to_stage = 0)
-        OR
-        (generation > 0 AND from_stage = generation - 1 AND length(prior_head_digest) = 32 AND prior_head_digest <> zeroblob(32))
     )
 ) STRICT
 "#;
@@ -77,27 +64,7 @@ BEGIN
 END
 "#;
 
-const CREATE_CHAIN_TRIGGER_SQL: &str = r#"
-CREATE TRIGGER IF NOT EXISTS enterprise_migration_transitions_require_predecessor
-BEFORE INSERT ON enterprise_migration_transitions
-WHEN NEW.generation > 0 AND NOT EXISTS (
-    SELECT 1
-    FROM enterprise_migration_transitions AS predecessor
-    WHERE predecessor.deployment_id = NEW.deployment_id
-      AND predecessor.scope_kind = NEW.scope_kind
-      AND predecessor.scope_id = NEW.scope_id
-      AND predecessor.control = NEW.control
-      AND predecessor.generation = NEW.generation - 1
-      AND predecessor.to_stage = NEW.from_stage
-      AND predecessor.transition_digest = NEW.prior_head_digest
-      AND predecessor.trusted_at_unix_ms <= NEW.trusted_at_unix_ms
-)
-BEGIN
-    SELECT RAISE(ABORT, 'enterprise migration transition predecessor is absent or mismatched');
-END
-"#;
-
-const SCHEMA_OBJECTS: [(&str, &str, &str); 4] = [
+const SCHEMA_OBJECTS: [(&str, &str, &str); 3] = [
     ("table", TABLE_NAME, CREATE_TABLE_SQL),
     (
         "trigger",
@@ -109,7 +76,6 @@ const SCHEMA_OBJECTS: [(&str, &str, &str); 4] = [
         NO_DELETE_TRIGGER_NAME,
         CREATE_NO_DELETE_TRIGGER_SQL,
     ),
-    ("trigger", CHAIN_TRIGGER_NAME, CREATE_CHAIN_TRIGGER_SQL),
 ];
 
 #[derive(Debug, Error)]
@@ -140,13 +106,13 @@ pub enum SqliteEnterpriseMigrationStateStoreError {
 #[derive(Clone)]
 pub struct SqliteEnterpriseMigrationOpenPolicy {
     trusted_signers: BTreeMap<String, PublicKey>,
-    minimum_heads: BTreeMap<EnterpriseMigrationKey, EnterpriseMigrationMinimumHead>,
+    heads: BTreeMap<EnterpriseMigrationKey, EnterpriseMigrationHead>,
 }
 
 impl SqliteEnterpriseMigrationOpenPolicy {
     pub fn new(
         trusted_signers: Vec<PublicKey>,
-        minimum_heads: Vec<EnterpriseMigrationMinimumHead>,
+        heads: Vec<EnterpriseMigrationHead>,
     ) -> Result<Self, SqliteEnterpriseMigrationStateStoreError> {
         let mut trusted = BTreeMap::new();
         for signer in trusted_signers {
@@ -156,15 +122,15 @@ impl SqliteEnterpriseMigrationOpenPolicy {
             return Err(SqliteEnterpriseMigrationStateStoreError::MissingTrustedSigner);
         }
         let mut anchors = BTreeMap::new();
-        for minimum_head in minimum_heads {
-            if !minimum_head.is_valid() || anchors.contains_key(&minimum_head.key) {
+        for head in heads {
+            if !head.is_valid() || anchors.contains_key(&head.key) {
                 return Err(SqliteEnterpriseMigrationStateStoreError::InvalidOpenPolicy);
             }
-            anchors.insert(minimum_head.key.clone(), minimum_head);
+            anchors.insert(head.key.clone(), head);
         }
         Ok(Self {
             trusted_signers: trusted,
-            minimum_heads: anchors,
+            heads: anchors,
         })
     }
 }
@@ -188,7 +154,7 @@ pub struct SqliteEnterpriseMigrationStateStore {
     identity_file: File,
     identity: DatabaseFileIdentity,
     trusted_signers: BTreeMap<String, PublicKey>,
-    minimum_heads: BTreeMap<EnterpriseMigrationKey, EnterpriseMigrationMinimumHead>,
+    heads: BTreeMap<EnterpriseMigrationKey, EnterpriseMigrationHead>,
 }
 
 impl SqliteEnterpriseMigrationStateStore {
@@ -199,7 +165,7 @@ impl SqliteEnterpriseMigrationStateStore {
         let path = validate_durable_path(path.as_ref())?;
         reject_symlink_components(&path)?;
         let database_exists = path.try_exists()?;
-        if !database_exists && !policy.minimum_heads.is_empty() {
+        if !database_exists && !policy.heads.is_empty() {
             return Err(SqliteEnterpriseMigrationStateStoreError::Integrity);
         }
         let parent = path
@@ -217,7 +183,7 @@ impl SqliteEnterpriseMigrationStateStore {
         let mut open_flags = OpenFlags::SQLITE_OPEN_READ_WRITE
             | OpenFlags::SQLITE_OPEN_NO_MUTEX
             | OpenFlags::SQLITE_OPEN_NOFOLLOW;
-        if policy.minimum_heads.is_empty() {
+        if policy.heads.is_empty() {
             open_flags |= OpenFlags::SQLITE_OPEN_CREATE;
         }
         let connection = Connection::open_with_flags(&path, open_flags)?;
@@ -246,7 +212,7 @@ impl SqliteEnterpriseMigrationStateStore {
             identity_file,
             identity,
             trusted_signers: policy.trusted_signers,
-            minimum_heads: policy.minimum_heads,
+            heads: policy.heads,
         };
         store.verify_file_identity()?;
         {
@@ -255,7 +221,7 @@ impl SqliteEnterpriseMigrationStateStore {
                 .lock()
                 .map_err(|_| SqliteEnterpriseMigrationStateStoreError::Integrity)?;
             verify_schema(&connection)?;
-            verify_all_chains(&connection, &store.trusted_signers, &store.minimum_heads)
+            verify_all_registrations(&connection, &store.trusted_signers, &store.heads)
                 .map_err(|_| SqliteEnterpriseMigrationStateStoreError::Integrity)?;
         }
         store.verify_file_identity()?;
@@ -280,11 +246,8 @@ impl SqliteEnterpriseMigrationStateStore {
     }
 
     #[must_use]
-    pub fn minimum_head(
-        &self,
-        key: &EnterpriseMigrationKey,
-    ) -> Option<&EnterpriseMigrationMinimumHead> {
-        self.minimum_heads.get(key)
+    pub fn head(&self, key: &EnterpriseMigrationKey) -> Option<&EnterpriseMigrationHead> {
+        self.heads.get(key)
     }
 }
 
@@ -342,9 +305,6 @@ impl EnterpriseMigrationStateStore for SqliteEnterpriseMigrationStateStore {
         transition: &EnterpriseMigrationTransition,
     ) -> PortResult<EnterpriseMigrationRegisterOutcome> {
         let validated = validate_transition(transition, &self.trusted_signers)?;
-        if transition.body.generation != 0 {
-            return Err(PortError::invalid_data());
-        }
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -354,13 +314,13 @@ impl EnterpriseMigrationStateStore for SqliteEnterpriseMigrationStateStore {
             &transaction,
             &transition.body.key,
             &self.trusted_signers,
-            self.minimum_heads.get(&transition.body.key),
+            self.heads.get(&transition.body.key),
         )?;
         if let Some(existing) = existing {
             transaction.commit().map_err(|_| PortError::unavailable())?;
             self.verify_file_identity()
                 .map_err(|_| PortError::integrity_failure())?;
-            if existing.generation == 0 && existing.transition_digest == validated.digest {
+            if existing.transition_digest == validated.digest {
                 return Ok(EnterpriseMigrationRegisterOutcome::Existing(existing));
             }
             return Ok(EnterpriseMigrationRegisterOutcome::Conflict(existing));
@@ -370,7 +330,7 @@ impl EnterpriseMigrationStateStore for SqliteEnterpriseMigrationStateStore {
             &transaction,
             &transition.body.key,
             &self.trusted_signers,
-            self.minimum_heads.get(&transition.body.key),
+            self.heads.get(&transition.body.key),
         )?
         .ok_or_else(PortError::integrity_failure)?;
         transaction.commit().map_err(|_| PortError::unavailable())?;
@@ -384,56 +344,12 @@ impl EnterpriseMigrationStateStore for SqliteEnterpriseMigrationStateStore {
             return Err(PortError::invalid_data());
         }
         let connection = self.connection()?;
-        let state = load_verified_state(
-            &connection,
-            key,
-            &self.trusted_signers,
-            self.minimum_heads.get(key),
-        )?;
+        let state =
+            load_verified_state(&connection, key, &self.trusted_signers, self.heads.get(key))?;
         drop(connection);
         self.verify_file_identity()
             .map_err(|_| PortError::integrity_failure())?;
         Ok(state)
-    }
-
-    fn compare_and_promote(
-        &self,
-        transition: &EnterpriseMigrationTransition,
-    ) -> PortResult<EnterpriseMigrationCasOutcome> {
-        let validated = validate_transition(transition, &self.trusted_signers)?;
-        if transition.body.generation == 0 {
-            return Err(PortError::invalid_data());
-        }
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|_| PortError::unavailable())?;
-        verify_schema(&transaction).map_err(|_| PortError::integrity_failure())?;
-        let current = load_verified_state(
-            &transaction,
-            &transition.body.key,
-            &self.trusted_signers,
-            self.minimum_heads.get(&transition.body.key),
-        )?
-        .ok_or_else(PortError::invalid_data)?;
-        if !transition_extends_state(transition, &current) {
-            transaction.commit().map_err(|_| PortError::unavailable())?;
-            self.verify_file_identity()
-                .map_err(|_| PortError::integrity_failure())?;
-            return Ok(EnterpriseMigrationCasOutcome::Conflict(current));
-        }
-        insert_transition(&transaction, transition, validated.digest)?;
-        let promoted = load_verified_state(
-            &transaction,
-            &transition.body.key,
-            &self.trusted_signers,
-            self.minimum_heads.get(&transition.body.key),
-        )?
-        .ok_or_else(PortError::integrity_failure)?;
-        transaction.commit().map_err(|_| PortError::unavailable())?;
-        self.verify_file_identity()
-            .map_err(|_| PortError::integrity_failure())?;
-        Ok(EnterpriseMigrationCasOutcome::Promoted(promoted))
     }
 }
 
@@ -453,18 +369,6 @@ fn validate_transition(
     Ok(ValidatedTransition { digest })
 }
 
-fn transition_extends_state(
-    transition: &EnterpriseMigrationTransition,
-    current: &EnterpriseMigrationState,
-) -> bool {
-    transition.body.key == current.key
-        && transition.body.from_stage == Some(current.stage)
-        && transition.body.to_stage == current.stage.next().unwrap_or(current.stage)
-        && current.generation.checked_add(1) == Some(transition.body.generation)
-        && transition.body.prior_head_digest == Some(current.transition_digest)
-        && transition.body.trusted_at_unix_ms >= current.updated_at_unix_ms
-}
-
 fn insert_transition(
     transaction: &Transaction<'_>,
     transition: &EnterpriseMigrationTransition,
@@ -481,10 +385,6 @@ fn insert_transition(
                 control,
                 signature_domain,
                 schema_version,
-                generation,
-                from_stage,
-                to_stage,
-                prior_head_digest,
                 posture_digest,
                 evidence_digest,
                 authorization_digest,
@@ -495,7 +395,7 @@ fn insert_transition(
                 transition_digest
             ) VALUES (
                 ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9,
-                ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18
+                ?10, ?11, ?12, ?13, ?14
             )
             "#,
             params![
@@ -505,11 +405,6 @@ fn insert_transition(
                 control_name(body.key.control),
                 body.signature_domain,
                 i64::from(body.schema_version),
-                encode_u64(body.generation)?,
-                body.from_stage.map(stage_number),
-                stage_number(body.to_stage),
-                body.prior_head_digest
-                    .map(|value| value.as_bytes().to_vec()),
                 body.posture_digest.as_bytes().as_slice(),
                 body.evidence_digest.as_bytes().as_slice(),
                 body.authorization_digest.as_bytes().as_slice(),
@@ -531,46 +426,25 @@ fn load_verified_state(
     connection: &Connection,
     key: &EnterpriseMigrationKey,
     trusted_signers: &BTreeMap<String, PublicKey>,
-    minimum_head: Option<&EnterpriseMigrationMinimumHead>,
+    head: Option<&EnterpriseMigrationHead>,
 ) -> PortResult<Option<EnterpriseMigrationState>> {
-    let rows = load_transition_rows(connection, key)?;
-    if rows.is_empty() {
-        if minimum_head.is_some() {
+    let Some(row) = load_registration_row(connection, key)? else {
+        if head.is_some() {
             return Err(PortError::integrity_failure());
         }
         return Ok(None);
-    }
-
-    let mut prior: Option<EnterpriseMigrationState> = None;
-    let mut anchored = minimum_head.is_none();
-    for row in rows {
-        let stored_digest = row.transition_digest;
-        let transition = row.transition(key.clone())?;
-        let validated = validate_transition(&transition, trusted_signers)
-            .map_err(|_| PortError::integrity_failure())?;
-        if validated.digest != stored_digest {
-            return Err(PortError::integrity_failure());
-        }
-        match &prior {
-            None if transition.body.generation == 0 => {}
-            Some(previous) if transition_extends_state(&transition, previous) => {}
-            _ => return Err(PortError::integrity_failure()),
-        }
-        let state = state_from_transition(&transition, validated.digest);
-        if let Some(minimum) = minimum_head {
-            if state.generation == minimum.minimum_generation {
-                if state.transition_digest != minimum.transition_digest {
-                    return Err(PortError::integrity_failure());
-                }
-                anchored = true;
-            }
-        }
-        prior = Some(state);
-    }
-    if !anchored {
+    };
+    let stored_digest = row.transition_digest;
+    let transition = row.transition(key.clone())?;
+    let validated = validate_transition(&transition, trusted_signers)
+        .map_err(|_| PortError::integrity_failure())?;
+    if validated.digest != stored_digest {
         return Err(PortError::integrity_failure());
     }
-    Ok(prior)
+    if head.is_some_and(|head| head.transition_digest != validated.digest) {
+        return Err(PortError::integrity_failure());
+    }
+    Ok(Some(state_from_transition(&transition, validated.digest)))
 }
 
 fn state_from_transition(
@@ -580,15 +454,12 @@ fn state_from_transition(
     EnterpriseMigrationState {
         schema_version: transition.body.schema_version,
         key: transition.body.key.clone(),
-        stage: transition.body.to_stage,
-        generation: transition.body.generation,
         transition_digest,
-        prior_head_digest: transition.body.prior_head_digest,
         posture_digest: transition.body.posture_digest,
         evidence_digest: transition.body.evidence_digest,
         authorization_digest: transition.body.authorization_digest,
         intent_digest: transition.body.intent_digest,
-        updated_at_unix_ms: transition.body.trusted_at_unix_ms,
+        registered_at_unix_ms: transition.body.trusted_at_unix_ms,
         signer_public_key: transition.body.signer_public_key.clone(),
     }
 }
@@ -596,10 +467,6 @@ fn state_from_transition(
 struct StoredTransitionRow {
     signature_domain: String,
     schema_version: i64,
-    generation: i64,
-    from_stage: Option<i64>,
-    to_stage: i64,
-    prior_head_digest: Option<Vec<u8>>,
     posture_digest: Vec<u8>,
     evidence_digest: Vec<u8>,
     authorization_digest: Vec<u8>,
@@ -618,10 +485,6 @@ impl StoredTransitionRow {
                 schema_version: u8::try_from(self.schema_version)
                     .map_err(|_| PortError::integrity_failure())?,
                 key,
-                generation: decode_u64(self.generation)?,
-                from_stage: self.from_stage.map(decode_stage).transpose()?,
-                to_stage: decode_stage(self.to_stage)?,
-                prior_head_digest: self.prior_head_digest.map(decode_digest).transpose()?,
                 posture_digest: decode_digest(self.posture_digest)?,
                 evidence_digest: decode_digest(self.evidence_digest)?,
                 authorization_digest: decode_digest(self.authorization_digest)?,
@@ -634,19 +497,15 @@ impl StoredTransitionRow {
     }
 }
 
-fn load_transition_rows(
+fn load_registration_row(
     connection: &Connection,
     key: &EnterpriseMigrationKey,
-) -> PortResult<Vec<StoredTransitionRow>> {
-    let mut statement = connection
-        .prepare(
+) -> PortResult<Option<StoredTransitionRow>> {
+    let row = connection
+        .query_row(
             r#"
             SELECT signature_domain,
                    schema_version,
-                   generation,
-                   from_stage,
-                   to_stage,
-                   prior_head_digest,
                    posture_digest,
                    evidence_digest,
                    authorization_digest,
@@ -660,12 +519,7 @@ fn load_transition_rows(
               AND scope_kind = ?2
               AND scope_id = ?3
               AND control = ?4
-            ORDER BY generation ASC
             "#,
-        )
-        .map_err(|_| PortError::integrity_failure())?;
-    let mapped = statement
-        .query_map(
             params![
                 key.deployment_id.as_str(),
                 scope_kind_name(key.scope_kind),
@@ -673,68 +527,55 @@ fn load_transition_rows(
                 control_name(key.control),
             ],
             |row| {
-                let transition_digest: Vec<u8> = row.get(13)?;
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, i64>(1)?,
-                    row.get::<_, i64>(2)?,
-                    row.get::<_, Option<i64>>(3)?,
-                    row.get::<_, i64>(4)?,
-                    row.get::<_, Option<Vec<u8>>>(5)?,
-                    row.get::<_, Vec<u8>>(6)?,
-                    row.get::<_, Vec<u8>>(7)?,
-                    row.get::<_, Vec<u8>>(8)?,
+                    row.get::<_, Vec<u8>>(2)?,
+                    row.get::<_, Vec<u8>>(3)?,
+                    row.get::<_, Vec<u8>>(4)?,
+                    row.get::<_, Vec<u8>>(5)?,
+                    row.get::<_, i64>(6)?,
+                    row.get::<_, String>(7)?,
+                    row.get::<_, String>(8)?,
                     row.get::<_, Vec<u8>>(9)?,
-                    row.get::<_, i64>(10)?,
-                    row.get::<_, String>(11)?,
-                    row.get::<_, String>(12)?,
-                    transition_digest,
                 ))
             },
         )
+        .optional()
         .map_err(|_| PortError::integrity_failure())?;
-    let mut rows = Vec::new();
-    for row in mapped {
-        let (
-            signature_domain,
-            schema_version,
-            generation,
-            from_stage,
-            to_stage,
-            prior_head_digest,
-            posture_digest,
-            evidence_digest,
-            authorization_digest,
-            intent_digest,
-            trusted_at_unix_ms,
-            signer_public_key,
-            signature,
-            transition_digest,
-        ) = row.map_err(|_| PortError::integrity_failure())?;
-        rows.push(StoredTransitionRow {
-            signature_domain,
-            schema_version,
-            generation,
-            from_stage,
-            to_stage,
-            prior_head_digest,
-            posture_digest,
-            evidence_digest,
-            authorization_digest,
-            intent_digest,
-            trusted_at_unix_ms,
-            signer_public_key,
-            signature,
-            transition_digest: decode_digest(transition_digest)?,
-        });
-    }
-    Ok(rows)
+    let Some((
+        signature_domain,
+        schema_version,
+        posture_digest,
+        evidence_digest,
+        authorization_digest,
+        intent_digest,
+        trusted_at_unix_ms,
+        signer_public_key,
+        signature,
+        transition_digest,
+    )) = row
+    else {
+        return Ok(None);
+    };
+    Ok(Some(StoredTransitionRow {
+        signature_domain,
+        schema_version,
+        posture_digest,
+        evidence_digest,
+        authorization_digest,
+        intent_digest,
+        trusted_at_unix_ms,
+        signer_public_key,
+        signature,
+        transition_digest: decode_digest(transition_digest)?,
+    }))
 }
 
-fn verify_all_chains(
+fn verify_all_registrations(
     connection: &Connection,
     trusted_signers: &BTreeMap<String, PublicKey>,
-    minimum_heads: &BTreeMap<EnterpriseMigrationKey, EnterpriseMigrationMinimumHead>,
+    heads: &BTreeMap<EnterpriseMigrationKey, EnterpriseMigrationHead>,
 ) -> PortResult<()> {
     let mut statement = connection
         .prepare(
@@ -769,11 +610,11 @@ fn verify_all_chains(
         keys.insert(key);
     }
     drop(statement);
-    for key in minimum_heads.keys() {
+    for key in heads.keys() {
         keys.insert(key.clone());
     }
     for key in keys {
-        load_verified_state(connection, &key, trusted_signers, minimum_heads.get(&key))?;
+        load_verified_state(connection, &key, trusted_signers, heads.get(&key))?;
     }
     Ok(())
 }
@@ -781,9 +622,7 @@ fn verify_all_chains(
 fn initialize_schema(
     connection: &Connection,
 ) -> Result<(), SqliteEnterpriseMigrationStateStoreError> {
-    let legacy_table_exists =
-        sqlite_object_exists(connection, "table", "enterprise_migration_state")?;
-    if legacy_table_exists {
+    if sqlite_object_exists(connection, "table", RETIRED_TABLE_NAME)? {
         return Err(SqliteEnterpriseMigrationStateStoreError::Integrity);
     }
     if sqlite_object_exists(connection, "table", TABLE_NAME)? {
@@ -791,7 +630,7 @@ fn initialize_schema(
     }
     let bootstrap = format!(
         "BEGIN IMMEDIATE; {CREATE_TABLE_SQL}; {CREATE_NO_UPDATE_TRIGGER_SQL}; \
-         {CREATE_NO_DELETE_TRIGGER_SQL}; {CREATE_CHAIN_TRIGGER_SQL}; COMMIT;"
+         {CREATE_NO_DELETE_TRIGGER_SQL}; COMMIT;"
     );
     if let Err(error) = connection.execute_batch(&bootstrap) {
         let _ = connection.execute_batch("ROLLBACK;");
@@ -807,9 +646,7 @@ fn verify_schema(connection: &Connection) -> Result<(), SqliteEnterpriseMigratio
     {
         return Err(SqliteEnterpriseMigrationStateStoreError::Integrity);
     }
-    let legacy_table_exists =
-        sqlite_object_exists(connection, "table", "enterprise_migration_state")?;
-    if legacy_table_exists {
+    if sqlite_object_exists(connection, "table", RETIRED_TABLE_NAME)? {
         return Err(SqliteEnterpriseMigrationStateStoreError::Integrity);
     }
     for (object_type, object_name, expected_sql) in SCHEMA_OBJECTS {
@@ -833,7 +670,6 @@ fn verify_schema(connection: &Connection) -> Result<(), SqliteEnterpriseMigratio
         .query_map(params![TABLE_NAME], |row| row.get::<_, String>(0))?
         .collect::<Result<Vec<_>, _>>()?;
     let mut expected = vec![
-        String::from(CHAIN_TRIGGER_NAME),
         String::from(NO_DELETE_TRIGGER_NAME),
         String::from(NO_UPDATE_TRIGGER_NAME),
     ];
@@ -1039,25 +875,6 @@ fn decode_digest(value: Vec<u8>) -> PortResult<Digest32> {
         .map_err(|_| PortError::integrity_failure())
 }
 
-const fn stage_number(stage: EnterpriseMigrationStage) -> i64 {
-    match stage {
-        EnterpriseMigrationStage::Disabled => 0,
-        EnterpriseMigrationStage::Shadow => 1,
-        EnterpriseMigrationStage::Enforced => 2,
-        EnterpriseMigrationStage::LegacyRemoved => 3,
-    }
-}
-
-fn decode_stage(stage: i64) -> PortResult<EnterpriseMigrationStage> {
-    match stage {
-        0 => Ok(EnterpriseMigrationStage::Disabled),
-        1 => Ok(EnterpriseMigrationStage::Shadow),
-        2 => Ok(EnterpriseMigrationStage::Enforced),
-        3 => Ok(EnterpriseMigrationStage::LegacyRemoved),
-        _ => Err(PortError::integrity_failure()),
-    }
-}
-
 const fn scope_kind_name(scope_kind: EnterpriseMigrationScopeKind) -> &'static str {
     match scope_kind {
         EnterpriseMigrationScopeKind::Deployment => "deployment",
@@ -1081,7 +898,6 @@ const fn control_name(control: EnterpriseMigrationControl) -> &'static str {
         EnterpriseMigrationControl::BrokerCredentialCustody => "broker_credential_custody",
         EnterpriseMigrationControl::BrokerQuotaEnforcement => "broker_quota_enforcement",
         EnterpriseMigrationControl::CageEnforcement => "cage_enforcement",
-        EnterpriseMigrationControl::LegacyConfiguration => "legacy_configuration",
     }
 }
 
@@ -1091,7 +907,6 @@ fn decode_control(value: &str) -> PortResult<EnterpriseMigrationControl> {
         "broker_credential_custody" => Ok(EnterpriseMigrationControl::BrokerCredentialCustody),
         "broker_quota_enforcement" => Ok(EnterpriseMigrationControl::BrokerQuotaEnforcement),
         "cage_enforcement" => Ok(EnterpriseMigrationControl::CageEnforcement),
-        "legacy_configuration" => Ok(EnterpriseMigrationControl::LegacyConfiguration),
         _ => Err(PortError::integrity_failure()),
     }
 }

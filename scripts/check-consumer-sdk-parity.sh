@@ -13,14 +13,14 @@ consumer_evidence="$(mktemp -d "${TMPDIR:-/tmp}/chio-consumer-sdk.XXXXXX")"
 trap 'rm -rf "${consumer_evidence}"' EXIT
 
 "${consumer_python}" -m pytest -q \
-  sdks/python/chio-sdk-python/tests/test_generated_manifest_v2.py \
+  sdks/python/chio-sdk-python/tests/test_generated_manifest.py \
   sdks/python/chio-sdk-python/tests/test_models.py::TestGeneratedWireModels::test_protocol_primitives_shared_fixtures_parse_reject_and_round_trip \
   sdks/python/chio-sdk-python/tests/test_models.py::TestGeneratedWireModels::test_protocol_primitives_raw_cases_reject_duplicate_keys \
   --junitxml="${consumer_evidence}/python.xml"
 
 (
   cd sdks/go/chio-go-http
-  go test -count=1 -json -run '^(TestGeneratedProtocolPrimitivesConsumeSharedFixtures|TestGeneratedManifestV2RuntimeCorpus|TestChioToolCallRequestPreservesApprovalSetAndOpaqueExtension|TestProtocolPublicDecoderRejectsMutationsWithoutReplacingPriorValue|TestProtocolNumbersPreserveOpaqueValuesAndRejectTypedOverflow|TestAggregatePublicUnionRejectsUnknownAndForbiddenRootProperties|TestProtocolWireBoundsAndOpaqueDuplicatesReject|TestReceiptOriginRejectsInvalidValuesWithoutReplacingPriorValue)$' ./...
+  go test -count=1 -json -run '^(TestGeneratedProtocolPrimitivesConsumeSharedFixtures|TestGeneratedManifestRuntimeCorpus|TestChioToolCallRequestPreservesApprovalSetAndOpaqueExtension|TestProtocolPublicDecoderRejectsMutationsWithoutReplacingPriorValue|TestProtocolNumbersPreserveOpaqueValuesAndRejectTypedOverflow|TestAggregatePublicUnionRejectsUnknownAndForbiddenRootProperties|TestProtocolWireBoundsAndOpaqueDuplicatesReject|TestReceiptOriginRejectsInvalidValuesWithoutReplacingPriorValue)$' ./...
 ) >"${consumer_evidence}/go.jsonl"
 
 (
@@ -29,7 +29,7 @@ trap 'rm -rf "${consumer_evidence}"' EXIT
   # wrapper or a previously built dist directory.
   npm run build --workspace @chio-protocol/node-http
   node_modules/.bin/vitest run \
-    packages/conformance/test/manifest_v2_schema.test.ts \
+    packages/conformance/test/manifest_schema.test.ts \
     packages/conformance/test/protocol_primitives_schema.test.ts \
     packages/conformance/test/wire_schema.test.ts \
     --reporter=json --outputFile="${consumer_evidence}/typescript.json"

@@ -106,7 +106,7 @@ baseline is present, and the keylog example configs agree with the units.
 
    `systemctl enable --now chio-secret-broker.service` starts only the configured
    broker. Readiness checks the kernel-reported PID of the listening child.
-   Capability issuance and migration promotion retain their existing governed
+   Capability issuance and migration registration retain their governed
    authorization. Stop grants up to 60 seconds for current requests to finish,
    then the supervisor escalates; the manager owns runtime-directory cleanup.
 
@@ -219,7 +219,7 @@ baseline is present, and the keylog example configs agree with the units.
      --execution-uid "$(id -u chio-edge)" --execution-gid "$(id -g chio-edge)" "${edge_groups[@]}" \
      --server-id chio-mcp-edge --server-name "Chio MCP edge" --server-version 1
    install -m 0640 -g chio-edge \
-     /etc/chio/mcp-edge/provision/{signed-manifest.json,cage-launch-policy.json,cage-migration-genesis.json,cage-migration-shadow.json,cage-migration-enforced.json,reviewed-tools.json,target-command} \
+     /etc/chio/mcp-edge/provision/{signed-manifest.json,cage-launch-policy.json,cage-migration-registration.json,reviewed-tools.json,target-command} \
      /etc/chio/mcp-edge/launch/
    install -d -m 0700 -o chio-edge -g chio-edge /var/lib/chio-mcp-edge/security
    install -m 0600 -o chio-edge -g chio-edge \
@@ -240,7 +240,7 @@ baseline is present, and the keylog example configs agree with the units.
 
    The provisioner binds the helper's and the target's digests, the exact
    argument list and working directory, the read grant on the repository,
-   and a migration ledger promoted through Shadow to Enforced, so the edge
+   and a migration ledger holding its enforced registration, so the edge
    composes a cage-required launch. It refuses a dynamically linked target
    whose interpreter and shared objects are not declared with
    `--runtime-file`, and a helper that is not a static position-independent

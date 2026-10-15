@@ -10,14 +10,14 @@ use chio_security_types::{Compartment, InformationLabel};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-#[path = "manifest_v2/json_boundary.rs"]
+#[path = "manifest_admission/json_boundary.rs"]
 mod json_boundary;
 
-fn v2_manifest(public_key: String) -> ToolManifest {
+fn platform_manifest(public_key: String) -> ToolManifest {
     ToolManifest {
         schema: TOOL_MANIFEST_SCHEMA.to_string(),
-        server_id: "srv-v2".to_string(),
-        name: "V2 server".to_string(),
+        server_id: "srv-platform".to_string(),
+        name: "Platform server".to_string(),
         description: None,
         version: "2.0.0".to_string(),
         tools: vec![ToolDefinition {
@@ -50,19 +50,17 @@ fn v2_manifest(public_key: String) -> ToolManifest {
 }
 
 fn unique_manifest_path(name: &str) -> PathBuf {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_else(|error| panic!("system clock: {error}"))
-        .as_nanos();
+    static NEXT_PATH: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let sequence = NEXT_PATH.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     std::env::temp_dir().join(format!(
-        "chio-manifest-{name}-{}-{nonce}.json",
+        "chio-manifest-{name}-{}-{sequence}.json",
         std::process::id()
     ))
 }
 
 fn write_signed_manifest_fixture(name: &str) -> (PathBuf, Keypair) {
     let keypair = Keypair::generate();
-    let signed = sign_manifest(&v2_manifest(keypair.public_key().to_hex()), &keypair)
+    let signed = sign_manifest(&platform_manifest(keypair.public_key().to_hex()), &keypair)
         .unwrap_or_else(|error| panic!("sign fixture: {error}"));
     let path = unique_manifest_path(name);
     std::fs::write(
@@ -79,12 +77,12 @@ fn existing_signed_manifest_loader_requires_out_of_band_key_and_server_identity(
     let registry = load_existing_verified_manifest_registry(
         &path,
         &keypair.public_key().to_hex(),
-        "srv-v2",
+        "srv-platform",
         RuntimeToolTopology::remote(),
     )
     .unwrap_or_else(|error| panic!("load registry: {error}"));
     let security = registry
-        .bridge_security("srv-v2", "read")
+        .bridge_security("srv-platform", "read")
         .unwrap_or_else(|| panic!("admitted bridge security"));
     assert!(security.has_registry_coordinates());
     assert!(security.effective_egress());
@@ -93,7 +91,7 @@ fn existing_signed_manifest_loader_requires_out_of_band_key_and_server_identity(
     assert!(load_existing_verified_manifest_registry(
         &path,
         &wrong_key.public_key().to_hex(),
-        "srv-v2",
+        "srv-platform",
         RuntimeToolTopology::remote(),
     )
     .is_err());
@@ -114,7 +112,7 @@ fn existing_signed_manifest_loader_never_creates_missing_paths() {
     assert!(load_existing_verified_manifest_registry(
         &path,
         &keypair.public_key().to_hex(),
-        "srv-v2",
+        "srv-platform",
         RuntimeToolTopology::remote(),
     )
     .is_err());
@@ -132,7 +130,7 @@ fn existing_signed_manifest_loader_rejects_symlinks() {
     assert!(load_existing_verified_manifest_registry(
         &link,
         &keypair.public_key().to_hex(),
-        "srv-v2",
+        "srv-platform",
         RuntimeToolTopology::remote(),
     )
     .is_err());
@@ -143,7 +141,7 @@ fn existing_signed_manifest_loader_rejects_symlinks() {
 #[test]
 fn verified_registry_admits_provider_server_tools_only_as_remote_egress() {
     let signer = Keypair::from_seed(&[30; 32]);
-    let mut manifest = v2_manifest(signer.public_key().to_hex());
+    let mut manifest = platform_manifest(signer.public_key().to_hex());
     manifest.server_tools = vec![ServerTool::Bash];
     let signed = sign_manifest(&manifest, &signer)
         .unwrap_or_else(|error| panic!("sign server-tool manifest: {error}"));
@@ -165,25 +163,25 @@ fn verified_registry_admits_provider_server_tools_only_as_remote_egress() {
         .unwrap_or_else(|error| panic!("admit server-tool manifest: {error}"));
     assert!(registry.requires_flow_runtime());
     let security = registry
-        .bridge_security_for_server_tool("srv-v2", "bash_20241022")
+        .bridge_security_for_server_tool("srv-platform", "bash_20241022")
         .unwrap_or_else(|| panic!("server-tool bridge security"));
     assert!(security.has_registry_coordinates());
     assert!(security.effective_egress());
     assert_eq!(security.tool_name(), Some("bash"));
     assert_eq!(
         registry
-            .tool_security_for_server_tool("srv-v2", "bash_20241022")
+            .tool_security_for_server_tool("srv-platform", "bash_20241022")
             .unwrap_or_else(|| panic!("server-tool admitted security")),
         registry
-            .tool_security_for_server_tool("srv-v2", "bash")
+            .tool_security_for_server_tool("srv-platform", "bash")
             .unwrap_or_else(|| panic!("stable server-tool admitted security"))
     );
     registry
-        .validate_bridge_security("srv-v2", "bash_20241022", &security)
+        .validate_bridge_security("srv-platform", "bash_20241022", &security)
         .unwrap_or_else(|error| panic!("validate server-tool sidecar: {error}"));
     registry
         .validate_invocation_arguments(
-            "srv-v2",
+            "srv-platform",
             "bash_20241022",
             &security,
             &serde_json::json!({"command": "pwd"}),
@@ -191,7 +189,7 @@ fn verified_registry_admits_provider_server_tools_only_as_remote_egress() {
         .unwrap_or_else(|error| panic!("validate trusted server-tool arguments: {error}"));
     registry
         .validate_invocation_arguments(
-            "srv-v2",
+            "srv-platform",
             "bash_20250124",
             &security,
             &serde_json::json!({"restart": true}),
@@ -199,7 +197,7 @@ fn verified_registry_admits_provider_server_tools_only_as_remote_egress() {
         .unwrap_or_else(|error| panic!("validate date-suffixed server-tool family: {error}"));
     assert!(matches!(
         registry.validate_invocation_arguments(
-            "srv-v2",
+            "srv-platform",
             "bash_20241022",
             &security,
             &serde_json::json!({"command": 7}),
@@ -207,7 +205,7 @@ fn verified_registry_admits_provider_server_tools_only_as_remote_egress() {
         Err(VerifiedManifestInvocationError::TrustedServerToolSchemaMismatch {
             server_id,
             tool_name,
-        }) if server_id == "srv-v2" && tool_name == "bash_20241022"
+        }) if server_id == "srv-platform" && tool_name == "bash_20241022"
     ));
 
     let mut local_registry = VerifiedManifestRegistry::default();
@@ -230,7 +228,7 @@ fn verified_registry_admits_provider_server_tools_only_as_remote_egress() {
 #[test]
 fn verified_registry_runtime_requirement_includes_derived_remote_topology() {
     let signer = Keypair::from_seed(&[32; 32]);
-    let manifest = v2_manifest(signer.public_key().to_hex());
+    let manifest = platform_manifest(signer.public_key().to_hex());
     let signed = sign_manifest(&manifest, &signer)
         .unwrap_or_else(|error| panic!("sign topology manifest: {error}"));
 
@@ -254,7 +252,7 @@ fn verified_registry_runtime_requirement_includes_derived_remote_topology() {
 #[test]
 fn cage_authorization_requires_profile_matched_runtime_topology() {
     let signer = Keypair::from_seed(&[36; 32]);
-    let mut local_manifest = v2_manifest(signer.public_key().to_hex());
+    let mut local_manifest = platform_manifest(signer.public_key().to_hex());
     local_manifest.required_permissions =
         local_manifest.required_permissions.map(|mut permissions| {
             permissions.native_syscall_profile = NativeSyscallProfile::NativeMinimalV1;
@@ -272,10 +270,10 @@ fn cage_authorization_requires_profile_matched_runtime_topology() {
         )
         .unwrap_or_else(|error| panic!("register local cage manifest: {error}"));
     let local = local_registry
-        .authorize_cage_manifest("srv-v2")
+        .authorize_cage_manifest("srv-platform")
         .unwrap_or_else(|error| panic!("authorize local cage manifest: {error}"));
     assert_eq!(local.topology(), RuntimeToolTopology::local());
-    assert_eq!(local.server_id(), "srv-v2");
+    assert_eq!(local.server_id(), "srv-platform");
     assert_eq!(local.manifest_digest().len(), 64);
     assert_eq!(local.signed_manifest_digest().len(), 64);
     assert_eq!(local.registry_digest().len(), 64);
@@ -290,12 +288,12 @@ fn cage_authorization_requires_profile_matched_runtime_topology() {
         )
         .unwrap_or_else(|error| panic!("register remote manifest: {error}"));
     assert!(matches!(
-        remote_registry.authorize_cage_manifest("srv-v2"),
+        remote_registry.authorize_cage_manifest("srv-platform"),
         Err(VerifiedManifestAdmissionError::CageTopologyMismatch { .. })
     ));
 
     let broker_signer = Keypair::from_seed(&[37; 32]);
-    let broker_manifest = v2_manifest(broker_signer.public_key().to_hex());
+    let broker_manifest = platform_manifest(broker_signer.public_key().to_hex());
     let broker_signed = sign_manifest(&broker_manifest, &broker_signer)
         .unwrap_or_else(|error| panic!("sign broker cage manifest: {error}"));
     let mut broker_registry = VerifiedManifestRegistry::default();
@@ -307,7 +305,7 @@ fn cage_authorization_requires_profile_matched_runtime_topology() {
         )
         .unwrap_or_else(|error| panic!("register broker cage manifest: {error}"));
     let broker = broker_registry
-        .authorize_cage_manifest("srv-v2")
+        .authorize_cage_manifest("srv-platform")
         .unwrap_or_else(|error| panic!("authorize broker cage manifest: {error}"));
     assert_eq!(broker.topology(), RuntimeToolTopology::brokered());
 
@@ -320,7 +318,7 @@ fn cage_authorization_requires_profile_matched_runtime_topology() {
         )
         .unwrap_or_else(|error| panic!("register profile-confused manifest: {error}"));
     assert!(matches!(
-        wrong_local_registry.authorize_cage_manifest("srv-v2"),
+        wrong_local_registry.authorize_cage_manifest("srv-platform"),
         Err(VerifiedManifestAdmissionError::CageTopologyMismatch { .. })
     ));
 }
@@ -328,7 +326,7 @@ fn cage_authorization_requires_profile_matched_runtime_topology() {
 #[test]
 fn cage_authorization_binds_registry_manifest_and_every_tool_topology() {
     let signer = Keypair::from_seed(&[38; 32]);
-    let mut manifest = v2_manifest(signer.public_key().to_hex());
+    let mut manifest = platform_manifest(signer.public_key().to_hex());
     manifest.required_permissions = manifest.required_permissions.map(|mut permissions| {
         permissions.native_syscall_profile = NativeSyscallProfile::NativeStandardV1;
         permissions
@@ -361,7 +359,7 @@ fn cage_authorization_binds_registry_manifest_and_every_tool_topology() {
         )
         .unwrap_or_else(|error| panic!("register exact local topology: {error}"));
     let exact = registry
-        .authorize_cage_manifest("srv-v2")
+        .authorize_cage_manifest("srv-platform")
         .unwrap_or_else(|error| panic!("authorize exact local topology: {error}"));
 
     let mut mixed_registry = VerifiedManifestRegistry::default();
@@ -379,12 +377,12 @@ fn cage_authorization_binds_registry_manifest_and_every_tool_topology() {
         )
         .unwrap_or_else(|error| panic!("register mixed topology: {error}"));
     assert!(matches!(
-        mixed_registry.authorize_cage_manifest("srv-v2"),
+        mixed_registry.authorize_cage_manifest("srv-platform"),
         Err(VerifiedManifestAdmissionError::CageTopologyMismatch { .. })
     ));
 
     let other_signer = Keypair::from_seed(&[39; 32]);
-    let mut other_manifest = v2_manifest(other_signer.public_key().to_hex());
+    let mut other_manifest = platform_manifest(other_signer.public_key().to_hex());
     other_manifest.server_id = "other-server".to_string();
     other_manifest.required_permissions =
         other_manifest.required_permissions.map(|mut permissions| {
@@ -402,7 +400,7 @@ fn cage_authorization_binds_registry_manifest_and_every_tool_topology() {
         )
         .unwrap_or_else(|error| panic!("expand registry snapshot: {error}"));
     let expanded = expanded_registry
-        .authorize_cage_manifest("srv-v2")
+        .authorize_cage_manifest("srv-platform")
         .unwrap_or_else(|error| panic!("authorize expanded registry: {error}"));
     assert_eq!(exact.manifest_digest(), expanded.manifest_digest());
     assert_eq!(
@@ -417,9 +415,9 @@ fn cage_authorization_binds_registry_manifest_and_every_tool_topology() {
 }
 
 #[test]
-fn v2_manifest_signs_and_verifies_with_normalized_permissions() {
+fn manifest_signs_and_verifies_with_normalized_permissions() {
     let keypair = Keypair::generate();
-    let manifest = v2_manifest(keypair.public_key().to_hex());
+    let manifest = platform_manifest(keypair.public_key().to_hex());
     assert_eq!(
         manifest
             .required_permissions
@@ -441,7 +439,7 @@ fn v2_manifest_signs_and_verifies_with_normalized_permissions() {
 #[test]
 fn changing_flow_metadata_invalidates_manifest_signature() {
     let keypair = Keypair::generate();
-    let mut manifest = v2_manifest(keypair.public_key().to_hex());
+    let mut manifest = platform_manifest(keypair.public_key().to_hex());
     manifest.tools[0].flow = Some(chio_manifest::ToolFlowDeclaration::public_egress());
     let mut signed = sign_manifest(&manifest, &keypair)
         .unwrap_or_else(|error| panic!("sign flow manifest: {error}"));
@@ -450,9 +448,9 @@ fn changing_flow_metadata_invalidates_manifest_signature() {
 }
 
 #[test]
-fn v2_rejects_alternate_json_spellings_of_signed_fields() {
+fn manifest_rejects_alternate_json_spellings_of_signed_fields() {
     let keypair = Keypair::from_seed(&[23; 32]);
-    let manifest = v2_manifest(keypair.public_key().to_hex());
+    let manifest = platform_manifest(keypair.public_key().to_hex());
     let canonical = serde_json::to_value(&manifest)
         .unwrap_or_else(|error| panic!("serialize manifest: {error}"));
 
@@ -477,9 +475,9 @@ fn v2_rejects_alternate_json_spellings_of_signed_fields() {
 }
 
 #[test]
-fn v2_rejects_noncanonical_permission_spellings() {
+fn manifest_rejects_noncanonical_permission_spellings() {
     let keypair = Keypair::from_seed(&[29; 32]);
-    let manifest = v2_manifest(keypair.public_key().to_hex());
+    let manifest = platform_manifest(keypair.public_key().to_hex());
     let canonical = serde_json::to_value(&manifest)
         .unwrap_or_else(|error| panic!("serialize manifest: {error}"));
 
@@ -510,6 +508,83 @@ fn v2_rejects_noncanonical_permission_spellings() {
             chio_manifest::validate_manifest(&parsed).is_err(),
             "{field}"
         );
+    }
+}
+
+fn old_shape_tool() -> serde_json::Value {
+    serde_json::json!({
+        "name": "file_read",
+        "description": "Read a file",
+        "input_schema": {"type": "object"},
+        "has_side_effects": false
+    })
+}
+
+#[test]
+fn old_tool_shape_under_the_current_id_is_refused_structurally() {
+    let payload = serde_json::json!({
+        "schema": TOOL_MANIFEST_SCHEMA,
+        "server_id": "srv-old-shape",
+        "name": "Old shape",
+        "version": "1.0.0",
+        "tools": [old_shape_tool()],
+        "public_key": Keypair::from_seed(&[21; 32]).public_key().to_hex()
+    });
+    let error = serde_json::from_value::<ToolManifest>(payload)
+        .err()
+        .map(|error| error.to_string());
+    assert_eq!(error.as_deref(), Some(
+            "unknown field `has_side_effects`, expected one of `name`, `description`, `input_schema`, `output_schema`, `pricing`, `annotations`, `latency_hint`, `flow`"
+        ));
+}
+
+#[test]
+fn old_permission_shape_under_the_current_id_is_refused_structurally() {
+    let payload = serde_json::json!({
+        "schema": TOOL_MANIFEST_SCHEMA,
+        "server_id": "srv-old-shape",
+        "name": "Old shape",
+        "version": "1.0.0",
+        "tools": [{
+            "name": "file_read",
+            "description": "Read a file",
+            "input_schema": {"type": "object"},
+            "annotations": {
+                "read_only": true,
+                "destructive": false,
+                "idempotent": true,
+                "requires_approval": false
+            }
+        }],
+        "required_permissions": {
+            "network_hosts": ["api.example.com"],
+            "native_syscall_profile": "native_minimal_v1"
+        },
+        "public_key": Keypair::from_seed(&[21; 32]).public_key().to_hex()
+    });
+    let error = serde_json::from_value::<ToolManifest>(payload)
+        .err()
+        .map(|error| error.to_string());
+    assert_eq!(error.as_deref(), Some(
+            "unknown field `network_hosts`, expected one of `read_paths`, `write_paths`, `network_destinations`, `environment_variables`, `native_syscall_profile`"
+        ));
+}
+
+#[test]
+fn retired_manifest_ids_are_refused_as_unsupported_schema() {
+    let keypair = Keypair::from_seed(&[24; 32]);
+    for retired in ["chio.manifest.v2", "chio.manifest.v0"] {
+        let mut manifest = platform_manifest(keypair.public_key().to_hex());
+        manifest.schema = retired.to_string();
+        let expected = format!("manifest schema version is not supported: {retired}");
+        let validation = chio_manifest::validate_manifest(&manifest)
+            .err()
+            .map(|error| error.to_string());
+        assert_eq!(validation.as_deref(), Some(expected.as_str()));
+        let signing = sign_manifest(&manifest, &keypair)
+            .err()
+            .map(|error| error.to_string());
+        assert_eq!(signing.as_deref(), Some(expected.as_str()));
     }
 }
 
@@ -548,7 +623,7 @@ fn verified_registry_merge_preserves_security_and_rejects_duplicates_atomically(
     let registry = |servers: &[&str]| -> Result<_, Box<dyn std::error::Error>> {
         let mut registry = VerifiedManifestRegistry::default();
         for server in servers {
-            let mut manifest = v2_manifest(keypair.public_key().to_hex());
+            let mut manifest = platform_manifest(keypair.public_key().to_hex());
             manifest.server_id = (*server).into();
             registry.register(
                 sign_manifest(&manifest, &keypair)?,
@@ -587,7 +662,7 @@ fn verified_registry_merge_preserves_security_and_rejects_duplicates_atomically(
 #[test]
 fn verified_registry_composes_registered_key_policy_and_runtime_topology() {
     let keypair = Keypair::from_seed(&[25; 32]);
-    let mut manifest = v2_manifest(keypair.public_key().to_hex());
+    let mut manifest = platform_manifest(keypair.public_key().to_hex());
     let purpose_a =
         DeclassificationPurpose::new("support").unwrap_or_else(|error| panic!("purpose: {error}"));
     let purpose_b =
@@ -622,7 +697,7 @@ fn verified_registry_composes_registered_key_policy_and_runtime_topology() {
         .unwrap_or_else(|error| panic!("register: {error}"));
 
     let admitted = registry
-        .tool_security("srv-v2", "read")
+        .tool_security("srv-platform", "read")
         .unwrap_or_else(|| panic!("admitted security"));
     assert!(admitted.effective_egress());
     assert_eq!(
@@ -635,11 +710,11 @@ fn verified_registry_composes_registered_key_policy_and_runtime_topology() {
     assert!(admitted.authorize_source(&InformationLabel::Top).is_err());
     assert_eq!(registry.verified_manifests().count(), 1);
     let sidecar = registry
-        .bridge_security("srv-v2", "read")
+        .bridge_security("srv-platform", "read")
         .unwrap_or_else(|| panic!("registry bridge security"));
     assert!(sidecar.has_registry_coordinates());
     assert!(sidecar.effective_egress());
-    assert_eq!(sidecar.server_id(), Some("srv-v2"));
+    assert_eq!(sidecar.server_id(), Some("srv-platform"));
     assert_eq!(sidecar.tool_name(), Some("read"));
     assert!(sidecar.manifest_digest().is_some());
 }
@@ -647,7 +722,7 @@ fn verified_registry_composes_registered_key_policy_and_runtime_topology() {
 #[test]
 fn verified_registry_rejects_manifest_clearance_that_widens_policy() {
     let keypair = Keypair::from_seed(&[33; 32]);
-    let mut manifest = v2_manifest(keypair.public_key().to_hex());
+    let mut manifest = platform_manifest(keypair.public_key().to_hex());
     manifest.tools[0].flow = Some(
         chio_manifest::ToolFlowDeclaration::new(
             None,
@@ -684,7 +759,7 @@ fn verified_registry_rejects_manifest_clearance_that_widens_policy() {
 #[test]
 fn verified_registry_requires_an_exact_live_bridge_security_value() {
     let signer = Keypair::from_seed(&[34; 32]);
-    let manifest = v2_manifest(signer.public_key().to_hex());
+    let manifest = platform_manifest(signer.public_key().to_hex());
     let signed = sign_manifest(&manifest, &signer)
         .unwrap_or_else(|error| panic!("sign first manifest: {error}"));
     let mut registry = VerifiedManifestRegistry::default();
@@ -692,11 +767,11 @@ fn verified_registry_requires_an_exact_live_bridge_security_value() {
         .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::remote())
         .unwrap_or_else(|error| panic!("register first manifest: {error}"));
     let sidecar = registry
-        .bridge_security("srv-v2", "read")
+        .bridge_security("srv-platform", "read")
         .unwrap_or_else(|| panic!("bridge security"));
     assert!(sidecar.has_registry_coordinates());
     registry
-        .validate_bridge_security("srv-v2", "read", &sidecar)
+        .validate_bridge_security("srv-platform", "read", &sidecar)
         .unwrap_or_else(|error| panic!("validate exact sidecar: {error}"));
 
     for (field, replacement) in [
@@ -711,7 +786,7 @@ fn verified_registry_requires_an_exact_live_bridge_security_value() {
         let forged = serde_json::from_value(value)
             .unwrap_or_else(|error| panic!("decode forged sidecar: {error}"));
         assert!(registry
-            .validate_bridge_security("srv-v2", "read", &forged)
+            .validate_bridge_security("srv-platform", "read", &forged)
             .is_err());
     }
 
@@ -725,17 +800,17 @@ fn verified_registry_requires_an_exact_live_bridge_security_value() {
     let forged_flow = serde_json::from_value(flow_value)
         .unwrap_or_else(|error| panic!("decode forged flow sidecar: {error}"));
     assert!(registry
-        .validate_bridge_security("srv-v2", "read", &forged_flow)
+        .validate_bridge_security("srv-platform", "read", &forged_flow)
         .is_err());
     assert!(registry
         .validate_bridge_security("other-server", "read", &sidecar)
         .is_err());
     assert!(registry
-        .validate_bridge_security("srv-v2", "other-tool", &sidecar)
+        .validate_bridge_security("srv-platform", "other-tool", &sidecar)
         .is_err());
 
     let second_signer = Keypair::from_seed(&[35; 32]);
-    let mut second_manifest = v2_manifest(second_signer.public_key().to_hex());
+    let mut second_manifest = platform_manifest(second_signer.public_key().to_hex());
     second_manifest.version = "2.0.1".to_string();
     let second_signed = sign_manifest(&second_manifest, &second_signer)
         .unwrap_or_else(|error| panic!("sign second manifest: {error}"));
@@ -748,14 +823,14 @@ fn verified_registry_requires_an_exact_live_bridge_security_value() {
         )
         .unwrap_or_else(|error| panic!("register second manifest: {error}"));
     assert!(second_registry
-        .validate_bridge_security("srv-v2", "read", &sidecar)
+        .validate_bridge_security("srv-platform", "read", &sidecar)
         .is_err());
 }
 
 #[test]
 fn verified_registry_rejects_tampering_and_remote_tools_without_policy_clearance() {
     let keypair = Keypair::from_seed(&[26; 32]);
-    let manifest = v2_manifest(keypair.public_key().to_hex());
+    let manifest = platform_manifest(keypair.public_key().to_hex());
     let policy =
         AuthoritativeToolPolicy::new(Vec::new(), InformationLabel::bottom(), BTreeSet::new())
             .unwrap_or_else(|error| panic!("policy: {error}"));
@@ -916,7 +991,7 @@ fn environment_variable_names_reject_injection_and_credential_names() {
 fn current_manifest_consumer_corpus_preserves_wire_and_registered_signature() {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../../tests/bindings/fixtures/manifest-v2-consumers.json"
+        "/../../../tests/bindings/fixtures/manifest-consumers.json"
     )))
     .unwrap_or_else(|error| panic!("manifest consumer corpus: {error}"));
     let cases = corpus["cases"]
@@ -945,17 +1020,17 @@ fn current_manifest_consumer_corpus_preserves_wire_and_registered_signature() {
             assert_eq!(source, encoded);
             assert_eq!(
                 chio_core::sha256_hex(&encoded),
-                "4f9a91d6859c909e118bc89d1645d20da15fc3ac90aae26c4d796e3c56e8d603"
+                "46062e102f1d1dab0c4200c8a8354796fc180f931785ef9dc89363bc1806ffed"
             );
         }
     }
 }
 
 #[test]
-fn v2_schema_accepts_runtime_shape_and_rejects_unknown_nested_fields() {
+fn manifest_schema_accepts_runtime_shape_and_rejects_unknown_nested_fields() {
     let schema: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../../spec/schemas/chio-wire/v1/security/tool-manifest-v2.schema.json"
+        "/../../../spec/schemas/chio-wire/v1/security/tool-manifest-v1.schema.json"
     )))
     .unwrap_or_else(|error| panic!("manifest schema: {error}"));
     let flow_schema: serde_json::Value = serde_json::from_str(include_str!(concat!(
@@ -975,10 +1050,10 @@ fn v2_schema_accepts_runtime_shape_and_rejects_unknown_nested_fields() {
         .with_registry(&registry)
         .build(&schema)
         .unwrap_or_else(|error| panic!("compile manifest schema: {error}"));
-    let mut manifest = v2_manifest(Keypair::from_seed(&[6; 32]).public_key().to_hex());
+    let mut manifest = platform_manifest(Keypair::from_seed(&[6; 32]).public_key().to_hex());
     manifest.tools[0].flow = Some(chio_manifest::ToolFlowDeclaration::public_egress());
     let value = serde_json::to_value(&manifest)
-        .unwrap_or_else(|error| panic!("serialize v2 manifest: {error}"));
+        .unwrap_or_else(|error| panic!("serialize manifest: {error}"));
     assert!(validator.is_valid(&value));
 
     for forbidden_name in [
@@ -1005,6 +1080,6 @@ fn v2_schema_accepts_runtime_shape_and_rejects_unknown_nested_fields() {
     assert!(!validator.is_valid(&unknown));
     assert!(
         serde_json::from_value::<ToolManifest>(unknown).is_err(),
-        "the v2 runtime must reject the same second latency authority as its schema",
+        "the runtime must reject the same second latency authority as its schema",
     );
 }

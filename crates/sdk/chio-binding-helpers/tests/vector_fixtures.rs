@@ -1200,9 +1200,18 @@ fn capability_vector_fixture_matches_checked_in_json() {
 }
 
 #[test]
-#[ignore = "on-disk JSON is the source of truth; manifest_vector_fixture() is a regenerator helper for a subset of cases"]
 fn manifest_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&manifest_fixture_path(), &manifest_vector_fixture());
+}
+
+#[test]
+#[ignore = "regenerator: rewrite the manifest vector fixture from manifest_vector_fixture(); run with --ignored, then `cargo xtask freeze-vectors`"]
+fn regenerate_manifest_vector_fixture() {
+    fs::write(
+        manifest_fixture_path(),
+        pretty_json(&manifest_vector_fixture()),
+    )
+    .test_unwrap("write manifest vector fixture");
 }
 
 // Re-sign the checked-in capability corpus in place after a capability
@@ -1688,17 +1697,83 @@ fn capability_fixture_cases_round_trip_through_public_api() {
 }
 
 #[test]
-fn obsolete_manifest_fixture_cases_reject_current_admission() {
-    let raw = std::fs::read_to_string(manifest_fixture_path())
-        .test_unwrap("read negative manifest fixtures");
-    let fixture: Value = serde_json::from_str(&raw).test_unwrap("parse negative manifest fixtures");
-    for case in fixture["cases"].as_array().test_unwrap("cases array") {
-        assert!(
-            serde_json::from_value::<SignedManifest>(case["signed_manifest"].clone()).is_err(),
-            "unsupported manifest case {} must reject",
-            case["id"]
-        );
+fn old_manifest_shape_under_the_current_id_is_refused_structurally() {
+    let server = Keypair::from_seed(&[21u8; 32]);
+    let public_key = server.public_key().to_hex();
+    let old_tool = json!({
+        "name": "file_read",
+        "description": "Tool definition for file_read",
+        "input_schema": {"type": "object"},
+        "has_side_effects": false
+    });
+    let current_tool =
+        serde_json::to_value(&sample_signed_manifest(public_key.clone(), &["file_read"]).tools[0])
+            .test_unwrap("current tool definition");
+    let signed = |manifest: Value| {
+        let (signature, _) = server
+            .sign_canonical(&manifest)
+            .test_unwrap("sign old-shape manifest");
+        json!({
+            "manifest": manifest,
+            "signature": signature,
+            "signer_key": server.public_key(),
+        })
+        .to_string()
+    };
+    let cases = [
+        (
+            signed(json!({
+                "schema": chio_manifest::TOOL_MANIFEST_SCHEMA,
+                "server_id": "srv-bindings-demo",
+                "name": "Bindings Demo",
+                "version": "1.0.0",
+                "tools": [old_tool],
+                "public_key": public_key,
+            })),
+            "unknown field `has_side_effects`, expected one of `name`, `description`, `input_schema`, `output_schema`, `pricing`, `annotations`, `latency_hint`, `flow` at line 1 column 250",
+        ),
+        (
+            signed(json!({
+                "schema": chio_manifest::TOOL_MANIFEST_SCHEMA,
+                "server_id": "srv-bindings-demo",
+                "name": "Bindings Demo",
+                "version": "1.0.0",
+                "tools": [current_tool],
+                "required_permissions": {"network_hosts": ["api.example.com"]},
+                "public_key": public_key,
+            })),
+            "unknown field `network_hosts`, expected one of `read_paths`, `write_paths`, `network_destinations`, `environment_variables`, `native_syscall_profile` at line 1 column 176",
+        ),
+    ];
+    for (input, expected) in cases {
+        let error = match chio_binding_helpers::parse_signed_manifest_json(&input) {
+            Ok(_) => panic!("old-shape manifest must be refused"),
+            Err(error) => error,
+        };
+        assert_eq!(error.code(), ErrorCode::Json);
+        assert_eq!(error.to_string(), expected);
     }
+}
+
+#[test]
+fn retired_manifest_id_is_refused_as_unsupported_schema() {
+    let server = Keypair::from_seed(&[21u8; 32]);
+    let mut manifest = sample_signed_manifest(server.public_key().to_hex(), &["file_read"]);
+    manifest.schema = "chio.manifest.v2".to_string();
+    let error = match sign_manifest(&manifest, &server) {
+        Ok(_) => panic!("retired manifest id must be refused"),
+        Err(error) => chio_binding_helpers::Error::from(error),
+    };
+    assert_eq!(error.code(), ErrorCode::UnsupportedSchema);
+    assert_eq!(
+        error.to_string(),
+        "manifest schema version is not supported: chio.manifest.v2"
+    );
+    let verification =
+        verify_signed_manifest(&signed_manifest_with_manual_signature(manifest, &server))
+            .test_unwrap("retired manifest verification");
+    assert!(!verification.structure_valid);
+    assert!(verification.signature_valid);
 }
 
 #[test]

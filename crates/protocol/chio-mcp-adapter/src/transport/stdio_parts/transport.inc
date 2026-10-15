@@ -397,7 +397,7 @@ impl CageRequiredLaunch {
     ) -> Result<Self, AdapterError> {
         let server_id = server_id.into();
         validate_cage_migration_identity(&server_id, &migration)?;
-        migration.require_enforced().map_err(|error| {
+        migration.revalidate().map_err(|error| {
             AdapterError::ConnectionFailed(format!(
                 "cage MCP launch denied by enterprise migration state: {error}"
             ))
@@ -463,7 +463,6 @@ fn validate_cage_migration_identity(
     if state.key.scope_kind != chio_security_types::EnterpriseMigrationScopeKind::ToolServer
         || state.key.control != chio_security_types::EnterpriseMigrationControl::CageEnforcement
         || state.key.scope_id.as_str() != server_id
-        || state.generation != state.stage.generation()
     {
         return Err(AdapterError::ConnectionFailed(
             "native MCP launch migration binding does not match the exact tool server and cage control"
@@ -589,7 +588,7 @@ impl StdioMcpTransport {
         cage_receipts.bind_preparation(prepared.receipt_bindings())?;
         if let Err(error) =
             validate_cage_migration_identity(&server_id, &migration).and_then(|()| {
-                migration.require_enforced().map_err(|error| {
+                migration.revalidate().map_err(|error| {
                     AdapterError::ConnectionFailed(format!(
                         "cage MCP launch denied by enterprise migration state: {error}"
                     ))

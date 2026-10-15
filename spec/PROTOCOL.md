@@ -144,7 +144,7 @@ The v1 contract also covers:
 - an HTTP substrate sidecar protocol for protecting arbitrary HTTP APIs through
   Chio policy evaluation, typed HTTP receipts, and structured verdicts (see
   [HTTP-SUBSTRATE.md](HTTP-SUBSTRATE.md))
-- an OpenAPI-to-manifest pipeline that derives `chio.manifest.v2` tool
+- an OpenAPI-to-manifest pipeline that derives `chio.manifest.v1` tool
   definitions from OpenAPI specifications with `x-chio-*` policy extensions (see
   [OPENAPI-INTEGRATION.md](OPENAPI-INTEGRATION.md))
 - a reverse-proxy entrypoint (`chio api protect`) that combines OpenAPI
@@ -2838,10 +2838,10 @@ HTTP projections without their complete embedded proof are rejected.
 
 ## 7. Manifest Contract
 
-Tool discovery currently accepts the strict manifest schema:
+Tool discovery accepts exactly one manifest schema:
 
 ```text
-chio.manifest.v2
+chio.manifest.v1
 ```
 
 The manifest defines:
@@ -2857,20 +2857,22 @@ The manifest defines:
 This manifest is the authoritative discovery contract for native tool servers
 and for mediated adapters that synthesize a Chio tool surface from another
 protocol. The normative shape is
-[tool-manifest-v2.schema.json](schemas/chio-wire/v1/security/tool-manifest-v2.schema.json).
+[tool-manifest-v1.schema.json](schemas/chio-wire/v1/security/tool-manifest-v1.schema.json).
 Unknown fields and noncanonical optional-field spellings are rejected. Signed
 file loading also rejects duplicate fields and numeric aliases before decoding.
 
-The current implementation no longer accepts `chio.manifest.v1` or provides its
-former migration API. Operators MUST review the v2 annotations, flow policy
-and permissions, obtain a new signature and admit the manifest against the
-registered server key. Relabeling a v1 document does not preserve its signature
-or grant authority. This manifest schema transition does not rename the other
-v1 protocol artifacts.
+A manifest whose `schema` is any other value, including the retired
+`chio.manifest.v2`, is rejected as an unsupported schema. The id is checked by
+exact equality only; the body is then decoded as the closed normative type, so a
+document in a different shape that carries the `chio.manifest.v1` id (for
+example, tools with `has_side_effects` or permissions with `network_hosts`) is
+rejected by structure. No conversion API exists: a manifest in another shape
+MUST be rewritten, reviewed, signed and admitted against the registered server
+key.
 
 ### 7.1 OpenAPI-Derived Manifests
 
-Chio includes an automated pipeline for deriving `chio.manifest.v2` tool
+Chio includes an automated pipeline for deriving `chio.manifest.v1` tool
 definitions from OpenAPI 3.0.x and 3.1.x specifications. Each HTTP operation
 (method + path pair) in the OpenAPI spec becomes one `ToolDefinition`. The full
 pipeline is specified in [OPENAPI-INTEGRATION.md](OPENAPI-INTEGRATION.md).
@@ -2888,7 +2890,7 @@ When no `x-chio-*` extensions are present, the pipeline applies a default
 deny-by-method policy that assigns conservative scope requirements based on
 the HTTP method. This ensures fail-closed behavior for undecorated specs.
 
-The derived `chio.manifest.v2` output is identical in structure to hand-authored
+The derived `chio.manifest.v1` output is identical in structure to hand-authored
 manifests. Downstream consumers (the kernel, trust-control, and receipt
 pipeline) do not distinguish between hand-authored and OpenAPI-derived
 manifests.

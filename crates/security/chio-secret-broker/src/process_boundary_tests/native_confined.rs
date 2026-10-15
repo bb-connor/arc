@@ -339,22 +339,19 @@ impl ConfinedFactory {
             broker_binding_digest: digest(&canonical_json_bytes(&self.peer)?),
             migration_ledger_digest: digest(&canonical_json_bytes(&key)?),
         };
-        let posture = |stage| {
-            chio_security_types::cage_migration_posture_digest(
-                &key.deployment_id,
-                &key.scope_id,
-                stage,
-                &inputs,
-            )
-        };
+        let posture = chio_security_types::cage_migration_posture_digest(
+            &key.deployment_id,
+            &key.scope_id,
+            &inputs,
+        )?;
         let path = self.directory.join("cage-migration.sqlite3");
         let store = SqliteEnterpriseMigrationStateStore::open(
             &path,
             SqliteEnterpriseMigrationOpenPolicy::new(vec![self.signer.public_key()], Vec::new())?,
         )?;
-        let genesis = EnterpriseMigrationTransitionBody::genesis(
+        let registration = EnterpriseMigrationTransitionBody::enforced(
             key.clone(),
-            posture(EnterpriseMigrationStage::Disabled)?,
+            posture,
             digest(contract.as_bytes()),
             digest(b"boundary cage approval"),
             digest(b"boundary cage evidence"),
@@ -362,28 +359,10 @@ impl ConfinedFactory {
             self.signer.public_key().to_hex(),
         )?;
         store.register(&sign_enterprise_migration_transition(
-            genesis,
+            registration,
             &self.signer,
         )?)?;
-        let mut state = store.load(&key)?.ok_or("cage genesis absent")?;
-        while state.stage != EnterpriseMigrationStage::Enforced {
-            let next = state.stage.next().ok_or("cage enforcement stage absent")?;
-            let promotion = EnterpriseMigrationTransitionBody::promotion(
-                &state,
-                posture(next)?,
-                digest(contract.as_bytes()),
-                digest(&canonical_json_bytes(&next)?),
-                digest(contract.as_bytes()),
-                next.generation() + 1,
-                self.signer.public_key().to_hex(),
-            )?;
-            store.compare_and_promote(&sign_enterprise_migration_transition(
-                promotion,
-                &self.signer,
-            )?)?;
-            state = store.load(&key)?.ok_or("cage promotion absent")?;
-        }
-        let head = state.minimum_head();
+        let head = store.load(&key)?.ok_or("cage registration absent")?.head();
         drop(store);
         let store: Arc<dyn EnterpriseMigrationStateStore> =
             Arc::new(SqliteEnterpriseMigrationStateStore::open(
@@ -394,10 +373,7 @@ impl ConfinedFactory {
                 )?,
             )?);
         Ok(EnterpriseMigrationRuntimeBinding::load(
-            &store,
-            &key,
-            EnterpriseMigrationStage::Enforced,
-            posture(EnterpriseMigrationStage::Enforced)?,
+            &store, &key, posture,
         )?)
     }
 }

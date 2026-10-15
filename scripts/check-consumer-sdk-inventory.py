@@ -17,7 +17,7 @@ TYPESCRIPT_GAP_SUFFIX = " (known gap: JSON.parse keeps the last duplicate)"
 
 
 def verify(evidence: Path, root: Path) -> None:
-    manifest = json.loads((root / "tests/bindings/fixtures/manifest-v2-consumers.json").read_text())["cases"]
+    manifest = json.loads((root / "tests/bindings/fixtures/manifest-consumers.json").read_text())["cases"]
     corpus = json.loads((root / "tests/bindings/fixtures/protocol-primitives-v1.json").read_text())
     primitives, raw = corpus["cases"], corpus["raw_cases"]
     if len(manifest) != 14 or len(primitives) != 42 or len(raw) != 2:
@@ -26,7 +26,7 @@ def verify(evidence: Path, root: Path) -> None:
         raise ValueError("raw fixture decoder status is not recorded")
     if any(status["go"] != "rejects" for status in RAW_CASE_STATUS.values()):
         raise ValueError("Go raw fixtures have no expected-failure form")
-    expected_python = {f"test_manifest_v2_runtime_corpus[{case['name']}]" for case in manifest}
+    expected_python = {f"test_manifest_runtime_corpus[{case['name']}]" for case in manifest}
     expected_python.add("test_protocol_primitives_shared_fixtures_parse_reject_and_round_trip")
     python_raw = {
         f"test_protocol_primitives_raw_cases_reject_duplicate_keys[{name}]": status["python"]
@@ -44,7 +44,7 @@ def verify(evidence: Path, root: Path) -> None:
 
     expected_go = {
         "TestGeneratedProtocolPrimitivesConsumeSharedFixtures",
-        "TestGeneratedManifestV2RuntimeCorpus",
+        "TestGeneratedManifestRuntimeCorpus",
         "TestChioToolCallRequestPreservesApprovalSetAndOpaqueExtension",
         "TestProtocolPublicDecoderRejectsMutationsWithoutReplacingPriorValue",
         "TestProtocolNumbersPreserveOpaqueValuesAndRejectTypedOverflow",
@@ -58,7 +58,7 @@ def verify(evidence: Path, root: Path) -> None:
     passed = [event["Test"] for event in events if event["Action"] == "pass" and "Test" in event and "/" not in event["Test"]]
     if len(passed) != len(expected_go) or set(passed) != expected_go:
         raise ValueError("Go consumer inventory mismatch")
-    for test, fixtures in [("TestGeneratedProtocolPrimitivesConsumeSharedFixtures", primitives + raw), ("TestGeneratedManifestV2RuntimeCorpus", manifest)]:
+    for test, fixtures in [("TestGeneratedProtocolPrimitivesConsumeSharedFixtures", primitives + raw), ("TestGeneratedManifestRuntimeCorpus", manifest)]:
         expected = {f"{test}/{case['name']}" for case in fixtures}
         observed = [event.get("Test") for event in events if event["Action"] == "pass" and event.get("Test", "").startswith(test + "/")]
         if len(observed) != len(expected) or set(observed) != expected:

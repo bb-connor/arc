@@ -104136,7 +104136,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///
     /// ```json
     ///{
-    ///  "title": "Chio signed tool manifest v2",
+    ///  "title": "Chio signed tool manifest v1",
     ///  "description": "Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.",
     ///  "type": "object",
     ///  "required": [
@@ -104146,7 +104146,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///  ],
     ///  "properties": {
     ///    "manifest": {
-    ///      "title": "Chio Tool Manifest v2",
+    ///      "title": "Chio Tool Manifest v1",
     ///      "description": "Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.",
     ///      "type": "object",
     ///      "required": [
@@ -104173,7 +104173,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///          "$ref": "#/$defs/requiredPermissions"
     ///        },
     ///        "schema": {
-    ///          "const": "chio.manifest.v2"
+    ///          "const": "chio.manifest.v1"
     ///        },
     ///        "server_id": {
     ///          "type": "string",
@@ -104220,17 +104220,17 @@ pub mod security_mcp_cage_launch_policy_v1 {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct ChioSignedToolManifestV2 {
-        pub manifest: ChioToolManifestV2,
-        pub signature: ChioSignedToolManifestV2Signature,
-        pub signer_key: ChioSignedToolManifestV2SignerKey,
+    pub struct ChioSignedToolManifestV1 {
+        pub manifest: ChioToolManifestV1,
+        pub signature: ChioSignedToolManifestV1Signature,
+        pub signer_key: ChioSignedToolManifestV1SignerKey,
     }
-    impl ::std::convert::From<&ChioSignedToolManifestV2> for ChioSignedToolManifestV2 {
-        fn from(value: &ChioSignedToolManifestV2) -> Self {
+    impl ::std::convert::From<&ChioSignedToolManifestV1> for ChioSignedToolManifestV1 {
+        fn from(value: &ChioSignedToolManifestV1) -> Self {
             value.clone()
         }
     }
-    ///`ChioSignedToolManifestV2Signature`
+    ///`ChioSignedToolManifestV1Signature`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -104243,26 +104243,26 @@ pub mod security_mcp_cage_launch_policy_v1 {
     /// </details>
     #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     #[serde(transparent)]
-    pub struct ChioSignedToolManifestV2Signature(::std::string::String);
-    impl ::std::ops::Deref for ChioSignedToolManifestV2Signature {
+    pub struct ChioSignedToolManifestV1Signature(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedToolManifestV1Signature {
         type Target = ::std::string::String;
         fn deref(&self) -> &::std::string::String {
             &self.0
         }
     }
-    impl ::std::convert::From<ChioSignedToolManifestV2Signature> for ::std::string::String {
-        fn from(value: ChioSignedToolManifestV2Signature) -> Self {
+    impl ::std::convert::From<ChioSignedToolManifestV1Signature> for ::std::string::String {
+        fn from(value: ChioSignedToolManifestV1Signature) -> Self {
             value.0
         }
     }
-    impl ::std::convert::From<&ChioSignedToolManifestV2Signature>
-        for ChioSignedToolManifestV2Signature
+    impl ::std::convert::From<&ChioSignedToolManifestV1Signature>
+        for ChioSignedToolManifestV1Signature
     {
-        fn from(value: &ChioSignedToolManifestV2Signature) -> Self {
+        fn from(value: &ChioSignedToolManifestV1Signature) -> Self {
             value.clone()
         }
     }
-    impl ::std::str::FromStr for ChioSignedToolManifestV2Signature {
+    impl ::std::str::FromStr for ChioSignedToolManifestV1Signature {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
@@ -104282,13 +104282,13 @@ pub mod security_mcp_cage_launch_policy_v1 {
             Ok(Self(value.to_string()))
         }
     }
-    impl ::std::convert::TryFrom<&str> for ChioSignedToolManifestV2Signature {
+    impl ::std::convert::TryFrom<&str> for ChioSignedToolManifestV1Signature {
         type Error = self::error::ConversionError;
         fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<&::std::string::String> for ChioSignedToolManifestV2Signature {
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSignedToolManifestV1Signature {
         type Error = self::error::ConversionError;
         fn try_from(
             value: &::std::string::String,
@@ -104296,7 +104296,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<::std::string::String> for ChioSignedToolManifestV2Signature {
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSignedToolManifestV1Signature {
         type Error = self::error::ConversionError;
         fn try_from(
             value: ::std::string::String,
@@ -104304,7 +104304,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl<'de> ::serde::Deserialize<'de> for ChioSignedToolManifestV2Signature {
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedToolManifestV1Signature {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -104316,7 +104316,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
                 })
         }
     }
-    ///`ChioSignedToolManifestV2SignerKey`
+    ///`ChioSignedToolManifestV1SignerKey`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -104329,26 +104329,26 @@ pub mod security_mcp_cage_launch_policy_v1 {
     /// </details>
     #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     #[serde(transparent)]
-    pub struct ChioSignedToolManifestV2SignerKey(::std::string::String);
-    impl ::std::ops::Deref for ChioSignedToolManifestV2SignerKey {
+    pub struct ChioSignedToolManifestV1SignerKey(::std::string::String);
+    impl ::std::ops::Deref for ChioSignedToolManifestV1SignerKey {
         type Target = ::std::string::String;
         fn deref(&self) -> &::std::string::String {
             &self.0
         }
     }
-    impl ::std::convert::From<ChioSignedToolManifestV2SignerKey> for ::std::string::String {
-        fn from(value: ChioSignedToolManifestV2SignerKey) -> Self {
+    impl ::std::convert::From<ChioSignedToolManifestV1SignerKey> for ::std::string::String {
+        fn from(value: ChioSignedToolManifestV1SignerKey) -> Self {
             value.0
         }
     }
-    impl ::std::convert::From<&ChioSignedToolManifestV2SignerKey>
-        for ChioSignedToolManifestV2SignerKey
+    impl ::std::convert::From<&ChioSignedToolManifestV1SignerKey>
+        for ChioSignedToolManifestV1SignerKey
     {
-        fn from(value: &ChioSignedToolManifestV2SignerKey) -> Self {
+        fn from(value: &ChioSignedToolManifestV1SignerKey) -> Self {
             value.clone()
         }
     }
-    impl ::std::str::FromStr for ChioSignedToolManifestV2SignerKey {
+    impl ::std::str::FromStr for ChioSignedToolManifestV1SignerKey {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
@@ -104368,13 +104368,13 @@ pub mod security_mcp_cage_launch_policy_v1 {
             Ok(Self(value.to_string()))
         }
     }
-    impl ::std::convert::TryFrom<&str> for ChioSignedToolManifestV2SignerKey {
+    impl ::std::convert::TryFrom<&str> for ChioSignedToolManifestV1SignerKey {
         type Error = self::error::ConversionError;
         fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<&::std::string::String> for ChioSignedToolManifestV2SignerKey {
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioSignedToolManifestV1SignerKey {
         type Error = self::error::ConversionError;
         fn try_from(
             value: &::std::string::String,
@@ -104382,7 +104382,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<::std::string::String> for ChioSignedToolManifestV2SignerKey {
+    impl ::std::convert::TryFrom<::std::string::String> for ChioSignedToolManifestV1SignerKey {
         type Error = self::error::ConversionError;
         fn try_from(
             value: ::std::string::String,
@@ -104390,7 +104390,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl<'de> ::serde::Deserialize<'de> for ChioSignedToolManifestV2SignerKey {
+    impl<'de> ::serde::Deserialize<'de> for ChioSignedToolManifestV1SignerKey {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -104408,7 +104408,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///
     /// ```json
     ///{
-    ///  "title": "Chio Tool Manifest v2",
+    ///  "title": "Chio Tool Manifest v1",
     ///  "description": "Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.",
     ///  "type": "object",
     ///  "required": [
@@ -104435,7 +104435,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///      "$ref": "#/$defs/requiredPermissions"
     ///    },
     ///    "schema": {
-    ///      "const": "chio.manifest.v2"
+    ///      "const": "chio.manifest.v1"
     ///    },
     ///    "server_id": {
     ///      "type": "string",
@@ -104471,26 +104471,26 @@ pub mod security_mcp_cage_launch_policy_v1 {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct ChioToolManifestV2 {
+    pub struct ChioToolManifestV1 {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub description: ::std::option::Option<::std::string::String>,
-        pub name: ChioToolManifestV2Name,
-        pub public_key: ChioToolManifestV2PublicKey,
+        pub name: ChioToolManifestV1Name,
+        pub public_key: ChioToolManifestV1PublicKey,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub required_permissions: ::std::option::Option<RequiredPermissions>,
         pub schema: ::serde_json::Value,
-        pub server_id: ChioToolManifestV2ServerId,
+        pub server_id: ChioToolManifestV1ServerId,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub server_tools: ::std::option::Option<Vec<ChioToolManifestV2ServerToolsItem>>,
+        pub server_tools: ::std::option::Option<Vec<ChioToolManifestV1ServerToolsItem>>,
         pub tools: ::std::vec::Vec<ToolDefinition>,
-        pub version: ChioToolManifestV2Version,
+        pub version: ChioToolManifestV1Version,
     }
-    impl ::std::convert::From<&ChioToolManifestV2> for ChioToolManifestV2 {
-        fn from(value: &ChioToolManifestV2) -> Self {
+    impl ::std::convert::From<&ChioToolManifestV1> for ChioToolManifestV1 {
+        fn from(value: &ChioToolManifestV1) -> Self {
             value.clone()
         }
     }
-    ///`ChioToolManifestV2Name`
+    ///`ChioToolManifestV1Name`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -104503,24 +104503,24 @@ pub mod security_mcp_cage_launch_policy_v1 {
     /// </details>
     #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     #[serde(transparent)]
-    pub struct ChioToolManifestV2Name(::std::string::String);
-    impl ::std::ops::Deref for ChioToolManifestV2Name {
+    pub struct ChioToolManifestV1Name(::std::string::String);
+    impl ::std::ops::Deref for ChioToolManifestV1Name {
         type Target = ::std::string::String;
         fn deref(&self) -> &::std::string::String {
             &self.0
         }
     }
-    impl ::std::convert::From<ChioToolManifestV2Name> for ::std::string::String {
-        fn from(value: ChioToolManifestV2Name) -> Self {
+    impl ::std::convert::From<ChioToolManifestV1Name> for ::std::string::String {
+        fn from(value: ChioToolManifestV1Name) -> Self {
             value.0
         }
     }
-    impl ::std::convert::From<&ChioToolManifestV2Name> for ChioToolManifestV2Name {
-        fn from(value: &ChioToolManifestV2Name) -> Self {
+    impl ::std::convert::From<&ChioToolManifestV1Name> for ChioToolManifestV1Name {
+        fn from(value: &ChioToolManifestV1Name) -> Self {
             value.clone()
         }
     }
-    impl ::std::str::FromStr for ChioToolManifestV2Name {
+    impl ::std::str::FromStr for ChioToolManifestV1Name {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             if value.chars().count() < 1usize {
@@ -104529,13 +104529,13 @@ pub mod security_mcp_cage_launch_policy_v1 {
             Ok(Self(value.to_string()))
         }
     }
-    impl ::std::convert::TryFrom<&str> for ChioToolManifestV2Name {
+    impl ::std::convert::TryFrom<&str> for ChioToolManifestV1Name {
         type Error = self::error::ConversionError;
         fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<&::std::string::String> for ChioToolManifestV2Name {
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioToolManifestV1Name {
         type Error = self::error::ConversionError;
         fn try_from(
             value: &::std::string::String,
@@ -104543,7 +104543,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<::std::string::String> for ChioToolManifestV2Name {
+    impl ::std::convert::TryFrom<::std::string::String> for ChioToolManifestV1Name {
         type Error = self::error::ConversionError;
         fn try_from(
             value: ::std::string::String,
@@ -104551,7 +104551,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl<'de> ::serde::Deserialize<'de> for ChioToolManifestV2Name {
+    impl<'de> ::serde::Deserialize<'de> for ChioToolManifestV1Name {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -104563,7 +104563,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
                 })
         }
     }
-    ///`ChioToolManifestV2PublicKey`
+    ///`ChioToolManifestV1PublicKey`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -104576,24 +104576,24 @@ pub mod security_mcp_cage_launch_policy_v1 {
     /// </details>
     #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     #[serde(transparent)]
-    pub struct ChioToolManifestV2PublicKey(::std::string::String);
-    impl ::std::ops::Deref for ChioToolManifestV2PublicKey {
+    pub struct ChioToolManifestV1PublicKey(::std::string::String);
+    impl ::std::ops::Deref for ChioToolManifestV1PublicKey {
         type Target = ::std::string::String;
         fn deref(&self) -> &::std::string::String {
             &self.0
         }
     }
-    impl ::std::convert::From<ChioToolManifestV2PublicKey> for ::std::string::String {
-        fn from(value: ChioToolManifestV2PublicKey) -> Self {
+    impl ::std::convert::From<ChioToolManifestV1PublicKey> for ::std::string::String {
+        fn from(value: ChioToolManifestV1PublicKey) -> Self {
             value.0
         }
     }
-    impl ::std::convert::From<&ChioToolManifestV2PublicKey> for ChioToolManifestV2PublicKey {
-        fn from(value: &ChioToolManifestV2PublicKey) -> Self {
+    impl ::std::convert::From<&ChioToolManifestV1PublicKey> for ChioToolManifestV1PublicKey {
+        fn from(value: &ChioToolManifestV1PublicKey) -> Self {
             value.clone()
         }
     }
-    impl ::std::str::FromStr for ChioToolManifestV2PublicKey {
+    impl ::std::str::FromStr for ChioToolManifestV1PublicKey {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             if value.chars().count() < 1usize {
@@ -104602,13 +104602,13 @@ pub mod security_mcp_cage_launch_policy_v1 {
             Ok(Self(value.to_string()))
         }
     }
-    impl ::std::convert::TryFrom<&str> for ChioToolManifestV2PublicKey {
+    impl ::std::convert::TryFrom<&str> for ChioToolManifestV1PublicKey {
         type Error = self::error::ConversionError;
         fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<&::std::string::String> for ChioToolManifestV2PublicKey {
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioToolManifestV1PublicKey {
         type Error = self::error::ConversionError;
         fn try_from(
             value: &::std::string::String,
@@ -104616,7 +104616,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<::std::string::String> for ChioToolManifestV2PublicKey {
+    impl ::std::convert::TryFrom<::std::string::String> for ChioToolManifestV1PublicKey {
         type Error = self::error::ConversionError;
         fn try_from(
             value: ::std::string::String,
@@ -104624,7 +104624,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl<'de> ::serde::Deserialize<'de> for ChioToolManifestV2PublicKey {
+    impl<'de> ::serde::Deserialize<'de> for ChioToolManifestV1PublicKey {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -104636,7 +104636,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
                 })
         }
     }
-    ///`ChioToolManifestV2ServerId`
+    ///`ChioToolManifestV1ServerId`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -104649,24 +104649,24 @@ pub mod security_mcp_cage_launch_policy_v1 {
     /// </details>
     #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     #[serde(transparent)]
-    pub struct ChioToolManifestV2ServerId(::std::string::String);
-    impl ::std::ops::Deref for ChioToolManifestV2ServerId {
+    pub struct ChioToolManifestV1ServerId(::std::string::String);
+    impl ::std::ops::Deref for ChioToolManifestV1ServerId {
         type Target = ::std::string::String;
         fn deref(&self) -> &::std::string::String {
             &self.0
         }
     }
-    impl ::std::convert::From<ChioToolManifestV2ServerId> for ::std::string::String {
-        fn from(value: ChioToolManifestV2ServerId) -> Self {
+    impl ::std::convert::From<ChioToolManifestV1ServerId> for ::std::string::String {
+        fn from(value: ChioToolManifestV1ServerId) -> Self {
             value.0
         }
     }
-    impl ::std::convert::From<&ChioToolManifestV2ServerId> for ChioToolManifestV2ServerId {
-        fn from(value: &ChioToolManifestV2ServerId) -> Self {
+    impl ::std::convert::From<&ChioToolManifestV1ServerId> for ChioToolManifestV1ServerId {
+        fn from(value: &ChioToolManifestV1ServerId) -> Self {
             value.clone()
         }
     }
-    impl ::std::str::FromStr for ChioToolManifestV2ServerId {
+    impl ::std::str::FromStr for ChioToolManifestV1ServerId {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             if value.chars().count() < 1usize {
@@ -104675,13 +104675,13 @@ pub mod security_mcp_cage_launch_policy_v1 {
             Ok(Self(value.to_string()))
         }
     }
-    impl ::std::convert::TryFrom<&str> for ChioToolManifestV2ServerId {
+    impl ::std::convert::TryFrom<&str> for ChioToolManifestV1ServerId {
         type Error = self::error::ConversionError;
         fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<&::std::string::String> for ChioToolManifestV2ServerId {
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioToolManifestV1ServerId {
         type Error = self::error::ConversionError;
         fn try_from(
             value: &::std::string::String,
@@ -104689,7 +104689,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<::std::string::String> for ChioToolManifestV2ServerId {
+    impl ::std::convert::TryFrom<::std::string::String> for ChioToolManifestV1ServerId {
         type Error = self::error::ConversionError;
         fn try_from(
             value: ::std::string::String,
@@ -104697,7 +104697,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl<'de> ::serde::Deserialize<'de> for ChioToolManifestV2ServerId {
+    impl<'de> ::serde::Deserialize<'de> for ChioToolManifestV1ServerId {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -104709,7 +104709,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
                 })
         }
     }
-    ///`ChioToolManifestV2ServerToolsItem`
+    ///`ChioToolManifestV1ServerToolsItem`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -104735,7 +104735,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
         PartialEq,
         PartialOrd,
     )]
-    pub enum ChioToolManifestV2ServerToolsItem {
+    pub enum ChioToolManifestV1ServerToolsItem {
         #[serde(rename = "computer_use")]
         ComputerUse,
         #[serde(rename = "bash")]
@@ -104743,12 +104743,12 @@ pub mod security_mcp_cage_launch_policy_v1 {
         #[serde(rename = "text_editor")]
         TextEditor,
     }
-    impl ::std::convert::From<&Self> for ChioToolManifestV2ServerToolsItem {
-        fn from(value: &ChioToolManifestV2ServerToolsItem) -> Self {
+    impl ::std::convert::From<&Self> for ChioToolManifestV1ServerToolsItem {
+        fn from(value: &ChioToolManifestV1ServerToolsItem) -> Self {
             value.clone()
         }
     }
-    impl ::std::fmt::Display for ChioToolManifestV2ServerToolsItem {
+    impl ::std::fmt::Display for ChioToolManifestV1ServerToolsItem {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::ComputerUse => f.write_str("computer_use"),
@@ -104757,7 +104757,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             }
         }
     }
-    impl ::std::str::FromStr for ChioToolManifestV2ServerToolsItem {
+    impl ::std::str::FromStr for ChioToolManifestV1ServerToolsItem {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             match value {
@@ -104768,13 +104768,13 @@ pub mod security_mcp_cage_launch_policy_v1 {
             }
         }
     }
-    impl ::std::convert::TryFrom<&str> for ChioToolManifestV2ServerToolsItem {
+    impl ::std::convert::TryFrom<&str> for ChioToolManifestV1ServerToolsItem {
         type Error = self::error::ConversionError;
         fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<&::std::string::String> for ChioToolManifestV2ServerToolsItem {
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioToolManifestV1ServerToolsItem {
         type Error = self::error::ConversionError;
         fn try_from(
             value: &::std::string::String,
@@ -104782,7 +104782,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<::std::string::String> for ChioToolManifestV2ServerToolsItem {
+    impl ::std::convert::TryFrom<::std::string::String> for ChioToolManifestV1ServerToolsItem {
         type Error = self::error::ConversionError;
         fn try_from(
             value: ::std::string::String,
@@ -104790,7 +104790,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    ///`ChioToolManifestV2Version`
+    ///`ChioToolManifestV1Version`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -104803,24 +104803,24 @@ pub mod security_mcp_cage_launch_policy_v1 {
     /// </details>
     #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     #[serde(transparent)]
-    pub struct ChioToolManifestV2Version(::std::string::String);
-    impl ::std::ops::Deref for ChioToolManifestV2Version {
+    pub struct ChioToolManifestV1Version(::std::string::String);
+    impl ::std::ops::Deref for ChioToolManifestV1Version {
         type Target = ::std::string::String;
         fn deref(&self) -> &::std::string::String {
             &self.0
         }
     }
-    impl ::std::convert::From<ChioToolManifestV2Version> for ::std::string::String {
-        fn from(value: ChioToolManifestV2Version) -> Self {
+    impl ::std::convert::From<ChioToolManifestV1Version> for ::std::string::String {
+        fn from(value: ChioToolManifestV1Version) -> Self {
             value.0
         }
     }
-    impl ::std::convert::From<&ChioToolManifestV2Version> for ChioToolManifestV2Version {
-        fn from(value: &ChioToolManifestV2Version) -> Self {
+    impl ::std::convert::From<&ChioToolManifestV1Version> for ChioToolManifestV1Version {
+        fn from(value: &ChioToolManifestV1Version) -> Self {
             value.clone()
         }
     }
-    impl ::std::str::FromStr for ChioToolManifestV2Version {
+    impl ::std::str::FromStr for ChioToolManifestV1Version {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             if value.chars().count() < 1usize {
@@ -104829,13 +104829,13 @@ pub mod security_mcp_cage_launch_policy_v1 {
             Ok(Self(value.to_string()))
         }
     }
-    impl ::std::convert::TryFrom<&str> for ChioToolManifestV2Version {
+    impl ::std::convert::TryFrom<&str> for ChioToolManifestV1Version {
         type Error = self::error::ConversionError;
         fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<&::std::string::String> for ChioToolManifestV2Version {
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioToolManifestV1Version {
         type Error = self::error::ConversionError;
         fn try_from(
             value: &::std::string::String,
@@ -104843,7 +104843,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<::std::string::String> for ChioToolManifestV2Version {
+    impl ::std::convert::TryFrom<::std::string::String> for ChioToolManifestV1Version {
         type Error = self::error::ConversionError;
         fn try_from(
             value: ::std::string::String,
@@ -104851,7 +104851,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.parse()
         }
     }
-    impl<'de> ::serde::Deserialize<'de> for ChioToolManifestV2Version {
+    impl<'de> ::serde::Deserialize<'de> for ChioToolManifestV1Version {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -105059,8 +105059,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///  "type": "object",
     ///  "required": [
     ///    "deployment_id",
-    ///    "minimum_head",
-    ///    "stage",
+    ///    "head",
     ///    "state_database_path",
     ///    "trusted_transition_signers"
     ///  ],
@@ -105068,16 +105067,8 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///    "deployment_id": {
     ///      "$ref": "#/$defs/identifier"
     ///    },
-    ///    "minimum_head": {
-    ///      "$ref": "#/$defs/minimumHead"
-    ///    },
-    ///    "stage": {
-    ///      "enum": [
-    ///        "disabled",
-    ///        "shadow",
-    ///        "enforced",
-    ///        "legacy_removed"
-    ///      ]
+    ///    "head": {
+    ///      "$ref": "#/$defs/migrationHead"
     ///    },
     ///    "state_database_path": {
     ///      "$ref": "#/$defs/absoluteCanonicalPath"
@@ -105100,100 +105091,13 @@ pub mod security_mcp_cage_launch_policy_v1 {
     #[serde(deny_unknown_fields)]
     pub struct EnterpriseMigration {
         pub deployment_id: Identifier,
-        pub minimum_head: MinimumHead,
-        pub stage: EnterpriseMigrationStage,
+        pub head: MigrationHead,
         pub state_database_path: AbsoluteCanonicalPath,
         pub trusted_transition_signers: Vec<PublicKey>,
     }
     impl ::std::convert::From<&EnterpriseMigration> for EnterpriseMigration {
         fn from(value: &EnterpriseMigration) -> Self {
             value.clone()
-        }
-    }
-    ///`EnterpriseMigrationStage`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "enum": [
-    ///    "disabled",
-    ///    "shadow",
-    ///    "enforced",
-    ///    "legacy_removed"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd,
-    )]
-    pub enum EnterpriseMigrationStage {
-        #[serde(rename = "disabled")]
-        Disabled,
-        #[serde(rename = "shadow")]
-        Shadow,
-        #[serde(rename = "enforced")]
-        Enforced,
-        #[serde(rename = "legacy_removed")]
-        LegacyRemoved,
-    }
-    impl ::std::convert::From<&Self> for EnterpriseMigrationStage {
-        fn from(value: &EnterpriseMigrationStage) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::fmt::Display for EnterpriseMigrationStage {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::Disabled => f.write_str("disabled"),
-                Self::Shadow => f.write_str("shadow"),
-                Self::Enforced => f.write_str("enforced"),
-                Self::LegacyRemoved => f.write_str("legacy_removed"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for EnterpriseMigrationStage {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "disabled" => Ok(Self::Disabled),
-                "shadow" => Ok(Self::Shadow),
-                "enforced" => Ok(Self::Enforced),
-                "legacy_removed" => Ok(Self::LegacyRemoved),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for EnterpriseMigrationStage {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for EnterpriseMigrationStage {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for EnterpriseMigrationStage {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
         }
     }
     ///`Environment`
@@ -108962,6 +108866,40 @@ pub mod security_mcp_cage_launch_policy_v1 {
             value.clone()
         }
     }
+    ///`MigrationHead`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "key",
+    ///    "transition_digest"
+    ///  ],
+    ///  "properties": {
+    ///    "key": {
+    ///      "$ref": "#/$defs/migrationKey"
+    ///    },
+    ///    "transition_digest": {
+    ///      "$ref": "#/$defs/nonzeroDigest32"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct MigrationHead {
+        pub key: MigrationKey,
+        pub transition_digest: NonzeroDigest32,
+    }
+    impl ::std::convert::From<&MigrationHead> for MigrationHead {
+        fn from(value: &MigrationHead) -> Self {
+            value.clone()
+        }
+    }
     ///`MigrationKey`
     ///
     /// <details><summary>JSON schema</summary>
@@ -109004,103 +108942,6 @@ pub mod security_mcp_cage_launch_policy_v1 {
     impl ::std::convert::From<&MigrationKey> for MigrationKey {
         fn from(value: &MigrationKey) -> Self {
             value.clone()
-        }
-    }
-    ///`MinimumHead`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "key",
-    ///    "minimum_generation",
-    ///    "transition_digest"
-    ///  ],
-    ///  "properties": {
-    ///    "key": {
-    ///      "$ref": "#/$defs/migrationKey"
-    ///    },
-    ///    "minimum_generation": {
-    ///      "enum": [
-    ///        0,
-    ///        1,
-    ///        2,
-    ///        3
-    ///      ]
-    ///    },
-    ///    "transition_digest": {
-    ///      "$ref": "#/$defs/nonzeroDigest32"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct MinimumHead {
-        pub key: MigrationKey,
-        pub minimum_generation: MinimumHeadMinimumGeneration,
-        pub transition_digest: NonzeroDigest32,
-    }
-    impl ::std::convert::From<&MinimumHead> for MinimumHead {
-        fn from(value: &MinimumHead) -> Self {
-            value.clone()
-        }
-    }
-    ///`MinimumHeadMinimumGeneration`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "enum": [
-    ///    0,
-    ///    1,
-    ///    2,
-    ///    3
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct MinimumHeadMinimumGeneration(f64);
-    impl ::std::ops::Deref for MinimumHeadMinimumGeneration {
-        type Target = f64;
-        fn deref(&self) -> &f64 {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<MinimumHeadMinimumGeneration> for f64 {
-        fn from(value: MinimumHeadMinimumGeneration) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&MinimumHeadMinimumGeneration> for MinimumHeadMinimumGeneration {
-        fn from(value: &MinimumHeadMinimumGeneration) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::TryFrom<f64> for MinimumHeadMinimumGeneration {
-        type Error = self::error::ConversionError;
-        fn try_from(value: f64) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if ![0_f64, 1_f64, 2_f64, 3_f64].contains(&value) {
-                Err("invalid value".into())
-            } else {
-                Ok(Self(value))
-            }
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for MinimumHeadMinimumGeneration {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            Self::try_from(<f64>::deserialize(deserializer)?)
-                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
         }
     }
     ///`MonetaryAmount`
@@ -109889,7 +109730,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///      "const": "chio.mcp.cage-launch-policy.v1"
     ///    },
     ///    "signed_manifest": {
-    ///      "title": "Chio signed tool manifest v2",
+    ///      "title": "Chio signed tool manifest v1",
     ///      "description": "Exact SignedManifest envelope admitted by chio-cage before any manifest permission is read.",
     ///      "type": "object",
     ///      "required": [
@@ -109899,7 +109740,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///      ],
     ///      "properties": {
     ///        "manifest": {
-    ///          "title": "Chio Tool Manifest v2",
+    ///          "title": "Chio Tool Manifest v1",
     ///          "description": "Strict signed platform manifest body combining normative tool flow metadata and typed native cage permissions.",
     ///          "type": "object",
     ///          "required": [
@@ -109926,7 +109767,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///              "$ref": "#/$defs/requiredPermissions"
     ///            },
     ///            "schema": {
-    ///              "const": "chio.manifest.v2"
+    ///              "const": "chio.manifest.v1"
     ///            },
     ///            "server_id": {
     ///              "type": "string",
@@ -109986,7 +109827,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
         pub registered_public_key: PublicKey,
         pub runtime: Runtime,
         pub schema: ::serde_json::Value,
-        pub signed_manifest: ChioSignedToolManifestV2,
+        pub signed_manifest: ChioSignedToolManifestV1,
     }
     impl ::std::convert::From<&PolicyBody> for PolicyBody {
         fn from(value: &PolicyBody) -> Self {

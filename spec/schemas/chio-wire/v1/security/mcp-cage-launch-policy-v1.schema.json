@@ -27,7 +27,7 @@
       ],
       "properties": {
         "schema": { "const": "chio.mcp.cage-launch-policy.v1" },
-        "signed_manifest": { "$ref": "signed-tool-manifest-v2.schema.json" },
+        "signed_manifest": { "$ref": "signed-tool-manifest-v1.schema.json" },
         "registered_public_key": { "$ref": "#/$defs/publicKey" },
         "operator_ceilings": { "$ref": "#/$defs/operatorCeilings" },
         "runtime": { "$ref": "#/$defs/runtime" },
@@ -86,7 +86,7 @@
         "network_destinations": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "$ref": "tool-manifest-v2.schema.json#/$defs/networkDestination" }
+          "items": { "$ref": "tool-manifest-v1.schema.json#/$defs/networkDestination" }
         },
         "environment_variables": {
           "type": "array",
@@ -212,13 +212,12 @@
         "const": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
       }
     },
-    "minimumHead": {
+    "migrationHead": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["key", "minimum_generation", "transition_digest"],
+      "required": ["key", "transition_digest"],
       "properties": {
         "key": { "$ref": "#/$defs/migrationKey" },
-        "minimum_generation": { "enum": [0, 1, 2, 3] },
         "transition_digest": { "$ref": "#/$defs/nonzeroDigest32" }
       }
     },
@@ -228,14 +227,12 @@
       "required": [
         "state_database_path",
         "deployment_id",
-        "stage",
         "trusted_transition_signers",
-        "minimum_head"
+        "head"
       ],
       "properties": {
         "state_database_path": { "$ref": "#/$defs/absoluteCanonicalPath" },
         "deployment_id": { "$ref": "#/$defs/identifier" },
-        "stage": { "enum": ["disabled", "shadow", "enforced", "legacy_removed"] },
         "trusted_transition_signers": {
           "type": "array",
           "minItems": 1,
@@ -243,58 +240,8 @@
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/publicKey" }
         },
-        "minimum_head": { "$ref": "#/$defs/minimumHead" }
-      },
-      "allOf": [
-        {
-          "if": { "type": "object", "properties": { "stage": { "const": "disabled" } } },
-          "then": {
-            "type": "object",
-            "properties": {
-              "minimum_head": {
-                "type": "object",
-                "properties": { "minimum_generation": { "const": 0 } }
-              }
-            }
-          }
-        },
-        {
-          "if": { "type": "object", "properties": { "stage": { "const": "shadow" } } },
-          "then": {
-            "type": "object",
-            "properties": {
-              "minimum_head": {
-                "type": "object",
-                "properties": { "minimum_generation": { "const": 1 } }
-              }
-            }
-          }
-        },
-        {
-          "if": { "type": "object", "properties": { "stage": { "const": "enforced" } } },
-          "then": {
-            "type": "object",
-            "properties": {
-              "minimum_head": {
-                "type": "object",
-                "properties": { "minimum_generation": { "const": 2 } }
-              }
-            }
-          }
-        },
-        {
-          "if": { "type": "object", "properties": { "stage": { "const": "legacy_removed" } } },
-          "then": {
-            "type": "object",
-            "properties": {
-              "minimum_head": {
-                "type": "object",
-                "properties": { "minimum_generation": { "const": 3 } }
-              }
-            }
-          }
-        }
-      ]
+        "head": { "$ref": "#/$defs/migrationHead" }
+      }
     },
     "brokerPeerIdentity": {
       "type": "object",

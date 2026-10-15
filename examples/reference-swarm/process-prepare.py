@@ -117,8 +117,8 @@ def main():
             f"provisioning refused; inspect {output / 'provision.stderr'}"
         )
     report = json.loads((launch / "provision-report.json").read_text())
-    if report["securityMode"] != "enforced_cage":
-        raise ValueError("provisioner did not select Enforced cage launch")
+    if report["cageInitPath"] != str(helper):
+        raise ValueError("provisioner did not bind the requested cage helper")
     policy = output / "policy.yaml"
     policy.write_text("""kernel:
   max_capability_ttl: 3600

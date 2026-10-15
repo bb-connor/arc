@@ -166,52 +166,35 @@ pub(super) fn migration_config(
         control: EnterpriseMigrationControl::KeyLogVerification,
     };
     let binding = policy.configuration_binding()?;
-    let posture = |stage| {
-        chio_control_plane::key_log_verification_migration_posture_digest(
-            &key.deployment_id,
-            stage,
-            binding,
-        )
-    };
+    let posture = chio_control_plane::key_log_verification_migration_posture_digest(
+        &key.deployment_id,
+        binding,
+    )?;
     let digest = Digest32::new(Sha256::digest(b"native keyring fixture provisioning").into());
     let path = directory.join("migration.sqlite3");
     let store = SqliteEnterpriseMigrationStateStore::open(
         &path,
         SqliteEnterpriseMigrationOpenPolicy::new(vec![signer.public_key()], Vec::new())?,
     )?;
-    let genesis = EnterpriseMigrationTransitionBody::genesis(
+    let registration = EnterpriseMigrationTransitionBody::enforced(
         key.clone(),
-        posture(EnterpriseMigrationStage::Disabled)?,
+        posture,
         digest,
         digest,
         digest,
         1,
         signer.public_key().to_hex(),
     )?;
-    store.register(&sign_enterprise_migration_transition(genesis, &signer)?)?;
-    let mut state = store
+    store.register(&sign_enterprise_migration_transition(
+        registration,
+        &signer,
+    )?)?;
+    let state = store
         .load(&key)?
-        .ok_or("key-log migration genesis absent")?;
-    while state.stage != EnterpriseMigrationStage::Enforced {
-        let stage = state.stage.next().ok_or("key-log migration stage absent")?;
-        let promotion = EnterpriseMigrationTransitionBody::promotion(
-            &state,
-            posture(stage)?,
-            digest,
-            digest,
-            digest,
-            stage.generation() + 1,
-            signer.public_key().to_hex(),
-        )?;
-        store.compare_and_promote(&sign_enterprise_migration_transition(promotion, &signer)?)?;
-        state = store
-            .load(&key)?
-            .ok_or("key-log migration promotion absent")?;
-    }
+        .ok_or("key-log migration registration absent")?;
     Ok(serde_json::json!({
         "state_database_path": path, "deployment_id": key.deployment_id,
-        "stage": EnterpriseMigrationStage::Enforced,
         "trusted_transition_signers": [signer.public_key().to_hex()],
-        "minimum_heads": [state.minimum_head()],
+        "heads": [state.head()],
     }))
 }

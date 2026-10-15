@@ -111,7 +111,7 @@ worker. The Python interpreter and model transport implementations can differ
 between the installed upstream driver and native worker architecture.
 
 Chio's comparison authority is explicitly issued by the harness using
-Disabled-stage fixture policies. Product session commands still consume
+fixture policies. Product session commands still consume
 operator-supplied signed policies. This comparison does not qualify production
 tool containment or grant an operator's provider credentials to an agent.
 

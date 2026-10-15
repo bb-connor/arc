@@ -383,33 +383,6 @@ pub(crate) fn run() {
             SecurityCommands::ShadowMigrate { input, output } => {
                 crate::active_defense_migration::cmd_shadow_migrate(&input, &output)
             }
-            SecurityCommands::ProvisionNativeMcpDemo {
-                output_dir,
-                runtime_security_dir,
-                tools_fixture,
-                target,
-                target_args,
-                working_directory,
-                execution_uid,
-                execution_gid,
-                execution_supplementary_gids,
-                server_id,
-                server_name,
-                server_version,
-            } => crate::mcp_cli::cmd_provision_native_mcp_demo(
-                &output_dir,
-                runtime_security_dir.as_deref(),
-                &tools_fixture,
-                &target,
-                &target_args,
-                working_directory.as_deref(),
-                execution_uid,
-                execution_gid,
-                &execution_supplementary_gids,
-                &server_id,
-                &server_name,
-                &server_version,
-            ),
             SecurityCommands::Preflight(args) => crate::cmd_security_preflight(
                 &args,
                 crate::PreflightStores {

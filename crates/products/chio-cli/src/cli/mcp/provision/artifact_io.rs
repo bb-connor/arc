@@ -29,16 +29,16 @@ pub(super) fn sync_directory(path: &Path) -> Result<(), CliError> {
 
 pub(super) fn write_report_to_stdout(report: &ProvisionReport) -> Result<(), CliError> {
     let bytes = chio_core::canonical_json_bytes(report).map_err(|error| {
-        CliError::cli_other_error(format!("failed to encode demo provision report: {error}"))
+        CliError::cli_other_error(format!("failed to encode provision report: {error}"))
     })?;
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
     lock.write_all(&bytes).map_err(|error| {
-        CliError::cli_io_error(format!("failed to write demo provision report: {error}"))
+        CliError::cli_io_error(format!("failed to write provision report: {error}"))
     })?;
     lock.write_all(b"\n").map_err(|error| {
         CliError::cli_io_error(format!(
-            "failed to terminate demo provision report: {error}"
+            "failed to terminate provision report: {error}"
         ))
     })
 }

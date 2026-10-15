@@ -71,8 +71,6 @@ class Harness:
             self.chio,
             "security",
             "provision-reference-runtime",
-            "--stage",
-            "enforced",
             "--output-dir",
             launch,
             "--cage-init",
@@ -101,7 +99,7 @@ class Harness:
             command.extend(["--write-path", path])
         self.run("provision-" + name, command)
         report = json.loads((launch / "provision-report.json").read_text())
-        assert report["securityMode"] == "enforced_cage", report
+        assert report["cageInitPath"] == str(self.helper), report
         self.servers.append(
             {
                 "id": name,

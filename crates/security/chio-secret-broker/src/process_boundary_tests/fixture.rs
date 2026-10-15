@@ -233,7 +233,7 @@ fn enforced_broker_migration(directory: &Path) -> BrokerDaemonMigrationConfig {
     let deployment_id = RecordId::new(DEPLOYMENT_ID).test_expect("migration deployment identifier");
     let credential_provider =
         RecordId::new(CREDENTIAL_PROVIDER).test_expect("migration provider identifier");
-    let mut minimum_heads = Vec::new();
+    let mut heads = Vec::new();
     for (control, seed) in [
         (EnterpriseMigrationControl::BrokerCredentialCustody, 0x41_u8),
         (EnterpriseMigrationControl::BrokerQuotaEnforcement, 0x51_u8),
@@ -244,63 +244,33 @@ fn enforced_broker_migration(directory: &Path) -> BrokerDaemonMigrationConfig {
             scope_id: credential_provider.clone(),
             control,
         };
-        let genesis = EnterpriseMigrationTransitionBody::genesis(
+        let registration = EnterpriseMigrationTransitionBody::enforced(
             key.clone(),
             production_broker_migration_posture_digest(
                 &deployment_id,
                 &credential_provider,
                 control,
-                EnterpriseMigrationStage::Disabled,
             )
-            .test_expect("disabled migration posture"),
+            .test_expect("enforced migration posture"),
             Digest32::new([seed; 32]),
             Digest32::new([seed.saturating_add(1); 32]),
             Digest32::new([seed.saturating_add(2); 32]),
             1,
             signer.public_key().to_hex(),
         )
-        .test_expect("migration genesis");
-        let genesis = sign_enterprise_migration_transition(genesis, &signer)
-            .test_expect("signed migration genesis");
+        .test_expect("migration registration");
+        let registration = sign_enterprise_migration_transition(registration, &signer)
+            .test_expect("sign migration registration");
         let _ = store
-            .register(&genesis)
-            .test_expect("registered migration genesis");
-        let mut state = store
+            .register(&registration)
+            .test_expect("register migration registration");
+        let state = store
             .load(&key)
-            .test_expect("loaded migration genesis")
-            .test_expect("migration genesis exists");
-        while state.stage < EnterpriseMigrationStage::Enforced {
-            let next_stage = state.stage.next().test_expect("next migration stage");
-            let generation = next_stage.generation();
-            let promotion = EnterpriseMigrationTransitionBody::promotion(
-                &state,
-                production_broker_migration_posture_digest(
-                    &deployment_id,
-                    &credential_provider,
-                    control,
-                    next_stage,
-                )
-                .test_expect("promoted migration posture"),
-                Digest32::new([seed.saturating_add(generation as u8 * 3); 32]),
-                Digest32::new([seed.saturating_add(generation as u8 * 3 + 1); 32]),
-                Digest32::new([seed.saturating_add(generation as u8 * 3 + 2); 32]),
-                generation + 1,
-                signer.public_key().to_hex(),
-            )
-            .test_expect("migration promotion");
-            let promotion = sign_enterprise_migration_transition(promotion, &signer)
-                .test_expect("signed migration promotion");
-            let _ = store
-                .compare_and_promote(&promotion)
-                .test_expect("promoted migration state");
-            state = store
-                .load(&key)
-                .test_expect("loaded promoted migration state")
-                .test_expect("promoted migration state exists");
-        }
-        minimum_heads.push(state.minimum_head());
+            .test_expect("load migration registration")
+            .test_expect("migration registration exists");
+        heads.push(state.head());
     }
-    minimum_heads.sort_unstable();
+    heads.sort_unstable();
     drop(store);
     fs::set_permissions(&state_database_path, fs::Permissions::from_mode(0o600))
         .test_expect("migration ledger permissions");
@@ -309,9 +279,7 @@ fn enforced_broker_migration(directory: &Path) -> BrokerDaemonMigrationConfig {
         deployment_id,
         credential_provider,
         trusted_transition_signers: vec![signer.public_key()],
-        minimum_heads,
-        credential_custody_stage: EnterpriseMigrationStage::Enforced,
-        quota_enforcement_stage: EnterpriseMigrationStage::Enforced,
+        heads,
     }
 }
 

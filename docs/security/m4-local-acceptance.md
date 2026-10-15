@@ -253,7 +253,7 @@ are relative to `/tmp/`; they are local retained logs, not hosted artifacts.
 | Rust generated protocol and authoritative wire-schema targets | 1 generated-shape and 9 schema tests passed | `chio-m4-rust-caller-wire-final.log` |
 | Public Node HTTP package suite | 73 passed; public validator export also rebuilt and exercised by the 35-vector SDK gate | `chio-m4-ts-public-export-tests.log` |
 | TypeScript caller corpus and typecheck | Both passed | `chio-m4-ts-caller-corpus.log`, `chio-m4-ts-caller-typecheck.log` |
-| `bash scripts/check-bindings-parity.sh` | Rust, Python, TypeScript and Go legacy binding lanes passed; not a v2 manifest support claim | `chio-m4-legacy-bindings-parity.log` |
+| `bash scripts/check-bindings-parity.sh` | Rust, Python, TypeScript and Go binding lanes passed | `chio-m4-legacy-bindings-parity.log` |
 | `bash scripts/check-chio-cpp.sh` | 19 Rust FFI tests, generated header, C ABI/symbol smoke, 2 CTest cases and installed external CMake consumer passed | `chio-m4-cpp-consumer-gate.log` |
 | `bash sdks/cpp/chio-cpp-kernel/scripts/check-with-ffi.sh` | 23 Rust tests and 1 CTest case passed | `chio-m4-cpp-kernel-consumer-gate.log` |
 | Live C++ protocol gate with `CHIO_CPP_LIVE_CONFORMANCE=1` | All five passed, zero failures/ignores: authentication, MCP core, nested callbacks, notifications and tasks; fresh CLI and real C++ peer | `chio-m4-cpp-live-qualified-final.log` |

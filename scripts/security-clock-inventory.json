@@ -1174,7 +1174,6 @@
     "crates/platform/chio-http-core/src/request.rs::new": 1,
     "crates/platform/chio-http-core/src/session.rs::is_expired": 1,
     "crates/platform/chio-http-core/src/session.rs::new": 1,
-    "crates/platform/chio-manifest/tests/manifest_v2.rs::unique_manifest_path": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/part_01.inc::unix_now::native-adapter": 1,
     "crates/platform/chio-store-sqlite/src/authority.rs::open::native-adapter": 1,
     "crates/platform/chio-store-sqlite/src/budget_store/store.rs::open::native-adapter": 1,

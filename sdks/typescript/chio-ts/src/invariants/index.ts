@@ -25,20 +25,6 @@ export type {
   DelegationLink,
 } from "./capability.ts";
 export {
-  parseSignedManifestJson,
-  signedManifestBodyCanonicalJson,
-  verifySignedManifest,
-  verifySignedManifestJson,
-} from "./manifest.ts";
-export type {
-  ManifestVerification,
-  MonetaryAmount,
-  PricingModel,
-  SignedManifest,
-  ToolManifest,
-  ToolPricing,
-} from "./manifest.ts";
-export {
   isValidPublicKeyHex,
   isValidSignatureHex,
   publicKeyHexMatches,
