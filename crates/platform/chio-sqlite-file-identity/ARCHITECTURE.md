@@ -43,8 +43,11 @@ enough file-object bytes for `BundledUnixFilePrefix`. `read_unaligned` copies
 that prefix without imposing stronger alignment. The prefix's VFS must match
 the reported VFS, its methods pointer must be non-null, and its descriptor
 must be nonnegative. The private `main_database_descriptor` returns that
-descriptor as a `BorrowedFd` whose lifetime is the connection borrow.
-`inspect_main_database_file_identity` passes it to `fstat`.
+descriptor as a `BorrowedFd`. SQLite may close or replace that descriptor
+during an operation on the same connection, such as VACUUM, so it is valid
+only while no SQLite operation or callback runs; each caller passes it
+directly to one syscall. `inspect_main_database_file_identity` passes it to
+`fstat`.
 
 On syscall success, `descriptor_file_identity` copies the device, inode, and
 link count into the result. On failure it retains `std::io::Error` as the
@@ -87,8 +90,9 @@ This observation supplies no crash-durability or rollback guarantee.
 Unix tests compare the observed identity with filesystem metadata, replace
 the pathname while retaining the connection, and inspect the original file
 after unlink. Available-space tests read the held file after rename,
-replacement, and removal of every path, and refuse a memory database with the
-identity validation. In-memory tests verify main-file refusal. Typed-error
+replacement, and removal of every path, then require SQLite to refuse a write
+with `SQLITE_READONLY_DBMOVED` while the pre-move row stays readable, and
+refuse a memory database with the identity validation. In-memory tests verify main-file refusal. Typed-error
 tests check successful inspection and the actual `EBADF` source of `fstat` and
 `fstatvfs` on an invalid descriptor. Arithmetic tests check the exact product,
 zero available blocks, and the `ZeroFragmentSize` and `CapacityOverflow`

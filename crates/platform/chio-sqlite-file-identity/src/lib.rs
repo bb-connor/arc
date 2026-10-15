@@ -30,7 +30,6 @@ pub struct SqliteFileIdentity {
 }
 
 /// Narrow inspection failure. Validation does not grant file or VFS trust.
-/// The legacy String shim preserves the original diagnostic text.
 #[derive(Debug)]
 pub enum SqliteFileIdentityInspectionError {
     Io(std::io::Error),
@@ -68,7 +67,7 @@ struct BundledUnixFilePrefix {
     descriptor: c_int,
 }
 
-/// Compatibility wrapper preserving the existing String error contract.
+/// Inspect the borrowed descriptor with string diagnostics.
 /// Inspection never closes or duplicates the descriptor held by SQLite.
 pub fn main_database_file_identity(
     connection: &rusqlite::Connection,
@@ -89,8 +88,12 @@ pub fn inspect_main_database_file_identity(
 }
 
 /// The validated main-database descriptor SQLite holds for `connection`.
-/// The borrow ends with the connection borrow; it is never duplicated,
-/// closed, or retained.
+///
+/// SQLite may close or replace this descriptor during an operation on the
+/// same connection (VACUUM, for example), so the connection borrow alone does
+/// not keep it open. The result is valid only while no SQLite operation or
+/// callback runs on `connection`: each caller passes it straight to one
+/// `fstat` or `fstatvfs` and never duplicates, closes, or retains it.
 #[cfg(unix)]
 fn main_database_descriptor(
     connection: &rusqlite::Connection,
@@ -175,9 +178,10 @@ fn main_database_descriptor(
         ));
     }
 
-    // SAFETY: the descriptor is nonnegative, so it is not -1. SQLite's open
-    // main file keeps it open until the connection closes, which needs an
-    // owned connection, so it stays open for the `connection` borrow.
+    // SAFETY: the descriptor is nonnegative, so it is not -1. SQLite closes or
+    // replaces it only while running an operation on this connection, and
+    // `Connection` is not `Sync`. Both callers hand the borrow directly to one
+    // fstat or fstatvfs, which runs no SQLite code, so it is open for that use.
     Ok(unsafe { BorrowedFd::borrow_raw(prefix.descriptor) })
 }
 

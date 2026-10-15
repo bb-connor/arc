@@ -64,6 +64,7 @@ fn reports_space_of_the_held_file_after_rename_replacement_and_unlink() -> TestR
     let moved = directory.path().join("moved.sqlite3");
     let connection = rusqlite::Connection::open(&database)?;
     connection.execute_batch("CREATE TABLE space_probe(value INTEGER);")?;
+    connection.execute("INSERT INTO space_probe VALUES(1)", [])?;
     main_database_available_bytes(&connection)?;
     let original = crate::inspect_main_database_file_identity(&connection)?;
 
@@ -81,7 +82,28 @@ fn reports_space_of_the_held_file_after_rename_replacement_and_unlink() -> TestR
         (unlinked.device, unlinked.inode, unlinked.link_count),
         (original.device, original.inode, 0)
     );
-    connection.execute("INSERT INTO space_probe VALUES(1)", [])?;
+
+    // Observing capacity grants no writer authority: SQLite refuses to write
+    // a database whose path no longer names the held file.
+    let retained = |connection: &rusqlite::Connection| {
+        connection.query_row(
+            "SELECT count(*) FROM space_probe WHERE value = 1",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+    };
+    assert_eq!(retained(&connection)?, 1);
+    match connection.execute("INSERT INTO space_probe VALUES(2)", []) {
+        Err(rusqlite::Error::SqliteFailure(error, _)) => {
+            assert_eq!(error.code, rusqlite::ErrorCode::ReadOnly);
+            assert_eq!(error.extended_code, rusqlite::ffi::SQLITE_READONLY_DBMOVED);
+        }
+        other => {
+            return Err(format!("expected SQLITE_READONLY_DBMOVED, got {other:?}").into());
+        }
+    }
+    assert_eq!(retained(&connection)?, 1);
+    main_database_available_bytes(&connection)?;
     Ok(())
 }
 
