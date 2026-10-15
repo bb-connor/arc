@@ -9,8 +9,14 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod available_space;
+
+pub use available_space::{main_database_available_bytes, SqliteAvailableSpaceError};
+
 #[cfg(unix)]
 use std::ffi::{c_int, c_void, CStr};
+#[cfg(unix)]
+use std::os::fd::{AsRawFd as _, BorrowedFd};
 
 #[cfg(unix)]
 use rusqlite::ffi;
@@ -24,7 +30,6 @@ pub struct SqliteFileIdentity {
 }
 
 /// Narrow inspection failure. Validation does not grant file or VFS trust.
-/// The legacy String shim preserves the original diagnostic text.
 #[derive(Debug)]
 pub enum SqliteFileIdentityInspectionError {
     Io(std::io::Error),
@@ -62,7 +67,7 @@ struct BundledUnixFilePrefix {
     descriptor: c_int,
 }
 
-/// Compatibility wrapper preserving the existing String error contract.
+/// Inspect the borrowed descriptor with string diagnostics.
 /// Inspection never closes or duplicates the descriptor held by SQLite.
 pub fn main_database_file_identity(
     connection: &rusqlite::Connection,
@@ -73,11 +78,26 @@ pub fn main_database_file_identity(
 /// Read the device, inode, and link count from the actual descriptor backing
 /// `connection`'s main database.
 ///
-/// This deliberately fails closed for non-Unix or non-bundled-Unix VFSes.
+/// This fails closed for non-Unix or non-bundled-Unix VFSes.
 #[cfg(unix)]
 pub fn inspect_main_database_file_identity(
     connection: &rusqlite::Connection,
 ) -> Result<SqliteFileIdentity, SqliteFileIdentityInspectionError> {
+    let descriptor = main_database_descriptor(connection)?;
+    descriptor_file_identity(descriptor.as_raw_fd())
+}
+
+/// The validated main-database descriptor SQLite holds for `connection`.
+///
+/// SQLite may close or replace this descriptor during an operation on the
+/// same connection (VACUUM, for example), so the connection borrow alone does
+/// not keep it open. The result is valid only while no SQLite operation or
+/// callback runs on `connection`: each caller passes it straight to one
+/// `fstat` or `fstatvfs` and never duplicates, closes, or retains it.
+#[cfg(unix)]
+fn main_database_descriptor(
+    connection: &rusqlite::Connection,
+) -> Result<BorrowedFd<'_>, SqliteFileIdentityInspectionError> {
     let mut file = std::ptr::null_mut::<ffi::sqlite3_file>();
     let mut vfs = std::ptr::null_mut::<ffi::sqlite3_vfs>();
     // SAFETY: the borrowed connection keeps the handle alive throughout both calls.
@@ -158,7 +178,11 @@ pub fn inspect_main_database_file_identity(
         ));
     }
 
-    descriptor_file_identity(prefix.descriptor)
+    // SAFETY: the descriptor is nonnegative, so it is not -1. SQLite closes or
+    // replaces it only while running an operation on this connection, and
+    // `Connection` is not `Sync`. Both callers hand the borrow directly to one
+    // fstat or fstatvfs, which runs no SQLite code, so it is open for that use.
+    Ok(unsafe { BorrowedFd::borrow_raw(prefix.descriptor) })
 }
 
 #[cfg(not(unix))]
@@ -175,11 +199,10 @@ fn descriptor_file_identity(
     descriptor: c_int,
 ) -> Result<SqliteFileIdentity, SqliteFileIdentityInspectionError> {
     let mut metadata = std::mem::MaybeUninit::<libc::stat>::uninit();
-    // SAFETY: fstat only inspects the descriptor and writes stat on success.
-    // The production caller keeps its borrowed SQLite descriptor alive; an
-    // invalid test descriptor is rejected by the real syscall. It never closes nor
-    // duplicates the descriptor. Closing even a duplicate would release the
-    // process's POSIX locks on this inode, invalidating SQLite's lock state.
+    // SAFETY: fstat only inspects the descriptor and writes stat on success;
+    // an invalid descriptor is refused by the syscall. Callers pass a
+    // descriptor borrowed for this call. It is neither closed nor duplicated:
+    // closing even a duplicate releases the process's POSIX locks on the inode.
     if unsafe { libc::fstat(descriptor, metadata.as_mut_ptr()) } != 0 {
         return Err(SqliteFileIdentityInspectionError::Io(
             std::io::Error::last_os_error(),
@@ -291,6 +314,7 @@ mod tests {
         for inspect in [false, true] {
             if inspect {
                 main_database_file_identity(&connection)?;
+                main_database_available_bytes(&connection)?;
             }
             let result = std::process::Command::new(std::env::current_exe()?)
                 .args([
@@ -317,8 +341,7 @@ mod tests {
     fn invalid_descriptor_syscall_preserves_actual_ebadf_source(
     ) -> Result<(), Box<dyn std::error::Error>> {
         use std::error::Error;
-        // A real fstat(-1) returns EBADF. No SQLite descriptor is closed or
-        // duplicated, no stat record is fabricated, and no fake IO error is made.
+        // fstat(-1) returns EBADF without touching any SQLite descriptor.
         let error = descriptor_file_identity(-1)
             .err()
             .ok_or("actual fstat must refuse invalid descriptor")?;
@@ -336,8 +359,8 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn typed_identity_matches_healthy_borrowed_file_and_legacy_shim(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn identity_apis_agree_for_the_healthy_borrowed_file() -> Result<(), Box<dyn std::error::Error>>
+    {
         use std::os::unix::fs::MetadataExt as _;
         let directory = tempfile::tempdir()?;
         let database = directory.path().join("typed.sqlite3");
@@ -383,6 +406,7 @@ mod tests {
             "PRAGMA journal_mode=DELETE; CREATE TABLE probe(value INTEGER); BEGIN EXCLUSIVE;",
         )?;
         inspect_main_database_file_identity(&connection)?;
+        main_database_available_bytes(&connection)?;
         let result = std::process::Command::new(std::env::current_exe()?)
             .args([
                 "--ignored",

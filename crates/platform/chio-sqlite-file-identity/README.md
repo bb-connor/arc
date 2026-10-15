@@ -1,8 +1,9 @@
 # chio-sqlite-file-identity
 
 Inspect the device, inode, and link count of the exact main-database descriptor
-held by a `rusqlite::Connection`. Chio store custody checks use this identity
-to compare SQLite's opened file with a separately retained filesystem identity.
+held by a `rusqlite::Connection`, and the space available on its filesystem.
+Chio store custody checks use this identity to compare SQLite's opened file
+with a separately retained filesystem identity.
 
 ## Usage
 
@@ -36,21 +37,31 @@ inspection borrows it synchronously and returns a copied `SqliteFileIdentity`.
 - Missing main files, unavailable pointers, and unsupported VFS/platform
   paths return errors. Non-Unix inspection always refuses.
 - `SqliteFileIdentityInspectionError` separates syscall I/O failure from
-  validation refusal. `main_database_file_identity` preserves the compatibility
-  API by converting either error to its diagnostic string.
+  validation refusal. `main_database_file_identity` returns either error as
+  its diagnostic string.
+- `main_database_available_bytes` validates the same borrowed descriptor, then
+  calls `fstatvfs` on it and returns `f_bavail * f_frsize` as checked `u64`
+  bytes. It never reopens or stats the database path, so a renamed, replaced,
+  or unlinked path still reports the held file's filesystem. Zero available
+  blocks returns zero; a zero fragment size refuses with `ZeroFragmentSize`
+  and a product beyond `u64` with `CapacityOverflow`.
+- `SqliteAvailableSpaceError` keeps the descriptor refusal as `Identity`, the
+  `fstatvfs` failure as `Io`, and exposes both through `Error::source`.
 
 Callers must validate owner, permissions, regular-file type, expected identity,
 and acceptable link count. A successful inspection can report an unlinked
 file with link count zero. It performs no custody acquisition, migration,
-transaction, synchronization, or rollback protection.
+transaction, synchronization, or rollback protection. Available space is an
+observation only: it reserves no space and grants no write capacity.
 
 ## Status
 
 Implemented for the pinned bundled SQLite Unix file layout. The runtime
 checks require a VFS name beginning with `unix`; callers must preserve the
-workspace's bundled-build assumption. Tests cover descriptor identity after
-path replacement, in-memory refusal, typed errors, and lock preservation
-against a competing process. This crate declares no Cargo features.
+workspace's bundled-build assumption. Tests cover descriptor identity and
+available space after path replacement and unlink, in-memory refusal, typed
+errors, available-space arithmetic, and lock preservation against a competing
+process. This crate declares no Cargo features.
 
 ## Related
 
