@@ -65,8 +65,6 @@ fn budget_selection_requires_the_live_runtime_grant_and_phase() -> TestResult {
 mod faults;
 #[path = "claims/kernel_recovery.rs"]
 mod kernel_recovery;
-#[path = "claims/migration.rs"]
-mod migration;
 #[path = "claims/recovery.rs"]
 mod recovery;
 

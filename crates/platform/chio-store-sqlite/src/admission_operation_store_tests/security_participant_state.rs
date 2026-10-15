@@ -2,19 +2,19 @@ use super::super::security_participant_state as native;
 use super::*;
 use std::cell::Cell;
 
-#[path = "security_participant_state/dispatch_ledger.rs"]
-mod dispatch_ledger;
 #[path = "security_participant_state/nonce_preflight.rs"]
 mod nonce_preflight;
 #[path = "security_participant_state/output.rs"]
 mod output;
 
+#[path = "security_participant_state/barrier.rs"]
+mod barrier;
 #[cfg(unix)]
 #[path = "security_participant_state/checkpoint.rs"]
 mod checkpoint;
 #[cfg(unix)]
-#[path = "security_participant_state/checkpoint_migration.rs"]
-mod checkpoint_migration;
+#[path = "security_participant_state/checkpoint_history.rs"]
+mod checkpoint_history;
 #[cfg(unix)]
 #[path = "security_participant_state/cutpoints.rs"]
 mod cutpoints;
@@ -27,8 +27,6 @@ mod integrity;
 #[cfg(unix)]
 #[path = "security_participant_state/lifecycle.rs"]
 mod lifecycle;
-#[path = "security_participant_state/migration.rs"]
-mod migration;
 #[cfg(unix)]
 #[path = "security_participant_state/mutations.rs"]
 mod mutations;
@@ -185,42 +183,6 @@ pub(crate) fn with_flow_sql_fixture(
                 .is_some(),
             initialized
         );
-    }
-    Ok(())
-}
-
-/// Construct genuine predecessor fixtures without discarding any retained rows.
-pub(super) fn remove_empty_v28_tables(connection: &Connection) -> rusqlite::Result<()> {
-    dispatch_ledger::remove_empty_v31_ledger(connection)?;
-    let mut tables = native::schema::TABLES
-        .iter()
-        .map(|table| table.native)
-        .collect::<Vec<_>>();
-    // Dependency order matters even when foreign keys are enabled.
-    tables.sort_by_key(|table| match *table {
-        "security_participant_state_declassification_receipt_outbox" => 0,
-        "security_participant_state_declassification_tombstones" => 1,
-        "security_participant_state_declassification_uses" => 2,
-        _ => 3,
-    });
-    tables.push("security_participant_state_initializations");
-    tables.insert(0, "security_participant_state_mutations");
-    tables.insert(0, "security_participant_egress_events");
-    for table in tables {
-        let exists: bool = connection.query_row(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?1)",
-            [table],
-            |row| row.get(0),
-        )?;
-        if !exists {
-            continue;
-        }
-        let count: i64 =
-            connection.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                row.get(0)
-            })?;
-        assert_eq!(count, 0, "predecessor fixture cannot discard native state");
-        connection.execute_batch(&format!("DROP TABLE {table}"))?;
     }
     Ok(())
 }

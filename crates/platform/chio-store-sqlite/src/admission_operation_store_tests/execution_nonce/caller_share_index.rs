@@ -191,31 +191,6 @@ fn caller_share_candidates_are_read_through_indexes() -> TestResult {
 }
 
 #[test]
-fn v37_migration_indexes_existing_funded_caller_operations() -> TestResult {
-    let fixture = funded("caller-report:test-server")?;
-    let expected = vec![root_row(&fixture.operation)];
-    {
-        let connection = Connection::open(&fixture.fixture.database)?;
-        crate::admission_operation_store::tests::schema::remove_caller_share_index(&connection)?;
-        connection.execute_batch(
-            "UPDATE chio_store_schema_versions SET version = 36
-             WHERE store_key = 'admission_operation'",
-        )?;
-    }
-    let fixture = lifecycle::reopen(fixture)?;
-    let version: i32 = Connection::open(&fixture.fixture.database)?.query_row(
-        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(version, ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION);
-    assert_eq!(index_rows(&fixture.fixture.database)?, expected);
-    let parent = identifier("parent_id", "caller-share-parent");
-    assert!(assert_indexed_matches_full_scan(&fixture.fixture, &parent)?.is_empty());
-    Ok(())
-}
-
-#[test]
 fn restart_rejects_a_missing_or_forged_caller_share_index() -> TestResult {
     for (edit, expected) in [
         (

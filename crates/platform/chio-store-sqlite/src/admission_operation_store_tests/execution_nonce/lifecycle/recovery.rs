@@ -318,60 +318,6 @@ fn durable_nonce_lifecycle_phase_rows_are_permanent_and_immutable() -> TestResul
 }
 
 #[test]
-fn durable_nonce_lifecycle_v12_migration_keeps_ready_history_without_inventing_commit() -> TestResult
-{
-    let fixture =
-        crate::admission_operation_store::tests::execution_nonce::domain::legacy_ready(false)?;
-    let operation_id = fixture.operation.binding().operation_id().clone();
-    let expected = fixture.reservation.canonical_bytes().to_vec();
-    let NonceFixture {
-        fixture:
-            Fixture {
-                _temp,
-                database,
-                lock_root,
-                authority,
-                store,
-                ..
-            },
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
-    let connection = Connection::open(&database)?;
-    crate::admission_operation_store::tests::runtime_replay::remove_empty_v19_runtime_tables(
-        &connection,
-    )?;
-    connection.execute_batch("DROP TABLE admission_execution_nonce_transitions;
-        UPDATE chio_store_schema_versions SET version = 12 WHERE store_key = 'admission_operation';")?;
-    drop(connection);
-    SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
-    let store = reopened.admission_operation_store();
-    assert_eq!(
-        store
-            .load_by_operation_id(&operation_id)?
-            .ok_or("lost operation")?
-            .state(),
-        AdmissionOperationState::ReadyToDispatch
-    );
-    assert_eq!(
-        store
-            .load_execution_nonce_reservation(&operation_id, &reopened.mutation_fence(), now_ms())?
-            .ok_or("lost reservation")?
-            .canonical_bytes(),
-        expected
-    );
-    let count: i64 = store.connection()?.query_row(
-        "SELECT COUNT(*) FROM admission_execution_nonce_transitions",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(count, 0);
-    Ok(())
-}
-
-#[test]
 fn durable_nonce_lifecycle_capture_and_cancellation_have_one_atomic_winner() -> TestResult {
     for _ in 0..4 {
         let mut fixture = ready()?;

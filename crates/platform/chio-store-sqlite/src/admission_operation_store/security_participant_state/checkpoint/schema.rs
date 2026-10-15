@@ -35,15 +35,6 @@ fn scan_catalog(connection: &Connection) -> Result<Vec<Entry>, AdmissionOperatio
     Ok(entries)
 }
 
-pub(in crate::admission_operation_store) fn require_absent(
-    connection: &Connection,
-) -> Result<(), AdmissionOperationStoreError> {
-    if !catalog(connection)?.is_empty() {
-        return Err(invalid("pre-v36 native checkpoint catalog is unqualified"));
-    }
-    Ok(())
-}
-
 pub(super) fn present(connection: &Connection) -> Result<bool, AdmissionOperationStoreError> {
     let actual = catalog(connection)?;
     if actual.is_empty() {
@@ -56,7 +47,7 @@ pub(super) fn present(connection: &Connection) -> Result<bool, AdmissionOperatio
         } else {
             None
         };
-        if version.is_some_and(|version| version >= 36) {
+        if version.is_some() {
             return Err(invalid("native checkpoint catalog is absent"));
         }
         return Ok(false);

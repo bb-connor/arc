@@ -221,7 +221,6 @@ jobs:
             admission_operation_store::tests::execution_nonce::durable_nonce_tampering_removal_and_oversized_storage_fail_reads_and_restart \
             admission_operation_store::tests::execution_nonce::durable_nonce_identity_cannot_be_updated_or_deleted \
             admission_operation_store::tests::execution_nonce::durable_nonce_expired_reservation_remains_available_only_as_history \
-            admission_operation_store::tests::execution_nonce::durable_nonce_v11_migration_preserves_original_commits_without_inventing_reservations \
             admission_operation_store::tests::execution_nonce::durable_nonce_decoder_rejects_unbound_noncanonical_and_future_artifacts \
             admission_operation_store::tests::execution_nonce::durable_nonce_contenders_in_distinct_namespaces_share_one_replay_identity \
             -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::durable_nonce
@@ -247,7 +246,6 @@ jobs:
             admission_operation_store::tests::execution_nonce::lifecycle::recovery::delayed_capture_cannot_revive_a_nonce_or_capture_budget_after_authority_expiry \
             admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_history_rejects_missing_corrupt_and_oversized_phases \
             admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_phase_rows_are_permanent_and_immutable \
-            admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_v12_migration_keeps_ready_history_without_inventing_commit \
             admission_operation_store::tests::execution_nonce::lifecycle::recovery::durable_nonce_lifecycle_capture_and_cancellation_have_one_atomic_winner \
             admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_commits_or_cancels_with_its_effect \
             admission_operation_store::tests::execution_nonce::lifecycle::approval::durable_nonce_lifecycle_composed_approval_expiry_prevents_budget_capture \
@@ -268,11 +266,8 @@ jobs:
             admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_generic_cas_cannot_forge_evidence \
             admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_rejects_legacy_profiles_and_wrong_issuers \
             admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_rolls_back_each_sql_cutpoint \
-            admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_reopens_with_current_fences_and_migrates_absence \
             admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_reservation_requires_the_exact_retained_artifact \
             admission_operation_store::tests::execution_nonce::issuance::durable_nonce_issuance_is_permanent_and_detects_corruption \
-            admission_operation_store::tests::execution_nonce::issuance::recovery::durable_nonce_issuance_v14_ready_cannot_gain_fresh_capture_authority \
-            admission_operation_store::tests::execution_nonce::issuance::recovery::durable_nonce_issuance_v14_pending_capture_rolls_back_and_can_cancel \
             admission_operation_store::tests::execution_nonce::issuance::recovery::live_issuance_does_not_occupy_a_recovery_page \
             admission_operation_store::tests::execution_nonce::issuance::qualification::delayed_issuance_cannot_use_a_nonce_expired_at_the_authority \
             admission_operation_store::tests::execution_nonce::issuance::qualification::durable_nonce_issuance_candidates_for_one_operation_have_one_winner \
@@ -299,9 +294,6 @@ jobs:
             admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_ownership_is_permanent_and_corruption_fails_reads_and_restart \
             admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_requires_original_provenance_and_cannot_start_after_issuance \
             admission_operation_store::tests::execution_nonce::preflight::qualification::durable_nonce_preflight_replay_callback_cannot_backfill_physical_ownership \
-            admission_operation_store::tests::execution_nonce::preflight::recovery::durable_nonce_preflight_v15_issuance_is_history_not_fresh_authority \
-            admission_operation_store::tests::execution_nonce::preflight::recovery::durable_nonce_preflight_v15_ready_cannot_reserve_or_prepare_capture \
-            admission_operation_store::tests::execution_nonce::preflight::recovery::durable_nonce_preflight_v15_pending_capture_rolls_back_and_can_cancel \
             admission_operation_store::tests::execution_nonce::preflight::approval::durable_nonce_preflight_restores_composite_budgets_but_cleanup_does_not_grant_approval \
             -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::preflight::
 
@@ -319,8 +311,6 @@ jobs:
             admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_rejects_schema_relabeling \
             admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_checks_every_bound_field \
             admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_checks_mint_bounds_and_canonical_decode \
-            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_v13_ready_history_cannot_regain_authority \
-            admission_operation_store::tests::execution_nonce::domain::durable_nonce_domain_v13_pending_capture_rolls_back_and_can_cancel \
             -- cargo test --locked -p chio-store-sqlite --lib execution_nonce::domain::
 
       - name: Exact nonce profile wire schema
@@ -374,10 +364,8 @@ jobs:
             admission_operation_store::tests::retained_request::retained_request_cannot_be_backfilled_for_a_legacy_operation \
             admission_operation_store::tests::retained_request::retained_request_tampering_or_removal_fails_reads_and_restart \
             admission_operation_store::tests::retained_request::retained_request_decoder_is_bounded_strict_and_not_an_authenticator \
-            admission_operation_store::tests::retained_request::retained_request_v9_migration_preserves_legacy_commits_without_inventing_context \
             admission_operation_store::tests::retained_request::retained_request_orphan_is_rejected_at_restart \
             admission_operation_store::tests::retained_request::retained_request_lookup_rejects_ambiguous_namespaces_even_without_legacy_material \
-            admission_operation_store::tests::retained_request::retained_request_v10_migration_adds_bounded_lookup_and_preserves_original_bytes \
             -- cargo test --locked -p chio-store-sqlite --lib retained_request
 
       - name: Exact kernel collector restart lifecycle

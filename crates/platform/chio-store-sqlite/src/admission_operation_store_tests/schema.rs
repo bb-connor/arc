@@ -1,11 +1,5 @@
 use super::*;
 
-#[path = "schema/caller_wait.rs"]
-mod caller_wait;
-pub(super) use caller_wait::{
-    remove_caller_share_index, remove_caller_wait_state, remove_empty_checkpoint_catalog,
-};
-
 struct SqlObligationHead {
     obligation_id: String,
     atom_digest: String,
@@ -592,531 +586,6 @@ fn current_schema_reopen_rejects_assignment_results_without_evidence_columns() -
 }
 
 #[test]
-fn provision_migrates_v8_threshold_token_ids_to_proposal_scope() -> AnchoredTestResult {
-    let fixture = fixture();
-    let Fixture {
-        _temp,
-        database,
-        lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
-
-    let connection = Connection::open(&database)?;
-    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
-    connection.execute_batch(
-        r#"
-        DROP TRIGGER threshold_approval_tokens_immutable;
-        DROP TRIGGER threshold_approval_tokens_no_delete;
-        ALTER TABLE threshold_approval_tokens
-            RENAME TO threshold_approval_tokens_v9;
-        CREATE TABLE threshold_approval_tokens (
-            token_id TEXT NOT NULL PRIMARY KEY
-                CHECK (length(token_id) BETWEEN 1 AND 512),
-            proposal_id TEXT NOT NULL,
-            approver_fingerprint TEXT NOT NULL
-                CHECK (approver_fingerprint <> ''),
-            canonical_token_digest TEXT NOT NULL UNIQUE CHECK (
-                length(canonical_token_digest) = 64
-                AND canonical_token_digest NOT GLOB '*[^0-9a-f]*'
-            ),
-            token_json BLOB NOT NULL
-                CHECK (length(token_json) BETWEEN 1 AND 262144),
-            UNIQUE (proposal_id, approver_fingerprint),
-            UNIQUE (proposal_id, canonical_token_digest),
-            FOREIGN KEY (proposal_id)
-                REFERENCES threshold_approval_proposals(proposal_id)
-        );
-        DROP TABLE threshold_approval_tokens_v9;
-        UPDATE chio_store_schema_versions
-        SET version = 8
-        WHERE store_key = 'admission_operation';
-        "#,
-    )?;
-    drop(connection);
-
-    SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
-    let store = authority.admission_operation_store();
-    let connection = store.connection()?;
-    let primary_key_columns: String = connection.query_row(
-        r#"
-        SELECT group_concat(name, ',')
-        FROM (
-            SELECT name
-            FROM pragma_table_info('threshold_approval_tokens')
-            WHERE pk > 0
-            ORDER BY pk
-        )
-        "#,
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(primary_key_columns, "proposal_id,token_id");
-    verify_admission_operation_invariants(&connection)?;
-    drop(_temp);
-    Ok(())
-}
-
-#[test]
-fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
-    let _legacy = legacy_clock::LegacyClock::enter();
-    let fixture = fixture();
-    let operation = prepared_operation(
-        &fixture.fence,
-        AdmissionOperationKind::ToolDispatch,
-        "request-v1-migration",
-        "capability-v1-migration",
-    );
-    fixture
-        .store
-        .begin(&operation, &fixture.fence, now_ms())
-        .expect("persist v1 operation");
-
-    let Fixture {
-        _temp,
-        database,
-        lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
-
-    let connection = Connection::open(&database).expect("open offline database");
-    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)
-        .expect("remove empty post-v1 runtime migration schema");
-    connection
-        .execute_batch(
-            r#"
-            DROP TABLE obligation_assignment_results;
-            DROP TABLE factor_assignment_authority_sets;
-            DROP TABLE credit_exposure_terminal_transitions;
-            DROP TABLE credit_exposure_reservations;
-            DROP TABLE credit_exposure_accounts;
-            DROP TABLE obligation_heads;
-            DROP TABLE obligation_head_commits;
-            DROP TABLE obligation_settlement_lifecycle_records;
-            DROP TABLE obligation_disposition_records;
-            DROP TABLE obligation_atoms;
-            DROP TABLE admission_operation_observer_attempts;
-            DROP TABLE admission_operation_authorization_consumptions;
-            DROP TABLE admission_operation_terminal_records;
-            DROP TABLE admission_operation_terminal_projections;
-            UPDATE chio_store_schema_versions
-            SET version = 1
-            WHERE store_key = 'admission_operation';
-            "#,
-        )
-        .expect("shape database as v1");
-    drop(connection);
-
-    SqliteAuthorityStore::provision(&database, &lock_root).expect("migrate v1 authority");
-    let authority = crate::test_authority::open_serving(&database, &lock_root)
-        .expect("open migrated authority");
-    let store = authority.admission_operation_store();
-    assert_eq!(
-        store
-            .load_by_operation_id(operation.binding().operation_id())
-            .expect("load preserved operation"),
-        Some(operation)
-    );
-    let connection = store.connection().expect("migrated connection");
-    verify_admission_operation_invariants(&connection).expect("migrated invariants");
-    drop(_temp);
-}
-
-#[test]
-fn provision_migrates_v2_commit_chain_across_closed_serving_epochs() {
-    let _legacy = legacy_clock::LegacyClock::enter();
-    let fixture = fixture();
-    let operation = prepared_operation(
-        &fixture.fence,
-        AdmissionOperationKind::ToolDispatch,
-        "request-v2-chain-migration",
-        "capability-v2-chain-migration",
-    );
-    fixture
-        .store
-        .begin(&operation, &fixture.fence, now_ms())
-        .expect("persist v2 operation");
-    let Fixture {
-        _temp,
-        database,
-        lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
-
-    let replacement =
-        crate::test_authority::open_serving(&database, &lock_root).expect("rotate serving owner");
-    drop(replacement);
-
-    let connection = Connection::open(&database).expect("open offline database");
-    let closed_epochs: i64 = connection
-        .query_row(
-            r#"
-            SELECT COUNT(*)
-            FROM admission_operation_commits AS commits
-            JOIN chio_serving_leases AS leases
-              ON leases.store_uuid = commits.store_uuid
-             AND leases.owner_epoch = commits.store_owner_epoch
-            WHERE leases.end_head_index IS NOT NULL
-            "#,
-            [],
-            |row| row.get(0),
-        )
-        .expect("closed commit epochs");
-    assert!(closed_epochs > 0);
-    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)
-        .expect("remove empty post-v2 runtime migration schema");
-    connection
-        .execute_batch(
-            r#"
-            DROP TABLE obligation_assignment_results;
-            DROP TABLE obligation_heads;
-            DROP TABLE obligation_head_commits;
-            DROP TABLE obligation_settlement_lifecycle_records;
-            DROP TRIGGER admission_operation_commits_exact_lease;
-            DROP TRIGGER admission_operation_commits_immutable;
-            DROP TRIGGER admission_operation_commits_no_delete;
-            DROP INDEX admission_operation_commits_operation;
-            ALTER TABLE admission_operation_commits
-                RENAME TO admission_operation_commits_v3;
-
-            CREATE TABLE admission_operation_commits (
-                commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
-                operation_id TEXT NOT NULL,
-                operation_version INTEGER NOT NULL CHECK (operation_version > 0),
-                mutation_kind TEXT NOT NULL CHECK (
-                    mutation_kind IN ('begin', 'compare_and_swap', 'recovery_claim')
-                ),
-                operation_digest TEXT NOT NULL CHECK (
-                    length(operation_digest) = 64
-                    AND operation_digest NOT GLOB '*[^0-9a-f]*'
-                ),
-                recovery_claim_digest TEXT CHECK (
-                    recovery_claim_digest IS NULL
-                    OR (length(recovery_claim_digest) = 64
-                        AND recovery_claim_digest NOT GLOB '*[^0-9a-f]*')
-                ),
-                previous_chain_digest TEXT NOT NULL CHECK (
-                    length(previous_chain_digest) = 64
-                    AND previous_chain_digest NOT GLOB '*[^0-9a-f]*'
-                ),
-                chain_digest TEXT NOT NULL CHECK (
-                    length(chain_digest) = 64
-                    AND chain_digest NOT GLOB '*[^0-9a-f]*'
-                ),
-                store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
-                store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
-                store_owner_epoch INTEGER NOT NULL CHECK (store_owner_epoch > 0),
-                recorded_at_unix_ms INTEGER NOT NULL CHECK (recorded_at_unix_ms > 0),
-                FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id),
-                FOREIGN KEY (store_uuid, store_owner_epoch)
-                    REFERENCES chio_serving_leases(store_uuid, owner_epoch),
-                CHECK (
-                    (mutation_kind = 'begin' AND recovery_claim_digest IS NULL)
-                    OR (mutation_kind IN ('compare_and_swap', 'recovery_claim')
-                        AND recovery_claim_digest IS NOT NULL)
-                )
-            );
-            INSERT INTO admission_operation_commits (
-                commit_sequence, operation_id, operation_version, mutation_kind,
-                operation_digest, recovery_claim_digest, previous_chain_digest,
-                chain_digest, store_uuid, store_lease_id, store_owner_epoch,
-                recorded_at_unix_ms
-            )
-            SELECT commit_sequence, operation_id, operation_version, mutation_kind,
-                   operation_digest, recovery_claim_digest, previous_chain_digest,
-                   chain_digest, store_uuid, store_lease_id, store_owner_epoch,
-                   recorded_at_unix_ms
-            FROM admission_operation_commits_v3;
-            DROP TABLE admission_operation_commits_v3;
-            CREATE INDEX admission_operation_commits_operation
-                ON admission_operation_commits(operation_id, commit_sequence);
-            CREATE TRIGGER admission_operation_commits_exact_lease
-            BEFORE INSERT ON admission_operation_commits
-            WHEN NOT EXISTS (
-                SELECT 1 FROM chio_serving_leases
-                WHERE store_uuid = NEW.store_uuid
-                  AND owner_epoch = NEW.store_owner_epoch
-                  AND lease_id = NEW.store_lease_id
-                  AND end_head_index IS NULL
-            )
-            BEGIN
-                SELECT RAISE(ABORT, 'admission operation commit has no exact serving lease');
-            END;
-            CREATE TRIGGER admission_operation_commits_immutable
-            BEFORE UPDATE ON admission_operation_commits
-            BEGIN
-                SELECT RAISE(ABORT, 'admission operation commit is immutable');
-            END;
-            CREATE TRIGGER admission_operation_commits_no_delete
-            BEFORE DELETE ON admission_operation_commits
-            BEGIN
-                SELECT RAISE(ABORT, 'admission operation commit is immutable');
-            END;
-            UPDATE chio_store_schema_versions
-            SET version = 2
-            WHERE store_key = 'admission_operation';
-            "#,
-        )
-        .expect("shape database as v2");
-    drop(connection);
-
-    SqliteAuthorityStore::provision(&database, &lock_root).expect("migrate v2 authority");
-    let authority = crate::test_authority::open_serving(&database, &lock_root)
-        .expect("open migrated authority");
-    let store = authority.admission_operation_store();
-    assert_eq!(
-        store
-            .load_by_operation_id(operation.binding().operation_id())
-            .expect("load preserved operation"),
-        Some(operation)
-    );
-    let connection = store.connection().expect("migrated connection");
-    let (version, null_participants): (i64, i64) = connection
-        .query_row(
-            r#"
-            SELECT
-                (SELECT version FROM chio_store_schema_versions
-                 WHERE store_key = 'admission_operation'),
-                (SELECT COUNT(*) FROM admission_operation_commits
-                 WHERE participant_digest IS NULL)
-            "#,
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .expect("migrated commit schema");
-    assert_eq!(
-        version,
-        i64::from(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
-    );
-    assert!(null_participants > 0);
-    verify_admission_operation_invariants(&connection).expect("migrated invariants");
-    drop(_temp);
-}
-
-#[test]
-fn provision_migrates_v4_channel_commit_kind_without_changing_history() -> AnchoredTestResult {
-    let _legacy = legacy_clock::LegacyClock::enter();
-    let _clock = chio_test_support::clock::scope_unix_secs(now_ms() / 1_000);
-    let fixture = fixture();
-    let operation = prepared_operation(
-        &fixture.fence,
-        AdmissionOperationKind::ToolDispatch,
-        "request-v4-channel-commit-migration",
-        "capability-v4-channel-commit-migration",
-    );
-    let begun_at = now_ms();
-    fixture.store.begin(&operation, &fixture.fence, begun_at)?;
-    let recovery = claim(&fixture, &operation, "v4-channel-migration", begun_at);
-    let participant_digest = economic_digest("v4-channel-participant");
-    {
-        let mut connection = fixture.store.connection()?;
-        let transaction = fixture
-            .store
-            .begin_write(&mut connection, Some(&fixture.fence))?;
-        append_participant_update_tx(
-            &transaction,
-            &fixture.store.serving_owner,
-            &operation,
-            &recovery,
-            &participant_digest,
-            begun_at,
-        )?;
-        fixture.store.commit_write(transaction)?;
-        fixture.store.sync_after_write(&connection)?;
-    }
-    let before = {
-        let connection = fixture.store.connection()?;
-        admission_commit_rows(&connection)?
-    };
-
-    let Fixture {
-        _temp,
-        database,
-        lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
-
-    let connection = Connection::open(&database)?;
-    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
-    connection.execute_batch(
-        r#"
-        DROP TABLE obligation_assignment_results;
-        DROP TABLE obligation_heads;
-        DROP TABLE obligation_head_commits;
-        DROP TABLE obligation_settlement_lifecycle_records;
-        DROP TRIGGER admission_operation_commits_exact_lease;
-        DROP TRIGGER admission_operation_commits_immutable;
-        DROP TRIGGER admission_operation_commits_no_delete;
-        DROP INDEX admission_operation_commits_operation;
-        ALTER TABLE admission_operation_commits
-            RENAME TO admission_operation_commits_v4;
-
-        CREATE TABLE admission_operation_commits (
-            commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
-            operation_id TEXT NOT NULL,
-            operation_version INTEGER NOT NULL CHECK (operation_version > 0),
-            mutation_kind TEXT NOT NULL CHECK (
-                mutation_kind IN (
-                    'begin', 'compare_and_swap', 'recovery_claim', 'participant_update'
-                )
-            ),
-            operation_digest TEXT NOT NULL CHECK (
-                length(operation_digest) = 64
-                AND operation_digest NOT GLOB '*[^0-9a-f]*'
-            ),
-            recovery_claim_digest TEXT CHECK (
-                recovery_claim_digest IS NULL
-                OR (length(recovery_claim_digest) = 64
-                    AND recovery_claim_digest NOT GLOB '*[^0-9a-f]*')
-            ),
-            participant_digest TEXT CHECK (
-                participant_digest IS NULL
-                OR (length(participant_digest) = 64
-                    AND participant_digest NOT GLOB '*[^0-9a-f]*')
-            ),
-            previous_chain_digest TEXT NOT NULL CHECK (
-                length(previous_chain_digest) = 64
-                AND previous_chain_digest NOT GLOB '*[^0-9a-f]*'
-            ),
-            chain_digest TEXT NOT NULL CHECK (
-                length(chain_digest) = 64
-                AND chain_digest NOT GLOB '*[^0-9a-f]*'
-            ),
-            store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
-            store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
-            store_owner_epoch INTEGER NOT NULL CHECK (store_owner_epoch > 0),
-            recorded_at_unix_ms INTEGER NOT NULL CHECK (recorded_at_unix_ms > 0),
-            FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id),
-            FOREIGN KEY (store_uuid, store_owner_epoch)
-                REFERENCES chio_serving_leases(store_uuid, owner_epoch),
-            CHECK (
-                (mutation_kind = 'begin'
-                 AND recovery_claim_digest IS NULL
-                 AND participant_digest IS NULL)
-                OR (mutation_kind = 'recovery_claim'
-                    AND recovery_claim_digest IS NOT NULL
-                    AND participant_digest IS NULL)
-                OR (mutation_kind = 'compare_and_swap'
-                    AND recovery_claim_digest IS NOT NULL)
-                OR (mutation_kind = 'participant_update'
-                    AND recovery_claim_digest IS NOT NULL
-                    AND participant_digest IS NOT NULL)
-            )
-        );
-        INSERT INTO admission_operation_commits (
-            commit_sequence, operation_id, operation_version, mutation_kind,
-            operation_digest, recovery_claim_digest, participant_digest,
-            previous_chain_digest, chain_digest,
-            store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
-        )
-        SELECT commit_sequence, operation_id, operation_version, mutation_kind,
-               operation_digest, recovery_claim_digest, participant_digest,
-               previous_chain_digest, chain_digest,
-               store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
-        FROM admission_operation_commits_v4
-        ORDER BY commit_sequence;
-        DROP TABLE admission_operation_commits_v4;
-        CREATE INDEX admission_operation_commits_operation
-            ON admission_operation_commits(operation_id, commit_sequence);
-        CREATE TRIGGER admission_operation_commits_exact_lease
-        BEFORE INSERT ON admission_operation_commits
-        WHEN NOT EXISTS (
-            SELECT 1 FROM chio_serving_leases
-            WHERE store_uuid = NEW.store_uuid
-              AND owner_epoch = NEW.store_owner_epoch
-              AND lease_id = NEW.store_lease_id
-              AND end_head_index IS NULL
-        )
-        BEGIN
-            SELECT RAISE(ABORT, 'admission operation commit has no exact serving lease');
-        END;
-        CREATE TRIGGER admission_operation_commits_immutable
-        BEFORE UPDATE ON admission_operation_commits
-        BEGIN
-            SELECT RAISE(ABORT, 'admission operation commit is immutable');
-        END;
-        CREATE TRIGGER admission_operation_commits_no_delete
-        BEFORE DELETE ON admission_operation_commits
-        BEGIN
-            SELECT RAISE(ABORT, 'admission operation commit is immutable');
-        END;
-        UPDATE chio_store_schema_versions
-        SET version = 4
-        WHERE store_key = 'admission_operation';
-        "#,
-    )?;
-    drop(connection);
-
-    SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
-    let fence = authority.mutation_fence();
-    let store = authority.admission_operation_store();
-    let mut connection = store.connection()?;
-    assert_eq!(before, admission_commit_rows(&connection)?);
-    let version: i64 = connection.query_row(
-        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(
-        version,
-        i64::from(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
-    );
-    verify_admission_operation_invariants(&connection)?;
-
-    let transaction = store.begin_write(&mut connection, Some(&fence))?;
-    let next_sequence: i64 = transaction.query_row(
-        "SELECT MAX(commit_sequence) + 1 FROM admission_operation_commits",
-        [],
-        |row| row.get(0),
-    )?;
-    let inserted = transaction.execute(
-        r#"
-        INSERT INTO admission_operation_commits (
-            commit_sequence, operation_id, operation_version, mutation_kind,
-            operation_digest, recovery_claim_digest, participant_digest,
-            previous_chain_digest, chain_digest,
-            store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
-        )
-        SELECT ?1, operation_id, 2, 'channel_reservation_finalized',
-               operation_digest, ?2, ?3, chain_digest, ?4, ?5, ?6, ?7, ?8
-        FROM admission_operation_commits
-        WHERE commit_sequence = 1
-        "#,
-        params![
-            next_sequence,
-            economic_digest("v5-channel-recovery-claim"),
-            economic_digest("v5-channel-participant"),
-            economic_digest("v5-channel-probe-chain"),
-            &fence.store_uuid,
-            &fence.lease_id,
-            i64::try_from(fence.owner_epoch)?,
-            i64::try_from(now_ms())?,
-        ],
-    )?;
-    assert_eq!(inserted, 1);
-    transaction.rollback()?;
-    drop(_temp);
-    Ok(())
-}
-
-#[test]
 fn canonical_schema_rejects_a_same_name_no_op_trigger() {
     let fixture = fixture();
     let connection = fixture.store.connection().expect("connection");
@@ -1425,5 +894,45 @@ fn applied_assignment_result_requires_the_exact_participant_head() -> AnchoredTe
         &resulting_head_digest,
     )
     .is_err());
+    Ok(())
+}
+
+#[test]
+fn admission_schema_other_than_current_is_refused() -> AnchoredTestResult {
+    for stamped in [0, 2, 38] {
+        let fixture = fixture();
+        let mut connection = fixture.store.connection()?;
+        connection.execute(
+            "UPDATE chio_store_schema_versions SET version = ?1 WHERE store_key = 'admission_operation'",
+            [stamped],
+        )?;
+        let error = initialize_admission_operation_schema(&mut connection)
+            .err()
+            .ok_or("stale admission schema opened")?;
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "admission operation invariant failed: database schema version {stamped} is not the current schema version 1; refusing to open"
+            )
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn unstamped_provisioned_admission_store_is_refused() -> AnchoredTestResult {
+    let fixture = fixture();
+    let mut connection = fixture.store.connection()?;
+    connection.execute(
+        "DELETE FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",
+        [],
+    )?;
+    let error = initialize_admission_operation_schema(&mut connection)
+        .err()
+        .ok_or("unstamped admission schema opened")?;
+    assert_eq!(
+        error.to_string(),
+        "admission operation invariant failed: admission storage is provisioned without a schema stamp"
+    );
     Ok(())
 }

@@ -8,6 +8,8 @@ use chio_security_types::ports::{
 
 #[path = "egress/authority.rs"]
 mod authority;
+#[path = "egress/catalog.rs"]
+mod catalog;
 #[path = "egress/compensation.rs"]
 mod compensation;
 #[path = "egress/crash.rs"]
@@ -18,8 +20,6 @@ mod faults;
 mod integrity;
 #[path = "egress/lifecycle.rs"]
 mod lifecycle;
-#[path = "egress/migration.rs"]
-mod migration;
 #[path = "egress/portable.rs"]
 mod portable;
 #[path = "egress/retention.rs"]

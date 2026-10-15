@@ -2,67 +2,26 @@ use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-fn legacy_schema() -> Result<Connection, rusqlite::Error> {
+fn physical_rows(
+    connection: &Connection,
+    table: &str,
+) -> rusqlite::Result<Vec<Vec<rusqlite::types::Value>>> {
+    let mut statement = connection.prepare(&format!("SELECT * FROM {table}"))?;
+    let columns = statement.column_count();
+    let rows = statement.query_map([], |row| {
+        (0..columns).map(|column| row.get(column)).collect()
+    })?;
+    rows.collect()
+}
+
+#[test]
+fn canonical_catalog_does_not_recreate_a_missing_runtime_barrier() -> TestResult {
     let connection = Connection::open_in_memory()?;
-    connection.execute_batch(&migration_v20::predecessor_schema())?;
-    connection.execute_batch(include_str!("../../../admission_operation_nonce.sql"))?;
-    connection.execute_batch(include_str!(
-        "../../../admission_operation_nonce_preflight.sql"
-    ))?;
-    Ok(connection)
-}
-
-#[test]
-fn canonical_v18_accepts_only_a_new_empty_runtime_namespace() -> TestResult {
-    let connection = legacy_schema()?;
-    verify_pre_migration_schema(&connection, 18)?;
-    connection.execute_batch(&migration_v21::predecessor_schema())?;
-    verify_admission_operation_schema(&connection, 19)?;
-    assert!(matches!(
-        verify_pre_migration_schema(&connection, 18),
-        Err(AdmissionOperationStoreError::Invariant(message))
-            if message.contains("unqualified runtime replay namespace")
-    ));
-    Ok(())
-}
-
-#[test]
-fn v18_damaged_old_schema_is_rejected_without_repair() -> TestResult {
-    let connection = legacy_schema()?;
-    connection.execute_batch("DROP TRIGGER admission_operation_tool_requests_immutable")?;
-    let before = admission_operation_schema_catalog(&connection)?;
-    assert!(matches!(
-        verify_pre_migration_schema(&connection, 18),
-        Err(AdmissionOperationStoreError::Invariant(message))
-            if message.contains("schema differs from the canonical definition")
-    ));
-    assert_eq!(admission_operation_schema_catalog(&connection)?, before);
-    Ok(())
-}
-
-#[test]
-fn every_pre_v19_version_rejects_case_insensitive_partial_namespace() -> TestResult {
-    for version in [0, 1, 16, 17, 18] {
-        let connection = Connection::open_in_memory()?;
-        connection.execute_batch("CREATE TABLE RUNTIME_REPLAY_LEGACY_TOMBSTONES(value INTEGER)")?;
-        let before = admission_operation_schema_catalog(&connection)?;
-        assert!(matches!(
-            verify_pre_migration_schema(&connection, version),
-            Err(AdmissionOperationStoreError::Invariant(message))
-                if message.contains("unqualified runtime replay namespace")
-        ));
-        assert_eq!(admission_operation_schema_catalog(&connection)?, before);
-    }
-    Ok(())
-}
-
-#[test]
-fn current_catalog_does_not_recreate_a_missing_runtime_barrier() -> TestResult {
-    let connection = legacy_schema()?;
-    connection.execute_batch(RUNTIME_REPLAY_MIGRATION_SCHEMA)?;
+    connection.execute_batch(&admission_operation_schema_sql()?)?;
+    verify_admission_operation_schema(&connection)?;
     connection.execute_batch("DROP TRIGGER runtime_replay_legacy_tombstones_no_delete")?;
     let before = admission_operation_schema_catalog(&connection)?;
-    assert!(verify_admission_operation_schema(&connection, 19).is_err());
+    assert!(verify_admission_operation_schema(&connection).is_err());
     assert_eq!(admission_operation_schema_catalog(&connection)?, before);
     Ok(())
 }
@@ -118,14 +77,48 @@ fn runtime_replay_tables_reject_hidden_rowid_replacement() -> TestResult {
     Ok(())
 }
 
-fn physical_rows(
-    connection: &Connection,
-    table: &str,
-) -> rusqlite::Result<Vec<Vec<rusqlite::types::Value>>> {
-    let mut statement = connection.prepare(&format!("SELECT * FROM {table}"))?;
-    let columns = statement.column_count();
-    let rows = statement.query_map([], |row| {
-        (0..columns).map(|column| row.get(column)).collect()
-    })?;
-    rows.collect()
+#[test]
+fn claim_rows_reject_replacement_mutation_and_unbounded_fields() -> TestResult {
+    let connection = Connection::open_in_memory()?;
+    connection.execute_batch("PRAGMA foreign_keys = OFF; PRAGMA recursive_triggers = OFF")?;
+    connection.execute_batch(RUNTIME_PARTICIPANT_SCHEMA)?;
+    let digest = "a".repeat(64);
+    let insert = "INSERT INTO runtime_replay_claim_episodes
+        (operation_id, episode_id, runtime_authority_id, ledger_digest, claim_digest, claim_json, operation_json)
+        VALUES (?1, ?2, 'runtime', ?3, ?3, ?4, X'01')";
+    for (operation, episode, hash, body) in [
+        (
+            "o".repeat(513),
+            "episode".into(),
+            digest.clone(),
+            vec![1_u8],
+        ),
+        ("operation".into(), "e".repeat(513), digest.clone(), vec![1]),
+        (
+            "operation".into(),
+            "episode".into(),
+            "A".repeat(64),
+            vec![1],
+        ),
+        (
+            "operation".into(),
+            "episode".into(),
+            digest.clone(),
+            vec![1; 16385],
+        ),
+    ] {
+        assert!(connection
+            .execute(insert, params![operation, episode, hash, body])
+            .is_err());
+    }
+    connection.execute(insert, params!["operation", "episode", digest, vec![1_u8]])?;
+    for sql in [
+        "UPDATE runtime_replay_claim_episodes SET episode_id = 'different'",
+        "DELETE FROM runtime_replay_claim_episodes",
+        "INSERT OR REPLACE INTO runtime_replay_claim_episodes SELECT * FROM runtime_replay_claim_episodes",
+        "INSERT OR REPLACE INTO runtime_replay_claim_episodes(rowid) VALUES(1)",
+    ] {
+        assert!(connection.execute(sql, []).is_err(), "{sql}");
+    }
+    Ok(())
 }

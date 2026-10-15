@@ -223,7 +223,6 @@ const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/schema.rs",
         symbols: &[
             "sql",
-            "require_absent",
             "verify_catalog",
         ],
     },
@@ -288,19 +287,6 @@ const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs",
         symbols: &[
             "verify_stored_terminal_projection_with_history",
-        ],
-    },
-    RequiredSource {
-        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v35.rs",
-        symbols: &[
-            "verify_pre_migration_schema",
-            "migrate",
-        ],
-    },
-    RequiredSource {
-        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v36.rs",
-        symbols: &[
-            "verify_pre_migration_schema",
         ],
     },
     RequiredSource {
@@ -1263,10 +1249,6 @@ const NATIVE_NONCE_PREFLIGHT_SOURCES: &[RequiredSource] = &[
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs",
         symbols: &["verify_rows","apply_image"],
     },
-    RequiredSource {
-        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v33.rs",
-        symbols: &["verify_pre_migration_schema"],
-    },
 ];
 
 const NATIVE_INPUT_SOURCES: &[RequiredSource] = &[
@@ -1525,16 +1507,12 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
         symbols: &["dispatch_snapshot", "verify_dispatch_snapshot"],
     },
     RequiredSource {
-        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v31.rs",
-        symbols: &["verify_pre_migration_schema"],
-    },
-    RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs",
-        symbols: &["initialize_admission_operation_schema", "migrate_schema", "verify_admission_operation_invariants", "verify_admission_operation_schema", "admission_operation_schema_catalog"],
+        symbols: &["initialize_admission_operation_schema", "verify_admission_operation_invariants", "verify_admission_operation_schema", "admission_operation_schema_catalog"],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs",
-        symbols: &["recorded_version", "digest_version", "expected", "verify_version"],
+        symbols: &["digest", "expected", "verify"],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",

@@ -48,42 +48,23 @@ pub(in crate::admission_operation_store) fn verify_coverage(
     // checkpoint/suffix custody and indexed heads, never lifetime counts.
     let records = records::verify_all(connection).map_err(invalid)?;
     verify_initialization_references(connection, &records)?;
-    let version: i32 = connection.query_row("SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",[],|row|row.get(0)).map_err(invalid)?;
-    let egress = super::egress::exists(connection).map_err(invalid)?;
-    let output = super::output::exists(connection).map_err(invalid)?;
-    let nonce = super::nonce_preflight::exists(connection).map_err(invalid)?;
-    if (version >= 30 && !egress) || (version >= 32 && !output) || (version >= 33 && !nonce) {
+    if !super::egress::exists(connection).map_err(invalid)?
+        || !super::output::exists(connection).map_err(invalid)?
+        || !super::nonce_preflight::exists(connection).map_err(invalid)?
+    {
         return Err(invalid("native journal family lacks its current catalog"));
     }
-    if egress {
-        super::egress::verify_catalog(connection).map_err(invalid)?;
-    }
-    if output {
-        super::output::verify_catalog(connection).map_err(invalid)?;
-    }
-    if nonce {
-        super::nonce_preflight::verify_catalog(connection).map_err(invalid)?;
-    }
+    super::egress::verify_catalog(connection).map_err(invalid)?;
+    super::output::verify_catalog(connection).map_err(invalid)?;
+    super::nonce_preflight::verify_catalog(connection).map_err(invalid)?;
     for record in &records {
         let authority = record.authority.as_str();
         let checkpoint = super::checkpoint::latest(connection, authority).map_err(invalid)?;
         let heads = [
             super::history::head(connection, authority).map_err(invalid)?,
-            if egress {
-                super::egress::head(connection, authority).map_err(invalid)?
-            } else {
-                0
-            },
-            if output {
-                super::output::head(connection, authority).map_err(invalid)?
-            } else {
-                0
-            },
-            if nonce {
-                super::nonce_preflight::head(connection, authority).map_err(invalid)?
-            } else {
-                0
-            },
+            super::egress::head(connection, authority).map_err(invalid)?,
+            super::output::head(connection, authority).map_err(invalid)?,
+            super::nonce_preflight::head(connection, authority).map_err(invalid)?,
         ];
         for (family, (kind, head)) in [
             "security_participant_state",
