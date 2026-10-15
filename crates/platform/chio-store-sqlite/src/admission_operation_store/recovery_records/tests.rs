@@ -1,0 +1,12 @@
+mod digest_vectors;
+mod encodings;
+mod fixture;
+mod global_coverage;
+mod history_chain;
+mod malformed_text;
+mod metadata_bounds;
+mod present_records;
+mod production_store;
+mod sqlite_errors;
+mod stored_bounds;
+mod stored_values;

@@ -1520,11 +1520,13 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
-        symbols: &["GLOBAL_COMMIT_SCHEMA", "budget_event_reference_digest"],
-    },
-    RequiredSource {
-        path: "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/schema_migration.rs",
-        symbols: &["migrate_previous_global_commit_schema"],
+        symbols: &[
+            "GLOBAL_COMMIT_SCHEMA",
+            "budget_event_reference_digest",
+            "initialize_global_commit_schema",
+            "verify_global_commit_schema",
+            "global_schema_catalog",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/projection_reference.rs",

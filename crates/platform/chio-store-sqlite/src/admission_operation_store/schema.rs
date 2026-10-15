@@ -11,6 +11,7 @@ fn admission_operation_schema_sql() -> Result<String, AdmissionOperationStoreErr
     let schema_v1 = [
         ADMISSION_OPERATION_SCHEMA,
         super::recovery::SCHEMA,
+        include_str!("../admission_operation_recovery.sql"),
         include_str!("../admission_operation_nonce.sql"),
         include_str!("../admission_operation_nonce_preflight.sql"),
         RUNTIME_REPLAY_MIGRATION_SCHEMA,
@@ -90,6 +91,7 @@ pub(crate) fn verify_admission_operation_invariants(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
     verify_admission_operation_schema(connection)?;
+    super::recovery_records::verify_local_history(connection)?;
 
     verify_operation_data(connection)?;
     super::caller_budget::verify_ownership(connection)?;

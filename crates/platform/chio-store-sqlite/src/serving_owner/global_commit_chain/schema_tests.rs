@@ -4,7 +4,7 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 fn seed_history(connection: &Connection) -> TestResult {
     let transaction = connection.unchecked_transaction()?;
-    let reference = sha256_hex(b"schema-migration-baseline");
+    let reference = sha256_hex(b"global-catalog-baseline");
     let projection = projection_root_digest(&ProjectionRootEntry {
         format: "chio.sqlite-authority-projection-root.v1",
         previous_projection_digest: GLOBAL_GENESIS_DIGEST,
@@ -23,7 +23,7 @@ fn seed_history(connection: &Connection) -> TestResult {
         0,
         &reference,
         &projection,
-        "schema-migration-fixture",
+        "global-catalog-fixture",
         None,
         0,
     )?;
@@ -39,115 +39,36 @@ fn history_bytes(connection: &Connection) -> Result<Vec<u8>, Box<dyn std::error:
     )?)?)
 }
 
-#[test]
-fn supported_previous_global_schemas_preserve_history_when_adding_replay_kinds() -> TestResult {
-    let without_stop = GLOBAL_COMMIT_SCHEMA.replace(", 'stop_epoch'", "");
-    let without_checkpoint = without_stop.replace(", 'security_participant_checkpoint'", "");
-    let without_preflight =
-        without_checkpoint.replace(", 'security_participant_nonce_preflight'", "");
-    let without_output = without_preflight.replace(", 'security_participant_output'", "");
-    let without_dispatch = without_output.replace(", 'native_dispatch_ledger'", "");
-    let without_egress = without_dispatch.replace(", 'security_participant_egress'", "");
-    let without_native = without_egress.replace(", 'security_participant_state'", "");
-    let without_security = without_native.replace(", 'security_participant_migration'", "");
-    let without_dpop = without_security.replace(", 'dpop_replay_migration'", "");
-    let previous = without_dpop.replace(", 'governed_approval_replay_migration'", "");
-    let without_runtime = previous.replace(", 'runtime_replay_migration'", "");
-    let without_status = without_runtime.replace(", 'finding_status'", "");
-    let without_challenge = without_status.replace(", 'finding_challenge'", "");
-    for schema in [
-        without_stop,
-        without_checkpoint,
-        without_preflight,
-        without_output,
-        without_dispatch,
-        without_egress,
-        without_native,
-        without_security,
-        without_dpop,
-        previous,
-        without_runtime,
-        without_status,
-        without_challenge,
-    ] {
-        let connection = Connection::open_in_memory()?;
-        connection.execute_batch(&schema)?;
-        seed_history(&connection)?;
-        let head = load_global_commit_head(&connection)?;
-        let before = history_bytes(&connection)?;
-        assert!(verify_global_commit_schema(&connection).is_err());
-        initialize_global_commit_schema(&connection)?;
-        verify_global_commit_schema(&connection)?;
-        assert_eq!(load_global_commit_head(&connection)?, head);
-        assert_eq!(history_bytes(&connection)?, before);
-        initialize_global_commit_schema(&connection)?;
-        assert_eq!(load_global_commit_head(&connection)?, head);
-        assert_eq!(history_bytes(&connection)?, before);
+fn assert_catalog_refused(connection: &Connection) {
+    match initialize_global_commit_schema(connection) {
+        Err(SqliteServingOwnerError::Invalid(message)) => {
+            assert_eq!(message, "global authority commit schema is not canonical");
+        }
+        other => panic!("expected exact global catalog refusal, got {other:?}"),
     }
-    Ok(())
 }
 
 #[test]
-fn nonhistorical_runtime_kind_without_status_is_not_an_upgrade_predecessor() -> TestResult {
+fn canonical_global_catalog_reopens_without_rewriting_history() -> TestResult {
     let connection = Connection::open_in_memory()?;
-    connection.execute_batch(
-        &GLOBAL_COMMIT_SCHEMA
-            .replace(", 'security_participant_checkpoint'", "")
-            .replace(", 'security_participant_nonce_preflight'", "")
-            .replace(", 'security_participant_output'", "")
-            .replace(", 'native_dispatch_ledger'", "")
-            .replace(", 'security_participant_egress'", "")
-            .replace(", 'security_participant_state'", "")
-            .replace(", 'security_participant_migration'", "")
-            .replace(", 'dpop_replay_migration'", "")
-            .replace(", 'governed_approval_replay_migration'", "")
-            .replace(", 'finding_status'", ""),
-    )?;
+    initialize_global_commit_schema(&connection)?;
     seed_history(&connection)?;
     let catalog = global_schema_catalog(&connection)?;
-    let before = history_bytes(&connection)?;
-    assert!(matches!(
-        initialize_global_commit_schema(&connection),
-        Err(SqliteServingOwnerError::Invalid(_))
-    ));
+    let history = history_bytes(&connection)?;
+    let head = load_global_commit_head(&connection)?;
+    initialize_global_commit_schema(&connection)?;
     assert_eq!(global_schema_catalog(&connection)?, catalog);
-    assert_eq!(history_bytes(&connection)?, before);
+    assert_eq!(history_bytes(&connection)?, history);
+    assert_eq!(load_global_commit_head(&connection)?, head);
     Ok(())
 }
 
 #[test]
-fn unexpected_trigger_on_previous_global_schema_is_not_repaired() -> TestResult {
-    let connection = Connection::open_in_memory()?;
-    connection.execute_batch(
-        &GLOBAL_COMMIT_SCHEMA
-            .replace(", 'security_participant_checkpoint'", "")
-            .replace(", 'security_participant_nonce_preflight'", "")
-            .replace(", 'security_participant_output'", "")
-            .replace(", 'native_dispatch_ledger'", "")
-            .replace(", 'security_participant_egress'", "")
-            .replace(", 'security_participant_state'", "")
-            .replace(", 'security_participant_migration'", "")
-            .replace(", 'dpop_replay_migration'", "")
-            .replace(", 'governed_approval_replay_migration'", "")
-            .replace(", 'runtime_replay_migration'", ""),
-    )?;
-    connection.execute_batch(
-        "CREATE TRIGGER unrelated_global_hook BEFORE INSERT ON authority_global_commits
-         BEGIN SELECT 1; END",
-    )?;
-    let before = global_schema_catalog(&connection)?;
-    assert!(matches!(
-        initialize_global_commit_schema(&connection),
-        Err(SqliteServingOwnerError::Invalid(_))
-    ));
-    assert_eq!(global_schema_catalog(&connection)?, before);
-    Ok(())
-}
-
-#[test]
-fn ignored_check_cannot_smuggle_future_projection_into_a_supported_predecessor() -> TestResult {
+fn missing_projection_kinds_refuse_without_rewriting_catalog_or_history() -> TestResult {
     let mut schema = GLOBAL_COMMIT_SCHEMA.to_owned();
     for kind in [
+        "recovery",
+        "stop_epoch",
         "security_participant_checkpoint",
         "security_participant_nonce_preflight",
         "security_participant_output",
@@ -165,19 +86,166 @@ fn ignored_check_cannot_smuggle_future_projection_into_a_supported_predecessor()
         let connection = Connection::open_in_memory()?;
         connection.execute_batch(&schema)?;
         seed_history(&connection)?;
-        connection.execute_batch("PRAGMA ignore_check_constraints = ON; DROP TRIGGER authority_global_commits_immutable;")?;
-        connection.execute(
-            "UPDATE authority_global_commits SET projection_kind = ?1",
-            [kind],
-        )?;
-        connection.execute_batch(&schema)?;
         let catalog = global_schema_catalog(&connection)?;
-        let before = history_bytes(&connection)?;
+        let history = history_bytes(&connection)?;
         let head = load_global_commit_head(&connection)?;
-        assert!(initialize_global_commit_schema(&connection).is_err());
+        assert_catalog_refused(&connection);
         assert_eq!(global_schema_catalog(&connection)?, catalog);
-        assert_eq!(history_bytes(&connection)?, before);
+        assert_eq!(history_bytes(&connection)?, history);
         assert_eq!(load_global_commit_head(&connection)?, head);
     }
+    Ok(())
+}
+
+#[test]
+fn missing_commit_table_refuses_without_recreating_history() -> TestResult {
+    let connection = Connection::open_in_memory()?;
+    connection.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
+    seed_history(&connection)?;
+    let head = load_global_commit_head(&connection)?;
+    connection.execute_batch("DROP TABLE authority_global_commits;")?;
+    let catalog = global_schema_catalog(&connection)?;
+    assert_catalog_refused(&connection);
+    assert_eq!(global_schema_catalog(&connection)?, catalog);
+    assert_eq!(load_global_commit_head(&connection)?, head);
+    Ok(())
+}
+
+#[test]
+fn missing_metadata_refuses_without_recreating_a_head() -> TestResult {
+    let connection = Connection::open_in_memory()?;
+    connection.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
+    seed_history(&connection)?;
+    let history = history_bytes(&connection)?;
+    connection.execute_batch("DROP TABLE authority_global_commit_meta;")?;
+    let catalog = global_schema_catalog(&connection)?;
+    assert_catalog_refused(&connection);
+    assert_eq!(global_schema_catalog(&connection)?, catalog);
+    assert_eq!(history_bytes(&connection)?, history);
+    Ok(())
+}
+
+#[test]
+fn missing_global_guards_refuse_without_repair() -> TestResult {
+    for statement in [
+        "DROP TRIGGER authority_global_commits_immutable",
+        "DROP TRIGGER authority_global_commits_no_delete",
+        "DROP INDEX authority_global_commits_projection",
+    ] {
+        let connection = Connection::open_in_memory()?;
+        connection.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
+        seed_history(&connection)?;
+        connection.execute_batch(statement)?;
+        let catalog = global_schema_catalog(&connection)?;
+        let history = history_bytes(&connection)?;
+        let head = load_global_commit_head(&connection)?;
+        assert_catalog_refused(&connection);
+        assert_eq!(global_schema_catalog(&connection)?, catalog);
+        assert_eq!(history_bytes(&connection)?, history);
+        assert_eq!(load_global_commit_head(&connection)?, head);
+    }
+    Ok(())
+}
+
+#[test]
+fn unexpected_global_guard_refuses_without_repair() -> TestResult {
+    let connection = Connection::open_in_memory()?;
+    connection.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
+    seed_history(&connection)?;
+    connection.execute_batch(
+        "CREATE TRIGGER unrelated_global_hook BEFORE INSERT ON authority_global_commits
+         BEGIN SELECT 1; END",
+    )?;
+    let catalog = global_schema_catalog(&connection)?;
+    let history = history_bytes(&connection)?;
+    let head = load_global_commit_head(&connection)?;
+    assert_catalog_refused(&connection);
+    assert_eq!(global_schema_catalog(&connection)?, catalog);
+    assert_eq!(history_bytes(&connection)?, history);
+    assert_eq!(load_global_commit_head(&connection)?, head);
+    Ok(())
+}
+
+#[test]
+fn reserved_global_catalog_names_are_not_adopted() -> TestResult {
+    let connection = Connection::open_in_memory()?;
+    connection.execute_batch(
+        "CREATE TABLE unrelated (value TEXT);
+         INSERT INTO unrelated VALUES ('preserved');
+         CREATE INDEX authority_global_commits_projection ON unrelated(value);",
+    )?;
+    let catalog = global_schema_catalog(&connection)?;
+    assert_catalog_refused(&connection);
+    assert_eq!(global_schema_catalog(&connection)?, catalog);
+    let value: String =
+        connection.query_row("SELECT value FROM unrelated", [], |row| row.get(0))?;
+    assert_eq!(value, "preserved");
+    Ok(())
+}
+
+#[test]
+fn failed_catalog_creation_rolls_back_every_created_object() -> TestResult {
+    use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
+
+    let connection = Connection::open_in_memory()?;
+    connection.authorizer(Some(|context: AuthContext<'_>| match context.action {
+        AuthAction::CreateIndex {
+            index_name: "authority_global_commits_projection",
+            ..
+        } => Authorization::Deny,
+        _ => Authorization::Allow,
+    }))?;
+    let result = initialize_global_commit_schema(&connection);
+    connection.authorizer(None::<fn(AuthContext<'_>) -> Authorization>)?;
+    match result {
+        Err(SqliteServingOwnerError::Sqlite(rusqlite::Error::SqliteFailure(
+            error,
+            Some(message),
+        )))
+        | Err(SqliteServingOwnerError::Sqlite(rusqlite::Error::SqlInputError {
+            error,
+            msg: message,
+            ..
+        })) => {
+            assert_eq!(error.extended_code, rusqlite::ffi::SQLITE_AUTH);
+            assert_eq!(message, "not authorized");
+        }
+        other => panic!("expected SQLite authorization refusal, got {other:?}"),
+    }
+    assert!(connection.is_autocommit());
+    assert_eq!(global_schema_catalog(&connection)?, Vec::new());
+    initialize_global_commit_schema(&connection)?;
+    verify_global_commit_schema(&connection)?;
+    Ok(())
+}
+
+#[test]
+fn differently_cased_reserved_names_refuse_without_catalog_changes() -> TestResult {
+    for statement in [
+        "CREATE TABLE AUTHORITY_GLOBAL_COMMITS (value TEXT)",
+        "CREATE TABLE unrelated (value TEXT);
+         CREATE INDEX AUTHORITY_GLOBAL_COMMITS_PROJECTION ON unrelated(value)",
+    ] {
+        let connection = Connection::open_in_memory()?;
+        connection.execute_batch(statement)?;
+        let catalog = global_schema_catalog(&connection)?;
+        assert!(!catalog.is_empty());
+        assert_catalog_refused(&connection);
+        assert_eq!(global_schema_catalog(&connection)?, catalog);
+    }
+    Ok(())
+}
+
+#[test]
+fn partial_catalog_with_a_genesis_head_refuses_without_repair() -> TestResult {
+    let connection = Connection::open_in_memory()?;
+    initialize_global_commit_schema(&connection)?;
+    let head = load_global_commit_head(&connection)?;
+    assert_eq!(head.head_sequence, 0);
+    connection.execute_batch("DROP TABLE authority_global_commits")?;
+    let catalog = global_schema_catalog(&connection)?;
+    assert_catalog_refused(&connection);
+    assert_eq!(global_schema_catalog(&connection)?, catalog);
+    assert_eq!(load_global_commit_head(&connection)?, head);
     Ok(())
 }

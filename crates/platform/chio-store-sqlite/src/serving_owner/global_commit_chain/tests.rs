@@ -63,9 +63,12 @@ fn factor_projection_fixture() -> Result<Connection, rusqlite::Error> {
             commit_digest TEXT NOT NULL
         );
         CREATE TABLE authority_global_commits (
+            commit_sequence INTEGER,
+            mutation_kind TEXT,
             projection_kind TEXT NOT NULL,
             projection_key TEXT NOT NULL,
-            projection_sequence INTEGER NOT NULL
+            projection_sequence INTEGER NOT NULL,
+            projection_reference_digest TEXT
         );
         INSERT INTO factor_assignment_authority_sets (
             generation, active_set_digest, previous_active_set_digest,
@@ -81,6 +84,7 @@ fn factor_projection_fixture() -> Result<Connection, rusqlite::Error> {
         );
         "#,
     )?;
+    connection.execute_batch(include_str!("../../admission_operation_recovery.sql"))?;
     Ok(connection)
 }
 
