@@ -419,6 +419,37 @@ impl Fixture {
         Ok(())
     }
 
+    /// A kernel whose signing identity differs from the admitting one is refused
+    /// on the retained operation: no receipt, no dispatch, the proposal kept.
+    #[cfg(feature = "pq")]
+    fn assert_retained_identity_refused(
+        &self,
+        proposal: &ThresholdApprovalProposal,
+        operation_id: &crate::admission_operation::AdmissionOperationId,
+    ) -> TestResult {
+        let receipts = self.kernel.receipt_log().len();
+        let error = self
+            .kernel
+            .evaluate_tool_call_blocking(&self.request)
+            .expect_err("a different signing identity cannot resume the retained operation");
+        let expected = format!(
+            "request id conflicts with retained operation {}",
+            operation_id.as_str()
+        );
+        assert!(
+            matches!(error, KernelError::DurableAdmission(ref reason) if *reason == expected),
+            "{error:?}"
+        );
+        assert_eq!(self.kernel.receipt_log().len(), receipts);
+        assert_eq!(
+            self.store.operation().binding().operation_id(),
+            operation_id
+        );
+        assert_eq!(self.store.operation().threshold_proposal(), Some(proposal));
+        assert_eq!(self.invocations.load(Ordering::SeqCst), 0);
+        self.assert_pending_unchanged(proposal)
+    }
+
     #[cfg(feature = "pq")]
     fn reconstruct_kernel(&mut self) -> TestResult {
         let resolver = self
@@ -611,10 +642,17 @@ fn pending_retry_rechecks_crypto_floor_without_reissuing_proposal() -> TestResul
     fixture
         .kernel
         .set_capability_crypto_floor(KernelCryptoFloor::AllowClassical);
-    let response = fixture
+    let receipts = fixture.kernel.receipt_log().len();
+    let error = fixture
         .kernel
-        .evaluate_tool_call_blocking(&fixture.request)?;
-    assert_eq!(response.verdict, Verdict::Deny);
+        .evaluate_tool_call_blocking(&fixture.request)
+        .expect_err("a lowered crypto floor cannot terminalize the pending approval");
+    assert!(
+        matches!(error, KernelError::GovernedTransactionDenied(ref reason)
+        if reason == "threshold approval verification denied: threshold proposal algorithm is not permitted or consistent"),
+        "{error:?}"
+    );
+    assert_eq!(fixture.kernel.receipt_log().len(), receipts);
     assert_eq!(
         fixture.store.operation().threshold_proposal(),
         Some(&proposal)
@@ -694,17 +732,9 @@ fn reconstructed_kernel_without_signer_refuses_retained_hybrid_proposal() -> Tes
     let mut fixture = Fixture::new()?;
     fixture.configure(KernelCryptoFloor::AllowHybrid)?;
     let proposal = fixture.pending()?;
+    let operation_id = fixture.store.operation().binding().operation_id().clone();
     fixture.reconstruct_kernel()?;
-    let response = fixture
-        .kernel
-        .evaluate_tool_call_blocking(&fixture.request)?;
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(
-        fixture.store.operation().threshold_proposal(),
-        Some(&proposal)
-    );
-    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
-    fixture.assert_pending_unchanged(&proposal)
+    fixture.assert_retained_identity_refused(&proposal, &operation_id)
 }
 
 #[cfg(feature = "pq")]
@@ -713,6 +743,7 @@ fn rotated_authority_does_not_resign_retained_proposal() -> TestResult {
     let mut fixture = Fixture::new()?;
     fixture.configure(KernelCryptoFloor::AllowHybrid)?;
     let proposal = fixture.pending()?;
+    let operation_id = fixture.store.operation().binding().operation_id().clone();
     let verifier = QuoteVerifier {
         expected_key: fixture.kernel.config.keypair.public_key(),
         accept: true,
@@ -726,16 +757,7 @@ fn rotated_authority_does_not_resign_retained_proposal() -> TestResult {
         b"threshold-test-self-quote",
         &verifier,
     )?;
-    let response = fixture
-        .kernel
-        .evaluate_tool_call_blocking(&fixture.request)?;
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(
-        fixture.store.operation().threshold_proposal(),
-        Some(&proposal)
-    );
-    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
-    fixture.assert_pending_unchanged(&proposal)
+    fixture.assert_retained_identity_refused(&proposal, &operation_id)
 }
 
 #[cfg(feature = "pq")]
