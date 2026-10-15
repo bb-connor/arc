@@ -70,7 +70,7 @@ impl ProcessStateReader {
             .connection
             .query_row(
                 "SELECT revision, CASE WHEN typeof(checkpoint)='text' AND
-             length(CAST(checkpoint AS BLOB))<=1048576 THEN checkpoint ELSE NULL END
+             octet_length(checkpoint)<=1048576 THEN checkpoint ELSE NULL END
              FROM processes WHERE id=?1",
                 [process],
                 |row| Ok((row.get(0)?, row.get(1)?)),

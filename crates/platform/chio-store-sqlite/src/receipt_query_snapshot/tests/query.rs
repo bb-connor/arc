@@ -497,7 +497,7 @@ fn hold_status_metrics_are_constant_work_for_high_cardinality_dimensions() {
         .connection()
         .unwrap()
         .query_row(
-            "SELECT COUNT(*), SUM(length(CAST(value AS BLOB))) FROM snapshot_dim",
+            "SELECT COUNT(*), SUM(octet_length(value)) FROM snapshot_dim",
             [],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )

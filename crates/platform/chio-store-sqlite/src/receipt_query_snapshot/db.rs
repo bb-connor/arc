@@ -719,8 +719,8 @@ impl SnapshotDb {
         {
             let mut statement = self.connection()?.prepare_cached(
                 "SELECT r.entry_seq,
-                        length(CAST(r.receipt_id AS BLOB)) + COALESCE(length(r.cost_charged), 0)
-                            + length(CAST(s.kernel_key AS BLOB)),
+                        octet_length(r.receipt_id) + COALESCE(length(r.cost_charged), 0)
+                            + octet_length(s.kernel_key),
                         r.tenant, r.capability, r.tool_server, r.tool_name, r.decision,
                         r.subject, r.cost_currency
                  FROM snapshot_tool_receipt r INDEXED BY sq_entry
@@ -753,7 +753,7 @@ impl SnapshotDb {
         }
         {
             let mut statement = self.connection()?.prepare_cached(
-                "SELECT c.entry_seq, length(CAST(s.kernel_key AS BLOB)) FROM snapshot_child_cursor c
+                "SELECT c.entry_seq, octet_length(s.kernel_key) FROM snapshot_child_cursor c
                  JOIN snapshot_signer s ON s.id = c.signer
                  WHERE c.entry_seq >= ?1 AND c.entry_seq <= ?2 ORDER BY c.entry_seq",
             )?;

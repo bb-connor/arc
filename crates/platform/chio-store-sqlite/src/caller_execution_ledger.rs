@@ -168,8 +168,8 @@ impl SqliteCallerExecutionLedger {
         let (encoded, device, inode, capacity): (Vec<u8>, String, String, u32) = tx.query_row(
             "SELECT
                 CASE WHEN typeof(identity) = 'blob' AND length(identity) BETWEEN 1 AND 4096 THEN identity END,
-                CASE WHEN typeof(device) = 'text' AND length(CAST(device AS BLOB)) BETWEEN 1 AND 20 THEN device END,
-                CASE WHEN typeof(inode) = 'text' AND length(CAST(inode AS BLOB)) BETWEEN 1 AND 20 THEN inode END,
+                CASE WHEN typeof(device) = 'text' AND octet_length(device) BETWEEN 1 AND 20 THEN device END,
+                CASE WHEN typeof(inode) = 'text' AND octet_length(inode) BETWEEN 1 AND 20 THEN inode END,
                 max_operations
              FROM caller_executor_configuration WHERE singleton = 1",
             [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
@@ -444,9 +444,9 @@ fn catalog(connection: &Connection) -> Result<Vec<(String, String, String)>> {
     let mut statement = connection
         .prepare(
             "SELECT
-            CASE WHEN length(CAST(type AS BLOB)) BETWEEN 1 AND 16 THEN type END,
-            CASE WHEN length(CAST(name AS BLOB)) BETWEEN 1 AND 128 THEN name END,
-            CASE WHEN length(CAST(sql AS BLOB)) BETWEEN 1 AND 8192 THEN sql END
+            CASE WHEN octet_length(type) BETWEEN 1 AND 16 THEN type END,
+            CASE WHEN octet_length(name) BETWEEN 1 AND 128 THEN name END,
+            CASE WHEN octet_length(sql) BETWEEN 1 AND 8192 THEN sql END
          FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY name LIMIT 32",
         )
         .map_err(storage)?;

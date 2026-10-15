@@ -187,7 +187,7 @@ fn copy_rows(
         // is allocated.
         let found: Option<(bool, i64)> = source
             .prepare_cached(
-                "SELECT receipt_kind = 'tool_receipt', length(CAST(raw_json AS BLOB))
+                "SELECT receipt_kind = 'tool_receipt', octet_length(raw_json)
                  FROM claim_receipt_log_entries WHERE entry_seq = ?1",
             )
             .and_then(|mut statement| {

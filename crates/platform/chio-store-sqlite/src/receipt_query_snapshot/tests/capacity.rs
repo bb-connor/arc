@@ -684,7 +684,7 @@ fn memory_projection_capacity() {
         .connection()
         .unwrap()
         .query_row(
-            "SELECT length(CAST(r.receipt_id AS BLOB)), length(CAST(d.value AS BLOB))
+            "SELECT octet_length(r.receipt_id), octet_length(d.value)
              FROM snapshot_tool_receipt r JOIN snapshot_dim d ON d.id = r.tool_name
              WHERE r.seq = ?1",
             [short + 1],

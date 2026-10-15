@@ -82,9 +82,9 @@ fn catalog(connection: &Connection) -> Result<Vec<CatalogEntry>, ChioRuntimeErro
         .query_row(
             &format!(
                 "SELECT COUNT(*), COALESCE(SUM(
-                    length(CAST(type AS BLOB)) + length(CAST(name AS BLOB))
-                    + length(CAST(tbl_name AS BLOB))
-                    + COALESCE(length(CAST(sql AS BLOB)), 0)), 0)
+                    octet_length(type) + octet_length(name)
+                    + octet_length(tbl_name)
+                    + COALESCE(octet_length(sql), 0)), 0)
                  FROM sqlite_schema WHERE {CATALOG_FILTER}"
             ),
             [],

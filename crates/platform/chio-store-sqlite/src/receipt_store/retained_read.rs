@@ -42,7 +42,7 @@ impl SqliteReceiptStore {
         if !present {
             return Ok(Vec::new());
         }
-        let mut statement = connection.prepare("SELECT CASE WHEN length(CAST(capability_id AS BLOB)) <= 1024 THEN capability_id END FROM revoked_capabilities")?;
+        let mut statement = connection.prepare("SELECT CASE WHEN octet_length(capability_id) <= 1024 THEN capability_id END FROM revoked_capabilities")?;
         let ids = statement
             .query_map([], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;

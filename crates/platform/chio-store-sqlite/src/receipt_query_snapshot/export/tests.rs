@@ -279,7 +279,7 @@ fn publication_core_and_binding_bytes_are_combined_before_metadata_decode() {
     let (bundle, _, _) = snapshots.build_export(&query, Limits::default()).unwrap();
     let connection = rusqlite::Connection::open(directory.path().join("live.db")).unwrap();
     let core_bytes: i64 = connection.query_row(
-        "SELECT length(CAST(publication_schema AS BLOB)) + length(CAST(merkle_root AS BLOB)) + length(CAST(kernel_key AS BLOB)) + COALESCE(length(CAST(previous_checkpoint_sha256 AS BLOB)), 0) FROM checkpoint_publication_metadata WHERE checkpoint_seq = 1",
+        "SELECT octet_length(publication_schema) + octet_length(merkle_root) + octet_length(kernel_key) + COALESCE(octet_length(previous_checkpoint_sha256), 0) FROM checkpoint_publication_metadata WHERE checkpoint_seq = 1",
         [], |row| row.get(0),
     ).unwrap();
     let binding = "x".repeat(1_024);
