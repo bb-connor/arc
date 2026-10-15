@@ -27,6 +27,7 @@ mod aggregate;
 mod caller_budget;
 #[path = "validation/capability_evidence.rs"]
 mod capability_evidence;
+pub(in crate::kernel) use capability_evidence::CapabilityPreAdmissionError;
 #[path = "validation/cumulative.rs"]
 mod cumulative;
 #[path = "validation/issuance.rs"]
@@ -377,17 +378,12 @@ impl ChioKernel {
         remote_kernel_id: Option<&str>,
         now: u64,
     ) -> Result<(), String> {
-        self.verify_capability_full_pre_admit_with_clock(cap, remote_kernel_id, now, |kernel| {
-            // Sample after authority/lineage lookups, retaining the fresh
-            // caller's admission floor and its owned clock refusal.
-            let fresh_now = kernel
-                .read_authority_time()
-                .map_err(|error| KernelError::Clock(error).to_string())?
-                .as_secs();
-            Ok(chio_kernel_core::FixedClock::new(now.max(fresh_now)))
-        })
+        self.verify_capability_full_pre_admit_typed(cap, remote_kernel_id, now)
+            .map_err(CapabilityPreAdmissionError::deny_reason)
     }
 
+    /// [`Self::verify_capability_full_pre_admit`] with the verifier's typed
+    /// refusal preserved.
     pub(super) fn verify_active_response_immutable_capability_pre_admit(
         &self,
         cap: &CapabilityToken,

@@ -164,6 +164,9 @@ pub enum KernelError {
     #[error("capability issuer is not a trusted CA")]
     UntrustedIssuer,
 
+    #[error("recovery authority refused")]
+    RecoveryAuthorityDenied,
+
     #[error("capability issuance failed: {0}")]
     CapabilityIssuanceFailed(String),
 
@@ -523,6 +526,11 @@ impl KernelError {
                 "CHIO-KERNEL-UNTRUSTED-ISSUER",
                 serde_json::json!({}),
                 "Configure the issuing CA public key in the kernel trust set or use a capability issued by a trusted authority.",
+            ),
+            Self::RecoveryAuthorityDenied => self.report_with_context(
+                "CHIO-KERNEL-RECOVERY-AUTHORITY-DENIED",
+                serde_json::json!({}),
+                "Present a current recovery control capability for the selected scope and permission.",
             ),
             Self::CapabilityIssuanceFailed(reason) => self.report_with_context(
                 "CHIO-KERNEL-CAPABILITY-ISSUANCE-FAILED",
@@ -1038,6 +1046,15 @@ mod hot_path_error_taxonomy_tests {
         assert_eq!(report.code, "CHIO-KERNEL-HOT-PATH-DEADLINE");
         assert!(err.to_string().contains("dispatch"));
         assert!(err.to_string().contains("1500"));
+    }
+
+    #[test]
+    fn recovery_authority_denied_reports_stable_code() {
+        let err = KernelError::RecoveryAuthorityDenied;
+        assert_eq!(err.to_string(), "recovery authority refused");
+        let report = err.report();
+        assert_eq!(report.code, "CHIO-KERNEL-RECOVERY-AUTHORITY-DENIED");
+        assert_eq!(report.context, serde_json::json!({}));
     }
 
     #[test]

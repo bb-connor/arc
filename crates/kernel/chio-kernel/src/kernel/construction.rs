@@ -291,6 +291,7 @@ impl ChioKernel {
             governed_active_response_plans_enabled: false,
             security_invocation_context_authority: None,
             tool_servers: HashMap::new(),
+            recovery_tool_servers: HashMap::new(),
             resource_providers: Vec::new(),
             prompt_providers: Vec::new(),
             sessions: DashMap::new(),
@@ -1888,11 +1889,38 @@ impl ChioKernel {
         self.runtime_trace_sequence = Arc::new(AtomicU64::new(0));
     }
 
-    /// Register a tool server connection.
+    /// Register a tool server connection. This withdraws any recovery
+    /// registration of the same server id.
     pub fn register_tool_server(&mut self, connection: Box<dyn ToolServerConnection>) {
         let id = connection.server_id().to_owned();
         info!(server_id = %id, "registering tool server");
+        self.recovery_tool_servers.remove(&id);
         self.tool_servers.insert(id, Arc::from(connection));
+    }
+
+    /// Register a recovery-capable tool server. The one connection both
+    /// dispatches the server's tools and reports its recovery effect contract.
+    pub fn register_recovery_tool_server<C>(&mut self, connection: C)
+    where
+        C: crate::recovery::RecoveryToolServerConnection + 'static,
+    {
+        let connection = Arc::new(connection);
+        let id = connection.server_id().to_owned();
+        info!(server_id = %id, "registering recovery tool server");
+        let dispatch: Arc<dyn ToolServerConnection> = connection.clone();
+        self.tool_servers.insert(id.clone(), dispatch);
+        self.recovery_tool_servers.insert(id, connection);
+    }
+
+    /// The recovery connection of `server_id`, only while it is the exact
+    /// connection the kernel currently dispatches for that id.
+    pub(in crate::kernel) fn registered_recovery_tool_server(
+        &self,
+        server_id: &str,
+    ) -> Option<Arc<dyn crate::recovery::RecoveryToolServerConnection>> {
+        let recovery = self.recovery_tool_servers.get(server_id)?;
+        let current = self.tool_servers.get(server_id)?;
+        std::ptr::addr_eq(Arc::as_ptr(current), Arc::as_ptr(recovery)).then(|| Arc::clone(recovery))
     }
 
     /// Register a resource provider.

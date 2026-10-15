@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::*;
 use crate::admission_operation::{AdmissionOperationStoreError, StoreMutationFence};
 use chio_core_types::capability::token::CapabilityToken;
@@ -29,6 +31,8 @@ pub struct AuthenticatedRecoveryActor {
     pub(crate) principal: PrincipalId,
     pub(crate) capability: CapabilityToken,
     pub(crate) permission: RecoveryPermission,
+    pub(crate) deployment: DeploymentDigest,
+    pub(crate) server: Arc<dyn RecoveryToolServerConnection>,
 }
 impl AuthenticatedRecoveryActor {
     pub fn scope(&self) -> &RecoveryScopeV1 {
@@ -137,7 +141,19 @@ pub trait RecoveryUnusedReservationClosurePort: Send + Sync {
     ) -> Result<Box<dyn RecoveryUnusedReservationClosureRole + '_>, AdmissionOperationStoreError>;
 }
 
-pub trait RecoveryAuthorityPort: Send + Sync {
+/// Authenticated read of the installed current deployment of one scope under
+/// the serving owner's exact fence and authority time. A read grants no actor,
+/// execution, capture or funding authority.
+pub trait RecoveryDeploymentPort: Send + Sync {
+    fn deployment(
+        &self,
+        scope: &RecoveryScopeV1,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<RecoveryDeploymentV1, AdmissionOperationStoreError>;
+}
+
+pub trait RecoveryAuthorityPort: RecoveryDeploymentPort {
     /// Read native setup requirements under the current serving fence. This
     /// grants neither readiness nor execution.
     fn protected_setup_required(
@@ -192,12 +208,6 @@ pub trait RecoveryAuthorityPort: Send + Sync {
         fence: &StoreMutationFence,
         now: u64,
     ) -> Result<ApprovalIntentV1, AdmissionOperationStoreError>;
-    fn deployment(
-        &self,
-        scope: &RecoveryScopeV1,
-        fence: &StoreMutationFence,
-        now: u64,
-    ) -> Result<RecoveryDeploymentV1, AdmissionOperationStoreError>;
     /// Accept one command and retain its exact workflow generation.
     /// Creating a workflow requires the original Process port. Its absence
     /// refuses with Invariant("recovery original process authority is absent")

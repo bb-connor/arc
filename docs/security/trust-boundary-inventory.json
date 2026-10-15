@@ -23100,6 +23100,9 @@
     ],
     "crates/tooling/chio-spec-codegen/src/schema_catalog.rs": [
       "load::shared-reader::crates/tooling/chio-spec-codegen/src/lib.rs::read_schema_file"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_authority.rs": [
+      "deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record"
     ]
   },
   "retired_direct_readers": {
