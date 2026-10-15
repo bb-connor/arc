@@ -1050,6 +1050,12 @@ criteria = "safe-to-deploy"
 version = "0.11.15"
 notes = "Local cargo-vet review for RUSTSEC-2026-0185 patched transport state-machine dependency. Manifest has no build script, license is MIT OR Apache-2.0, and unsafe usage is confined to bounded QUIC VarInt construction."
 
+[[audits.quinn-proto]]
+who = "Chio supply-chain reviewer"
+criteria = "safe-to-deploy"
+delta = "0.11.15 -> 0.11.18"
+notes = "Delta scan of the published crates (checksums match Cargo.lock) for the RUSTSEC-2026-0338 to 0342 QUIC frame, ACK-delay, connection-ID retirement and reassembly fixes. No build script; no added unsafe, FFI, filesystem, process, environment or network access; dependency changes are the rand 0.10, rand_pcg 0.10 and getrandom 0.4 migration."
+
 [[audits.quote]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
