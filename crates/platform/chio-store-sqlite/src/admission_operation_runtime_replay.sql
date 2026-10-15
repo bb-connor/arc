@@ -3,46 +3,46 @@
 CREATE TABLE IF NOT EXISTS runtime_replay_migration_expectations (
     runtime_authority_id TEXT NOT NULL PRIMARY KEY CHECK (
         typeof(runtime_authority_id) = 'text'
-        AND length(CAST(runtime_authority_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(runtime_authority_id) = 'text' AND length(runtime_authority_id) BETWEEN 1 AND 512 AND octet_length(runtime_authority_id) <= 2048 AND instr(runtime_authority_id, char(0)) = 0
     ),
     source_id TEXT NOT NULL UNIQUE CHECK (
         typeof(source_id) = 'text'
-        AND length(CAST(source_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(source_id) = 'text' AND length(source_id) BETWEEN 1 AND 512 AND octet_length(source_id) <= 2048 AND instr(source_id, char(0)) = 0
     ),
     expectation_id TEXT NOT NULL UNIQUE CHECK (
         typeof(expectation_id) = 'text'
-        AND length(CAST(expectation_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(expectation_id) = 'text' AND length(expectation_id) BETWEEN 1 AND 512 AND octet_length(expectation_id) <= 2048 AND instr(expectation_id, char(0)) = 0
     ),
     destination_store_uuid TEXT NOT NULL CHECK (destination_store_uuid <> ''),
     canonical_source BLOB NOT NULL CHECK (
         typeof(canonical_source) = 'blob'
-        AND length(canonical_source) BETWEEN 1 AND 8388608
+        AND typeof(canonical_source) = 'blob' AND length(canonical_source) BETWEEN 1 AND 8388608
     ),
     inventory_sha256 TEXT NOT NULL CHECK (
-        length(inventory_sha256) = 64 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
+        typeof(inventory_sha256) = 'text' AND length(inventory_sha256) = 64 AND instr(inventory_sha256, char(0)) = 0 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     expectation_digest TEXT NOT NULL CHECK (
-        length(expectation_digest) = 64 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(expectation_digest) = 'text' AND length(expectation_digest) = 64 AND instr(expectation_digest, char(0)) = 0 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
     )
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS runtime_replay_migration_events (
     runtime_authority_id TEXT NOT NULL CHECK (
         typeof(runtime_authority_id) = 'text'
-        AND length(CAST(runtime_authority_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(runtime_authority_id) = 'text' AND length(runtime_authority_id) BETWEEN 1 AND 512 AND octet_length(runtime_authority_id) <= 2048 AND instr(runtime_authority_id, char(0)) = 0
     ),
     sequence INTEGER NOT NULL CHECK (typeof(sequence) = 'integer' AND sequence BETWEEN 1 AND 3),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind IN (
         'expect_runtime_replay_source', 'import_runtime_replay_source', 'activate_runtime_replay_source'
     )),
     expectation_digest TEXT NOT NULL CHECK (
-        length(expectation_digest) = 64 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(expectation_digest) = 'text' AND length(expectation_digest) = 64 AND instr(expectation_digest, char(0)) = 0 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
     ),
     inventory_sha256 TEXT NOT NULL CHECK (
-        length(inventory_sha256) = 64 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
+        typeof(inventory_sha256) = 'text' AND length(inventory_sha256) = 64 AND instr(inventory_sha256, char(0)) = 0 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     event_digest TEXT NOT NULL CHECK (
-        length(event_digest) = 64 AND event_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(event_digest) = 'text' AND length(event_digest) = 64 AND instr(event_digest, char(0)) = 0 AND event_digest NOT GLOB '*[^0-9a-f]*'
     ),
     observed_at_unix_ms INTEGER NOT NULL CHECK (
         typeof(observed_at_unix_ms) = 'integer'
@@ -68,26 +68,26 @@ CREATE TABLE IF NOT EXISTS runtime_replay_migration_events (
 CREATE TABLE IF NOT EXISTS runtime_replay_legacy_tombstones (
     runtime_authority_id TEXT NOT NULL CHECK (
         typeof(runtime_authority_id) = 'text'
-        AND length(CAST(runtime_authority_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(runtime_authority_id) = 'text' AND length(runtime_authority_id) BETWEEN 1 AND 512 AND octet_length(runtime_authority_id) <= 2048 AND instr(runtime_authority_id, char(0)) = 0
     ),
     participant_kind TEXT NOT NULL CHECK (participant_kind IN (
         'destructive_lease', 'treaty_continuation', 'swarm_continuation'
     )),
     resource_id TEXT NOT NULL CHECK (
         typeof(resource_id) = 'text'
-        AND length(CAST(resource_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(resource_id) = 'text' AND length(resource_id) BETWEEN 1 AND 512 AND octet_length(resource_id) <= 2048 AND instr(resource_id, char(0)) = 0
     ),
     source_id TEXT NOT NULL CHECK (
         typeof(source_id) = 'text'
-        AND length(CAST(source_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(source_id) = 'text' AND length(source_id) BETWEEN 1 AND 512 AND octet_length(source_id) <= 2048 AND instr(source_id, char(0)) = 0
     ),
     expectation_id TEXT NOT NULL CHECK (
         typeof(expectation_id) = 'text'
-        AND length(CAST(expectation_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(expectation_id) = 'text' AND length(expectation_id) BETWEEN 1 AND 512 AND octet_length(expectation_id) <= 2048 AND instr(expectation_id, char(0)) = 0
     ),
     historical_admission_id TEXT NOT NULL CHECK (
         typeof(historical_admission_id) = 'text'
-        AND length(CAST(historical_admission_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(historical_admission_id) = 'text' AND length(historical_admission_id) BETWEEN 1 AND 512 AND octet_length(historical_admission_id) <= 2048 AND instr(historical_admission_id, char(0)) = 0
     ),
     PRIMARY KEY (runtime_authority_id, participant_kind, resource_id),
     FOREIGN KEY (runtime_authority_id)

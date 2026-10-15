@@ -3,29 +3,29 @@
 CREATE TABLE IF NOT EXISTS runtime_replay_claim_episodes (
     operation_id TEXT NOT NULL CHECK (
         typeof(operation_id) = 'text'
-        AND length(CAST(operation_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(operation_id) = 'text' AND length(operation_id) BETWEEN 1 AND 512 AND octet_length(operation_id) <= 2048 AND instr(operation_id, char(0)) = 0
     ),
     episode_id TEXT NOT NULL CHECK (
         typeof(episode_id) = 'text'
-        AND length(CAST(episode_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(episode_id) = 'text' AND length(episode_id) BETWEEN 1 AND 512 AND octet_length(episode_id) <= 2048 AND instr(episode_id, char(0)) = 0
     ),
     runtime_authority_id TEXT NOT NULL CHECK (
         typeof(runtime_authority_id) = 'text'
-        AND length(CAST(runtime_authority_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(runtime_authority_id) = 'text' AND length(runtime_authority_id) BETWEEN 1 AND 512 AND octet_length(runtime_authority_id) <= 2048 AND instr(runtime_authority_id, char(0)) = 0
     ),
     ledger_digest TEXT NOT NULL CHECK (
         typeof(ledger_digest) = 'text'
-        AND length(CAST(ledger_digest AS BLOB)) = 64 AND ledger_digest NOT GLOB '*[^0-9a-f]*'
+        AND typeof(ledger_digest) = 'text' AND length(ledger_digest) = 64 AND instr(ledger_digest, char(0)) = 0 AND ledger_digest NOT GLOB '*[^0-9a-f]*'
     ),
     claim_digest TEXT NOT NULL CHECK (
         typeof(claim_digest) = 'text'
-        AND length(CAST(claim_digest AS BLOB)) = 64 AND claim_digest NOT GLOB '*[^0-9a-f]*'
+        AND typeof(claim_digest) = 'text' AND length(claim_digest) = 64 AND instr(claim_digest, char(0)) = 0 AND claim_digest NOT GLOB '*[^0-9a-f]*'
     ),
     claim_json BLOB NOT NULL CHECK (
-        typeof(claim_json) = 'blob' AND length(claim_json) BETWEEN 1 AND 16384
+        typeof(claim_json) = 'blob' AND typeof(claim_json) = 'blob' AND length(claim_json) BETWEEN 1 AND 16384
     ),
     operation_json BLOB NOT NULL CHECK (
-        typeof(operation_json) = 'blob' AND length(operation_json) BETWEEN 1 AND 262144
+        typeof(operation_json) = 'blob' AND typeof(operation_json) = 'blob' AND length(operation_json) BETWEEN 1 AND 262144
     ),
     PRIMARY KEY (operation_id, episode_id),
     FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id),
@@ -36,26 +36,26 @@ CREATE TABLE IF NOT EXISTS runtime_replay_claim_episodes (
 CREATE TABLE IF NOT EXISTS runtime_replay_claim_resources (
     operation_id TEXT NOT NULL CHECK (
         typeof(operation_id) = 'text'
-        AND length(CAST(operation_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(operation_id) = 'text' AND length(operation_id) BETWEEN 1 AND 512 AND octet_length(operation_id) <= 2048 AND instr(operation_id, char(0)) = 0
     ),
     episode_id TEXT NOT NULL CHECK (
         typeof(episode_id) = 'text'
-        AND length(CAST(episode_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(episode_id) = 'text' AND length(episode_id) BETWEEN 1 AND 512 AND octet_length(episode_id) <= 2048 AND instr(episode_id, char(0)) = 0
     ),
     runtime_authority_id TEXT NOT NULL CHECK (
         typeof(runtime_authority_id) = 'text'
-        AND length(CAST(runtime_authority_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(runtime_authority_id) = 'text' AND length(runtime_authority_id) BETWEEN 1 AND 512 AND octet_length(runtime_authority_id) <= 2048 AND instr(runtime_authority_id, char(0)) = 0
     ),
     participant_kind TEXT NOT NULL CHECK (participant_kind IN (
         'destructive_lease', 'treaty_continuation', 'swarm_continuation'
     )),
     resource_id TEXT NOT NULL CHECK (
         typeof(resource_id) = 'text'
-        AND length(CAST(resource_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(resource_id) = 'text' AND length(resource_id) BETWEEN 1 AND 512 AND octet_length(resource_id) <= 2048 AND instr(resource_id, char(0)) = 0
     ),
     artifact_digest TEXT NOT NULL CHECK (
         typeof(artifact_digest) = 'text'
-        AND length(CAST(artifact_digest AS BLOB)) = 64 AND artifact_digest NOT GLOB '*[^0-9a-f]*'
+        AND typeof(artifact_digest) = 'text' AND length(artifact_digest) = 64 AND instr(artifact_digest, char(0)) = 0 AND artifact_digest NOT GLOB '*[^0-9a-f]*'
     ),
     PRIMARY KEY (operation_id, episode_id, participant_kind),
     FOREIGN KEY (operation_id, episode_id)
@@ -68,21 +68,21 @@ ON runtime_replay_claim_resources(runtime_authority_id, participant_kind, resour
 CREATE TABLE IF NOT EXISTS runtime_replay_claim_releases (
     operation_id TEXT NOT NULL CHECK (
         typeof(operation_id) = 'text'
-        AND length(CAST(operation_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(operation_id) = 'text' AND length(operation_id) BETWEEN 1 AND 512 AND octet_length(operation_id) <= 2048 AND instr(operation_id, char(0)) = 0
     ),
     episode_id TEXT NOT NULL CHECK (
         typeof(episode_id) = 'text'
-        AND length(CAST(episode_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(episode_id) = 'text' AND length(episode_id) BETWEEN 1 AND 512 AND octet_length(episode_id) <= 2048 AND instr(episode_id, char(0)) = 0
     ),
     release_digest TEXT NOT NULL CHECK (
         typeof(release_digest) = 'text'
-        AND length(CAST(release_digest AS BLOB)) = 64 AND release_digest NOT GLOB '*[^0-9a-f]*'
+        AND typeof(release_digest) = 'text' AND length(release_digest) = 64 AND instr(release_digest, char(0)) = 0 AND release_digest NOT GLOB '*[^0-9a-f]*'
     ),
     release_json BLOB NOT NULL CHECK (
-        typeof(release_json) = 'blob' AND length(release_json) BETWEEN 1 AND 16384
+        typeof(release_json) = 'blob' AND typeof(release_json) = 'blob' AND length(release_json) BETWEEN 1 AND 16384
     ),
     operation_json BLOB NOT NULL CHECK (
-        typeof(operation_json) = 'blob' AND length(operation_json) BETWEEN 1 AND 262144
+        typeof(operation_json) = 'blob' AND typeof(operation_json) = 'blob' AND length(operation_json) BETWEEN 1 AND 262144
     ),
     PRIMARY KEY (operation_id, episode_id),
     FOREIGN KEY (operation_id, episode_id)

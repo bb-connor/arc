@@ -106,10 +106,10 @@ pub(super) fn verify(
 ) -> Result<(), AdmissionOperationStoreError> {
     let mut statement = connection
         .prepare(
-            "SELECT CASE WHEN length(kind) <= 15 THEN kind END,
+            "SELECT CASE WHEN typeof(kind) = 'text' AND length(kind) <= 15 AND octet_length(kind) <= 60 AND instr(kind, char(0)) = 0 THEN kind END,
                 CASE WHEN length(operation_json) BETWEEN 1 AND 262144 THEN operation_json END,
                 recorded_at_unix_ms,
-                CASE WHEN length(participant_digest) = 64 THEN participant_digest END,
+                CASE WHEN typeof(participant_digest) = 'text' AND length(participant_digest) = 64 AND instr(participant_digest, char(0)) = 0 THEN participant_digest END,
                 participant_digest IS NULL
          FROM admission_execution_nonce_transitions WHERE operation_id = ?1
          ORDER BY CASE kind WHEN 'capture_pending' THEN 0 WHEN 'committed' THEN 1 ELSE 2 END

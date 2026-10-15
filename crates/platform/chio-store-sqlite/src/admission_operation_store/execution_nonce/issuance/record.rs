@@ -8,8 +8,8 @@ pub(in crate::admission_operation_store) fn verify(
 ) -> Result<Option<AdmissionExecutionNonceReservationV1>, AdmissionOperationStoreError> {
     let row = connection
         .query_row(
-            "SELECT CASE WHEN length(CAST(nonce_id AS BLOB)) BETWEEN 1 AND 512 THEN nonce_id END,
-                CASE WHEN length(issuer) = 64 THEN issuer END,
+            "SELECT CASE WHEN typeof(nonce_id) = 'text' AND length(nonce_id) BETWEEN 1 AND 512 AND octet_length(nonce_id) <= 2048 AND instr(nonce_id, char(0)) = 0 THEN nonce_id END,
+                CASE WHEN typeof(issuer) = 'text' AND length(issuer) = 64 AND instr(issuer, char(0)) = 0 THEN issuer END,
                 CASE WHEN length(issuance_json) BETWEEN 1 AND 16384 THEN issuance_json END,
                 CASE WHEN length(operation_json) BETWEEN 1 AND 262144 THEN operation_json END,
                 issued_at_unix_ms

@@ -34,7 +34,7 @@ impl LeaseHistory {
              WHERE operation_id = ?1 AND operation_version = ?2 AND operation_digest = ?3
                AND recovery_claim_digest = ?4 AND store_uuid = ?5 AND store_lease_id = ?6
                AND store_owner_epoch = ?7 AND recorded_at_unix_ms <= ?8
-               AND COALESCE(observed_at_unix_ms, recorded_at_unix_ms) <= ?9)",
+               AND observed_at_unix_ms <= ?9)",
                 params![
                     operation.binding().operation_id().as_str(),
                     i64::try_from(operation.version()).map_err(invalid)?,

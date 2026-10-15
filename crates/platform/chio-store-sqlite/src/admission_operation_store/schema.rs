@@ -149,7 +149,7 @@ pub(super) fn verify_admission_commit_chronology(
                 (SELECT COUNT(*) FROM admission_operation_commits),
                 (SELECT COALESCE(MAX(commit_sequence), 0)
                  FROM admission_operation_commits),
-                (SELECT COALESCE(MAX(COALESCE(observed_at_unix_ms, recorded_at_unix_ms)), 0)
+                (SELECT COALESCE(MAX(observed_at_unix_ms), 0)
                  FROM admission_operation_commits)
             "#,
                 [],
@@ -259,8 +259,8 @@ pub(super) fn verify_admission_commit_chronology(
             r#"
             SELECT EXISTS(
                 SELECT 1 FROM (
-                    SELECT COALESCE(observed_at_unix_ms, recorded_at_unix_ms) AS authority_time,
-                           LAG(COALESCE(observed_at_unix_ms, recorded_at_unix_ms)) OVER (
+                    SELECT observed_at_unix_ms AS authority_time,
+                           LAG(observed_at_unix_ms) OVER (
                                ORDER BY commit_sequence
                            ) AS previous_time
                     FROM admission_operation_commits

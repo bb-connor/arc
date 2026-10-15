@@ -234,10 +234,10 @@ pub(super) fn load(
     // the bounded canonical artifact, then compare typed metadata in SQLite.
     let row: Option<Option<Vec<u8>>> = connection.query_row(
         "SELECT CASE WHEN typeof(canonical_record) = 'blob' AND length(canonical_record) BETWEEN 1 AND 16777216
-         AND length(CAST(mutation_digest AS BLOB)) = 64
-         AND length(CAST(operation_id AS BLOB)) BETWEEN 1 AND 512
-         AND length(CAST(tenant_id AS BLOB)) BETWEEN 1 AND 512
-         AND length(CAST(transition_id AS BLOB)) BETWEEN 1 AND 512
+         AND typeof(mutation_digest) = 'text' AND length(mutation_digest) = 64 AND instr(mutation_digest, char(0)) = 0
+         AND typeof(operation_id) = 'text' AND length(operation_id) BETWEEN 1 AND 512 AND octet_length(operation_id) <= 2048 AND instr(operation_id, char(0)) = 0
+         AND typeof(tenant_id) = 'text' AND length(tenant_id) BETWEEN 1 AND 512 AND octet_length(tenant_id) <= 2048 AND instr(tenant_id, char(0)) = 0
+         AND typeof(transition_id) = 'text' AND length(transition_id) BETWEEN 1 AND 512 AND octet_length(transition_id) <= 2048 AND instr(transition_id, char(0)) = 0
          THEN canonical_record END FROM security_participant_state_mutations
          WHERE security_authority_id = ?1 AND sequence = ?2",
         params![authority, i64::try_from(sequence).map_err(invalid)?],
@@ -303,7 +303,7 @@ pub(super) fn load_for_operation(
     operation: &AdmissionOperationId,
 ) -> Result<Option<Record>, AdmissionOperationStoreError> {
     let located: Option<(Option<String>, i64)> = connection.query_row(
-        "SELECT CASE WHEN length(CAST(security_authority_id AS BLOB)) BETWEEN 1 AND 512
+        "SELECT CASE WHEN typeof(security_authority_id) = 'text' AND length(security_authority_id) BETWEEN 1 AND 512 AND octet_length(security_authority_id) <= 2048 AND instr(security_authority_id, char(0)) = 0
          THEN security_authority_id END, sequence FROM security_participant_state_mutations WHERE operation_id = ?1",
         [operation.as_str()], |row| Ok((row.get(0)?, row.get(1)?)),
     ).optional().map_err(sqlite_error)?;

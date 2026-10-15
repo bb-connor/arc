@@ -37,7 +37,7 @@ pub(super) fn load(
 ) -> Result<Option<Record>, AdmissionOperationStoreError> {
     let row: Option<(Option<Vec<u8>>, Option<String>)> = connection.query_row(
         "SELECT CASE WHEN typeof(canonical_record) = 'blob' AND length(canonical_record) BETWEEN 1 AND 1048576 THEN canonical_record END,
-                CASE WHEN length(CAST(record_digest AS BLOB)) = 64 THEN record_digest END
+                CASE WHEN typeof(record_digest) = 'text' AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 THEN record_digest END
          FROM admission_operation_native_dispatch_ledger WHERE operation_id = ?1",
         [operation], |row| Ok((row.get(0)?, row.get(1)?)),
     ).optional().map_err(sqlite_error)?;
@@ -125,7 +125,7 @@ pub(in crate::admission_operation_store) fn verify_all(
     connection: &Connection,
 ) -> Result<(), AdmissionOperationStoreError> {
     verify_coverage(connection)?;
-    let mut statement = connection.prepare("SELECT CASE WHEN length(CAST(operation_id AS BLOB)) = 64 THEN operation_id END FROM admission_operation_native_dispatch_ledger ORDER BY operation_id").map_err(sqlite_error)?;
+    let mut statement = connection.prepare("SELECT CASE WHEN typeof(operation_id) = 'text' AND length(operation_id) = 64 AND instr(operation_id, char(0)) = 0 THEN operation_id END FROM admission_operation_native_dispatch_ledger ORDER BY operation_id").map_err(sqlite_error)?;
     let mut rows = statement.query([]).map_err(sqlite_error)?;
     while let Some(row) = rows.next().map_err(sqlite_error)? {
         let operation: Option<String> = row.get(0).map_err(sqlite_error)?;

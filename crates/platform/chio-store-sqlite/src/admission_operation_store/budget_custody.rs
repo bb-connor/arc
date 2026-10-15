@@ -61,9 +61,11 @@ impl SqliteAdmissionOperationStore {
             let mut statement = transaction
                 .prepare(
                     "SELECT CASE WHEN typeof(hold.operation_id) = 'text'
-                         AND length(CAST(hold.operation_id AS BLOB)) BETWEEN 1 AND 512
+                         AND length(hold.operation_id) BETWEEN 1 AND 512 AND octet_length(hold.operation_id) <= 2048 AND instr(hold.operation_id, char(0)) = 0
                          AND typeof(COALESCE(preflight.operation_id, hold.operation_id)) = 'text'
-                         AND length(CAST(COALESCE(preflight.operation_id, hold.operation_id) AS BLOB)) BETWEEN 1 AND 512
+                         AND length(COALESCE(preflight.operation_id, hold.operation_id)) BETWEEN 1 AND 512
+                         AND octet_length(COALESCE(preflight.operation_id, hold.operation_id)) <= 2048
+                         AND instr(COALESCE(preflight.operation_id, hold.operation_id), char(0)) = 0
                          THEN COALESCE(preflight.operation_id, hold.operation_id) END
                      FROM budget_authorization_holds AS hold
                      INDEXED BY idx_budget_holds_supplemental_artifact
@@ -256,7 +258,7 @@ fn verify_nonce_selector_artifact(
     let committed: Option<String> = transaction
         .query_row(
             "SELECT CASE WHEN typeof(projection_reference_digest) = 'text'
-             AND length(CAST(projection_reference_digest AS BLOB)) = 64
+             AND typeof(projection_reference_digest) = 'text' AND length(projection_reference_digest) = 64 AND instr(projection_reference_digest, char(0)) = 0
              THEN projection_reference_digest END FROM authority_global_commits
              WHERE projection_kind = 'budget' AND projection_key = ?1
                AND projection_sequence = ?2",
