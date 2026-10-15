@@ -5505,6 +5505,16 @@ files = ["crates/kernel/chio-kernel/src/stop.rs"]
 first_seen = "01a1098250"
 
 [[schema]]
+value = "chio.stop-operator-config-approval.v1"
+files = ["crates/kernel/chio-kernel/src/stop/config.rs"]
+first_seen = "cd485a55ba"
+
+[[schema]]
+value = "chio.stop-operator-config.v1"
+files = ["crates/kernel/chio-kernel/src/stop/config.rs"]
+first_seen = "cd485a55ba"
+
+[[schema]]
 value = "chio.structured-budget-request.v1"
 files = ["crates/platform/chio-control-plane/src/trust_control/service_types/structured_budget.rs"]
 first_seen = "51e46336b1"
