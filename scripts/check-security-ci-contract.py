@@ -347,8 +347,8 @@ EXPECTED_ACTIONS_WRITE_JOBS = {
     ("enterprise-evidence-controller.yml", "dispatch-isolated-capture"),
     ("enterprise-linux-capture.yml", "dispatch-trusted-finalizer"),
 }
-EXPECTED_CI_CONCURRENCY = {'group': 'ci-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}',
- 'cancel-in-progress': 'false'}
+EXPECTED_CI_CONCURRENCY = {'group': "${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || format('ci-{0}-{1}-{2}', github.workflow, github.run_id, github.run_attempt) }}",
+ 'cancel-in-progress': "${{ github.event_name == 'pull_request' }}"}
 EXPECTED_NONCE_FIPS_CONCURRENCY = {'group': 'chio-tee-fips-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}',
  'cancel-in-progress': 'false'}
 EXPECTED_ADVISORY_ENV = {'CARGO_INCREMENTAL': '0',
@@ -5931,7 +5931,7 @@ def validate(root: Path) -> None:
         raise ContractError("required CI must not rerun on capture-label edits")
 
     if ci.get("concurrency") != EXPECTED_CI_CONCURRENCY:
-        raise ContractError("critical CI concurrency can replace or cancel another run")
+        raise ContractError("critical CI concurrency can replace or cancel a push run")
     if "nextest-security" in workflow_jobs(ci):
         raise ContractError("advisory nextest must have a separate reported workflow")
     advisory = load_workflow(root / ".github/workflows/security-nextest-advisory.yml")
