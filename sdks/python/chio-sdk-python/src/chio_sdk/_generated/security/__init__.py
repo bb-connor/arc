@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 33f75027d5869fde01689ddc8847f699f9d2b6912e599a8b6672a18c0f49adea
+# Schema sha256: 36374ae1d7b7dc22790c1af5565d3c1addac0491ef3b254c573b3f259bd7dd4a
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -19,7 +19,7 @@ from .broker_audit_comparison_body_v1_schema import ChioBrokerAuditComparisonBod
 from .broker_audit_comparison_envelope_v1_schema import Algorithm, ChioSignedBrokerAuditComparisonV1, PublicKey, Signature
 from .broker_audit_runner_authorization_body_v1_schema import ChioBrokerAuditRunnerAuthorizationBodyV1, Digest, Identifier
 from .broker_audit_runner_authorization_envelope_v1_schema import Algorithm, ChioSignedBrokerAuditRunnerAuthorizationV1, PublicKey, Signature
-from .broker_authority_request_body_v1_schema import AuthorityRpcDigest, AuthorityRpcIdentifier, AuthorizationItem, AuthorizeHoldRequest, BrokerRevocationRequest, ByteArray, ByteArrayItem, CapabilitiesOperation, CapabilityLivenessRequest, CaptureHoldRequest, CheckBrokerRevocationOperation, ChioBrokerAuthorityRpcRequestBodyV1, ControlOperation, ControlRequest, HoldOperation, HoldOperation1, HoldOperation2, HoldOperation3, HoldOperation4, Operation, Operation2, PayloadItem, PositiveU64, PrepareExecutionOperation, PublicKey, QueryHoldRequest, Quota, ReverseHoldRequest, U32, VerifyLiveParentOperation
+from .broker_authority_request_body_v1_schema import AuthorityRpcDigest, AuthorityRpcIdentifier, AuthorizationItem, AuthorizeHoldRequest, BrokerRevocationRequest, ByteArray, ByteArrayItem, CapabilitiesOperation, CapabilityLivenessRequest, CaptureHoldRequest, CheckBrokerRevocationOperation, ChioBrokerAuthorityRpcRequestBodyV1, ControlOperation, ControlRequest, HoldOperation, HoldOperation1, HoldOperation2, HoldOperation3, HoldOperation4, Operation, Operation3, PayloadItem, PositiveU64, PrepareExecutionOperation, PublicKey, QueryHoldRequest, Quota, ReverseHoldRequest, U32, VerifyLiveParentOperation
 from .broker_authority_request_envelope_v1_schema import Algorithm, ChioSignedBrokerAuthorityRpcRequestV1, Signature
 from .broker_authority_response_body_v1_schema import AuthorityRpcResponseIdentifier, AuthorityRpcResponseQuota, Capabilities, CapabilitiesResult, CaptureCommit, ChioBrokerAuthorityRpcResponseBodyV1, ControlResult, Digest, HoldResult, HoldState, HoldState1, HoldState2, LiveParent, LiveParentResult, PositiveU64, PreparedResult, PublicKey, RejectedResult, Response, ResponseItem, Result, RevocationResult, RevocationSnapshot, TrustedExecutionContext, U64
 from .broker_authority_response_envelope_v1_schema import Algorithm, ChioSignedBrokerAuthorityRpcResponseV1, Signature
@@ -46,17 +46,17 @@ from .broker_request_proof_body_v1_schema import ChioBrokerRequestProofBodyV1, D
 from .broker_request_proof_envelope_v1_schema import Algorithm, ChioSignedBrokerRequestProofV1
 from .cage_enforcement_failure_v1_schema import ChioCageEnforcementFailureV1, Code
 from .cage_enforcement_prepared_v1_schema import ChioCageEnforcementPreparedEvidenceV1, Digest, FileIdentity, Kind, RegularFileIdentity
-from .cage_enforcement_record_v1_schema import ChioCageEnforcementRecordV1, ChioCageEnforcementRecordV11, ChioCageEnforcementRecordV12, ChioCageEnforcementRecordV13, State, State2
+from .cage_enforcement_record_v1_schema import ChioCageEnforcementRecordV1, ChioCageEnforcementRecordV11, ChioCageEnforcementRecordV12, ChioCageEnforcementRecordV13, State, State3
 from .cage_exec_transition_observed_v1_schema import ChioCageExecTransitionObservationV1, Digest, FileIdentity, Kind, RegularFileIdentity
 from .cage_fully_enforced_evidence_v1_schema import ChioCageFullyEnforcedEvidenceV1
-from .cage_init_plan_v1_schema import AbsoluteCanonicalPath, Access, AllowedSyscall, ArgumentConstraint, ArtifactEntry, BrokerPeerIdentity, ChioCageInitPlanV1, Digest, DirectoryIdentity, Environment, ExecutionIdentity, FdEntry, FdEntry1, FdEntry10, FdEntry2, FdEntry3, FdEntry4, FdEntry5, FdEntry6, FdEntry7, FdEntry8, FdEntry9, FdEntryBase, FdTable, FdTable1, FileIdentity, FilesystemGrant, ForbiddenResource, Kind, Kind5, Kind6, LandlockPlan, PathIdentity, Profile, Purpose, Purpose1, Purpose2, PurposeBrokerIpc, PurposeCageInitHelper, PurposeIndexedResource, PurposeTargetExecutable, PurposeTargetStderr, PurposeTargetStdin, PurposeTargetStdout, PurposeWorkingDirectory, RegularFileIdentity, ResourceLimits, SeccompPlan, SocketIdentity, StdioEntry, SupplementaryGid, SyscallArgumentConstraint, TargetArgv, TargetArgvItem
+from .cage_init_plan_v1_schema import AbsoluteCanonicalPath, Access, AllowedSyscall, ArgumentConstraint, ArtifactEntry, BrokerPeerIdentity, ChioCageInitPlanV1, Digest, DirectoryIdentity, Environment, ExecutionIdentity, FdEntry, FdEntry1, FdEntry10, FdEntry2, FdEntry3, FdEntry4, FdEntry5, FdEntry6, FdEntry7, FdEntry8, FdEntry9, FdEntryBase, FdTable, FdTable1, FileIdentity, FilesystemGrant, ForbiddenResource, Kind, Kind8, Kind9, LandlockPlan, PathIdentity, Profile, Purpose, Purpose1, Purpose2, PurposeBrokerIpc, PurposeCageInitHelper, PurposeIndexedResource, PurposeTargetExecutable, PurposeTargetStderr, PurposeTargetStdin, PurposeTargetStdout, PurposeWorkingDirectory, RegularFileIdentity, ResourceLimits, SeccompPlan, SocketIdentity, StdioEntry, SupplementaryGid, SyscallArgumentConstraint, TargetArgv, TargetArgvItem
 from .cage_process_exit_evidence_v1_schema import ChioCageProcessExitEvidenceV1, ChioCageProcessExitEvidenceV11, ChioCageProcessExitEvidenceV12, ExitCode, ExitCode1, Signal, Signal1
 from .cage_receipt_body_v1_schema import Bindings, ChioCageReceiptBodyV1, ChioCageReceiptBodyV11, ChioCageReceiptBodyV12, ChioCageReceiptBodyV13, ChioCageReceiptBodyV14, Digest, Identifier, Stage
 from .cage_receipt_metadata_v1_schema import ChioCageReceiptMetadataV1
 from .correlated_finding_receipt_body_v1_schema import ChioCorrelatedFindingReceiptBodyV1
 from .correlated_finding_v1_schema import ChioCorrelatedFindingV1, Digest, DigestItem, Identifier, Identifiers, Time
 from .declassification_consumption_receipt_body_v1_schema import ChioDeclassificationConsumptionReceiptBodyV1
-from .declassification_grant_schema import Algorithm, Body, Digest32, Digest32Item, FlowIdentifier, SignedDeclassificationGrant, TargetLabel
+from .declassification_grant_schema import Algorithm, Body, Body2, Digest32, Digest32Item, FlowIdentifier, SignedDeclassificationGrant, TargetLabel
 from .declassification_outcome_receipt_body_v1_schema import ChioDeclassificationOutcomeReceiptBodyV1, ToState
 from .detector_health_receipt_body_v1_schema import ChioDetectorHealthReceiptBodyV1, Digest, DigestItem, GroupBinding, GroupBinding1, GroupBinding2, Header, HealthKind, Identifier, Policy, Time, Watermark, Watermark1, Watermark2, Watermark3
 from .effect_transition_receipt_body_v1_schema import ChioEffectTransitionReceiptBodyV1, Effect, Header, JsonSafePositiveInteger, Kind, Outcome, Outcome1, Outcome2, Outcome3, Outcome4, Outcome5, Outcome6, Target, Target1, Target2, Target3, Target4
@@ -72,7 +72,7 @@ from .key_log_checkpoint_body_v1_schema import ChioKeyLogCheckpointBodyV1, Hash
 from .key_log_checkpoint_envelope_v1_schema import ChioSignedKeyLogCheckpointEnvelopeV1, OperatorAlgorithm, Signature
 from .key_log_enterprise_receipt_body_v1_schema import ChioKeyLogEnterpriseReceiptBodyV1, ChioKeyLogEnterpriseReceiptBodyV11, ChioKeyLogEnterpriseReceiptBodyV12, EventSigner, EventSigner1, EventSigner2, EventSigner3, EventSigner4, Hash, KeyLogIdentifier, Outcome, Stage
 from .key_log_enterprise_receipt_envelope_v1_schema import ChioSignedKeyLogEnterpriseReceiptEnvelopeV1, OperatorAlgorithm
-from .key_log_event_body_v1_schema import Algorithm, ChioKeyLogEventBodyV1, Hash, KeyLogIdentifier, Operation, Operation3, Operation4, Operation5, Operation6, Operation7, Operation8, PublicKey
+from .key_log_event_body_v1_schema import Algorithm, ChioKeyLogEventBodyV1, Hash, KeyLogIdentifier, Operation, Operation11, Operation12, Operation13, Operation14, Operation15, Operation16, PublicKey
 from .key_log_event_envelope_v1_schema import Algorithm, Authorizations, ChioSignedKeyLogEventEnvelopeV1, Hash, KeyAuthorization, KeyLogIdentifier, RecoveryAuthorization, Signature
 from .key_log_sync_response_v1_schema import ChioKeyLogSynchronizationResponseV1, ConsistencyProof, Hash
 from .key_log_witness_readiness_body_v1_schema import ChioKeyLogWitnessServiceReadinessBodyV1, Count, Hash, Identifier, KeyLogPin, Nonce, PositiveU64
@@ -82,7 +82,7 @@ from .keyring_artifact_signature_v1_schema import Algorithm, ChioKeyringArtifact
 from .lift_rollback_completion_receipt_body_v1_schema import ChioLiftOrRollbackCompletionReceiptBodyV1, Effect, FinalState, Header, LiftOutcome, LiftOutcome1, LiftOutcome2, LiftOutcome3, LiftOutcome4, LiftOutcome5
 from .mcp_cage_launch_policy_v1_schema import AbsoluteCanonicalPath, BrokerBinding, BrokerBinding1, BrokerBinding2, BrokerPeerIdentity, ChioSignedMcpCageLaunchPolicyV1, Digest, EnterpriseMigration, EnvironmentVariable, Identifier, Limits, MigrationHead, MigrationKey, NativeSyscallProfile, NonzeroDigest32, NonzeroDigest32Item, OperatorCeilings, PolicyBody, PublicKey, ReceiptRuntime, Runtime, Signature, TargetArgvItem
 from .response_completion_receipt_body_v1_schema import ChioResponseCompletionReceiptBodyV1, CompletionOutcome, CompletionOutcome1, CompletionOutcome2, CompletionOutcome3, DispatchApproval, DispatchApproval1, DispatchApproval2, Effect, ExecutionDispatch, FinalState, Header
-from .response_effect_v1_schema import CanonicalContributionItem, ChioResponseEffectV1, Digest, DigestItem, Identifier, Kind, Target, Target5, Target6, Target7, Target8
+from .response_effect_v1_schema import CanonicalContributionItem, ChioResponseEffectV1, Digest, DigestItem, Identifier, Kind, Target, Target10, Target11, Target12, Target9
 from .response_plan_receipt_body_v1_schema import ChioResponsePlanReceiptBodyV1
 from .response_plan_v1_schema import ApprovalRequirement, ApprovalRequirement1, ApprovalRequirement2, ChioResponsePlanV1, Digest, DigestItem, ExecutionBinding, Identifier, Mode, OperatorCapability, SchemaVersion, Time
 from .response_state_transition_receipt_body_v1_schema import Cause, ChioResponseStateTransitionReceiptBodyV1, Digest, DigestItem, Header, Header4, Identifier, Policy, Response, State, Time
@@ -118,6 +118,7 @@ __all__ = [
     "AuthorizeHoldRequest",
     "Bindings",
     "Body",
+    "Body2",
     "BodyItem",
     "BrokerBinding",
     "BrokerBinding1",
@@ -317,8 +318,8 @@ __all__ = [
     "KeyLogIdentifier",
     "KeyLogPin",
     "Kind",
-    "Kind5",
-    "Kind6",
+    "Kind8",
+    "Kind9",
     "KnownLabel",
     "LandlockPlan",
     "LatencyHint",
@@ -343,13 +344,13 @@ __all__ = [
     "NonzeroDigest32",
     "NonzeroDigest32Item",
     "Operation",
-    "Operation2",
+    "Operation11",
+    "Operation12",
+    "Operation13",
+    "Operation14",
+    "Operation15",
+    "Operation16",
     "Operation3",
-    "Operation4",
-    "Operation5",
-    "Operation6",
-    "Operation7",
-    "Operation8",
     "OperatorAlgorithm",
     "OperatorCapability",
     "OperatorCeilings",
@@ -413,20 +414,20 @@ __all__ = [
     "SocketIdentity",
     "Stage",
     "State",
-    "State2",
+    "State3",
     "StdioEntry",
     "Subject",
     "SupplementaryGid",
     "SyscallArgumentConstraint",
     "Target",
     "Target1",
+    "Target10",
+    "Target11",
+    "Target12",
     "Target2",
     "Target3",
     "Target4",
-    "Target5",
-    "Target6",
-    "Target7",
-    "Target8",
+    "Target9",
     "TargetArgv",
     "TargetArgvItem",
     "TargetLabel",

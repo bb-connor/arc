@@ -1,4 +1,4 @@
-//! Finite local schema resolution for the Rust generator.
+//! Finite local schema resolution shared by every pinned generator.
 //!
 //! A schema ID identifies a catalog resource, never a network destination.
 use std::collections::BTreeMap;
@@ -40,6 +40,33 @@ impl LocalSchemaCatalog {
         })
     }
 
+    /// Mirror the catalog with known ID references rewritten to local paths.
+    /// Unknown IDs or references outside this catalog are rejected before a
+    /// generator process starts. Unchanged schemas keep their exact bytes,
+    /// because property order affects generated names in the pinned tools.
+    pub fn mirror(&self, destination: &Path) -> Result<()> {
+        for (path, value) in &self.resources {
+            let relative = path.strip_prefix(&self.root).map_err(|_| {
+                CodegenError::SchemaRef(path.clone(), "schema escaped the catalog".into())
+            })?;
+            let target = destination.join(relative);
+            let mut mirrored = value.clone();
+            self.rewrite_refs(&mut mirrored, path)?;
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent).map_err(|err| CodegenError::Io(parent.into(), err))?;
+            }
+            if mirrored == *value {
+                fs::copy(path, &target).map_err(|err| CodegenError::Io(target, err))?;
+            } else {
+                let mut bytes = serde_json::to_vec_pretty(&mirrored)
+                    .map_err(|err| CodegenError::Json(path.clone(), err))?;
+                bytes.push(b'\n');
+                fs::write(&target, bytes).map_err(|err| CodegenError::Io(target, err))?;
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn resource(&self, path: &Path) -> Result<serde_json::Value> {
         let canonical = fs::canonicalize(path).map_err(|err| CodegenError::Io(path.into(), err))?;
         self.resources.get(&canonical).cloned().ok_or_else(|| {
@@ -79,6 +106,58 @@ impl LocalSchemaCatalog {
         }
         Ok(Some((target, fragment)))
     }
+
+    fn rewrite_refs(&self, value: &mut serde_json::Value, base: &Path) -> Result<()> {
+        match value {
+            serde_json::Value::Object(map) => {
+                if let Some(serde_json::Value::String(reference)) = map.get_mut("$ref") {
+                    if let Some((target, fragment)) = self.resolve(reference, base)? {
+                        let path = reference.split('#').next().unwrap_or(reference.as_str());
+                        if has_uri_scheme(path) {
+                            let mut local = relative_reference(base, &target)?;
+                            if let Some(fragment) = fragment {
+                                local.push('#');
+                                local.push_str(&fragment);
+                            }
+                            *reference = local;
+                        }
+                    }
+                }
+                for value in map.values_mut() {
+                    self.rewrite_refs(value, base)?;
+                }
+            }
+            serde_json::Value::Array(values) => {
+                for value in values {
+                    self.rewrite_refs(value, base)?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+fn relative_reference(base: &Path, target: &Path) -> Result<String> {
+    let parent = base.parent().ok_or_else(|| {
+        CodegenError::SchemaRef(base.into(), "schema path has no parent directory".into())
+    })?;
+    let from: Vec<_> = parent.components().collect();
+    let to: Vec<_> = target.components().collect();
+    let common = from.iter().zip(&to).take_while(|(a, b)| a == b).count();
+    let mut parts = vec!["..".to_owned(); from.len() - common];
+    for component in to.iter().skip(common) {
+        parts.push(
+            component
+                .as_os_str()
+                .to_str()
+                .ok_or_else(|| {
+                    CodegenError::SchemaRef(target.into(), "schema path is not UTF-8".into())
+                })?
+                .to_owned(),
+        );
+    }
+    Ok(parts.join("/"))
 }
 
 #[cfg(test)]
@@ -86,7 +165,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn known_ids_resolve_offline_within_the_catalog() -> Result<()> {
+    fn known_ids_resolve_offline_and_mirror_locally() -> Result<()> {
         let root = crate::tests::unique_temp_dir("chio-local-schema-ids")?;
         fs::create_dir_all(root.join("records"))
             .map_err(|err| CodegenError::Io(root.clone(), err))?;
@@ -112,6 +191,17 @@ mod tests {
             .is_err());
         let rendered = render_chio_wire_v1(&root)?;
         assert!(rendered.contains("pub receipt:"));
+        let mirror = root.join("mirror");
+        catalog.mirror(&mirror)?;
+        let mirrored: serde_json::Value = serde_json::from_slice(
+            &fs::read(mirror.join("response.schema.json"))
+                .map_err(|err| CodegenError::Io(mirror.clone(), err))?,
+        )
+        .map_err(|err| CodegenError::Json(mirror.clone(), err))?;
+        assert_eq!(
+            mirrored["properties"]["receipt"]["$ref"],
+            "records/record.schema.json"
+        );
         fs::remove_dir_all(&root).map_err(|err| CodegenError::Io(root, err))?;
         Ok(())
     }

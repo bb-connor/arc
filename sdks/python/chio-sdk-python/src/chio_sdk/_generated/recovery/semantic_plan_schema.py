@@ -1,0 +1,97 @@
+# DO NOT EDIT - regenerate via 'cargo xtask codegen --lang python'.
+#
+# Source: spec/schemas/chio-wire/v1/**/*.schema.json
+# Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
+# Schema sha256: 36374ae1d7b7dc22790c1af5565d3c1addac0491ef3b254c573b3f259bd7dd4a
+#
+# Manual edits will be overwritten by the next regeneration; the
+# spec-drift CI lane enforces this header on every file
+# under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
+
+
+from __future__ import annotations
+
+from enum import Enum
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
+
+
+class OpaqueId(
+    RootModel[
+        constr(
+            pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$", min_length=1, max_length=128
+        )
+    ]
+):
+    root: constr(
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$", min_length=1, max_length=128
+    )
+
+
+class RecoveryDigest32Item(RootModel[conint(ge=0, le=255)]):
+    root: conint(ge=0, le=255) = Field(..., title="Recovery digest octet")
+
+
+class RecoveryDigest32(RootModel[list[RecoveryDigest32Item]]):
+    root: list[RecoveryDigest32Item] = Field(
+        ..., max_length=32, min_length=32, title="Recovery digest32"
+    )
+
+
+class Scope(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    authority_domain: OpaqueId
+    tenant_id: OpaqueId
+    process_id: OpaqueId
+
+
+class SemanticPlanInput1(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["exact"]
+    resource: OpaqueId
+    version: RecoveryDigest32
+    material: RecoveryDigest32
+
+
+class SemanticPlanInput2(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["future_output"]
+    step: OpaqueId
+
+
+class SemanticPlanInput(RootModel[SemanticPlanInput1 | SemanticPlanInput2]):
+    root: SemanticPlanInput1 | SemanticPlanInput2
+
+
+class Output(Enum):
+    return_value = "return_value"
+    withhold = "withhold"
+
+
+class SemanticPlanStep(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    step: OpaqueId
+    operation: OpaqueId
+    destination: OpaqueId
+    dependencies: list[OpaqueId] = Field(..., max_length=8, min_length=0)
+    inputs: list[SemanticPlanInput] = Field(..., max_length=16, min_length=1)
+    output: Output
+
+
+class SemanticPlanV1(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    domain_version: Literal[1]
+    scope: Scope
+    registry: RecoveryDigest32
+    steps: list[SemanticPlanStep] = Field(..., max_length=8, min_length=1)

@@ -5,7 +5,7 @@ use std::process::Command;
 
 use sha2::{Digest, Sha256};
 
-use crate::support::{digest_to_hex, display_path, walk_schema_json, workspace_root};
+use crate::support::{digest_to_hex, display_path, walk_schema_json, workspace_root, TempDir};
 use crate::XtaskError;
 
 use super::CHIO_WIRE_V1_SCHEMAS;
@@ -82,6 +82,12 @@ pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
     }
     let schema_sha = digest_to_hex(&schema_hasher.finalize());
 
+    let staging = TempDir::new("chio-codegen-ts")
+        .map_err(|error| XtaskError::Io("typescript schema staging".into(), error))?;
+    chio_spec_codegen::LocalSchemaCatalog::load(&schemas_dir)
+        .and_then(|catalog| catalog.mirror(staging.path()))
+        .map_err(XtaskError::Codegen)?;
+
     // Render each schema in isolation, then wrap each emitted file in a
     // namespace keyed by its `<group>/<name>` path so the cross-schema name
     // collisions (e.g., `Operation` between capability/grant and
@@ -106,7 +112,15 @@ pub(super) fn codegen_ts(check_only: bool) -> Result<(), XtaskError> {
                 display_path(path)
             ))
         })?;
-        let raw_ts = run_json2ts(&json2ts, path)?;
+        let mirrored = staging
+            .path()
+            .join(path.strip_prefix(&schemas_dir).map_err(|_| {
+                XtaskError::Usage(format!(
+                    "codegen ts: schema {} is not under the schema root",
+                    display_path(path)
+                ))
+            })?);
+        let raw_ts = run_json2ts(&json2ts, &mirrored)?;
         let normalized = normalize_ts_chunk(&raw_ts);
         body.push_str(
             "// -----------------------------------------------------------------------------\n",

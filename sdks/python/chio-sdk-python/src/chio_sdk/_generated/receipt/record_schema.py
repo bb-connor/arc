@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 33f75027d5869fde01689ddc8847f699f9d2b6912e599a8b6672a18c0f49adea
+# Schema sha256: 36374ae1d7b7dc22790c1af5565d3c1addac0491ef3b254c573b3f259bd7dd4a
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -120,7 +120,7 @@ class ToolCallAction(BaseModel):
     )
 
 
-class Decision1(BaseModel):
+class Decision3(BaseModel):
     """
     The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).
     """
@@ -131,7 +131,7 @@ class Decision1(BaseModel):
     verdict: Literal["allow"]
 
 
-class Decision2(BaseModel):
+class Decision4(BaseModel):
     """
     The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).
     """
@@ -146,7 +146,7 @@ class Decision2(BaseModel):
     )
 
 
-class Decision3(BaseModel):
+class Decision5(BaseModel):
     """
     The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).
     """
@@ -158,7 +158,7 @@ class Decision3(BaseModel):
     reason: str = Field(..., description="Human-readable reason for the cancellation.")
 
 
-class Decision4(BaseModel):
+class Decision6(BaseModel):
     """
     The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).
     """
@@ -172,8 +172,8 @@ class Decision4(BaseModel):
     )
 
 
-class Decision(RootModel[Decision1 | Decision2 | Decision3 | Decision4]):
-    root: Decision1 | Decision2 | Decision3 | Decision4 = Field(
+class Decision(RootModel[Decision3 | Decision4 | Decision5 | Decision6]):
+    root: Decision3 | Decision4 | Decision5 | Decision6 = Field(
         ...,
         description='The Kernel\'s verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).',
     )
