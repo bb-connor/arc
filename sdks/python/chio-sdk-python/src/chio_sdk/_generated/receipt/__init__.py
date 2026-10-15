@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 420d6d33bf1e07cccb9265dd8a14b791cc92336cf63a49dc16da093ac0270a10
+# Schema sha256: 76d7fa85798af8c0fa0bf76f068a5e8c2e5d4c46d4b3bd275c8adb3e4185cecf
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from .admission_metadata_schema import ChioDurableAdmissionReceiptMetadata, CompensationStatus, Digest, DispatchCommit, Identifier, PositiveIJsonInteger, ProjectedDispatchState, ProjectedState, ProviderAttempt, StoreFence
+from .admission_metadata_schema import ChioDurableAdmissionReceiptMetadata, CompensationStatus, Digest, DispatchCommit, DispatchLaunch, Identifier, LaunchRef, NativeLaunch, PositiveIJsonInteger, ProjectedDispatchState, ProjectedState, ProviderAttempt, StoreFence, WorkerProfile
 from .delivery_contract_schema import ChioDeliveryContractReceiptMetadata, Digest, Result
 from .finding_delivery_schema import ChioFindingDeliveryReceiptMetadata, Digest, DigestCheck, HierarchicalIdentifier, IJsonU64NonZero, Identifier, MediaTypeCheck, SettlementMode, StatusProof, TransformProfile
 from .inclusion_proof_schema import ChioReceiptMerkleInclusionProof
@@ -37,12 +37,15 @@ __all__ = [
     "Digest",
     "DigestCheck",
     "DispatchCommit",
+    "DispatchLaunch",
     "EvidenceClass",
     "GuardEvidence",
     "HierarchicalIdentifier",
     "IJsonU64NonZero",
     "Identifier",
+    "LaunchRef",
     "MediaTypeCheck",
+    "NativeLaunch",
     "ObservationOutcome",
     "PositiveIJsonInteger",
     "ProjectedDispatchState",
@@ -60,4 +63,5 @@ __all__ = [
     "ToolOrigin",
     "TransformProfile",
     "TrustLevel",
+    "WorkerProfile",
 ]

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 420d6d33bf1e07cccb9265dd8a14b791cc92336cf63a49dc16da093ac0270a10
+# Schema sha256: 76d7fa85798af8c0fa0bf76f068a5e8c2e5d4c46d4b3bd275c8adb3e4185cecf
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -84,6 +84,39 @@ class ProviderAttempt(BaseModel):
     transport_key_epoch: PositiveIJsonInteger
 
 
+class NativeLaunch(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    receipt_id: Digest
+    receipt_sha256: Digest
+
+
+class LaunchRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    record_id: Digest
+    record_sha256: Digest
+
+
+class WorkerProfile(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["container"]
+    launch_attempt: conint(ge=1, le=4294967295)
+    launch_ref: LaunchRef
+
+
+class DispatchLaunch(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    native_launch: NativeLaunch | None = None
+    worker_profile: WorkerProfile | None = None
+
+
 class DispatchCommit(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -93,6 +126,7 @@ class DispatchCommit(BaseModel):
     coordinator_lease_epoch: PositiveIJsonInteger
     store_fence: StoreFence
     provider_attempt: ProviderAttempt | None = None
+    dispatch_launch: DispatchLaunch
 
 
 class ChioDurableAdmissionReceiptMetadata(BaseModel):
