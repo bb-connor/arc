@@ -359,8 +359,8 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn typed_identity_matches_healthy_borrowed_file_and_legacy_shim(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn identity_apis_agree_for_the_healthy_borrowed_file() -> Result<(), Box<dyn std::error::Error>>
+    {
         use std::os::unix::fs::MetadataExt as _;
         let directory = tempfile::tempdir()?;
         let database = directory.path().join("typed.sqlite3");
