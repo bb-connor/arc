@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 070f6ddd37d8898e219a16b9234ef13087898d0f784980a0e9c5fc1f741c12c5
+// Schema content SHA-256: 283967ccea526d87b72ace99db802f4faee2a903b9d941479bcb57e763cc16e7
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -5781,13 +5781,13 @@ type KernelExecutionNonce struct {
 		ReservedHoldId     *string `json:"reserved_hold_id,omitempty"`
 		ReservingRequestId *string `json:"reserving_request_id,omitempty"`
 
-		// Schema v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+		// Schema chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.
 		Schema KernelExecutionNonceNonceSchema `json:"schema"`
 	} `json:"nonce"`
 	Signature string `json:"signature"`
 }
 
-// KernelExecutionNonceNonceSchema v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+// KernelExecutionNonceNonceSchema chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.
 type KernelExecutionNonceNonceSchema string
 
 // KernelHeartbeat defines model for KernelHeartbeat.

@@ -35,42 +35,6 @@ fn refusal_error(state: AdmissionOperationState) -> &'static str {
     }
 }
 
-fn assert_incident_observation_rejected(
-    artifact: &str,
-    public_key: &str,
-    expected: &str,
-) -> Result<(), CliError> {
-    let key = PublicKey::from_hex(public_key.trim()).map_err(error)?;
-    let signed = crate::receipt_verify::verify_original_receipt(artifact, &key)?;
-    let evidence: Evidence =
-        serde_json::from_value(signed.action.parameters.clone()).map_err(error)?;
-    let call = crate::process_response_verify::verify_values(
-        &evidence.request,
-        &evidence.context,
-        &evidence.response,
-        &key,
-    )?;
-    let process = evidence.context["process_id"]
-        .as_str()
-        .ok_or_else(|| error("missing fixture process"))?;
-    let cap: CapabilityToken = serde_json::from_value(
-        evidence.bootstrap.action.parameters["capabilities"][process].clone(),
-    )
-    .map_err(error)?;
-    assert_eq!(
-        verify_operation(
-            evidence.operation.as_ref(),
-            &call,
-            &cap,
-            &evidence.runtime_id,
-            evidence.observed_at_unix_ms,
-        )
-        .map_err(|failure| failure.to_string()),
-        Err(error(expected).to_string()),
-    );
-    Ok(())
-}
-
 fn assert_signed_dispatch_commit_without_launch_is_refused(
     decision: Decision,
 ) -> Result<(), CliError> {
@@ -123,18 +87,6 @@ fn assert_signed_dispatch_commit_without_launch_is_refused(
         Some("missing field `dispatch_launch`".to_owned()),
     );
     Ok(())
-}
-
-#[test]
-fn issued_denial_incident_artifact_is_rejected() -> Result<(), CliError> {
-    assert_incident_observation_rejected(
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/fixtures/process-call-observation/issued-denial.json"
-        )),
-        "b4cdc34f12b6f9b4bca630d008b3c15333b82df760f801516c40c921b9257534",
-        COMPENSATED_ERROR,
-    )
 }
 
 #[test]

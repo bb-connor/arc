@@ -1844,7 +1844,7 @@ pub mod agent_tool_call_request {
     ///              "minLength": 1
     ///            },
     ///            "schema": {
-    ///              "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///              "description": "chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.",
     ///              "enum": [
     ///                "chio.execution_nonce.v1",
     ///                "chio.operation_execution_nonce.v1"
@@ -7683,7 +7683,7 @@ pub mod agent_tool_call_request {
     ///          "minLength": 1
     ///        },
     ///        "schema": {
-    ///          "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///          "description": "chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.",
     ///          "enum": [
     ///            "chio.execution_nonce.v1",
     ///            "chio.operation_execution_nonce.v1"
@@ -7786,7 +7786,7 @@ pub mod agent_tool_call_request {
     ///      "minLength": 1
     ///    },
     ///    "schema": {
-    ///      "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///      "description": "chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.",
     ///      "enum": [
     ///        "chio.execution_nonce.v1",
     ///        "chio.operation_execution_nonce.v1"
@@ -7809,7 +7809,7 @@ pub mod agent_tool_call_request {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub reserving_request_id:
             ::std::option::Option<ChioSignedExecutionNonceNonceReservingRequestId>,
-        ///v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+        ///chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.
         pub schema: ChioSignedExecutionNonceNonceSchema,
     }
     impl ::std::convert::From<&ChioSignedExecutionNonceNonce> for ChioSignedExecutionNonceNonce {
@@ -8596,13 +8596,13 @@ pub mod agent_tool_call_request {
                 })
         }
     }
-    ///v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+    ///chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///  "description": "chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.",
     ///  "enum": [
     ///    "chio.execution_nonce.v1",
     ///    "chio.operation_execution_nonce.v1"
@@ -30765,7 +30765,7 @@ pub mod kernel_tool_call_response {
     ///              "minLength": 1
     ///            },
     ///            "schema": {
-    ///              "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///              "description": "chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.",
     ///              "enum": [
     ///                "chio.execution_nonce.v1",
     ///                "chio.operation_execution_nonce.v1"
@@ -33981,7 +33981,7 @@ pub mod kernel_tool_call_response {
     ///          "minLength": 1
     ///        },
     ///        "schema": {
-    ///          "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///          "description": "chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.",
     ///          "enum": [
     ///            "chio.execution_nonce.v1",
     ///            "chio.operation_execution_nonce.v1"
@@ -34084,7 +34084,7 @@ pub mod kernel_tool_call_response {
     ///      "minLength": 1
     ///    },
     ///    "schema": {
-    ///      "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///      "description": "chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.",
     ///      "enum": [
     ///        "chio.execution_nonce.v1",
     ///        "chio.operation_execution_nonce.v1"
@@ -34107,7 +34107,7 @@ pub mod kernel_tool_call_response {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub reserving_request_id:
             ::std::option::Option<ChioSignedExecutionNonceNonceReservingRequestId>,
-        ///v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+        ///chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.
         pub schema: ChioSignedExecutionNonceNonceSchema,
     }
     impl ::std::convert::From<&ChioSignedExecutionNonceNonce> for ChioSignedExecutionNonceNonce {
@@ -34894,13 +34894,13 @@ pub mod kernel_tool_call_response {
                 })
         }
     }
-    ///v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+    ///chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+    ///  "description": "chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.",
     ///  "enum": [
     ///    "chio.execution_nonce.v1",
     ///    "chio.operation_execution_nonce.v1"
