@@ -93,16 +93,15 @@ impl ChioKernel {
         }
         let terminal_state = match &result {
             Ok(response) => response.terminal_state.clone(),
-            Err(KernelError::RequestCancelled { request_id, reason })
+            Err(KernelError::RequestCancelled { request_id, .. })
                 if request_id == &context.request_id =>
             {
+                let reason = self.cancellation_reason_after_dispatch(Some(context), request_id);
                 self.with_session_mut(&context.session_id, |session| {
                     session.request_cancellation(&context.request_id)?;
                     Ok(())
                 })?;
-                OperationTerminalState::Cancelled {
-                    reason: reason.clone(),
-                }
+                OperationTerminalState::Cancelled { reason }
             }
             _ => OperationTerminalState::Completed,
         };
@@ -180,16 +179,15 @@ impl ChioKernel {
         };
         let terminal_state = match &result {
             Ok(response) => response.terminal_state.clone(),
-            Err(KernelError::RequestCancelled { request_id, reason })
+            Err(KernelError::RequestCancelled { request_id, .. })
                 if request_id == &context.request_id =>
             {
+                let reason = self.cancellation_reason_after_dispatch(Some(context), request_id);
                 self.with_session_mut(&context.session_id, |session| {
                     session.request_cancellation(&context.request_id)?;
                     Ok(())
                 })?;
-                OperationTerminalState::Cancelled {
-                    reason: reason.clone(),
-                }
+                OperationTerminalState::Cancelled { reason }
             }
             _ => OperationTerminalState::Completed,
         };

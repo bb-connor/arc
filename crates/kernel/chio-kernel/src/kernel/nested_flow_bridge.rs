@@ -274,14 +274,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
                 .replace_roots(roots.clone());
             Ok(roots)
         })();
-        if matches!(
-            &result,
-            Err(KernelError::RequestCancelled { request_id, .. })
-                if request_id == &child_context.request_id
-        ) {
-            session_from_map(self.sessions, &child_context.session_id)?
-                .request_cancellation(&child_context.request_id)?;
-        }
+        self.latch_matching_cancellation(&result, Some(&child_context.request_id))?;
         self.complete_child_request_with_receipt(
             evidence_index,
             &child_context,
@@ -323,14 +316,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
             self.client
                 .create_message(self.parent_context, &child_context, &operation)
         })();
-        if matches!(
-            &result,
-            Err(KernelError::RequestCancelled { request_id, .. })
-                if request_id == &child_context.request_id
-        ) {
-            session_from_map(self.sessions, &child_context.session_id)?
-                .request_cancellation(&child_context.request_id)?;
-        }
+        self.latch_matching_cancellation(&result, Some(&child_context.request_id))?;
         self.complete_child_request_with_receipt(
             evidence_index,
             &child_context,
@@ -371,14 +357,7 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
             self.client
                 .create_elicitation(self.parent_context, &child_context, &operation)
         })();
-        if matches!(
-            &result,
-            Err(KernelError::RequestCancelled { request_id, .. })
-                if request_id == &child_context.request_id
-        ) {
-            session_from_map(self.sessions, &child_context.session_id)?
-                .request_cancellation(&child_context.request_id)?;
-        }
+        self.latch_matching_cancellation(&result, Some(&child_context.request_id))?;
         self.complete_child_request_with_receipt(
             evidence_index,
             &child_context,

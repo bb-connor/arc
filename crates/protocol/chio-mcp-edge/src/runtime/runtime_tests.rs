@@ -1405,11 +1405,12 @@ fn execute_bridge_mcp_tool_call_blocking_preserves_request_cancelled_terminal_st
     let bridge =
         runtime.block_on(async { execute_bridge_mcp_tool_call(&kernel, request).unwrap() });
 
-    assert!(matches!(
+    assert_eq!(
         bridge.response.terminal_state,
-        OperationTerminalState::Cancelled { reason }
-            if reason == "cancelled by direct bridge test"
-    ));
+        OperationTerminalState::Cancelled {
+            reason: "tool server reported cancellation after dispatch; outcome is unknown".into(),
+        }
+    );
 }
 
 #[test]
@@ -1462,11 +1463,12 @@ fn execute_bridge_mcp_tool_call_async_preserves_request_cancelled_terminal_state
         .block_on(execute_bridge_mcp_tool_call_async(&kernel, request))
         .unwrap();
 
-    assert!(matches!(
+    assert_eq!(
         bridge.response.terminal_state,
-        OperationTerminalState::Cancelled { reason }
-            if reason == "cancelled by direct bridge test"
-    ));
+        OperationTerminalState::Cancelled {
+            reason: "tool server reported cancellation after dispatch; outcome is unknown".into(),
+        }
+    );
 }
 
 #[test]

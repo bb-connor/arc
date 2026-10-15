@@ -429,3 +429,52 @@ fn cancelled_dispatch_start_preserves_authoritative_reason(
     ));
     Ok(())
 }
+
+#[test]
+fn cancellation_after_dispatch_names_only_the_kernel_held_cancellation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let kernel = make_kernel(make_config());
+    let agent = make_keypair();
+    let session_id = kernel.open_session(agent.public_key().to_hex(), Vec::new())?;
+    kernel.activate_session(&session_id)?;
+    let held = make_operation_context(
+        &session_id,
+        "held-cancellation",
+        &agent.public_key().to_hex(),
+    );
+    let reasonless = make_operation_context(
+        &session_id,
+        "reasonless-cancellation",
+        &agent.public_key().to_hex(),
+    );
+    let live = make_operation_context(&session_id, "live-request", &agent.public_key().to_hex());
+    for context in [&held, &reasonless, &live] {
+        kernel.begin_session_request(context, OperationKind::ToolCall, true)?;
+    }
+    kernel.request_session_cancellation_with_reason(
+        &session_id,
+        &held.request_id,
+        "client cancelled the call",
+    )?;
+    kernel.request_session_cancellation(&session_id, &reasonless.request_id)?;
+
+    assert_eq!(
+        kernel.cancellation_reason_after_dispatch(Some(&held), &held.request_id),
+        "client cancelled the call"
+    );
+    assert_eq!(
+        kernel.cancellation_reason_after_dispatch(Some(&reasonless), &reasonless.request_id),
+        "session request cancelled after dispatch; outcome is unknown"
+    );
+    for (context, request_id) in [
+        (Some(&live), &live.request_id),
+        (Some(&live), &held.request_id),
+        (None, &held.request_id),
+    ] {
+        assert_eq!(
+            kernel.cancellation_reason_after_dispatch(context, request_id),
+            "tool server reported cancellation after dispatch; outcome is unknown"
+        );
+    }
+    Ok(())
+}

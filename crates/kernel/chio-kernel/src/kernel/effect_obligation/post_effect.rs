@@ -286,14 +286,22 @@ fn prepare_ordinary(
                     error @ KernelError::UrlElicitationsRequired { .. } => kernel
                         .prepare_cancelled_response_with_metadata_and_payee_binding(
                             inputs.request,
-                            &PostDispatchRefusal::classify("transport_return", &error).reason,
+                            &PostDispatchRefusal::classify(
+                                kernel,
+                                inputs.parent_context,
+                                "transport_return",
+                                &error,
+                            )
+                            .reason,
                             now,
                             Some(inputs.matched_grant_index),
                             RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
                             inputs.payee.as_ref(),
                         )
                         .map(|response| (response, Some(error))),
-                    KernelError::RequestCancelled { request_id, reason } => {
+                    KernelError::RequestCancelled { request_id, .. } => {
+                        let reason = kernel
+                            .cancellation_reason_after_dispatch(inputs.parent_context, &request_id);
                         if let Some(parent) = inputs
                             .parent_context
                             .filter(|parent| parent.request_id == request_id)
@@ -320,7 +328,13 @@ fn prepare_ordinary(
                     error @ KernelError::HotPathDeadlineExceeded { .. } => kernel
                         .prepare_cancelled_response_with_metadata_and_payee_binding(
                             inputs.request,
-                            &PostDispatchRefusal::classify("transport_return", &error).reason,
+                            &PostDispatchRefusal::classify(
+                                kernel,
+                                inputs.parent_context,
+                                "transport_return",
+                                &error,
+                            )
+                            .reason,
                             now,
                             Some(inputs.matched_grant_index),
                             RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
