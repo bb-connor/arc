@@ -57,18 +57,28 @@ async fn refuse_http2_streams(
     }
 }
 
-#[tokio::test]
-async fn contract_client_does_not_retry_http2_refused_stream(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn assert_remote_refusal(error: &(dyn std::error::Error + 'static)) {
+    let mut cause = error;
+    while let Some(source) = cause.source() {
+        cause = source;
+    }
+    assert_eq!(
+        cause.to_string(),
+        "stream error received: refused stream before processing any application logic"
+    );
+}
+
+async fn refused_attempts(
+    builder: impl FnOnce(&HttpEgressContract) -> reqwest::ClientBuilder,
+) -> Result<usize, Box<dyn std::error::Error>> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let authority = listener.local_addr()?.to_string();
     let observed = Arc::new(AtomicUsize::new(0));
     let server = tokio::spawn(refuse_http2_streams(listener, observed.clone()));
     let mut contract = HttpEgressContract::permissive_for_tests(&authority);
     contract.max_redirect_chain = 0;
-    let client = client_builder_with_contract(&contract)
+    let client = builder(&contract)
         .timeout(Duration::from_secs(5))
-        .inner
         .http2_prior_knowledge()
         .build()?;
     let request = client
@@ -86,14 +96,34 @@ async fn contract_client_does_not_retry_http2_refused_stream(
     if let Ok(result) = server_result {
         result?;
     }
-    let result = result?;
-    let error = result.err().ok_or("REFUSED_STREAM was accepted")?;
-    assert!(matches!(error, HttpEgressError::Transport(_)), "{error:?}");
+    let error = result?.err().ok_or("REFUSED_STREAM was accepted")?;
+    assert!(matches!(&error, HttpEgressError::Transport(_)), "{error:?}");
     assert_eq!(error.to_string(), "urn:chio:error:transport:http-failed");
+    assert_remote_refusal(&error);
+    Ok(observed.load(Ordering::SeqCst))
+}
+
+#[tokio::test]
+async fn contract_client_does_not_retry_http2_refused_stream(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let observed =
+        refused_attempts(|contract| client_builder_with_contract(contract).inner).await?;
+    assert_eq!(observed, 1, "one native attempt was replayed");
+    Ok(())
+}
+
+#[tokio::test]
+async fn default_policy_retries_the_same_http2_refusal_fixture(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let observed = refused_attempts(|_| {
+        reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
+    })
+    .await?;
     assert_eq!(
-        observed.load(Ordering::SeqCst),
-        1,
-        "one native attempt was replayed after a protocol refusal"
+        observed, 3,
+        "default protocol retry control did not replay twice"
     );
     Ok(())
 }
