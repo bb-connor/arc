@@ -1,4 +1,4 @@
-use rusqlite::types::Value;
+use rusqlite::types::{ToSqlOutput, Value, ValueRef};
 
 use super::assert_check;
 use super::encodings::{
@@ -8,7 +8,7 @@ use super::encodings::{
 use super::replacement::{event_snapshot, record_snapshot};
 use super::{params, Connection};
 
-/// Text bound from raw bytes, so the stored value keeps its exact encoding.
+/// Blob casts interpret bytes in the database encoding.
 const INSERT_CAST_RECORD: &str = "INSERT INTO admission_operation_recovery_records VALUES
      (CAST(?1 AS TEXT), CAST(?2 AS TEXT), ?3, ?4, ?5, CAST(?6 AS TEXT), CAST(?7 AS TEXT))";
 const INSERT_CAST_EVENT: &str = "INSERT INTO admission_operation_recovery_events VALUES
@@ -127,7 +127,21 @@ fn utf16_catalogs_store_malformed_utf8_as_one_replacement_character() -> rusqlit
         record[1] = malformed_utf8(&"a".repeat(63), 1_048_576);
         record[5] = malformed_utf8(&"d".repeat(63), 256);
         record[6] = malformed_utf8(&"r".repeat(255), 1024);
-        connection.execute(INSERT_CAST_RECORD, rusqlite::params_from_iter(record))?;
+        let records = record_snapshot(&connection)?;
+        let events = event_snapshot(&connection)?;
+        assert_check(
+            connection.execute(INSERT_CAST_RECORD, rusqlite::params_from_iter(&record)),
+            "length(record_key) BETWEEN 1 AND 512",
+        );
+        assert_unchanged(&connection, &records, &events)?;
+        let mut bound = record.each_ref().map(ToSqlOutput::from);
+        for column in [0, 1, 5, 6] {
+            let Value::Blob(bytes) = &record[column] else {
+                panic!("malformed text fixture must contain raw bytes");
+            };
+            bound[column] = ToSqlOutput::Borrowed(ValueRef::Text(bytes));
+        }
+        connection.execute(INSERT_RECORD, rusqlite::params_from_iter(bound))?;
         let key = format!("{}\u{fffd}", "k".repeat(511));
         let stored: (String, String, String, String, i64, i64, i64, i64) = connection.query_row(
             "SELECT record_key, scope_key, native_namespace, native_request,
@@ -164,7 +178,12 @@ fn utf16_catalogs_store_malformed_utf8_as_one_replacement_character() -> rusqlit
         let mut event = appended_event_values();
         event[1] = Value::Text(key);
         event[5] = malformed_utf8(&"b".repeat(63), 1_048_576);
-        connection.execute(INSERT_CAST_EVENT, rusqlite::params_from_iter(event))?;
+        let mut bound = event.each_ref().map(ToSqlOutput::from);
+        let Value::Blob(bytes) = &event[5] else {
+            panic!("malformed text fixture must contain raw bytes");
+        };
+        bound[5] = ToSqlOutput::Borrowed(ValueRef::Text(bytes));
+        connection.execute(INSERT_EVENT, rusqlite::params_from_iter(bound))?;
         let digest: (String, i64) = connection.query_row(
             "SELECT event_digest, length(CAST(event_digest AS BLOB))
              FROM admission_operation_recovery_events WHERE sequence = 9",
