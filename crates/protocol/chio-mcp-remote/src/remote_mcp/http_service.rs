@@ -527,6 +527,19 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         drop(stream_lock);
         return remote_session_send_error(error.into_error());
     }
+    if let (Some(call), Some(credential)) = (credential_call, session_credential.clone()) {
+        return post_completion::respond(post_completion::PendingCompletion {
+            state,
+            session,
+            events: event_rx,
+            stream_lock,
+            request_id,
+            request_generation,
+            call,
+            credential,
+            response_method: response_method.to_string(),
+        });
+    }
 
     let mut response_deadline = Box::pin(session.response_deadline());
     let session_for_stream = session.clone();
@@ -561,22 +574,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                         && event.request_generation != Some(request_generation) {
                         continue;
                     }
-                    let mut outgoing = event.message.clone();
-                    if is_terminal_response_for_request(&event.message, &request_id) {
-                        if let Some(call) = credential_call.as_ref() {
-                            match remote_mcp_session_credentials::finish_call(&state, call, &event.message) {
-                                Ok(response) => outgoing = response,
-                                Err(_) => {
-                                    // The effect may already exist. Withhold success
-                                    // and leave the durable pending fence in place.
-                                    let failure = json!({"jsonrpc":"2.0","id":request_id,
-                                        "error":{"code":-32603,"message":"credential outcome persistence failed; effect is uncertain"}});
-                                    yield Ok(Event::default().data(failure.to_string()));
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                    let outgoing = event.message.clone();
                     let should_emit = should_emit_post_stream_event(
                         &event,
                         Some(&request_id),

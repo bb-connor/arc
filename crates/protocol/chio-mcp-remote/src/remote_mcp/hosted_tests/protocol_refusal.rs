@@ -9,14 +9,23 @@ use tower::ServiceExt;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+#[path = "protocol_refusal/call_completion.rs"]
+mod call_completion;
 #[path = "protocol_refusal/projection_original.rs"]
 mod projection_original;
 #[path = "protocol_refusal/reservation_original.rs"]
 mod reservation_original;
 
+/// Holds a tool call inside the upstream until the test releases it.
+struct CallGate {
+    entered: std::sync::mpsc::Sender<()>,
+    release: std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
+}
+
 struct CountedTransport {
     inner: Arc<dyn McpTransport>,
     calls: Arc<AtomicUsize>,
+    gate: Option<Arc<CallGate>>,
 }
 impl McpTransport for CountedTransport {
     fn list_tools(&self) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, AdapterError> {
@@ -28,6 +37,12 @@ impl McpTransport for CountedTransport {
         arguments: Value,
     ) -> Result<chio_mcp_adapter::edge::McpToolResult, AdapterError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
+        if let Some(gate) = &self.gate {
+            let _ = gate.entered.send(());
+            if let Ok(release) = gate.release.lock() {
+                let _ = release.recv();
+            }
+        }
         self.inner.call_tool(name, arguments)
     }
 }
@@ -41,6 +56,9 @@ struct HttpFixture {
     trusted_key: PublicKey,
 }
 fn fixture() -> TestResult<HttpFixture> {
+    fixture_with(None)
+}
+fn fixture_with(gate: Option<Arc<CallGate>>) -> TestResult<HttpFixture> {
     let directory = chio_test_support::private_tempdir()?;
     let mut config = support::base_remote_config(directory.path(), "127.0.0.1:0".parse()?);
     config.auth_token = Some("operator-fixture".into());
@@ -50,6 +68,7 @@ fn fixture() -> TestResult<HttpFixture> {
     config.test_transport = Some(Arc::new(CountedTransport {
         inner: config.test_transport.take().ok_or("transport")?,
         calls: calls.clone(),
+        gate,
     }));
     let receipt_path = config.receipt_db_path.clone().ok_or("receipt path")?;
     let factory = Arc::new(RemoteSessionFactory::new(config.clone())?);
