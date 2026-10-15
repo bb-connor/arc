@@ -15,6 +15,8 @@ mod call_completion;
 mod projection_original;
 #[path = "protocol_refusal/reservation_original.rs"]
 mod reservation_original;
+#[path = "protocol_refusal/retry_rule.rs"]
+mod retry_rule;
 
 /// Holds a tool call inside the upstream until the test releases it.
 struct CallGate {

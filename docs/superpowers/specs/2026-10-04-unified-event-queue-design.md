@@ -296,7 +296,7 @@ A POST whose HTTP connection breaks before its response arrives has an unknown o
 | Surface | Safe retry | Why |
 |---|---|---|
 | Credential session | Same `chioRequestId` | The completion task records the outcome regardless of the consumer (section 4.2); `reserve_at` replays `completed_unacknowledged`. A real persistence failure still fences |
-| Non-credential, durable admission, with `chioRequestId` | Same `chioRequestId` | The stable request id binds one admission operation; a replay returns the bound terminal result and never redispatches |
+| Non-credential, durable admission, with `chioRequestId` | Same `chioRequestId`, without a replayed result | The stable request id binds one admission operation, so a retry never redispatches. It is refused: `DuplicateRequestLineage` in the same session, and a retained-operation conflict from another session. Returning the bound terminal result needs retained-operation replay in the kernel (`hosted_tests::protocol_refusal::retry_rule`) |
 | Strict-nonce request | Same nonce | The request identity is bound into the nonce (`parsing.rs:136-139`) |
 | Anything else (no `chioRequestId`, or a non-durable call) | **Not safe** | A retry gets a fresh kernel identity (`parsing.rs:139-146`) and redispatches |
 
