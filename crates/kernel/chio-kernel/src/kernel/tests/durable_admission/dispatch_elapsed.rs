@@ -191,14 +191,22 @@ fn assert_outcome_unknown(
     clock_error: ClockError,
 ) -> TestResult {
     let response = response?;
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(
-        response.reason,
-        Some(KernelError::Clock(clock_error).to_string())
+    let reason = format!(
+        "dispatch outcome is unknown after transport_return: {}",
+        KernelError::Clock(clock_error).report().code
     );
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(response.reason.as_deref(), Some(reason.as_str()));
     assert_eq!(response.output, None);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), effects);
-    let operation = assert_original_unknown_incident(&fixture.store, &fixture.request);
+    let operation = assert_original_unknown_incident(
+        &fixture.store,
+        &fixture.request,
+        &chio_core::receipt::decision::Decision::Deny {
+            reason,
+            guard: "kernel".into(),
+        },
+    );
     assert_unknown_replay(Ok(response), &operation, &fixture.store);
     assert_eq!(fixture.kernel.receipt_log().len(), 1);
     assert_eq!(recorded_elapsed_millis(fixture)?, None);

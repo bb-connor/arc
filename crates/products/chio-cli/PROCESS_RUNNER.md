@@ -190,7 +190,7 @@ and active workers are not reclassified by dependency propagation. A child's
 submission parent alone is not a completion dependency.
 
 A live parent calling `wait_children` for an already failed child records the
-join before receiving the `child worker failed` denial. If that parent then
+join before receiving its denial. If that parent then
 exits 75, the runner records one suspension and terminalizes it as
 `failed`/`dependency_failed` on the next dependency pass. It is not relaunched,
 and its unstarted dependents spend no attempt. A parent that handles the denial

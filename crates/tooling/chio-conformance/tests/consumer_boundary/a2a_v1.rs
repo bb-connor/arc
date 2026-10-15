@@ -110,13 +110,13 @@ fn continuation_error_does_not_restore_pending_approval_after_terminal_dispatch(
     let terminal = receipts.last().ok_or("signed terminal cancellation")?;
     assert!(terminal.verify_signature()?);
     assert_eq!(terminal.kernel_key, fixture.signer.public_key());
-    assert!(matches!(
+    assert_eq!(
         terminal.decision,
-        Some(
-            chio_core::receipt::decision::Decision::Cancelled { .. }
-                | chio_core::receipt::decision::Decision::Deny { .. }
-        )
-    ));
+        Some(chio_core::receipt::decision::Decision::Cancelled {
+            reason: "tool server returned URL elicitation after dispatch; outcome is unknown"
+                .into(),
+        })
+    );
     let observed = call(&mut consumer, &approved, lookup("GetTask", id))?;
     assert_eq!(
         observed["result"]["status"]["state"], "TASK_STATE_FAILED",

@@ -49,13 +49,9 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
         let response = kernel.evaluate_tool_call_blocking(&request)?;
         assert_eq!(response.verdict, Verdict::Deny);
         assert!(response.output.is_none());
-        assert!(
-            response
-                .reason
-                .as_deref()
-                .is_some_and(|reason| reason.contains("injected tool outcome write failure")),
-            "{:?}",
-            response.reason
+        assert_eq!(
+            response.reason.as_deref(),
+            Some("dispatch outcome is unknown after durable_return: CHIO-KERNEL-DURABLE-ADMISSION")
         );
         assert_eq!(
             response

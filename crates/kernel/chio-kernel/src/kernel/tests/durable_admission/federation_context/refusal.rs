@@ -76,7 +76,11 @@ fn refusing_fixture(
             }));
     }
     let result = fixture.kernel.evaluate_tool_call_blocking(&fixture.request);
-    let operation = assert_original_unknown_incident(&fixture.store, &fixture.request);
+    let operation = assert_original_unknown_incident(
+        &fixture.store,
+        &fixture.request,
+        &unknown_after("transport_return", "CHIO-KERNEL-TOOL-SERVER"),
+    );
     let receipt = fixture
         .store
         .state
@@ -97,7 +101,7 @@ fn refusing_fixture(
         assert!(response.output.is_none());
         assert_eq!(
             response.reason.as_deref(),
-            Some("tool server error: federated mutation is refused")
+            Some("dispatch outcome is unknown after transport_return: CHIO-KERNEL-TOOL-SERVER")
         );
         assert_same_receipt(&response.receipt, &receipt);
     } else {
@@ -157,7 +161,7 @@ fn federated_unknown_refusal_replays_existing_bilateral_artifacts() -> TestResul
     assert!(replay.output.is_none());
     assert_eq!(
         replay.reason.as_deref(),
-        Some("tool server error: federated mutation is refused")
+        Some("dispatch outcome is unknown after transport_return: CHIO-KERNEL-TOOL-SERVER")
     );
     assert_same_receipt(&replay.receipt, &case.receipt);
     let envelope = case

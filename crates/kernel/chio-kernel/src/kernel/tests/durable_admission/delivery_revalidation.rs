@@ -164,7 +164,14 @@ fn invocation_owned_connections_close_on_completion_denial_and_cancellation() ->
                     );
                     assert!(kernel.receipt_log().is_empty());
                     kernel.reconcile_recoverable_admissions()?;
-                    let terminal = assert_original_unknown_incident(&store, &request);
+                    let terminal = assert_original_unknown_incident(
+                        &store,
+                        &request,
+                        &chio_core::receipt::decision::Decision::Deny {
+                            reason: "dispatch outcome is unknown after recovery".into(),
+                            guard: "kernel".into(),
+                        },
+                    );
                     assert_eq!(terminal.binding(), committed.binding());
                     assert_eq!(terminal.dispatch_commit(), committed.dispatch_commit());
                     assert_eq!(kernel.receipt_log().len(), 1);

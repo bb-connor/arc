@@ -19,7 +19,10 @@ use terminal_refusal::compensation_response;
 #[path = "durable_admission/unknown_incident_assertions.rs"]
 mod unknown_incident_assertions;
 use receipt_projection::AdmissionReceiptProjectionStore;
-use unknown_incident_assertions::{assert_original_unknown_incident, assert_unknown_replay};
+use unknown_incident_assertions::{
+    assert_original_unknown_incident, assert_unknown_replay, unknown_after,
+    url_elicitation_after_dispatch,
+};
 
 #[path = "durable_admission/admitted_metadata.rs"]
 mod admitted_metadata;

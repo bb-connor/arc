@@ -65,7 +65,8 @@ def worker():
         if data.get("join_after_failure"):
             assert (
                 joined["verdict"] == "deny"
-                and "child worker failed" in joined["reason"]
+                and joined["reason"]
+                == "dispatch outcome is unknown after transport_return: CHIO-KERNEL-TOOL-SERVER"
             )
         else:
             assert (

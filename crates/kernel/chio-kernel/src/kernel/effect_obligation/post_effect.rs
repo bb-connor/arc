@@ -229,64 +229,129 @@ fn prepare_ordinary(
         })),
     );
     let metadata = with_identity_disposition(metadata, IdentityDisposition::Terminal);
-    let prepared = kernel.with_pre_invocation_guard_evidence(&inputs.evidence, || {
-        match observed {
+    let prepared = kernel
+        .with_pre_invocation_guard_evidence(&inputs.evidence, || match observed {
             Ok(((output, reported_cost), elapsed)) => {
-                if let Err(denial) = kernel.revalidate_ordinary_recovery_status(inputs.matched_grant_index, inputs.request, &inputs.finding) {
-                    return kernel.prepare_changed_ordinary_recovery_status(
-                        inputs.request, inputs.matched_grant_index, &metadata, &inputs.evidence,
-                        inputs.payee.as_ref(), &denial,
-                    ).map(|response| (response, None));
+                if let Err(denial) = kernel.revalidate_ordinary_recovery_status(
+                    inputs.matched_grant_index,
+                    inputs.request,
+                    &inputs.finding,
+                ) {
+                    return kernel
+                        .prepare_changed_ordinary_recovery_status(
+                            inputs.request,
+                            inputs.matched_grant_index,
+                            &metadata,
+                            &inputs.evidence,
+                            inputs.payee.as_ref(),
+                            &denial,
+                        )
+                        .map(|response| (response, None));
                 }
-                let metadata = crate::kernel::delivery_contract::attach_finding_recovery_metadata(metadata, inputs.finding.recovery_binding());
-                crate::kernel::evaluation::evaluation_helpers::require_durable_finding_recovery(inputs.finding.recovery_binding())?;
-                kernel.prepare_budgeted_tool_output_with_cost_and_metadata(
-                    inputs.request, output, elapsed, now, inputs.matched_grant_index,
-                    PrepareToolOutputCostContext {
-                        charge_result: inputs.budget.charge_result(), reported_cost: reported_cost.as_ref(),
-                        payment_authorization: inputs.payment.as_ref(), cap: &inputs.request.capability,
-                        fault_progress: inputs.prepared.fault.as_mut(),
-                    },
-                    metadata, inputs.payee.as_ref(), inputs.security_context,
-                ).map(|response| (response, None))
+                let metadata = crate::kernel::delivery_contract::attach_finding_recovery_metadata(
+                    metadata,
+                    inputs.finding.recovery_binding(),
+                );
+                crate::kernel::evaluation::evaluation_helpers::require_durable_finding_recovery(
+                    inputs.finding.recovery_binding(),
+                )?;
+                kernel
+                    .prepare_budgeted_tool_output_with_cost_and_metadata(
+                        inputs.request,
+                        output,
+                        elapsed,
+                        now,
+                        inputs.matched_grant_index,
+                        PrepareToolOutputCostContext {
+                            charge_result: inputs.budget.charge_result(),
+                            reported_cost: reported_cost.as_ref(),
+                            payment_authorization: inputs.payment.as_ref(),
+                            cap: &inputs.request.capability,
+                            fault_progress: inputs.prepared.fault.as_mut(),
+                        },
+                        metadata,
+                        inputs.payee.as_ref(),
+                        inputs.security_context,
+                    )
+                    .map(|response| (response, None))
             }
             Err(error) => {
-                let metadata = kernel.ambiguous_dispatch_receipt_metadata(&inputs.budget, inputs.payment.as_ref(), metadata);
+                let metadata = kernel.ambiguous_dispatch_receipt_metadata(
+                    &inputs.budget,
+                    inputs.payment.as_ref(),
+                    metadata,
+                );
                 kernel.note_retained_ambiguous_hold(metadata.is_some() || inputs.payment.is_some());
                 match error {
                     error @ KernelError::UrlElicitationsRequired { .. } => kernel
-                        .prepare_cancelled_response_with_metadata_and_payee_binding(inputs.request,
-                            "tool server returned URL elicitation after dispatch; outcome is unknown", now,
-                            Some(inputs.matched_grant_index), RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal), inputs.payee.as_ref())
+                        .prepare_cancelled_response_with_metadata_and_payee_binding(
+                            inputs.request,
+                            &PostDispatchRefusal::classify("transport_return", &error).reason,
+                            now,
+                            Some(inputs.matched_grant_index),
+                            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
+                            inputs.payee.as_ref(),
+                        )
                         .map(|response| (response, Some(error))),
                     KernelError::RequestCancelled { request_id, reason } => {
-                        if let Some(parent) = inputs.parent_context.filter(|parent| parent.request_id == request_id) {
+                        if let Some(parent) = inputs
+                            .parent_context
+                            .filter(|parent| parent.request_id == request_id)
+                        {
                             kernel.with_session_mut(&parent.session_id, |session| {
                                 session.request_cancellation(&parent.request_id)?;
                                 Ok(())
                             })?;
                         }
                         kernel
-                        .prepare_cancelled_response_with_metadata_and_payee_binding(inputs.request, &reason, now,
-                            Some(inputs.matched_grant_index), RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal), inputs.payee.as_ref())
-                        .map(|response| (response, None))
-                    },
-                    KernelError::HotPathDeadlineExceeded { stage, budget_ms } => kernel
-                        .prepare_cancelled_response_with_metadata_and_payee_binding(inputs.request,
-                            &format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms"), now,
-                            Some(inputs.matched_grant_index), RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal), inputs.payee.as_ref())
+                            .prepare_cancelled_response_with_metadata_and_payee_binding(
+                                inputs.request,
+                                &reason,
+                                now,
+                                Some(inputs.matched_grant_index),
+                                RefusalReceiptMetadata::new(
+                                    metadata,
+                                    IdentityDisposition::Terminal,
+                                ),
+                                inputs.payee.as_ref(),
+                            )
+                            .map(|response| (response, None))
+                    }
+                    error @ KernelError::HotPathDeadlineExceeded { .. } => kernel
+                        .prepare_cancelled_response_with_metadata_and_payee_binding(
+                            inputs.request,
+                            &PostDispatchRefusal::classify("transport_return", &error).reason,
+                            now,
+                            Some(inputs.matched_grant_index),
+                            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
+                            inputs.payee.as_ref(),
+                        )
                         .map(|response| (response, None)),
                     KernelError::RequestIncomplete(reason) => kernel
-                        .prepare_incomplete_response_with_output_metadata_and_payee_binding(inputs.request, None, &reason, now,
-                            Some(inputs.matched_grant_index), RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal), inputs.payee.as_ref())
+                        .prepare_incomplete_response_with_output_metadata_and_payee_binding(
+                            inputs.request,
+                            None,
+                            &reason,
+                            now,
+                            Some(inputs.matched_grant_index),
+                            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
+                            inputs.payee.as_ref(),
+                        )
                         .map(|response| (response, None)),
-                    error => kernel.prepare_deny_response_with_metadata_and_payee_binding(inputs.request,
-                        &error.to_string(), now, Some(inputs.matched_grant_index), RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal), inputs.payee.as_ref())
+                    error => kernel
+                        .prepare_deny_response_with_metadata_and_payee_binding(
+                            inputs.request,
+                            &error.to_string(),
+                            now,
+                            Some(inputs.matched_grant_index),
+                            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
+                            inputs.payee.as_ref(),
+                        )
                         .map(|response| (response, None)),
                 }
             }
-        }
-    }).map_err(|error| failure("ordinary_finalization", error))?;
+        })
+        .map_err(|error| failure("ordinary_finalization", error))?;
     if let Some(fault) = inputs.prepared.fault.as_mut() {
         fault.observe_economics(prepared.0.receipt().metadata.as_ref());
     }

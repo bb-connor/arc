@@ -196,18 +196,17 @@ fn rejected_output_terminalizes_unknown(entry: Entry) -> TestResult {
         [at_return_recording(&request)],
         "{entry:?}"
     );
-    let expected_reason = KernelError::GuardDenied(format!(
-        "guard output validation failed: {}",
-        KernelError::GuardDenied(REJECTION.to_owned())
-    ))
-    .to_string();
     assert_eq!(
         response.reason.as_deref(),
-        Some(expected_reason.as_str()),
+        Some("dispatch outcome is unknown after durable_return: CHIO-KERNEL-GUARD-DENIED"),
         "{entry:?}"
     );
 
-    let retained = assert_original_unknown_incident(&store, &request);
+    let retained = assert_original_unknown_incident(
+        &store,
+        &request,
+        &unknown_after("durable_return", "CHIO-KERNEL-GUARD-DENIED"),
+    );
     {
         let state = store.state.lock().map_err(|_| "admission state poisoned")?;
         assert!(state.raw_outcome.is_none());
