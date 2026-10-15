@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/trajectory.schema.json",
+  "title": "Recovery trajectory V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "source_digest",
+    "contract_digest",
+    "policy_digest",
+    "profile_digest",
+    "deterministic_time",
+    "frames"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.recovery.trajectory.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "source_digest": {
+      "$ref": "observation.schema.json#/$defs/recoveryDigest32"
+    },
+    "contract_digest": {
+      "$ref": "observation.schema.json#/$defs/recoveryDigest32"
+    },
+    "policy_digest": {
+      "$ref": "observation.schema.json#/$defs/recoveryDigest32"
+    },
+    "profile_digest": {
+      "$ref": "observation.schema.json#/$defs/recoveryDigest32"
+    },
+    "deterministic_time": {
+      "$ref": "observation.schema.json#/$defs/safeInteger"
+    },
+    "frames": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation",
+          "expected"
+        ],
+        "properties": {
+          "observation": {
+            "$ref": "observation.schema.json"
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "effect_count",
+              "consumed_authority",
+              "remaining_budget",
+              "knowledge_digest",
+              "native_admission_digest",
+              "process_request_digest"
+            ],
+            "properties": {
+              "effect_count": {
+                "$ref": "observation.schema.json#/$defs/safeInteger"
+              },
+              "consumed_authority": {
+                "$ref": "observation.schema.json#/$defs/safeInteger"
+              },
+              "remaining_budget": {
+                "$ref": "observation.schema.json#/$defs/safeInteger"
+              },
+              "knowledge_digest": {
+                "$ref": "observation.schema.json#/$defs/recoveryDigest32"
+              },
+              "native_admission_digest": {
+                "$ref": "observation.schema.json#/$defs/recoveryDigest32"
+              },
+              "process_request_digest": {
+                "$ref": "observation.schema.json#/$defs/recoveryDigest32"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

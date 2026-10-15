@@ -18,18 +18,22 @@
 extern crate alloc;
 
 pub mod clock;
+pub mod confinement;
 pub mod deception;
 pub mod declassification;
 pub mod event;
 pub mod flow;
+pub mod knowledge;
 pub mod migration;
 pub mod ports;
+pub mod recovery;
 pub mod response;
 pub mod response_dispatch;
 mod response_domains;
 pub mod response_execution;
 pub mod response_simulation;
 pub mod response_state;
+pub mod semantic;
 
 pub use response_dispatch::DispatchRejection;
 pub use response_execution::{

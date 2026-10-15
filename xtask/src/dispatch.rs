@@ -14,6 +14,7 @@ use crate::formal_mirrors;
 use crate::launch_acceptance;
 use crate::proof_coverage;
 use crate::qualify;
+use crate::recovery_authority_vectors;
 use crate::XtaskError;
 use crate::{crate_paths, eval_receipt_regen};
 use crate::{errors_regen, freeze_vectors, run_codegen, run_snippets, validate_scenarios};
@@ -32,6 +33,9 @@ pub(crate) fn dispatch(command: cli::Command) -> Result<(), XtaskError> {
             GenCommand::FreezeVectors { check } => freeze_vectors(check_argv(check)),
             GenCommand::CageVectors { check } => cage_vectors::run(check),
             GenCommand::ProofCoverage { check } => proof_coverage::run(check),
+            GenCommand::RecoveryAuthorityVectors { check } => {
+                recovery_authority_vectors::run(check)
+            }
             GenCommand::BrokerReceiptVectors { check } => broker_receipt_vectors::run(check),
         },
         // -- check group --
