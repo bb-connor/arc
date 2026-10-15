@@ -93,6 +93,11 @@ mod participant;
 mod projection;
 mod recovery;
 pub(crate) use recovery::verify_outcome_recovery_status;
+mod recovery_records;
+pub(crate) use recovery_records::{
+    projection_reference as recovery_projection_reference,
+    verify_global_coverage as verify_recovery_projection_coverage,
+};
 mod retained_request;
 mod runtime_participant;
 mod runtime_replay;
@@ -237,6 +242,8 @@ const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
     "admission_operation_recovery_deferrals",
+    "admission_operation_recovery_records",
+    "admission_operation_recovery_events",
     "threshold_approval_proposals",
     "chio_serving_owner",
     "capability_grant_budgets",

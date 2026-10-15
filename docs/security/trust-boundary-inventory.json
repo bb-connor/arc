@@ -7105,6 +7105,9 @@
     ],
     "crates/security/chio-security-types/src/recovery/profile.rs": [
       "attachment_profile::custom_deserialize"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs": [
+      "require_canonical_json::from_slice"
     ]
   },
   "decoder_file_contracts": {
@@ -12213,6 +12216,22 @@
           ],
           "apis": [
             "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs": {
+      "kind": "durable-internal-state",
+      "contract": "Decodes protected recovery payloads selected only as BLOBs within 1..262144 bytes during mandatory store-open local history verification. Each current record must hold exact canonical JSON, a bounded canonical identity, and a record digest equal to its authenticated latest event; global coverage is a separate mandatory open check. Signed authority and semantic validation remain with the owning consumer.",
+      "readers": [
+        {
+          "reader": "require_canonical_json",
+          "decoders": [
+            "from_slice"
+          ],
+          "apis": [
+            "canonical_json_bytes+original_equality"
           ],
           "checked": true
         }
@@ -19509,6 +19528,14 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/status.rs": [
       "load::original-json-reader::UntrustedJsonText"
     ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/history.rs": [
+      "verify_current_records::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::verify_present_record",
+      "verify_local_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/history.rs::verify_current_records"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs": [
+      "authenticate::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::require_canonical_json",
+      "verify_present_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::authenticate"
+    ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/retained_request.rs": [
       "begin_retaining_tool_request::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::begin_prepared_operation_tx",
       "load_original_request_by_nonce::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
@@ -19547,6 +19574,7 @@
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/dpop_replay/records.rs::verify_all_records",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/governed_approval_claim/records.rs::verify_all",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs::verify_all",
+      "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/history.rs::verify_local_history",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::verify_all",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_admission_operation_schema",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_operation_data",

@@ -17,7 +17,6 @@ use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
 use crate::admission_operation_store as admission_store;
 
 mod projection_reference;
-mod schema_migration;
 use projection_reference::projection_reference_digest;
 
 pub(crate) const GLOBAL_GENESIS_DIGEST: &str =
@@ -45,7 +44,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight', 'security_participant_checkpoint', 'stop_epoch')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight', 'security_participant_checkpoint', 'stop_epoch', 'recovery')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -220,17 +219,13 @@ type SchemaCatalogEntry = (String, String, String, Option<String>);
 pub(crate) fn initialize_global_commit_schema(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    let table_exists = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'authority_global_commits')",
-        [],
-        |row| row.get::<_, bool>(0),
-    )?;
-    if !table_exists {
-        connection.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
-    } else if verify_global_commit_schema(connection).is_err() {
-        schema_migration::migrate_previous_global_commit_schema(connection)?;
+    let transaction = connection.unchecked_transaction()?;
+    if global_schema_catalog(&transaction)?.is_empty() {
+        transaction.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
     }
-    verify_global_commit_schema(connection)
+    verify_global_commit_schema(&transaction)?;
+    transaction.commit()?;
+    Ok(())
 }
 
 pub(crate) fn verify_global_commit_schema(
@@ -1441,8 +1436,7 @@ pub(super) fn finding_market_snapshot_digest_version(
 pub(crate) fn verify_pristine_authority_tables(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    // Keep runtime migration outside the historical baseline snapshot shape.
-    // Its own projection covers every row once an active owner writes it.
+    // The runtime replay projection covers every row written by an active owner.
     crate::admission_operation_store::verify_runtime_replay_pristine(connection)?;
     crate::admission_operation_store::verify_governed_approval_replay_pristine(connection)?;
     crate::admission_operation_store::verify_dpop_replay_pristine(connection)?;
@@ -1718,6 +1712,7 @@ fn verify_global_projection_coverage(
     admission_store::verify_dpop_replay_projection_coverage(connection)?;
     admission_store::verify_security_participant_migration_coverage(connection)?;
     admission_store::verify_stop_epoch_projection_coverage(connection)?;
+    admission_store::verify_recovery_projection_coverage(connection)?;
     verify_channel_release_projection_coverage(connection)?;
     verify_finding_challenge_projection_coverage(connection)?;
     verify_finding_status_projection_coverage(connection)?;
@@ -2374,9 +2369,7 @@ fn table_snapshot(
     })
 }
 
-/// Reproduce an older snapshot after a schema revision adds one column.
-/// This is verification-only compatibility for an authenticated prior
-/// head; every new commit uses the complete current table shape.
+/// Snapshot the retained columns in canonical column and row order.
 fn table_snapshot_without_column(
     connection: &Connection,
     table: &str,
@@ -2502,8 +2495,8 @@ fn global_schema_catalog(
     let mut statement = connection.prepare(
         r#"
         SELECT type, name, tbl_name, sql FROM sqlite_schema
-        WHERE name GLOB 'authority_global_commit*'
-           OR tbl_name GLOB 'authority_global_commit*'
+        WHERE lower(name) GLOB 'authority_global_commit*'
+           OR lower(tbl_name) GLOB 'authority_global_commit*'
         ORDER BY type, name, tbl_name
         "#,
     )?;

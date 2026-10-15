@@ -98,7 +98,7 @@ expected_counts = {
     "native runtime validity contract": 1,
     "native runtime signed freshness": 3,
     "native input intent contracts": 6,
-    "native global journal migration": 4,
+    "native global journal catalog": 10,
     "native nonce issuance custody": 1,
     "native policy clock bounds": 1,
     "security types library": 26,
@@ -236,7 +236,7 @@ required_native_commands = {
     "dispatch rejection payment custody": [
         "cargo", "test", "-p", "chio-kernel", "--lib", "kernel::tests::durable_admission::dispatch_commit_failure::",
     ],
-    "native global journal migration": [
+    "native global journal catalog": [
         "cargo", "test", "-p", "chio-store-sqlite", "--lib",
         "serving_owner::global_commit_chain::schema_tests::",
     ],

@@ -1037,11 +1037,17 @@ run_exact_target --label "native input intent contracts" --allow-filtered --expe
   admission_operation::native_input_join::tests::input_transition_binds_operation_each_identity_and_classified_label \
   -- cargo test -p chio-kernel --lib admission_operation::native_input_join::tests::
 
-run_exact_target --label "native global journal migration" --allow-filtered --expected \
-  serving_owner::global_commit_chain::schema_tests::ignored_check_cannot_smuggle_future_projection_into_a_supported_predecessor \
-  serving_owner::global_commit_chain::schema_tests::nonhistorical_runtime_kind_without_status_is_not_an_upgrade_predecessor \
-  serving_owner::global_commit_chain::schema_tests::supported_previous_global_schemas_preserve_history_when_adding_replay_kinds \
-  serving_owner::global_commit_chain::schema_tests::unexpected_trigger_on_previous_global_schema_is_not_repaired \
+run_exact_target --label "native global journal catalog" --allow-filtered --expected \
+  serving_owner::global_commit_chain::schema_tests::canonical_global_catalog_reopens_without_rewriting_history \
+  serving_owner::global_commit_chain::schema_tests::missing_projection_kinds_refuse_without_rewriting_catalog_or_history \
+  serving_owner::global_commit_chain::schema_tests::missing_commit_table_refuses_without_recreating_history \
+  serving_owner::global_commit_chain::schema_tests::missing_metadata_refuses_without_recreating_a_head \
+  serving_owner::global_commit_chain::schema_tests::missing_global_guards_refuse_without_repair \
+  serving_owner::global_commit_chain::schema_tests::unexpected_global_guard_refuses_without_repair \
+  serving_owner::global_commit_chain::schema_tests::reserved_global_catalog_names_are_not_adopted \
+  serving_owner::global_commit_chain::schema_tests::failed_catalog_creation_rolls_back_every_created_object \
+  serving_owner::global_commit_chain::schema_tests::differently_cased_reserved_names_refuse_without_catalog_changes \
+  serving_owner::global_commit_chain::schema_tests::partial_catalog_with_a_genesis_head_refuses_without_repair \
   -- cargo test -p chio-store-sqlite --lib serving_owner::global_commit_chain::schema_tests::
 
 run_exact_target --label "native nonce issuance custody" --allow-filtered --expected \
