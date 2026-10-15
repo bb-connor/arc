@@ -2008,22 +2008,14 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/tool_outcome_security_release.rs"
 rust_symbols = [
-  "has_release_namespace",
-  "verify_unstamped_source",
-  "predecessor_schema",
-  "verify_pre_migration",
   "participant_digest",
   "load",
   "verify_projection",
   "require_terminal_release",
   "SqliteToolOutcomeStore::persist_security_release",
 ]
-normalized_sha256 = "b702b8ce63f6947c9c975a8d8cce0f3cfadd7e3b0883647ee0aaa490481bf9a1"
+normalized_sha256 = "88514f90075fd29cdf793060aecbb4baae461b3680aebb9108e3809bb3b7f45f"
 symbol_sha256 = [
-  { symbol = "has_release_namespace", sha256 = "71ed3bd52b4e107adf8aa1867d8678ec2eb4a8ba0c03cb72169fcea2908f008a" },
-  { symbol = "verify_unstamped_source", sha256 = "8755e74d57934bd55bbfb32c26b642c8468e9bba50027a1bd4232bd92eabbccd" },
-  { symbol = "predecessor_schema", sha256 = "f9a6993e8124d18253cb7f0de3c0a22236ff3f58ee36fc7c6890c5b4e25476fe" },
-  { symbol = "verify_pre_migration", sha256 = "c36fa2ddbf6c313bdac827a9883f3fe1e7118743968f08ecffd362627bdb7c58" },
   { symbol = "participant_digest", sha256 = "8b11d5c6edb6307b36e1082f3ec079f994ec01471d20d40595ad818dcac809f8" },
   { symbol = "load", sha256 = "c21a4a60a9e799edb92b80d4abd41843be2d30ec167abb3ed44a1bac60d5159a" },
   { symbol = "verify_projection", sha256 = "d22a72c488995fda7930b31a9e1a18acc23e5d2a67e1d26cca010fe4b9b98ec3" },
@@ -2044,12 +2036,12 @@ rust_symbols = [
   "verify_tool_outcome_invariants",
   "verify_tool_outcome_data_invariants",
 ]
-normalized_sha256 = "d47967d9ffeea0bba0347fa084772e437ddfcb296c1520321523e850cbe83434"
+normalized_sha256 = "7323f7e2bbeeb2579d4227483a05d94fed17cd1022c5046344e6c9d4d56a240c"
 symbol_sha256 = [
   { symbol = "SqliteToolOutcomeStore::require_security_release_checkpoint_support", sha256 = "cbf49359b0aa14f5549fe6e1fb787b9fe1565ca27319ef120cb0baa20f9c75df" },
   { symbol = "SqliteToolOutcomeStore::record_security_release", sha256 = "d95908fa37f96e5c10dbda7d8b7f396ddc99420e3ad86c08a1a394610a909a65" },
   { symbol = "SqliteToolOutcomeStore::lookup_security_release", sha256 = "3315ac8508a69f3aa77e42d00c478dcc98b734e98d5a5265e1d076fa8517da1e" },
-  { symbol = "initialize_tool_outcome_schema", sha256 = "01c78c538fa03581454573e1ce39e762a4cacc9ec964b60a51ae5b6bbc8d798b" },
+  { symbol = "initialize_tool_outcome_schema", sha256 = "09f532f3f70e99d2eae4e77a5dd018d5792c64944ae8b71d0bac68bf5e55b69a" },
   { symbol = "verify_tool_outcome_invariants", sha256 = "c4591c11808b4e426b17cc461a13ab66a20c5700e2cd5452d19504fe3de12d5c" },
   { symbol = "verify_tool_outcome_data_invariants", sha256 = "5c71f770b78fcacc10df25ff3ad452f3a07424b073ccc409ae3894215a9dbeb2" },
 ]

@@ -4,8 +4,8 @@ mod signing;
 
 use super::*;
 
-#[path = "payload_maintenance_tests/migration.rs"]
-mod migration;
+#[path = "payload_maintenance_tests/schema_refusal.rs"]
+mod schema_refusal;
 #[path = "payload_maintenance_tests/stop.rs"]
 mod stop;
 use std::error::Error;

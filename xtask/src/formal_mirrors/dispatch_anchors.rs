@@ -738,10 +738,6 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/tool_outcome_security_release.rs",
         symbols: &[
-            "has_release_namespace",
-            "verify_unstamped_source",
-            "predecessor_schema",
-            "verify_pre_migration",
             "participant_digest",
             "load",
             "verify_projection",
