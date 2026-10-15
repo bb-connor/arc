@@ -40,6 +40,8 @@ struct MemoryStopStore {
     records: Mutex<Vec<StopEpochV1>>,
     fail_appends: AtomicBool,
     fail_loads: AtomicBool,
+    withheld: AtomicU64,
+    fail_counts: AtomicBool,
 }
 
 impl DurableStopStore for MemoryStopStore {
@@ -75,6 +77,13 @@ impl DurableStopStore for MemoryStopStore {
         let next = record(head.as_ref(), request.transition);
         records.push(next.clone());
         Ok(Some(next))
+    }
+
+    fn withheld_operations(&self) -> Result<u64, DurableStopError> {
+        if self.fail_counts.load(Ordering::SeqCst) {
+            return Err(AdmissionOperationStoreError::Unavailable("disk full".to_owned()).into());
+        }
+        Ok(self.withheld.load(Ordering::SeqCst))
     }
 }
 
@@ -314,10 +323,48 @@ fn a_control_does_not_keep_its_store_open() {
     };
     assert_eq!(detail, "stop store is closed");
     assert!(status.stopped);
+    assert_eq!(status.withheld_operations, None);
     assert!(control.heads().is_stopped());
     assert!(matches!(
         control.resume(resume_command(None)),
         Err(StopControlError::NotReady(detail)) if detail == "stop store is closed"
     ));
     assert!(control.heads().is_stopped());
+}
+
+#[test]
+fn a_stopped_status_counts_withheld_operations() {
+    let store = Arc::new(MemoryStopStore::default());
+    store.withheld.store(3, Ordering::SeqCst);
+    let control = StopControl::durable(&store, fence());
+    assert_eq!(control.status().withheld_operations, None);
+
+    let stopped = control.stop(stop_command("incident")).unwrap();
+    assert_eq!(stopped.withheld_operations, Some(3));
+    let body = serde_json::to_value(&stopped).unwrap();
+    assert_eq!(body["withheld_operations"], 3);
+
+    store.fail_counts.store(true, Ordering::SeqCst);
+    let unreadable = control.status();
+    assert!(unreadable.stopped);
+    assert_eq!(unreadable.withheld_operations, None);
+    assert!(serde_json::to_value(&unreadable)
+        .unwrap()
+        .get("withheld_operations")
+        .is_none());
+    store.fail_counts.store(false, Ordering::SeqCst);
+
+    let head = stopped.head.unwrap();
+    let resumed = control
+        .resume(resume_command(Some(StopEpochId {
+            chain_generation: head.chain_generation,
+            epoch: head.epoch,
+        })))
+        .unwrap();
+    assert_eq!(resumed.withheld_operations, None);
+
+    let local = StopControl::process_local();
+    let stopped = local.stop(stop_command("incident")).unwrap();
+    assert!(stopped.stopped);
+    assert_eq!(stopped.withheld_operations, None);
 }

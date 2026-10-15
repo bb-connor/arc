@@ -2971,12 +2971,14 @@ kernel of the edge. With durable admission enabled, a stop is an append-only
 
 A success returns the status: `scope`, `stopped`, `readiness` (`ready`,
 `ready_stopped`, or `not_ready` with a `reason`), `durability` (`durable`,
-`process_local`, `process_only` or `unverified`), the optional `head`, and
-`host_latch`. A refusal returns `{"error", "message"}` with `error` one of
-`bad_request` (400), `stop_head_moved` (409, with the current `head`),
-`stop_not_durable` (503, with the `status` of the stop this process still
-holds), `stop_not_ready` (503) or `resume_refused` (503). A tool call denied by
-a stop carries `chio_runtime.identity_disposition = "reusable"` and
+`process_local`, `process_only` or `unverified`), the optional `head`,
+`host_latch`, and, while a stop holds over a durable admission store,
+`withheld_operations`: the number of returned operations whose output stays in
+durable custody until resume. A refusal returns `{"error", "message"}` with
+`error` one of `bad_request` (400), `stop_head_moved` (409, with the current
+`head`), `stop_not_durable` (503, with the `status` of the stop this process
+still holds), `stop_not_ready` (503) or `resume_refused` (503). A tool call
+denied by a stop carries `chio_runtime.identity_disposition = "reusable"` and
 `chio_runtime.retryable_after_resume = true` in its signed receipt metadata.
 
 ### 8.4 HTTP egress contract enforcement (W2.2)

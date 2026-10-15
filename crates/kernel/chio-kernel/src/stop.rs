@@ -322,6 +322,10 @@ pub trait DurableStopStore: Send + Sync {
         request: &StopTransitionRequest,
         fence: &StoreMutationFence,
     ) -> Result<Option<StopEpochV1>, DurableStopError>;
+
+    /// Count the returned operations whose output release is pending. While
+    /// a stop holds, each one keeps its output in durable custody.
+    fn withheld_operations(&self) -> Result<u64, DurableStopError>;
 }
 
 /// Where the durable view came from.
@@ -466,6 +470,10 @@ pub struct StopStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head: Option<StopHeadStatus>,
     pub host_latch: bool,
+    /// Returned operations whose output stays in durable custody until
+    /// resume. Present while a stop holds over a readable durable store.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withheld_operations: Option<u64>,
 }
 
 /// Body of a stop request on every operator control surface.
@@ -772,6 +780,22 @@ impl StopControl {
                 requested_via: head.requested_via.clone(),
             }),
             host_latch: self.heads.host_latched(),
+            withheld_operations: if stopped {
+                self.withheld_operations()
+            } else {
+                None
+            },
+        }
+    }
+
+    fn withheld_operations(&self) -> Option<u64> {
+        let store = self.durable.as_ref()?.store.upgrade()?;
+        match store.withheld_operations() {
+            Ok(count) => Some(count),
+            Err(error) => {
+                tracing::error!(error = %error, "withheld operation count is unavailable");
+                None
+            }
         }
     }
 

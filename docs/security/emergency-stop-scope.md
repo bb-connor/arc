@@ -72,8 +72,10 @@ after resume.
 The recovery sweep, at startup and on each periodic batch, leaves a returned
 (`Finalizing`) operation untouched while a stop is in force: its output stays
 in durable custody, no recovery deferral is recorded, and a sweep or a replay
-of the same request after resume releases it. A host restarted during a stop with such work therefore
-comes up `ready_stopped`.
+of the same request after resume releases it. A host restarted during a stop
+with such work therefore comes up `ready_stopped`. While a stop holds, the
+status on every control surface reports these operations as
+`withheld_operations`.
 
 ## Operator reach
 

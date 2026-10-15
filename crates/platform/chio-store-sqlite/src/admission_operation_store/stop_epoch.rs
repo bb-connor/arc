@@ -362,4 +362,18 @@ impl DurableStopStore for SqliteAdmissionOperationStore {
         self.sync_after_write(&connection)?;
         Ok(Some(record))
     }
+
+    fn withheld_operations(&self) -> Result<u64, DurableStopError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let count: i64 = transaction
+            .query_row(
+                "SELECT COUNT(*) FROM admission_operations
+                 WHERE terminal = 0 AND state = 'finalizing'",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(sqlite_error)?;
+        Ok(stored_u64(count, "withheld operation count")?)
+    }
 }
