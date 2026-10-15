@@ -7125,6 +7125,9 @@
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs": [
       "require_canonical_json::from_slice"
+    ],
+    "crates/kernel/chio-kernel/src/admission_operation/dispatch_launch.rs": [
+      "schema::custom_deserialize"
     ]
   },
   "decoder_file_contracts": {
@@ -7818,6 +7821,22 @@
           ],
           "checked": true,
           "instances": 2
+        }
+      ]
+    },
+    "crates/kernel/chio-kernel/src/admission_operation/dispatch_launch.rs": {
+      "kind": "reviewed-signed-owner",
+      "contract": "Custom deserializers validate bounded identity, digest or operation fields in a typed value. They are not original-byte readers; the containing original-byte owner must run its constrained JSON contract first.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true
         }
       ]
     },
