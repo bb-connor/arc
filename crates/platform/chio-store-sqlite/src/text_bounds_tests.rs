@@ -6,9 +6,10 @@
 //! count could otherwise carry an unbounded tail. Each probe copies one bounded
 //! column definition out of a live catalog into UTF-8, UTF-16le and UTF-16be
 //! databases. It requires the column CHECK to accept a valid value and to
-//! refuse a valid prefix followed by a NUL and a megabyte of padding, and, in
-//! UTF-8, a prefix followed by one lead byte and a megabyte of continuation
-//! bytes.
+//! refuse a valid prefix followed by a NUL and a megabyte of padding, and a
+//! prefix followed by one UTF-8 lead byte and a megabyte of continuation bytes.
+//! The octet ceilings need `octet_length()`, which the bundled SQLite must
+//! provide.
 
 use std::error::Error;
 
@@ -119,13 +120,11 @@ fn assert_column_refuses_nul_padding(
                 );
                 let padded = insert(&probe, Value::Text(nul_padded(valid)));
                 assert!(is_check_refusal(&padded), "{table}.{column}: {padded:?}");
-                if encoding == "UTF-8" {
-                    let stretched = insert_text_bytes(&probe, continuation_padded(valid));
-                    assert!(
-                        is_check_refusal(&stretched),
-                        "{table}.{column}: {stretched:?}"
-                    );
-                }
+                let stretched = insert_text_bytes(&probe, continuation_padded(valid));
+                assert!(
+                    is_check_refusal(&stretched),
+                    "{table}.{column}: {stretched:?}"
+                );
             }
             Bound::Blob(len) => {
                 assert_eq!(
@@ -144,6 +143,19 @@ fn assert_column_refuses_nul_padding(
             assert!(is_check_refusal(&refused), "{table}.{column}: {refused:?}");
         }
     }
+    Ok(())
+}
+
+#[test]
+fn bundled_sqlite_provides_octet_length() -> TestResult {
+    assert!(
+        rusqlite::version_number() >= 3_043_000,
+        "{}",
+        rusqlite::version()
+    );
+    let probe = Connection::open_in_memory()?;
+    let octets: i64 = probe.query_row("SELECT octet_length('ab')", [], |row| row.get(0))?;
+    assert_eq!(octets, 2);
     Ok(())
 }
 
