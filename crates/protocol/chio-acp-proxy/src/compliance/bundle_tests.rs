@@ -766,3 +766,42 @@ fn compliance_bundle_lightweight_refuses_weak_test_anchor() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn verification_result_refuses_camel_case_keys() -> TestResult {
+    let error = serde_json::from_value::<CertificateVerificationResult>(serde_json::json!({
+        "verification_scope": "signature_and_body_only",
+        "certificateSignatureValid": true,
+        "body_consistent": true,
+        "receipts_reverified": 0,
+        "receipt_failures": 0,
+        "passed": true,
+        "summary": "ok",
+    }))
+    .err()
+    .ok_or("camelCase verification result keys must be refused")?;
+    assert_eq!(
+        error.to_string(),
+        "unknown field `certificateSignatureValid`, expected one of `verification_scope`, \
+         `certificate_signature_valid`, `body_consistent`, `receipts_reverified`, \
+         `receipt_failures`, `passed`, `summary`"
+    );
+    Ok(())
+}
+
+#[test]
+fn verification_result_round_trips_its_snake_case_shape() -> TestResult {
+    let result = CertificateVerificationResult {
+        verification_scope: CertificateVerificationScope::SignatureAndBodyOnly,
+        certificate_signature_valid: true,
+        body_consistent: true,
+        receipts_reverified: 2,
+        receipt_failures: 0,
+        passed: true,
+        summary: "ok".into(),
+    };
+    let value = serde_json::to_value(&result)?;
+    let decoded: CertificateVerificationResult = serde_json::from_value(value.clone())?;
+    assert_eq!(serde_json::to_value(&decoded)?, value);
+    Ok(())
+}
