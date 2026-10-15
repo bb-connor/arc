@@ -171,14 +171,30 @@ fn published_v2_proof_envelope_schema_requires_scope_and_unique_receipts() {
 #[test]
 fn verifier_refuses_unsupported_envelope_schema() {
     let mut bundle = agent_web_bundle(AgentWebCase::Valid);
-    relabel_agent_web_envelopes_as_v1(&mut bundle);
+    relabel_agent_web_envelopes(&mut bundle, "chio.agent-web-proof-envelope.v2");
 
     let error = verify_agent_web_interop(&bundle)
         .test_expect_err("an envelope outside the supported schema must be refused");
 
     assert_eq!(
         error.to_string(),
-        "invalid evidence graph artifact: unsupported evidence graph node schema: chio.agent-web-proof-envelope.v1"
+        "invalid evidence graph artifact: unsupported evidence graph node schema: chio.agent-web-proof-envelope.v2"
+    );
+}
+
+#[test]
+fn verifier_refuses_unsupported_envelope_payload_schema() {
+    let mut bundle = agent_web_bundle(AgentWebCase::Valid);
+    replace_agent_web_envelope_artifact(&mut bundle, "standard-webhooks-envelope.json", |envelope| {
+        envelope["schema"] = json!("chio.agent-web-proof-envelope.v2");
+    });
+
+    let error = verify_agent_web_interop(&bundle)
+        .test_expect_err("the graph schema cannot authorize an unsupported envelope payload");
+
+    assert_eq!(
+        error.to_string(),
+        "invalid Agent Web artifact standard-webhooks-envelope.json: unsupported schema: chio.agent-web-proof-envelope.v2"
     );
 }
 
