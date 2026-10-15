@@ -120,7 +120,7 @@ impl Record {
             initialized.digest
         } else {
             connection.query_row(
-                "SELECT CASE WHEN length(CAST(checkpoint_digest AS BLOB)) = 64 THEN checkpoint_digest END
+                "SELECT CASE WHEN typeof(checkpoint_digest) = 'text' AND length(checkpoint_digest) = 64 AND instr(checkpoint_digest, char(0)) = 0 THEN checkpoint_digest END
                  FROM security_participant_checkpoint_events WHERE security_authority_id = ?1 AND sequence = ?2",
                 params![self.authority.as_str(), i64::try_from(self.sequence - 1).map_err(invalid)?],
                 |row| row.get::<_, Option<String>>(0),

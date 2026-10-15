@@ -102,6 +102,8 @@ mod retained_request;
 mod runtime_participant;
 mod runtime_replay;
 mod schema;
+#[cfg(test)]
+pub(crate) use schema::admission_operation_schema_sql;
 mod security_dispatch;
 pub(crate) use security_dispatch::verify_dispatch_capture_owner_tx;
 pub(crate) use security_dispatch::verify_native_dispatch_capture_owner_tx;

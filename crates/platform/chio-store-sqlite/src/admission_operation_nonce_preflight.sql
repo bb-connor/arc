@@ -2,10 +2,10 @@
 -- budget operation. Neither identity nor the physical hold may be recycled.
 CREATE TABLE IF NOT EXISTS admission_nonce_preflight_holds (
     operation_id TEXT PRIMARY KEY REFERENCES admission_operations(operation_id),
-    budget_operation_id TEXT NOT NULL UNIQUE CHECK(length(budget_operation_id) BETWEEN 1 AND 512),
+    budget_operation_id TEXT NOT NULL UNIQUE CHECK(typeof(budget_operation_id) = 'text' AND length(budget_operation_id) BETWEEN 1 AND 512 AND octet_length(budget_operation_id) <= 2048 AND instr(budget_operation_id, char(0)) = 0),
     hold_id TEXT NOT NULL UNIQUE REFERENCES budget_authorization_holds(hold_id),
-    ownership_json BLOB NOT NULL CHECK(length(ownership_json) BETWEEN 1 AND 4096),
-    operation_json BLOB NOT NULL CHECK(length(operation_json) BETWEEN 1 AND 262144),
+    ownership_json BLOB NOT NULL CHECK(typeof(ownership_json) = 'blob' AND length(ownership_json) BETWEEN 1 AND 4096),
+    operation_json BLOB NOT NULL CHECK(typeof(operation_json) = 'blob' AND length(operation_json) BETWEEN 1 AND 262144),
     recorded_at_unix_ms INTEGER NOT NULL CHECK(recorded_at_unix_ms BETWEEN 0 AND 9007199254740991)
 );
 

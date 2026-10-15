@@ -82,13 +82,13 @@ fn validate_bounds(connection: &Connection) -> Result<bool, AdmissionOperationSt
     let (count, malformed): (i64, bool) = connection
         .query_row(
             "SELECT COUNT(*), COALESCE(MAX(
-        length(CAST(security_authority_id AS BLOB)) NOT BETWEEN 1 AND 512
-        OR length(CAST(expectation_id AS BLOB)) != 64
-        OR length(CAST(fingerprint_digest AS BLOB)) != 64
-        OR length(CAST(schema_digest AS BLOB)) != 64
-        OR length(CAST(initialization_digest AS BLOB)) != 64
-        OR length(CAST(store_uuid AS BLOB)) NOT BETWEEN 1 AND 512
-        OR length(CAST(store_lease_id AS BLOB)) NOT BETWEEN 1 AND 512
+        typeof(security_authority_id) <> 'text' OR length(security_authority_id) NOT BETWEEN 1 AND 512 OR octet_length(security_authority_id) > 2048 OR instr(security_authority_id, char(0)) <> 0
+        OR typeof(expectation_id) <> 'text' OR length(expectation_id) != 64 OR instr(expectation_id, char(0)) <> 0
+        OR typeof(fingerprint_digest) <> 'text' OR length(fingerprint_digest) != 64 OR instr(fingerprint_digest, char(0)) <> 0
+        OR typeof(schema_digest) <> 'text' OR length(schema_digest) != 64 OR instr(schema_digest, char(0)) <> 0
+        OR typeof(initialization_digest) <> 'text' OR length(initialization_digest) != 64 OR instr(initialization_digest, char(0)) <> 0
+        OR typeof(store_uuid) <> 'text' OR length(store_uuid) NOT BETWEEN 1 AND 512 OR octet_length(store_uuid) > 2048 OR instr(store_uuid, char(0)) <> 0
+        OR typeof(store_lease_id) <> 'text' OR length(store_lease_id) NOT BETWEEN 1 AND 512 OR octet_length(store_lease_id) > 2048 OR instr(store_lease_id, char(0)) <> 0
         OR initialized_at NOT BETWEEN 1 AND 9007199254740991 OR store_owner_epoch < 1
     ), 0) FROM security_participant_state_initializations",
             [],

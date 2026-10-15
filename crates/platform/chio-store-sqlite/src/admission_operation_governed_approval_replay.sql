@@ -3,46 +3,46 @@
 CREATE TABLE IF NOT EXISTS governed_approval_replay_migration_expectations (
     approval_authority_id TEXT NOT NULL PRIMARY KEY CHECK (
         typeof(approval_authority_id) = 'text'
-        AND length(CAST(approval_authority_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(approval_authority_id) = 'text' AND length(approval_authority_id) BETWEEN 1 AND 512 AND octet_length(approval_authority_id) <= 2048 AND instr(approval_authority_id, char(0)) = 0
     ),
     source_id TEXT NOT NULL UNIQUE CHECK (
         typeof(source_id) = 'text'
-        AND length(CAST(source_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(source_id) = 'text' AND length(source_id) BETWEEN 1 AND 512 AND octet_length(source_id) <= 2048 AND instr(source_id, char(0)) = 0
     ),
     expectation_id TEXT NOT NULL UNIQUE CHECK (
         typeof(expectation_id) = 'text'
-        AND length(CAST(expectation_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(expectation_id) = 'text' AND length(expectation_id) BETWEEN 1 AND 512 AND octet_length(expectation_id) <= 2048 AND instr(expectation_id, char(0)) = 0
     ),
     destination_store_uuid TEXT NOT NULL CHECK (destination_store_uuid <> ''),
     canonical_source BLOB NOT NULL CHECK (
         typeof(canonical_source) = 'blob'
-        AND length(canonical_source) BETWEEN 1 AND 8388608
+        AND typeof(canonical_source) = 'blob' AND length(canonical_source) BETWEEN 1 AND 8388608
     ),
     inventory_sha256 TEXT NOT NULL CHECK (
-        length(inventory_sha256) = 64 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
+        typeof(inventory_sha256) = 'text' AND length(inventory_sha256) = 64 AND instr(inventory_sha256, char(0)) = 0 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     expectation_digest TEXT NOT NULL CHECK (
-        length(expectation_digest) = 64 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(expectation_digest) = 'text' AND length(expectation_digest) = 64 AND instr(expectation_digest, char(0)) = 0 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
     )
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS governed_approval_replay_migration_events (
     approval_authority_id TEXT NOT NULL CHECK (
         typeof(approval_authority_id) = 'text'
-        AND length(CAST(approval_authority_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(approval_authority_id) = 'text' AND length(approval_authority_id) BETWEEN 1 AND 512 AND octet_length(approval_authority_id) <= 2048 AND instr(approval_authority_id, char(0)) = 0
     ),
     sequence INTEGER NOT NULL CHECK (typeof(sequence) = 'integer' AND sequence BETWEEN 1 AND 3),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind IN (
         'expect_governed_approval_replay_source', 'import_governed_approval_replay_source', 'activate_governed_approval_replay_source'
     )),
     expectation_digest TEXT NOT NULL CHECK (
-        length(expectation_digest) = 64 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(expectation_digest) = 'text' AND length(expectation_digest) = 64 AND instr(expectation_digest, char(0)) = 0 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
     ),
     inventory_sha256 TEXT NOT NULL CHECK (
-        length(inventory_sha256) = 64 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
+        typeof(inventory_sha256) = 'text' AND length(inventory_sha256) = 64 AND instr(inventory_sha256, char(0)) = 0 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     event_digest TEXT NOT NULL CHECK (
-        length(event_digest) = 64 AND event_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(event_digest) = 'text' AND length(event_digest) = 64 AND instr(event_digest, char(0)) = 0 AND event_digest NOT GLOB '*[^0-9a-f]*'
     ),
     observed_at_unix_ms INTEGER NOT NULL CHECK (
         typeof(observed_at_unix_ms) = 'integer'
@@ -68,33 +68,33 @@ CREATE TABLE IF NOT EXISTS governed_approval_replay_migration_events (
 CREATE TABLE IF NOT EXISTS governed_approval_replay_legacy_tombstones (
     approval_authority_id TEXT NOT NULL CHECK (
         typeof(approval_authority_id) = 'text'
-        AND length(CAST(approval_authority_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(approval_authority_id) = 'text' AND length(approval_authority_id) BETWEEN 1 AND 512 AND octet_length(approval_authority_id) <= 2048 AND instr(approval_authority_id, char(0)) = 0
     ),
     subject_id TEXT NOT NULL CHECK (
         typeof(subject_id) = 'text'
-        AND length(CAST(subject_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(subject_id) = 'text' AND length(subject_id) BETWEEN 1 AND 512 AND octet_length(subject_id) <= 2048 AND instr(subject_id, char(0)) = 0
     ),
     request_id TEXT NOT NULL CHECK (
         typeof(request_id) = 'text'
-        AND length(CAST(request_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(request_id) = 'text' AND length(request_id) BETWEEN 1 AND 512 AND octet_length(request_id) <= 2048 AND instr(request_id, char(0)) = 0
     ),
     intent_hash TEXT NOT NULL CHECK (
         typeof(intent_hash) = 'text'
-        AND length(CAST(intent_hash AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(intent_hash) = 'text' AND length(intent_hash) BETWEEN 1 AND 512 AND octet_length(intent_hash) <= 2048 AND instr(intent_hash, char(0)) = 0
     ),
     source_id TEXT NOT NULL CHECK (
         typeof(source_id) = 'text'
-        AND length(CAST(source_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(source_id) = 'text' AND length(source_id) BETWEEN 1 AND 512 AND octet_length(source_id) <= 2048 AND instr(source_id, char(0)) = 0
     ),
     expectation_id TEXT NOT NULL CHECK (
         typeof(expectation_id) = 'text'
-        AND length(CAST(expectation_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(expectation_id) = 'text' AND length(expectation_id) BETWEEN 1 AND 512 AND octet_length(expectation_id) <= 2048 AND instr(expectation_id, char(0)) = 0
     ),
     expires_at INTEGER NOT NULL CHECK (typeof(expires_at) = 'integer' AND expires_at >= 0),
     historical_reservation_id TEXT CHECK (
         historical_reservation_id IS NULL OR (
             typeof(historical_reservation_id) = 'text'
-            AND length(CAST(historical_reservation_id AS BLOB)) BETWEEN 1 AND 512
+            AND length(historical_reservation_id) BETWEEN 1 AND 512 AND octet_length(historical_reservation_id) <= 2048 AND instr(historical_reservation_id, char(0)) = 0
         )
     ),
     PRIMARY KEY (approval_authority_id, subject_id, request_id, intent_hash),

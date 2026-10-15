@@ -1490,7 +1490,7 @@ mod tests {
         ).expect("observed authority clock");
         let chain_digest = sha256_hex(
             &canonical_json_bytes(&TestChainEntry {
-                format: "chio.admission-operation-commit-chain.v2",
+                format: "chio.admission-operation-commit-chain.v1",
                 previous_chain_digest: GENESIS_CHAIN_DIGEST,
                 commit_sequence: 1,
                 operation_id: alternate.binding().operation_id().as_str(),

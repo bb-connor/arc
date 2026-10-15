@@ -12,8 +12,8 @@ pub(in crate::admission_operation_store) fn verify(
             "SELECT CASE WHEN length(ownership_json) BETWEEN 1 AND 4096 THEN ownership_json END,
          CASE WHEN length(operation_json) BETWEEN 1 AND 262144 THEN operation_json END,
          recorded_at_unix_ms,
-         CASE WHEN length(budget_operation_id) <= 512 THEN budget_operation_id END,
-         CASE WHEN length(hold_id) <= 512 THEN hold_id END
+         CASE WHEN typeof(budget_operation_id) = 'text' AND length(budget_operation_id) <= 512 AND octet_length(budget_operation_id) <= 2048 AND instr(budget_operation_id, char(0)) = 0 THEN budget_operation_id END,
+         CASE WHEN typeof(hold_id) = 'text' AND length(hold_id) <= 512 AND octet_length(hold_id) <= 2048 AND instr(hold_id, char(0)) = 0 THEN hold_id END
          FROM admission_nonce_preflight_holds WHERE operation_id = ?1",
             [operation.binding().operation_id().as_str()],
             |row| {

@@ -15,14 +15,14 @@
 -- Authority-scoped native rows. Hydration is not serving activation.
 CREATE TABLE IF NOT EXISTS security_participant_state_initializations (
     security_authority_id TEXT NOT NULL PRIMARY KEY,
-    expectation_id TEXT NOT NULL CHECK (length(expectation_id) = 64 AND expectation_id NOT GLOB '*[^0-9a-f]*'),
-    fingerprint_digest TEXT NOT NULL CHECK (length(fingerprint_digest) = 64 AND fingerprint_digest NOT GLOB '*[^0-9a-f]*'),
-    schema_digest TEXT NOT NULL CHECK (length(schema_digest) = 64 AND schema_digest NOT GLOB '*[^0-9a-f]*'),
+    expectation_id TEXT NOT NULL CHECK (length(expectation_id) = 64 AND instr(expectation_id, char(0)) = 0 AND expectation_id NOT GLOB '*[^0-9a-f]*'),
+    fingerprint_digest TEXT NOT NULL CHECK (length(fingerprint_digest) = 64 AND instr(fingerprint_digest, char(0)) = 0 AND fingerprint_digest NOT GLOB '*[^0-9a-f]*'),
+    schema_digest TEXT NOT NULL CHECK (length(schema_digest) = 64 AND instr(schema_digest, char(0)) = 0 AND schema_digest NOT GLOB '*[^0-9a-f]*'),
     initialized_at INTEGER NOT NULL CHECK (initialized_at BETWEEN 1 AND 9007199254740991),
     store_uuid TEXT NOT NULL,
     store_lease_id TEXT NOT NULL,
     store_owner_epoch INTEGER NOT NULL CHECK (store_owner_epoch > 0),
-    initialization_digest TEXT NOT NULL CHECK (length(initialization_digest) = 64 AND initialization_digest NOT GLOB '*[^0-9a-f]*'),
+    initialization_digest TEXT NOT NULL CHECK (length(initialization_digest) = 64 AND instr(initialization_digest, char(0)) = 0 AND initialization_digest NOT GLOB '*[^0-9a-f]*'),
     FOREIGN KEY (security_authority_id) REFERENCES security_participant_migration_expectations(security_authority_id),
     FOREIGN KEY (store_uuid, store_owner_epoch) REFERENCES chio_serving_leases(store_uuid, owner_epoch)
 ) STRICT, WITHOUT ROWID;

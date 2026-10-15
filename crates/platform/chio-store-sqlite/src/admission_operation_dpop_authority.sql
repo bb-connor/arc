@@ -3,11 +3,11 @@
 CREATE TABLE IF NOT EXISTS dpop_replay_authority_activations (
     dpop_authority_id TEXT NOT NULL PRIMARY KEY CHECK (
         typeof(dpop_authority_id) = 'text'
-        AND length(CAST(dpop_authority_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(dpop_authority_id) = 'text' AND length(dpop_authority_id) BETWEEN 1 AND 512 AND octet_length(dpop_authority_id) <= 2048 AND instr(dpop_authority_id, char(0)) = 0
     ),
     canonical_authority BLOB NOT NULL CHECK (
         typeof(canonical_authority) = 'blob'
-        AND length(canonical_authority) BETWEEN 1 AND 4096
+        AND typeof(canonical_authority) = 'blob' AND length(canonical_authority) BETWEEN 1 AND 4096
     ),
     FOREIGN KEY (dpop_authority_id)
         REFERENCES dpop_replay_migration_expectations(dpop_authority_id)

@@ -64,7 +64,7 @@ pub(crate) fn verify_native_dispatch_capture_owner_tx(
     }
     let owner: Option<String> = transaction
         .query_row(
-            "SELECT CASE WHEN length(CAST(operation.operation_id AS BLOB)) = 64 THEN operation.operation_id END
+            "SELECT CASE WHEN typeof(operation.operation_id) = 'text' AND length(operation.operation_id) = 64 AND instr(operation.operation_id, char(0)) = 0 THEN operation.operation_id END
              FROM budget_authorization_holds AS hold
              JOIN admission_operations AS operation ON operation.operation_id = hold.operation_id
              WHERE hold.hold_id = ?1",

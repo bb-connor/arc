@@ -2,12 +2,12 @@
 -- Contracts: docs/security/trust-boundary-inventory.json
 CREATE TABLE IF NOT EXISTS admission_operations (
     operation_id TEXT NOT NULL PRIMARY KEY
-        CHECK (length(operation_id) = 64 AND operation_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(operation_id) = 'text' AND length(operation_id) = 64 AND instr(operation_id, char(0)) = 0 AND operation_id NOT GLOB '*[^0-9a-f]*'),
     request_namespace_digest TEXT NOT NULL
-        CHECK (length(request_namespace_digest) = 64
+        CHECK (typeof(request_namespace_digest) = 'text' AND length(request_namespace_digest) = 64 AND instr(request_namespace_digest, char(0)) = 0
                AND request_namespace_digest NOT GLOB '*[^0-9a-f]*'),
-    request_id TEXT NOT NULL CHECK (length(request_id) BETWEEN 1 AND 512),
-    operation_json BLOB NOT NULL CHECK (length(operation_json) BETWEEN 1 AND 262144),
+    request_id TEXT NOT NULL CHECK (typeof(request_id) = 'text' AND length(request_id) BETWEEN 1 AND 512 AND octet_length(request_id) <= 2048 AND instr(request_id, char(0)) = 0),
+    operation_json BLOB NOT NULL CHECK (typeof(operation_json) = 'blob' AND length(operation_json) BETWEEN 1 AND 262144),
     state TEXT NOT NULL CHECK (state IN (
         'prepared', 'broker_attempt_registered', 'approval_required',
         'budget_authorized', 'approval_reserved', 'ready_to_dispatch',
@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS admission_operations (
          AND recovery_store_lease_id IS NULL
          AND recovery_store_owner_epoch IS NULL)
         OR
-        (length(recovery_claimant_id) BETWEEN 1 AND 512
-         AND length(recovery_coordinator_lease_id) BETWEEN 1 AND 512
+        (length(recovery_claimant_id) BETWEEN 1 AND 512 AND octet_length(recovery_claimant_id) <= 2048 AND instr(recovery_claimant_id, char(0)) = 0
+         AND length(recovery_coordinator_lease_id) BETWEEN 1 AND 512 AND octet_length(recovery_coordinator_lease_id) <= 2048 AND instr(recovery_coordinator_lease_id, char(0)) = 0
          AND recovery_coordinator_lease_epoch > 0
          AND recovery_claimed_version > 0
          AND recovery_expires_at_unix_ms > 0
@@ -59,13 +59,13 @@ CREATE INDEX IF NOT EXISTS admission_operations_request_id
 
 CREATE TABLE IF NOT EXISTS admission_operation_tool_requests (
     operation_id TEXT NOT NULL PRIMARY KEY,
-    request_json BLOB NOT NULL CHECK (length(request_json) BETWEEN 1 AND 262144),
+    request_json BLOB NOT NULL CHECK (typeof(request_json) = 'blob' AND length(request_json) BETWEEN 1 AND 262144),
     FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id)
 );
 
 CREATE TABLE IF NOT EXISTS admission_operation_caller_contexts (
     operation_id TEXT NOT NULL PRIMARY KEY,
-    context_json BLOB NOT NULL CHECK (length(context_json) BETWEEN 1 AND 1048576),
+    context_json BLOB NOT NULL CHECK (typeof(context_json) = 'blob' AND length(context_json) BETWEEN 1 AND 1048576),
     FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id)
 );
 
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS admission_operation_commit_meta (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     head_sequence INTEGER NOT NULL CHECK (head_sequence >= 0),
     head_chain_digest TEXT NOT NULL CHECK (
-        length(head_chain_digest) = 64
+        typeof(head_chain_digest) = 'text' AND length(head_chain_digest) = 64 AND instr(head_chain_digest, char(0)) = 0
         AND head_chain_digest NOT GLOB '*[^0-9a-f]*'
     ),
     trusted_time_high_water_unix_ms INTEGER NOT NULL
@@ -135,33 +135,32 @@ CREATE TABLE IF NOT EXISTS admission_operation_commits (
         )
     ),
     operation_digest TEXT NOT NULL
-        CHECK (length(operation_digest) = 64
+        CHECK (typeof(operation_digest) = 'text' AND length(operation_digest) = 64 AND instr(operation_digest, char(0)) = 0
                AND operation_digest NOT GLOB '*[^0-9a-f]*'),
     recovery_claim_digest TEXT CHECK (
         recovery_claim_digest IS NULL
-        OR (length(recovery_claim_digest) = 64
+        OR (length(recovery_claim_digest) = 64 AND instr(recovery_claim_digest, char(0)) = 0
             AND recovery_claim_digest NOT GLOB '*[^0-9a-f]*')
     ),
     participant_digest TEXT CHECK (
         participant_digest IS NULL
-        OR (length(participant_digest) = 64
+        OR (length(participant_digest) = 64 AND instr(participant_digest, char(0)) = 0
             AND participant_digest NOT GLOB '*[^0-9a-f]*')
     ),
     previous_chain_digest TEXT NOT NULL CHECK (
-        length(previous_chain_digest) = 64
+        typeof(previous_chain_digest) = 'text' AND length(previous_chain_digest) = 64 AND instr(previous_chain_digest, char(0)) = 0
         AND previous_chain_digest NOT GLOB '*[^0-9a-f]*'
     ),
     chain_digest TEXT NOT NULL CHECK (
-        length(chain_digest) = 64
+        typeof(chain_digest) = 'text' AND length(chain_digest) = 64 AND instr(chain_digest, char(0)) = 0
         AND chain_digest NOT GLOB '*[^0-9a-f]*'
     ),
     store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
     store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
     store_owner_epoch INTEGER NOT NULL CHECK (store_owner_epoch > 0),
     recorded_at_unix_ms INTEGER NOT NULL CHECK (recorded_at_unix_ms > 0),
-    observed_at_unix_ms INTEGER CHECK (
-        observed_at_unix_ms IS NULL
-        OR observed_at_unix_ms BETWEEN 1 AND 9007199254740991
+    observed_at_unix_ms INTEGER NOT NULL CHECK (
+        observed_at_unix_ms BETWEEN 1 AND 9007199254740991
     ),
     FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id),
     FOREIGN KEY (store_uuid, store_owner_epoch)
@@ -277,36 +276,36 @@ BEGIN
 END;
 
 CREATE TABLE IF NOT EXISTS threshold_approval_proposals (
-    proposal_id TEXT NOT NULL PRIMARY KEY CHECK (length(proposal_id) BETWEEN 1 AND 512),
+    proposal_id TEXT NOT NULL PRIMARY KEY CHECK (typeof(proposal_id) = 'text' AND length(proposal_id) BETWEEN 1 AND 512 AND octet_length(proposal_id) <= 2048 AND instr(proposal_id, char(0)) = 0),
     operation_id TEXT NOT NULL UNIQUE,
-    request_id TEXT NOT NULL CHECK (length(request_id) BETWEEN 1 AND 512),
+    request_id TEXT NOT NULL CHECK (typeof(request_id) = 'text' AND length(request_id) BETWEEN 1 AND 512 AND octet_length(request_id) <= 2048 AND instr(request_id, char(0)) = 0),
     governed_intent_hash TEXT NOT NULL CHECK (
-        length(governed_intent_hash) = 64
+        typeof(governed_intent_hash) = 'text' AND length(governed_intent_hash) = 64 AND instr(governed_intent_hash, char(0)) = 0
         AND governed_intent_hash NOT GLOB '*[^0-9a-f]*'
     ),
     subject_fingerprint TEXT NOT NULL CHECK (subject_fingerprint <> ''),
     authorizing_capability_digest TEXT NOT NULL CHECK (
-        length(authorizing_capability_digest) = 64
+        typeof(authorizing_capability_digest) = 'text' AND length(authorizing_capability_digest) = 64 AND instr(authorizing_capability_digest, char(0)) = 0
         AND authorizing_capability_digest NOT GLOB '*[^0-9a-f]*'
     ),
     policy_hash TEXT NOT NULL CHECK (
-        length(policy_hash) = 64 AND policy_hash NOT GLOB '*[^0-9a-f]*'
+        typeof(policy_hash) = 'text' AND length(policy_hash) = 64 AND instr(policy_hash, char(0)) = 0 AND policy_hash NOT GLOB '*[^0-9a-f]*'
     ),
     threshold INTEGER NOT NULL CHECK (threshold > 0),
     eligible_set_digest TEXT NOT NULL CHECK (
-        length(eligible_set_digest) = 64
+        typeof(eligible_set_digest) = 'text' AND length(eligible_set_digest) = 64 AND instr(eligible_set_digest, char(0)) = 0
         AND eligible_set_digest NOT GLOB '*[^0-9a-f]*'
     ),
     proposal_created_at INTEGER NOT NULL CHECK (proposal_created_at >= 0),
     proposal_deadline INTEGER NOT NULL CHECK (proposal_deadline > proposal_created_at),
     proposal_hash TEXT NOT NULL UNIQUE CHECK (
-        length(proposal_hash) = 64 AND proposal_hash NOT GLOB '*[^0-9a-f]*'
+        typeof(proposal_hash) = 'text' AND length(proposal_hash) = 64 AND instr(proposal_hash, char(0)) = 0 AND proposal_hash NOT GLOB '*[^0-9a-f]*'
     ),
     approval_set_hash TEXT NOT NULL UNIQUE CHECK (
-        length(approval_set_hash) = 64
+        typeof(approval_set_hash) = 'text' AND length(approval_set_hash) = 64 AND instr(approval_set_hash, char(0)) = 0
         AND approval_set_hash NOT GLOB '*[^0-9a-f]*'
     ),
-    proposal_json BLOB NOT NULL CHECK (length(proposal_json) BETWEEN 1 AND 262144),
+    proposal_json BLOB NOT NULL CHECK (typeof(proposal_json) = 'blob' AND length(proposal_json) BETWEEN 1 AND 262144),
     state TEXT NOT NULL CHECK (state IN ('reserved', 'committed', 'cancelled')),
     reserved_at_unix_ms INTEGER NOT NULL CHECK (reserved_at_unix_ms > 0),
     updated_at_unix_ms INTEGER NOT NULL CHECK (updated_at_unix_ms >= reserved_at_unix_ms),
@@ -315,13 +314,13 @@ CREATE TABLE IF NOT EXISTS threshold_approval_proposals (
 
 CREATE TABLE IF NOT EXISTS threshold_approval_tokens (
     proposal_id TEXT NOT NULL,
-    token_id TEXT NOT NULL CHECK (length(token_id) BETWEEN 1 AND 512),
+    token_id TEXT NOT NULL CHECK (typeof(token_id) = 'text' AND length(token_id) BETWEEN 1 AND 512 AND octet_length(token_id) <= 2048 AND instr(token_id, char(0)) = 0),
     approver_fingerprint TEXT NOT NULL CHECK (approver_fingerprint <> ''),
     canonical_token_digest TEXT NOT NULL UNIQUE CHECK (
-        length(canonical_token_digest) = 64
+        typeof(canonical_token_digest) = 'text' AND length(canonical_token_digest) = 64 AND instr(canonical_token_digest, char(0)) = 0
         AND canonical_token_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    token_json BLOB NOT NULL CHECK (length(token_json) BETWEEN 1 AND 262144),
+    token_json BLOB NOT NULL CHECK (typeof(token_json) = 'blob' AND length(token_json) BETWEEN 1 AND 262144),
     PRIMARY KEY (proposal_id, token_id),
     UNIQUE (proposal_id, approver_fingerprint),
     UNIQUE (proposal_id, canonical_token_digest),
@@ -417,18 +416,18 @@ CREATE TABLE IF NOT EXISTS admission_operation_terminal_projections (
         'economic_mutation_applied', 'economic_mutation_not_applied'
     )),
     projection_body_digest TEXT NOT NULL CHECK (
-        length(projection_body_digest) = 64
+        typeof(projection_body_digest) = 'text' AND length(projection_body_digest) = 64 AND instr(projection_body_digest, char(0)) = 0
         AND projection_body_digest NOT GLOB '*[^0-9a-f]*'
     ),
     projection_digest TEXT NOT NULL CHECK (
-        length(projection_digest) = 64
+        typeof(projection_digest) = 'text' AND length(projection_digest) = 64 AND instr(projection_digest, char(0)) = 0
         AND projection_digest NOT GLOB '*[^0-9a-f]*'
     ),
     projection_json BLOB NOT NULL CHECK (
-        length(projection_json) BETWEEN 1 AND 4194304
+        typeof(projection_json) = 'blob' AND length(projection_json) BETWEEN 1 AND 4194304
     ),
     manifest_json BLOB NOT NULL CHECK (
-        length(manifest_json) BETWEEN 1 AND 262144
+        typeof(manifest_json) = 'blob' AND length(manifest_json) BETWEEN 1 AND 262144
     ),
     record_count INTEGER NOT NULL CHECK (record_count BETWEEN 1 AND 32),
     committed_at_unix_ms INTEGER NOT NULL CHECK (committed_at_unix_ms > 0),
@@ -473,12 +472,12 @@ CREATE TABLE IF NOT EXISTS admission_operation_terminal_records (
         'observation_attempt_zero', 'obligation', 'release_proof',
         'channel_terminal', 'economic_mutation_result', 'mutation_audit'
     )),
-    record_id TEXT NOT NULL CHECK (length(record_id) BETWEEN 1 AND 512),
+    record_id TEXT NOT NULL CHECK (typeof(record_id) = 'text' AND length(record_id) BETWEEN 1 AND 512 AND octet_length(record_id) <= 2048 AND instr(record_id, char(0)) = 0),
     record_digest TEXT NOT NULL CHECK (
-        length(record_digest) = 64
+        typeof(record_digest) = 'text' AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0
         AND record_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    record_json BLOB NOT NULL CHECK (length(record_json) BETWEEN 1 AND 1048576),
+    record_json BLOB NOT NULL CHECK (typeof(record_json) = 'blob' AND length(record_json) BETWEEN 1 AND 1048576),
     PRIMARY KEY (operation_id, record_kind, record_id),
     UNIQUE (record_kind, record_id),
     FOREIGN KEY (operation_id)
@@ -502,22 +501,22 @@ END;
 
 CREATE TABLE IF NOT EXISTS obligation_atoms (
     obligation_id TEXT NOT NULL PRIMARY KEY CHECK (
-        length(obligation_id) = 64
+        typeof(obligation_id) = 'text' AND length(obligation_id) = 64 AND instr(obligation_id, char(0)) = 0
         AND obligation_id NOT GLOB '*[^0-9a-f]*'
     ),
     operation_id TEXT NOT NULL UNIQUE,
     atom_digest TEXT NOT NULL UNIQUE CHECK (
-        length(atom_digest) = 64
+        typeof(atom_digest) = 'text' AND length(atom_digest) = 64 AND instr(atom_digest, char(0)) = 0
         AND atom_digest NOT GLOB '*[^0-9a-f]*'
     ),
     source_receipt_id TEXT NOT NULL UNIQUE CHECK (
-        length(source_receipt_id) BETWEEN 1 AND 512
+        typeof(source_receipt_id) = 'text' AND length(source_receipt_id) BETWEEN 1 AND 512 AND octet_length(source_receipt_id) <= 2048 AND instr(source_receipt_id, char(0)) = 0
     ),
     source_receipt_digest TEXT NOT NULL UNIQUE CHECK (
-        length(source_receipt_digest) = 64
+        typeof(source_receipt_digest) = 'text' AND length(source_receipt_digest) = 64 AND instr(source_receipt_digest, char(0)) = 0
         AND source_receipt_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    atom_json BLOB NOT NULL CHECK (length(atom_json) BETWEEN 1 AND 1048576),
+    atom_json BLOB NOT NULL CHECK (typeof(atom_json) = 'blob' AND length(atom_json) BETWEEN 1 AND 1048576),
     committed_at_unix_ms INTEGER NOT NULL CHECK (committed_at_unix_ms > 0),
     store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
     store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
@@ -559,15 +558,15 @@ CREATE TABLE IF NOT EXISTS obligation_disposition_records (
     version INTEGER NOT NULL CHECK (version > 0),
     lifecycle_fence INTEGER NOT NULL CHECK (lifecycle_fence = version),
     atom_digest TEXT NOT NULL CHECK (
-        length(atom_digest) = 64
+        typeof(atom_digest) = 'text' AND length(atom_digest) = 64 AND instr(atom_digest, char(0)) = 0
         AND atom_digest NOT GLOB '*[^0-9a-f]*'
     ),
     disposition_digest TEXT NOT NULL UNIQUE CHECK (
-        length(disposition_digest) = 64
+        typeof(disposition_digest) = 'text' AND length(disposition_digest) = 64 AND instr(disposition_digest, char(0)) = 0
         AND disposition_digest NOT GLOB '*[^0-9a-f]*'
     ),
     operation_id TEXT NOT NULL,
-    record_json BLOB NOT NULL CHECK (length(record_json) BETWEEN 1 AND 1048576),
+    record_json BLOB NOT NULL CHECK (typeof(record_json) = 'blob' AND length(record_json) BETWEEN 1 AND 1048576),
     committed_at_unix_ms INTEGER NOT NULL CHECK (committed_at_unix_ms > 0),
     store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
     store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
@@ -614,15 +613,15 @@ CREATE TABLE IF NOT EXISTS obligation_settlement_lifecycle_records (
     version INTEGER NOT NULL CHECK (version > 0),
     lifecycle_fence INTEGER NOT NULL CHECK (lifecycle_fence = version),
     atom_digest TEXT NOT NULL CHECK (
-        length(atom_digest) = 64
+        typeof(atom_digest) = 'text' AND length(atom_digest) = 64 AND instr(atom_digest, char(0)) = 0
         AND atom_digest NOT GLOB '*[^0-9a-f]*'
     ),
     lifecycle_digest TEXT NOT NULL UNIQUE CHECK (
-        length(lifecycle_digest) = 64
+        typeof(lifecycle_digest) = 'text' AND length(lifecycle_digest) = 64 AND instr(lifecycle_digest, char(0)) = 0
         AND lifecycle_digest NOT GLOB '*[^0-9a-f]*'
     ),
     operation_id TEXT NOT NULL,
-    record_json BLOB NOT NULL CHECK (length(record_json) BETWEEN 1 AND 1048576),
+    record_json BLOB NOT NULL CHECK (typeof(record_json) = 'blob' AND length(record_json) BETWEEN 1 AND 1048576),
     committed_at_unix_ms INTEGER NOT NULL CHECK (committed_at_unix_ms > 0),
     store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
     store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
@@ -668,15 +667,15 @@ CREATE TABLE IF NOT EXISTS obligation_head_commits (
     obligation_id TEXT NOT NULL,
     head_sequence INTEGER NOT NULL CHECK (head_sequence > 0),
     previous_head_digest TEXT NOT NULL CHECK (
-        length(previous_head_digest) = 64
+        typeof(previous_head_digest) = 'text' AND length(previous_head_digest) = 64 AND instr(previous_head_digest, char(0)) = 0
         AND previous_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     head_digest TEXT NOT NULL CHECK (
-        length(head_digest) = 64
+        typeof(head_digest) = 'text' AND length(head_digest) = 64 AND instr(head_digest, char(0)) = 0
         AND head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     atom_digest TEXT NOT NULL CHECK (
-        length(atom_digest) = 64
+        typeof(atom_digest) = 'text' AND length(atom_digest) = 64 AND instr(atom_digest, char(0)) = 0
         AND atom_digest NOT GLOB '*[^0-9a-f]*'
     ),
     disposition_version INTEGER NOT NULL CHECK (disposition_version > 0),
@@ -684,7 +683,7 @@ CREATE TABLE IF NOT EXISTS obligation_head_commits (
         disposition_lifecycle_fence = disposition_version
     ),
     disposition_digest TEXT NOT NULL CHECK (
-        length(disposition_digest) = 64
+        typeof(disposition_digest) = 'text' AND length(disposition_digest) = 64 AND instr(disposition_digest, char(0)) = 0
         AND disposition_digest NOT GLOB '*[^0-9a-f]*'
     ),
     settlement_version INTEGER NOT NULL CHECK (settlement_version > 0),
@@ -692,7 +691,7 @@ CREATE TABLE IF NOT EXISTS obligation_head_commits (
         settlement_lifecycle_fence = settlement_version
     ),
     settlement_lifecycle_digest TEXT NOT NULL CHECK (
-        length(settlement_lifecycle_digest) = 64
+        typeof(settlement_lifecycle_digest) = 'text' AND length(settlement_lifecycle_digest) = 64 AND instr(settlement_lifecycle_digest, char(0)) = 0
         AND settlement_lifecycle_digest NOT GLOB '*[^0-9a-f]*'
     ),
     snapshot_version INTEGER NOT NULL CHECK (snapshot_version > 0),
@@ -703,7 +702,7 @@ CREATE TABLE IF NOT EXISTS obligation_head_commits (
     source_operation_id TEXT NOT NULL,
     participant_digest TEXT CHECK (
         participant_digest IS NULL
-        OR (length(participant_digest) = 64
+        OR (length(participant_digest) = 64 AND instr(participant_digest, char(0)) = 0
             AND participant_digest NOT GLOB '*[^0-9a-f]*')
     ),
     participant_commit_sequence INTEGER CHECK (
@@ -839,11 +838,11 @@ CREATE TABLE IF NOT EXISTS obligation_heads (
     obligation_id TEXT NOT NULL PRIMARY KEY,
     head_sequence INTEGER NOT NULL CHECK (head_sequence > 0),
     head_digest TEXT NOT NULL CHECK (
-        length(head_digest) = 64
+        typeof(head_digest) = 'text' AND length(head_digest) = 64 AND instr(head_digest, char(0)) = 0
         AND head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     atom_digest TEXT NOT NULL CHECK (
-        length(atom_digest) = 64
+        typeof(atom_digest) = 'text' AND length(atom_digest) = 64 AND instr(atom_digest, char(0)) = 0
         AND atom_digest NOT GLOB '*[^0-9a-f]*'
     ),
     disposition_version INTEGER NOT NULL CHECK (disposition_version > 0),
@@ -967,12 +966,12 @@ END;
 CREATE TABLE IF NOT EXISTS factor_assignment_authority_sets (
     generation INTEGER NOT NULL PRIMARY KEY CHECK (generation > 0),
     active_set_digest TEXT NOT NULL CHECK (
-        length(active_set_digest) = 64
+        typeof(active_set_digest) = 'text' AND length(active_set_digest) = 64 AND instr(active_set_digest, char(0)) = 0
         AND active_set_digest NOT GLOB '*[^0-9a-f]*'
     ),
     previous_active_set_digest TEXT CHECK (
         previous_active_set_digest IS NULL
-        OR (length(previous_active_set_digest) = 64
+        OR (length(previous_active_set_digest) = 64 AND instr(previous_active_set_digest, char(0)) = 0
             AND previous_active_set_digest NOT GLOB '*[^0-9a-f]*')
     ),
     activated_at_unix_ms INTEGER NOT NULL CHECK (activated_at_unix_ms > 0),
@@ -1035,147 +1034,147 @@ END;
 
 CREATE TABLE IF NOT EXISTS obligation_assignment_results (
     operation_id TEXT NOT NULL PRIMARY KEY CHECK (
-        length(operation_id) = 64
+        typeof(operation_id) = 'text' AND length(operation_id) = 64 AND instr(operation_id, char(0)) = 0
         AND operation_id NOT GLOB '*[^0-9a-f]*'
     ),
     obligation_id TEXT NOT NULL CHECK (
-        length(obligation_id) = 64
+        typeof(obligation_id) = 'text' AND length(obligation_id) = 64 AND instr(obligation_id, char(0)) = 0
         AND obligation_id NOT GLOB '*[^0-9a-f]*'
     ),
     obligation_atom_digest TEXT NOT NULL CHECK (
-        length(obligation_atom_digest) = 64
+        typeof(obligation_atom_digest) = 'text' AND length(obligation_atom_digest) = 64 AND instr(obligation_atom_digest, char(0)) = 0
         AND obligation_atom_digest NOT GLOB '*[^0-9a-f]*'
     ),
     outcome TEXT NOT NULL CHECK (outcome IN ('applied', 'not_applied')),
     authority_set_generation INTEGER NOT NULL CHECK (authority_set_generation > 0),
     authority_set_digest TEXT NOT NULL CHECK (
-        length(authority_set_digest) = 64
+        typeof(authority_set_digest) = 'text' AND length(authority_set_digest) = 64 AND instr(authority_set_digest, char(0)) = 0
         AND authority_set_digest NOT GLOB '*[^0-9a-f]*'
     ),
     authority_configuration_digest TEXT NOT NULL CHECK (
-        length(authority_configuration_digest) = 64
+        typeof(authority_configuration_digest) = 'text' AND length(authority_configuration_digest) = 64 AND instr(authority_configuration_digest, char(0)) = 0
         AND authority_configuration_digest NOT GLOB '*[^0-9a-f]*'
     ),
     normalized_request_digest TEXT NOT NULL CHECK (
-        length(normalized_request_digest) = 64
+        typeof(normalized_request_digest) = 'text' AND length(normalized_request_digest) = 64 AND instr(normalized_request_digest, char(0)) = 0
         AND normalized_request_digest NOT GLOB '*[^0-9a-f]*'
     ),
     normalized_request_json BLOB NOT NULL CHECK (
         typeof(normalized_request_json) = 'blob'
-        AND length(normalized_request_json) BETWEEN 1 AND 1048576
+        AND typeof(normalized_request_json) = 'blob' AND length(normalized_request_json) BETWEEN 1 AND 1048576
     ),
     claim_digest TEXT NOT NULL CHECK (
-        length(claim_digest) = 64
+        typeof(claim_digest) = 'text' AND length(claim_digest) = 64 AND instr(claim_digest, char(0)) = 0
         AND claim_digest NOT GLOB '*[^0-9a-f]*'
     ),
     claim_json BLOB NOT NULL CHECK (
         typeof(claim_json) = 'blob'
-        AND length(claim_json) BETWEEN 1 AND 1048576
+        AND typeof(claim_json) = 'blob' AND length(claim_json) BETWEEN 1 AND 1048576
     ),
     receipt_digest TEXT NOT NULL CHECK (
-        length(receipt_digest) = 64
+        typeof(receipt_digest) = 'text' AND length(receipt_digest) = 64 AND instr(receipt_digest, char(0)) = 0
         AND receipt_digest NOT GLOB '*[^0-9a-f]*'
     ),
     receipt_json BLOB NOT NULL CHECK (
         typeof(receipt_json) = 'blob'
-        AND length(receipt_json) BETWEEN 1 AND 1048576
+        AND typeof(receipt_json) = 'blob' AND length(receipt_json) BETWEEN 1 AND 1048576
     ),
     iou_digest TEXT NOT NULL CHECK (
-        length(iou_digest) = 64
+        typeof(iou_digest) = 'text' AND length(iou_digest) = 64 AND instr(iou_digest, char(0)) = 0
         AND iou_digest NOT GLOB '*[^0-9a-f]*'
     ),
     iou_json BLOB NOT NULL CHECK (
         typeof(iou_json) = 'blob'
-        AND length(iou_json) BETWEEN 1 AND 1048576
+        AND typeof(iou_json) = 'blob' AND length(iou_json) BETWEEN 1 AND 1048576
     ),
     offer_digest TEXT NOT NULL CHECK (
-        length(offer_digest) = 64
+        typeof(offer_digest) = 'text' AND length(offer_digest) = 64 AND instr(offer_digest, char(0)) = 0
         AND offer_digest NOT GLOB '*[^0-9a-f]*'
     ),
     offer_json BLOB NOT NULL CHECK (
         typeof(offer_json) = 'blob'
-        AND length(offer_json) BETWEEN 1 AND 1048576
+        AND typeof(offer_json) = 'blob' AND length(offer_json) BETWEEN 1 AND 1048576
     ),
     bind_authorization_body_digest TEXT NOT NULL CHECK (
-        length(bind_authorization_body_digest) = 64
+        typeof(bind_authorization_body_digest) = 'text' AND length(bind_authorization_body_digest) = 64 AND instr(bind_authorization_body_digest, char(0)) = 0
         AND bind_authorization_body_digest NOT GLOB '*[^0-9a-f]*'
     ),
     bind_authorization_envelope_digest TEXT NOT NULL CHECK (
-        length(bind_authorization_envelope_digest) = 64
+        typeof(bind_authorization_envelope_digest) = 'text' AND length(bind_authorization_envelope_digest) = 64 AND instr(bind_authorization_envelope_digest, char(0)) = 0
         AND bind_authorization_envelope_digest NOT GLOB '*[^0-9a-f]*'
     ),
     bind_authorization_json BLOB NOT NULL CHECK (
         typeof(bind_authorization_json) = 'blob'
-        AND length(bind_authorization_json) BETWEEN 1 AND 1048576
+        AND typeof(bind_authorization_json) = 'blob' AND length(bind_authorization_json) BETWEEN 1 AND 1048576
     ),
     agreement_body_digest TEXT NOT NULL CHECK (
-        length(agreement_body_digest) = 64
+        typeof(agreement_body_digest) = 'text' AND length(agreement_body_digest) = 64 AND instr(agreement_body_digest, char(0)) = 0
         AND agreement_body_digest NOT GLOB '*[^0-9a-f]*'
     ),
     agreement_artifact_digest TEXT NOT NULL CHECK (
-        length(agreement_artifact_digest) = 64
+        typeof(agreement_artifact_digest) = 'text' AND length(agreement_artifact_digest) = 64 AND instr(agreement_artifact_digest, char(0)) = 0
         AND agreement_artifact_digest NOT GLOB '*[^0-9a-f]*'
     ),
     agreement_seller_signature_digest TEXT NOT NULL CHECK (
-        length(agreement_seller_signature_digest) = 64
+        typeof(agreement_seller_signature_digest) = 'text' AND length(agreement_seller_signature_digest) = 64 AND instr(agreement_seller_signature_digest, char(0)) = 0
         AND agreement_seller_signature_digest NOT GLOB '*[^0-9a-f]*'
     ),
     agreement_buyer_signature_digest TEXT NOT NULL CHECK (
-        length(agreement_buyer_signature_digest) = 64
+        typeof(agreement_buyer_signature_digest) = 'text' AND length(agreement_buyer_signature_digest) = 64 AND instr(agreement_buyer_signature_digest, char(0)) = 0
         AND agreement_buyer_signature_digest NOT GLOB '*[^0-9a-f]*'
     ),
     agreement_json BLOB NOT NULL CHECK (
         typeof(agreement_json) = 'blob'
-        AND length(agreement_json) BETWEEN 1 AND 1048576
+        AND typeof(agreement_json) = 'blob' AND length(agreement_json) BETWEEN 1 AND 1048576
     ),
     assignment_authorization_set_digest TEXT NOT NULL CHECK (
-        length(assignment_authorization_set_digest) = 64
+        typeof(assignment_authorization_set_digest) = 'text' AND length(assignment_authorization_set_digest) = 64 AND instr(assignment_authorization_set_digest, char(0)) = 0
         AND assignment_authorization_set_digest NOT GLOB '*[^0-9a-f]*'
     ),
     status_proof_body_digest TEXT NOT NULL CHECK (
-        length(status_proof_body_digest) = 64
+        typeof(status_proof_body_digest) = 'text' AND length(status_proof_body_digest) = 64 AND instr(status_proof_body_digest, char(0)) = 0
         AND status_proof_body_digest NOT GLOB '*[^0-9a-f]*'
     ),
     status_proof_envelope_digest TEXT NOT NULL CHECK (
-        length(status_proof_envelope_digest) = 64
+        typeof(status_proof_envelope_digest) = 'text' AND length(status_proof_envelope_digest) = 64 AND instr(status_proof_envelope_digest, char(0)) = 0
         AND status_proof_envelope_digest NOT GLOB '*[^0-9a-f]*'
     ),
     status_proof_json BLOB NOT NULL CHECK (
         typeof(status_proof_json) = 'blob'
-        AND length(status_proof_json) BETWEEN 1 AND 1048576
+        AND typeof(status_proof_json) = 'blob' AND length(status_proof_json) BETWEEN 1 AND 1048576
     ),
     result_id TEXT NOT NULL CHECK (
-        length(result_id) = 64
+        typeof(result_id) = 'text' AND length(result_id) = 64 AND instr(result_id, char(0)) = 0
         AND result_id NOT GLOB '*[^0-9a-f]*'
     ),
     result_body_digest TEXT NOT NULL CHECK (
-        length(result_body_digest) = 64
+        typeof(result_body_digest) = 'text' AND length(result_body_digest) = 64 AND instr(result_body_digest, char(0)) = 0
         AND result_body_digest NOT GLOB '*[^0-9a-f]*'
     ),
     result_envelope_digest TEXT NOT NULL CHECK (
-        length(result_envelope_digest) = 64
+        typeof(result_envelope_digest) = 'text' AND length(result_envelope_digest) = 64 AND instr(result_envelope_digest, char(0)) = 0
         AND result_envelope_digest NOT GLOB '*[^0-9a-f]*'
     ),
     result_signature_digest TEXT NOT NULL CHECK (
-        length(result_signature_digest) = 64
+        typeof(result_signature_digest) = 'text' AND length(result_signature_digest) = 64 AND instr(result_signature_digest, char(0)) = 0
         AND result_signature_digest NOT GLOB '*[^0-9a-f]*'
     ),
     result_json BLOB NOT NULL CHECK (
         typeof(result_json) = 'blob'
-        AND length(result_json) BETWEEN 1 AND 1048576
+        AND typeof(result_json) = 'blob' AND length(result_json) BETWEEN 1 AND 1048576
     ),
     observed_head_sequence INTEGER NOT NULL CHECK (observed_head_sequence > 0),
     observed_head_digest TEXT NOT NULL CHECK (
-        length(observed_head_digest) = 64
+        typeof(observed_head_digest) = 'text' AND length(observed_head_digest) = 64 AND instr(observed_head_digest, char(0)) = 0
         AND observed_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     resulting_head_sequence INTEGER NOT NULL CHECK (resulting_head_sequence > 0),
     resulting_head_digest TEXT NOT NULL CHECK (
-        length(resulting_head_digest) = 64
+        typeof(resulting_head_digest) = 'text' AND length(resulting_head_digest) = 64 AND instr(resulting_head_digest, char(0)) = 0
         AND resulting_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     participant_digest TEXT NOT NULL CHECK (
-        length(participant_digest) = 64
+        typeof(participant_digest) = 'text' AND length(participant_digest) = 64 AND instr(participant_digest, char(0)) = 0
         AND participant_digest NOT GLOB '*[^0-9a-f]*'
     ),
     participant_commit_sequence INTEGER NOT NULL UNIQUE CHECK (
@@ -1315,23 +1314,23 @@ END;
 CREATE TABLE IF NOT EXISTS admission_operation_authorization_consumptions (
     operation_id TEXT NOT NULL PRIMARY KEY,
     authorization_receipt_id TEXT NOT NULL UNIQUE
-        CHECK (length(authorization_receipt_id) BETWEEN 1 AND 512),
+        CHECK (typeof(authorization_receipt_id) = 'text' AND length(authorization_receipt_id) BETWEEN 1 AND 512 AND octet_length(authorization_receipt_id) <= 2048 AND instr(authorization_receipt_id, char(0)) = 0),
     consumer_receipt_id TEXT NOT NULL
-        CHECK (length(consumer_receipt_id) BETWEEN 1 AND 512),
-    request_id TEXT NOT NULL CHECK (length(request_id) BETWEEN 1 AND 512),
-    session_id TEXT NOT NULL CHECK (length(session_id) BETWEEN 1 AND 512),
-    tool_call_id TEXT NOT NULL CHECK (length(tool_call_id) BETWEEN 1 AND 512),
-    tenant_id TEXT CHECK (tenant_id IS NULL OR length(tenant_id) BETWEEN 1 AND 512),
+        CHECK (typeof(consumer_receipt_id) = 'text' AND length(consumer_receipt_id) BETWEEN 1 AND 512 AND octet_length(consumer_receipt_id) <= 2048 AND instr(consumer_receipt_id, char(0)) = 0),
+    request_id TEXT NOT NULL CHECK (typeof(request_id) = 'text' AND length(request_id) BETWEEN 1 AND 512 AND octet_length(request_id) <= 2048 AND instr(request_id, char(0)) = 0),
+    session_id TEXT NOT NULL CHECK (typeof(session_id) = 'text' AND length(session_id) BETWEEN 1 AND 512 AND octet_length(session_id) <= 2048 AND instr(session_id, char(0)) = 0),
+    tool_call_id TEXT NOT NULL CHECK (typeof(tool_call_id) = 'text' AND length(tool_call_id) BETWEEN 1 AND 512 AND octet_length(tool_call_id) <= 2048 AND instr(tool_call_id, char(0)) = 0),
+    tenant_id TEXT CHECK (tenant_id IS NULL OR (length(tenant_id) BETWEEN 1 AND 512 AND octet_length(tenant_id) <= 2048 AND instr(tenant_id, char(0)) = 0)),
     parameter_hash TEXT NOT NULL CHECK (
-        length(parameter_hash) = 64
+        typeof(parameter_hash) = 'text' AND length(parameter_hash) = 64 AND instr(parameter_hash, char(0)) = 0
         AND parameter_hash NOT GLOB '*[^0-9a-f]*'
     ),
     consumed_at_unix_ms INTEGER NOT NULL CHECK (consumed_at_unix_ms > 0),
     record_digest TEXT NOT NULL CHECK (
-        length(record_digest) = 64
+        typeof(record_digest) = 'text' AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0
         AND record_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    record_json BLOB NOT NULL CHECK (length(record_json) BETWEEN 1 AND 1048576),
+    record_json BLOB NOT NULL CHECK (typeof(record_json) = 'blob' AND length(record_json) BETWEEN 1 AND 1048576),
     FOREIGN KEY (operation_id)
         REFERENCES admission_operation_terminal_projections(operation_id)
 );
@@ -1353,19 +1352,19 @@ END;
 
 CREATE TABLE IF NOT EXISTS admission_operation_observer_attempts (
     operation_id TEXT NOT NULL PRIMARY KEY,
-    receipt_id TEXT NOT NULL UNIQUE CHECK (length(receipt_id) BETWEEN 1 AND 512),
+    receipt_id TEXT NOT NULL UNIQUE CHECK (typeof(receipt_id) = 'text' AND length(receipt_id) BETWEEN 1 AND 512 AND octet_length(receipt_id) <= 2048 AND instr(receipt_id, char(0)) = 0),
     work_state TEXT NOT NULL CHECK (work_state IN (
         'pending', 'claimed', 'completed', 'failed'
     )),
     attempts INTEGER NOT NULL CHECK (attempts >= 0),
     next_visible_at_unix_ms INTEGER NOT NULL CHECK (next_visible_at_unix_ms > 0),
     row_version INTEGER NOT NULL CHECK (row_version >= 0),
-    last_error TEXT CHECK (last_error IS NULL OR length(last_error) BETWEEN 1 AND 2048),
+    last_error TEXT CHECK (last_error IS NULL OR (length(last_error) BETWEEN 1 AND 2048 AND octet_length(last_error) <= 8192 AND instr(last_error, char(0)) = 0)),
     record_digest TEXT NOT NULL CHECK (
-        length(record_digest) = 64
+        typeof(record_digest) = 'text' AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0
         AND record_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    record_json BLOB NOT NULL CHECK (length(record_json) BETWEEN 1 AND 1048576),
+    record_json BLOB NOT NULL CHECK (typeof(record_json) = 'blob' AND length(record_json) BETWEEN 1 AND 1048576),
     created_at_unix_ms INTEGER NOT NULL CHECK (created_at_unix_ms > 0),
     updated_at_unix_ms INTEGER NOT NULL CHECK (
         updated_at_unix_ms >= created_at_unix_ms
@@ -1431,30 +1430,30 @@ BEGIN
 END;
 
 CREATE TABLE IF NOT EXISTS credit_exposure_accounts (
-    debtor_id TEXT NOT NULL CHECK (length(debtor_id) BETWEEN 1 AND 512),
+    debtor_id TEXT NOT NULL CHECK (typeof(debtor_id) = 'text' AND length(debtor_id) BETWEEN 1 AND 512 AND octet_length(debtor_id) <= 2048 AND instr(debtor_id, char(0)) = 0),
     scope_digest TEXT NOT NULL CHECK (
-        length(scope_digest) = 64
+        typeof(scope_digest) = 'text' AND length(scope_digest) = 64 AND instr(scope_digest, char(0)) = 0
         AND scope_digest = lower(scope_digest)
         AND scope_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    currency TEXT NOT NULL CHECK (length(currency) BETWEEN 1 AND 32),
+    currency TEXT NOT NULL CHECK (typeof(currency) = 'text' AND length(currency) BETWEEN 1 AND 32 AND octet_length(currency) <= 128 AND instr(currency, char(0)) = 0),
     open_units INTEGER NOT NULL CHECK (open_units BETWEEN 0 AND 9007199254740991),
     reserved_units INTEGER NOT NULL CHECK (reserved_units BETWEEN 0 AND 9007199254740991),
     effective_ceiling_units INTEGER NOT NULL CHECK (
         effective_ceiling_units BETWEEN 1 AND 9007199254740991
     ),
     authority_configuration_digest TEXT NOT NULL CHECK (
-        length(authority_configuration_digest) = 64
+        typeof(authority_configuration_digest) = 'text' AND length(authority_configuration_digest) = 64 AND instr(authority_configuration_digest, char(0)) = 0
         AND authority_configuration_digest = lower(authority_configuration_digest)
         AND authority_configuration_digest NOT GLOB '*[^0-9a-f]*'
     ),
     authority_set_digest TEXT NOT NULL CHECK (
-        length(authority_set_digest) = 64
+        typeof(authority_set_digest) = 'text' AND length(authority_set_digest) = 64 AND instr(authority_set_digest, char(0)) = 0
         AND authority_set_digest = lower(authority_set_digest)
         AND authority_set_digest NOT GLOB '*[^0-9a-f]*'
     ),
     authority_evidence_digest TEXT NOT NULL CHECK (
-        length(authority_evidence_digest) = 64
+        typeof(authority_evidence_digest) = 'text' AND length(authority_evidence_digest) = 64 AND instr(authority_evidence_digest, char(0)) = 0
         AND authority_evidence_digest = lower(authority_evidence_digest)
         AND authority_evidence_digest NOT GLOB '*[^0-9a-f]*'
     ),
@@ -1525,14 +1524,14 @@ END;
 CREATE TABLE IF NOT EXISTS credit_exposure_reservations (
     operation_id TEXT NOT NULL PRIMARY KEY,
     reservation_digest TEXT NOT NULL UNIQUE CHECK (
-        length(reservation_digest) = 64
+        typeof(reservation_digest) = 'text' AND length(reservation_digest) = 64 AND instr(reservation_digest, char(0)) = 0
         AND reservation_digest = lower(reservation_digest)
         AND reservation_digest NOT GLOB '*[^0-9a-f]*'
     ),
     debtor_id TEXT NOT NULL,
     scope_digest TEXT NOT NULL,
     currency TEXT NOT NULL,
-    action_nonce TEXT NOT NULL CHECK (length(action_nonce) BETWEEN 1 AND 512),
+    action_nonce TEXT NOT NULL CHECK (typeof(action_nonce) = 'text' AND length(action_nonce) BETWEEN 1 AND 512 AND octet_length(action_nonce) <= 2048 AND instr(action_nonce, char(0)) = 0),
     amount_units INTEGER NOT NULL CHECK (amount_units BETWEEN 1 AND 9007199254740991),
     source_account_version INTEGER NOT NULL CHECK (
         source_account_version BETWEEN 1 AND 9007199254740991
@@ -1546,7 +1545,7 @@ CREATE TABLE IF NOT EXISTS credit_exposure_reservations (
     reserved_resource_fence INTEGER NOT NULL CHECK (
         reserved_resource_fence BETWEEN 1 AND 9007199254740991
     ),
-    reservation_json BLOB NOT NULL CHECK (length(reservation_json) > 0),
+    reservation_json BLOB NOT NULL CHECK (typeof(reservation_json) = 'blob' AND length(reservation_json) > 0),
     reserved_at_unix_ms INTEGER NOT NULL CHECK (
         reserved_at_unix_ms BETWEEN 1 AND 9007199254740991
     ),
@@ -1617,14 +1616,14 @@ CREATE TABLE IF NOT EXISTS credit_exposure_terminal_transitions (
         )
     ),
     projection_digest TEXT NOT NULL CHECK (
-        length(projection_digest) = 64
+        typeof(projection_digest) = 'text' AND length(projection_digest) = 64 AND instr(projection_digest, char(0)) = 0
         AND projection_digest = lower(projection_digest)
         AND projection_digest NOT GLOB '*[^0-9a-f]*'
     ),
     obligation_id TEXT,
     account_version INTEGER NOT NULL CHECK (account_version BETWEEN 1 AND 9007199254740991),
     resource_fence INTEGER NOT NULL CHECK (resource_fence BETWEEN 1 AND 9007199254740991),
-    transition_json BLOB NOT NULL CHECK (length(transition_json) > 0),
+    transition_json BLOB NOT NULL CHECK (typeof(transition_json) = 'blob' AND length(transition_json) > 0),
     transitioned_at_unix_ms INTEGER NOT NULL CHECK (
         transitioned_at_unix_ms BETWEEN 1 AND 9007199254740991
     ),

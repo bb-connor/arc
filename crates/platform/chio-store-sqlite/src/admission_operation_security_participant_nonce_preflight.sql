@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS security_participant_nonce_preflight_events (
     operation_id TEXT NOT NULL UNIQUE REFERENCES admission_operations(operation_id),
     tenant_id TEXT NOT NULL,
     transition_id TEXT NOT NULL,
-    canonical_record BLOB NOT NULL CHECK (length(canonical_record) BETWEEN 1 AND 16777216),
-    event_digest TEXT NOT NULL CHECK (length(event_digest) = 64 AND event_digest NOT GLOB '*[^0-9a-f]*'),
+    canonical_record BLOB NOT NULL CHECK (typeof(canonical_record) = 'blob' AND length(canonical_record) BETWEEN 1 AND 16777216),
+    event_digest TEXT NOT NULL CHECK (typeof(event_digest) = 'text' AND length(event_digest) = 64 AND instr(event_digest, char(0)) = 0 AND event_digest NOT GLOB '*[^0-9a-f]*'),
     observed_at INTEGER NOT NULL CHECK (observed_at BETWEEN 1 AND 9007199254740991),
     PRIMARY KEY (security_authority_id, sequence),
     UNIQUE (security_authority_id, tenant_id, transition_id)

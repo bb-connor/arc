@@ -737,12 +737,13 @@ fn prepared_record_load_rejects_multiple_begin_commits() -> TestResult {
                 commit_sequence, operation_id, operation_version, mutation_kind,
                 operation_digest, recovery_claim_digest, participant_digest,
                 previous_chain_digest, chain_digest,
-                store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
+                store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms,
+                observed_at_unix_ms
             )
             SELECT
                 (SELECT MAX(commit_sequence) + 1 FROM admission_operation_commits),
                 operation_id, operation_version, 'begin', operation_digest, NULL,
-                participant_digest, chain_digest, ?2, ?3, ?4, ?5, ?6
+                participant_digest, chain_digest, ?2, ?3, ?4, ?5, ?6, ?6
             FROM admission_operation_commits
             WHERE operation_id = ?1 AND mutation_kind = 'begin'
             "#,

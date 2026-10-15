@@ -28,10 +28,10 @@ CREATE TABLE admission_operation_recovery_records (
         AND (native_request IS NULL OR instr(native_request, char(0)) = 0)
     ),
     CONSTRAINT recovery_record_bytes CHECK (
-        length(CAST(record_key AS BLOB)) <= 2048
-        AND length(CAST(scope_key AS BLOB)) <= 256
-        AND (native_namespace IS NULL OR length(CAST(native_namespace AS BLOB)) <= 256)
-        AND (native_request IS NULL OR length(CAST(native_request AS BLOB)) <= 1024)
+        octet_length(record_key) <= 2048
+        AND octet_length(scope_key) <= 256
+        AND (native_namespace IS NULL OR octet_length(native_namespace) <= 256)
+        AND (native_request IS NULL OR octet_length(native_request) <= 1024)
     )
 ) WITHOUT ROWID;
 CREATE UNIQUE INDEX admission_operation_recovery_native_identity
@@ -110,10 +110,10 @@ CREATE TABLE admission_operation_recovery_events (
         AND instr(event_digest, char(0)) = 0
     ),
     CONSTRAINT recovery_event_bytes CHECK (
-        length(CAST(record_key AS BLOB)) <= 2048
-        AND length(CAST(record_digest AS BLOB)) <= 256
-        AND length(CAST(previous_digest AS BLOB)) <= 256
-        AND length(CAST(event_digest AS BLOB)) <= 256
+        octet_length(record_key) <= 2048
+        AND octet_length(record_digest) <= 256
+        AND octet_length(previous_digest) <= 256
+        AND octet_length(event_digest) <= 256
     )
 );
 CREATE TRIGGER admission_operation_recovery_event_no_replace

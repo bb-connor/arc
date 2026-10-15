@@ -19,20 +19,28 @@ use rusqlite::{ffi, Connection};
 const PADDING: usize = 1 << 20;
 const HEX64: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-type TestResult = Result<(), Box<dyn Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 #[derive(Clone, Copy)]
-enum Bound {
+enum Bound<'a> {
     /// A TEXT column whose valid value is the given string.
-    Text(&'static str),
+    Text(&'a str),
     /// A TEXT column of exact width, which must also refuse an in-width NUL.
-    ExactText(&'static str),
+    ExactText(&'a str),
     /// A BLOB column whose valid value has the given length.
     Blob(usize),
 }
 
-fn column_definition(table_sql: &str, column: &str) -> Option<String> {
-    let open = table_sql.find('(')?;
+pub(crate) fn column_definition(table_sql: &str, column: &str) -> Option<String> {
+    table_items(table_sql)
+        .into_iter()
+        .find(|item| item.split_whitespace().next() == Some(column))
+}
+
+fn table_items(table_sql: &str) -> Vec<String> {
+    let Some(open) = table_sql.find('(') else {
+        return Vec::new();
+    };
     let mut depth = 0usize;
     let mut quoted = false;
     let mut start = open + 1;
@@ -58,9 +66,8 @@ fn column_definition(table_sql: &str, column: &str) -> Option<String> {
     }
     items
         .into_iter()
-        .map(str::trim)
-        .find(|item| item.split_whitespace().next() == Some(column))
-        .map(str::to_owned)
+        .map(|item| item.trim().to_owned())
+        .collect()
 }
 
 fn insert(probe: &Connection, value: Value) -> rusqlite::Result<usize> {
@@ -81,11 +88,11 @@ fn continuation_padded(valid: &str) -> Vec<u8> {
     bytes
 }
 
-fn is_check_refusal(result: &rusqlite::Result<usize>) -> bool {
+fn is_constraint_refusal(result: &rusqlite::Result<usize>, code: i32) -> bool {
     matches!(
         result,
         Err(rusqlite::Error::SqliteFailure(error, Some(_)))
-            if error.extended_code == ffi::SQLITE_CONSTRAINT_CHECK
+            if error.extended_code == code
     )
 }
 
@@ -97,7 +104,7 @@ fn assert_column_refuses_nul_padding(
     catalog: &Connection,
     table: &str,
     column: &str,
-    bound: Bound,
+    bound: Bound<'_>,
 ) -> TestResult {
     let table_sql: String = catalog.query_row(
         "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?1",
@@ -106,10 +113,12 @@ fn assert_column_refuses_nul_padding(
     )?;
     let definition =
         column_definition(&table_sql, column).ok_or(format!("{table}.{column} is not defined"))?;
+    let strict = if is_strict(&table_sql) { " STRICT" } else { "" };
     for encoding in ["UTF-8", "UTF-16le", "UTF-16be"] {
         let probe = Connection::open_in_memory()?;
         probe.execute_batch(&format!(
-            "PRAGMA encoding = '{encoding}'; CREATE TABLE probe ({definition});"
+            "PRAGMA encoding = '{encoding}'; PRAGMA foreign_keys = OFF;
+             CREATE TABLE probe ({definition}){strict};"
         ))?;
         match bound {
             Bound::Text(valid) | Bound::ExactText(valid) => {
@@ -119,10 +128,13 @@ fn assert_column_refuses_nul_padding(
                     "{table}.{column}"
                 );
                 let padded = insert(&probe, Value::Text(nul_padded(valid)));
-                assert!(is_check_refusal(&padded), "{table}.{column}: {padded:?}");
+                assert!(
+                    is_constraint_refusal(&padded, ffi::SQLITE_CONSTRAINT_CHECK),
+                    "{table}.{column}: {padded:?}"
+                );
                 let stretched = insert_text_bytes(&probe, continuation_padded(valid));
                 assert!(
-                    is_check_refusal(&stretched),
+                    is_constraint_refusal(&stretched, ffi::SQLITE_CONSTRAINT_CHECK),
                     "{table}.{column}: {stretched:?}"
                 );
             }
@@ -133,15 +145,28 @@ fn assert_column_refuses_nul_padding(
                     "{table}.{column}"
                 );
                 let text = insert(&probe, Value::Text(nul_padded(&"a".repeat(len))));
-                assert!(is_check_refusal(&text), "{table}.{column}: {text:?}");
+                let code = if is_strict(&table_sql) {
+                    ffi::SQLITE_CONSTRAINT_DATATYPE
+                } else {
+                    ffi::SQLITE_CONSTRAINT_CHECK
+                };
+                assert!(
+                    is_constraint_refusal(&text, code),
+                    "{table}.{column}: {text:?}"
+                );
             }
         }
         if let Bound::ExactText(valid) = bound {
             let mut in_width = valid[..valid.len() - 1].to_owned();
             in_width.push('\0');
             let refused = insert(&probe, Value::Text(in_width));
-            assert!(is_check_refusal(&refused), "{table}.{column}: {refused:?}");
+            assert!(
+                is_constraint_refusal(&refused, ffi::SQLITE_CONSTRAINT_CHECK),
+                "{table}.{column}: {refused:?}"
+            );
         }
+        let rows: i64 = probe.query_row("SELECT count(*) FROM probe", [], |row| row.get(0))?;
+        assert_eq!(rows, 1, "{table}.{column}: refusal changed the stored rows");
     }
     Ok(())
 }
@@ -157,6 +182,13 @@ fn bundled_sqlite_provides_octet_length() -> TestResult {
     let octets: i64 = probe.query_row("SELECT octet_length('ab')", [], |row| row.get(0))?;
     assert_eq!(octets, 2);
     Ok(())
+}
+
+fn is_strict(table_sql: &str) -> bool {
+    table_sql
+        .rsplit(')')
+        .next()
+        .is_some_and(|options| options.split(',').any(|option| option.trim() == "STRICT"))
 }
 
 fn catalog(schema: &str) -> rusqlite::Result<Connection> {
@@ -414,4 +446,107 @@ fn encrypted_blob_store_refuses_nul_padding() -> TestResult {
     )?);
     let catalog = Connection::open(&path)?;
     assert_column_refuses_nul_padding(&catalog, "chio_encrypted_blobs", "nonce", Bound::Blob(12))
+}
+
+/// A value the column accepts, so the probe can test refusals around it.
+fn admission_bound(
+    catalog: &Connection,
+    table: &str,
+    definition: &str,
+) -> TestResult<Option<OwnedBound>> {
+    let table_sql: String = catalog.query_row(
+        "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?1",
+        [table],
+        |row| row.get(0),
+    )?;
+    let strict = if is_strict(&table_sql) { " STRICT" } else { "" };
+    let probe = Connection::open_in_memory()?;
+    probe.execute_batch(&format!(
+        "PRAGMA foreign_keys = OFF; CREATE TABLE probe ({definition}){strict};"
+    ))?;
+    let column = definition.split_whitespace().next().unwrap_or_default();
+    let exact = definition.contains(&format!("length({column}) = "));
+    if definition.split_whitespace().nth(1) == Some("TEXT") {
+        for text in [HEX64, "a", "1", "operation"] {
+            if insert(&probe, Value::Text(text.to_owned())).is_ok() {
+                return Ok(Some(if exact {
+                    OwnedBound::ExactText(text.to_owned())
+                } else {
+                    OwnedBound::Text(text.to_owned())
+                }));
+            }
+        }
+        return Ok(None);
+    }
+    for len in [1, 16, 32, 64] {
+        if insert(&probe, Value::Blob(vec![1; len])).is_ok() {
+            return Ok(Some(OwnedBound::Blob(len)));
+        }
+    }
+    Ok(None)
+}
+
+enum OwnedBound {
+    Text(String),
+    ExactText(String),
+    Blob(usize),
+}
+
+#[test]
+fn admission_operation_catalog_refuses_nul_padding() -> TestResult {
+    let catalog = catalog(&crate::admission_operation_store::admission_operation_schema_sql()?)?;
+    let tables = catalog
+        .prepare("SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND sql IS NOT NULL ORDER BY name")?
+        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut probed = 0usize;
+    let mut unprobed = Vec::new();
+    for (table, sql) in &tables {
+        assert!(
+            !sql.contains("length(CAST("),
+            "{table} bounds bytes in the database encoding"
+        );
+        for item in table_items(sql) {
+            let mut words = item.split_whitespace();
+            let (Some(column), Some(kind)) = (words.next(), words.next()) else {
+                continue;
+            };
+            // A DPoP nonce is opaque client text and may contain NUL; its
+            // octet ceiling bounds it instead.
+            let nul_allowed = table == "dpop_replay_claim_resources" && column == "nonce";
+            if kind == "TEXT" && !nul_allowed && sql.contains(&format!("length({column})")) {
+                assert!(
+                    sql.contains(&format!("instr({column}, char(0)) = 0")),
+                    "{table}.{column} is length-bounded without a NUL guard"
+                );
+            }
+            // Recovery records bound their text with table constraints, which a
+            // single-column probe cannot copy; recovery_records::tests::
+            // malformed_text and encodings exercise them in place.
+            let table_bounded = table.starts_with("admission_operation_recovery_");
+            if table_bounded
+                || !matches!(kind, "TEXT" | "BLOB")
+                || !item.contains(&format!("length({column})"))
+            {
+                continue;
+            }
+            let Some(owned) = admission_bound(&catalog, table, &item)? else {
+                unprobed.push(format!("{table}.{column}"));
+                continue;
+            };
+            let bound = match &owned {
+                OwnedBound::Text(text) => Bound::Text(text),
+                OwnedBound::ExactText(text) => Bound::ExactText(text),
+                OwnedBound::Blob(len) => Bound::Blob(*len),
+            };
+            assert_column_refuses_nul_padding(&catalog, table, column, bound)?;
+            probed += 1;
+        }
+    }
+    assert!(
+        unprobed.is_empty(),
+        "no accepted probe value for {unprobed:?}"
+    );
+    assert!(probed > 150, "{probed} bounded admission columns");
+    Ok(())
 }
